@@ -106,8 +106,7 @@ describe("Logger", () => {
     process.env.BUN_ENV = undefined;
     const devLogger = new Logger();
     const formattedDev = devLogger.formatObject(testObj);
-    expect(formattedDev).toContain("key: value");
-    expect(formattedDev).toContain("number: 42");
+    expect(formattedDev).toBe("\u001B[90mkey\u001B[39m: value, \u001B[90mnumber\u001B[39m: 42");
 
     // Test in test environment
     process.env.NODE_ENV = "test";
