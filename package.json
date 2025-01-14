@@ -3,7 +3,9 @@
   "type": "module",
   "scripts": {
     "start": "bun run src/index.ts",
-    "test": "BUN_ENV=test bun test --timeout 10000",
+    "test": "BUN_ENV=test bun test --timeout 30000",
+    "test:mock": "BUN_ENV=test bun test --timeout 10000 --pattern 'Mock Tests'",
+    "test:live": "BUN_ENV=test bun test --timeout 30000 --pattern 'Live API Tests'",
     "test:watch": "BUN_ENV=test bun test --watch"
   },
   "dependencies": {

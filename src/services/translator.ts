@@ -1,14 +1,16 @@
-import Anthropic from '@anthropic-ai/sdk';
-import { TranslationFile } from '../types';
+import type { TranslationFile } from '../types';
+
 import { RateLimiter } from '../utils/rateLimiter';
 import { TranslationError, ErrorCodes } from '../utils/errors';
 import logger from '../utils/logger';
+
+import Anthropic from '@anthropic-ai/sdk';
 
 export class TranslatorService {
   private claude = new Anthropic({
     apiKey: process.env.CLAUDE_API_KEY!,
   });
-  // Claude API rate limit varies by tier, adjust as needed
+  private model = process.env.CLAUDE_MODEL! ?? 'claude-3-sonnet-20240229';
   private rateLimiter = new RateLimiter(30, 'Claude API');
 
   async translateContent(file: TranslationFile, glossary: string): Promise<string> {
@@ -25,7 +27,7 @@ export class TranslatorService {
     try {
       const message = await this.rateLimiter.schedule(() =>
         this.claude.messages.create({
-          model: 'claude-3-sonnet-20240229',
+          model: this.model,
           max_tokens: 4096,
           messages: [ {
             role: 'user',
@@ -74,7 +76,7 @@ export class TranslatorService {
     try {
       const message = await this.rateLimiter.schedule(() =>
         this.claude.messages.create({
-          model: 'claude-3-sonnet-20240229',
+          model: this.model,
           max_tokens: 4096,
           messages: [ {
             role: 'user',
