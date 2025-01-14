@@ -1,8 +1,8 @@
-import { expect, test, mock, describe, beforeEach } from "bun:test";
-import { GitHubService } from "../services/github";
-import { TranslatorService } from "../services/translator";
-import { FileTranslator } from "../services/fileTranslator";
-import Logger from "../utils/logger";
+import { expect, test, mock, describe } from "bun:test";
+import { GitHubService } from "../src/services/github";
+import { TranslatorService } from "../src/services/translator";
+import { FileTranslator } from "../src/services/fileTranslator";
+import Logger from "../src/utils/logger";
 
 describe("Integration Tests", () => {
   let logger = new Logger();

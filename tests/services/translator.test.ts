@@ -1,9 +1,9 @@
-import { expect, test, describe, beforeAll, mock, beforeEach, afterAll } from "bun:test";
-import { TranslatorService } from "../services/translator";
-import { TranslationFile } from "../types";
-import { readFileSync } from "fs";
-import { join } from "path";
-import { TranslationError, ErrorCodes } from "../utils/errors";
+import { expect, test, describe, beforeAll, mock, beforeEach } from "bun:test";
+import path from "node:path";
+
+import { TranslatorService } from "../../src/services/translator";
+import { TranslationFile } from "../../src/types";
+import { TranslationError } from "../../src/utils/errors";
 
 declare class MockAnthropic {
   messages: {
@@ -16,14 +16,18 @@ describe("TranslatorService", () => {
   let mockGlossary: string;
   let mockFile: TranslationFile;
 
-  beforeAll(() => {
-    mockGlossary = readFileSync(join(import.meta.dir, "fixtures/glossary.md"), "utf-8");
+  beforeAll(async () => {
+    const file = Bun.file(path.join(import.meta.dir, "../mocks/glossary.md"));
+
+    mockGlossary = await file.text();
   });
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    const file = Bun.file(path.join(import.meta.dir, "../mocks/sample-doc.md"));
+
     mockFile = {
       path: "src/content/learn/your-first-component.md",
-      content: readFileSync(join(import.meta.dir, "fixtures/sample-doc.md"), "utf-8"),
+      content: await file.text(),
       sha: "mock-sha"
     };
   });

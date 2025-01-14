@@ -1,5 +1,5 @@
 import { expect, test, describe, beforeEach, afterEach, spyOn, mock } from "bun:test";
-import Logger from "../utils/logger";
+import Logger from "../../src/utils/logger";
 import log from "loglevel";
 
 describe("Logger", () => {

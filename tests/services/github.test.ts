@@ -1,6 +1,6 @@
 import { expect, test, describe, mock, beforeEach } from "bun:test";
-import { GitHubService } from "../services/github";
-import { TranslationFile } from "../types";
+import { GitHubService } from "../../src/services/github";
+import { TranslationFile } from "../../src/types";
 
 describe("GitHubService", () => {
   describe("Mock Tests", () => {

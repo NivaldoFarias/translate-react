@@ -1,5 +1,5 @@
 import { expect, test, describe, beforeEach } from "bun:test";
-import { FileTranslator } from "../services/fileTranslator";
+import { FileTranslator } from "../../src/services/fileTranslator";
 
 describe("FileTranslator", () => {
   let translator: FileTranslator;
