@@ -2,9 +2,10 @@ import { expect, test, mock, describe, beforeEach } from "bun:test";
 import { GitHubService } from "../services/github";
 import { TranslatorService } from "../services/translator";
 import { FileTranslator } from "../services/fileTranslator";
-import logger from "../utils/logger";
+import Logger from "../utils/logger";
 
 describe("Integration Tests", () => {
+  let logger = new Logger();
   let github = new GitHubService();
   let translator = new TranslatorService();
   let fileTranslator = new FileTranslator();
@@ -55,7 +56,7 @@ describe("Integration Tests", () => {
 
     // 8. Delete branch
     await github.deleteBranch(branch);
-  }, { timeout: 60000 });
+  }, { timeout: 60_000 });
 
   test("should handle up to 10 concurrent translations", async () => {
     // Mock the Anthropic class
@@ -99,7 +100,7 @@ describe("Integration Tests", () => {
     });
 
     expect(results.some(r => r.status === "fulfilled")).toBe(true);
-  }, { timeout: 60000 });
+  }, { timeout: 60_000 });
 
   test("should maintain consistency across translations", async () => {
     // Mock the Anthropic class
@@ -130,5 +131,5 @@ describe("Integration Tests", () => {
 
     // All translations should be identical
     expect(translations.size).toBe(1);
-  });
+  }, { timeout: 10_000 });
 }); 

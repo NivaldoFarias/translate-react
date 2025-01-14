@@ -60,4 +60,10 @@ export class RateLimiter {
 
     this.processing = false;
   }
+
+  public reset(): void {
+    this.queue = [];
+    this.processing = false;
+    this.lastRequestTime = 0;
+  }
 } 

@@ -3,10 +3,10 @@
   "type": "module",
   "scripts": {
     "start": "bun run src/index.ts",
-    "test": "BUN_ENV=test bun test --timeout 30000",
-    "test:mock": "BUN_ENV=test bun test --timeout 10000 --pattern 'Mock Tests'",
-    "test:live": "BUN_ENV=test bun test --timeout 30000 --pattern 'Live API Tests'",
-    "test:watch": "BUN_ENV=test bun test --watch"
+    "test": "bun test",
+    "test:mock": "bun test --pattern 'Mock Tests'",
+    "test:live": "bun test --pattern 'Live API Tests'",
+    "test:coverage": "bun test --coverage"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.18.0",

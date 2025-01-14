@@ -10,7 +10,7 @@ const prefixes = {
   progress: chalk.blue('↻')
 } as const;
 
-class Logger {
+export default class Logger {
   private lastProgressMessage: string = '';
   private isShowingProgress: boolean = false;
   private isTestEnvironment: boolean;
@@ -124,5 +124,3 @@ class Logger {
       .join(', ');
   }
 }
-
-export default new Logger(); 

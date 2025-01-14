@@ -2,11 +2,12 @@ import type { TranslationFile } from '../types';
 
 import { RateLimiter } from '../utils/rateLimiter';
 import { TranslationError, ErrorCodes } from '../utils/errors';
-import logger from '../utils/logger';
+import Logger from '../utils/logger';
 
 import Anthropic from '@anthropic-ai/sdk';
 
 export class TranslatorService {
+  private logger = new Logger();
   private claude = new Anthropic({
     apiKey: process.env.CLAUDE_API_KEY!,
   });
@@ -21,8 +22,8 @@ export class TranslatorService {
       );
     }
 
-    logger.section('Translation');
-    logger.info(`Translating file: ${file.path}`);
+    this.logger.section('Translation');
+    this.logger.info(`Translating file: ${file.path}`);
 
     try {
       const message = await this.rateLimiter.schedule(() =>
@@ -59,11 +60,11 @@ export class TranslatorService {
 
       const translation = message.content[ 0 ].text;
 
-      logger.info('Refining translation...');
+      this.logger.info('Refining translation...');
       return await this.refineTranslation(translation, glossary);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
-      logger.error(`Translation failed: ${message}`);
+      this.logger.error(`Translation failed: ${message}`);
       throw new TranslationError(
         `Translation failed: ${message}`,
         ErrorCodes.CLAUDE_API_ERROR,
@@ -72,7 +73,7 @@ export class TranslatorService {
     }
   }
 
-  private async refineTranslation(translation: string, glossary: string): Promise<string> {
+  public async refineTranslation(translation: string, glossary: string): Promise<string> {
     try {
       const message = await this.rateLimiter.schedule(() =>
         this.claude.messages.create({

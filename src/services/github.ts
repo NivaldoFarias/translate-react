@@ -5,9 +5,10 @@ import { Octokit } from '@octokit/rest';
 import { RateLimiter } from '../utils/rateLimiter';
 import { TranslationError, ErrorCodes } from '../utils/errors';
 import { FileTranslator } from './fileTranslator';
-import logger from '../utils/logger';
+import Logger from '../utils/logger';
 
 export class GitHubService {
+  private logger = new Logger();
   private octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
   private owner = process.env.REPO_OWNER!;
   private repo = process.env.REPO_NAME!;
@@ -15,8 +16,8 @@ export class GitHubService {
   private fileTranslator = new FileTranslator();
 
   public async getUntranslatedFiles(maxFiles?: number): Promise<TranslationFile[]> {
-    logger.section('Repository Scan');
-    logger.info('Scanning repository for untranslated files...');
+    this.logger.section('Repository Scan');
+    this.logger.info('Scanning repository for untranslated files...');
 
     try {
       const { data } = await this.fetchRepositoryTree();
@@ -33,16 +34,16 @@ export class GitHubService {
         );
       }
 
-      logger.info(`Found ${mdFiles.length} markdown files`);
+      this.logger.info(`Found ${mdFiles.length} markdown files`);
 
       const untranslatedFiles = await this.analyzeFiles(mdFiles);
 
-      logger.success(`Found ${untranslatedFiles.length} untranslated files`);
+      this.logger.success(`Found ${untranslatedFiles.length} untranslated files`);
 
       return untranslatedFiles;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
-      logger.error(`Failed to fetch repository files: ${message}`);
+      this.logger.error(`Failed to fetch repository files: ${message}`);
       throw new TranslationError(
         `Failed to fetch repository files: ${message}`,
         ErrorCodes.GITHUB_API_ERROR,
@@ -59,7 +60,7 @@ export class GitHubService {
       try {
         const content = await this.getFileContent(file.path!);
         processed++;
-        logger.progress(processed, mdFiles.length, 'Analyzing files');
+        this.logger.progress(processed, mdFiles.length, 'Analyzing files');
 
         if (this.fileTranslator.isFileUntranslated(content)) {
           untranslatedFiles.push({
@@ -70,7 +71,7 @@ export class GitHubService {
         }
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : 'Unknown error';
-        logger.warn(`Skipping ${file.path}: ${message}`);
+        this.logger.warn(`Skipping ${file.path}: ${message}`);
       }
     }
 
@@ -79,7 +80,7 @@ export class GitHubService {
 
   public async fetchRepositoryTree() {
     try {
-      logger.info('Fetching repository tree...');
+      this.logger.info('Fetching repository tree...');
       const result = await this.rateLimiter.schedule(() =>
         this.octokit.rest.git.getTree({
           owner: this.owner,
@@ -92,13 +93,13 @@ export class GitHubService {
       return result;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
-      logger.error(`Failed to fetch repository tree: ${message}`);
+      this.logger.error(`Failed to fetch repository tree: ${message}`);
       throw error;
     }
   }
 
   public async getGlossary(): Promise<string> {
-    logger.info('Fetching translation glossary...');
+    this.logger.info('Fetching translation glossary...');
     const content = await this.getFileContent('GLOSSARY.md');
     return content;
   }
@@ -138,7 +139,7 @@ export class GitHubService {
 
   public async createBranch(filePath: string): Promise<string> {
     const branchName = `translate-${filePath.replace(/[\s\/]+/g, '-')}-${Date.now()}`;
-    logger.info(`Creating branch: ${branchName}`);
+    this.logger.info(`Creating branch: ${branchName}`);
 
     try {
       const { data: ref } = await this.rateLimiter.schedule(() =>
@@ -170,7 +171,7 @@ export class GitHubService {
   }
 
   public async commitTranslation(branch: string, file: TranslationFile, translation: string): Promise<void> {
-    logger.info(`Committing translation to branch: ${branch}`);
+    this.logger.info(`Committing translation to branch: ${branch}`);
 
     try {
       // Get the current commit SHA for the branch
@@ -237,7 +238,7 @@ export class GitHubService {
         })
       );
 
-      logger.success(`Successfully committed translation to branch: ${branch}`);
+      this.logger.success(`Successfully committed translation to branch: ${branch}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       throw new TranslationError(

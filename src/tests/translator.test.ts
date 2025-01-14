@@ -21,20 +21,6 @@ describe("TranslatorService", () => {
   });
 
   beforeEach(() => {
-    // Mock entire Anthropic class
-    mock.module("@anthropic-ai/sdk", () => {
-      return {
-        default: class Anthropic implements MockAnthropic {
-          messages = {
-            create: async () => ({
-              content: [ { text: "Mocked translation response" } ]
-            })
-          }
-        }
-      }
-    });
-
-    translator = new TranslatorService();
     mockFile = {
       path: "src/content/learn/your-first-component.md",
       content: readFileSync(join(import.meta.dir, "fixtures/sample-doc.md"), "utf-8"),
@@ -43,6 +29,23 @@ describe("TranslatorService", () => {
   });
 
   describe("Mock Tests", () => {
+    beforeEach(() => {
+      // Mock entire Anthropic class
+      mock.module("@anthropic-ai/sdk", () => {
+        return {
+          default: class Anthropic implements MockAnthropic {
+            messages = {
+              create: async () => ({
+                content: [ { text: "Mocked translation response" } ]
+              })
+            }
+          }
+        }
+      });
+
+      translator = new TranslatorService();
+    });
+
     test("should handle empty content", async () => {
       mockFile.content = "";
       expect(translator.translateContent(mockFile, mockGlossary))
@@ -110,25 +113,24 @@ describe("TranslatorService", () => {
   });
 
   describe("Live API Tests", () => {
-    beforeEach(() => {
-      // Unmock the module completely before live tests
+    test("should correctly translate content with glossary terms", async () => {
       mock.module("@anthropic-ai/sdk", () => require("@anthropic-ai/sdk"));
       translator = new TranslatorService();
-    });
 
-    test("should correctly translate content with glossary terms", async () => {
       const content = `A component uses props and state.`;
       mockFile.content = content;
 
       const translation = await translator.translateContent(mockFile, mockGlossary);
 
-      // Verify translation contains Portuguese terms from glossary
       expect(translation).toContain("componente");
       expect(translation).toContain("props");
       expect(translation).toContain("estado");
-    }, { timeout: 30000 }); // Longer timeout for actual API call
+    }, { timeout: 30000 });
 
     test("should handle content with special characters", async () => {
+      mock.module("@anthropic-ai/sdk", () => require("@anthropic-ai/sdk"));
+      translator = new TranslatorService();
+
       mockFile.content = "# Title with ñ, é, ç\n```jsx\nconst x = 'áéíóú';\n```";
 
       const translation = await translator.translateContent(mockFile, mockGlossary);
@@ -136,5 +138,48 @@ describe("TranslatorService", () => {
       expect(translation).toContain("```jsx");
       expect(translation).toContain("const x = 'áéíóú';");
     }, { timeout: 30000 });
+  });
+
+  test("should handle refinement failures", async () => {
+    mock.module("@anthropic-ai/sdk", () => ({
+      default: class MockAnthropic {
+        messages = {
+          create: async () => {
+            throw new Error("Refinement failed");
+          }
+        }
+      }
+    }));
+
+    const translator = new TranslatorService();
+    await expect(
+      translator.refineTranslation("test content", "test glossary")
+    ).rejects.toThrow(TranslationError);
+  });
+
+  test("should handle rate limiting in translation", async () => {
+    const rateLimitError = new Error("Rate limit exceeded");
+    rateLimitError.name = "RateLimitError";
+
+    mock.module("@anthropic-ai/sdk", () => ({
+      default: class MockAnthropic {
+        messages = {
+          create: async () => {
+            throw rateLimitError;
+          }
+        }
+      }
+    }));
+
+    const translator = new TranslatorService();
+    const mockFile = {
+      path: "test.md",
+      content: "test content",
+      sha: "test-sha"
+    };
+
+    await expect(
+      translator.translateContent(mockFile, "test glossary")
+    ).rejects.toThrow(TranslationError);
   });
 }); 

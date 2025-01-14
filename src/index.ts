@@ -2,11 +2,13 @@ import { config } from 'dotenv';
 import { GitHubService } from './services/github';
 import { TranslatorService } from './services/translator';
 import { TranslationError } from './utils/errors';
-import logger from './utils/logger';
+import Logger from './utils/logger';
 
 config();
 
 async function main() {
+  const logger = new Logger();
+
   logger.info('Starting React docs translation process');
 
   const github = new GitHubService();

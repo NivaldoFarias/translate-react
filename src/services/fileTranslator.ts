@@ -1,6 +1,3 @@
-import { TranslationFile } from '../types';
-import logger from '../utils/logger';
-
 interface LanguageAnalysis {
   portugueseScore: number;
   englishScore: number;
