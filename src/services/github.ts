@@ -2,41 +2,38 @@ import { Octokit } from '@octokit/rest';
 import { TranslationFile } from '../types';
 import { RateLimiter } from '../utils/rateLimiter';
 import { TranslationError, ErrorCodes } from '../utils/errors';
-
-interface LanguageAnalysis {
-  portugueseScore: number;
-  englishScore: number;
-  ratio: number;
-  isTranslated: boolean;
-  patterns: {
-    portuguese: number[];
-    english: number[];
-  };
-}
+import { FileTranslator } from './fileTranslator';
+import logger from '../utils/logger';
 
 export class GitHubService {
   private octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
   private owner = process.env.REPO_OWNER!;
   private repo = process.env.REPO_NAME!;
-  private rateLimiter = new RateLimiter(60, 'GitHub API'); // GitHub API allows 5000 requests per hour = ~83 per minute
+  private rateLimiter = new RateLimiter(60, 'GitHub API');
+  private fileTranslator = new FileTranslator();
 
   async getUntranslatedFiles(): Promise<TranslationFile[]> {
-    console.log('🔍 Scanning repository for untranslated files...');
+    logger.info('Scanning repository for untranslated files...');
+    logger.clear();
 
     try {
       const { data } = await this.fetchRepositoryTree();
-
       const mdFiles = data.tree.filter(file =>
         file.path?.startsWith('src/') &&
         file.path.endsWith('.md')
       );
 
+      logger.info(`Found ${mdFiles.length} markdown files`);
       const untranslatedFiles: TranslationFile[] = [];
+      let processed = 0;
 
       for (const file of mdFiles) {
         try {
           const content = await this.getFileContent(file.path!);
-          if (this.isFileUntranslated(content)) {
+          processed++;
+          logger.progress(processed, mdFiles.length, 'Analyzing files');
+
+          if (this.fileTranslator.isFileUntranslated(content)) {
             untranslatedFiles.push({
               path: file.path!,
               content,
@@ -45,16 +42,16 @@ export class GitHubService {
           }
         } catch (error: unknown) {
           const message = error instanceof Error ? error.message : 'Unknown error';
-
-          console.warn(`⚠️ Skipping file ${file.path}: ${message}`);
+          logger.warn(`Skipping ${file.path}: ${message}`);
         }
       }
 
-      console.log(`📊 Found ${untranslatedFiles.length} untranslated files`);
+      logger.clear();
+      logger.success(`Found ${untranslatedFiles.length} untranslated files`);
       return untranslatedFiles;
+
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
-
       throw new TranslationError(
         `Failed to fetch repository files: ${message}`,
         ErrorCodes.GITHUB_API_ERROR,
@@ -63,8 +60,9 @@ export class GitHubService {
     }
   }
 
-  async fetchRepositoryTree() {
+  private async fetchRepositoryTree() {
     try {
+      logger.info('Fetching repository tree...');
       const result = await this.rateLimiter.schedule(() =>
         this.octokit.rest.git.getTree({
           owner: this.owner,
@@ -74,96 +72,12 @@ export class GitHubService {
         })
       );
 
-      console.log('🌳 Repository tree response:', {
-        status: result.status,
-        headers: result.headers,
-        truncated: result.data.truncated,
-        treeCount: result.data.tree.length
-      });
-
       return result;
     } catch (error) {
-      console.error('🚨 Failed to fetch repository tree:', {
-        owner: this.owner,
-        repo: this.repo,
-        error: error instanceof Error ? {
-          name: error.name,
-          message: error.message,
-          stack: error.stack
-        } : error
-      });
-
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      logger.error(`Failed to fetch repository tree: ${message}`);
       throw error;
     }
-  }
-
-  private isFileUntranslated(content: string): boolean {
-    // Skip files that are explicitly marked as translated
-    if (content.includes('status: translated')) {
-      return false;
-    }
-
-    const analysis = this.analyzeLanguage(content);
-
-    // Log detailed analysis
-    console.debug('📊 Language analysis:', {
-      file: {
-        length: content.length,
-        lines: content.split('\n').length
-      },
-      scores: {
-        portuguese: analysis.portugueseScore,
-        english: analysis.englishScore,
-        ratio: `${(analysis.ratio * 100).toFixed(2)}%`
-      },
-      patterns: {
-        portuguese: analysis.patterns.portuguese,
-        english: analysis.patterns.english
-      }
-    });
-
-    return !analysis.isTranslated;
-  }
-
-  private analyzeLanguage(content: string): LanguageAnalysis {
-    const portuguesePatterns = [
-      /\b(são|está|você|também|não|para|como|isso|este|esta|pelo|pela)\b/gi,
-      /\b(função|variável|objeto|array|classe|componente|propriedade)\b/gi,
-      /\b(exemplo|nota|aviso|importante|observação|lembre-se)\b/gi,
-      /\b(código|página|aplicação|desenvolvimento|biblioteca)\b/gi
-    ];
-
-    const englishPatterns = [
-      /\b(is|are|was|were|has|have|had|been|will|would|should|could|must)\b/g,
-      /\b(the|this|that|these|those|there|their|they|them|then|than)\b/g,
-      /\b(function|variable|object|array|class|component|property)\b/g,
-      /\b(example|note|warning|important|remember|learn|more)\b/g,
-      /\b(code|page|application|development|library)\b/g
-    ];
-
-    const portugueseMatches = portuguesePatterns.map(pattern =>
-      (content.match(pattern) || []).length
-    );
-
-    const englishMatches = englishPatterns.map(pattern =>
-      (content.match(pattern) || []).length
-    );
-
-    const portugueseScore = portugueseMatches.reduce((a, b) => a + b, 0);
-    const englishScore = englishMatches.reduce((a, b) => a + b, 0);
-    const totalScore = portugueseScore + englishScore;
-    const ratio = totalScore > 0 ? portugueseScore / totalScore : 0;
-
-    return {
-      portugueseScore,
-      englishScore,
-      ratio,
-      isTranslated: ratio >= 0.3 && !(englishScore > 10 && portugueseScore < 5),
-      patterns: {
-        portuguese: portugueseMatches,
-        english: englishMatches
-      }
-    };
   }
 
   async getGlossary(): Promise<string> {
