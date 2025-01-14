@@ -49,7 +49,6 @@ async function main() {
       }
     }
 
-    logger.clear();
     logger.success('Translation process completed!');
     logger.info(`Summary:
     Files processed: ${stats.processed}

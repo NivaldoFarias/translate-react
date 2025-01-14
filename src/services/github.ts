@@ -13,8 +13,8 @@ export class GitHubService {
   private fileTranslator = new FileTranslator();
 
   public async getUntranslatedFiles(): Promise<TranslationFile[]> {
+    logger.section('Repository Scan');
     logger.info('Scanning repository for untranslated files...');
-    logger.clear();
 
     try {
       const { data } = await this.fetchRepositoryTree();
@@ -46,12 +46,12 @@ export class GitHubService {
         }
       }
 
-      logger.clear();
       logger.success(`Found ${untranslatedFiles.length} untranslated files`);
       return untranslatedFiles;
 
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
+      logger.error(`Failed to fetch repository files: ${message}`);
       throw new TranslationError(
         `Failed to fetch repository files: ${message}`,
         ErrorCodes.GITHUB_API_ERROR,

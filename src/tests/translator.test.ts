@@ -26,7 +26,7 @@ describe("TranslatorService", () => {
   // Edge Cases
   test("should handle empty content", async () => {
     mockFile.content = "";
-    await expect(translator.translateContent(mockFile, mockGlossary))
+    expect(translator.translateContent(mockFile, mockGlossary))
       .rejects.toThrow(TranslationError);
   });
 

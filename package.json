@@ -3,8 +3,8 @@
   "type": "module",
   "scripts": {
     "start": "bun run src/index.ts",
-    "test": "bun test",
-    "test:watch": "bun test --watch"
+    "test": "BUN_ENV=test bun test --timeout 10000",
+    "test:watch": "BUN_ENV=test bun test --watch"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.18.0",
