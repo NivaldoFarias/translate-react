@@ -2,7 +2,9 @@
   "name": "react-docs-translator",
   "type": "module",
   "scripts": {
-    "start": "bun run src/index.ts"
+    "start": "bun run src/index.ts",
+    "test": "bun test",
+    "test:watch": "bun test --watch"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.18.0",

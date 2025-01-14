@@ -12,7 +12,7 @@ export class GitHubService {
   private rateLimiter = new RateLimiter(60, 'GitHub API');
   private fileTranslator = new FileTranslator();
 
-  async getUntranslatedFiles(): Promise<TranslationFile[]> {
+  public async getUntranslatedFiles(): Promise<TranslationFile[]> {
     logger.info('Scanning repository for untranslated files...');
     logger.clear();
 
@@ -60,7 +60,7 @@ export class GitHubService {
     }
   }
 
-  private async fetchRepositoryTree() {
+  public async fetchRepositoryTree() {
     try {
       logger.info('Fetching repository tree...');
       const result = await this.rateLimiter.schedule(() =>
@@ -80,13 +80,13 @@ export class GitHubService {
     }
   }
 
-  async getGlossary(): Promise<string> {
+  public async getGlossary(): Promise<string> {
     console.log('📖 Fetching translation glossary...');
     const content = await this.getFileContent('GLOSSARY.md');
     return content;
   }
 
-  private async getFileContent(path: string): Promise<string> {
+  public async getFileContent(path: string): Promise<string> {
     try {
       const { data } = await this.rateLimiter.schedule(() =>
         this.octokit.rest.repos.getContent({
@@ -119,7 +119,7 @@ export class GitHubService {
     }
   }
 
-  async createBranch(filePath: string): Promise<string> {
+  public async createBranch(filePath: string): Promise<string> {
     const branchName = `translate-${filePath.replace(/\//g, '-')}`;
     console.log(`🌿 Creating branch: ${branchName}`);
 
@@ -154,7 +154,7 @@ export class GitHubService {
     }
   }
 
-  async commitTranslation(branch: string, file: TranslationFile, translation: string): Promise<void> {
+  public async commitTranslation(branch: string, file: TranslationFile, translation: string): Promise<void> {
     console.log(`📝 Committing translation to branch: ${branch}`);
 
     try {
