@@ -1,7 +1,12 @@
+import Logger from './logger';
+
 export class RateLimiter {
   private queue: Array<() => Promise<any>> = [];
   private processing = false;
   private lastRequestTime = 0;
+  private logger = new Logger();
+  private currentOperation: string = '';
+  private operationStartTime: number = 0;
 
   constructor(
     private requestsPerMinute: number,
@@ -12,10 +17,13 @@ export class RateLimiter {
     return process.env.NODE_ENV === 'test' || process.env.BUN_ENV === 'test';
   }
 
-  async schedule<T>(task: () => Promise<T>): Promise<T> {
+  async schedule<T>(task: () => Promise<T>, operation: string = ''): Promise<T> {
     if (this.isTestEnvironment()) {
       return task();
     }
+
+    this.currentOperation = operation;
+    this.operationStartTime = Date.now();
 
     return new Promise((resolve, reject) => {
       this.queue.push(async () => {
@@ -40,7 +48,9 @@ export class RateLimiter {
 
     if (timeSinceLastRequest < minDelay) {
       const delay = minDelay - timeSinceLastRequest;
-      console.log(`⏳ Rate limiting ${this.name}: waiting ${delay}ms`);
+      const elapsedTime = ((now - this.operationStartTime) / 1000).toFixed(1);
+      const context = this.currentOperation ? ` - ${this.currentOperation}` : '';
+      this.logger.progress(1, 1, `${this.name}${context} (${elapsedTime}s, rate limit: ${Math.round(delay)}ms)`);
       await new Promise(resolve => setTimeout(resolve, delay));
     }
 
@@ -65,5 +75,7 @@ export class RateLimiter {
     this.queue = [];
     this.processing = false;
     this.lastRequestTime = 0;
+    this.currentOperation = '';
+    this.operationStartTime = 0;
   }
 } 
