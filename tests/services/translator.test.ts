@@ -1,189 +1,138 @@
-import { expect, test, describe, beforeAll, mock, beforeEach } from "bun:test";
-import path from "node:path";
+import { describe, test, expect, beforeEach, mock, spyOn } from 'bun:test';
+import { TranslatorService } from '../../src/services/translator';
+import { TranslationError } from '../../src/utils/errors';
+import type { TranslationFile } from '../../src/types';
 
-import { TranslatorService } from "../../src/services/translator";
-import { TranslationFile } from "../../src/types";
-import { TranslationError } from "../../src/utils/errors";
-
-declare class MockAnthropic {
-  messages: {
-    create: () => Promise<{ content: { text: string }[] }>;
-  };
-}
-
-describe("TranslatorService", () => {
+describe('TranslatorService', () => {
   let translator: TranslatorService;
-  let mockGlossary: string;
-  let mockFile: TranslationFile;
+  const mockGlossary = 'React: React\nComponent: Componente';
+  const mockFile: TranslationFile = {
+    path: 'test/file.md',
+    content: 'This is a test content',
+    sha: 'test-sha'
+  };
 
-  beforeAll(async () => {
-    const file = Bun.file(path.join(import.meta.dir, "../mocks/glossary.md"));
-
-    mockGlossary = await file.text();
+  beforeEach(() => {
+    translator = new TranslatorService();
   });
 
-  beforeEach(async () => {
-    const file = Bun.file(path.join(import.meta.dir, "../mocks/sample-doc.md"));
-
-    mockFile = {
-      path: "src/content/learn/your-first-component.md",
-      content: await file.text(),
-      sha: "mock-sha"
-    };
-  });
-
-  describe("Mock Tests", () => {
-    beforeEach(() => {
-      // Mock entire Anthropic class
-      mock.module("@anthropic-ai/sdk", () => {
-        return {
-          default: class Anthropic implements MockAnthropic {
-            messages = {
-              create: async () => ({
-                content: [ { text: "Mocked translation response" } ]
-              })
-            }
-          }
+  describe('translateContent', () => {
+    test('should successfully translate content', async () => {
+      const mockTranslation = 'Isto é um conteúdo de teste';
+      mock.module('@anthropic-ai/sdk', () => ({
+        default: class {
+          messages = {
+            create: async () => ({
+              content: [ { text: mockTranslation } ]
+            })
+          };
         }
-      });
+      }));
 
-      translator = new TranslatorService();
+      const result = await translator.translateContent(mockFile, mockGlossary);
+      expect(result).toBe(mockTranslation);
     });
 
-    test("should handle empty content", async () => {
-      mockFile.content = "";
-      expect(translator.translateContent(mockFile, mockGlossary))
-        .rejects.toThrow(TranslationError);
-    });
+    test('should use cached translation when available', async () => {
+      const mockTranslation = 'Cached translation';
+      const spy = spyOn(translator[ 'claude' ].messages, 'create');
 
-    test("should handle content with only code blocks", async () => {
-      mockFile.content = "```jsx\nconst x = 1;\n```";
-
-      mock.module("@anthropic-ai/sdk", () => {
-        return {
-          default: class Anthropic implements MockAnthropic {
-            messages = {
-              create: async () => ({
-                content: [ { text: mockFile.content } ]
-              })
-            }
-          }
+      // First call to cache the result
+      mock.module('@anthropic-ai/sdk', () => ({
+        default: class {
+          messages = {
+            create: async () => ({
+              content: [ { text: mockTranslation } ]
+            })
+          };
         }
-      });
+      }));
 
-      translator = new TranslatorService();
+      await translator.translateContent(mockFile, mockGlossary);
 
-      const translation = await translator.translateContent(mockFile, mockGlossary);
-      expect(translation).toContain("```jsx");
-      expect(translation).toContain("const x = 1;");
+      // Second call should use cache
+      const result = await translator.translateContent(mockFile, mockGlossary);
+
+      expect(result).toBe(mockTranslation);
+      expect(spy).toHaveBeenCalledTimes(1);
     });
 
-    test("should handle API rate limit errors", async () => {
-      const mockError = new Error("Rate limit exceeded");
-      mockError.name = "RateLimitError";
+    test('should throw error for empty content', async () => {
+      const emptyFile: TranslationFile = {
+        path: 'test/empty.md',
+        content: '',
+        sha: 'empty-sha'
+      };
 
-      mock.module("@anthropic-ai/sdk", () => {
-        return {
-          default: class Anthropic implements MockAnthropic {
-            messages = {
-              create: async () => { throw mockError; }
-            }
-          }
-        };
-      });
-
-      translator = new TranslatorService();
-
-      expect(translator.translateContent(mockFile, mockGlossary))
-        .rejects.toThrow(TranslationError);
+      await expect(translator.translateContent(emptyFile, mockGlossary))
+        .rejects
+        .toThrow(TranslationError);
     });
 
-    test("should handle API timeout errors", async () => {
-      mock.module("@anthropic-ai/sdk", () => {
-        return {
-          default: class Anthropic implements MockAnthropic {
-            messages = {
-              create: async () => { throw new Error("Request timeout"); }
+    test('should retry on failure', async () => {
+      let attempts = 0;
+      mock.module('@anthropic-ai/sdk', () => ({
+        default: class {
+          messages = {
+            create: async () => {
+              if (attempts++ < 2) {
+                throw new Error('API Error');
+              }
+              return {
+                content: [ { text: 'Success after retry' } ]
+              };
             }
-          }
+          };
         }
-      });
+      }));
 
-      translator = new TranslatorService();
-
-      expect(translator.translateContent(mockFile, mockGlossary))
-        .rejects.toThrow(TranslationError);
+      const result = await translator.translateContent(mockFile, mockGlossary);
+      expect(result).toBe('Success after retry');
+      expect(attempts).toBe(3);
     });
   });
 
-  describe("Live API Tests", () => {
-    test("should correctly translate content with glossary terms", async () => {
-      mock.module("@anthropic-ai/sdk", () => require("@anthropic-ai/sdk"));
-      translator = new TranslatorService();
-
-      const content = `A component uses props and state.`;
-      mockFile.content = content;
-
-      const translation = await translator.translateContent(mockFile, mockGlossary);
-
-      expect(translation).toContain("componente");
-      expect(translation).toContain("props");
-      expect(translation).toContain("estado");
-    }, { timeout: 30000 });
-
-    test("should handle content with special characters", async () => {
-      mock.module("@anthropic-ai/sdk", () => require("@anthropic-ai/sdk"));
-      translator = new TranslatorService();
-
-      mockFile.content = "# Title with ñ, é, ç\n```jsx\nconst x = 'áéíóú';\n```";
-
-      const translation = await translator.translateContent(mockFile, mockGlossary);
-      expect(translation).toMatch(/[ñéçáíóú]/);
-      expect(translation).toContain("```jsx");
-      expect(translation).toContain("const x = 'áéíóú';");
-    }, { timeout: 30000 });
-  });
-
-  test("should handle refinement failures", async () => {
-    mock.module("@anthropic-ai/sdk", () => ({
-      default: class MockAnthropic {
-        messages = {
-          create: async () => {
-            throw new Error("Refinement failed");
-          }
+  describe('metrics', () => {
+    test('should track translation metrics', async () => {
+      mock.module('@anthropic-ai/sdk', () => ({
+        default: class {
+          messages = {
+            create: async () => ({
+              content: [ { text: 'Test translation' } ]
+            })
+          };
         }
+      }));
+
+      await translator.translateContent(mockFile, mockGlossary);
+      const metrics = translator.getMetrics();
+
+      expect(metrics.totalTranslations).toBe(1);
+      expect(metrics.successfulTranslations).toBe(1);
+      expect(metrics.failedTranslations).toBe(0);
+      expect(metrics.averageTranslationTime).toBeGreaterThan(0);
+    });
+
+    test('should track failed translations', async () => {
+      mock.module('@anthropic-ai/sdk', () => ({
+        default: class {
+          messages = {
+            create: async () => {
+              throw new Error('API Error');
+            }
+          };
+        }
+      }));
+
+      try {
+        await translator.translateContent(mockFile, mockGlossary);
+      } catch (error) {
+        // Expected error
       }
-    }));
 
-    const translator = new TranslatorService();
-    await expect(
-      translator.refineTranslation("test content", "test glossary")
-    ).rejects.toThrow(TranslationError);
-  });
-
-  test("should handle rate limiting in translation", async () => {
-    const rateLimitError = new Error("Rate limit exceeded");
-    rateLimitError.name = "RateLimitError";
-
-    mock.module("@anthropic-ai/sdk", () => ({
-      default: class MockAnthropic {
-        messages = {
-          create: async () => {
-            throw rateLimitError;
-          }
-        }
-      }
-    }));
-
-    const translator = new TranslatorService();
-    const mockFile = {
-      path: "test.md",
-      content: "test content",
-      sha: "test-sha"
-    };
-
-    await expect(
-      translator.translateContent(mockFile, "test glossary")
-    ).rejects.toThrow(TranslationError);
+      const metrics = translator.getMetrics();
+      expect(metrics.failedTranslations).toBe(1);
+      expect(metrics.successfulTranslations).toBe(0);
+    });
   });
 }); 

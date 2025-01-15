@@ -3,8 +3,23 @@ import type { TranslationFile } from '../types';
 import { RateLimiter } from '../utils/rateLimiter';
 import { TranslationError, ErrorCodes } from '../utils/errors';
 import Logger from '../utils/logger';
+import { RetryableOperation } from '../utils/retryableOperation';
 
 import Anthropic from '@anthropic-ai/sdk';
+
+interface TranslationCache {
+  content: string;
+  timestamp: number;
+}
+
+interface TranslationMetrics {
+  totalTranslations: number;
+  successfulTranslations: number;
+  failedTranslations: number;
+  cacheHits: number;
+  averageTranslationTime: number;
+  totalTranslationTime: number;
+}
 
 export class TranslatorService {
   private logger = new Logger();
@@ -13,56 +28,106 @@ export class TranslatorService {
   });
   private model = process.env.CLAUDE_MODEL! ?? 'claude-3-sonnet-20240229';
   private rateLimiter = new RateLimiter(30, 'Claude API');
+  private retryOperation = new RetryableOperation();
+  private cache: Map<string, TranslationCache> = new Map();
+  private readonly CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+
+  private metrics: TranslationMetrics = {
+    totalTranslations: 0,
+    successfulTranslations: 0,
+    failedTranslations: 0,
+    cacheHits: 0,
+    averageTranslationTime: 0,
+    totalTranslationTime: 0
+  };
+
+  private getTranslationPrompt(content: string, glossary: string): string {
+    return `You are tasked with translating React documentation from English to Brazilian Portuguese.
+
+    CRITICAL REQUIREMENTS - YOU MUST FOLLOW THESE EXACTLY:
+    1. MUST maintain all original markdown formatting, including code blocks, links, and special syntax
+    2. MUST preserve all original code examples exactly as they are
+    3. MUST keep all original HTML tags intact
+    4. MUST follow the glossary rules below STRICTLY - these are non-negotiable terms
+    5. MUST maintain all original frontmatter
+    6. MUST preserve all original line breaks and paragraph structure
+    7. MUST NOT translate code variables, function names, or technical terms not in the glossary
+    8. MUST NOT add or remove any content
+    9. MUST NOT change any URLs or links
+    10. MUST translate comments within code blocks according to the glossary
+
+    GLOSSARY RULES:
+    ${glossary}
+
+    CONTENT TO TRANSLATE:
+    ${content}
+
+    Translate the above content following ALL requirements exactly.`;
+  }
 
   async translateContent(file: TranslationFile, glossary: string): Promise<string> {
-    if (file.content.length === 0) {
-      throw new TranslationError(
-        `File content is empty: ${file.path}`,
-        ErrorCodes.INVALID_CONTENT
-      );
-    }
-
-    this.logger.section('Translation');
-    this.logger.info(`Translating file: ${file.path}`);
+    const startTime = Date.now();
+    this.metrics.totalTranslations++;
 
     try {
-      const message = await this.rateLimiter.schedule(() =>
-        this.claude.messages.create({
-          model: this.model,
-          max_tokens: 4096,
-          messages: [ {
-            role: 'user',
-            content: `You are tasked with translating React documentation from English to Brazilian Portuguese.
+      const cacheKey = `${file.path}:${file.content}`;
+      const cached = this.cache.get(cacheKey);
 
-            CRITICAL REQUIREMENTS - YOU MUST FOLLOW THESE EXACTLY:
-            1. MUST maintain all original markdown formatting, including code blocks, links, and special syntax
-            2. MUST preserve all original code examples exactly as they are
-            3. MUST keep all original HTML tags intact
-            4. MUST follow the glossary rules below STRICTLY - these are non-negotiable terms
-            5. MUST maintain all original frontmatter
-            6. MUST preserve all original line breaks and paragraph structure
-            7. MUST NOT translate code variables, function names, or technical terms not in the glossary
-            8. MUST NOT add or remove any content
-            9. MUST NOT change any URLs or links
-            10. MUST translate comments within code blocks according to the glossary
+      if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
+        this.metrics.cacheHits++;
+        this.logger.info(`Using cached translation for: ${file.path}`);
+        return cached.content;
+      }
 
-            GLOSSARY RULES:
-            ${glossary}
+      if (file.content.length === 0) {
+        throw new TranslationError(
+          `File content is empty: ${file.path}`,
+          ErrorCodes.INVALID_CONTENT
+        );
+      }
 
-            CONTENT TO TRANSLATE:
-            ${file.content}
+      this.logger.section('Translation');
+      this.logger.info(`Translating file: ${file.path}`);
 
-            Translate the above content following ALL requirements exactly.`
-          } ]
-        })
+      const translation = await this.retryOperation.withRetry(
+        async () => {
+          const message = await this.rateLimiter.schedule(() =>
+            this.claude.messages.create({
+              model: this.model,
+              max_tokens: 4096,
+              messages: [ {
+                role: 'user',
+                content: this.getTranslationPrompt(file.content, glossary)
+              } ]
+            })
+          );
+          return message.content[ 0 ].text;
+        },
+        `Translation of ${file.path}`
       );
 
+      const refined = await this.retryOperation.withRetry(
+        () => this.refineTranslation(translation, glossary),
+        `Refinement of ${file.path}`
+      );
 
-      const translation = message.content[ 0 ].text;
+      // Cache the result
+      this.cache.set(cacheKey, {
+        content: refined,
+        timestamp: Date.now()
+      });
 
-      this.logger.info('Refining translation...');
-      return await this.refineTranslation(translation, glossary);
+      // Update metrics
+      const translationTime = Date.now() - startTime;
+      this.metrics.successfulTranslations++;
+      this.metrics.totalTranslationTime += translationTime;
+      this.metrics.averageTranslationTime =
+        this.metrics.totalTranslationTime / this.metrics.successfulTranslations;
+
+      return refined;
+
     } catch (error) {
+      this.metrics.failedTranslations++;
       const message = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Translation failed: ${message}`);
       throw new TranslationError(
@@ -71,6 +136,10 @@ export class TranslatorService {
         { filePath: file.path }
       );
     }
+  }
+
+  public getMetrics(): TranslationMetrics {
+    return { ...this.metrics };
   }
 
   public async refineTranslation(translation: string, glossary: string): Promise<string> {
