@@ -1,11 +1,11 @@
-interface LanguageAnalysis {
+declare interface LanguageAnalysis {
   portugueseScore: number;
   englishScore: number;
   ratio: number;
   isTranslated: boolean;
 }
 
-interface LanguagePattern {
+declare interface LanguagePattern {
   pattern: RegExp;
   weight: number;
 }

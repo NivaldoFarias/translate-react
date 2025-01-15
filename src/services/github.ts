@@ -1,261 +1,158 @@
+import { Octokit } from '@octokit/rest';
 import type { TranslationFile } from '../types';
 import type { RestEndpointMethodTypes } from '@octokit/rest';
-
-import { Octokit } from '@octokit/rest';
 import { RateLimiter } from '../utils/rateLimiter';
-import { TranslationError, ErrorCodes } from '../utils/errors';
-import { FileTranslator } from './fileTranslator';
 import Logger from '../utils/logger';
+import { BranchManager } from '../utils/branchManager';
 
 export class GitHubService {
+  private octokit: Octokit;
   private logger = new Logger();
-  private octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
-  private owner = process.env.REPO_OWNER!;
-  private repo = process.env.REPO_NAME!;
   private rateLimiter = new RateLimiter(60, 'GitHub API');
-  private fileTranslator = new FileTranslator();
+  private branchManager: BranchManager;
+
+  constructor(
+    private owner: string,
+    private repo: string,
+    githubToken: string
+  ) {
+    this.octokit = new Octokit({ auth: githubToken });
+    this.branchManager = new BranchManager(owner, repo, githubToken);
+  }
 
   public async getUntranslatedFiles(maxFiles?: number): Promise<TranslationFile[]> {
-    this.logger.section('Repository Scan');
-    this.logger.info('Scanning repository for untranslated files...');
-
     try {
-      const { data } = await this.fetchRepositoryTree();
-      const mdFiles = data.tree.filter(file =>
-        file.path?.startsWith('src/') &&
-        file.path.endsWith('.md')
-      ).slice(0, maxFiles ?? data.tree.length);
-
-      if (mdFiles.length === 0) {
-        throw new TranslationError(
-          'No markdown files found',
-          ErrorCodes.NO_FILES_FOUND,
-          { maxFiles }
-        );
-      }
-
-      this.logger.info(`Found ${mdFiles.length} markdown files`);
-
-      const untranslatedFiles = await this.analyzeFiles(mdFiles);
-
-      this.logger.success(`Found ${untranslatedFiles.length} untranslated files`);
-
-      return untranslatedFiles;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Failed to fetch repository files: ${message}`);
-      throw new TranslationError(
-        `Failed to fetch repository files: ${message}`,
-        ErrorCodes.GITHUB_API_ERROR,
-        { owner: this.owner, repo: this.repo }
-      );
-    }
-  }
-
-  public async analyzeFiles(mdFiles: RestEndpointMethodTypes[ "git" ][ "getTree" ][ "response" ][ "data" ][ "tree" ]) {
-    const untranslatedFiles: TranslationFile[] = [];
-    let processed = 0;
-
-    for (const file of mdFiles) {
-      try {
-        const content = await this.getFileContent(file.path!);
-        processed++;
-        this.logger.progress(processed, mdFiles.length, 'Analyzing files');
-
-        if (this.fileTranslator.isFileUntranslated(content)) {
-          untranslatedFiles.push({
-            path: file.path!,
-            content,
-            sha: file.sha!
-          });
-        }
-      } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        this.logger.warn(`Skipping ${file.path}: ${message}`);
-      }
-    }
-
-    return untranslatedFiles;
-  }
-
-  public async fetchRepositoryTree() {
-    try {
-      this.logger.info('Fetching repository tree...');
-      const result = await this.rateLimiter.schedule(() =>
-        this.octokit.rest.git.getTree({
+      const { data: tree } = await this.rateLimiter.schedule(() =>
+        this.octokit.git.getTree({
           owner: this.owner,
           repo: this.repo,
           tree_sha: 'main',
-          recursive: '1',
+          recursive: '1'
         })
       );
 
-      return result;
+      const markdownFiles = tree.tree
+        .filter(item => item.path?.endsWith('.md'))
+        .slice(0, maxFiles);
+
+      const files: TranslationFile[] = [];
+      for (const file of markdownFiles) {
+        if (!file.path) continue;
+
+        const { data: content } = await this.rateLimiter.schedule(() =>
+          this.octokit.repos.getContent({
+            owner: this.owner,
+            repo: this.repo,
+            path: file.path!
+          })
+        );
+
+        if ('content' in content) {
+          const decodedContent = Buffer.from(content.content, 'base64').toString();
+          files.push({
+            path: file.path,
+            content: decodedContent,
+            sha: content.sha
+          });
+        }
+      }
+
+      return files;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Failed to fetch repository tree: ${message}`);
+      this.logger.error(`Failed to fetch untranslated files: ${message}`);
       throw error;
     }
   }
 
-  public async getGlossary(): Promise<string> {
-    this.logger.info('Fetching translation glossary...');
-    const content = await this.getFileContent('GLOSSARY.md');
-    return content;
+  async createTranslationBranch(baseBranch: string = 'main'): Promise<string> {
+    const branchName = `translate-${Date.now()}`;
+    await this.branchManager.createBranch(branchName, baseBranch);
+    return branchName;
   }
 
-  public async getFileContent(path: string): Promise<string> {
+  async commitTranslation(
+    branch: string,
+    filePath: string,
+    content: string,
+    message: string
+  ): Promise<void> {
     try {
-      const { data } = await this.rateLimiter.schedule(() =>
-        this.octokit.rest.repos.getContent({
-          owner: this.owner,
-          repo: this.repo,
-          path,
-        })
-      );
-
-      if (!('content' in data)) {
-        throw new TranslationError(
-          'Invalid file content received',
-          ErrorCodes.INVALID_CONTENT,
-          { path }
+      // Get the current file (if it exists)
+      let currentFile: RestEndpointMethodTypes[ 'repos' ][ 'getContent' ][ 'response' ] | undefined;
+      try {
+        currentFile = await this.rateLimiter.schedule(() =>
+          this.octokit.repos.getContent({
+            owner: this.owner,
+            repo: this.repo,
+            path: filePath,
+            ref: branch
+          })
         );
+      } catch (error) {
+        // File doesn't exist yet, which is fine
       }
 
-      return Buffer.from(data.content, 'base64').toString();
-
-    } catch (error) {
-      if (error instanceof TranslationError) throw error;
-
-      const message = error instanceof Error ? error.message : 'Unknown error';
-
-      throw new TranslationError(
-        `Failed to fetch file content: ${message}`,
-        ErrorCodes.GITHUB_API_ERROR,
-        { path }
-      );
-    }
-  }
-
-  public async createBranch(filePath: string): Promise<string> {
-    const branchName = `translate-${filePath.replace(/[\s\/]+/g, '-')}-${Date.now()}`;
-    this.logger.info(`Creating branch: ${branchName}`);
-
-    try {
-      const { data: ref } = await this.rateLimiter.schedule(() =>
-        this.octokit.rest.git.getRef({
-          owner: this.owner,
-          repo: this.repo,
-          ref: 'heads/main'
-        })
-      );
-
       await this.rateLimiter.schedule(() =>
-        this.octokit.rest.git.createRef({
+        this.octokit.repos.createOrUpdateFileContents({
           owner: this.owner,
           repo: this.repo,
-          ref: `refs/heads/${branchName}`,
-          sha: ref.object.sha
+          path: filePath,
+          message,
+          content: Buffer.from(content).toString('base64'),
+          branch,
+          sha: currentFile && 'data' in currentFile ?
+            ('sha' in currentFile.data ? currentFile.data.sha : undefined) :
+            undefined
         })
       );
 
-      return branchName;
+      this.logger.info(`Committed translation to ${filePath} on branch ${branch}`);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      throw new TranslationError(
-        `Failed to create branch: ${message}`,
-        ErrorCodes.GITHUB_API_ERROR,
-        { branchName, filePath }
-      );
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Failed to commit translation: ${errorMessage}`);
+
+      // Clean up the branch on failure
+      await this.branchManager.deleteBranch(branch);
+      throw error;
     }
   }
 
-  public async commitTranslation(branch: string, file: TranslationFile, translation: string): Promise<void> {
-    this.logger.info(`Committing translation to branch: ${branch}`);
-
+  async createPullRequest(
+    branch: string,
+    title: string,
+    body: string,
+    baseBranch: string = 'main'
+  ): Promise<number> {
     try {
-      // Get the current commit SHA for the branch
-      const { data: ref } = await this.rateLimiter.schedule(() =>
-        this.octokit.rest.git.getRef({
+      const { data: pr } = await this.rateLimiter.schedule(() =>
+        this.octokit.pulls.create({
           owner: this.owner,
           repo: this.repo,
-          ref: `heads/${branch}`
+          title,
+          body,
+          head: branch,
+          base: baseBranch
         })
       );
 
-      // Create blob with new content
-      const { data: blob } = await this.rateLimiter.schedule(() =>
-        this.octokit.rest.git.createBlob({
-          owner: this.owner,
-          repo: this.repo,
-          content: translation,
-          encoding: 'utf-8'
-        })
-      );
-
-      // Get the current tree
-      const { data: currentCommit } = await this.rateLimiter.schedule(() =>
-        this.octokit.rest.git.getCommit({
-          owner: this.owner,
-          repo: this.repo,
-          commit_sha: ref.object.sha
-        })
-      );
-
-      // Create new tree
-      const { data: newTree } = await this.rateLimiter.schedule(() =>
-        this.octokit.rest.git.createTree({
-          owner: this.owner,
-          repo: this.repo,
-          base_tree: currentCommit.tree.sha,
-          tree: [ {
-            path: file.path,
-            mode: '100644',
-            type: 'blob',
-            sha: blob.sha
-          } ]
-        })
-      );
-
-      // Create commit
-      const { data: newCommit } = await this.rateLimiter.schedule(() =>
-        this.octokit.rest.git.createCommit({
-          owner: this.owner,
-          repo: this.repo,
-          message: `translate: ${file.path}`,
-          tree: newTree.sha,
-          parents: [ ref.object.sha ]
-        })
-      );
-
-      // Update branch reference
-      await this.rateLimiter.schedule(() =>
-        this.octokit.rest.git.updateRef({
-          owner: this.owner,
-          repo: this.repo,
-          ref: `heads/${branch}`,
-          sha: newCommit.sha
-        })
-      );
-
-      this.logger.success(`Successfully committed translation to branch: ${branch}`);
+      this.logger.info(`Created pull request #${pr.number}: ${title}`);
+      return pr.number;
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      throw new TranslationError(
-        `Failed to commit translation: ${message}`,
-        ErrorCodes.GITHUB_API_ERROR,
-        { branch, filePath: file.path }
-      );
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Failed to create pull request: ${errorMessage}`);
+
+      // Clean up the branch on failure
+      await this.branchManager.deleteBranch(branch);
+      throw error;
     }
   }
 
-  public async deleteBranch(branchName: string): Promise<void> {
-    await this.rateLimiter.schedule(() =>
-      this.octokit.rest.git.deleteRef({
-        owner: this.owner,
-        repo: this.repo,
-        ref: `heads/${branchName}`
-      })
-    );
+  async cleanupBranch(branch: string): Promise<void> {
+    await this.branchManager.deleteBranch(branch);
+  }
+
+  getActiveBranches(): string[] {
+    return this.branchManager.getActiveBranches();
   }
 } 
