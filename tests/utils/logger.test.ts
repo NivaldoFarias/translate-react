@@ -1,11 +1,13 @@
 import { expect, test, describe, beforeEach, afterEach, spyOn, mock } from "bun:test";
 import Logger from "../../src/utils/logger";
-import log from "loglevel";
+import ora from "ora";
+import chalk from 'chalk';
 
 describe("Logger", () => {
   let logger: Logger;
   let originalEnv: string | undefined;
   let originalBunEnv: string | undefined;
+  let mockOra: any;
 
   beforeEach(() => {
     originalEnv = process.env.NODE_ENV;
@@ -15,17 +17,66 @@ describe("Logger", () => {
     process.env.NODE_ENV = 'development';
     process.env.BUN_ENV = undefined;
 
-    // Mock loglevel
-    mock.module('loglevel', () => ({
-      default: {
-        setLevel: mock(() => { }),
-        info: mock(() => { }),
-        error: mock(() => { }),
-        warn: mock(() => { }),
-        debug: mock(() => { }),
-        levels: { DEBUG: 0, INFO: 1, WARN: 2, ERROR: 3 }
-      }
-    }));
+    // Mock ora with proper method tracking
+    const mockMethods = {
+      start: 0,
+      stop: 0,
+      succeed: 0,
+      fail: 0,
+      warn: 0,
+      info: 0,
+    };
+
+    let spinnerText = '';
+    let isSpinning = false;
+
+    mockOra = {
+      start: mock(() => {
+        mockMethods.start++;
+        isSpinning = true;
+        return mockOra;
+      }),
+      stop: mock(() => {
+        if (isSpinning) {
+          mockMethods.stop++;
+          isSpinning = false;
+        }
+        return mockOra;
+      }),
+      succeed: mock(() => {
+        mockMethods.succeed++;
+        isSpinning = false;
+        return mockOra;
+      }),
+      fail: mock(() => {
+        mockMethods.fail++;
+        isSpinning = false;
+        return mockOra;
+      }),
+      warn: mock(() => {
+        mockMethods.warn++;
+        isSpinning = false;
+        return mockOra;
+      }),
+      info: mock(() => {
+        mockMethods.info++;
+        isSpinning = false;
+        return mockOra;
+      }),
+      get isSpinning() {
+        return isSpinning;
+      },
+      get text() {
+        return spinnerText;
+      },
+      set text(value: string) {
+        spinnerText = value;
+      },
+      _methods: mockMethods,
+    };
+
+    // Create a new mock function that returns our mockOra
+    mock.module('ora', () => () => mockOra);
 
     logger = new Logger();
   });
@@ -37,65 +88,59 @@ describe("Logger", () => {
   });
 
   test("should log section headers", () => {
-    const spy = spyOn(log, "info");
+    const spy = spyOn(console, "log");
     logger.section("Test Section");
-    expect(spy).toHaveBeenCalled();
+    expect(spy).toHaveBeenCalledWith(chalk.bold.blue("\n=== Test Section ===\n"));
   });
 
   test("should log progress updates", () => {
-    const spy = spyOn(process.stdout, "write");
     logger.progress(1, 10, "Processing");
-    expect(spy).toHaveBeenCalled();
+    expect(mockOra.text).toBe("Processing (1/10 - 10%)");
+    expect(mockOra._methods.start).toBe(1);
   });
 
   test("should format objects for logging", () => {
-    const spy = spyOn(log, "debug");
     const testObj = { key: "value" };
     logger.debug(`Debug object: ${JSON.stringify(testObj)}`);
-    expect(spy).toHaveBeenCalled();
+    expect(mockOra._methods.info).toBe(1);
   });
 
   test("should handle different log levels", () => {
-    const spyInfo = spyOn(log, "info");
-    const spyError = spyOn(log, "error");
-    const spyWarn = spyOn(log, "warn");
-
     logger.info("Info message");
     logger.error("Error message");
     logger.warn("Warning message");
 
-    expect(spyInfo).toHaveBeenCalled();
-    expect(spyError).toHaveBeenCalled();
-    expect(spyWarn).toHaveBeenCalled();
+    expect(mockOra._methods.info).toBe(1);
+    expect(mockOra._methods.fail).toBe(1);
+    expect(mockOra._methods.warn).toBe(1);
   });
 
   test("should handle debug logs based on environment", () => {
-    const spy = spyOn(log, "debug");
-
     // Test production
     process.env.NODE_ENV = "production";
     logger = new Logger();
     logger.debug("Debug in production");
-    expect(spy).not.toHaveBeenCalled();
+    expect(mockOra._methods.info).toBe(0);
 
     // Test development
     process.env.NODE_ENV = "development";
     logger = new Logger();
     logger.debug("Debug in development");
-    expect(spy).toHaveBeenCalled();
+    expect(mockOra._methods.info).toBe(1);
   });
 
   test("should respect test environment", () => {
     process.env.NODE_ENV = "test";
     const logger = new Logger();
-    const spy = spyOn(log, "debug");
 
     logger.debug("Test message");
     logger.info("Test message");
     logger.warn("Test message");
     logger.error("Test message");
 
-    expect(spy).not.toHaveBeenCalled();
+    expect(mockOra._methods.info).toBe(0);
+    expect(mockOra._methods.fail).toBe(0);
+    expect(mockOra._methods.warn).toBe(0);
   });
 
   test("should format objects for logging in different environments", () => {
@@ -106,7 +151,7 @@ describe("Logger", () => {
     process.env.BUN_ENV = undefined;
     const devLogger = new Logger();
     const formattedDev = devLogger.formatObject(testObj);
-    expect(formattedDev).toBe("\u001B[90mkey\u001B[39m: value, \u001B[90mnumber\u001B[39m: 42");
+    expect(formattedDev).toBe(`${chalk.gray("key")}: value, ${chalk.gray("number")}: 42`);
 
     // Test in test environment
     process.env.NODE_ENV = "test";

@@ -6,7 +6,7 @@ A specialized tool for automated translation of React documentation from English
 
 - 🤖 Automated translation using Claude AI
 - 📚 Strict glossary enforcement for technical terms
-- 🔄 Two-step translation process with refinement
+- 🎯 Single-pass high-quality translation
 - 💾 Translation caching for improved performance
 - 🔍 Smart language detection
 - 🚦 Rate limiting for API calls
@@ -43,6 +43,7 @@ CLAUDE_MODEL=claude-3-sonnet-20240229
 GITHUB_TOKEN=your_github_token
 REPO_OWNER=target_repo_owner
 REPO_NAME=target_repo_name
+MAX_FILES=10 # Optional: limit the number of files to process
 ```
 
 ## Usage
@@ -52,6 +53,9 @@ REPO_NAME=target_repo_name
 ```bash
 # Start the translation process
 bun start
+
+# Process only a specific number of files
+MAX_FILES=5 bun start
 
 # Run tests
 bun test
@@ -71,12 +75,14 @@ bun test:live    # Run live API tests
    - Uses Claude AI with strict requirements
    - Preserves markdown formatting and code blocks
    - Follows glossary rules for technical terms
-   - Includes automatic refinement pass
+   - Maintains document structure and technical accuracy
+   - Produces natural-sounding Brazilian Portuguese translations
 
 3. **Quality Control**:
-   - Automated verification
+   - Automated verification during translation
    - Language pattern analysis
    - Glossary compliance check
+   - Technical terminology consistency
 
 4. **GitHub Integration**:
    - Creates feature branches

@@ -29,10 +29,39 @@ export class GitHubService {
           tree_sha: 'main',
           recursive: '1'
         })
-      );
+        , 'Fetching repository tree');
+
+      // Filter out ignored paths
+      const ignoredDirs = [
+        '.github/',
+        '.circleci/',
+        '.husky/',
+        '.vscode/',
+        'scripts/',
+        'node_modules/'
+      ];
+
+      const ignoredRootFiles = [
+        'CODE_OF_CONDUCT.md',
+        'CONTRIBUTING.md',
+        'LICENSE.md',
+        'README.md',
+        'SECURITY.md',
+        'CHANGELOG.md'
+      ];
 
       const markdownFiles = tree.tree
-        .filter(item => item.path?.endsWith('.md'))
+        .filter(item => {
+          if (!item.path?.endsWith('.md')) return false;
+
+          // Check if file is in ignored directory
+          if (ignoredDirs.some(dir => item.path!.startsWith(dir))) return false;
+
+          // Check if file is an ignored root file
+          if (!item.path.includes('/') && ignoredRootFiles.includes(item.path)) return false;
+
+          return true;
+        })
         .slice(0, maxFiles);
 
       const files: TranslationFile[] = [];
@@ -45,7 +74,7 @@ export class GitHubService {
             repo: this.repo,
             path: file.path!
           })
-        );
+          , `Fetching ${file.path}`);
 
         if ('content' in content) {
           const decodedContent = Buffer.from(content.content, 'base64').toString();
@@ -88,9 +117,10 @@ export class GitHubService {
             path: filePath,
             ref: branch
           })
-        );
+          , `Checking existing file: ${filePath}`);
       } catch (error) {
-        // File doesn't exist yet, which is fine
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        this.logger.warn(`File not found: ${message}`);
       }
 
       await this.rateLimiter.schedule(() =>
@@ -105,7 +135,7 @@ export class GitHubService {
             ('sha' in currentFile.data ? currentFile.data.sha : undefined) :
             undefined
         })
-      );
+        , `Committing changes to ${filePath}`);
 
       this.logger.info(`Committed translation to ${filePath} on branch ${branch}`);
     } catch (error) {

@@ -42,19 +42,21 @@ export class TranslatorService {
   };
 
   private getTranslationPrompt(content: string, glossary: string): string {
-    return `You are tasked with translating React documentation from English to Brazilian Portuguese.
+    return `You are a precise translator specializing in technical documentation. Your task is to translate React documentation from English to Brazilian Portuguese in a single, high-quality pass.
 
-    CRITICAL REQUIREMENTS - YOU MUST FOLLOW THESE EXACTLY:
+    TRANSLATION AND VERIFICATION REQUIREMENTS - YOU MUST FOLLOW THESE EXACTLY:
     1. MUST maintain all original markdown formatting, including code blocks, links, and special syntax
     2. MUST preserve all original code examples exactly as they are
-    3. MUST keep all original HTML tags intact
+    3. MUST keep all original HTML tags intact and unchanged
     4. MUST follow the glossary rules below STRICTLY - these are non-negotiable terms
-    5. MUST maintain all original frontmatter
+    5. MUST maintain all original frontmatter exactly as in original
     6. MUST preserve all original line breaks and paragraph structure
     7. MUST NOT translate code variables, function names, or technical terms not in the glossary
     8. MUST NOT add or remove any content
     9. MUST NOT change any URLs or links
     10. MUST translate comments within code blocks according to the glossary
+    11. MUST maintain consistent technical terminology throughout the translation
+    12. MUST ensure the translation reads naturally in Brazilian Portuguese while preserving technical accuracy
 
     GLOSSARY RULES:
     ${glossary}
@@ -62,7 +64,8 @@ export class TranslatorService {
     CONTENT TO TRANSLATE:
     ${content}
 
-    Translate the above content following ALL requirements exactly.`;
+    IMPORTANT: Respond ONLY with the final translated content. Do not include any explanations, notes, or the original content.
+    Start your response with the translation immediately.`;
   }
 
   async translateContent(file: TranslationFile, glossary: string): Promise<string> {
@@ -75,7 +78,6 @@ export class TranslatorService {
 
       if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
         this.metrics.cacheHits++;
-        this.logger.info(`Using cached translation for: ${file.path}`);
         return cached.content;
       }
 
@@ -85,9 +87,6 @@ export class TranslatorService {
           ErrorCodes.INVALID_CONTENT
         );
       }
-
-      this.logger.section('Translation');
-      this.logger.info(`Translating file: ${file.path}`);
 
       const translation = await this.retryOperation.withRetry(
         async () => {
@@ -106,14 +105,9 @@ export class TranslatorService {
         `Translation of ${file.path}`
       );
 
-      const refined = await this.retryOperation.withRetry(
-        () => this.refineTranslation(translation, glossary),
-        `Refinement of ${file.path}`
-      );
-
       // Cache the result
       this.cache.set(cacheKey, {
-        content: refined,
+        content: translation,
         timestamp: Date.now()
       });
 
@@ -124,12 +118,11 @@ export class TranslatorService {
       this.metrics.averageTranslationTime =
         this.metrics.totalTranslationTime / this.metrics.successfulTranslations;
 
-      return refined;
+      return translation;
 
     } catch (error) {
       this.metrics.failedTranslations++;
       const message = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Translation failed: ${message}`);
       throw new TranslationError(
         `Translation failed: ${message}`,
         ErrorCodes.CLAUDE_API_ERROR,
@@ -140,51 +133,5 @@ export class TranslatorService {
 
   public getMetrics(): TranslationMetrics {
     return { ...this.metrics };
-  }
-
-  public async refineTranslation(translation: string, glossary: string): Promise<string> {
-    try {
-      const message = await this.rateLimiter.schedule(() =>
-        this.claude.messages.create({
-          model: this.model,
-          max_tokens: 4096,
-          messages: [ {
-            role: 'user',
-            content: `You are tasked with verifying and refining a Brazilian Portuguese translation of React documentation.
-
-            VERIFICATION REQUIREMENTS - YOU MUST CHECK ALL OF THESE:
-            1. MUST verify all glossary terms are translated correctly and consistently
-            2. MUST ensure all markdown formatting is preserved exactly
-            3. MUST confirm all code blocks and technical terms remain unchanged
-            4. MUST verify all HTML tags are intact and unchanged
-            5. MUST check that all links and URLs are preserved
-            6. MUST validate that the translation maintains the original structure
-            7. MUST ensure no content is added or removed
-            8. MUST verify that code comments are translated according to glossary
-            9. MUST maintain consistent technical terminology
-            10. MUST preserve all frontmatter exactly as in original
-
-            If any requirement is not met, fix it according to these rules:
-
-            GLOSSARY RULES:
-            ${glossary}
-
-            TRANSLATION TO VERIFY AND REFINE:
-            ${translation}
-
-            Return the verified and refined translation, ensuring ALL requirements are met exactly.`
-          } ]
-        })
-      );
-
-      return message.content[ 0 ].text;
-
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      throw new TranslationError(
-        `Translation refinement failed: ${message}`,
-        ErrorCodes.TRANSLATION_FAILED
-      );
-    }
   }
 } 
