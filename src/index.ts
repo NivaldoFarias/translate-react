@@ -46,13 +46,21 @@ MAX_FILES=10 (optional, defaults to all files)`);
     // First get the files to estimate total time
     const files = await github.getUntranslatedFiles(maxFiles);
 
-    // Calculate time estimates
-    const avgTimePerFile = 60; // seconds per file for translation
+    // Calculate time estimates based on file sizes and API rate limits
+    const avgTimePerFile = 75; // seconds per file for translation (increased from 60 to be more realistic)
     const githubOpsPerFile = 3; // getContent, createBranch, commitTranslation
     const githubRateDelay = (60 / 60) * 1000; // 60 requests per minute = 1 second delay
+    const totalFileSize = files.reduce((sum, file) => sum + file.content.length, 0);
+    const avgFileSize = totalFileSize / files.length;
+
+    // Adjust time based on file size
+    const sizeAdjustedTime = files.map(file => {
+      const sizeRatio = file.content.length / avgFileSize;
+      return Math.max(30, Math.min(120, avgTimePerFile * sizeRatio)); // between 30s and 2min per file
+    }).reduce((sum, time) => sum + time, 0);
+
     const estimatedGithubTime = files.length * githubOpsPerFile * githubRateDelay / 1000; // in seconds
-    const estimatedTranslationTime = files.length * avgTimePerFile;
-    const totalEstimatedTime = Math.ceil((estimatedGithubTime + estimatedTranslationTime) / 60); // in minutes
+    const totalEstimatedTime = Math.ceil((estimatedGithubTime + sizeAdjustedTime) / 60); // in minutes
 
     logger.info(`Found ${files.length} files to translate (est. ${totalEstimatedTime} minutes)`);
 
@@ -60,13 +68,13 @@ MAX_FILES=10 (optional, defaults to all files)`);
       stats.processed++;
       const remainingFiles = files.length - stats.processed;
       const elapsedMinutes = (Date.now() - stats.startTime) / (1000 * 60);
-      const avgTimePerFile = elapsedMinutes / stats.processed;
+      const avgTimePerFile = stats.processed > 0 ? elapsedMinutes / stats.processed : 0;
       const estimatedRemaining = Math.ceil(remainingFiles * avgTimePerFile);
 
       logger.progress(
         stats.processed,
         files.length,
-        `Translating ${file.path} (${stats.processed}/${files.length}, ${estimatedRemaining}m remaining)`
+        `Processing ${file.path} (${estimatedRemaining}m remaining)`
       );
 
       try {

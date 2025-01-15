@@ -54,14 +54,21 @@ export default class Logger {
   progress(current: number, total: number, message: string): void {
     if (this.isSilent) return;
 
-    // Only update if message changed to avoid flickering
-    if (message !== this.currentSpinnerText) {
-      this.currentSpinnerText = message;
-      this.spinner.text = message;
+    // Format progress message with percentage
+    const percent = Math.round((current / total) * 100);
+    const formattedMessage = `${message} (${percent}%)`;
 
-      if (!this.spinner.isSpinning) {
-        this.spinner.start();
+    // Only update if message changed to avoid flickering
+    if (formattedMessage !== this.currentSpinnerText) {
+      this.currentSpinnerText = formattedMessage;
+
+      // Stop existing spinner if running with different text
+      if (this.spinner.isSpinning) {
+        this.spinner.stop();
       }
+
+      // Start new spinner with updated text
+      this.spinner.start(formattedMessage);
     }
   }
 

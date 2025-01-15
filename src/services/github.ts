@@ -57,8 +57,10 @@ export class GitHubService {
           // Check if file is in ignored directory
           if (ignoredDirs.some(dir => item.path!.startsWith(dir))) return false;
 
-          // Check if file is an ignored root file
-          if (!item.path.includes('/') && ignoredRootFiles.includes(item.path)) return false;
+          // Check if file is an ignored root file or any root .md file
+          if (!item.path.includes('/')) {
+            return false; // Exclude all root .md files
+          }
 
           return true;
         })
