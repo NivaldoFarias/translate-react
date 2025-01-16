@@ -50,16 +50,30 @@ export class RateLimiter {
 			const delay = minDelay - timeSinceLastRequest;
 			const elapsedTime = ((now - this.operationStartTime) / 1000).toFixed(1);
 			const context = this.currentOperation ? ` - ${this.currentOperation}` : "";
-			this.logger.progress(
-				1,
-				1,
-				`${this._name}${context} (${elapsedTime}s, rate limit: ${Math.round(delay)}ms)`,
+
+			this.logger.debug(
+				`Rate limiting ${this._name}${context} - Waiting ${Math.round(
+					delay,
+				)}ms (${this._requestsPerMinute} requests/min)`,
 			);
+
 			await new Promise((resolve) => setTimeout(resolve, delay));
 		}
 
-		this.lastRequestTime = Date.now();
-		return task();
+		try {
+			this.lastRequestTime = Date.now();
+			return await task();
+		} catch (error) {
+			if (error instanceof Error && error.message.includes("rate limit")) {
+				const retryDelay = 60 * 1000;
+				this.logger.warn(
+					`Rate limit exceeded for ${this._name}, waiting ${retryDelay / 1000} seconds...`,
+				);
+				await new Promise((resolve) => setTimeout(resolve, retryDelay));
+				return this.executeWithDelay(task);
+			}
+			throw error;
+		}
 	}
 
 	private async processQueue() {

@@ -22,8 +22,15 @@ export class RetryableOperation {
 					break;
 				}
 
+				// Check if error is retryable
+				const isRetryable = this.isRetryableError(lastError);
+				if (!isRetryable) {
+					this.logger.error(`Non-retryable error encountered: ${lastError.message}`);
+					throw lastError;
+				}
+
 				this.logger.warn(
-					`${context} - Attempt ${attempt} failed: ${lastError.message}. Retrying in ${delay}ms...`,
+					`${context} - Attempt ${attempt}/${this.maxRetries} failed: ${lastError.message}. Retrying in ${delay}ms...`,
 				);
 
 				await new Promise((resolve) => setTimeout(resolve, delay));
@@ -31,6 +38,23 @@ export class RetryableOperation {
 			}
 		}
 
+		this.logger.error(
+			`${context} - All ${this.maxRetries} retry attempts failed. Last error: ${lastError?.message}`,
+		);
 		throw lastError;
+	}
+
+	private isRetryableError(error: Error): boolean {
+		if (!error.message) return true;
+
+		const nonRetryableErrors = [
+			"Bad credentials",
+			"Not Found",
+			"Unauthorized",
+			"Forbidden",
+			"Validation failed",
+		];
+
+		return !nonRetryableErrors.some((msg) => error.message.includes(msg));
 	}
 }

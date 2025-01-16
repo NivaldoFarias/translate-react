@@ -38,7 +38,7 @@ export class GitHubService {
 
 	public async getUntranslatedFiles(maxFiles?: number): Promise<TranslationFile[]> {
 		try {
-			const { data: tree } = await this.withRetry(
+			const { data } = await this.withRetry(
 				() =>
 					this.octokit.git.getTree({
 						owner: this.owner,
@@ -49,47 +49,58 @@ export class GitHubService {
 				"Fetching repository tree",
 			);
 
-			// Filter out ignored paths
-			const ignoredDirs = [
-				".github/",
-				".circleci/",
-				".husky/",
-				".vscode/",
-				"scripts/",
-				"node_modules/",
-			];
+			if (!data.tree) {
+				throw new Error("Repository tree is empty");
+			}
 
-			const markdownFiles = tree.tree
-				.filter((item) => {
-					if (!item.path?.endsWith(".md")) return false;
-					if (ignoredDirs.some((dir) => item.path!.startsWith(dir))) return false;
-					if (!item.path.includes("/")) return false;
-					return true;
-				})
-				.slice(0, maxFiles);
+			// Filter out ignored paths
+			const markdownFiles = this.filterRepositoryTree(data.tree);
+
+			// Apply maxFiles limit after filtering but before content fetching
+			const filesToProcess = maxFiles ? markdownFiles.slice(0, maxFiles) : markdownFiles;
+			this.logger.info(`Found ${filesToProcess.length} markdown files to process`);
 
 			const files: TranslationFile[] = [];
-			for (const file of markdownFiles) {
-				if (!file.path) continue;
+			for (const file of filesToProcess) {
+				if (!file.path) {
+					this.logger.warn("Skipping file with undefined path");
+					continue;
+				}
 
-				const { data: content } = await this.withRetry(
-					() =>
-						this.octokit.repos.getContent({
-							owner: this.owner,
-							repo: this.repo,
-							path: file.path!,
-						}),
-					`Fetching ${file.path}`,
-				);
+				try {
+					const { data: content } = await this.withRetry(
+						() =>
+							this.octokit.repos.getContent({
+								owner: this.owner,
+								repo: this.repo,
+								path: file.path!,
+							}),
+						`Fetching ${file.path}`,
+					);
 
-				if ("content" in content) {
+					if (!("content" in content)) {
+						this.logger.warn(`No content found for ${file.path}`);
+						continue;
+					}
+
 					const decodedContent = Buffer.from(content.content, "base64").toString();
 					files.push({
 						path: file.path,
 						content: decodedContent,
 						sha: content.sha,
 					});
+				} catch (error) {
+					const message = error instanceof Error ? error.message : "Unknown error";
+					this.logger.warn(`Failed to fetch content for ${file.path}: ${message}`);
+					// Continue with other files instead of failing completely
+					continue;
 				}
+			}
+
+			if (files.length === 0) {
+				this.logger.warn("No valid files were found to process");
+			} else {
+				this.logger.info(`Successfully processed ${files.length} files`);
 			}
 
 			return files;
@@ -100,7 +111,20 @@ export class GitHubService {
 		}
 	}
 
-	async createTranslationBranch(baseBranch: string = "main"): Promise<string> {
+	private filterRepositoryTree(
+		tree: RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"],
+	) {
+		return tree.filter((item) => {
+			if (!item.path) return false;
+			if (!item.path.endsWith(".md")) return false;
+			if (!item.path.includes("/") && item.path !== "GLOSSARY.md") return false;
+			if (!item.path.includes("src/")) return false;
+
+			return true;
+		});
+	}
+
+	async createTranslationBranch(baseBranch: string = "main") {
 		const branchName = `translate-${Date.now()}`;
 		await this.branchManager.createBranch(branchName, baseBranch);
 		return branchName;
@@ -193,7 +217,7 @@ export class GitHubService {
 		}
 	}
 
-	async cleanupBranch(branch: string): Promise<void> {
+	async cleanupBranch(branch: string) {
 		await this.branchManager.deleteBranch(branch);
 	}
 
@@ -226,5 +250,20 @@ export class GitHubService {
 			this.logger.error(`Failed to fetch file content: ${message}`);
 			throw error;
 		}
+	}
+
+	async getRepositoryTree(baseBranch: string = "main", filterIgnored: boolean = true) {
+		const { data } = await this.withRetry(
+			() =>
+				this.octokit.git.getTree({
+					owner: this.owner,
+					repo: this.repo,
+					tree_sha: baseBranch,
+					recursive: "1",
+				}),
+			"Fetching repository tree",
+		);
+
+		return filterIgnored ? this.filterRepositoryTree(data.tree) : data.tree;
 	}
 }

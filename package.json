@@ -4,11 +4,12 @@
   "description": "Translation status tracker for React documentation",
   "main": "dist/index.js",
   "scripts": {
-    "analyze": "bun run src/scripts/analyze-translations.ts",
+    "start": "bun run src/index.ts",
     "test": "bun test",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "format": "prettier --write '**/*.{ts,js,cjs,mjs,json,md}'"
+    "format": "prettier --write '**/*.{ts,js,cjs,mjs,json,md}'",
+    "analyze": "bun run src/scripts/analyze-translations.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.33.1",
