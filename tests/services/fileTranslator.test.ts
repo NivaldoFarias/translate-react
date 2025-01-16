@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 
-import { FileTranslator } from "../../src/services/fileTranslator";
+import { LanguageDetector } from "../../src/services/language-detector";
 
 describe("FileTranslator", () => {
-	let translator: FileTranslator;
+	let translator: LanguageDetector;
 
 	beforeEach(() => {
-		translator = new FileTranslator();
+		translator = new LanguageDetector();
 	});
 
 	test("should analyze language patterns correctly", () => {

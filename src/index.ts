@@ -1,7 +1,5 @@
-import type { TranslationData, TranslationStatus } from "./scripts/analyze-translations";
-
-import output from "./scripts/output.json";
 import { GitHubService } from "./services/github";
+import { LanguageDetector } from "./services/language-detector";
 import { TranslatorService } from "./services/translator";
 import { TranslationError } from "./utils/errors";
 import Logger from "./utils/logger";
@@ -10,6 +8,7 @@ class Runner {
 	private readonly logger = new Logger();
 	private readonly github = new GitHubService();
 	private readonly translator = new TranslatorService();
+	private readonly languageDetector = new LanguageDetector();
 	private stats = {
 		processed: 0,
 		translated: 0,
@@ -17,6 +16,8 @@ class Runner {
 		branches: 0,
 		startTime: Date.now(),
 	};
+	private readonly maxFiles =
+		process.env["MAX_FILES"] ? parseInt(process.env["MAX_FILES"]!) : undefined;
 
 	constructor() {
 		const requiredEnvVars = ["GITHUB_TOKEN", "REPO_OWNER", "REPO_NAME"];
@@ -31,82 +32,69 @@ class Runner {
 				REPO_NAME=target_repo_name
 				MAX_FILES=10 (optional, defaults to all files)
 			`);
+
 			process.exit(1);
 		}
 	}
 
 	async run() {
 		try {
-			// Get max files from environment or use undefined for all files
-			const maxFiles = process.env["MAX_FILES"] ? parseInt(process.env["MAX_FILES"]!) : undefined;
+			this.logger.info("Starting translation workflow");
+			const repositoryTree = await this.github.getRepositoryTree("main");
 
-			// Extract pending translations from the JSON data
-			const pendingTranslations: TranslationStatus[] = [];
-			const translationData = output as TranslationData;
+			const uncheckedFiles = await Promise.all(
+				repositoryTree.slice(0, this.maxFiles).map(async (file) => {
+					return {
+						path: file.path,
+						content: await this.github.getFileContent(file),
+						filename: file.path?.split("/").pop(),
+					};
+				}),
+			);
 
-			for (const section of Object.values(translationData.sections)) {
-				// Add items from main section
-				pendingTranslations.push(...section.items.filter((item) => item.status === "PENDING"));
+			const filesToTranslate = uncheckedFiles.filter(
+				(file) => !this.languageDetector.isFileTranslated(file.content),
+			);
 
-				// Add items from subsections
-				for (const subsectionItems of Object.values(section.subsections)) {
-					pendingTranslations.push(...subsectionItems.filter((item) => item.status === "PENDING"));
-				}
-			}
+			this.logger.info(`Found ${filesToTranslate.length} files to translate`);
 
-			// Limit the number of files if maxFiles is specified
-			const filesToProcess =
-				maxFiles ? pendingTranslations.slice(0, maxFiles) : pendingTranslations;
-
-			this.logger.info(`Found ${filesToProcess.length} files to translate`);
-
-			for (const item of filesToProcess) {
+			for (const [index, file] of filesToTranslate.entries()) {
 				this.stats.processed++;
-				const remainingFiles = filesToProcess.length - this.stats.processed;
+				const remainingFiles = filesToTranslate.length - this.stats.processed;
 				const elapsedMinutes = (Date.now() - this.stats.startTime) / (1000 * 60);
 				const avgTimePerFile = this.stats.processed > 0 ? elapsedMinutes / this.stats.processed : 0;
 				const estimatedRemaining = Math.ceil(remainingFiles * avgTimePerFile);
 
-				const filePath = `content/${item.section.toLowerCase()}/${item.title
-					.toLowerCase()
-					.replace(/[<>]/g, "")
-					.replace(/\s+/g, "-")}.md`;
-
 				this.logger.progress(
 					this.stats.processed,
-					filesToProcess.length,
-					`Processing ${filePath} (${estimatedRemaining}m remaining)`,
+					filesToTranslate.length,
+					`[${index + 1}/${filesToTranslate.length}] Processing "${file.filename}" (${estimatedRemaining}m remaining)`,
 				);
 
 				try {
-					// Get the current file content and sha from GitHub
-					const fileContent = await this.github.getFileContent(filePath);
-					const branch = await this.github.createTranslationBranch();
-					this.stats.branches++;
+					const branch = await this.github.createTranslationBranch(file.filename!);
 
-					const translation = await this.translator.translateContent(
-						{
-							path: filePath,
-							content: fileContent.content,
-							sha: fileContent.sha,
-						},
-						item.title,
-					);
+					this.stats.branches++;
+					this.logger.info(`Creating branch ${branch} for ${file.path}`);
+
+					const translation = await this.translator.translateContent(file);
+
+					this.logger.info(`Translated ${file.filename} to pt-br`);
 
 					await this.github.commitTranslation(
 						branch,
-						filePath,
+						file.path!,
 						translation,
-						`Translate ${item.title} to Brazilian Portuguese`,
+						`Translate ${file.filename} to pt-br`,
 					);
 
 					this.stats.translated++;
 				} catch (error) {
 					this.stats.failed++;
 					if (error instanceof TranslationError) {
-						this.logger.error(`Failed: ${item.title} [${error.code}] ${error.message}`);
+						this.logger.error(`Failed: ${file.filename} [${error.code}] ${error.message}`);
 					} else {
-						this.logger.error(`Failed: ${item.title}`);
+						this.logger.error(`Failed: ${file.filename}`);
 					}
 				}
 			}

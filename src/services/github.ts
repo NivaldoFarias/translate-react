@@ -36,7 +36,7 @@ export class GitHubService {
 		);
 	}
 
-	public async getUntranslatedFiles(maxFiles?: number): Promise<TranslationFile[]> {
+	public async getUntranslatedFiles(maxFiles?: number) {
 		try {
 			const { data } = await this.withRetry(
 				() =>
@@ -124,9 +124,11 @@ export class GitHubService {
 		});
 	}
 
-	async createTranslationBranch(baseBranch: string = "main") {
-		const branchName = `translate-${Date.now()}`;
+	async createTranslationBranch(fileName: string, baseBranch: string = "main") {
+		const branchName = `translate/${fileName}`;
+
 		await this.branchManager.createBranch(branchName, baseBranch);
+
 		return branchName;
 	}
 
@@ -225,26 +227,28 @@ export class GitHubService {
 		return this.branchManager.getActiveBranches();
 	}
 
-	async getFileContent(filePath: string) {
+	async getFileContent(
+		file: RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"][number],
+	) {
 		try {
-			const { data: content } = await this.withRetry(
-				() =>
-					this.octokit.repos.getContent({
-						owner: this.owner,
-						repo: this.repo,
-						path: filePath,
-					}),
-				`Fetching ${filePath}`,
-			);
+			// The file object already contains the url property
+			const blobSha = file.url?.split("/").pop();
 
-			if (!("content" in content)) {
-				throw new Error("Invalid content response from GitHub");
+			if (!blobSha) {
+				throw new Error("Invalid blob URL");
 			}
 
-			return {
-				content: Buffer.from(content.content, "base64").toString(),
-				sha: content.sha,
-			};
+			const { data } = await this.withRetry(
+				() =>
+					this.octokit.git.getBlob({
+						owner: this.owner,
+						repo: this.repo,
+						file_sha: blobSha,
+					}),
+				`Fetching blob: ${blobSha}`,
+			);
+
+			return Buffer.from(data.content, "base64").toString();
 		} catch (error) {
 			const message = error instanceof Error ? error.message : "Unknown error";
 			this.logger.error(`Failed to fetch file content: ${message}`);

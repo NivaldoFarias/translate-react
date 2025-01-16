@@ -1,7 +1,7 @@
 import { describe, expect, mock, test } from "bun:test";
 
-import { FileTranslator } from "../src/services/fileTranslator";
 import { GitHubService } from "../src/services/github";
+import { LanguageDetector } from "../src/services/language-detector";
 import { TranslatorService } from "../src/services/translator";
 import Logger from "../src/utils/logger";
 
@@ -9,7 +9,7 @@ describe("Integration Tests", () => {
 	let logger = new Logger();
 	let github = new GitHubService();
 	let translator = new TranslatorService();
-	let fileTranslator = new FileTranslator();
+	let fileTranslator = new LanguageDetector();
 
 	test(
 		"should complete full translation workflow",
@@ -50,7 +50,7 @@ describe("Integration Tests", () => {
 			expect(translation).toBeTruthy();
 
 			// 6. Verify translation
-			expect(fileTranslator.isFileUntranslated(translation)).toBe(false);
+			expect(fileTranslator.isFileTranslated(translation)).toBe(false);
 
 			// 7. Commit changes
 			expect(github.commitTranslation(branch, file, translation)).resolves.toBeUndefined();
