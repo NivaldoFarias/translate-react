@@ -7,11 +7,13 @@ import type { TranslationFile } from "../types";
 import { BranchManager } from "../utils/branchManager";
 import Logger from "../utils/logger";
 import { RateLimiter } from "../utils/rateLimiter";
+import { RetryableOperation } from "../utils/retryableOperation";
 
 export class GitHubService {
 	private octokit: Octokit;
 	private logger = new Logger();
 	private rateLimiter = new RateLimiter(60, "GitHub API");
+	private retryOperation = new RetryableOperation(3, 1000, 5000);
 	private branchManager: BranchManager;
 
 	constructor(
@@ -23,9 +25,20 @@ export class GitHubService {
 		this.branchManager = new BranchManager(owner, repo, githubToken);
 	}
 
+	private async callGitHubAPI<T>(operation: () => Promise<T>, context: string): Promise<T> {
+		return this.rateLimiter.schedule(() => operation(), context);
+	}
+
+	private async withRetry<T>(operation: () => Promise<T>, context: string): Promise<T> {
+		return this.retryOperation.withRetry(
+			async () => this.callGitHubAPI(operation, context),
+			context,
+		);
+	}
+
 	public async getUntranslatedFiles(maxFiles?: number): Promise<TranslationFile[]> {
 		try {
-			const { data: tree } = await this.rateLimiter.schedule(
+			const { data: tree } = await this.withRetry(
 				() =>
 					this.octokit.git.getTree({
 						owner: this.owner,
@@ -46,27 +59,11 @@ export class GitHubService {
 				"node_modules/",
 			];
 
-			const ignoredRootFiles = [
-				"CODE_OF_CONDUCT.md",
-				"CONTRIBUTING.md",
-				"LICENSE.md",
-				"README.md",
-				"SECURITY.md",
-				"CHANGELOG.md",
-			];
-
 			const markdownFiles = tree.tree
 				.filter((item) => {
 					if (!item.path?.endsWith(".md")) return false;
-
-					// Check if file is in ignored directory
 					if (ignoredDirs.some((dir) => item.path!.startsWith(dir))) return false;
-
-					// Check if file is an ignored root file or any root .md file
-					if (!item.path.includes("/")) {
-						return false; // Exclude all root .md files
-					}
-
+					if (!item.path.includes("/")) return false;
 					return true;
 				})
 				.slice(0, maxFiles);
@@ -75,7 +72,7 @@ export class GitHubService {
 			for (const file of markdownFiles) {
 				if (!file.path) continue;
 
-				const { data: content } = await this.rateLimiter.schedule(
+				const { data: content } = await this.withRetry(
 					() =>
 						this.octokit.repos.getContent({
 							owner: this.owner,
@@ -119,7 +116,7 @@ export class GitHubService {
 			// Get the current file (if it exists)
 			let currentFile: RestEndpointMethodTypes["repos"]["getContent"]["response"] | undefined;
 			try {
-				currentFile = await this.rateLimiter.schedule(
+				currentFile = await this.withRetry(
 					() =>
 						this.octokit.repos.getContent({
 							owner: this.owner,
@@ -134,7 +131,7 @@ export class GitHubService {
 				this.logger.warn(`File not found: ${message}`);
 			}
 
-			await this.rateLimiter.schedule(
+			await this.withRetry(
 				() =>
 					this.octokit.repos.createOrUpdateFileContents({
 						owner: this.owner,
@@ -171,15 +168,17 @@ export class GitHubService {
 		baseBranch: string = "main",
 	): Promise<number> {
 		try {
-			const { data: pr } = await this.rateLimiter.schedule(() =>
-				this.octokit.pulls.create({
-					owner: this.owner,
-					repo: this.repo,
-					title,
-					body,
-					head: branch,
-					base: baseBranch,
-				}),
+			const { data: pr } = await this.withRetry(
+				() =>
+					this.octokit.pulls.create({
+						owner: this.owner,
+						repo: this.repo,
+						title,
+						body,
+						head: branch,
+						base: baseBranch,
+					}),
+				"Creating pull request",
 			);
 
 			this.logger.info(`Created pull request #${pr.number}: ${title}`);
@@ -200,5 +199,32 @@ export class GitHubService {
 
 	getActiveBranches(): string[] {
 		return this.branchManager.getActiveBranches();
+	}
+
+	async getFileContent(filePath: string) {
+		try {
+			const { data: content } = await this.withRetry(
+				() =>
+					this.octokit.repos.getContent({
+						owner: this.owner,
+						repo: this.repo,
+						path: filePath,
+					}),
+				`Fetching ${filePath}`,
+			);
+
+			if (!("content" in content)) {
+				throw new Error("Invalid content response from GitHub");
+			}
+
+			return {
+				content: Buffer.from(content.content, "base64").toString(),
+				sha: content.sha,
+			};
+		} catch (error) {
+			const message = error instanceof Error ? error.message : "Unknown error";
+			this.logger.error(`Failed to fetch file content: ${message}`);
+			throw error;
+		}
 	}
 }

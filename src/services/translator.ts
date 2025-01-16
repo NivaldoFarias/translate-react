@@ -22,16 +22,13 @@ interface TranslationMetrics {
 }
 
 export class TranslatorService {
-	private logger = new Logger();
-	private claude = new Anthropic({
-		apiKey: process.env["CLAUDE_API_KEY"]!,
-	});
-	private model = process.env["CLAUDE_MODEL"]! ?? "claude-3-sonnet-20240229";
-	private rateLimiter = new RateLimiter(30, "Claude API");
-	private retryOperation = new RetryableOperation(3, 1000, 10000);
-	private cache: Map<string, TranslationCache> = new Map();
+	private claude: Anthropic;
+	private model = "claude-3-sonnet-20240229";
+	private cache = new Map<string, TranslationCache>();
 	private readonly CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
-
+	private logger = new Logger();
+	private rateLimiter = new RateLimiter(60, "Claude API");
+	private retryOperation = new RetryableOperation(3, 1000, 5000);
 	private metrics: TranslationMetrics = {
 		totalTranslations: 0,
 		successfulTranslations: 0,
@@ -41,31 +38,34 @@ export class TranslatorService {
 		totalTranslationTime: 0,
 	};
 
-	private getTranslationPrompt(content: string, glossary: string): string {
-		return `You are a precise translator specializing in technical documentation. Your task is to translate React documentation from English to Brazilian Portuguese in a single, high-quality pass.
+	constructor(apiKey: string = process.env["ANTHROPIC_API_KEY"]!) {
+		this.claude = new Anthropic({ apiKey });
+	}
 
-    TRANSLATION AND VERIFICATION REQUIREMENTS - YOU MUST FOLLOW THESE EXACTLY:
-    1. MUST maintain all original markdown formatting, including code blocks, links, and special syntax
-    2. MUST preserve all original code examples exactly as they are
-    3. MUST keep all original HTML tags intact and unchanged
-    4. MUST follow the glossary rules below STRICTLY - these are non-negotiable terms
-    5. MUST maintain all original frontmatter exactly as in original
-    6. MUST preserve all original line breaks and paragraph structure
-    7. MUST NOT translate code variables, function names, or technical terms not in the glossary
-    8. MUST NOT add or remove any content
-    9. MUST NOT change any URLs or links
-    10. MUST translate comments within code blocks according to the glossary
-    11. MUST maintain consistent technical terminology throughout the translation
-    12. MUST ensure the translation reads naturally in Brazilian Portuguese while preserving technical accuracy
+	private async callClaudeAPI(content: string, glossary: string): Promise<string> {
+		const message = await this.rateLimiter.schedule(
+			() =>
+				this.claude.messages.create({
+					model: this.model,
+					max_tokens: 4096,
+					messages: [
+						{
+							role: "user",
+							content: this.getTranslationPrompt(content, glossary),
+						},
+					],
+				}),
+			"Claude API Call",
+		);
 
-    GLOSSARY RULES:
-    ${glossary}
+		return message.content[0].type === "text" ? message.content[0].text : "";
+	}
 
-    CONTENT TO TRANSLATE:
-    ${content}
-
-    IMPORTANT: Respond ONLY with the final translated content. Do not include any explanations, notes, or the original content.
-    Start your response with the translation immediately.`;
+	private async translateWithRetry(file: TranslationFile, glossary: string): Promise<string> {
+		return this.retryOperation.withRetry(
+			async () => this.callClaudeAPI(file.content, glossary),
+			`Translation of ${file.path}`,
+		);
 	}
 
 	async translateContent(file: TranslationFile, glossary: string): Promise<string> {
@@ -88,21 +88,7 @@ export class TranslatorService {
 				);
 			}
 
-			const translation = await this.retryOperation.withRetry(async () => {
-				const message = await this.rateLimiter.schedule(() =>
-					this.claude.messages.create({
-						model: this.model,
-						max_tokens: 4096,
-						messages: [
-							{
-								role: "user",
-								content: this.getTranslationPrompt(file.content, glossary),
-							},
-						],
-					}),
-				);
-				return message.content[0].text;
-			}, `Translation of ${file.path}`);
+			const translation = await this.translateWithRetry(file, glossary);
 
 			// Cache the result
 			this.cache.set(cacheKey, {
@@ -125,6 +111,22 @@ export class TranslatorService {
 				filePath: file.path,
 			});
 		}
+	}
+
+	private getTranslationPrompt(content: string, glossary: string): string {
+		return `
+You are a professional translator specializing in technical documentation.
+Your task is to translate the following content from English to Brazilian Portuguese.
+
+Use the following glossary for consistent translations:
+${glossary}
+
+Content to translate:
+${content}
+
+Please provide only the translated content, without any additional comments or explanations.
+Maintain all Markdown formatting, code blocks, and special characters exactly as they appear in the original.
+`;
 	}
 
 	public getMetrics(): TranslationMetrics {

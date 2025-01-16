@@ -5,12 +5,10 @@
   "main": "dist/index.js",
   "scripts": {
     "analyze": "bun run src/scripts/analyze-translations.ts",
-    "build": "tsc",
     "test": "bun test",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
-    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\""
+    "format": "prettier --write '**/*.{ts,js,cjs,mjs,json,md}'"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.33.1",

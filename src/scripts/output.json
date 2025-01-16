@@ -1,0 +1,365 @@
+{
+  "sections": {
+    "Content Principal": {
+      "name": "Content Principal",
+      "subsections": {},
+      "items": [
+        {
+          "title": "Manipulating the DOM with Refs",
+          "status": "IN_PROGRESS",
+          "section": "Content Principal",
+          "assignee": "gustavospriebe"
+        },
+        {
+          "title": "Synchronizing with Effects",
+          "status": "PENDING",
+          "section": "Content Principal"
+        },
+        {
+          "title": "Queueing a Series of State Updates",
+          "status": "IN_PROGRESS",
+          "section": "Content Principal",
+          "assignee": "augustodg2"
+        },
+        {
+          "title": "Passing Data Deeply with Context",
+          "status": "IN_PROGRESS",
+          "section": "Content Principal",
+          "assignee": "terciogarcia"
+        },
+        {
+          "title": "Updating Arrays in State",
+          "status": "IN_PROGRESS",
+          "section": "Content Principal",
+          "assignee": "junagao"
+        },
+        {
+          "title": "Managing State",
+          "status": "PENDING",
+          "section": "Content Principal"
+        },
+        {
+          "title": "Preserving and Resetting State",
+          "status": "IN_PROGRESS",
+          "section": "Content Principal",
+          "assignee": "VitorGultzgoff"
+        },
+        {
+          "title": "Lifecycle of Reactive Effects",
+          "status": "IN_PROGRESS",
+          "section": "Content Principal",
+          "assignee": "jotaRenan"
+        },
+        {
+          "title": "Separating Events from Effects",
+          "status": "IN_PROGRESS",
+          "section": "Content Principal",
+          "assignee": "alexandredev3"
+        }
+      ]
+    },
+    "API Reference": {
+      "name": "API Reference",
+      "subsections": {},
+      "items": [
+        {
+          "title": "useCallback",
+          "status": "IN_PROGRESS",
+          "section": "API Reference",
+          "assignee": "glauberbrack"
+        },
+        {
+          "title": "useContext",
+          "status": "IN_PROGRESS",
+          "section": "API Reference",
+          "assignee": "glauberbrack"
+        },
+        {
+          "title": "useDebugValue",
+          "status": "IN_PROGRESS",
+          "section": "API Reference",
+          "assignee": "joaooliveiradev"
+        },
+        {
+          "title": "useDeferredValue",
+          "status": "IN_PROGRESS",
+          "section": "API Reference",
+          "assignee": "joaooliveiradev"
+        },
+        {
+          "title": "useInsertionEffect",
+          "status": "IN_PROGRESS",
+          "section": "API Reference",
+          "assignee": "GabrielleEmanoela"
+        },
+        {
+          "title": "useMemo",
+          "status": "IN_PROGRESS",
+          "section": "API Reference",
+          "assignee": "TMendes-lucca"
+        },
+        {
+          "title": "useReducer",
+          "status": "IN_PROGRESS",
+          "section": "API Reference",
+          "assignee": "TMendes-lucca"
+        },
+        {
+          "title": "useRef",
+          "status": "IN_PROGRESS",
+          "section": "API Reference",
+          "assignee": "Duduzera1997"
+        },
+        {
+          "title": "useState",
+          "status": "IN_PROGRESS",
+          "section": "API Reference",
+          "assignee": "soutovnc"
+        },
+        {
+          "title": "useSyncExternalStore",
+          "status": "IN_PROGRESS",
+          "section": "API Reference",
+          "assignee": "bdsqqq"
+        }
+      ]
+    },
+    "React: Components": {
+      "name": "React: Components",
+      "subsections": {},
+      "items": [
+        {
+          "title": "<StrictMode>",
+          "status": "PENDING",
+          "section": "React: Components"
+        },
+        {
+          "title": "<Suspense>",
+          "status": "IN_PROGRESS",
+          "section": "React: Components",
+          "assignee": "tiagobarros01"
+        },
+        {
+          "title": "forwardRef",
+          "status": "PENDING",
+          "section": "React: Components"
+        },
+        {
+          "title": "lazy",
+          "status": "IN_PROGRESS",
+          "section": "React: Components",
+          "assignee": "matheuscaldas1"
+        },
+        {
+          "title": "memo",
+          "status": "PENDING",
+          "section": "React: Components"
+        }
+      ]
+    },
+    "React-dom: Components": {
+      "name": "React-dom: Components",
+      "subsections": {},
+      "items": [
+        {
+          "title": "Common (e.g. <div>)",
+          "status": "PENDING",
+          "section": "React-dom: Components"
+        },
+        {
+          "title": "<input>",
+          "status": "PENDING",
+          "section": "React-dom: Components"
+        },
+        {
+          "title": "<select>",
+          "status": "PENDING",
+          "section": "React-dom: Components"
+        },
+        {
+          "title": "<textarea>",
+          "status": "PENDING",
+          "section": "React-dom: Components"
+        }
+      ]
+    },
+    "React-dom: APIs": {
+      "name": "React-dom: APIs",
+      "subsections": {},
+      "items": [
+        {
+          "title": "createPortal",
+          "status": "IN_PROGRESS",
+          "section": "React-dom: APIs",
+          "assignee": "renaldodev"
+        },
+        {
+          "title": "flushSync",
+          "status": "IN_PROGRESS",
+          "section": "React-dom: APIs",
+          "assignee": "tiagobarros01"
+        },
+        {
+          "title": "findDOMNode",
+          "status": "PENDING",
+          "section": "React-dom: APIs"
+        },
+        {
+          "title": "hydrate",
+          "status": "PENDING",
+          "section": "React-dom: APIs"
+        },
+        {
+          "title": "render",
+          "status": "PENDING",
+          "section": "React-dom: APIs"
+        },
+        {
+          "title": "unmountComponentAtNode",
+          "status": "PENDING",
+          "section": "React-dom: APIs"
+        }
+      ]
+    },
+    "React-dom/client: Client APIs": {
+      "name": "React-dom/client: Client APIs",
+      "subsections": {},
+      "items": [
+        {
+          "title": "createRoot",
+          "status": "PENDING",
+          "section": "React-dom/client: Client APIs"
+        },
+        {
+          "title": "hydrateRoot",
+          "status": "PENDING",
+          "section": "React-dom/client: Client APIs"
+        }
+      ]
+    },
+    "React-dom/server: Server APIs": {
+      "name": "React-dom/server: Server APIs",
+      "subsections": {},
+      "items": [
+        {
+          "title": "renderToNodeStream",
+          "status": "PENDING",
+          "section": "React-dom/server: Server APIs"
+        },
+        {
+          "title": "renderToPipeableStream",
+          "status": "PENDING",
+          "section": "React-dom/server: Server APIs"
+        },
+        {
+          "title": "renderToReadableStream",
+          "status": "PENDING",
+          "section": "React-dom/server: Server APIs"
+        },
+        {
+          "title": "renderToStaticMarkup",
+          "status": "PENDING",
+          "section": "React-dom/server: Server APIs"
+        },
+        {
+          "title": "renderToStaticNodeStream",
+          "status": "PENDING",
+          "section": "React-dom/server: Server APIs"
+        },
+        {
+          "title": "renderToString",
+          "status": "PENDING",
+          "section": "React-dom/server: Server APIs"
+        }
+      ]
+    },
+    "Navigation and UI": {
+      "name": "Navigation and UI",
+      "subsections": {},
+      "items": [
+        {
+          "title": "Top-level navigation (currently in TopNav.tsx)",
+          "status": "PENDING",
+          "section": "Navigation and UI"
+        }
+      ]
+    },
+    "Secondary Content": {
+      "name": "Secondary Content",
+      "subsections": {
+        "Legacy React APIs": [
+          {
+            "title": "Children",
+            "status": "PENDING",
+            "section": "Secondary Content",
+            "subsection": "Legacy React APIs"
+          },
+          {
+            "title": "cloneElement",
+            "status": "PENDING",
+            "section": "Secondary Content",
+            "subsection": "Legacy React APIs"
+          },
+          {
+            "title": "Component",
+            "status": "PENDING",
+            "section": "Secondary Content",
+            "subsection": "Legacy React APIs"
+          },
+          {
+            "title": "createElement",
+            "status": "PENDING",
+            "section": "Secondary Content",
+            "subsection": "Legacy React APIs"
+          },
+          {
+            "title": "createFactory",
+            "status": "PENDING",
+            "section": "Secondary Content",
+            "subsection": "Legacy React APIs"
+          },
+          {
+            "title": "createRef",
+            "status": "PENDING",
+            "section": "Secondary Content",
+            "subsection": "Legacy React APIs"
+          },
+          {
+            "title": "isValidElement",
+            "status": "PENDING",
+            "section": "Secondary Content",
+            "subsection": "Legacy React APIs"
+          },
+          {
+            "title": "PureComponent",
+            "status": "PENDING",
+            "section": "Secondary Content",
+            "subsection": "Legacy React APIs"
+          }
+        ]
+      },
+      "items": []
+    },
+    "Optional Content": {
+      "name": "Optional Content",
+      "subsections": {},
+      "items": [
+        {
+          "title": "Community",
+          "status": "PENDING",
+          "section": "Optional Content"
+        },
+        {
+          "title": "Blog",
+          "status": "PENDING",
+          "section": "Optional Content"
+        },
+        {
+          "title": "Warnings",
+          "status": "PENDING",
+          "section": "Optional Content"
+        }
+      ]
+    }
+  }
+}

@@ -1,3 +1,6 @@
+import type { TranslationData, TranslationStatus } from "./scripts/analyze-translations";
+
+import output from "./scripts/output.json";
 import { GitHubService } from "./services/github";
 import { TranslatorService } from "./services/translator";
 import { TranslationError } from "./utils/errors";
@@ -40,61 +43,72 @@ MAX_FILES=10 (optional, defaults to all files)`);
 		// Get max files from environment or use undefined for all files
 		const maxFiles = process.env["MAX_FILES"] ? parseInt(process.env["MAX_FILES"]!) : undefined;
 
-		// First get the files to estimate total time
-		const files = await github.getUntranslatedFiles(maxFiles);
+		// Extract pending translations from the JSON data
+		const pendingTranslations: TranslationStatus[] = [];
+		const translationData = output as TranslationData;
 
-		// Calculate time estimates based on file sizes and API rate limits
-		const avgTimePerFile = 75; // seconds per file for translation (increased from 60 to be more realistic)
-		const githubOpsPerFile = 3; // getContent, createBranch, commitTranslation
-		const githubRateDelay = (60 / 60) * 1000; // 60 requests per minute = 1 second delay
-		const totalFileSize = files.reduce((sum, file) => sum + file.content.length, 0);
-		const avgFileSize = totalFileSize / files.length;
+		for (const section of Object.values(translationData.sections)) {
+			// Add items from main section
+			pendingTranslations.push(...section.items.filter((item) => item.status === "PENDING"));
 
-		// Adjust time based on file size
-		const sizeAdjustedTime = files
-			.map((file) => {
-				const sizeRatio = file.content.length / avgFileSize;
-				return Math.max(30, Math.min(120, avgTimePerFile * sizeRatio)); // between 30s and 2min per file
-			})
-			.reduce((sum, time) => sum + time, 0);
+			// Add items from subsections
+			for (const subsectionItems of Object.values(section.subsections)) {
+				pendingTranslations.push(...subsectionItems.filter((item) => item.status === "PENDING"));
+			}
+		}
 
-		const estimatedGithubTime = (files.length * githubOpsPerFile * githubRateDelay) / 1000; // in seconds
-		const totalEstimatedTime = Math.ceil((estimatedGithubTime + sizeAdjustedTime) / 60); // in minutes
+		// Limit the number of files if maxFiles is specified
+		const filesToProcess = maxFiles ? pendingTranslations.slice(0, maxFiles) : pendingTranslations;
 
-		logger.info(`Found ${files.length} files to translate (est. ${totalEstimatedTime} minutes)`);
+		logger.info(`Found ${filesToProcess.length} files to translate`);
 
-		for (const file of files) {
+		for (const item of filesToProcess) {
 			stats.processed++;
-			const remainingFiles = files.length - stats.processed;
+			const remainingFiles = filesToProcess.length - stats.processed;
 			const elapsedMinutes = (Date.now() - stats.startTime) / (1000 * 60);
 			const avgTimePerFile = stats.processed > 0 ? elapsedMinutes / stats.processed : 0;
 			const estimatedRemaining = Math.ceil(remainingFiles * avgTimePerFile);
 
+			const filePath = `content/${item.section.toLowerCase()}/${item.title
+				.toLowerCase()
+				.replace(/[<>]/g, "")
+				.replace(/\s+/g, "-")}.md`;
+
 			logger.progress(
 				stats.processed,
-				files.length,
-				`Processing ${file.path} (${estimatedRemaining}m remaining)`,
+				filesToProcess.length,
+				`Processing ${filePath} (${estimatedRemaining}m remaining)`,
 			);
 
 			try {
+				// Get the current file content and sha from GitHub
+				const fileContent = await github.getFileContent(filePath);
 				const branch = await github.createTranslationBranch();
 				stats.branches++;
 
-				const translation = await translator.translateContent(file, "");
+				const translation = await translator.translateContent(
+					{
+						path: filePath,
+						content: fileContent.content,
+						sha: fileContent.sha,
+					},
+					item.title,
+				);
+
 				await github.commitTranslation(
 					branch,
-					file.path,
+					filePath,
 					translation,
-					`Translate ${file.path} to Brazilian Portuguese`,
+					`Translate ${item.title} to Brazilian Portuguese`,
 				);
 
 				stats.translated++;
 			} catch (error) {
 				stats.failed++;
 				if (error instanceof TranslationError) {
-					logger.error(`Failed: ${file.path} [${error.code}] ${error.message}`);
+					logger.error(`Failed: ${item.title} [${error.code}] ${error.message}`);
 				} else {
-					logger.error(`Failed: ${file.path}`);
+					logger.error(`Failed: ${item.title}`);
 				}
 			}
 		}
