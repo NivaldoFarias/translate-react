@@ -1,138 +1,140 @@
-import { describe, test, expect, beforeEach, mock, spyOn } from 'bun:test';
-import { TranslatorService } from '../../src/services/translator';
-import { TranslationError } from '../../src/utils/errors';
-import type { TranslationFile } from '../../src/types';
+import { beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
 
-describe('TranslatorService', () => {
-  let translator: TranslatorService;
-  const mockGlossary = 'React: React\nComponent: Componente';
-  const mockFile: TranslationFile = {
-    path: 'test/file.md',
-    content: 'This is a test content',
-    sha: 'test-sha'
-  };
+import type { TranslationFile } from "../../src/types";
 
-  beforeEach(() => {
-    translator = new TranslatorService();
-  });
+import { TranslatorService } from "../../src/services/translator";
+import { TranslationError } from "../../src/utils/errors";
 
-  describe('translateContent', () => {
-    test('should successfully translate content', async () => {
-      const mockTranslation = 'Isto é um conteúdo de teste';
-      mock.module('@anthropic-ai/sdk', () => ({
-        default: class {
-          messages = {
-            create: async () => ({
-              content: [ { text: mockTranslation } ]
-            })
-          };
-        }
-      }));
+describe("TranslatorService", () => {
+	let translator: TranslatorService;
+	const mockGlossary = "React: React\nComponent: Componente";
+	const mockFile: TranslationFile = {
+		path: "test/file.md",
+		content: "This is a test content",
+		sha: "test-sha",
+	};
 
-      const result = await translator.translateContent(mockFile, mockGlossary);
-      expect(result).toBe(mockTranslation);
-    });
+	beforeEach(() => {
+		translator = new TranslatorService();
+	});
 
-    test('should use cached translation when available', async () => {
-      const mockTranslation = 'Cached translation';
-      const spy = spyOn(translator[ 'claude' ].messages, 'create');
+	describe("translateContent", () => {
+		test("should successfully translate content", async () => {
+			const mockTranslation = "Isto é um conteúdo de teste";
+			mock.module("@anthropic-ai/sdk", () => ({
+				default: class {
+					messages = {
+						create: async () => ({
+							content: [ { text: mockTranslation } ],
+						}),
+					};
+				},
+			}));
 
-      // First call to cache the result
-      mock.module('@anthropic-ai/sdk', () => ({
-        default: class {
-          messages = {
-            create: async () => ({
-              content: [ { text: mockTranslation } ]
-            })
-          };
-        }
-      }));
+			const result = await translator.translateContent(mockFile, mockGlossary);
+			expect(result).toBe(mockTranslation);
+		});
 
-      await translator.translateContent(mockFile, mockGlossary);
+		test("should use cached translation when available", async () => {
+			const mockTranslation = "Cached translation";
+			const spy = spyOn(translator[ "claude" ].messages, "create");
 
-      // Second call should use cache
-      const result = await translator.translateContent(mockFile, mockGlossary);
+			// First call to cache the result
+			mock.module("@anthropic-ai/sdk", () => ({
+				default: class {
+					messages = {
+						create: async () => ({
+							content: [ { text: mockTranslation } ],
+						}),
+					};
+				},
+			}));
 
-      expect(result).toBe(mockTranslation);
-      expect(spy).toHaveBeenCalledTimes(1);
-    });
+			await translator.translateContent(mockFile, mockGlossary);
 
-    test('should throw error for empty content', async () => {
-      const emptyFile: TranslationFile = {
-        path: 'test/empty.md',
-        content: '',
-        sha: 'empty-sha'
-      };
+			// Second call should use cache
+			const result = await translator.translateContent(mockFile, mockGlossary);
 
-      await expect(translator.translateContent(emptyFile, mockGlossary))
-        .rejects
-        .toThrow(TranslationError);
-    });
+			expect(result).toBe(mockTranslation);
+			expect(spy).toHaveBeenCalledTimes(1);
+		});
 
-    test('should retry on failure', async () => {
-      let attempts = 0;
-      mock.module('@anthropic-ai/sdk', () => ({
-        default: class {
-          messages = {
-            create: async () => {
-              if (attempts++ < 2) {
-                throw new Error('API Error');
-              }
-              return {
-                content: [ { text: 'Success after retry' } ]
-              };
-            }
-          };
-        }
-      }));
+		test("should throw error for empty content", async () => {
+			const emptyFile: TranslationFile = {
+				path: "test/empty.md",
+				content: "",
+				sha: "empty-sha",
+			};
 
-      const result = await translator.translateContent(mockFile, mockGlossary);
-      expect(result).toBe('Success after retry');
-      expect(attempts).toBe(3);
-    });
-  });
+			await expect(translator.translateContent(emptyFile, mockGlossary)).rejects.toThrow(
+				TranslationError,
+			);
+		});
 
-  describe('metrics', () => {
-    test('should track translation metrics', async () => {
-      mock.module('@anthropic-ai/sdk', () => ({
-        default: class {
-          messages = {
-            create: async () => ({
-              content: [ { text: 'Test translation' } ]
-            })
-          };
-        }
-      }));
+		test("should retry on failure", async () => {
+			let attempts = 0;
+			mock.module("@anthropic-ai/sdk", () => ({
+				default: class {
+					messages = {
+						create: async () => {
+							if (attempts++ < 2) {
+								throw new Error("API Error");
+							}
+							return {
+								content: [ { text: "Success after retry" } ],
+							};
+						},
+					};
+				},
+			}));
 
-      await translator.translateContent(mockFile, mockGlossary);
-      const metrics = translator.getMetrics();
+			const result = await translator.translateContent(mockFile, mockGlossary);
+			expect(result).toBe("Success after retry");
+			expect(attempts).toBe(3);
+		});
+	});
 
-      expect(metrics.totalTranslations).toBe(1);
-      expect(metrics.successfulTranslations).toBe(1);
-      expect(metrics.failedTranslations).toBe(0);
-      expect(metrics.averageTranslationTime).toBeGreaterThan(0);
-    });
+	describe("metrics", () => {
+		test("should track translation metrics", async () => {
+			mock.module("@anthropic-ai/sdk", () => ({
+				default: class {
+					messages = {
+						create: async () => ({
+							content: [ { text: "Test translation" } ],
+						}),
+					};
+				},
+			}));
 
-    test('should track failed translations', async () => {
-      mock.module('@anthropic-ai/sdk', () => ({
-        default: class {
-          messages = {
-            create: async () => {
-              throw new Error('API Error');
-            }
-          };
-        }
-      }));
+			await translator.translateContent(mockFile, mockGlossary);
+			const metrics = translator.getMetrics();
 
-      try {
-        await translator.translateContent(mockFile, mockGlossary);
-      } catch (error) {
-        // Expected error
-      }
+			expect(metrics.totalTranslations).toBe(1);
+			expect(metrics.successfulTranslations).toBe(1);
+			expect(metrics.failedTranslations).toBe(0);
+			expect(metrics.averageTranslationTime).toBeGreaterThan(0);
+		});
 
-      const metrics = translator.getMetrics();
-      expect(metrics.failedTranslations).toBe(1);
-      expect(metrics.successfulTranslations).toBe(0);
-    });
-  });
-}); 
+		test("should track failed translations", async () => {
+			mock.module("@anthropic-ai/sdk", () => ({
+				default: class {
+					messages = {
+						create: async () => {
+							throw new Error("API Error");
+						},
+					};
+				},
+			}));
+
+			try {
+				await translator.translateContent(mockFile, mockGlossary);
+			} catch {
+				// Expected error
+			}
+
+			const metrics = translator.getMetrics();
+			expect(metrics.failedTranslations).toBe(1);
+			expect(metrics.successfulTranslations).toBe(0);
+		});
+	});
+});

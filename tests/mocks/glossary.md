@@ -8,4 +8,4 @@
 **render** → renderizar
 **React** → React
 **JSX** → JSX
-**DOM** → DOM 
+**DOM** → DOM

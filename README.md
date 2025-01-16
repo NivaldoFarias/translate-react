@@ -67,11 +67,13 @@ bun test:live    # Run live API tests
 
 ### Translation Process
 
-1. **Repository Scan**: 
+1. **Repository Scan**:
+
    - Scans the React documentation repository for untranslated Markdown files
    - Identifies files based on language analysis and frontmatter
 
 2. **Translation**:
+
    - Uses Claude AI with strict requirements
    - Preserves markdown formatting and code blocks
    - Follows glossary rules for technical terms
@@ -79,6 +81,7 @@ bun test:live    # Run live API tests
    - Produces natural-sounding Brazilian Portuguese translations
 
 3. **Quality Control**:
+
    - Automated verification during translation
    - Language pattern analysis
    - Glossary compliance check
@@ -164,11 +167,13 @@ const metrics = translator.getMetrics();
 ### Common Issues
 
 1. **Rate Limiting**
+
    - The service includes automatic retries
    - Check your API quota
    - Adjust rate limits in configuration
 
 2. **Translation Quality**
+
    - Review glossary terms
    - Check source content formatting
    - Verify markdown preservation
