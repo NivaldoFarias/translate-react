@@ -1,4 +1,6 @@
 export interface TranslationFile {
+    path?: string;
+    sha?: string;
     filename?: string;
     content: string;
 }

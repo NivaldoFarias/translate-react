@@ -45,6 +45,7 @@ export class BranchManager {
 		} catch (error) {
 			const message = error instanceof Error ? error.message : "Unknown error";
 			this.logger.error(`Failed to create branch ${branchName}: ${message}`);
+
 			// Don't track the branch if creation failed
 			this.activeBranches.delete(branchName);
 			throw error;
@@ -74,7 +75,6 @@ export class BranchManager {
 	}
 
 	private async cleanup(): Promise<void> {
-		this.logger.section("Branch Cleanup");
 		this.logger.info(`Cleaning up ${this.activeBranches.size} active branches...`);
 
 		const cleanupPromises = Array.from(this.activeBranches).map((branch) =>

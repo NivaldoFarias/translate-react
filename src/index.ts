@@ -1,14 +1,18 @@
+import type { TranslationFile } from "./types";
+
 import { GitHubService } from "./services/github";
 import { LanguageDetector } from "./services/language-detector";
 import { TranslatorService } from "./services/translator";
-import { TranslationError } from "./utils/errors";
 import Logger from "./utils/logger";
+import { ParallelProcessor } from "./utils/parallelProcessor";
 
 class Runner {
 	private readonly logger = new Logger();
-	private readonly github = new GitHubService();
+	private readonly github = new GitHubService(this.logger);
 	private readonly translator = new TranslatorService();
 	private readonly languageDetector = new LanguageDetector();
+	private readonly maxFiles =
+		process.env["MAX_FILES"] ? parseInt(process.env["MAX_FILES"]!) : undefined;
 	private stats = {
 		processed: 0,
 		translated: 0,
@@ -16,8 +20,8 @@ class Runner {
 		branches: 0,
 		startTime: Date.now(),
 	};
-	private readonly maxFiles =
-		process.env["MAX_FILES"] ? parseInt(process.env["MAX_FILES"]!) : undefined;
+	private readonly sessionId = Date.now();
+	private results: { results: any[]; errors: any[] } = { results: [], errors: [] };
 
 	constructor() {
 		const requiredEnvVars = ["GITHUB_TOKEN", "REPO_OWNER", "REPO_NAME"];
@@ -58,28 +62,13 @@ class Runner {
 
 			this.logger.info(`Found ${filesToTranslate.length} files to translate`);
 
-			for (const [index, file] of filesToTranslate.entries()) {
-				this.stats.processed++;
-				const remainingFiles = filesToTranslate.length - this.stats.processed;
-				const elapsedMinutes = (Date.now() - this.stats.startTime) / (1000 * 60);
-				const avgTimePerFile = this.stats.processed > 0 ? elapsedMinutes / this.stats.processed : 0;
-				const estimatedRemaining = Math.ceil(remainingFiles * avgTimePerFile);
+			this.logger.startProgress("Processing files...");
+			const parallelProcessor = new ParallelProcessor();
 
-				this.logger.progress(
-					this.stats.processed,
-					filesToTranslate.length,
-					`[${index + 1}/${filesToTranslate.length}] Processing "${file.filename}" (${estimatedRemaining}m remaining)`,
-				);
-
+			const processFile = async (file: TranslationFile) => {
 				try {
 					const branch = await this.github.createTranslationBranch(file.filename!);
-
-					this.stats.branches++;
-					this.logger.info(`Creating branch ${branch} for ${file.path}`);
-
 					const translation = await this.translator.translateContent(file);
-
-					this.logger.info(`Translated ${file.filename} to pt-br`);
 
 					await this.github.commitTranslation(
 						branch,
@@ -88,31 +77,54 @@ class Runner {
 						`Translate ${file.filename} to pt-br`,
 					);
 
+					this.logger.success(`Translated ${file.filename} to pt-br`);
+
 					this.stats.translated++;
+
+					return {
+						branch,
+						translation,
+					};
 				} catch (error) {
 					this.stats.failed++;
-					if (error instanceof TranslationError) {
-						this.logger.error(`Failed: ${file.filename} [${error.code}] ${error.message}`);
-					} else {
-						this.logger.error(`Failed: ${file.filename}`);
-					}
-				}
-			}
+					this.logger.error(`Failed: ${file.filename}`);
 
-			const totalMinutes = Math.ceil((Date.now() - this.stats.startTime) / (1000 * 60));
-			this.logger.success(`Translation completed in ${totalMinutes} minutes`);
-			this.logger.info(`
-				Summary:
-				-	Files processed: ${this.stats.processed}
-				-	Translations completed: ${this.stats.translated}
-				-	Failed translations: ${this.stats.failed}
-				-	Branches created: ${this.stats.branches}
-				-	Total time: ${totalMinutes} minutes
-			`);
+					return {
+						error: error instanceof Error ? error.message : "Unknown error",
+					};
+				}
+			};
+
+			this.results = await parallelProcessor.parallel(filesToTranslate, processFile, {
+				batchSize: 5,
+				maxConcurrent: 3,
+				delayBetweenBatches: 1000,
+			});
+
+			this.logger.success(`Translation completed`);
+
+			this.logger.table({
+				"Files processed": this.stats.processed,
+				"Translations completed": this.stats.translated,
+				"Failed translations": this.stats.failed,
+				"Branches created": this.stats.branches,
+				"Elapsed time": `${Math.ceil(Date.now() - this.stats.startTime)}ms`,
+			});
 		} catch (error) {
 			this.logger.error(error instanceof Error ? error.message : "Unknown error");
+			this.logger.table({
+				"Elapsed time": `${Math.ceil(Date.now() - this.stats.startTime)}ms`,
+			});
+
 			process.exit(1);
+		} finally {
+			this.logger.endProgress();
+			await this.writeResultsToFile();
 		}
+	}
+
+	private async writeResultsToFile() {
+		await Bun.write(`logs/session-${this.sessionId}.json`, JSON.stringify(this.results, null, 2));
 	}
 }
 

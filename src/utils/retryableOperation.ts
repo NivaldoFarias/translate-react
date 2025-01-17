@@ -1,12 +1,11 @@
 import Logger from "./logger";
 
 export class RetryableOperation {
-	private logger = new Logger();
-
 	constructor(
-		private maxRetries: number,
-		private initialDelay: number,
-		private maxDelay: number,
+		private readonly maxRetries: number,
+		private readonly initialDelay: number,
+		private readonly maxDelay: number,
+		private readonly logger: Logger | undefined = undefined,
 	) {}
 
 	async withRetry<T>(operation: () => Promise<T>, context: string): Promise<T> {
@@ -25,11 +24,11 @@ export class RetryableOperation {
 				// Check if error is retryable
 				const isRetryable = this.isRetryableError(lastError);
 				if (!isRetryable) {
-					this.logger.error(`Non-retryable error encountered: ${lastError.message}`);
+					this.logger?.error(`Non-retryable error encountered: ${lastError.message}`);
 					throw lastError;
 				}
 
-				this.logger.warn(
+				this.logger?.error(
 					`${context} - Attempt ${attempt}/${this.maxRetries} failed: ${lastError.message}. Retrying in ${delay}ms...`,
 				);
 
@@ -38,7 +37,7 @@ export class RetryableOperation {
 			}
 		}
 
-		this.logger.error(
+		this.logger?.error(
 			`${context} - All ${this.maxRetries} retry attempts failed. Last error: ${lastError?.message}`,
 		);
 		throw lastError;

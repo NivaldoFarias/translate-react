@@ -4,13 +4,13 @@ export class RateLimiter {
 	private queue: Array<() => Promise<void>> = [];
 	private isProcessing = false;
 	private lastRequestTime = 0;
-	private logger = new Logger();
 	private currentOperation: string = "";
 	private operationStartTime: number = 0;
 
 	constructor(
 		private _requestsPerMinute: number,
 		private _name = "default",
+		private readonly logger: Logger | undefined = undefined,
 	) {}
 
 	private isTestEnvironment(): boolean {
@@ -51,7 +51,7 @@ export class RateLimiter {
 			const elapsedTime = ((now - this.operationStartTime) / 1000).toFixed(1);
 			const context = this.currentOperation ? ` - ${this.currentOperation}` : "";
 
-			this.logger.debug(
+			this.logger?.info(
 				`Rate limiting ${this._name}${context} - Waiting ${Math.round(
 					delay,
 				)}ms (${this._requestsPerMinute} requests/min)`,
@@ -66,7 +66,7 @@ export class RateLimiter {
 		} catch (error) {
 			if (error instanceof Error && error.message.includes("rate limit")) {
 				const retryDelay = 60 * 1000;
-				this.logger.warn(
+				this.logger?.info(
 					`Rate limit exceeded for ${this._name}, waiting ${retryDelay / 1000} seconds...`,
 				);
 				await new Promise((resolve) => setTimeout(resolve, retryDelay));
