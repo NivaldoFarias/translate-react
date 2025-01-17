@@ -18,7 +18,7 @@ export interface ProcessedFileResult {
 	error: Error | null;
 }
 
-class Runner {
+export default class Runner {
 	private readonly logger = new Logger();
 	private readonly github = new GitHubService(this.logger);
 	private readonly translator = new TranslatorService();
@@ -110,30 +110,32 @@ class Runner {
 
 			this.logger.success(`Translation completed`);
 
+			if (process.env["TRANSLATION_ISSUE_NUMBER"] && this.compiledResults.length > 0) {
+				const comment = await this.github.commentCompiledResultsOnIssue(
+					Number.parseInt(process.env["TRANSLATION_ISSUE_NUMBER"]),
+					this.compiledResults,
+				);
+
+				this.logger.info(`Commented on translation issue: ${comment.data.html_url}`);
+			}
+
 			this.logger.table({
 				"Files processed successfully": Array.from(this.stats.results).filter(
 					(file) => file.error === null,
 				).length,
 				"Failed translations": Array.from(this.stats.results).filter((file) => file.error !== null)
 					.length,
-				"Elapsed time": `${Math.ceil(Date.now() - this.stats.startTime)}ms`,
 			});
-
-			if (process.env["TRANSLATION_ISSUE_NUMBER"] && this.compiledResults.length > 0) {
-				await this.github.commentCompiledResultsOnIssue(
-					Number.parseInt(process.env["TRANSLATION_ISSUE_NUMBER"]),
-					this.compiledResults,
-				);
-			}
 		} catch (error) {
 			this.logger.error(error instanceof Error ? error.message : "Unknown error");
-			this.logger.table({
-				"Elapsed time": `${Math.ceil(Date.now() - this.stats.startTime)}ms`,
-			});
 
 			process.exit(1);
 		} finally {
+			const elapsedTime = Math.ceil(Date.now() - this.stats.startTime);
+
+			this.logger.info(`Elapsed time: ${elapsedTime}ms (${Math.ceil(elapsedTime / 1000)}s)`);
 			this.logger.endProgress();
+
 			await this.writeResultsToFile();
 		}
 	}
@@ -199,5 +201,3 @@ class Runner {
 		return Array.from(this.stats.results).filter((file) => file.pullRequest);
 	}
 }
-
-void new Runner().run();

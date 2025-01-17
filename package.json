@@ -1,15 +1,16 @@
 {
   "name": "translate-react",
-  "version": "1.0.0",
-  "description": "Translation status tracker for React documentation",
+  "version": "0.0.1",
+  "description": "A tool to translate React docs to Portuguese",
+  "type": "module",
   "main": "dist/index.js",
   "scripts": {
-    "start": "bun run src/index.ts",
-    "test": "bun test",
+    "start": "bun run dist/index.js",
+    "dev": "bun --watch index.ts",
+    "build": "bun build index.ts --outdir dist --target bun",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "format": "prettier --write '**/*.{ts,js,cjs,mjs,json,md}'",
-    "analyze": "bun run src/scripts/analyze-translations.ts"
+    "format": "prettier --write '**/*.{ts,js,cjs,mjs,json,md}'"
   },
   "dependencies": {
     "@octokit/rest": "^21.1.0",

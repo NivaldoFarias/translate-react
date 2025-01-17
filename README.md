@@ -1,188 +1,85 @@
 # translate-react
 
-A specialized tool for automated translation of React documentation from English to Brazilian Portuguese using Claude AI. The project maintains high-quality translations while preserving technical accuracy and documentation structure.
+A CLI tool to automate the translation of React documentation from English to Brazilian Portuguese (pt-BR) using OpenAI's GPT models.
 
-## Features
+## Overview
 
-- 🤖 Automated translation using Claude AI
-- 📚 Strict glossary enforcement for technical terms
-- 🎯 Single-pass high-quality translation
-- 💾 Translation caching for improved performance
-- 🔍 Smart language detection
-- 🚦 Rate limiting for API calls
-- 📊 Translation metrics and monitoring
-- 🔁 Automatic retries with exponential backoff
-- 🔀 GitHub integration for automated PRs
+This project aims to accelerate the translation process of React's documentation to Brazilian Portuguese, which is currently *(2025-01-17)* only 42% complete. It automates the workflow of:
+
+1. Fetching untranslated markdown files from the React docs repository
+2. Translating content using OpenAI's GPT models
+3. Creating branches and pull requests with translations
+4. Managing the translation workflow with rate limiting and error handling
+
+## Prerequisites
+
+- [Bun](https://bun.sh) runtime
+- GitHub Personal Access Token with repo permissions
+- OpenAI API Key
+- Node.js v18+
 
 ## Setup
 
-### Prerequisites
-
-- [Bun](https://bun.sh) >= 1.0.0
-- GitHub account with repository access
-- Anthropic API key for Claude
-
-### Installation
+1. Clone the repository:
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/translate-react.git
+git clone https://github.com/NivaldoFarias/translate-react.git
 cd translate-react
+```
 
-# Install dependencies
+2. Install dependencies:
+
+```bash
 bun install
 ```
 
-### Configuration
-
-Create a `.env` file in the project root:
+3. Create a `.env` file with the following variables:
 
 ```env
-CLAUDE_API_KEY=your_claude_api_key
-CLAUDE_MODEL=claude-3-sonnet-20240229
 GITHUB_TOKEN=your_github_token
+OPENAI_API_KEY=your_openai_api_key
+OPENAI_MODEL=gpt-4 # or another compatible model
 REPO_OWNER=target_repo_owner
 REPO_NAME=target_repo_name
-MAX_FILES=10 # Optional: limit the number of files to process
+NODE_ENV=production
+MAX_FILES= # optional, defaults to all files
 ```
 
 ## Usage
 
-### Basic Usage
+Build and run:
 
 ```bash
-# Start the translation process
-bun start
-
-# Process only a specific number of files
-MAX_FILES=5 bun start
-
-# Run tests
-bun test
-
-# Run specific test suites
-bun test:mock    # Run mock tests only
-bun test:live    # Run live API tests
+bun run build
+bun run start
 ```
 
-### Translation Process
+Development mode with watch:
 
-1. **Repository Scan**:
+```bash
+bun run dev
+```
 
-   - Scans the React documentation repository for untranslated Markdown files
-   - Identifies files based on language analysis and frontmatter
-
-2. **Translation**:
-
-   - Uses Claude AI with strict requirements
-   - Preserves markdown formatting and code blocks
-   - Follows glossary rules for technical terms
-   - Maintains document structure and technical accuracy
-   - Produces natural-sounding Brazilian Portuguese translations
-
-3. **Quality Control**:
-
-   - Automated verification during translation
-   - Language pattern analysis
-   - Glossary compliance check
-   - Technical terminology consistency
-
-4. **GitHub Integration**:
-   - Creates feature branches
-   - Automated commits
-   - Rate-limited API calls
-
-## Development
-
-### Project Structure
+## Project Structure
 
 ```
 src/
 ├── services/
-│   ├── translator.ts      # Translation service
-│   ├── fileTranslator.ts  # File handling and language detection
-│   └── github.ts         # GitHub integration
+│   ├── github.ts        # GitHub API integration
+│   ├── translator.ts    # OpenAI translation service
+│   └── language-detector.ts
 ├── utils/
-│   ├── errors.ts         # Custom error types
-│   ├── logger.ts         # Logging utility
-│   └── rateLimiter.ts    # Rate limiting
-└── types.ts              # TypeScript types
-
-tests/
-├── services/            # Service tests
-├── utils/              # Utility tests
-└── mocks/              # Test fixtures
+│   ├── branchManager.ts # Git branch management
+│   ├── logger.ts        # Logging utilities
+│   ├── rateLimiter.ts   # API rate limiting
+│   └── errors.ts        # Custom error handling
+└── index.ts            # Main runner
 ```
 
-### Running Tests
+## Contributing
 
-The project includes comprehensive tests:
-
-```bash
-# Run all tests
-bun test
-
-# Run with coverage
-bun test:coverage
-
-# Run specific test suites
-bun test:mock
-bun test:live
-```
-
-### Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests for new functionality
-5. Ensure all tests pass
-6. Submit a pull request
-
-#### Commit Guidelines
-
-- Use conventional commits format
-- Include tests for new features
-- Update documentation as needed
-
-## Monitoring
-
-The translation service includes built-in metrics:
-
-- Total translations
-- Success/failure rates
-- Cache hit rates
-- Average translation time
-- API usage statistics
-
-Access metrics programmatically:
-
-```typescript
-const translator = new TranslatorService();
-const metrics = translator.getMetrics();
-```
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Rate Limiting**
-
-   - The service includes automatic retries
-   - Check your API quota
-   - Adjust rate limits in configuration
-
-2. **Translation Quality**
-
-   - Review glossary terms
-   - Check source content formatting
-   - Verify markdown preservation
-
-3. **GitHub Integration**
-   - Verify token permissions
-   - Check repository access
-   - Review rate limits
+Feel free to open issues and pull requests for improvements.
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details
+MIT
