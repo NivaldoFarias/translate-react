@@ -32,7 +32,7 @@ export default class Logger {
 			this.spinner = this.startProgress(text).spinner;
 		}
 
-		this.spinner!.text = `${text} [${current}/${total}]`;
+		this.spinner!.text = `${text} [${Math.round((current / total) * 100)}%]`;
 		return this;
 	}
 

@@ -1,13 +1,10 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { franc } from "franc";
 import langs from "langs";
+import OpenAI from "openai";
 
 import type { TranslationFile } from "../types";
-import type { ParallelOptions } from "../utils/parallelProcessor";
 
 import { ErrorCodes, TranslationError } from "../utils/errors";
-import Logger from "../utils/logger";
-import { ParallelProcessor } from "../utils/parallelProcessor";
 import { RateLimiter } from "../utils/rateLimiter";
 import { RetryableOperation } from "../utils/retryableOperation";
 
@@ -26,13 +23,11 @@ interface TranslationMetrics {
 }
 
 export class TranslatorService {
-	private claude = new Anthropic({ apiKey: process.env["CLAUDE_API_KEY"]! });
-	private model = process.env["CLAUDE_MODEL"]! ?? "claude-3-haiku-20240307";
+	private openai = new OpenAI({ apiKey: process.env["OPENAI_API_KEY"]! });
+	private model = process.env["OPENAI_MODEL"]! ?? "gpt-4o";
 	private cache = new Map<string, TranslationCache>();
 	private readonly CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
-	private readonly MAX_CACHE_SIZE = 1000; // Maximum number of entries
-	private readonly CACHE_CLEANUP_INTERVAL = 60 * 60 * 1000; // 1 hour
-	private rateLimiter = new RateLimiter(10, "Claude API");
+	private rateLimiter = new RateLimiter(10, "OpenAI API");
 	private retryOperation = new RetryableOperation(3, 1000, 5000);
 	private metrics: TranslationMetrics = {
 		totalTranslations: 0,
@@ -42,45 +37,12 @@ export class TranslatorService {
 		averageTranslationTime: 0,
 		totalTranslationTime: 0,
 	};
-	private readonly parallelProcessor: ParallelProcessor;
 
-	constructor() {
-		// Setup cache cleanup interval
-		setInterval(() => this.cleanupCache(), this.CACHE_CLEANUP_INTERVAL);
-		this.parallelProcessor = new ParallelProcessor();
-	}
-
-	private cleanupCache(): void {
-		const now = Date.now();
-		let entriesRemoved = 0;
-
-		// Remove expired entries
-		for (const [key, value] of this.cache.entries()) {
-			if (now - value.timestamp > this.CACHE_TTL) {
-				this.cache.delete(key);
-				entriesRemoved++;
-			}
-		}
-
-		// If still over size limit, remove oldest entries
-		if (this.cache.size > this.MAX_CACHE_SIZE) {
-			const entriesToRemove = Array.from(this.cache.entries())
-				.sort((a, b) => a[1].timestamp - b[1].timestamp)
-				.slice(0, this.cache.size - this.MAX_CACHE_SIZE);
-
-			for (const [key] of entriesToRemove) {
-				this.cache.delete(key);
-				entriesRemoved++;
-			}
-		}
-	}
-
-	private async callClaudeAPI(content: string) {
+	private async callOpenAIAPI(content: string) {
 		const message = await this.rateLimiter.schedule(
 			() =>
-				this.claude.messages.create({
+				this.openai.chat.completions.create({
 					model: this.model,
-					max_tokens: 4096,
 					messages: [
 						{
 							role: "user",
@@ -88,74 +50,17 @@ export class TranslatorService {
 						},
 					],
 				}),
-			"Claude API Call",
+			"OpenAI API Call",
 		);
 
-		return message.content[0].type === "text" ? message.content[0].text : "";
+		return message.choices[0].message.content ?? "";
 	}
 
 	private async translateWithRetry(file: TranslationFile) {
-		const translation = await this.retryOperation.withRetry(
-			async () => this.callClaudeAPI(file.content),
+		return this.retryOperation.withRetry(
+			async () => this.callOpenAIAPI(file.content),
 			`Translation of ${file.filename}`,
 		);
-
-		// Validate translation
-		if (!translation || translation.trim().length === 0) {
-			throw new TranslationError("Translation returned empty content", ErrorCodes.INVALID_CONTENT, {
-				filePath: file.filename,
-			});
-		}
-
-		// Ensure we're not getting error messages instead of translations
-		if (
-			translation.toLowerCase().includes("error") ||
-			translation.toLowerCase().includes("failed")
-		) {
-			throw new TranslationError(
-				"Translation may contain error messages",
-				ErrorCodes.INVALID_CONTENT,
-				{ filePath: file.filename },
-			);
-		}
-
-		// Basic format validation for markdown files
-		if (file.filename?.endsWith(".md")) {
-			if (!this.validateMarkdownTranslation(file.content, translation)) {
-				throw new TranslationError(
-					"Translation format validation failed",
-					ErrorCodes.FORMAT_VALIDATION_FAILED,
-					{ filePath: file.filename },
-				);
-			}
-		}
-
-		return translation;
-	}
-
-	private validateMarkdownTranslation(original: string, translation: string): boolean {
-		// Check if the number of code blocks matches
-		const originalCodeBlocks = (original.match(/```/g) || []).length;
-		const translationCodeBlocks = (translation.match(/```/g) || []).length;
-		if (originalCodeBlocks !== translationCodeBlocks) {
-			return false;
-		}
-
-		// Check if all links are preserved
-		const originalLinks = (original.match(/\[.*?\]\(.*?\)/g) || []).length;
-		const translationLinks = (translation.match(/\[.*?\]\(.*?\)/g) || []).length;
-		if (originalLinks !== translationLinks) {
-			return false;
-		}
-
-		// Check if all headers are preserved
-		const originalHeaders = (original.match(/^#{1,6}\s/gm) || []).length;
-		const translationHeaders = (translation.match(/^#{1,6}\s/gm) || []).length;
-		if (originalHeaders !== translationHeaders) {
-			return false;
-		}
-
-		return true;
 	}
 
 	public async translateContent(file: TranslationFile) {
@@ -197,7 +102,7 @@ export class TranslatorService {
 		} catch (error) {
 			this.metrics.failedTranslations++;
 			const message = error instanceof Error ? error.message : "Unknown error";
-			throw new TranslationError(`Translation failed: ${message}`, ErrorCodes.CLAUDE_API_ERROR, {
+			throw new TranslationError(`Translation failed: ${message}`, ErrorCodes.OPENAI_API_ERROR, {
 				filePath: file.filename,
 			});
 		}
@@ -220,11 +125,12 @@ export class TranslatorService {
 			5. MUST maintain ALL original frontmatter exactly as in original
 			6. MUST preserve ALL original line breaks and paragraph structure
 			7. MUST NOT translate code variables, function names, or technical terms not in the glossary
-			8. MUST NOT add or remove any content, specially 
-			9. MUST NOT change any URLs or links
-			10. MUST translate comments within code blocks according to the glossary
-			11. MUST maintain consistent technical terminology throughout the translation
-			12. MUST ensure the translation reads naturally in Brazilian Portuguese while preserving technical accuracy
+			8. MUST NOT add any content
+			9. MUST NOT remove any content. This is very important, DO NOT DO IT!
+			10. MUST NOT change any URLs or links
+			11. MUST translate comments within code blocks according to the glossary
+			12. MUST maintain consistent technical terminology throughout the translation
+			13. MUST ensure the translation reads naturally in Brazilian Portuguese while preserving technical accuracy
 
 			GLOSSARY RULES:
 			You must translate the following terms according to the glossary:
@@ -405,90 +311,21 @@ export class TranslatorService {
 			- mock
 			- portal
 			- props
-			| ref
-			| release
-			| script
-			| single-page-apps
-			| state
-			| string
-			| string literal
-			| subscribe
-			| subscription
-			| template literal
-			| timestamps
-			| UI
-			| watcher
-			| widgets
-			| wrapper
+			- ref
+			- release
+			- script
+			- single-page-apps
+			- state
+			- string
+			- string literal
+			- subscribe
+			- subscription
+			- template literal
+			- timestamps
+			- UI
+			- watcher
+			- widgets
+			- wrapper
 		`;
-	}
-
-	public async translateContentBatch(files: TranslationFile[], options?: ParallelOptions) {
-		const startTime = Date.now();
-		this.metrics.totalTranslations += files.length;
-
-		const result = await this.parallelProcessor.parallel(
-			files,
-			async (file) => {
-				try {
-					const cacheKey = `${file.filename}:${file.content}`;
-					const cached = this.cache.get(cacheKey);
-
-					if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
-						this.metrics.cacheHits++;
-						return {
-							path: file.path,
-							content: cached.content,
-							filename: file.filename,
-							fromCache: true,
-						};
-					}
-
-					if (file.content.length === 0) {
-						throw new TranslationError(
-							`File content is empty: ${file.filename}`,
-							ErrorCodes.INVALID_CONTENT,
-						);
-					}
-
-					const translation = await this.translateWithRetry(file);
-
-					// Cache the result
-					this.cache.set(cacheKey, {
-						content: translation,
-						timestamp: Date.now(),
-					});
-
-					// Update metrics
-					const translationTime = Date.now() - startTime;
-					this.metrics.successfulTranslations++;
-					this.metrics.totalTranslationTime += translationTime;
-					this.metrics.averageTranslationTime =
-						this.metrics.totalTranslationTime / this.metrics.successfulTranslations;
-
-					return {
-						path: file.path,
-						content: translation,
-						filename: file.filename,
-						fromCache: false,
-					};
-				} catch (error) {
-					this.metrics.failedTranslations++;
-					const message = error instanceof Error ? error.message : "Unknown error";
-					throw new TranslationError(
-						`Translation failed: ${message}`,
-						ErrorCodes.CLAUDE_API_ERROR,
-						{ filePath: file.filename },
-					);
-				}
-			},
-			options,
-		);
-
-		return {
-			...result,
-			metrics: this.metrics,
-			totalTime: Date.now() - startTime,
-		};
 	}
 }

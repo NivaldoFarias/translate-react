@@ -12,9 +12,8 @@ export class BranchManager {
 		private readonly repo: string,
 		private readonly githubToken: string,
 	) {
-		this.octokit = new Octokit({ auth: githubToken });
+		this.octokit = new Octokit({ auth: this.githubToken });
 
-		// Setup cleanup handlers
 		process.on("SIGINT", () => this.cleanup());
 		process.on("SIGTERM", () => this.cleanup());
 		process.on("uncaughtException", (error) => {
@@ -23,21 +22,19 @@ export class BranchManager {
 		});
 	}
 
-	async createBranch(branchName: string, baseBranch: string = "main"): Promise<void> {
+	async createBranch(branchName: string, baseBranch: string = "main") {
 		try {
-			// Get the SHA of the base branch
-			const { data: ref } = await this.octokit.git.getRef({
+			const { data } = await this.octokit.git.getRef({
 				owner: this.owner,
 				repo: this.repo,
 				ref: `heads/${baseBranch}`,
 			});
 
-			// Create new branch
 			await this.octokit.git.createRef({
 				owner: this.owner,
 				repo: this.repo,
 				ref: `refs/heads/${branchName}`,
-				sha: ref.object.sha,
+				sha: data.object.sha,
 			});
 
 			this.activeBranches.add(branchName);
@@ -46,10 +43,19 @@ export class BranchManager {
 			const message = error instanceof Error ? error.message : "Unknown error";
 			this.logger.error(`Failed to create branch ${branchName}: ${message}`);
 
-			// Don't track the branch if creation failed
 			this.activeBranches.delete(branchName);
 			throw error;
 		}
+	}
+
+	async getBranch(branchName: string) {
+		const { data } = await this.octokit.git.getRef({
+			owner: this.owner,
+			repo: this.repo,
+			ref: `heads/${branchName}`,
+		});
+
+		return data?.object.sha ?? null;
 	}
 
 	async deleteBranch(branchName: string): Promise<void> {

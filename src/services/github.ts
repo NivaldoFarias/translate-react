@@ -10,25 +10,21 @@ import { RateLimiter } from "../utils/rateLimiter";
 import { RetryableOperation } from "../utils/retryableOperation";
 
 export class GitHubService {
-	private octokit: Octokit;
-	private rateLimiter = new RateLimiter(60, "GitHub API");
-	private retryOperation: RetryableOperation | undefined;
-	private branchManager: BranchManager;
+	private readonly rateLimiter = new RateLimiter(60, "GitHub API");
+	private readonly retryOperation: RetryableOperation | undefined;
+	private readonly auth = {
+		owner: process.env["REPO_OWNER"]!,
+		repo: process.env["REPO_NAME"]!,
+		githubToken: process.env["GITHUB_TOKEN"]!,
+	};
+	private readonly octokit = new Octokit({ auth: this.auth.githubToken });
+	private readonly branchManager = new BranchManager(
+		this.auth.owner,
+		this.auth.repo,
+		this.auth.githubToken,
+	);
 
-	constructor(
-		private readonly logger: Logger | undefined = undefined,
-		private readonly auth: {
-			owner: string;
-			repo: string;
-			githubToken: string;
-		} = {
-			owner: process.env["REPO_OWNER"]!,
-			repo: process.env["REPO_NAME"]!,
-			githubToken: process.env["GITHUB_TOKEN"]!,
-		},
-	) {
-		this.octokit = new Octokit({ auth: auth.githubToken });
-		this.branchManager = new BranchManager(auth.owner, auth.repo, auth.githubToken);
+	constructor(private readonly logger: Logger | undefined = undefined) {
 		if (this.logger) this.retryOperation = new RetryableOperation(3, 1000, 5000, this.logger);
 	}
 
@@ -137,7 +133,14 @@ export class GitHubService {
 	}
 
 	async createTranslationBranch(fileName: string, baseBranch: string = "main") {
-		const branchName = `translate/${fileName}`;
+		const branchName =
+			process.env.NODE_ENV === "production" ?
+				`translate/${fileName}`
+			:	`translate/${fileName}-${Date.now()}`;
+
+		// check if branch already exists
+		const branch = await this.branchManager.getBranch(branchName);
+		if (branch) return branch;
 
 		await this.branchManager.createBranch(branchName, baseBranch);
 
@@ -209,12 +212,13 @@ export class GitHubService {
 			const { data } = await this.withRetry(
 				() =>
 					this.octokit.pulls.create({
-						owner: this.auth.owner,
+						owner: "reactjs",
 						repo: this.auth.repo,
 						title,
 						body,
-						head: branch,
+						head: `${this.auth.owner}:${branch}`,
 						base: baseBranch,
+						maintainer_can_modify: true,
 					}),
 				"Creating pull request",
 			);
