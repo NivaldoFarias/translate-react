@@ -133,11 +133,11 @@ export class GitHubService {
 		});
 	}
 
-	public async createTranslationBranch(fileName: string, baseBranch: string = "main") {
+	public async createTranslationBranch(fileName: string, baseBranch = "main") {
 		const branchName =
-			process.env.NODE_ENV === "production" ?
-				`translate/${fileName}`
-			:	`translate/${fileName}-${Date.now()}`;
+			process.env.NODE_ENV === "development" ?
+				`translate/${fileName}-${Date.now()}`
+			:	`translate/${fileName}`;
 
 		// check if branch already exists
 		const branch = await this.branchManager.getBranch(branchName);
@@ -274,7 +274,7 @@ export class GitHubService {
 		}
 	}
 
-	public async getRepositoryTree(baseBranch: string = "main", filterIgnored: boolean = true) {
+	public async getRepositoryTree(baseBranch = "main", filterIgnored = true) {
 		const { data } = await this.withRetry(
 			() =>
 				this.octokit.git.getTree({

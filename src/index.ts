@@ -90,6 +90,8 @@ export default class Runner {
 
 			const repositoryTree = await this.github.getRepositoryTree("main");
 
+			this.logger.info(`Repository tree fetched. Fetching files to translate`);
+
 			const uncheckedFiles = await Promise.all(
 				repositoryTree.slice(0, this.maxFiles).map(async (file) => {
 					return {
@@ -184,7 +186,9 @@ export default class Runner {
 	}
 
 	private async writeResultsToFile() {
-		await Bun.write(`dist/session-${Date.now()}.json`, JSON.stringify(this.stats.results));
+		if (!this.stats.results.size) return;
+
+		await Bun.write(`logs/session-${Date.now()}.json`, JSON.stringify(this.stats.results));
 	}
 
 	private get pullRequestDescription() {

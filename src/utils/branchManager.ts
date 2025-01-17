@@ -49,13 +49,17 @@ export class BranchManager {
 	}
 
 	async getBranch(branchName: string) {
-		const { data } = await this.octokit.git.getRef({
-			owner: this.owner,
-			repo: this.repo,
-			ref: `heads/${branchName}`,
-		});
+		try {
+			const { data } = await this.octokit.git.getRef({
+				owner: this.owner,
+				repo: this.repo,
+				ref: `heads/${branchName}`,
+			});
 
-		return data?.object.sha ?? null;
+			return data?.object.sha ?? null;
+		} catch (_error) {
+			return null;
+		}
 	}
 
 	async deleteBranch(branchName: string): Promise<void> {
