@@ -39,7 +39,7 @@ export class TranslatorService {
 	};
 
 	private async callOpenAIAPI(content: string) {
-		const message = await this.rateLimiter.schedule(
+		return await this.rateLimiter.schedule(
 			() =>
 				this.openai.chat.completions.create({
 					model: this.model,
@@ -52,8 +52,6 @@ export class TranslatorService {
 				}),
 			"OpenAI API Call",
 		);
-
-		return message.choices[0].message.content ?? "";
 	}
 
 	private async translateWithRetry(file: TranslationFile) {
@@ -83,7 +81,8 @@ export class TranslatorService {
 				);
 			}
 
-			const translation = await this.translateWithRetry(file);
+			const response = await this.translateWithRetry(file);
+			const translation = response.choices[0].message.content ?? "";
 
 			// Cache the result
 			this.cache.set(cacheKey, {
@@ -98,7 +97,7 @@ export class TranslatorService {
 			this.metrics.averageTranslationTime =
 				this.metrics.totalTranslationTime / this.metrics.successfulTranslations;
 
-			return translation;
+			return response;
 		} catch (error) {
 			this.metrics.failedTranslations++;
 			const message = error instanceof Error ? error.message : "Unknown error";

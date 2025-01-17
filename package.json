@@ -19,7 +19,6 @@
     "langs": "^2.0.0",
     "openai": "^4.78.1",
     "ora": "^8.1.1",
-    "tiktoken": "^1.0.18",
     "zod": "^3.22.4"
   },
   "devDependencies": {

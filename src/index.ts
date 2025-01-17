@@ -1,9 +1,22 @@
+import Bun from "bun";
+
+import type { RestEndpointMethodTypes } from "@octokit/rest";
+import type { ChatCompletion } from "openai/resources";
+
 import type { TranslationFile } from "./types";
 
 import { GitHubService } from "./services/github";
 import { LanguageDetector } from "./services/language-detector";
 import { TranslatorService } from "./services/translator";
 import Logger from "./utils/logger";
+
+export interface ProcessedFileResult {
+	branch: string | null;
+	filename: string;
+	translation: ChatCompletion | string | null;
+	pullRequest: RestEndpointMethodTypes["pulls"]["create"]["response"]["data"] | null;
+	error: Error | null;
+}
 
 class Runner {
 	private readonly logger = new Logger();
@@ -13,12 +26,9 @@ class Runner {
 	private readonly maxFiles =
 		process.env["MAX_FILES"] ? parseInt(process.env["MAX_FILES"]!) : undefined;
 	private stats = {
-		processed: 0,
-		failed: 0,
+		results: new Set<ProcessedFileResult>(),
 		startTime: Date.now(),
 	};
-	private results: { branch: string | null; translation: string | null; error: string | null }[] =
-		[];
 
 	constructor() {
 		const requiredEnvVars = ["GITHUB_TOKEN", "REPO_OWNER", "REPO_NAME"];
@@ -46,7 +56,7 @@ class Runner {
 		});
 	}
 
-	private async processBatch(files: TranslationFile[], batchSize = 10) {
+	private async processInBatches(files: TranslationFile[], batchSize = 10) {
 		const batches = [];
 		for (let i = 0; i < files.length; i += batchSize) {
 			batches.push(files.slice(i, i + batchSize));
@@ -94,17 +104,27 @@ class Runner {
 				(file) => !this.languageDetector.isFileTranslated(file.content),
 			);
 
-			this.logger.success(`Found ${filesToTranslate.length} files to translate`);
+			this.logger.info(`Found ${filesToTranslate.length} files to translate`);
 
-			this.results = await this.processBatch(filesToTranslate, 10);
+			await this.processInBatches(filesToTranslate, 10);
 
 			this.logger.success(`Translation completed`);
 
 			this.logger.table({
-				"Files processed": this.stats.processed,
-				"Failed translations": this.stats.failed,
+				"Files processed successfully": Array.from(this.stats.results).filter(
+					(file) => file.error === null,
+				).length,
+				"Failed translations": Array.from(this.stats.results).filter((file) => file.error !== null)
+					.length,
 				"Elapsed time": `${Math.ceil(Date.now() - this.stats.startTime)}ms`,
 			});
+
+			if (process.env["TRANSLATION_ISSUE_NUMBER"] && this.compiledResults.length > 0) {
+				await this.github.commentCompiledResultsOnIssue(
+					Number.parseInt(process.env["TRANSLATION_ISSUE_NUMBER"]),
+					this.compiledResults,
+				);
+			}
 		} catch (error) {
 			this.logger.error(error instanceof Error ? error.message : "Unknown error");
 			this.logger.table({
@@ -119,51 +139,50 @@ class Runner {
 	}
 
 	private async processFile(file: TranslationFile) {
+		let metadata: ProcessedFileResult = {
+			branch: null,
+			filename: file.filename!,
+			translation: null,
+			pullRequest: null,
+			error: null,
+		};
+
 		try {
 			this.logger.info(`Processing ${file.filename}`);
 
-			const branch = await this.github.createTranslationBranch(file.filename!);
-			const translation = await this.translator.translateContent(file);
+			metadata.branch = await this.github.createTranslationBranch(file.filename!);
+			metadata.translation = await this.translator.translateContent(file);
+
+			const content =
+				typeof metadata.translation === "string" ?
+					metadata.translation
+				:	metadata.translation.choices[0].message.content;
 
 			await this.github.commitTranslation(
-				branch,
+				metadata.branch,
 				file.path!,
-				translation,
+				content ?? "",
 				`Translate \`${file.filename}\` to pt-br`,
 			);
 
-			await this.github.createPullRequest(
-				branch,
+			metadata.pullRequest = await this.github.createPullRequest(
+				metadata.branch,
 				`Translate \`${file.filename}\` to pt-br`,
 				this.pullRequestDescription,
 			);
 
 			this.logger.success(`Processed ${file.filename} successfully`);
-
-			this.stats.processed++;
-
-			return {
-				branch,
-				translation,
-				error: null,
-			};
 		} catch (error) {
-			this.stats.failed++;
-			this.logger.error(`Failed to process ${file.filename}`);
+			metadata.error = error instanceof Error ? error : new Error(String(error));
 
-			return {
-				error: error instanceof Error ? error.message : "Unknown error",
-				branch: null,
-				translation: null,
-			};
+			this.logger.error(`Failed to process ${file.filename}`);
+		} finally {
+			this.stats.results.add(metadata);
 		}
 	}
 
 	private async writeResultsToFile() {
-		await Bun.write(
-			`logs/session-${this.stats.startTime}.json`,
-			JSON.stringify({ results: this.results, stats: this.stats }, null, 2),
-		);
+		await Bun.write(`dist/session-${Date.now()}.json`, JSON.stringify(this.stats.results));
 	}
 
 	private get pullRequestDescription() {
@@ -174,6 +193,10 @@ class Runner {
 
 			Feel free to review and suggest any improvements to the translation.
 		`;
+	}
+
+	private get compiledResults() {
+		return Array.from(this.stats.results).filter((file) => file.pullRequest);
 	}
 }
 

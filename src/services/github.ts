@@ -2,6 +2,7 @@ import { Octokit } from "@octokit/rest";
 
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
+import type { ProcessedFileResult } from "..";
 import type { TranslationFile } from "../types";
 
 import { BranchManager } from "../utils/branchManager";
@@ -132,7 +133,7 @@ export class GitHubService {
 		});
 	}
 
-	async createTranslationBranch(fileName: string, baseBranch: string = "main") {
+	public async createTranslationBranch(fileName: string, baseBranch: string = "main") {
 		const branchName =
 			process.env.NODE_ENV === "production" ?
 				`translate/${fileName}`
@@ -147,7 +148,7 @@ export class GitHubService {
 		return branchName;
 	}
 
-	async commitTranslation(
+	public async commitTranslation(
 		branch: string,
 		filePath: string,
 		content: string,
@@ -202,12 +203,12 @@ export class GitHubService {
 		}
 	}
 
-	async createPullRequest(
+	public async createPullRequest(
 		branch: string,
 		title: string,
 		body: string,
 		baseBranch: string = "main",
-	): Promise<number> {
+	) {
 		try {
 			const { data } = await this.withRetry(
 				() =>
@@ -224,7 +225,8 @@ export class GitHubService {
 			);
 
 			this.logger?.info(`Created pull request #${data.number}: ${title}`);
-			return data.number;
+
+			return data;
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : "Unknown error";
 			this.logger?.error(`Failed to create pull request: ${errorMessage}`);
@@ -235,15 +237,15 @@ export class GitHubService {
 		}
 	}
 
-	async cleanupBranch(branch: string) {
+	public async cleanupBranch(branch: string) {
 		await this.branchManager.deleteBranch(branch);
 	}
 
-	getActiveBranches(): string[] {
+	public getActiveBranches(): string[] {
 		return this.branchManager.getActiveBranches();
 	}
 
-	async getFileContent(
+	public async getFileContent(
 		file: RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"][number],
 	) {
 		try {
@@ -272,7 +274,7 @@ export class GitHubService {
 		}
 	}
 
-	async getRepositoryTree(baseBranch: string = "main", filterIgnored: boolean = true) {
+	public async getRepositoryTree(baseBranch: string = "main", filterIgnored: boolean = true) {
 		const { data } = await this.withRetry(
 			() =>
 				this.octokit.git.getTree({
@@ -285,5 +287,30 @@ export class GitHubService {
 		);
 
 		return filterIgnored ? this.filterRepositoryTree(data.tree) : data.tree;
+	}
+
+	public async commentCompiledResultsOnIssue(issueNumber: number, results: ProcessedFileResult[]) {
+		const comment = `
+			As seguintes páginas foram traduzidas e PRs foram criados:
+
+			${results.map((result) => `- [${result.filename}](${result.pullRequest?.html_url})`).join("\n")}
+
+			###### Observações
+			
+			- As traduções foram geradas por IA e precisam de revisão.
+			- O fluxo que escrevi para gerar as traduções está disponível no repositório [\`translate-react\`](https://github.com/${process.env["REPO_OWNER"]}/translate-react).
+			- A implementação não é perfeita e pode conter erros.
+		`;
+
+		return await this.withRetry(
+			() =>
+				this.octokit.issues.createComment({
+					owner: this.auth.owner,
+					repo: this.auth.repo,
+					issue_number: issueNumber,
+					body: comment,
+				}),
+			"Creating comment on translation progress issue",
+		);
 	}
 }
