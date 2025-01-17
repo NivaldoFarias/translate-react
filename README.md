@@ -43,6 +43,7 @@ REPO_OWNER=target_repo_owner
 REPO_NAME=target_repo_name
 NODE_ENV=production
 MAX_FILES= # optional, defaults to all files
+TRANSLATION_ISSUE_NUMBER= # optional, defaults to no issue comment
 ```
 
 ## Usage
@@ -52,6 +53,12 @@ Build and run:
 ```bash
 bun run build
 bun run start
+```
+
+Or just run using bun without building:
+
+```bash
+bun run index.ts
 ```
 
 Development mode with watch:
@@ -65,15 +72,15 @@ bun run dev
 ```
 src/
 ├── services/
-│   ├── github.ts        # GitHub API integration
-│   ├── translator.ts    # OpenAI translation service
-│   └── language-detector.ts
+│   ├── github.ts             # GitHub API integration
+│   ├── translator.ts         # OpenAI translation service
+│   └── language-detector.ts  # Language detection service
 ├── utils/
-│   ├── branchManager.ts # Git branch management
-│   ├── logger.ts        # Logging utilities
-│   ├── rateLimiter.ts   # API rate limiting
-│   └── errors.ts        # Custom error handling
-└── index.ts            # Main runner
+│   ├── branchManager.ts      # Git branch management
+│   ├── logger.ts             # Logging utilities
+│   ├── rateLimiter.ts        # API rate limiting
+│   └── errors.ts             # Custom error handling
+└── index.ts                  # Main runner
 ```
 
 ## Contributing
