@@ -150,6 +150,22 @@ export class GitHubService {
 		message: string,
 	): Promise<void> {
 		try {
+			// Check if branch already has commits
+			const commits = await this.withRetry(
+				() =>
+					this.octokit.repos.listCommits({
+						owner: process.env.REPO_OWNER!,
+						repo: process.env.REPO_NAME!,
+						sha: branch.ref,
+					}),
+				`Checking commits on branch: ${branch.ref}`,
+			);
+
+			if (commits.data.length > 1) {
+				this.logger?.info(`Branch ${branch.ref} already has a commit, skipping`);
+				return;
+			}
+
 			// Get the current file (if it exists)
 			const currentFile = await this.withRetry(
 				() =>
@@ -192,6 +208,31 @@ export class GitHubService {
 		baseBranch: string = "main",
 	) {
 		try {
+			// Check for existing PRs from this branch
+			const { data: existingPRs } = await this.withRetry(
+				() =>
+					this.octokit.pulls.list({
+						owner: process.env.ORIGINAL_REPO_OWNER!,
+						repo: process.env.REPO_NAME!,
+						head: `${process.env.REPO_OWNER!}:${branch}`,
+						state: "open",
+					}),
+				"Checking existing pull requests",
+			);
+
+			if (existingPRs.length > 0) {
+				this.logger?.info(`Pull request already exists for branch ${branch}`);
+
+				const pr = existingPRs.find((pr) => pr.title === title);
+
+				if (!pr) {
+					this.logger?.error(`Pull request not found for title ${title}`);
+					throw new Error(`Pull request not found for title ${title}`);
+				}
+
+				return pr;
+			}
+
 			const { data } = await this.withRetry(
 				() =>
 					this.octokit.pulls.create({
@@ -276,14 +317,14 @@ export class GitHubService {
 	public async commentCompiledResultsOnIssue(issueNumber: number, results: ProcessedFileResult[]) {
 		const comment = `As seguintes páginas foram traduzidas e PRs foram criados:
 
-	${results.map((result) => `- [${result.filename}](${result.pullRequest?.html_url})`).join("\n")}
+${results.map((result) => `- [${result.filename}](${result.pullRequest?.html_url})`).join("\n")}
 
-	###### Observações
-	
-	- As traduções foram geradas por IA e precisam de revisão.
-	- Talvez algumas traduções já tenham PRs criados, mas ainda não foram fechados.
-	- O fluxo que escrevi para gerar as traduções está disponível no repositório [\`translate-react\`](https://github.com/${process.env["REPO_OWNER"]}/translate-react).
-	- A implementação não é perfeita e pode conter erros.`;
+###### Observações
+
+- As traduções foram geradas por IA e precisam de revisão.
+- Talvez algumas traduções já tenham PRs criados, mas ainda não foram fechados.
+- O fluxo que escrevi para gerar as traduções está disponível no repositório [\`translate-react\`](https://github.com/${process.env["REPO_OWNER"]}/translate-react).
+- A implementação não é perfeita e pode conter erros.`;
 
 		return await this.withRetry(
 			() =>

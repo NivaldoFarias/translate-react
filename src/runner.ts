@@ -16,7 +16,10 @@ export interface ProcessedFileResult {
 	branch: RestEndpointMethodTypes["git"]["getRef"]["response"]["data"] | null;
 	filename: string;
 	translation: ChatCompletion | string | null;
-	pullRequest: RestEndpointMethodTypes["pulls"]["create"]["response"]["data"] | null;
+	pullRequest:
+		| RestEndpointMethodTypes["pulls"]["create"]["response"]["data"]
+		| RestEndpointMethodTypes["pulls"]["list"]["response"]["data"][number]
+		| null;
 	error: Error | null;
 }
 
@@ -228,9 +231,9 @@ export default class Runner {
 	private get pullRequestDescription() {
 		return `This pull request contains a translation of the referenced page into Portuguese (pt-BR). The translation was generated using OpenAI _(model \`${process.env.OPENAI_MODEL}\`)_.
 
-	Refer to the source repository workflow that generated this translation for more details: https://github.com/${process.env.REPO_OWNER}/${process.env.REPO_NAME}
+Refer to the [source repository](https://github.com/${process.env.REPO_OWNER}/translate-react) workflow that generated this translation for more details.
 
-	Feel free to review and suggest any improvements to the translation.`;
+Feel free to review and suggest any improvements to the translation.`;
 	}
 
 	private get compiledResults() {
