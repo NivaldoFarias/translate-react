@@ -1,4 +1,8 @@
+import { existsSync, mkdirSync } from "fs";
+
 import Bun from "bun";
+
+import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 import type { ProcessedFileResult } from "../runner";
 import type { TranslationFile } from "../types";
@@ -6,10 +10,9 @@ import type Logger from "../utils/logger";
 
 export interface Snapshot {
 	timestamp: number;
-	repositoryTree?: any[];
-	uncheckedFiles?: TranslationFile[];
-	filesToTranslate?: TranslationFile[];
-	processedResults?: ProcessedFileResult[];
+	repositoryTree: RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"];
+	filesToTranslate: TranslationFile[];
+	processedResults: ProcessedFileResult[];
 }
 
 export class SnapshotManager {
@@ -18,19 +21,25 @@ export class SnapshotManager {
 	private readonly snapshotFilePath: string;
 	private snapshot: Snapshot | null = null;
 
+	private pendingWrites: Snapshot[] = [];
+	private writeTimeout: number | null = null;
+	private readonly WRITE_DELAY = 1000; // 1 second debounce
+
 	constructor(private readonly logger?: Logger) {
-		// Ensure checkpoint directory exists
-		const dir = Bun.file(this.snapshotDir);
-		if (!dir.exists()) {
-			Bun.write(this.snapshotDir + "/.gitkeep", "");
+		if (!existsSync(this.snapshotDir)) {
+			mkdirSync(this.snapshotDir, { recursive: true });
 		}
 
 		this.snapshotFilePath = `${this.snapshotDir}/${this.prefix}-${Date.now()}.json`;
-	}
 
-	private pendingWrites: Array<Partial<Snapshot>> = [];
-	private writeTimeout: number | null = null;
-	private readonly WRITE_DELAY = 1000; // 1 second debounce
+		process.on("SIGINT", async () => {
+			await this.cleanup();
+		});
+
+		process.on("SIGTERM", async () => {
+			await this.cleanup();
+		});
+	}
 
 	private async flushWrites() {
 		if (!this.pendingWrites.length) return;
@@ -38,7 +47,7 @@ export class SnapshotManager {
 		try {
 			// Merge all pending writes into one snapshot
 			const mergedData = this.pendingWrites.reduce((acc, curr) => ({ ...acc, ...curr }), {});
-			const snapshot = { ...mergedData, timestamp: Date.now() };
+			const snapshot = { ...mergedData, timestamp: Date.now() } as Snapshot;
 
 			this.snapshot = snapshot;
 			await Bun.write(this.snapshotFilePath, JSON.stringify(this.snapshot, null, 2));
@@ -52,7 +61,7 @@ export class SnapshotManager {
 		}
 	}
 
-	public async save(data: Partial<Snapshot>) {
+	public async save(data: Snapshot) {
 		this.pendingWrites.push(data);
 
 		// Clear existing timeout if any
@@ -67,9 +76,10 @@ export class SnapshotManager {
 		}, this.WRITE_DELAY) as unknown as number;
 	}
 
-	public async append(data: Partial<Snapshot>) {
+	public async append<K extends keyof Snapshot>(key: K, data: Snapshot[K]) {
 		if (!this.snapshot) return;
-		await this.save(data);
+
+		await this.save({ ...this.snapshot, [key]: data });
 	}
 
 	public async loadLatest() {
@@ -121,5 +131,16 @@ export class SnapshotManager {
 				`Failed to clear snapshots: ${error instanceof Error ? error.message : "Unknown error"}`,
 			);
 		}
+	}
+
+	private async cleanup() {
+		this.logger?.info("Cleaning up snapshots...");
+
+		if (this.writeTimeout) {
+			clearTimeout(this.writeTimeout);
+			this.writeTimeout = null;
+		}
+
+		// await this.flushWrites();
 	}
 }

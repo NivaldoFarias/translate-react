@@ -1,5 +1,3 @@
-import Bun from "bun";
-
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 import type { ChatCompletion } from "openai/resources";
 
@@ -31,8 +29,15 @@ export default class Runner {
 	private readonly snapshotManager = new SnapshotManager(this.logger);
 	private readonly maxFiles = import.meta.env.MAX_FILES;
 	private stats = {
-		results: new Set<ProcessedFileResult>(),
+		results: new Map<ProcessedFileResult["filename"], ProcessedFileResult>(),
 		startTime: Date.now(),
+	};
+
+	private cleanup = () => {
+		this.logger?.endProgress();
+
+		// Force exit after a timeout to ensure cleanup handlers run
+		setTimeout(() => process.exit(0), 1000);
 	};
 
 	constructor() {
@@ -43,103 +48,106 @@ export default class Runner {
 			process.exit(1);
 		}
 
-		process.on("SIGINT", async () => {
-			this.logger.info("SIGINT received, writing results to file");
-			this.logger.endProgress();
-			await this.writeResultsToFile();
-
-			process.exit(0);
+		process.on("SIGINT", this.cleanup);
+		process.on("SIGTERM", this.cleanup);
+		process.on("uncaughtException", (error) => {
+			this.logger.error(`Uncaught exception: ${error.message}`);
+			this.cleanup();
 		});
 	}
 
-	async run() {
+	public async run() {
 		try {
 			this.logger.info("Starting translation workflow");
 
-			const verified = await this.github.verifyTokenPermissions();
-
-			if (!verified) {
+			if (!(await this.github.verifyTokenPermissions())) {
 				throw new Error("Token permissions verification failed");
 			}
 
-			// Try to load snapshot
-			const snapshot = await this.snapshotManager.loadLatest();
-			if (snapshot) {
-				this.logger.info(
-					`Found snapshot. Resuming from latest: ${new Date(snapshot.timestamp).toLocaleString()}`,
-				);
-				this.stats.results = new Set(snapshot.processedResults);
+			let snapshot = (await this.snapshotManager.loadLatest()) || {
+				repositoryTree: [],
+				filesToTranslate: [],
+				processedResults: [],
+				timestamp: Date.now(),
+			};
 
-				if (snapshot.filesToTranslate?.length) {
-					await this.processInBatches(snapshot.filesToTranslate, 10);
+			if (!snapshot.repositoryTree?.length) {
+				snapshot.repositoryTree = await this.github.getRepositoryTree("main");
+
+				await this.snapshotManager.append("repositoryTree", snapshot.repositoryTree);
+
+				this.logger.info(`Repository tree fetched`);
+			} else {
+				this.logger.info(`Repository tree already fetched`);
+			}
+
+			if (!snapshot.filesToTranslate?.length) {
+				const uncheckedFiles: TranslationFile[] = [];
+
+				for (const [index, file] of snapshot.repositoryTree.slice(0, this.maxFiles).entries()) {
+					this.logger.updateProgress(
+						index + 1,
+						snapshot.repositoryTree.length,
+						`Fetching file ${index + 1}/${snapshot.repositoryTree.length}: ${file.path}`,
+					);
+
+					if (uncheckedFiles.find((compareFile) => compareFile.path === file.path)) continue;
+
+					uncheckedFiles.push({
+						content: await this.github.getFileContent(file),
+						filename: file.path?.split("/").pop(),
+						...file,
+					});
 				}
 
-				this.logger.success("Resumed processing completed");
-				return;
-			}
+				this.logger.endProgress();
 
-			const repositoryTree = await this.github.getRepositoryTree("main");
-			await this.snapshotManager.append({ repositoryTree });
-
-			this.logger.info(`Repository tree fetched. Fetching files to translate`);
-
-			this.logger.startProgress("Fetching file contents");
-			const uncheckedFiles = [];
-
-			for (const [index, file] of repositoryTree.slice(0, this.maxFiles).entries()) {
-				this.logger.updateProgress(
-					index + 1,
-					repositoryTree.length,
-					`Fetching file ${index + 1}/${repositoryTree.length}: ${file.path}`,
+				const filesToTranslate = uncheckedFiles.filter(
+					(file) => !this.languageDetector.isFileTranslated(file.content),
 				);
 
-				uncheckedFiles.push({
-					path: file.path,
-					content: await this.github.getFileContent(file),
-					filename: file.path?.split("/").pop(),
-				});
+				await this.snapshotManager.append("filesToTranslate", filesToTranslate);
+
+				snapshot.filesToTranslate = filesToTranslate;
+
+				this.logger.info(`Found ${filesToTranslate.length} files to translate`);
+			} else {
+				this.logger.info(`Found ${snapshot.filesToTranslate.length} files to translate`);
 			}
 
-			this.logger.endProgress();
+			await this.processInBatches(snapshot.filesToTranslate, 10);
 
-			await this.snapshotManager.append({ uncheckedFiles });
+			snapshot.processedResults = Array.from(this.stats.results.values());
 
-			const filesToTranslate = uncheckedFiles.filter(
-				(file) => !this.languageDetector.isFileTranslated(file.content),
-			);
-
-			await this.snapshotManager.append({ filesToTranslate });
-
-			this.logger.info(`Found ${filesToTranslate.length} files to translate`);
-
-			await this.processInBatches(filesToTranslate, 10);
-
-			// Save final results
-			await this.snapshotManager.append({
-				processedResults: Array.from(this.stats.results),
-			});
+			await this.snapshotManager.append("processedResults", snapshot.processedResults);
 
 			this.logger.success(`Translation completed`);
 
-			if (import.meta.env.TRANSLATION_ISSUE_NUMBER && this.compiledResults.length > 0) {
+			if (
+				import.meta.env.NODE_ENV === "production" &&
+				import.meta.env.TRANSLATION_ISSUE_NUMBER &&
+				snapshot.processedResults.length > 0
+			) {
 				const comment = await this.github.commentCompiledResultsOnIssue(
 					import.meta.env.TRANSLATION_ISSUE_NUMBER,
-					this.compiledResults,
+					snapshot.processedResults,
 				);
 
-				this.logger.info(`Commented on translation issue: ${comment.data.html_url}`);
+				this.logger.info(`Commented on translation issue: ${comment.html_url}`);
 			}
 
 			this.logger.table({
-				"Files processed successfully": Array.from(this.stats.results).filter(
+				"Files processed successfully": Array.from(this.stats.results.values()).filter(
 					(file) => file.error === null,
 				).length,
-				"Failed translations": Array.from(this.stats.results).filter((file) => file.error !== null)
-					.length,
+				"Failed translations": Array.from(this.stats.results.values()).filter(
+					(file) => file.error !== null,
+				).length,
 			});
 
-			// Clear checkpoints after successful completion
-			await this.snapshotManager.clear();
+			if (import.meta.env.NODE_ENV === "production") {
+				await this.snapshotManager.clear();
+			}
 		} catch (error) {
 			this.logger.error(error instanceof Error ? error.message : "Unknown error");
 			process.exit(1);
@@ -148,8 +156,6 @@ export default class Runner {
 
 			this.logger.info(`Elapsed time: ${elapsedTime}ms (${Math.ceil(elapsedTime / 1000)}s)`);
 			this.logger.endProgress();
-
-			await this.writeResultsToFile();
 		}
 	}
 
@@ -158,8 +164,6 @@ export default class Runner {
 		for (let i = 0; i < files.length; i += batchSize) {
 			batches.push(files.slice(i, i + batchSize));
 		}
-
-		const results = [];
 
 		this.logger.startProgress(`Processing ${batches.length} batches`);
 
@@ -170,20 +174,16 @@ export default class Runner {
 				`Processing batch ${batches.indexOf(batch) + 1} of ${batches.length}`,
 			);
 
-			const batchResults = await Promise.all(batch.map(this.processFile.bind(this)));
-
-			results.push(...batchResults);
+			await Promise.all(batch.map(this.processFile.bind(this)));
 
 			this.logger.success(`Processed batch ${batches.indexOf(batch) + 1} of ${batches.length}`);
 		}
 
 		this.logger.endProgress();
-
-		return results;
 	}
 
 	private async processFile(file: TranslationFile) {
-		let metadata: ProcessedFileResult = {
+		const metadata = this.stats.results.get(file.filename!) || {
 			branch: null,
 			filename: file.filename!,
 			translation: null,
@@ -192,41 +192,42 @@ export default class Runner {
 		};
 
 		try {
-			metadata.branch = await this.github.createTranslationBranch(file.filename!);
-
-			if (this.stats.results.size > 0) {
-				const lastTranslation = Array.from(this.stats.results).find(
-					(result) => result.filename === file.filename,
-				);
-
-				if (lastTranslation?.translation) {
-					this.logger.info(`Found cached translation for ${file.filename}. Skipping AI call`);
-
-					metadata.translation = lastTranslation.translation;
-				}
+			if (!metadata.branch) {
+				metadata.branch = await this.github.createTranslationBranch(file.filename!);
 			}
+
+			const commitExists = await this.github.checkIfCommitExistsOnFork();
 
 			if (!metadata.translation) {
-				metadata.translation = await this.translator.translateContent(file);
+				metadata.translation =
+					commitExists ?
+						await this.github.getFileContent(file)
+					:	await this.translator.translateContent(file);
 			}
 
-			const content =
-				typeof metadata.translation === "string" ?
-					metadata.translation
-				:	metadata.translation?.choices[0].message.content;
+			if (commitExists) {
+				this.logger.info(`Branch ${metadata.branch.ref} already has a commit for ${file.filename}`);
+			} else {
+				const content =
+					typeof metadata.translation === "string" ?
+						metadata.translation
+					:	metadata.translation?.choices[0].message.content;
 
-			await this.github.commitTranslation(
-				metadata.branch,
-				file.path!,
-				content ?? "",
-				`Translate \`${file.filename}\` to pt-br`,
-			);
+				await this.github.commitTranslation(
+					metadata.branch,
+					file,
+					content ?? "",
+					`Translate \`${file.filename}\` to pt-br`,
+				);
+			}
 
-			metadata.pullRequest = await this.github.createPullRequest(
-				metadata.branch.ref,
-				`Translate \`${file.filename}\` to pt-br`,
-				this.pullRequestDescription,
-			);
+			if (!metadata.pullRequest) {
+				metadata.pullRequest = await this.github.createPullRequest(
+					metadata.branch.ref,
+					`Translate \`${file.filename}\` to pt-br`,
+					this.pullRequestDescription,
+				);
+			}
 
 			this.logger.success(`Processed ${file.filename} successfully`);
 		} catch (error) {
@@ -234,14 +235,8 @@ export default class Runner {
 
 			this.logger.error(`Failed to process ${file.filename}`);
 		} finally {
-			this.stats.results.add(metadata);
+			this.stats.results.set(file.filename!, metadata);
 		}
-	}
-
-	private async writeResultsToFile() {
-		if (!this.stats.results.size) return;
-
-		await Bun.write(`logs/session-${Date.now()}.json`, JSON.stringify(this.stats.results));
 	}
 
 	private get pullRequestDescription() {
@@ -250,9 +245,5 @@ export default class Runner {
 Refer to the [source repository](https://github.com/${import.meta.env.REPO_OWNER}/translate-react) workflow that generated this translation for more details.
 
 Feel free to review and suggest any improvements to the translation.`;
-	}
-
-	private get compiledResults() {
-		return Array.from(this.stats.results).filter((file) => file.pullRequest);
 	}
 }

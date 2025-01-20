@@ -1,4 +1,3 @@
-import { RequestError } from "@octokit/request-error";
 import { Octokit } from "@octokit/rest";
 
 import Logger from "../utils/logger";
@@ -15,11 +14,11 @@ export class BranchManager {
 	) {
 		this.octokit = new Octokit({ auth: this.githubToken });
 
-		process.on("SIGINT", () => this.cleanup());
-		process.on("SIGTERM", () => this.cleanup());
-		process.on("uncaughtException", (error) => {
+		process.on("SIGINT", async () => await this.cleanup());
+		process.on("SIGTERM", async () => await this.cleanup());
+		process.on("uncaughtException", async (error) => {
 			this.logger.error(`Uncaught exception: ${error.message}`);
-			this.cleanup();
+			await this.cleanup();
 		});
 	}
 
@@ -59,7 +58,7 @@ export class BranchManager {
 				ref: `heads/${branchName}`,
 			});
 		} catch (error) {
-			if (error instanceof RequestError && error.status == 404) {
+			if (error instanceof Error && error.message.includes("404")) {
 				const message = error instanceof Error ? error.message : "Unknown error";
 
 				this.logger.error(`Error checking branch ${branchName}: ${message}`);
@@ -87,7 +86,7 @@ export class BranchManager {
 		}
 	}
 
-	getActiveBranches(): string[] {
+	public getActiveBranches(): string[] {
 		return Array.from(this.activeBranches);
 	}
 
