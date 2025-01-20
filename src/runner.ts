@@ -79,7 +79,7 @@ export default class Runner {
 			}
 
 			const repositoryTree = await this.github.getRepositoryTree("main");
-			await this.snapshotManager.save({ repositoryTree });
+			await this.snapshotManager.append({ repositoryTree });
 
 			this.logger.info(`Repository tree fetched. Fetching files to translate`);
 
@@ -99,22 +99,23 @@ export default class Runner {
 					filename: file.path?.split("/").pop(),
 				});
 			}
+
 			this.logger.endProgress();
 
-			await this.snapshotManager.save({ uncheckedFiles });
+			await this.snapshotManager.append({ uncheckedFiles });
 
 			const filesToTranslate = uncheckedFiles.filter(
 				(file) => !this.languageDetector.isFileTranslated(file.content),
 			);
 
-			await this.snapshotManager.save({ filesToTranslate });
+			await this.snapshotManager.append({ filesToTranslate });
 
 			this.logger.info(`Found ${filesToTranslate.length} files to translate`);
 
 			await this.processInBatches(filesToTranslate, 10);
 
 			// Save final results
-			await this.snapshotManager.save({
+			await this.snapshotManager.append({
 				processedResults: Array.from(this.stats.results),
 			});
 
