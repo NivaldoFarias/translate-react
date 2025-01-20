@@ -8,16 +8,10 @@ import { ErrorCodes, TranslationError } from "../utils/errors";
 import { RateLimiter } from "../utils/rateLimiter";
 import { RetryableOperation } from "../utils/retryableOperation";
 
-interface TranslationCache {
-	content: string;
-	timestamp: number;
-}
-
 interface TranslationMetrics {
 	totalTranslations: number;
 	successfulTranslations: number;
 	failedTranslations: number;
-	cacheHits: number;
 	averageTranslationTime: number;
 	totalTranslationTime: number;
 }
@@ -25,15 +19,12 @@ interface TranslationMetrics {
 export class TranslatorService {
 	private openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 	private model = process.env.OPENAI_MODEL! ?? "gpt-4o";
-	private cache = new Map<string, TranslationCache>();
-	private readonly CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 	private rateLimiter = new RateLimiter(10, "OpenAI API");
 	private retryOperation = new RetryableOperation(3, 1000, 5000);
 	private metrics: TranslationMetrics = {
 		totalTranslations: 0,
 		successfulTranslations: 0,
 		failedTranslations: 0,
-		cacheHits: 0,
 		averageTranslationTime: 0,
 		totalTranslationTime: 0,
 	};
@@ -66,14 +57,6 @@ export class TranslatorService {
 		this.metrics.totalTranslations++;
 
 		try {
-			const cacheKey = `${file.filename}:${file.content}`;
-			const cached = this.cache.get(cacheKey);
-
-			if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
-				this.metrics.cacheHits++;
-				return cached.content;
-			}
-
 			if (file.content.length === 0) {
 				throw new TranslationError(
 					`File content is empty: ${file.filename}`,
@@ -82,13 +65,6 @@ export class TranslatorService {
 			}
 
 			const response = await this.translateWithRetry(file);
-			const translation = response.choices[0].message.content ?? "";
-
-			// Cache the result
-			this.cache.set(cacheKey, {
-				content: translation,
-				timestamp: Date.now(),
-			});
 
 			// Update metrics
 			const translationTime = Date.now() - startTime;
@@ -310,21 +286,21 @@ export class TranslatorService {
 			- mock
 			- portal
 			- props
-			- ref
-			- release
-			- script
-			- single-page-apps
-			- state
-			- string
-			- string literal
-			- subscribe
-			- subscription
-			- template literal
-			- timestamps
-			- UI
-			- watcher
-			- widgets
-			- wrapper
+			| ref
+			| release
+			| script
+			| single-page-apps
+			| state
+			| string
+			| string literal
+			| subscribe
+			| subscription
+			| template literal
+			| timestamps
+			| UI
+			| watcher
+			| widgets
+			| wrapper
 		`;
 	}
 }

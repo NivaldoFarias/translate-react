@@ -135,58 +135,44 @@ export class GitHubService {
 				`translate/${fileName}-${Date.now()}`
 			:	`translate/${fileName}`;
 
-		// check if branch already exists
-		const branch = await this.branchManager.getBranch(branchName);
-		if (branch) return branch;
+		const alreadyCreatedBranch = await this.branchManager.getBranch(branchName);
+		if (alreadyCreatedBranch) return alreadyCreatedBranch.data;
 
-		await this.branchManager.createBranch(branchName, baseBranch);
+		const branchRef = await this.branchManager.createBranch(branchName, baseBranch);
 
-		return branchName;
+		return branchRef.data;
 	}
 
 	public async commitTranslation(
-		branch: string,
+		branch: RestEndpointMethodTypes["git"]["getRef"]["response"]["data"],
 		filePath: string,
 		content: string,
 		message: string,
 	): Promise<void> {
 		try {
 			// Get the current file (if it exists)
-			let currentFile: RestEndpointMethodTypes["repos"]["getContent"]["response"] | undefined;
-			try {
-				currentFile = await this.withRetry(
-					() =>
-						this.octokit.repos.getContent({
-							owner: process.env.REPO_OWNER!,
-							repo: process.env.REPO_NAME!,
-							path: filePath,
-							ref: branch,
-						}),
-					`Checking existing file: ${filePath}`,
-				);
-			} catch (error) {
-				const message = error instanceof Error ? error.message : "Unknown error";
-				this.logger?.error(`File not found: ${message}`);
-			}
-
-			await this.withRetry(
+			const currentFile = await this.withRetry(
 				() =>
-					this.octokit.repos.createOrUpdateFileContents({
+					this.octokit.repos.getContent({
 						owner: process.env.REPO_OWNER!,
 						repo: process.env.REPO_NAME!,
 						path: filePath,
-						message,
-						content: Buffer.from(content).toString("base64"),
-						branch,
-						sha:
-							currentFile && "data" in currentFile ?
-								"sha" in currentFile.data ?
-									currentFile.data.sha
-								:	undefined
-							:	undefined,
+						ref: branch.object.sha,
 					}),
-				`Committing changes to ${filePath}`,
+				`Checking existing file: ${filePath}`,
 			);
+
+			const fileSha = "sha" in currentFile.data ? currentFile.data.sha : undefined;
+
+			await this.octokit.repos.createOrUpdateFileContents({
+				owner: process.env.REPO_OWNER!,
+				repo: process.env.REPO_NAME!,
+				path: filePath,
+				message,
+				content: Buffer.from(content).toString("base64"),
+				branch: branch.ref,
+				sha: fileSha,
+			});
 
 			this.logger?.info(`Committed translation to ${filePath} on branch ${branch}`);
 		} catch (error) {
@@ -194,7 +180,7 @@ export class GitHubService {
 			this.logger?.error(`Failed to commit translation: ${errorMessage}`);
 
 			// Clean up the branch on failure
-			await this.branchManager.deleteBranch(branch);
+			await this.branchManager.deleteBranch(branch.ref);
 			throw error;
 		}
 	}
@@ -309,5 +295,26 @@ export class GitHubService {
 				}),
 			"Creating comment on translation progress issue",
 		);
+	}
+
+	public async verifyTokenPermissions() {
+		try {
+			const { data } = await this.octokit.rest.users.getAuthenticated();
+
+			this.logger?.info(`Authenticated as ${data.login}`);
+
+			// Check access to original repo
+			await this.octokit.rest.repos.get({
+				owner: process.env.ORIGINAL_REPO_OWNER!,
+				repo: process.env.REPO_NAME!,
+			});
+
+			this.logger?.info(`Access to original repo verified`);
+
+			return true;
+		} catch (error) {
+			this.logger?.error(`Token permission verification failed: ${error}`);
+			return false;
+		}
 	}
 }
