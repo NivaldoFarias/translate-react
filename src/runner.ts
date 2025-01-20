@@ -7,8 +7,8 @@ import type { TranslationFile } from "./types";
 
 import { GitHubService } from "./services/github";
 import { LanguageDetector } from "./services/language-detector";
+import { SnapshotManager } from "./services/snapshot-manager";
 import { TranslatorService } from "./services/translator";
-import { CheckpointManager } from "./utils/checkpoint";
 import { validateEnv } from "./utils/env";
 import Logger from "./utils/logger";
 
@@ -25,7 +25,7 @@ export default class Runner {
 	private readonly github = new GitHubService(this.logger);
 	private readonly translator = new TranslatorService();
 	private readonly languageDetector = new LanguageDetector();
-	private readonly checkpointManager = new CheckpointManager(console);
+	private readonly snapshotManager = new SnapshotManager(this.logger);
 	private readonly maxFiles = process.env.MAX_FILES;
 	private stats = {
 		results: new Set<ProcessedFileResult>(),
@@ -82,7 +82,7 @@ export default class Runner {
 			this.logger.info("Starting translation workflow");
 
 			// Try to load checkpoint
-			const checkpoint = await this.checkpointManager.loadLatestCheckpoint();
+			const checkpoint = await this.snapshotManager.loadLatest();
 			if (checkpoint) {
 				this.logger.info("Resuming from checkpoint");
 				this.stats.results = new Set(checkpoint.processedResults);
@@ -96,7 +96,7 @@ export default class Runner {
 			}
 
 			const repositoryTree = await this.github.getRepositoryTree("main");
-			await this.checkpointManager.saveCheckpoint({ repositoryTree });
+			await this.snapshotManager.save({ repositoryTree });
 
 			this.logger.info(`Repository tree fetched. Fetching files to translate`);
 
@@ -118,20 +118,20 @@ export default class Runner {
 			}
 			this.logger.endProgress();
 
-			await this.checkpointManager.saveCheckpoint({ uncheckedFiles });
+			await this.snapshotManager.save({ uncheckedFiles });
 
 			const filesToTranslate = uncheckedFiles.filter(
 				(file) => !this.languageDetector.isFileTranslated(file.content),
 			);
 
-			await this.checkpointManager.saveCheckpoint({ filesToTranslate });
+			await this.snapshotManager.save({ filesToTranslate });
 
 			this.logger.info(`Found ${filesToTranslate.length} files to translate`);
 
 			await this.processInBatches(filesToTranslate, 10);
 
 			// Save final results
-			await this.checkpointManager.saveCheckpoint({
+			await this.snapshotManager.save({
 				processedResults: Array.from(this.stats.results),
 			});
 
@@ -155,7 +155,7 @@ export default class Runner {
 			});
 
 			// Clear checkpoints after successful completion
-			await this.checkpointManager.clearCheckpoints();
+			await this.snapshotManager.clear();
 		} catch (error) {
 			this.logger.error(error instanceof Error ? error.message : "Unknown error");
 			process.exit(1);

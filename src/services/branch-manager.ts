@@ -1,6 +1,6 @@
 import { Octokit } from "@octokit/rest";
 
-import Logger from "./logger";
+import Logger from "../utils/logger";
 
 export class BranchManager {
 	private activeBranches: Set<string> = new Set();
