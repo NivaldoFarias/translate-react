@@ -36,19 +36,35 @@ bun install
 3. Create a `.env` file with the following variables:
 
 ```env
-GITHUB_TOKEN=your_github_token
-OPENAI_API_KEY=your_openai_api_key
-OPENAI_MODEL=gpt-4 # or another compatible model
-REPO_OWNER=target_repo_owner
-REPO_NAME=target_repo_name
-NODE_ENV=production
-MAX_FILES= # optional, defaults to all files
-TRANSLATION_ISSUE_NUMBER= # optional, defaults to no issue comment
+GITHUB_TOKEN=your_github_token                  # required         
+OPENAI_API_KEY=your_openai_api_key              # required
+OPENAI_MODEL=gpt-4                              # optional, defaults to gpt-4o
+REPO_OWNER=target_repo_owner                    # required
+REPO_NAME=target_repo_name                      # required
+ORIGINAL_REPO_OWNER=original_repo_owner         # required
+NODE_ENV=production                             # optional, defaults to production
+BUN_ENV=test                                    # optional, defaults to development
+MAX_FILES=                                      # optional, defaults to all files
+TRANSLATION_ISSUE_NUMBER=                       # optional, defaults to no issue comment
 ```
+
+> [!NOTE]
+> These variables are also checked during runtime. Refer to the `src/utils/env.ts` file for more details.
 
 ## Usage
 
-Build and run:
+### Development
+
+Development mode with watch:
+
+```bash
+bun run dev
+```
+
+### Production
+
+> [!WARNING]
+> This project is not meant to be run in production. It's a proof of concept and should not be used in production environments.
 
 ```bash
 bun run build
@@ -59,12 +75,6 @@ Or just run using bun without building:
 
 ```bash
 bun run index.ts
-```
-
-Development mode with watch:
-
-```bash
-bun run dev
 ```
 
 ## Project Structure
@@ -79,14 +89,12 @@ src/
 │   ├── branchManager.ts      # Git branch management
 │   ├── logger.ts             # Logging utilities
 │   ├── rateLimiter.ts        # API rate limiting
+│   ├── env.ts                # Environment variables
 │   └── errors.ts             # Custom error handling
-└── index.ts                  # Main runner
+├── runner.ts                 # Main workflow runner
+└── types.d.ts                # Local type definitions
 ```
 
 ## Contributing
 
-Feel free to open issues and pull requests for improvements.
-
-## License
-
-MIT
+This project is still WIP *(Work In Progress)* and there are many possible parallel use cases that are not covered yet. Feel free to open issues, fork the project and send pull requests for improvements.

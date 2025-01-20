@@ -8,6 +8,8 @@ import type { TranslationFile } from "./types";
 import { GitHubService } from "./services/github";
 import { LanguageDetector } from "./services/language-detector";
 import { TranslatorService } from "./services/translator";
+import { CheckpointManager } from "./utils/checkpoint";
+import { validateEnv } from "./utils/env";
 import Logger from "./utils/logger";
 
 export interface ProcessedFileResult {
@@ -23,27 +25,18 @@ export default class Runner {
 	private readonly github = new GitHubService(this.logger);
 	private readonly translator = new TranslatorService();
 	private readonly languageDetector = new LanguageDetector();
-	private readonly maxFiles =
-		process.env["MAX_FILES"] ? parseInt(process.env["MAX_FILES"]!) : undefined;
+	private readonly checkpointManager = new CheckpointManager(console);
+	private readonly maxFiles = process.env.MAX_FILES;
 	private stats = {
 		results: new Set<ProcessedFileResult>(),
 		startTime: Date.now(),
 	};
 
 	constructor() {
-		const requiredEnvVars = ["GITHUB_TOKEN", "REPO_OWNER", "REPO_NAME"];
-		const missingEnvVars = requiredEnvVars.filter((varName) => !process.env[varName]);
-
-		if (missingEnvVars.length > 0) {
-			this.logger.error(`Missing required environment variables: ${missingEnvVars.join(", ")}`);
-			this.logger.info("Please create a .env file with the following variables:");
-			this.logger.info(`
-				GITHUB_TOKEN=your_github_token
-				REPO_OWNER=target_repo_owner
-				REPO_NAME=target_repo_name
-				MAX_FILES=10 (optional, defaults to all files)
-			`);
-
+		try {
+			validateEnv();
+		} catch (error) {
+			this.logger.error(error instanceof Error ? error.message : String(error));
 			process.exit(1);
 		}
 
@@ -88,33 +81,65 @@ export default class Runner {
 		try {
 			this.logger.info("Starting translation workflow");
 
+			// Try to load checkpoint
+			const checkpoint = await this.checkpointManager.loadLatestCheckpoint();
+			if (checkpoint) {
+				this.logger.info("Resuming from checkpoint");
+				this.stats.results = new Set(checkpoint.processedResults);
+
+				if (checkpoint.filesToTranslate?.length) {
+					await this.processInBatches(checkpoint.filesToTranslate, 10);
+				}
+
+				this.logger.success("Resumed processing completed");
+				return;
+			}
+
 			const repositoryTree = await this.github.getRepositoryTree("main");
+			await this.checkpointManager.saveCheckpoint({ repositoryTree });
 
 			this.logger.info(`Repository tree fetched. Fetching files to translate`);
 
-			const uncheckedFiles = await Promise.all(
-				repositoryTree.slice(0, this.maxFiles).map(async (file) => {
-					return {
-						path: file.path,
-						content: await this.github.getFileContent(file),
-						filename: file.path?.split("/").pop(),
-					};
-				}),
-			);
+			this.logger.startProgress("Fetching file contents");
+			const uncheckedFiles = [];
+
+			for (const [index, file] of repositoryTree.slice(0, this.maxFiles).entries()) {
+				this.logger.updateProgress(
+					index + 1,
+					repositoryTree.length,
+					`Fetching file ${index + 1}/${repositoryTree.length}: ${file.path}`,
+				);
+
+				uncheckedFiles.push({
+					path: file.path,
+					content: await this.github.getFileContent(file),
+					filename: file.path?.split("/").pop(),
+				});
+			}
+			this.logger.endProgress();
+
+			await this.checkpointManager.saveCheckpoint({ uncheckedFiles });
 
 			const filesToTranslate = uncheckedFiles.filter(
 				(file) => !this.languageDetector.isFileTranslated(file.content),
 			);
 
+			await this.checkpointManager.saveCheckpoint({ filesToTranslate });
+
 			this.logger.info(`Found ${filesToTranslate.length} files to translate`);
 
 			await this.processInBatches(filesToTranslate, 10);
 
+			// Save final results
+			await this.checkpointManager.saveCheckpoint({
+				processedResults: Array.from(this.stats.results),
+			});
+
 			this.logger.success(`Translation completed`);
 
-			if (process.env["TRANSLATION_ISSUE_NUMBER"] && this.compiledResults.length > 0) {
+			if (process.env.TRANSLATION_ISSUE_NUMBER && this.compiledResults.length > 0) {
 				const comment = await this.github.commentCompiledResultsOnIssue(
-					Number.parseInt(process.env["TRANSLATION_ISSUE_NUMBER"]),
+					process.env.TRANSLATION_ISSUE_NUMBER,
 					this.compiledResults,
 				);
 
@@ -128,16 +153,16 @@ export default class Runner {
 				"Failed translations": Array.from(this.stats.results).filter((file) => file.error !== null)
 					.length,
 			});
+
+			// Clear checkpoints after successful completion
+			await this.checkpointManager.clearCheckpoints();
 		} catch (error) {
 			this.logger.error(error instanceof Error ? error.message : "Unknown error");
-
 			process.exit(1);
 		} finally {
 			const elapsedTime = Math.ceil(Date.now() - this.stats.startTime);
-
 			this.logger.info(`Elapsed time: ${elapsedTime}ms (${Math.ceil(elapsedTime / 1000)}s)`);
 			this.logger.endProgress();
-
 			await this.writeResultsToFile();
 		}
 	}
@@ -192,13 +217,11 @@ export default class Runner {
 	}
 
 	private get pullRequestDescription() {
-		return `
-			This pull request contains a translation of the referenced page into Portuguese (pt-BR). The translation was generated using OpenAI _(model \`${process.env["OPENAI_MODEL"]}\`)_.
+		return `This pull request contains a translation of the referenced page into Portuguese (pt-BR). The translation was generated using OpenAI _(model \`${process.env.OPENAI_MODEL}\`)_.
 
-			Refer to the source repository workflow that generated this translation for more details: https://github.com/${process.env["REPO_OWNER"]}/translate-react
+	Refer to the source repository workflow that generated this translation for more details: https://github.com/${process.env.REPO_OWNER}/${process.env.REPO_NAME}
 
-			Feel free to review and suggest any improvements to the translation.
-		`;
+	Feel free to review and suggest any improvements to the translation.`;
 	}
 
 	private get compiledResults() {

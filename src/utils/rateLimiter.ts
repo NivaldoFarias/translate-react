@@ -14,7 +14,7 @@ export class RateLimiter {
 	) {}
 
 	private isTestEnvironment(): boolean {
-		return process.env.NODE_ENV === "test" || process.env["BUN_ENV"] === "test";
+		return process.env.NODE_ENV === "test" || process.env.BUN_ENV === "test";
 	}
 
 	async schedule<T>(task: () => Promise<T>, operation: string = ""): Promise<T> {

@@ -57,7 +57,11 @@ export class BranchManager {
 			});
 
 			return data?.object.sha ?? null;
-		} catch (_error) {
+		} catch (error) {
+			// Only log if it's not a 404 error (which is expected when branch doesn't exist)
+			if (error instanceof Error && !error.message.includes("Not Found")) {
+				this.logger.error(`Error checking branch ${branchName}: ${error.message}`);
+			}
 			return null;
 		}
 	}

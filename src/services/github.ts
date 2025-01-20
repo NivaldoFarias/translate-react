@@ -2,7 +2,7 @@ import { Octokit } from "@octokit/rest";
 
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
-import type { ProcessedFileResult } from "..";
+import type { ProcessedFileResult } from "../runner";
 import type { TranslationFile } from "../types";
 
 import { BranchManager } from "../utils/branchManager";
@@ -13,16 +13,11 @@ import { RetryableOperation } from "../utils/retryableOperation";
 export class GitHubService {
 	private readonly rateLimiter = new RateLimiter(60, "GitHub API");
 	private readonly retryOperation: RetryableOperation | undefined;
-	private readonly auth = {
-		owner: process.env["REPO_OWNER"]!,
-		repo: process.env["REPO_NAME"]!,
-		githubToken: process.env["GITHUB_TOKEN"]!,
-	};
-	private readonly octokit = new Octokit({ auth: this.auth.githubToken });
+	private readonly octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
 	private readonly branchManager = new BranchManager(
-		this.auth.owner,
-		this.auth.repo,
-		this.auth.githubToken,
+		process.env.REPO_OWNER!,
+		process.env.REPO_NAME!,
+		process.env.GITHUB_TOKEN!,
 	);
 
 	constructor(private readonly logger: Logger | undefined = undefined) {
@@ -49,8 +44,8 @@ export class GitHubService {
 			const { data } = await this.withRetry(
 				() =>
 					this.octokit.git.getTree({
-						owner: this.auth.owner,
-						repo: this.auth.repo,
+						owner: process.env.REPO_OWNER!,
+						repo: process.env.REPO_NAME!,
 						tree_sha: "main",
 						recursive: "1",
 					}),
@@ -79,8 +74,8 @@ export class GitHubService {
 					const { data: content } = await this.withRetry(
 						() =>
 							this.octokit.repos.getContent({
-								owner: this.auth.owner,
-								repo: this.auth.repo,
+								owner: process.env.REPO_OWNER!,
+								repo: process.env.REPO_NAME!,
 								path: file.path!,
 							}),
 						`Fetching ${file.path}`,
@@ -161,8 +156,8 @@ export class GitHubService {
 				currentFile = await this.withRetry(
 					() =>
 						this.octokit.repos.getContent({
-							owner: this.auth.owner,
-							repo: this.auth.repo,
+							owner: process.env.REPO_OWNER!,
+							repo: process.env.REPO_NAME!,
 							path: filePath,
 							ref: branch,
 						}),
@@ -176,8 +171,8 @@ export class GitHubService {
 			await this.withRetry(
 				() =>
 					this.octokit.repos.createOrUpdateFileContents({
-						owner: this.auth.owner,
-						repo: this.auth.repo,
+						owner: process.env.REPO_OWNER!,
+						repo: process.env.REPO_NAME!,
 						path: filePath,
 						message,
 						content: Buffer.from(content).toString("base64"),
@@ -213,11 +208,13 @@ export class GitHubService {
 			const { data } = await this.withRetry(
 				() =>
 					this.octokit.pulls.create({
-						owner: "reactjs",
-						repo: this.auth.repo,
+						// The original repository owner (reactjs)
+						owner: process.env.ORIGINAL_REPO_OWNER!,
+						repo: process.env.REPO_NAME!,
 						title,
 						body,
-						head: `${this.auth.owner}:${branch}`,
+						// Format: username:branch-name
+						head: `${process.env.REPO_OWNER!}:${branch}`,
 						base: baseBranch,
 						maintainer_can_modify: true,
 					}),
@@ -259,8 +256,8 @@ export class GitHubService {
 			const { data } = await this.withRetry(
 				() =>
 					this.octokit.git.getBlob({
-						owner: this.auth.owner,
-						repo: this.auth.repo,
+						owner: process.env.REPO_OWNER!,
+						repo: process.env.REPO_NAME!,
 						file_sha: blobSha,
 					}),
 				`Fetching blob: ${blobSha}`,
@@ -278,8 +275,8 @@ export class GitHubService {
 		const { data } = await this.withRetry(
 			() =>
 				this.octokit.git.getTree({
-					owner: this.auth.owner,
-					repo: this.auth.repo,
+					owner: process.env.REPO_OWNER!,
+					repo: process.env.REPO_NAME!,
 					tree_sha: baseBranch,
 					recursive: "1",
 				}),
@@ -290,23 +287,22 @@ export class GitHubService {
 	}
 
 	public async commentCompiledResultsOnIssue(issueNumber: number, results: ProcessedFileResult[]) {
-		const comment = `
-			As seguintes páginas foram traduzidas e PRs foram criados:
+		const comment = `As seguintes páginas foram traduzidas e PRs foram criados:
 
-			${results.map((result) => `- [${result.filename}](${result.pullRequest?.html_url})`).join("\n")}
+	${results.map((result) => `- [${result.filename}](${result.pullRequest?.html_url})`).join("\n")}
 
-			###### Observações
-			
-			- As traduções foram geradas por IA e precisam de revisão.
-			- O fluxo que escrevi para gerar as traduções está disponível no repositório [\`translate-react\`](https://github.com/${process.env["REPO_OWNER"]}/translate-react).
-			- A implementação não é perfeita e pode conter erros.
-		`;
+	###### Observações
+	
+	- As traduções foram geradas por IA e precisam de revisão.
+	- Talvez algumas traduções já tenham PRs criados, mas ainda não foram fechados.
+	- O fluxo que escrevi para gerar as traduções está disponível no repositório [\`translate-react\`](https://github.com/${process.env["REPO_OWNER"]}/translate-react).
+	- A implementação não é perfeita e pode conter erros.`;
 
 		return await this.withRetry(
 			() =>
 				this.octokit.issues.createComment({
-					owner: this.auth.owner,
-					repo: this.auth.repo,
+					owner: process.env.REPO_OWNER!,
+					repo: process.env.REPO_NAME!,
 					issue_number: issueNumber,
 					body: comment,
 				}),
