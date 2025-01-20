@@ -1,3 +1,4 @@
+import { RequestError } from "@octokit/request-error";
 import { Octokit } from "@octokit/rest";
 
 import Logger from "../utils/logger";
@@ -22,23 +23,25 @@ export class BranchManager {
 		});
 	}
 
-	async createBranch(branchName: string, baseBranch: string = "main") {
+	async createBranch(branchName: string, baseBranch = "main") {
 		try {
-			const { data } = await this.octokit.git.getRef({
+			const mainBranchRef = await this.octokit.git.getRef({
 				owner: this.owner,
 				repo: this.repo,
 				ref: `heads/${baseBranch}`,
 			});
 
-			await this.octokit.git.createRef({
+			const branchRef = await this.octokit.git.createRef({
 				owner: this.owner,
 				repo: this.repo,
 				ref: `refs/heads/${branchName}`,
-				sha: data.object.sha,
+				sha: mainBranchRef.data.object.sha,
 			});
 
 			this.activeBranches.add(branchName);
 			this.logger.info(`Created and tracking branch: ${branchName}`);
+
+			return branchRef;
 		} catch (error) {
 			const message = error instanceof Error ? error.message : "Unknown error";
 			this.logger.error(`Failed to create branch ${branchName}: ${message}`);
@@ -50,18 +53,18 @@ export class BranchManager {
 
 	async getBranch(branchName: string) {
 		try {
-			const { data } = await this.octokit.git.getRef({
+			return await this.octokit.git.getRef({
 				owner: this.owner,
 				repo: this.repo,
 				ref: `heads/${branchName}`,
 			});
-
-			return data?.object.sha ?? null;
 		} catch (error) {
-			// Only log if it's not a 404 error (which is expected when branch doesn't exist)
-			if (error instanceof Error && !error.message.includes("Not Found")) {
-				this.logger.error(`Error checking branch ${branchName}: ${error.message}`);
+			if (error instanceof RequestError && error.status == 404) {
+				const message = error instanceof Error ? error.message : "Unknown error";
+
+				this.logger.error(`Error checking branch ${branchName}: ${message}`);
 			}
+
 			return null;
 		}
 	}

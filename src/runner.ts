@@ -13,7 +13,7 @@ import { validateEnv } from "./utils/env";
 import Logger from "./utils/logger";
 
 export interface ProcessedFileResult {
-	branch: string | null;
+	branch: RestEndpointMethodTypes["git"]["getRef"]["response"]["data"] | null;
 	filename: string;
 	translation: ChatCompletion | string | null;
 	pullRequest: RestEndpointMethodTypes["pulls"]["create"]["response"]["data"] | null;
@@ -49,46 +49,26 @@ export default class Runner {
 		});
 	}
 
-	private async processInBatches(files: TranslationFile[], batchSize = 10) {
-		const batches = [];
-		for (let i = 0; i < files.length; i += batchSize) {
-			batches.push(files.slice(i, i + batchSize));
-		}
-
-		const results = [];
-
-		this.logger.startProgress(`Processing ${batches.length} batches`);
-
-		for (const batch of batches) {
-			this.logger.updateProgress(
-				batches.indexOf(batch) + 1,
-				batches.length,
-				`Processing batch ${batches.indexOf(batch) + 1} of ${batches.length}`,
-			);
-
-			const batchResults = await Promise.all(batch.map(this.processFile.bind(this)));
-			results.push(...batchResults);
-
-			this.logger.success(`Processed batch ${batches.indexOf(batch) + 1} of ${batches.length}`);
-		}
-
-		this.logger.endProgress();
-
-		return results;
-	}
-
 	async run() {
 		try {
 			this.logger.info("Starting translation workflow");
 
-			// Try to load checkpoint
-			const checkpoint = await this.snapshotManager.loadLatest();
-			if (checkpoint) {
-				this.logger.info("Resuming from checkpoint");
-				this.stats.results = new Set(checkpoint.processedResults);
+			const verified = await this.github.verifyTokenPermissions();
 
-				if (checkpoint.filesToTranslate?.length) {
-					await this.processInBatches(checkpoint.filesToTranslate, 10);
+			if (!verified) {
+				throw new Error("Token permissions verification failed");
+			}
+
+			// Try to load snapshot
+			const snapshot = await this.snapshotManager.loadLatest();
+			if (snapshot) {
+				this.logger.info(
+					`Found snapshot. Resuming from latest: ${new Date(snapshot.timestamp).toLocaleString()}`,
+				);
+				this.stats.results = new Set(snapshot.processedResults);
+
+				if (snapshot.filesToTranslate?.length) {
+					await this.processInBatches(snapshot.filesToTranslate, 10);
 				}
 
 				this.logger.success("Resumed processing completed");
@@ -161,10 +141,41 @@ export default class Runner {
 			process.exit(1);
 		} finally {
 			const elapsedTime = Math.ceil(Date.now() - this.stats.startTime);
+
 			this.logger.info(`Elapsed time: ${elapsedTime}ms (${Math.ceil(elapsedTime / 1000)}s)`);
 			this.logger.endProgress();
+
 			await this.writeResultsToFile();
 		}
+	}
+
+	private async processInBatches(files: TranslationFile[], batchSize = 10) {
+		const batches = [];
+		for (let i = 0; i < files.length; i += batchSize) {
+			batches.push(files.slice(i, i + batchSize));
+		}
+
+		const results = [];
+
+		this.logger.startProgress(`Processing ${batches.length} batches`);
+
+		for (const batch of batches) {
+			this.logger.updateProgress(
+				batches.indexOf(batch) + 1,
+				batches.length,
+				`Processing batch ${batches.indexOf(batch) + 1} of ${batches.length}`,
+			);
+
+			const batchResults = await Promise.all(batch.map(this.processFile.bind(this)));
+
+			results.push(...batchResults);
+
+			this.logger.success(`Processed batch ${batches.indexOf(batch) + 1} of ${batches.length}`);
+		}
+
+		this.logger.endProgress();
+
+		return results;
 	}
 
 	private async processFile(file: TranslationFile) {
@@ -177,8 +188,6 @@ export default class Runner {
 		};
 
 		try {
-			this.logger.info(`Processing ${file.filename}`);
-
 			metadata.branch = await this.github.createTranslationBranch(file.filename!);
 			metadata.translation = await this.translator.translateContent(file);
 
@@ -195,7 +204,7 @@ export default class Runner {
 			);
 
 			metadata.pullRequest = await this.github.createPullRequest(
-				metadata.branch,
+				metadata.branch.ref,
 				`Translate \`${file.filename}\` to pt-br`,
 				this.pullRequestDescription,
 			);
