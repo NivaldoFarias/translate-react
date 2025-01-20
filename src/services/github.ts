@@ -5,10 +5,11 @@ import type { RestEndpointMethodTypes } from "@octokit/rest";
 import type { ProcessedFileResult } from "../runner";
 import type { TranslationFile } from "../types";
 
-import { BranchManager } from "../utils/branchManager";
 import Logger from "../utils/logger";
 import { RateLimiter } from "../utils/rateLimiter";
 import { RetryableOperation } from "../utils/retryableOperation";
+
+import { BranchManager } from "./branch-manager";
 
 export class GitHubService {
 	private readonly rateLimiter = new RateLimiter(60, "GitHub API");

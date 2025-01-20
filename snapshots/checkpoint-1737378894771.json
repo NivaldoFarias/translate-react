@@ -1,0 +1,1357 @@
+{
+  "repositoryTree": [
+    {
+      "path": "src/content/blog/2020/12/21/data-fetching-with-react-server-components.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9be5d3509dc38ddb115a1541d91df583132c337b",
+      "size": 2075,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/9be5d3509dc38ddb115a1541d91df583132c337b"
+    },
+    {
+      "path": "src/content/blog/2021/06/08/the-plan-for-react-18.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "42843cc42ced56cb45a7e3fab7d8b6de64352e9d",
+      "size": 6934,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/42843cc42ced56cb45a7e3fab7d8b6de64352e9d"
+    },
+    {
+      "path": "src/content/blog/2021/12/17/react-conf-2021-recap.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1806c757f35fca90a93a9b81896b6f2b0e4c2a99",
+      "size": 11824,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/1806c757f35fca90a93a9b81896b6f2b0e4c2a99"
+    },
+    {
+      "path": "src/content/blog/2022/03/08/react-18-upgrade-guide.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9d34dfaaa321c5db3ceb5d493749b94bfb15771f",
+      "size": 19071,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/9d34dfaaa321c5db3ceb5d493749b94bfb15771f"
+    },
+    {
+      "path": "src/content/blog/2022/03/29/react-v18.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d21eeb1f50df6711170a7c73b1ccb70c423268bc",
+      "size": 34461,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/d21eeb1f50df6711170a7c73b1ccb70c423268bc"
+    },
+    {
+      "path": "src/content/blog/2022/06/15/react-labs-what-we-have-been-working-on-june-2022.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1349909918e42c671bc9782db72ef4157f57bddc",
+      "size": 11322,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/1349909918e42c671bc9782db72ef4157f57bddc"
+    },
+    {
+      "path": "src/content/blog/2023/03/16/introducing-react-dev.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1d631605a2c100427dfd6d274c4b941c3477c327",
+      "size": 25009,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/1d631605a2c100427dfd6d274c4b941c3477c327"
+    },
+    {
+      "path": "src/content/blog/2023/03/22/react-labs-what-we-have-been-working-on-march-2023.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "aeb677f31b5504ce08d385bfe2cafe706421ac16",
+      "size": 16307,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/aeb677f31b5504ce08d385bfe2cafe706421ac16"
+    },
+    {
+      "path": "src/content/blog/2023/05/03/react-canaries.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "19d9960b01954f640a35a57f950c88a78ca1e32e",
+      "size": 11924,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/19d9960b01954f640a35a57f950c88a78ca1e32e"
+    },
+    {
+      "path": "src/content/blog/2024/02/15/react-labs-what-we-have-been-working-on-february-2024.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "fee21f4ecfa9ea92d809a583b465e0eef12207eb",
+      "size": 14883,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/fee21f4ecfa9ea92d809a583b465e0eef12207eb"
+    },
+    {
+      "path": "src/content/blog/2024/04/25/react-19-upgrade-guide.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4d4355a47cc2373738c956d73db090c026c10a1d",
+      "size": 27532,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/4d4355a47cc2373738c956d73db090c026c10a1d"
+    },
+    {
+      "path": "src/content/blog/2024/04/25/react-19.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1ccffa1c82dc8af8228477da92189a31d37462d7",
+      "size": 32235,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/1ccffa1c82dc8af8228477da92189a31d37462d7"
+    },
+    {
+      "path": "src/content/blog/index.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "245559028684bb75f0d09a13ca952b15eff7921a",
+      "size": 6120,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/245559028684bb75f0d09a13ca952b15eff7921a"
+    },
+    {
+      "path": "src/content/community/acknowledgements.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d5ac78829db040c216bfa35a3af8bdfd24e5950b",
+      "size": 3560,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/d5ac78829db040c216bfa35a3af8bdfd24e5950b"
+    },
+    {
+      "path": "src/content/community/conferences.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "dc0d60c58d3d701e2374a2993904194701197572",
+      "size": 39567,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/dc0d60c58d3d701e2374a2993904194701197572"
+    },
+    {
+      "path": "src/content/community/docs-contributors.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0f9d002d6c0bb122178257715f590871b005c24f",
+      "size": 2270,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/0f9d002d6c0bb122178257715f590871b005c24f"
+    },
+    {
+      "path": "src/content/community/index.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "50f093a12f86558b4ce8097273692907359375ae",
+      "size": 1759,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/50f093a12f86558b4ce8097273692907359375ae"
+    },
+    {
+      "path": "src/content/community/meetups.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a12a5349c7f6066a5ecf3abf596d8f1dc38d183b",
+      "size": 9562,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/a12a5349c7f6066a5ecf3abf596d8f1dc38d183b"
+    },
+    {
+      "path": "src/content/community/team.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6004476e23ab0c000dc4f376deeb14910470dab7",
+      "size": 11429,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/6004476e23ab0c000dc4f376deeb14910470dab7"
+    },
+    {
+      "path": "src/content/community/translations.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4c07e6a1ea2f95688ea590baa278cb34cf624c07",
+      "size": 1369,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/4c07e6a1ea2f95688ea590baa278cb34cf624c07"
+    },
+    {
+      "path": "src/content/community/versioning-policy.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7aa71efd20c12bc341e599a0ac720515a03f25eb",
+      "size": 15083,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/7aa71efd20c12bc341e599a0ac720515a03f25eb"
+    },
+    {
+      "path": "src/content/community/videos.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3fad95786e6545efeca728d9d9077e018105a8db",
+      "size": 6623,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/3fad95786e6545efeca728d9d9077e018105a8db"
+    },
+    {
+      "path": "src/content/errors/377.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6269e9d06d61b387e738980f8f38f4b7ca1e0f33",
+      "size": 639,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/6269e9d06d61b387e738980f8f38f4b7ca1e0f33"
+    },
+    {
+      "path": "src/content/errors/generic.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "27c3ca52d4c919dd1cf97faa31a2d65ebc2a212b",
+      "size": 544,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/27c3ca52d4c919dd1cf97faa31a2d65ebc2a212b"
+    },
+    {
+      "path": "src/content/errors/index.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "25746d25d8eb82f010ea7b7d99f54f97cf1fcde4",
+      "size": 557,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/25746d25d8eb82f010ea7b7d99f54f97cf1fcde4"
+    },
+    {
+      "path": "src/content/index.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3b235c32ff2b04f04f90bf5d9904647ccf26ce23",
+      "size": 80,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/3b235c32ff2b04f04f90bf5d9904647ccf26ce23"
+    },
+    {
+      "path": "src/content/learn/add-react-to-an-existing-project.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2627dacd7e479f6a9c09ff4b804d5960beec6821",
+      "size": 9180,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/2627dacd7e479f6a9c09ff4b804d5960beec6821"
+    },
+    {
+      "path": "src/content/learn/adding-interactivity.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a7c851141be86fbd17dae1902630c6ad86fb211a",
+      "size": 23855,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/a7c851141be86fbd17dae1902630c6ad86fb211a"
+    },
+    {
+      "path": "src/content/learn/choosing-the-state-structure.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6c8d86a159943a42ba2e4944fac07f078cbe8ce5",
+      "size": 63637,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/6c8d86a159943a42ba2e4944fac07f078cbe8ce5"
+    },
+    {
+      "path": "src/content/learn/conditional-rendering.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9e60e6d76beaee1dee3249b0fe5cc3e09615d1ff",
+      "size": 20321,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/9e60e6d76beaee1dee3249b0fe5cc3e09615d1ff"
+    },
+    {
+      "path": "src/content/learn/describing-the-ui.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2ab1343f024e6148a3ef67796540f16dc0dde24b",
+      "size": 15900,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/2ab1343f024e6148a3ef67796540f16dc0dde24b"
+    },
+    {
+      "path": "src/content/learn/editor-setup.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "cee4564bca9febe8c00cc40122361aab26c408e6",
+      "size": 4535,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/cee4564bca9febe8c00cc40122361aab26c408e6"
+    },
+    {
+      "path": "src/content/learn/escape-hatches.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d3118086c7b8f67cdb161fa8a894e49b014b044b",
+      "size": 26568,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/d3118086c7b8f67cdb161fa8a894e49b014b044b"
+    },
+    {
+      "path": "src/content/learn/extracting-state-logic-into-a-reducer.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5c08c012390754bac44a33bd094aeb421cf8dd74",
+      "size": 62189,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/5c08c012390754bac44a33bd094aeb421cf8dd74"
+    },
+    {
+      "path": "src/content/learn/importing-and-exporting-components.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9d6386d2fbc68633abb20777a41315e43687edaf",
+      "size": 12484,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/9d6386d2fbc68633abb20777a41315e43687edaf"
+    },
+    {
+      "path": "src/content/learn/index.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1538e2697f4deb15fc0a4cba00d617a18c10be23",
+      "size": 16898,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/1538e2697f4deb15fc0a4cba00d617a18c10be23"
+    },
+    {
+      "path": "src/content/learn/installation.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4adfa0fd881acfa5676fa9342cd3889f04fb89cb",
+      "size": 2509,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/4adfa0fd881acfa5676fa9342cd3889f04fb89cb"
+    },
+    {
+      "path": "src/content/learn/javascript-in-jsx-with-curly-braces.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9713a0db997aea1b3a5e780d4dbc798db5d95d83",
+      "size": 14400,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/9713a0db997aea1b3a5e780d4dbc798db5d95d83"
+    },
+    {
+      "path": "src/content/learn/keeping-components-pure.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "087f0e26e1f55664b487cb84c0100d78fe458509",
+      "size": 25076,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/087f0e26e1f55664b487cb84c0100d78fe458509"
+    },
+    {
+      "path": "src/content/learn/lifecycle-of-reactive-effects.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3dc9a75f02b452cd8f379089f5d32f28b0591235",
+      "size": 72027,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/3dc9a75f02b452cd8f379089f5d32f28b0591235"
+    },
+    {
+      "path": "src/content/learn/managing-state.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e28160f1f2f01addcf282b32c8351345f38a78ef",
+      "size": 26439,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/e28160f1f2f01addcf282b32c8351345f38a78ef"
+    },
+    {
+      "path": "src/content/learn/manipulating-the-dom-with-refs.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2d44d7353596fb93f746183f1b7c49674b930eca",
+      "size": 32052,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/2d44d7353596fb93f746183f1b7c49674b930eca"
+    },
+    {
+      "path": "src/content/learn/passing-data-deeply-with-context.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1aea87b354f7b802822d692e3fa84ea6a936d57e",
+      "size": 34831,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/1aea87b354f7b802822d692e3fa84ea6a936d57e"
+    },
+    {
+      "path": "src/content/learn/passing-props-to-a-component.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c2efa8eff85d9f20ce84b9ee2450bcc9aeb86898",
+      "size": 27673,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/c2efa8eff85d9f20ce84b9ee2450bcc9aeb86898"
+    },
+    {
+      "path": "src/content/learn/preserving-and-resetting-state.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d35071845d2f7d4517e79b8c50637fed7304eb2d",
+      "size": 54748,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/d35071845d2f7d4517e79b8c50637fed7304eb2d"
+    },
+    {
+      "path": "src/content/learn/queueing-a-series-of-state-updates.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "41de6529a6dfdacb003225abe31a1119797c60d7",
+      "size": 17272,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/41de6529a6dfdacb003225abe31a1119797c60d7"
+    },
+    {
+      "path": "src/content/learn/react-compiler.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "23c7f86a35a2f58c4680942db3547b41a0892e1e",
+      "size": 11480,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/23c7f86a35a2f58c4680942db3547b41a0892e1e"
+    },
+    {
+      "path": "src/content/learn/react-developer-tools.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d06eda7a361580eaafd995ebdcd5a876994b13af",
+      "size": 2743,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/d06eda7a361580eaafd995ebdcd5a876994b13af"
+    },
+    {
+      "path": "src/content/learn/reacting-to-input-with-state.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "eb20524aa26d49a380b3ddcd226069562a9909e2",
+      "size": 38816,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/eb20524aa26d49a380b3ddcd226069562a9909e2"
+    },
+    {
+      "path": "src/content/learn/referencing-values-with-refs.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f116d4ee22a8fa5bc554a26797a08b150f35cde0",
+      "size": 23476,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/f116d4ee22a8fa5bc554a26797a08b150f35cde0"
+    },
+    {
+      "path": "src/content/learn/removing-effect-dependencies.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9a871c6c3f032caf5c92e727d592288a1de83d45",
+      "size": 76644,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/9a871c6c3f032caf5c92e727d592288a1de83d45"
+    },
+    {
+      "path": "src/content/learn/render-and-commit.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ef8bc20837dc396d39c73683bb68540f507602be",
+      "size": 9882,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/ef8bc20837dc396d39c73683bb68540f507602be"
+    },
+    {
+      "path": "src/content/learn/rendering-lists.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "68426b4ca67494824806c25d222aa80e59e99482",
+      "size": 33859,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/68426b4ca67494824806c25d222aa80e59e99482"
+    },
+    {
+      "path": "src/content/learn/responding-to-events.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "fa13abb98b809cd10986013f1119d91c0c264b0f",
+      "size": 25430,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/fa13abb98b809cd10986013f1119d91c0c264b0f"
+    },
+    {
+      "path": "src/content/learn/reusing-logic-with-custom-hooks.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "12142f7b7f702ed910bb3741dde4355b26c9c54c",
+      "size": 75260,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/12142f7b7f702ed910bb3741dde4355b26c9c54c"
+    },
+    {
+      "path": "src/content/learn/scaling-up-with-reducer-and-context.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c3da0c6373d37da3df7d746c954ca0358391d5a4",
+      "size": 31209,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/c3da0c6373d37da3df7d746c954ca0358391d5a4"
+    },
+    {
+      "path": "src/content/learn/separating-events-from-effects.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "21276c287101984b969f065cb860edcfcaadc9ca",
+      "size": 55224,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/21276c287101984b969f065cb860edcfcaadc9ca"
+    },
+    {
+      "path": "src/content/learn/sharing-state-between-components.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4c56671480af2c8844c21f2485e24c7445949286",
+      "size": 20560,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/4c56671480af2c8844c21f2485e24c7445949286"
+    },
+    {
+      "path": "src/content/learn/start-a-new-react-project.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bb086a553fde288a35f7c6372417ffe7924b06f6",
+      "size": 12565,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/bb086a553fde288a35f7c6372417ffe7924b06f6"
+    },
+    {
+      "path": "src/content/learn/state-a-components-memory.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "968b4812754949bcde61bbe19803d01857aea2db",
+      "size": 66517,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/968b4812754949bcde61bbe19803d01857aea2db"
+    },
+    {
+      "path": "src/content/learn/state-as-a-snapshot.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1da4864971ee6526b65cb89a8bb004e6478e10c6",
+      "size": 15181,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/1da4864971ee6526b65cb89a8bb004e6478e10c6"
+    },
+    {
+      "path": "src/content/learn/synchronizing-with-effects.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9ca109656aab6807391c2118e26e5453e199898c",
+      "size": 61610,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/9ca109656aab6807391c2118e26e5453e199898c"
+    },
+    {
+      "path": "src/content/learn/thinking-in-react.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0f05a0569f66b34ea9dbb4d65e851330fa2e691b",
+      "size": 23017,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/0f05a0569f66b34ea9dbb4d65e851330fa2e691b"
+    },
+    {
+      "path": "src/content/learn/tutorial-tic-tac-toe.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0a43e5768569d8e4bb5d0537d5288ba5d5d3ef98",
+      "size": 92130,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/0a43e5768569d8e4bb5d0537d5288ba5d5d3ef98"
+    },
+    {
+      "path": "src/content/learn/typescript.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "aab0ce5328a8bd2c9b4007fc00058b3dfba9f2cd",
+      "size": 19729,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/aab0ce5328a8bd2c9b4007fc00058b3dfba9f2cd"
+    },
+    {
+      "path": "src/content/learn/understanding-your-ui-as-a-tree.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2abf7affc717c5bb0739fab4f23c78b18031cf8a",
+      "size": 14060,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/2abf7affc717c5bb0739fab4f23c78b18031cf8a"
+    },
+    {
+      "path": "src/content/learn/updating-arrays-in-state.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "61e4f4e2d98049493c96d88539c577293f189447",
+      "size": 45983,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/61e4f4e2d98049493c96d88539c577293f189447"
+    },
+    {
+      "path": "src/content/learn/updating-objects-in-state.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "169f6c90a0b6a80fb27b40dd6565bb672c5659a9",
+      "size": 40253,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/169f6c90a0b6a80fb27b40dd6565bb672c5659a9"
+    },
+    {
+      "path": "src/content/learn/writing-markup-with-jsx.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "62670150aca3e48772a671ea625ea4a5ef038e20",
+      "size": 10378,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/62670150aca3e48772a671ea625ea4a5ef038e20"
+    },
+    {
+      "path": "src/content/learn/you-might-not-need-an-effect.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0004117b5dadfc5c60a9c06bdba089da0f494c65",
+      "size": 64823,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/0004117b5dadfc5c60a9c06bdba089da0f494c65"
+    },
+    {
+      "path": "src/content/learn/your-first-component.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "10f25073a4b574b3667d4c88f40338784b5ba627",
+      "size": 14271,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/10f25073a4b574b3667d4c88f40338784b5ba627"
+    },
+    {
+      "path": "src/content/reference/react-dom/client/createRoot.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b336b6e5ed237479a4d6b0b14ce879395c2ae639",
+      "size": 36821,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/b336b6e5ed237479a4d6b0b14ce879395c2ae639"
+    },
+    {
+      "path": "src/content/reference/react-dom/client/hydrateRoot.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "cc30ce22c1f1dfed699a4889caac2fdab954006e",
+      "size": 35588,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/cc30ce22c1f1dfed699a4889caac2fdab954006e"
+    },
+    {
+      "path": "src/content/reference/react-dom/client/index.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "89f48212fad9905cfd3f42d722235ec11dcc0484",
+      "size": 990,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/89f48212fad9905cfd3f42d722235ec11dcc0484"
+    },
+    {
+      "path": "src/content/reference/react-dom/components/common.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "62ee08139db6b8712ae5ddfa611c24b9b2bfbe47",
+      "size": 76345,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/62ee08139db6b8712ae5ddfa611c24b9b2bfbe47"
+    },
+    {
+      "path": "src/content/reference/react-dom/components/form.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8f6ab00e00997d9abc59a8bb6c3a519ec59eef44",
+      "size": 14640,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/8f6ab00e00997d9abc59a8bb6c3a519ec59eef44"
+    },
+    {
+      "path": "src/content/reference/react-dom/components/index.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c9b355c8469e11671c1ff59a6f99d9b9d2103725",
+      "size": 17286,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/c9b355c8469e11671c1ff59a6f99d9b9d2103725"
+    },
+    {
+      "path": "src/content/reference/react-dom/components/input.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "706b8ae8ae883146b2acffbc54b2b6bc9d02f0ac",
+      "size": 26576,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/706b8ae8ae883146b2acffbc54b2b6bc9d02f0ac"
+    },
+    {
+      "path": "src/content/reference/react-dom/components/link.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9172a66e7f390a4f275abdf25104b3d848c282e3",
+      "size": 11665,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/9172a66e7f390a4f275abdf25104b3d848c282e3"
+    },
+    {
+      "path": "src/content/reference/react-dom/components/meta.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "801ca2af16a42c5bc8ff2dff86731b5e1f6f17b8",
+      "size": 4489,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/801ca2af16a42c5bc8ff2dff86731b5e1f6f17b8"
+    },
+    {
+      "path": "src/content/reference/react-dom/components/option.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "84725854cdb7a8849dadf96960e442b5156f72f6",
+      "size": 2824,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/84725854cdb7a8849dadf96960e442b5156f72f6"
+    },
+    {
+      "path": "src/content/reference/react-dom/components/progress.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "eda3606d5d2227e7e412c8c11cb28c4d4be0b09b",
+      "size": 1902,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/eda3606d5d2227e7e412c8c11cb28c4d4be0b09b"
+    },
+    {
+      "path": "src/content/reference/react-dom/components/script.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "fc4b012772564220de956d1c71f9ab4c79d385b4",
+      "size": 6551,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/fc4b012772564220de956d1c71f9ab4c79d385b4"
+    },
+    {
+      "path": "src/content/reference/react-dom/components/select.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9477e9994d1690e3614f46d82059fe70a71fe923",
+      "size": 17018,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/9477e9994d1690e3614f46d82059fe70a71fe923"
+    },
+    {
+      "path": "src/content/reference/react-dom/components/style.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "77ee950e423dd3899e9a3bfccef778a5a1ace133",
+      "size": 4813,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/77ee950e423dd3899e9a3bfccef778a5a1ace133"
+    },
+    {
+      "path": "src/content/reference/react-dom/components/textarea.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9bd29fa38398116cbdfba8fe5bc1ab3200e2b997",
+      "size": 17415,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/9bd29fa38398116cbdfba8fe5bc1ab3200e2b997"
+    },
+    {
+      "path": "src/content/reference/react-dom/components/title.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "24b2aba2f07cf620a67545c3259e4288683818d0",
+      "size": 3903,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/24b2aba2f07cf620a67545c3259e4288683818d0"
+    },
+    {
+      "path": "src/content/reference/react-dom/createPortal.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0107c20d3e1841c5564076a23342b3c983e65aa2",
+      "size": 12888,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/0107c20d3e1841c5564076a23342b3c983e65aa2"
+    },
+    {
+      "path": "src/content/reference/react-dom/findDOMNode.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8e7b00653973b1f30f5700223c0193388a71a8a8",
+      "size": 11680,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/8e7b00653973b1f30f5700223c0193388a71a8a8"
+    },
+    {
+      "path": "src/content/reference/react-dom/flushSync.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e23ef4eac77781d2055251c154764cab907cb3f9",
+      "size": 4581,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/e23ef4eac77781d2055251c154764cab907cb3f9"
+    },
+    {
+      "path": "src/content/reference/react-dom/hooks/index.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "681488b57e7e2023683fb5084d5e3efd5ab49df8",
+      "size": 1457,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/681488b57e7e2023683fb5084d5e3efd5ab49df8"
+    },
+    {
+      "path": "src/content/reference/react-dom/hooks/useFormStatus.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "70feceaeafc863fcae8b7d5d083d11382f312341",
+      "size": 7518,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/70feceaeafc863fcae8b7d5d083d11382f312341"
+    },
+    {
+      "path": "src/content/reference/react-dom/hydrate.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a005abf1444d97f0327293ca0fb698eb6ded57cd",
+      "size": 7261,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/a005abf1444d97f0327293ca0fb698eb6ded57cd"
+    },
+    {
+      "path": "src/content/reference/react-dom/index.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6feef65e57de5bf4458831bab1f88ecca9781e2b",
+      "size": 3037,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/6feef65e57de5bf4458831bab1f88ecca9781e2b"
+    },
+    {
+      "path": "src/content/reference/react-dom/preconnect.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9b3100b08d87d3affd2184a7736a2bb8932f53d7",
+      "size": 2842,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/9b3100b08d87d3affd2184a7736a2bb8932f53d7"
+    },
+    {
+      "path": "src/content/reference/react-dom/prefetchDNS.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "fc9ffdb1693d62465dcbdaa6759879079ec08761",
+      "size": 3095,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/fc9ffdb1693d62465dcbdaa6759879079ec08761"
+    },
+    {
+      "path": "src/content/reference/react-dom/preinit.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3c9a879b4fd81abd5e30990e487ae17010d12b42",
+      "size": 5093,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/3c9a879b4fd81abd5e30990e487ae17010d12b42"
+    },
+    {
+      "path": "src/content/reference/react-dom/preinitModule.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "996c5a2edaa834dd6b140c2507ae6beb1a1b3631",
+      "size": 3868,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/996c5a2edaa834dd6b140c2507ae6beb1a1b3631"
+    },
+    {
+      "path": "src/content/reference/react-dom/preload.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1e7fd195954f33bd6f28c9ea155fb6f45704ce21",
+      "size": 6631,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/1e7fd195954f33bd6f28c9ea155fb6f45704ce21"
+    },
+    {
+      "path": "src/content/reference/react-dom/preloadModule.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "99d128c7d8fc6e26eca412f2c8dc4b2752d58e25",
+      "size": 3693,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/99d128c7d8fc6e26eca412f2c8dc4b2752d58e25"
+    },
+    {
+      "path": "src/content/reference/react-dom/render.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "03feb2881c33af3f26a756f57882092124a0b784",
+      "size": 7073,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/03feb2881c33af3f26a756f57882092124a0b784"
+    },
+    {
+      "path": "src/content/reference/react-dom/server/index.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "700a8c07e36bc9f1206f67b961ff96d6072cdde8",
+      "size": 2410,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/700a8c07e36bc9f1206f67b961ff96d6072cdde8"
+    },
+    {
+      "path": "src/content/reference/react-dom/server/renderToNodeStream.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "aa2c2e8fca1fad74b4dfea47f2919835a186efa7",
+      "size": 3096,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/aa2c2e8fca1fad74b4dfea47f2919835a186efa7"
+    },
+    {
+      "path": "src/content/reference/react-dom/server/renderToPipeableStream.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "20a5960eb9b7a0b7799355f0b9c1d013f869c90c",
+      "size": 25431,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/20a5960eb9b7a0b7799355f0b9c1d013f869c90c"
+    },
+    {
+      "path": "src/content/reference/react-dom/server/renderToReadableStream.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f407f2245f4f2693c39ff601ebbd23563b115667",
+      "size": 25489,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/f407f2245f4f2693c39ff601ebbd23563b115667"
+    },
+    {
+      "path": "src/content/reference/react-dom/server/renderToStaticMarkup.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2b9178d550ee531c2f0e4e884811173a9b2b4450",
+      "size": 2578,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/2b9178d550ee531c2f0e4e884811173a9b2b4450"
+    },
+    {
+      "path": "src/content/reference/react-dom/server/renderToStaticNodeStream.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f12b6da2f7b99afb2fcb9cb0bcfaed1fa15c4a9b",
+      "size": 3065,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/f12b6da2f7b99afb2fcb9cb0bcfaed1fa15c4a9b"
+    },
+    {
+      "path": "src/content/reference/react-dom/server/renderToString.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d9f1bdba426c5877f807a15442e75027e685ad46",
+      "size": 5244,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/d9f1bdba426c5877f807a15442e75027e685ad46"
+    },
+    {
+      "path": "src/content/reference/react-dom/unmountComponentAtNode.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "376a9bc2bfb16ac306e1e9fedd0e81efda4dbbd4",
+      "size": 2904,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/376a9bc2bfb16ac306e1e9fedd0e81efda4dbbd4"
+    },
+    {
+      "path": "src/content/reference/react/Children.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "81a28c5b38d718e8feb4ed58947a8aad4080736a",
+      "size": 25958,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/81a28c5b38d718e8feb4ed58947a8aad4080736a"
+    },
+    {
+      "path": "src/content/reference/react/Component.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "46406ff5e5d824306771f28e4b9483cedd1d17aa",
+      "size": 73904,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/46406ff5e5d824306771f28e4b9483cedd1d17aa"
+    },
+    {
+      "path": "src/content/reference/react/Fragment.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1d0848b22096fc6e31611b676c6002988fbd7750",
+      "size": 5741,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/1d0848b22096fc6e31611b676c6002988fbd7750"
+    },
+    {
+      "path": "src/content/reference/react/Profiler.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3a69bf8d2d39ae1ddc61133b1e0f9b5d34851dff",
+      "size": 5223,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/3a69bf8d2d39ae1ddc61133b1e0f9b5d34851dff"
+    },
+    {
+      "path": "src/content/reference/react/PureComponent.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3e2d074e10d00e38579dc4f60711c8f882a3823e",
+      "size": 5902,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/3e2d074e10d00e38579dc4f60711c8f882a3823e"
+    },
+    {
+      "path": "src/content/reference/react/StrictMode.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "92c6ba63af0877999b7b53eed650ed6b14a25bcf",
+      "size": 24477,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/92c6ba63af0877999b7b53eed650ed6b14a25bcf"
+    },
+    {
+      "path": "src/content/reference/react/Suspense.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7622aa1828bd24ba386d43dcf202cce9ac85fe83",
+      "size": 61712,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/7622aa1828bd24ba386d43dcf202cce9ac85fe83"
+    },
+    {
+      "path": "src/content/reference/react/apis.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "620f066c991bd88572265508fdf127900a2a3120",
+      "size": 1890,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/620f066c991bd88572265508fdf127900a2a3120"
+    },
+    {
+      "path": "src/content/reference/react/cache.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "735560636a38d68bdcb0e75b31d9d699709da5c8",
+      "size": 19642,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/735560636a38d68bdcb0e75b31d9d699709da5c8"
+    },
+    {
+      "path": "src/content/reference/react/cloneElement.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6bcea51b05743ed2dcd0cb2173805bb75cd662f7",
+      "size": 16306,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/6bcea51b05743ed2dcd0cb2173805bb75cd662f7"
+    },
+    {
+      "path": "src/content/reference/react/components.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d4332046a07c1eb4cd8883492633a24ce542f0be",
+      "size": 922,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/d4332046a07c1eb4cd8883492633a24ce542f0be"
+    },
+    {
+      "path": "src/content/reference/react/createContext.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2bf8941f8ae9ea79dae5b5de6215be63d682c1cc",
+      "size": 7488,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/2bf8941f8ae9ea79dae5b5de6215be63d682c1cc"
+    },
+    {
+      "path": "src/content/reference/react/createElement.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a5f684c66f91bdd560778300a1ab2c2ff00872eb",
+      "size": 7170,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/a5f684c66f91bdd560778300a1ab2c2ff00872eb"
+    },
+    {
+      "path": "src/content/reference/react/createFactory.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7df7fcd87751c69cf993fa08cee04ac5f3c3b104",
+      "size": 5291,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/7df7fcd87751c69cf993fa08cee04ac5f3c3b104"
+    },
+    {
+      "path": "src/content/reference/react/createRef.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2a3ba6aa3df4e102e1ab536f252ea4a97aa19c28",
+      "size": 4053,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/2a3ba6aa3df4e102e1ab536f252ea4a97aa19c28"
+    },
+    {
+      "path": "src/content/reference/react/experimental_taintObjectReference.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b5b9e513de73f61b4063910fddd031afe8809047",
+      "size": 5439,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/b5b9e513de73f61b4063910fddd031afe8809047"
+    },
+    {
+      "path": "src/content/reference/react/experimental_taintUniqueValue.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "09d277eb35da5288a63382b52a91378992a615c0",
+      "size": 8105,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/09d277eb35da5288a63382b52a91378992a615c0"
+    },
+    {
+      "path": "src/content/reference/react/experimental_useEffectEvent.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e819f041cdcaf297e94a88aa1ec577b1ade2d73d",
+      "size": 657,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/e819f041cdcaf297e94a88aa1ec577b1ade2d73d"
+    },
+    {
+      "path": "src/content/reference/react/forwardRef.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "04d69287ce223a81357fa0bf9e17232a2f8dbfa5",
+      "size": 13842,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/04d69287ce223a81357fa0bf9e17232a2f8dbfa5"
+    },
+    {
+      "path": "src/content/reference/react/hooks.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6dea3a0fd508277c8143b18a94c4207dfbb4802f",
+      "size": 5508,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/6dea3a0fd508277c8143b18a94c4207dfbb4802f"
+    },
+    {
+      "path": "src/content/reference/react/index.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7be49eedd63e8e05ceb5036eb719699a701d7326",
+      "size": 2568,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/7be49eedd63e8e05ceb5036eb719699a701d7326"
+    },
+    {
+      "path": "src/content/reference/react/isValidElement.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bc4fbaef45498188a95d67d1004a6ed7efd33a58",
+      "size": 4028,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/bc4fbaef45498188a95d67d1004a6ed7efd33a58"
+    },
+    {
+      "path": "src/content/reference/react/lazy.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "db99daa115032e2e2e13e4f86eeb4c88464890af",
+      "size": 6280,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/db99daa115032e2e2e13e4f86eeb4c88464890af"
+    },
+    {
+      "path": "src/content/reference/react/legacy.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "407232adae19b3b39db31212045558a150d25cb8",
+      "size": 1731,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/407232adae19b3b39db31212045558a150d25cb8"
+    },
+    {
+      "path": "src/content/reference/react/memo.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "26fa9ed9cc68c5c036e9e3fd632c3067696c4d90",
+      "size": 15577,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/26fa9ed9cc68c5c036e9e3fd632c3067696c4d90"
+    },
+    {
+      "path": "src/content/reference/react/startTransition.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3b1defd2472c9e197d6e1e1b3f25047b0536da59",
+      "size": 3827,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/3b1defd2472c9e197d6e1e1b3f25047b0536da59"
+    },
+    {
+      "path": "src/content/reference/react/use.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b7a6fc70122cbc1a225946c78bbe5fdae66656a7",
+      "size": 17042,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/b7a6fc70122cbc1a225946c78bbe5fdae66656a7"
+    },
+    {
+      "path": "src/content/reference/react/useActionState.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6f5924e3de955671d53aa2e5ab7ac8863bfa2606",
+      "size": 10126,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/6f5924e3de955671d53aa2e5ab7ac8863bfa2606"
+    },
+    {
+      "path": "src/content/reference/react/useCallback.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "93ce700e437031f54c4fe767d20b89d4c56e23dc",
+      "size": 32880,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/93ce700e437031f54c4fe767d20b89d4c56e23dc"
+    },
+    {
+      "path": "src/content/reference/react/useContext.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ce06e7035d6335b45b2a9b23556cb29b4d246ef6",
+      "size": 34144,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/ce06e7035d6335b45b2a9b23556cb29b4d246ef6"
+    },
+    {
+      "path": "src/content/reference/react/useDebugValue.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "62db9e6b231a2538abb7158a55b79eff773a31da",
+      "size": 3812,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/62db9e6b231a2538abb7158a55b79eff773a31da"
+    },
+    {
+      "path": "src/content/reference/react/useDeferredValue.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6d055f1f984535531ca7dc1137c51e0d21604b11",
+      "size": 28446,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/6d055f1f984535531ca7dc1137c51e0d21604b11"
+    },
+    {
+      "path": "src/content/reference/react/useEffect.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d7659c5e9c9f5bae1516ad1de5ab7a35fb83275d",
+      "size": 64757,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/d7659c5e9c9f5bae1516ad1de5ab7a35fb83275d"
+    },
+    {
+      "path": "src/content/reference/react/useId.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b08e19f32683371d5004ba8132fc91028c83f84a",
+      "size": 9421,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/b08e19f32683371d5004ba8132fc91028c83f84a"
+    },
+    {
+      "path": "src/content/reference/react/useImperativeHandle.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c73949a594846fabc92fdfea9fd54a17ab06e36c",
+      "size": 8762,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/c73949a594846fabc92fdfea9fd54a17ab06e36c"
+    },
+    {
+      "path": "src/content/reference/react/useInsertionEffect.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e2bde3bda66d244294fbc15b24cbdd8a60cdc88b",
+      "size": 7000,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/e2bde3bda66d244294fbc15b24cbdd8a60cdc88b"
+    },
+    {
+      "path": "src/content/reference/react/useLayoutEffect.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e90238ce3da4828e7e78d78363051eb8fdc759bf",
+      "size": 25972,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/e90238ce3da4828e7e78d78363051eb8fdc759bf"
+    },
+    {
+      "path": "src/content/reference/react/useMemo.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a44c86fc8e5bf9b09e85097a05a7d86411a49250",
+      "size": 45749,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/a44c86fc8e5bf9b09e85097a05a7d86411a49250"
+    },
+    {
+      "path": "src/content/reference/react/useOptimistic.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0a9a74865a63c6acee401b2aec64328eacebf9e1",
+      "size": 5132,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/0a9a74865a63c6acee401b2aec64328eacebf9e1"
+    },
+    {
+      "path": "src/content/reference/react/useReducer.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "dbd18f6b8da376ce0116e3f0fcc026fff37f1a8d",
+      "size": 30187,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/dbd18f6b8da376ce0116e3f0fcc026fff37f1a8d"
+    },
+    {
+      "path": "src/content/reference/react/useRef.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "fcecae7149beb8f1f1bb0774e783ae7e628bf53b",
+      "size": 17201,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/fcecae7149beb8f1f1bb0774e783ae7e628bf53b"
+    },
+    {
+      "path": "src/content/reference/react/useState.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "48d96f8eecaa11c407d8c79536164f5c2b8fe671",
+      "size": 38714,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/48d96f8eecaa11c407d8c79536164f5c2b8fe671"
+    },
+    {
+      "path": "src/content/reference/react/useSyncExternalStore.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "481690d7ed186008bae4c07934745382896db67d",
+      "size": 16523,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/481690d7ed186008bae4c07934745382896db67d"
+    },
+    {
+      "path": "src/content/reference/react/useTransition.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ce8aabbc8cbec920970800cbdd6c1e9995dea323",
+      "size": 43340,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/ce8aabbc8cbec920970800cbdd6c1e9995dea323"
+    },
+    {
+      "path": "src/content/reference/rsc/directives.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0157ba4dd055bdd2ae8918927500fbcca1330ecf",
+      "size": 687,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/0157ba4dd055bdd2ae8918927500fbcca1330ecf"
+    },
+    {
+      "path": "src/content/reference/rsc/server-actions.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "06613cb7cf8f2b95ffafadc027e39d52fd4499f2",
+      "size": 7337,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/06613cb7cf8f2b95ffafadc027e39d52fd4499f2"
+    },
+    {
+      "path": "src/content/reference/rsc/server-components.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9819464285784ded587c43c52d47bec9640d015b",
+      "size": 9872,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/9819464285784ded587c43c52d47bec9640d015b"
+    },
+    {
+      "path": "src/content/reference/rsc/use-client.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "513578df9b17046d033e467d1ac24c019a5b9e2a",
+      "size": 20654,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/513578df9b17046d033e467d1ac24c019a5b9e2a"
+    },
+    {
+      "path": "src/content/reference/rsc/use-server.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8f3a0095b2b0e67d44a656acc9ce6be1888263fa",
+      "size": 10297,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/8f3a0095b2b0e67d44a656acc9ce6be1888263fa"
+    },
+    {
+      "path": "src/content/reference/rules/components-and-hooks-must-be-pure.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "abcef814a5e72186880a3ca0ec71314e16a03d5e",
+      "size": 19002,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/abcef814a5e72186880a3ca0ec71314e16a03d5e"
+    },
+    {
+      "path": "src/content/reference/rules/index.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "dd5f7456c84374d09f12497c5daf58481e6c840d",
+      "size": 4463,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/dd5f7456c84374d09f12497c5daf58481e6c840d"
+    },
+    {
+      "path": "src/content/reference/rules/react-calls-components-and-hooks.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3d865b4f2299a36a82a97b4ade367c7b9e092364",
+      "size": 4873,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/3d865b4f2299a36a82a97b4ade367c7b9e092364"
+    },
+    {
+      "path": "src/content/reference/rules/rules-of-hooks.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ecaef7c60d9caf26b1740a6bf4b0f970d31da875",
+      "size": 4023,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/ecaef7c60d9caf26b1740a6bf4b0f970d31da875"
+    },
+    {
+      "path": "src/content/versions.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "fe0dac5595ce9903fbacc041222e16ecc3e6e0c6",
+      "size": 20296,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/fe0dac5595ce9903fbacc041222e16ecc3e6e0c6"
+    },
+    {
+      "path": "src/content/warnings/invalid-aria-prop.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d1c4cf540988a9e6fa1136b0eb1f77246bae855e",
+      "size": 850,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/d1c4cf540988a9e6fa1136b0eb1f77246bae855e"
+    },
+    {
+      "path": "src/content/warnings/invalid-hook-call-warning.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "75eed4d710757543a1402f54e9dd78cb4e18e5a8",
+      "size": 6681,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/75eed4d710757543a1402f54e9dd78cb4e18e5a8"
+    },
+    {
+      "path": "src/content/warnings/react-dom-test-utils.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "04e213a7ba1429ac11f655b0d6cfc5a2bd47c73a",
+      "size": 2112,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/04e213a7ba1429ac11f655b0d6cfc5a2bd47c73a"
+    },
+    {
+      "path": "src/content/warnings/react-test-renderer.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ae7cca5e1245dce0f1399aa1502fedf7f4c4886c",
+      "size": 1282,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/ae7cca5e1245dce0f1399aa1502fedf7f4c4886c"
+    },
+    {
+      "path": "src/content/warnings/special-props.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "95932a9c4a357cacca443ed9f3e352554316d9ac",
+      "size": 609,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/95932a9c4a357cacca443ed9f3e352554316d9ac"
+    },
+    {
+      "path": "src/content/warnings/unknown-prop.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b25eb7cc22dc6e51f2c237b4c615ce70cc7ead49",
+      "size": 3211,
+      "url": "https://api.github.com/repos/NivaldoFarias/pt-br.react.dev/git/blobs/b25eb7cc22dc6e51f2c237b4c615ce70cc7ead49"
+    }
+  ],
+  "timestamp": 1737378895438
+}
