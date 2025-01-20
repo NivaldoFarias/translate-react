@@ -16,6 +16,13 @@ export class GitHubService {
 		import.meta.env.REPO_NAME!,
 		import.meta.env.GITHUB_TOKEN!,
 	);
+	private branch: {
+		fork: RestEndpointMethodTypes["git"]["getRef"]["response"]["data"] | null;
+		upstream: RestEndpointMethodTypes["git"]["getRef"]["response"]["data"] | null;
+	} = {
+		fork: null,
+		upstream: null,
+	};
 
 	constructor(private readonly logger: Logger | undefined = undefined) {}
 
@@ -47,22 +54,22 @@ export class GitHubService {
 				}
 
 				try {
-					const { data: content } = await this.octokit.repos.getContent({
+					const { data } = await this.octokit.repos.getContent({
 						owner: import.meta.env.REPO_OWNER!,
 						repo: import.meta.env.REPO_NAME!,
 						path: file.path!,
 					});
 
-					if (!("content" in content)) {
+					if (!("content" in data)) {
 						this.logger?.error(`No content found for ${file.path}`);
 						continue;
 					}
 
-					const decodedContent = Buffer.from(content.content, "base64").toString();
+					const decodedContent = Buffer.from(data.content, "base64").toString();
 					files.push({
 						path: file.path,
 						content: decodedContent,
-						sha: content.sha,
+						sha: data.sha,
 					});
 				} catch (error) {
 					const message = error instanceof Error ? error.message : "Unknown error";
@@ -101,44 +108,44 @@ export class GitHubService {
 	}
 
 	public async createTranslationBranch(fileName: string, baseBranch = "main") {
-		const branchName =
-			import.meta.env.NODE_ENV === "development" ?
-				`translate/${fileName}-${Date.now()}`
-			:	`translate/${fileName}`;
+		const branchName = `translate/${fileName}`;
 
 		const alreadyCreatedBranch = await this.branchManager.getBranch(branchName);
-		if (alreadyCreatedBranch) return alreadyCreatedBranch.data;
+		if (alreadyCreatedBranch) {
+			this.branch.fork = alreadyCreatedBranch.data;
+			return alreadyCreatedBranch.data;
+		}
 
 		const branchRef = await this.branchManager.createBranch(branchName, baseBranch);
 
+		this.branch.fork = branchRef.data;
 		return branchRef.data;
+	}
+
+	public async checkIfCommitExistsOnFork() {
+		const listCommitsResponse = await this.octokit.repos.listCommits({
+			owner: import.meta.env.REPO_OWNER!,
+			repo: import.meta.env.REPO_NAME!,
+			sha: this.branch.fork?.ref,
+		});
+
+		return listCommitsResponse.data.some(
+			(commit) => commit?.author?.login === import.meta.env.REPO_OWNER!,
+		);
 	}
 
 	public async commitTranslation(
 		branch: RestEndpointMethodTypes["git"]["getRef"]["response"]["data"],
-		filePath: string,
+		file: TranslationFile,
 		content: string,
 		message: string,
 	) {
 		try {
-			// Check if branch already has commits
-			const commits = await this.octokit.repos.listCommits({
-				owner: import.meta.env.REPO_OWNER!,
-				repo: import.meta.env.REPO_NAME!,
-				sha: branch.ref,
-			});
-
-			if (commits.data.length > 1) {
-				this.logger?.info(`Branch ${branch.ref} already has a commit, skipping`);
-
-				return;
-			}
-
 			// Get the current file (if it exists)
 			const currentFile = await this.octokit.repos.getContent({
 				owner: import.meta.env.REPO_OWNER!,
 				repo: import.meta.env.REPO_NAME!,
-				path: filePath,
+				path: file.path!,
 				ref: branch.object.sha,
 			});
 
@@ -147,14 +154,14 @@ export class GitHubService {
 			await this.octokit.repos.createOrUpdateFileContents({
 				owner: import.meta.env.REPO_OWNER!,
 				repo: import.meta.env.REPO_NAME!,
-				path: filePath,
+				path: file.path!,
 				message,
 				content: Buffer.from(content).toString("base64"),
 				branch: branch.ref,
 				sha: fileSha,
 			});
 
-			this.logger?.info(`Committed translation to ${filePath} on branch ${branch}`);
+			this.logger?.info(`Committed translation to ${file.filename} on branch ${branch.ref}`);
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : "Unknown error";
 			this.logger?.error(`Failed to commit translation: ${errorMessage}`);
@@ -173,22 +180,17 @@ export class GitHubService {
 	) {
 		try {
 			// Check for existing PRs from this branch
-			const { data: existingPRs } = await this.octokit.pulls.list({
+			const existingPRsResponse = await this.octokit.pulls.list({
 				owner: import.meta.env.ORIGINAL_REPO_OWNER!,
 				repo: import.meta.env.REPO_NAME!,
 				head: `${import.meta.env.REPO_OWNER!}:${branch}`,
 				state: "open",
 			});
 
-			if (existingPRs.length > 0) {
+			const pr = existingPRsResponse.data.find((pr) => pr.title === title);
+
+			if (pr) {
 				this.logger?.info(`Pull request already exists for branch ${branch}`);
-
-				const pr = existingPRs.find((pr) => pr.title === title);
-
-				if (!pr) {
-					this.logger?.error(`Pull request not found for title ${title}`);
-					throw new Error(`Pull request not found for title ${title}`);
-				}
 
 				return pr;
 			}
@@ -225,11 +227,12 @@ export class GitHubService {
 	}
 
 	public async getFileContent(
-		file: RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"][number],
+		file:
+			| TranslationFile
+			| RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"][number],
 	) {
 		try {
-			// The file object already contains the url property
-			const blobSha = file.url?.split("/").pop();
+			const blobSha = file.sha;
 
 			if (!blobSha) {
 				throw new Error("Invalid blob URL");
@@ -261,23 +264,101 @@ export class GitHubService {
 	}
 
 	public async commentCompiledResultsOnIssue(issueNumber: number, results: ProcessedFileResult[]) {
-		const comment = `As seguintes páginas foram traduzidas e PRs foram criados:
+		// check if the issue exists
+		const issue = await this.octokit.issues.get({
+			owner: import.meta.env.ORIGINAL_REPO_OWNER!,
+			repo: import.meta.env.REPO_NAME!,
+			issue_number: issueNumber,
+		});
 
-${results.map((result) => `- [${result.filename}](${result.pullRequest?.html_url})`).join("\n")}
+		if (!issue.data) {
+			throw new Error(`Issue ${issueNumber} not found`);
+		}
 
-###### Observações
+		// check if the issue contains the comment
+		const listCommentsResponse = await this.octokit.issues.listComments({
+			owner: import.meta.env.ORIGINAL_REPO_OWNER!,
+			repo: import.meta.env.REPO_NAME!,
+			issue_number: issueNumber,
+			since: import.meta.env.GITHUB_SINCE,
+		});
+
+		const userComment = listCommentsResponse.data.find((comment) => {
+			return (
+				comment.user?.login === import.meta.env.REPO_OWNER! &&
+				comment.body?.includes("###### Observações")
+			);
+		});
+
+		if (userComment) {
+			this.logger?.info(`Comment already exists on issue ${issueNumber}`);
+
+			const listResults = userComment.body
+				?.split("\n")
+				.filter((line) => line.includes("- ["))
+				.map((line) => {
+					const match = line.match(/-\s*\[(?<filename>.*?)\]\((?<html_url>.*?)\)/);
+					const data = match ? match.groups : null;
+
+					return data ? { filename: data["filename"], html_url: data["html_url"] } : null;
+				})
+				.filter((result) => result !== null) as { filename: string; html_url: string }[];
+
+			const newResults = results
+				.filter((result) => !listResults.find((compare) => compare.filename === result.filename))
+				.map((result) => ({
+					filename: result.filename,
+					html_url: result.pullRequest?.html_url,
+				}));
+
+			if (!newResults.length) {
+				this.logger?.info(`No new results to add to comment on issue ${issueNumber}`);
+				return userComment;
+			}
+
+			const newResultsComment = newResults
+				.concat(listResults)
+				.map((result) => `- [${result.filename}](${result.html_url})`)
+				.join("\n");
+
+			const newComment = `${this.commentPrefix}\n\n${newResultsComment}\n\n${this.commentSufix}`;
+
+			const updateCommentResponse = await this.octokit.issues.updateComment({
+				owner: import.meta.env.ORIGINAL_REPO_OWNER!,
+				repo: import.meta.env.REPO_NAME!,
+				issue_number: issueNumber,
+				body: newComment,
+				comment_id: userComment.id,
+			});
+
+			return updateCommentResponse.data;
+		}
+
+		const listResults = results
+			.map((result) => `- [${result.filename}](${result.pullRequest?.html_url})`)
+			.join("\n");
+
+		const createCommentResponse = await this.octokit.issues.createComment({
+			owner: import.meta.env.ORIGINAL_REPO_OWNER!,
+			repo: import.meta.env.REPO_NAME!,
+			issue_number: issueNumber,
+			body: `${this.commentPrefix}\n\n${listResults}\n\n${this.commentSufix}`,
+		});
+
+		return createCommentResponse.data;
+	}
+
+	private get commentPrefix() {
+		return `As seguintes páginas foram traduzidas e PRs foram criados:`;
+	}
+
+	private get commentSufix() {
+		return `###### Observações
 
 - As traduções foram geradas por IA e precisam de revisão.
 - Talvez algumas traduções já tenham PRs criados, mas ainda não foram fechados.
-- O fluxo que escrevi para gerar as traduções está disponível no repositório [\`translate-react\`](https://github.com/${process.env["REPO_OWNER"]}/translate-react).
+- O fluxo que escrevi para gerar as traduções está disponível no repositório [\`translate-react\`](https://github.com/${import.meta.env.REPO_OWNER}/translate-react).
 - A implementação não é perfeita e pode conter erros.`;
-
-		return await this.octokit.issues.createComment({
-			owner: import.meta.env.REPO_OWNER!,
-			repo: import.meta.env.REPO_NAME!,
-			issue_number: issueNumber,
-			body: comment,
-		});
 	}
 
 	public async verifyTokenPermissions() {
