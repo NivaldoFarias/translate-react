@@ -23,8 +23,8 @@ interface TranslationMetrics {
 }
 
 export class TranslatorService {
-	private openai = new OpenAI({ apiKey: process.env["OPENAI_API_KEY"]! });
-	private model = process.env["OPENAI_MODEL"]! ?? "gpt-4o";
+	private openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
+	private model = process.env.OPENAI_MODEL! ?? "gpt-4o";
 	private cache = new Map<string, TranslationCache>();
 	private readonly CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 	private rateLimiter = new RateLimiter(10, "OpenAI API");

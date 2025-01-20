@@ -11,6 +11,13 @@ export default class Logger {
 		process.on("SIGINT", () => this.endProgress());
 	}
 
+	private ensureSpinner(text: string = "") {
+		if (!this.spinner) {
+			this.spinner = ora({ text, color: "blue" }).start();
+		}
+		return this.spinner;
+	}
+
 	public endProgress() {
 		if (this.spinner) {
 			this.spinner.stop();
@@ -37,47 +44,35 @@ export default class Logger {
 	}
 
 	public success(message: string) {
-		if (this.spinner) {
-			this.spinner.succeed(message);
-			this.spinner = null;
-		} else {
-			console.log(chalk.green("✔"), message);
-		}
+		const spinner = this.ensureSpinner();
+		const currentText = spinner.text;
+		spinner.stopAndPersist({ symbol: chalk.green("✔"), text: message });
+		spinner.start(currentText);
 		return this;
 	}
 
 	public error(message: string) {
-		if (this.spinner) {
-			this.spinner.fail(message);
-			this.spinner = null;
-		} else {
-			console.error(chalk.red("✖"), message);
-		}
+		const spinner = this.ensureSpinner();
+		const currentText = spinner.text;
+		spinner.stopAndPersist({ symbol: chalk.red("✖"), text: message });
+		spinner.start(currentText);
 		return this;
 	}
 
 	public info(message: string) {
-		if (this.spinner) {
-			// Preserve spinner state
-			const text = this.spinner.text;
-			this.spinner.stop();
-			console.log(chalk.blue("ℹ"), message);
-			this.spinner.start(text);
-		} else {
-			console.log(chalk.blue("ℹ"), message);
-		}
+		const spinner = this.ensureSpinner();
+		const currentText = spinner.text;
+		spinner.stopAndPersist({ symbol: chalk.blue("ℹ"), text: message });
+		spinner.start(currentText);
 		return this;
 	}
 
 	public table(data: Record<string, any>) {
-		if (this.spinner) {
-			const text = this.spinner.text;
-			this.spinner.stop();
-			console.table(data);
-			this.spinner.start(text);
-		} else {
-			console.table(data);
-		}
+		const spinner = this.ensureSpinner();
+		const currentText = spinner.text;
+		spinner.stop();
+		console.table(data);
+		spinner.start(currentText);
 		return this;
 	}
 }

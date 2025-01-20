@@ -51,6 +51,7 @@ export class RetryableOperation {
 			"Not Found",
 			"Unauthorized",
 			"Forbidden",
+			"Resource not accessible by personal access token",
 			"Validation failed",
 		];
 
