@@ -6,52 +6,27 @@ import type { ProcessedFileResult } from "../runner";
 import type { TranslationFile } from "../types";
 
 import Logger from "../utils/logger";
-import { RateLimiter } from "../utils/rateLimiter";
-import { RetryableOperation } from "../utils/retryableOperation";
 
 import { BranchManager } from "./branch-manager";
 
 export class GitHubService {
-	private readonly rateLimiter = new RateLimiter(60, "GitHub API");
-	private readonly retryOperation: RetryableOperation | undefined;
-	private readonly octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
+	private readonly octokit = new Octokit({ auth: import.meta.env.GITHUB_TOKEN });
 	private readonly branchManager = new BranchManager(
-		process.env.REPO_OWNER!,
-		process.env.REPO_NAME!,
-		process.env.GITHUB_TOKEN!,
+		import.meta.env.REPO_OWNER!,
+		import.meta.env.REPO_NAME!,
+		import.meta.env.GITHUB_TOKEN!,
 	);
 
-	constructor(private readonly logger: Logger | undefined = undefined) {
-		if (this.logger) this.retryOperation = new RetryableOperation(3, 1000, 5000, this.logger);
-	}
-
-	private async callGitHubAPI<T>(operation: () => Promise<T>, context: string): Promise<T> {
-		return this.rateLimiter.schedule(() => operation(), context);
-	}
-
-	private async withRetry<T>(operation: () => Promise<T>, context: string): Promise<T> {
-		if (!this.retryOperation) {
-			throw new Error("Retry operation is not initialized");
-		}
-
-		return this.retryOperation.withRetry(
-			async () => this.callGitHubAPI(operation, context),
-			context,
-		);
-	}
+	constructor(private readonly logger: Logger | undefined = undefined) {}
 
 	public async getUntranslatedFiles(maxFiles?: number) {
 		try {
-			const { data } = await this.withRetry(
-				() =>
-					this.octokit.git.getTree({
-						owner: process.env.REPO_OWNER!,
-						repo: process.env.REPO_NAME!,
-						tree_sha: "main",
-						recursive: "1",
-					}),
-				"Fetching repository tree",
-			);
+			const { data } = await this.octokit.git.getTree({
+				owner: import.meta.env.REPO_OWNER!,
+				repo: import.meta.env.REPO_NAME!,
+				tree_sha: "main",
+				recursive: "1",
+			});
 
 			if (!data.tree) {
 				throw new Error("Repository tree is empty");
@@ -72,15 +47,11 @@ export class GitHubService {
 				}
 
 				try {
-					const { data: content } = await this.withRetry(
-						() =>
-							this.octokit.repos.getContent({
-								owner: process.env.REPO_OWNER!,
-								repo: process.env.REPO_NAME!,
-								path: file.path!,
-							}),
-						`Fetching ${file.path}`,
-					);
+					const { data: content } = await this.octokit.repos.getContent({
+						owner: import.meta.env.REPO_OWNER!,
+						repo: import.meta.env.REPO_NAME!,
+						path: file.path!,
+					});
 
 					if (!("content" in content)) {
 						this.logger?.error(`No content found for ${file.path}`);
@@ -131,7 +102,7 @@ export class GitHubService {
 
 	public async createTranslationBranch(fileName: string, baseBranch = "main") {
 		const branchName =
-			process.env.NODE_ENV === "development" ?
+			import.meta.env.NODE_ENV === "development" ?
 				`translate/${fileName}-${Date.now()}`
 			:	`translate/${fileName}`;
 
@@ -148,41 +119,34 @@ export class GitHubService {
 		filePath: string,
 		content: string,
 		message: string,
-	): Promise<void> {
+	) {
 		try {
 			// Check if branch already has commits
-			const commits = await this.withRetry(
-				() =>
-					this.octokit.repos.listCommits({
-						owner: process.env.REPO_OWNER!,
-						repo: process.env.REPO_NAME!,
-						sha: branch.ref,
-					}),
-				`Checking commits on branch: ${branch.ref}`,
-			);
+			const commits = await this.octokit.repos.listCommits({
+				owner: import.meta.env.REPO_OWNER!,
+				repo: import.meta.env.REPO_NAME!,
+				sha: branch.ref,
+			});
 
 			if (commits.data.length > 1) {
 				this.logger?.info(`Branch ${branch.ref} already has a commit, skipping`);
+
 				return;
 			}
 
 			// Get the current file (if it exists)
-			const currentFile = await this.withRetry(
-				() =>
-					this.octokit.repos.getContent({
-						owner: process.env.REPO_OWNER!,
-						repo: process.env.REPO_NAME!,
-						path: filePath,
-						ref: branch.object.sha,
-					}),
-				`Checking existing file: ${filePath}`,
-			);
+			const currentFile = await this.octokit.repos.getContent({
+				owner: import.meta.env.REPO_OWNER!,
+				repo: import.meta.env.REPO_NAME!,
+				path: filePath,
+				ref: branch.object.sha,
+			});
 
 			const fileSha = "sha" in currentFile.data ? currentFile.data.sha : undefined;
 
 			await this.octokit.repos.createOrUpdateFileContents({
-				owner: process.env.REPO_OWNER!,
-				repo: process.env.REPO_NAME!,
+				owner: import.meta.env.REPO_OWNER!,
+				repo: import.meta.env.REPO_NAME!,
 				path: filePath,
 				message,
 				content: Buffer.from(content).toString("base64"),
@@ -209,16 +173,12 @@ export class GitHubService {
 	) {
 		try {
 			// Check for existing PRs from this branch
-			const { data: existingPRs } = await this.withRetry(
-				() =>
-					this.octokit.pulls.list({
-						owner: process.env.ORIGINAL_REPO_OWNER!,
-						repo: process.env.REPO_NAME!,
-						head: `${process.env.REPO_OWNER!}:${branch}`,
-						state: "open",
-					}),
-				"Checking existing pull requests",
-			);
+			const { data: existingPRs } = await this.octokit.pulls.list({
+				owner: import.meta.env.ORIGINAL_REPO_OWNER!,
+				repo: import.meta.env.REPO_NAME!,
+				head: `${import.meta.env.REPO_OWNER!}:${branch}`,
+				state: "open",
+			});
 
 			if (existingPRs.length > 0) {
 				this.logger?.info(`Pull request already exists for branch ${branch}`);
@@ -233,21 +193,15 @@ export class GitHubService {
 				return pr;
 			}
 
-			const { data } = await this.withRetry(
-				() =>
-					this.octokit.pulls.create({
-						// The original repository owner (reactjs)
-						owner: process.env.ORIGINAL_REPO_OWNER!,
-						repo: process.env.REPO_NAME!,
-						title,
-						body,
-						// Format: username:branch-name
-						head: `${process.env.REPO_OWNER!}:${branch}`,
-						base: baseBranch,
-						maintainer_can_modify: true,
-					}),
-				"Creating pull request",
-			);
+			const { data } = await this.octokit.pulls.create({
+				owner: import.meta.env.ORIGINAL_REPO_OWNER!,
+				repo: import.meta.env.REPO_NAME!,
+				title,
+				body,
+				head: `${import.meta.env.REPO_OWNER!}:${branch}`,
+				base: baseBranch,
+				maintainer_can_modify: true,
+			});
 
 			this.logger?.info(`Created pull request #${data.number}: ${title}`);
 
@@ -281,15 +235,11 @@ export class GitHubService {
 				throw new Error("Invalid blob URL");
 			}
 
-			const { data } = await this.withRetry(
-				() =>
-					this.octokit.git.getBlob({
-						owner: process.env.REPO_OWNER!,
-						repo: process.env.REPO_NAME!,
-						file_sha: blobSha,
-					}),
-				`Fetching blob: ${blobSha}`,
-			);
+			const { data } = await this.octokit.git.getBlob({
+				owner: import.meta.env.REPO_OWNER!,
+				repo: import.meta.env.REPO_NAME!,
+				file_sha: blobSha,
+			});
 
 			return Buffer.from(data.content, "base64").toString();
 		} catch (error) {
@@ -300,16 +250,12 @@ export class GitHubService {
 	}
 
 	public async getRepositoryTree(baseBranch = "main", filterIgnored = true) {
-		const { data } = await this.withRetry(
-			() =>
-				this.octokit.git.getTree({
-					owner: process.env.REPO_OWNER!,
-					repo: process.env.REPO_NAME!,
-					tree_sha: baseBranch,
-					recursive: "1",
-				}),
-			"Fetching repository tree",
-		);
+		const { data } = await this.octokit.git.getTree({
+			owner: import.meta.env.REPO_OWNER!,
+			repo: import.meta.env.REPO_NAME!,
+			tree_sha: baseBranch,
+			recursive: "1",
+		});
 
 		return filterIgnored ? this.filterRepositoryTree(data.tree) : data.tree;
 	}
@@ -326,31 +272,27 @@ ${results.map((result) => `- [${result.filename}](${result.pullRequest?.html_url
 - O fluxo que escrevi para gerar as traduções está disponível no repositório [\`translate-react\`](https://github.com/${process.env["REPO_OWNER"]}/translate-react).
 - A implementação não é perfeita e pode conter erros.`;
 
-		return await this.withRetry(
-			() =>
-				this.octokit.issues.createComment({
-					owner: process.env.REPO_OWNER!,
-					repo: process.env.REPO_NAME!,
-					issue_number: issueNumber,
-					body: comment,
-				}),
-			"Creating comment on translation progress issue",
-		);
+		return await this.octokit.issues.createComment({
+			owner: import.meta.env.REPO_OWNER!,
+			repo: import.meta.env.REPO_NAME!,
+			issue_number: issueNumber,
+			body: comment,
+		});
 	}
 
 	public async verifyTokenPermissions() {
 		try {
-			const { data } = await this.octokit.rest.users.getAuthenticated();
+			const authResponse = await this.octokit.rest.users.getAuthenticated();
 
-			this.logger?.info(`Authenticated as ${data.login}`);
+			this.logger?.success(`Authenticated as ${authResponse.data.login}`);
 
 			// Check access to original repo
 			await this.octokit.rest.repos.get({
-				owner: process.env.ORIGINAL_REPO_OWNER!,
-				repo: process.env.REPO_NAME!,
+				owner: import.meta.env.ORIGINAL_REPO_OWNER!,
+				repo: import.meta.env.REPO_NAME!,
 			});
 
-			this.logger?.info(`Access to original repo verified`);
+			this.logger?.success(`Access to original repo verified`);
 
 			return true;
 		} catch (error) {

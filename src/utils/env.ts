@@ -17,10 +17,10 @@ export type Environment = z.infer<typeof envSchema>;
 
 export function validateEnv() {
 	try {
-		const env = envSchema.parse(process.env);
+		const env = envSchema.parse(import.meta.env);
 
-		// Update process.env with parsed and transformed values
-		Object.assign(process.env, env);
+		// Update import.meta.env with parsed and transformed values
+		Object.assign(import.meta.env, env);
 
 		return env;
 	} catch (error) {
