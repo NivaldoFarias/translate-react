@@ -7,9 +7,11 @@ A CLI tool to automate the translation of React documentation from English to Br
 This project aims to accelerate the translation process of React's documentation to Brazilian Portuguese, which is currently *(2025-01-17)* only 42% complete. It automates the workflow of:
 
 1. Fetching untranslated markdown files from the React docs repository
-2. Translating content using OpenAI's GPT models
-3. Creating branches and pull requests with translations
-4. Managing the translation workflow with rate limiting and error handling
+2. Managing translation state through snapshots to handle interruptions
+3. Translating content using OpenAI's GPT models with strict glossary rules
+4. Creating branches and pull requests with translations
+5. Tracking progress through GitHub issues
+6. Managing cleanup and error recovery
 
 ## Prerequisites
 
@@ -38,18 +40,19 @@ bun install
 ```env
 GITHUB_TOKEN=your_github_token                  # required         
 OPENAI_API_KEY=your_openai_api_key              # required
-OPENAI_MODEL=gpt-4                              # optional, defaults to gpt-4o
+OPENAI_MODEL=gpt-4                              # required
 REPO_OWNER=target_repo_owner                    # required
 REPO_NAME=target_repo_name                      # required
 ORIGINAL_REPO_OWNER=original_repo_owner         # required
-NODE_ENV=production                             # optional, defaults to production
-BUN_ENV=test                                    # optional, defaults to development
-MAX_FILES=                                      # optional, defaults to all files
-TRANSLATION_ISSUE_NUMBER=                       # optional, defaults to no issue comment
+NODE_ENV=development|production|test            # optional, defaults to development
+BUN_ENV=development|production|test             # optional, defaults to development
+MAX_FILES=10                                    # optional, defaults to 10
+TRANSLATION_ISSUE_NUMBER=123                    # required for production
+GITHUB_SINCE=2024-01-01                         # optional, filters issue comments since date
 ```
 
 > [!NOTE]
-> These variables are also checked during runtime. Refer to the `src/utils/env.ts` file for more details.
+> These variables are validated at runtime using Zod. Refer to the `src/utils/env.ts` file for the validation schema.
 
 ## Usage
 
@@ -63,15 +66,12 @@ bun run dev
 
 ### Production
 
-> [!WARNING]
-> This project is not meant to be run in production. It's a proof of concept and should not be used in production environments.
-
 ```bash
 bun run build
 bun run start
 ```
 
-Or just run using bun without building:
+Or run directly using Bun:
 
 ```bash
 bun run index.ts
@@ -84,17 +84,35 @@ src/
 ├── services/
 │   ├── github.ts             # GitHub API integration
 │   ├── translator.ts         # OpenAI translation service
-│   └── language-detector.ts  # Language detection service
+│   ├── language-detector.ts  # Language detection service
+│   ├── branch-manager.ts     # Git branch management
+│   └── snapshot-manager.ts   # State persistence
 ├── utils/
-│   ├── branchManager.ts      # Git branch management
-│   ├── logger.ts             # Logging utilities
-│   ├── rateLimiter.ts        # API rate limiting
-│   ├── env.ts                # Environment variables
+│   ├── logger.ts             # Console logging with spinners
+│   ├── env.ts                # Environment validation
 │   └── errors.ts             # Custom error handling
-├── runner.ts                 # Main workflow runner
-└── types.d.ts                # Local type definitions
+├── runner.ts                 # Main workflow orchestrator
+└── types.d.ts                # Type definitions
+
+.snapshots/                   # Persisted workflow state
 ```
+
+## Features
+
+- **Snapshot Management**: Persists workflow state to handle interruptions and failures
+- **Batch Processing**: Processes files in configurable batches with progress tracking
+- **Error Recovery**: Maintains state and allows resuming from failures
+- **GitHub Integration**: 
+  - Creates branches per file
+  - Submits PRs with translations
+  - Comments progress on tracking issues
+  - Handles cleanup of temporary branches
+- **Translation Quality**:
+  - Enforces strict glossary rules
+  - Preserves markdown formatting
+  - Maintains code blocks and technical terms
+  - Supports Brazilian Portuguese localization standards
 
 ## Contributing
 
-This project is still WIP *(Work In Progress)* and there are many possible parallel use cases that are not covered yet. Feel free to open issues, fork the project and send pull requests for improvements.
+This project is open for contributions. Feel free to open issues, fork the project and submit pull requests for improvements.
