@@ -1,19 +1,22 @@
+import Bun from "bun";
+
 import type { ProcessedFileResult } from "../runner";
 import type { TranslationFile } from "../types";
 import type Logger from "../utils/logger";
 
 export interface Snapshot {
 	timestamp: number;
-	repositoryTree: any[];
-	uncheckedFiles: TranslationFile[];
-	filesToTranslate: TranslationFile[];
-	processedResults: ProcessedFileResult[];
+	repositoryTree?: any[];
+	uncheckedFiles?: TranslationFile[];
+	filesToTranslate?: TranslationFile[];
+	processedResults?: ProcessedFileResult[];
 }
 
 export class SnapshotManager {
 	private readonly prefix = "snapshot";
 	private readonly snapshotDir = ".snapshots";
-	private readonly snapshotFile: string;
+	private readonly snapshotFilePath: string;
+	private snapshot: Snapshot | null = null;
 
 	constructor(private readonly logger?: Logger) {
 		// Ensure checkpoint directory exists
@@ -22,14 +25,26 @@ export class SnapshotManager {
 			Bun.write(this.snapshotDir + "/.gitkeep", "");
 		}
 
-		this.snapshotFile = `${this.snapshotDir}/${this.prefix}-${Date.now()}.json`;
+		this.snapshotFilePath = `${this.snapshotDir}/${this.prefix}-${Date.now()}.json`;
 	}
 
-	async save(data: Partial<Snapshot>) {
+	private pendingWrites: Array<Partial<Snapshot>> = [];
+	private writeTimeout: number | null = null;
+	private readonly WRITE_DELAY = 1000; // 1 second debounce
+
+	private async flushWrites() {
+		if (!this.pendingWrites.length) return;
+
 		try {
-			const snapshot = { ...data, timestamp: Date.now() };
-			await Bun.write(this.snapshotFile, JSON.stringify(snapshot, null, 2));
-			this.logger?.info(`Snapshot saved to ${this.snapshotFile}`);
+			// Merge all pending writes into one snapshot
+			const mergedData = this.pendingWrites.reduce((acc, curr) => ({ ...acc, ...curr }), {});
+			const snapshot = { ...mergedData, timestamp: Date.now() };
+
+			this.snapshot = snapshot;
+			await Bun.write(this.snapshotFilePath, JSON.stringify(this.snapshot, null, 2));
+
+			this.logger?.info(`Snapshot saved to ${this.snapshotFilePath}`);
+			this.pendingWrites = [];
 		} catch (error) {
 			this.logger?.error(
 				`Failed to save snapshot: ${error instanceof Error ? error.message : "Unknown error"}`,
@@ -37,7 +52,27 @@ export class SnapshotManager {
 		}
 	}
 
-	async loadLatest(): Promise<Snapshot | null> {
+	public async save(data: Partial<Snapshot>) {
+		this.pendingWrites.push(data);
+
+		// Clear existing timeout if any
+		if (this.writeTimeout) {
+			clearTimeout(this.writeTimeout);
+		}
+
+		// Set new timeout to flush writes
+		this.writeTimeout = setTimeout(() => {
+			this.flushWrites();
+			this.writeTimeout = null;
+		}, this.WRITE_DELAY) as unknown as number;
+	}
+
+	public async append(data: Partial<Snapshot>) {
+		if (!this.snapshot) return;
+		await this.save(data);
+	}
+
+	public async loadLatest() {
 		try {
 			const filesIterator = new Bun.Glob(`${this.prefix}-*.json`).scan({ cwd: this.snapshotDir });
 			const files: string[] = [];
@@ -58,9 +93,10 @@ export class SnapshotManager {
 			if (!(await file.exists())) return null;
 
 			const snapshotData = await file.json();
-			this.logger?.info(`Loaded snapshot from ${latestFile}`);
 
-			return snapshotData as Snapshot;
+			this.snapshot = snapshotData as Snapshot;
+
+			return this.snapshot;
 		} catch (error) {
 			this.logger?.error(
 				`Failed to load snapshot: ${error instanceof Error ? error.message : "Unknown error"}`,
@@ -69,7 +105,7 @@ export class SnapshotManager {
 		}
 	}
 
-	async clear() {
+	public async clear() {
 		try {
 			const filesIterator = new Bun.Glob(`${this.prefix}-*.json`).scan({ cwd: this.snapshotDir });
 			const files: string[] = [];
