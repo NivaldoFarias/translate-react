@@ -29,7 +29,7 @@ export default class Runner {
 	private readonly translator = new TranslatorService();
 	private readonly languageDetector = new LanguageDetector();
 	private readonly snapshotManager = new SnapshotManager(this.logger);
-	private readonly maxFiles = process.env.MAX_FILES;
+	private readonly maxFiles = import.meta.env.MAX_FILES;
 	private stats = {
 		results: new Set<ProcessedFileResult>(),
 		startTime: Date.now(),
@@ -121,9 +121,9 @@ export default class Runner {
 
 			this.logger.success(`Translation completed`);
 
-			if (process.env.TRANSLATION_ISSUE_NUMBER && this.compiledResults.length > 0) {
+			if (import.meta.env.TRANSLATION_ISSUE_NUMBER && this.compiledResults.length > 0) {
 				const comment = await this.github.commentCompiledResultsOnIssue(
-					process.env.TRANSLATION_ISSUE_NUMBER,
+					import.meta.env.TRANSLATION_ISSUE_NUMBER,
 					this.compiledResults,
 				);
 
@@ -193,12 +193,27 @@ export default class Runner {
 
 		try {
 			metadata.branch = await this.github.createTranslationBranch(file.filename!);
-			metadata.translation = await this.translator.translateContent(file);
+
+			if (this.stats.results.size > 0) {
+				const lastTranslation = Array.from(this.stats.results).find(
+					(result) => result.filename === file.filename,
+				);
+
+				if (lastTranslation?.translation) {
+					this.logger.info(`Found cached translation for ${file.filename}. Skipping AI call`);
+
+					metadata.translation = lastTranslation.translation;
+				}
+			}
+
+			if (!metadata.translation) {
+				metadata.translation = await this.translator.translateContent(file);
+			}
 
 			const content =
 				typeof metadata.translation === "string" ?
 					metadata.translation
-				:	metadata.translation.choices[0].message.content;
+				:	metadata.translation?.choices[0].message.content;
 
 			await this.github.commitTranslation(
 				metadata.branch,
@@ -230,9 +245,9 @@ export default class Runner {
 	}
 
 	private get pullRequestDescription() {
-		return `This pull request contains a translation of the referenced page into Portuguese (pt-BR). The translation was generated using OpenAI _(model \`${process.env.OPENAI_MODEL}\`)_.
+		return `This pull request contains a translation of the referenced page into Portuguese (pt-BR). The translation was generated using OpenAI _(model \`${import.meta.env.OPENAI_MODEL}\`)_.
 
-Refer to the [source repository](https://github.com/${process.env.REPO_OWNER}/translate-react) workflow that generated this translation for more details.
+Refer to the [source repository](https://github.com/${import.meta.env.REPO_OWNER}/translate-react) workflow that generated this translation for more details.
 
 Feel free to review and suggest any improvements to the translation.`;
 	}

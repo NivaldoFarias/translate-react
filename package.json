@@ -7,7 +7,7 @@
   "scripts": {
     "start": "bun run dist/index.js",
     "dev": "bun --watch index.ts",
-    "build": "bun build index.ts --outdir dist --target bun",
+    "build": "rm -rf dist && bun build index.ts --outdir dist --target bun",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write '**/*.{ts,js,cjs,mjs,json,md}'"
