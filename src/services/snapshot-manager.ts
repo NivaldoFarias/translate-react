@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync } from "fs";
+import { existsSync, mkdirSync, readdirSync } from "node:fs";
 
 import Bun from "bun";
 
@@ -16,21 +16,22 @@ export interface Snapshot {
 }
 
 export class SnapshotManager {
-	private readonly prefix = "snapshot";
 	private readonly snapshotDir = ".snapshots";
-	private readonly snapshotFilePath: string;
+	private readonly currentTimestamp: string;
+	private readonly currentDir: string;
 	private snapshot: Snapshot | null = null;
+	private static readonly DEFAULT_SNAPSHOT_TTL = 60 * 60 * 1000; // 1 hour in milliseconds
 
-	private pendingWrites: Snapshot[] = [];
+	private pendingWrites: Map<string, any> = new Map();
 	private writeTimeout: number | null = null;
 	private readonly WRITE_DELAY = 1000; // 1 second debounce
 
-	constructor(private readonly logger?: Logger) {
-		if (!existsSync(this.snapshotDir)) {
-			mkdirSync(this.snapshotDir, { recursive: true });
-		}
-
-		this.snapshotFilePath = `${this.snapshotDir}/${this.prefix}-${Date.now()}.json`;
+	constructor(
+		private readonly logger?: Logger,
+		private readonly snapshotTTL: number = SnapshotManager.DEFAULT_SNAPSHOT_TTL,
+	) {
+		this.currentTimestamp = Date.now().toString();
+		this.currentDir = `${this.snapshotDir}/${this.currentTimestamp}`;
 
 		process.on("SIGINT", async () => {
 			await this.cleanup();
@@ -41,28 +42,40 @@ export class SnapshotManager {
 		});
 	}
 
+	private getFilePath(key: string) {
+		return `${this.currentDir}/${key}.json`;
+	}
+
 	private async flushWrites() {
-		if (!this.pendingWrites.length) return;
+		if (!this.pendingWrites.size) return;
 
 		try {
-			// Merge all pending writes into one snapshot
-			const mergedData = this.pendingWrites.reduce((acc, curr) => ({ ...acc, ...curr }), {});
-			const snapshot = { ...mergedData, timestamp: Date.now() } as Snapshot;
+			const writePromises: Promise<void>[] = [];
 
-			this.snapshot = snapshot;
-			await Bun.write(this.snapshotFilePath, JSON.stringify(this.snapshot, null, 2));
+			for (const [key, data] of this.pendingWrites.entries()) {
+				const filePath = this.getFilePath(key);
+				const writePromise = Bun.write(
+					filePath,
+					JSON.stringify({ timestamp: Date.now(), data }, null, 2),
+				).then(() => {});
+				writePromises.push(writePromise);
+			}
 
-			this.logger?.info(`Snapshot saved to ${this.snapshotFilePath}`);
-			this.pendingWrites = [];
+			await Promise.all(writePromises);
+
+			this.logger?.info(`Saved ${this.pendingWrites.size} snapshot files to ${this.currentDir}`);
+			this.pendingWrites.clear();
 		} catch (error) {
 			this.logger?.error(
-				`Failed to save snapshot: ${error instanceof Error ? error.message : "Unknown error"}`,
+				`Failed to save snapshots: ${error instanceof Error ? error.message : "Unknown error"}`,
 			);
 		}
 	}
 
 	public async save(data: Snapshot) {
-		this.pendingWrites.push(data);
+		for (const [key, value] of Object.entries(data)) {
+			this.pendingWrites.set(key, value);
+		}
 
 		// Clear existing timeout if any
 		if (this.writeTimeout) {
@@ -77,54 +90,87 @@ export class SnapshotManager {
 	}
 
 	public async append<K extends keyof Snapshot>(key: K, data: Snapshot[K]) {
-		if (!this.snapshot) return;
-
-		await this.save({ ...this.snapshot, [key]: data });
+		this.pendingWrites.set(key, data);
+		await this.flushWrites();
 	}
 
+	/**
+	 * Loads the most recent snapshot if it exists and is within the TTL window
+	 */
 	public async loadLatest() {
 		try {
-			const filesIterator = new Bun.Glob(`${this.prefix}-*.json`).scan({ cwd: this.snapshotDir });
-			const files: string[] = [];
+			const dirs = readdirSync(this.snapshotDir);
+			if (!dirs.length) return null;
 
-			for await (const file of filesIterator) {
-				files.push(file);
+			const latestDir = dirs.sort().pop();
+			if (!latestDir) return null;
+
+			const snapshotPath = `${this.snapshotDir}/${latestDir}`;
+			const files = readdirSync(snapshotPath);
+
+			if (!files.length) return null;
+
+			// Get the timestamp from the first file
+			const firstFile = await Bun.file(`${snapshotPath}/${files[0]}`).json();
+			const snapshotTimestamp = firstFile.timestamp;
+
+			// Check if snapshot is within TTL
+			const age = Date.now() - snapshotTimestamp;
+			if (age > this.snapshotTTL) {
+				this.logger?.info(
+					`Snapshot is too old (${Math.round(age / 1000 / 60)} minutes), skipping load`,
+				);
+				return null;
 			}
 
-			if (files.length === 0) return null;
+			const snapshot: Partial<Snapshot> = {
+				timestamp: snapshotTimestamp,
+			};
 
-			// Get the most recent snapshot file based on the timestamp in filename
-			const latestFile = files.toSorted().pop();
-			if (!latestFile) return null;
+			for (const file of files) {
+				const key = file.replace(".json", "") as keyof Snapshot;
+				const filePath = `${snapshotPath}/${file}`;
+				const fileContent = await Bun.file(filePath).json();
+				snapshot[key] = fileContent.data;
+			}
 
-			const checkpointPath = `${this.snapshotDir}/${latestFile}`;
-			const file = Bun.file(checkpointPath);
-
-			if (!(await file.exists())) return null;
-
-			const snapshotData = await file.json();
-
-			this.snapshot = snapshotData as Snapshot;
+			this.snapshot = snapshot as Snapshot;
+			this.logger?.info(
+				`Loaded snapshot from ${new Date(snapshotTimestamp).toLocaleString()} (${Math.round(
+					age / 1000 / 60,
+				)} minutes old)`,
+			);
 
 			return this.snapshot;
 		} catch (error) {
 			this.logger?.error(
 				`Failed to load snapshot: ${error instanceof Error ? error.message : "Unknown error"}`,
 			);
+
 			return null;
+		} finally {
+			this.setupSnapshotDir();
+		}
+	}
+
+	private setupSnapshotDir() {
+		if (!existsSync(this.snapshotDir)) {
+			mkdirSync(this.snapshotDir, { recursive: true });
+		}
+
+		if (!existsSync(this.currentDir)) {
+			mkdirSync(this.currentDir, { recursive: true });
 		}
 	}
 
 	public async clear() {
 		try {
-			const filesIterator = new Bun.Glob(`${this.prefix}-*.json`).scan({ cwd: this.snapshotDir });
-			const files: string[] = [];
+			const dirs = readdirSync(this.snapshotDir);
+			const clearPromises = dirs.map((dir: string) =>
+				Bun.write(`${this.snapshotDir}/${dir}`, "").then(() => {}),
+			);
 
-			for await (const file of filesIterator) {
-				files.push(file);
-			}
-
-			await Promise.all(files.map((file) => Bun.write(`${this.snapshotDir}/${file}`, "")));
+			await Promise.all(clearPromises);
 			this.logger?.info("Cleared all snapshots");
 		} catch (error) {
 			this.logger?.error(
@@ -141,6 +187,6 @@ export class SnapshotManager {
 			this.writeTimeout = null;
 		}
 
-		// await this.flushWrites();
+		await this.flushWrites();
 	}
 }

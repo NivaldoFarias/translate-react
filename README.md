@@ -1,118 +1,188 @@
-# translate-react
+# translate-react 🌐
 
-A CLI tool to automate the translation of React documentation from English to Brazilian Portuguese (pt-BR) using OpenAI's GPT models.
+> Automate React documentation translation from English to Brazilian Portuguese (pt-BR) using OpenAI's GPT models.
+
+[![License](https://img.shields.io/github/license/NivaldoFarias/translate-react)](LICENSE)
+[![GitHub package.json version](https://img.shields.io/github/package-json/v/NivaldoFarias/translate-react)](package.json)
+[![Bun](https://img.shields.io/badge/runtime-bun-black)](https://bun.sh)
 
 ## Overview
 
-This project aims to accelerate the translation process of React's documentation to Brazilian Portuguese, which is currently *(2025-01-17)* only 42% complete. It automates the workflow of:
+This CLI tool streamlines the React documentation translation process to Brazilian Portuguese, currently at 42% completion _(2025-01-17)_. Built with TypeScript and powered by Bun, it leverages OpenAI's GPT models for high-quality translations while maintaining technical accuracy.
 
-1. Fetching untranslated markdown files from the React docs repository
-2. Managing translation state through snapshots to handle interruptions
-3. Translating content using OpenAI's GPT models with strict glossary rules
-4. Creating branches and pull requests with translations
-5. Tracking progress through GitHub issues
-6. Managing cleanup and error recovery
+> [!TIP]
+> Check out our [Contributing](#contributing) section if you want to help improve the translations!
 
-## Prerequisites
+### Key Features
+
+- 🤖 **AI-Powered Translation**: Uses OpenAI's GPT models with strict glossary rules
+- 🔄 **State Management**: Handles interruptions gracefully through snapshots
+- 🌐 **GitHub Integration**: Automated PR creation and issue tracking
+- 🔍 **Quality Control**: Preserves markdown, code blocks, and technical terms
+- 📦 **Batch Processing**: Configurable batch sizes with progress tracking
+- 🛠️ **Error Recovery**: Resume from failures without losing progress
+
+## Getting Started
+
+### Prerequisites
 
 - [Bun](https://bun.sh) runtime
-- GitHub Personal Access Token with repo permissions
+- GitHub Personal Access Token (with repo scope)
 - OpenAI API Key
 - Node.js v18+
 
-## Setup
+> [!IMPORTANT]
+> Make sure your GitHub token has the `repo` scope enabled. This is required for creating branches and submitting PRs.
 
-1. Clone the repository:
+### Quick Setup
+
+1. **Clone and Install**
 
 ```bash
 git clone https://github.com/NivaldoFarias/translate-react.git
 cd translate-react
-```
-
-2. Install dependencies:
-
-```bash
 bun install
 ```
 
-3. Create a `.env` file with the following variables:
+2. **Configure Environment**
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` with your credentials:
 
 ```env
-GITHUB_TOKEN=your_github_token                  # required         
-OPENAI_API_KEY=your_openai_api_key              # required
-OPENAI_MODEL=gpt-4                              # required
-REPO_OWNER=target_repo_owner                    # required
-REPO_NAME=target_repo_name                      # required
-ORIGINAL_REPO_OWNER=original_repo_owner         # required
-NODE_ENV=development|production|test            # optional, defaults to development
-BUN_ENV=development|production|test             # optional, defaults to development
-MAX_FILES=10                                    # optional, defaults to 10
-TRANSLATION_ISSUE_NUMBER=123                    # required for production
-GITHUB_SINCE=2024-01-01                         # optional, filters issue comments since date
+# Required
+GITHUB_TOKEN=your_github_token
+OPENAI_API_KEY=your_openai_api_key
+OPENAI_MODEL=gpt-4
+REPO_OWNER=target_repo_owner
+REPO_NAME=target_repo_name
+ORIGINAL_REPO_OWNER=original_repo_owner
+TRANSLATION_ISSUE_NUMBER=123
+
+# Optional (with defaults)
+NODE_ENV=development
+BUN_ENV=development
+MAX_FILES=10
+GITHUB_SINCE=2024-01-01
 ```
 
 > [!NOTE]
-> These variables are validated at runtime using Zod. Refer to the `src/utils/env.ts` file for the validation schema.
+> All environment variables are validated at runtime using Zod. Check `src/utils/env.ts` for the validation schema.
 
-## Usage
+### Development Workflow
 
-### Development
-
-Development mode with watch:
+1. **Start Development Server**
 
 ```bash
-bun run dev
+bun run dev     # Watch mode
 ```
 
-### Production
+2. **Run Tests**
 
 ```bash
-bun run build
-bun run start
+bun test        # Run test suite
 ```
 
-Or run directly using Bun:
+3. **Production Build**
 
 ```bash
-bun run index.ts
+bun run build   # Build for production
+bun run start   # Start production server
 ```
+
+> [!WARNING]
+> Always run tests before deploying to production to ensure translations maintain quality standards.
+
+4. **State Recovery**
+
+The tool automatically manages state through snapshots:
+
+- Saves progress every time a file is processed
+- Loads most recent snapshot if within TTL window (default: 1 hour)
+- Configurable TTL for different environments
+- Graceful handling of interruptions and failures
+
+Example of custom TTL configuration:
+
+```typescript
+// 30 minutes TTL
+const snapshotManager = new SnapshotManager(logger, 30 * 60 * 1000);
+```
+
+> [!NOTE]
+> Snapshots older than the TTL window are ignored to prevent using outdated translation state.
+
+## How It Works
+
+### Translation Workflow
+
+1. **File Discovery**
+   1.1 Fetches untranslated markdown files from React docs
+   1.2 Filters based on configured criteria (date, issue numbers)
+
+2. **Translation Process**
+   2.1 Splits content into manageable chunks
+   2.2 Applies strict glossary rules
+   2.3 Preserves formatting and technical terms
+   2.4 Maintains code block integrity
+
+> [!IMPORTANT]
+> The translation process strictly follows the glossary rules to maintain consistency across all translations.
+
+3. **GitHub Integration**
+   3.1 Creates feature branches per file
+   3.2 Submits PRs with translations
+   3.3 Updates tracking issues
+   3.4 Handles branch cleanup
+
+4. **State Management**
+   4.1 Saves progress in `.snapshots/`
+   4.2 Enables interruption recovery
+   4.3 Tracks translation metrics
+   4.4 Auto-loads snapshots within TTL window (default: 1 hour)
+   4.5 Configurable TTL via constructor options
 
 ## Project Structure
 
 ```
 src/
-├── services/
-│   ├── github.ts             # GitHub API integration
-│   ├── translator.ts         # OpenAI translation service
-│   ├── language-detector.ts  # Language detection service
-│   ├── branch-manager.ts     # Git branch management
-│   └── snapshot-manager.ts   # State persistence
-├── utils/
-│   ├── logger.ts             # Console logging with spinners
-│   ├── env.ts                # Environment validation
-│   └── errors.ts             # Custom error handling
-├── runner.ts                 # Main workflow orchestrator
-└── types.d.ts                # Type definitions
-
-.snapshots/                   # Persisted workflow state
+├── services/           # Core business logic
+│   ├── github.ts         # GitHub API integration
+│   ├── translator.ts     # OpenAI translation service
+│   ├── branch-manager.ts # Git branch management
+│   └── snapshot-manager.ts # State persistence
+├── utils/             # Helper functions
+│   ├── logger.ts        # Console logging
+│   ├── env.ts          # Environment config
+│   └── errors.ts       # Error handling
+└── types.d.ts        # Type definitions
 ```
 
-## Features
-
-- **Snapshot Management**: Persists workflow state to handle interruptions and failures
-- **Batch Processing**: Processes files in configurable batches with progress tracking
-- **Error Recovery**: Maintains state and allows resuming from failures
-- **GitHub Integration**: 
-  - Creates branches per file
-  - Submits PRs with translations
-  - Comments progress on tracking issues
-  - Handles cleanup of temporary branches
-- **Translation Quality**:
-  - Enforces strict glossary rules
-  - Preserves markdown formatting
-  - Maintains code blocks and technical terms
-  - Supports Brazilian Portuguese localization standards
+> [!TIP]
+> The modular architecture makes it easy to extend functionality or add support for new languages.
 
 ## Contributing
 
-This project is open for contributions. Feel free to open issues, fork the project and submit pull requests for improvements.
+Contributions are welcome! Here's how you can help:
+
+1. Fork the repository
+2. Create your feature branch (`git switch -c feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'feat: add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+> [!NOTE]
+> Please follow our commit convention and include tests for new features.
+
+## License
+
+This project is MIT licensed - see the [LICENSE](LICENSE) file for details.
+
+---
+
+<div align="center">
+  <sub>Built with ❤️ by <a href="https://github.com/NivaldoFarias">Nivaldo Farias</a></sub>
+</div>

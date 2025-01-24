@@ -2,9 +2,13 @@ import { franc } from "franc";
 import langs from "langs";
 import OpenAI from "openai";
 
+import type { ChatCompletion } from "openai/resources";
+import type { TiktokenModel } from "tiktoken";
+
 import type { TranslationFile } from "../types";
 
 import { ErrorCodes, TranslationError } from "../utils/errors";
+import { TokenManager } from "../utils/tokens";
 
 interface TranslationMetrics {
 	totalTranslations: number;
@@ -12,20 +16,26 @@ interface TranslationMetrics {
 	failedTranslations: number;
 	averageTranslationTime: number;
 	totalTranslationTime: number;
+	totalTokensProcessed: number;
 }
 
 export class TranslatorService {
 	private openai = new OpenAI({ apiKey: import.meta.env.OPENAI_API_KEY! });
 	private model = import.meta.env.OPENAI_MODEL! ?? "gpt-4o";
+	private tiktokenModel: TiktokenModel = "gpt-4";
 	private metrics: TranslationMetrics = {
 		totalTranslations: 0,
 		successfulTranslations: 0,
 		failedTranslations: 0,
 		averageTranslationTime: 0,
 		totalTranslationTime: 0,
+		totalTokensProcessed: 0,
 	};
 
 	private async callOpenAIAPI(content: string) {
+		const tokens = TokenManager.countTokens(content, this.tiktokenModel);
+		this.metrics.totalTokensProcessed += tokens;
+
 		return await this.openai.chat.completions.create({
 			model: this.model,
 			messages: [
@@ -49,7 +59,40 @@ export class TranslatorService {
 				);
 			}
 
-			const response = await this.callOpenAIAPI(file.content);
+			// Split content into chunks if needed
+			const chunks = TokenManager.splitContentIntoChunks(file.content, this.tiktokenModel);
+
+			if (chunks.length === 1) {
+				return await this.callOpenAIAPI(chunks[0]);
+			}
+
+			// Process chunks and combine results
+			const translatedChunks = await Promise.all(
+				chunks.map(async (chunk) => {
+					const response = await this.callOpenAIAPI(chunk);
+					return response.choices[0].message.content;
+				}),
+			);
+
+			// Combine translated chunks
+			const combinedTranslation: ChatCompletion = {
+				id: "combined",
+				object: "chat.completion",
+				created: Date.now(),
+				model: this.model,
+				choices: [
+					{
+						index: 0,
+						message: {
+							role: "assistant",
+							content: translatedChunks.join("\n"),
+							refusal: null,
+						},
+						finish_reason: "stop",
+						logprobs: null,
+					},
+				],
+			};
 
 			// Update metrics
 			const translationTime = Date.now() - startTime;
@@ -58,7 +101,7 @@ export class TranslatorService {
 			this.metrics.averageTranslationTime =
 				this.metrics.totalTranslationTime / this.metrics.successfulTranslations;
 
-			return response;
+			return combinedTranslation;
 		} catch (error) {
 			this.metrics.failedTranslations++;
 

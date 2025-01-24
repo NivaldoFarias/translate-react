@@ -365,7 +365,7 @@ export class GitHubService {
 		try {
 			const authResponse = await this.octokit.rest.users.getAuthenticated();
 
-			this.logger?.success(`Authenticated as ${authResponse.data.login}`);
+			this.logger?.success(`Authenticated as user "${authResponse.data.login}"`);
 
 			// Check access to original repo
 			await this.octokit.rest.repos.get({

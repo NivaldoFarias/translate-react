@@ -27,7 +27,7 @@ export default {
 			},
 		},
 	],
-	plugins: ["@ianvs/prettier-plugin-sort-imports"],
+	plugins: ["@ianvs/prettier-plugin-sort-imports", "prettier-plugin-jsdoc"],
 	importOrder: [
 		"<BUILTIN_MODULES>",
 		"",

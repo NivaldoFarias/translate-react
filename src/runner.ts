@@ -43,6 +43,10 @@ export default class Runner {
 	constructor() {
 		try {
 			validateEnv();
+
+			this.logger.success(
+				`Environment variables from file ".env.${import.meta.env.NODE_ENV}" validated`,
+			);
 		} catch (error) {
 			this.logger.error(error instanceof Error ? error.message : String(error));
 			process.exit(1);

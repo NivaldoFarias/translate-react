@@ -2,9 +2,9 @@
 .config
 .dotfiles
 .snapshots/
+.vscode/
 
 # Logs
-
 logs
 _.log
 npm-debug.log_
