@@ -1,5 +1,5 @@
 import type { RestEndpointMethodTypes } from "@octokit/rest";
-import type { ChatCompletion } from "openai/resources";
+import type { ChatCompletion } from "openai/resources/chat/completions.mjs";
 
 import type { TranslationFile } from "./types";
 
@@ -27,7 +27,9 @@ export default class Runner {
 	private readonly translator = new TranslatorService();
 	private readonly languageDetector = new LanguageDetector();
 	private readonly snapshotManager = new SnapshotManager(this.logger);
-	private readonly maxFiles = import.meta.env.MAX_FILES;
+	private get maxFiles(): number | undefined {
+		return import.meta.env.NODE_ENV === "production" ? undefined : 10;
+	}
 	private stats = {
 		results: new Map<ProcessedFileResult["filename"], ProcessedFileResult>(),
 		startTime: Date.now(),
@@ -211,7 +213,7 @@ export default class Runner {
 				const content =
 					typeof metadata.translation === "string" ?
 						metadata.translation
-					:	metadata.translation?.choices[0].message.content;
+					:	metadata.translation?.choices[0]?.message?.content;
 
 				await this.github.commitTranslation(
 					metadata.branch,

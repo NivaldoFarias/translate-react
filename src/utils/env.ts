@@ -9,7 +9,6 @@ const envSchema = z.object({
 	ORIGINAL_REPO_OWNER: z.string().min(1, "Original repository owner is required"),
 	NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
 	BUN_ENV: z.enum(["development", "production", "test"]).default("development"),
-	MAX_FILES: z.coerce.number().positive().default(10),
 	TRANSLATION_ISSUE_NUMBER: z.coerce.number().positive("Translation issue number is required"),
 	GITHUB_SINCE: z.string().optional(),
 });
