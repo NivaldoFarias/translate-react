@@ -4,7 +4,7 @@ A CLI tool to automate the translation of React documentation from English to Br
 
 ## Overview
 
-This project aims to accelerate the translation process of React's documentation to Brazilian Portuguese, which is currently *(2025-01-17)* only 42% complete. It automates the workflow of:
+This project aims to accelerate the translation process of React's documentation to Brazilian Portuguese, which is currently _(2025-01-17)_ only 42% complete. It automates the workflow of:
 
 1. Fetching untranslated markdown files from the React docs repository
 2. Managing translation state through snapshots to handle interruptions
@@ -38,7 +38,7 @@ bun install
 3. Create a `.env` file with the following variables:
 
 ```env
-GITHUB_TOKEN=your_github_token                  # required         
+GITHUB_TOKEN=your_github_token                  # required
 OPENAI_API_KEY=your_openai_api_key              # required
 OPENAI_MODEL=gpt-4                              # required
 REPO_OWNER=target_repo_owner                    # required
@@ -46,7 +46,6 @@ REPO_NAME=target_repo_name                      # required
 ORIGINAL_REPO_OWNER=original_repo_owner         # required
 NODE_ENV=development|production|test            # optional, defaults to development
 BUN_ENV=development|production|test             # optional, defaults to development
-MAX_FILES=10                                    # optional, defaults to 10
 TRANSLATION_ISSUE_NUMBER=123                    # required for production
 GITHUB_SINCE=2024-01-01                         # optional, filters issue comments since date
 ```
@@ -102,7 +101,7 @@ src/
 - **Snapshot Management**: Persists workflow state to handle interruptions and failures
 - **Batch Processing**: Processes files in configurable batches with progress tracking
 - **Error Recovery**: Maintains state and allows resuming from failures
-- **GitHub Integration**: 
+- **GitHub Integration**:
   - Creates branches per file
   - Submits PRs with translations
   - Comments progress on tracking issues

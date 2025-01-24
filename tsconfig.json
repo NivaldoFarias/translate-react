@@ -3,7 +3,7 @@
         /* Language Compilation Options */
         "module": "ESNext",
         "target": "ESNext",
-        "moduleResolution": "node",
+        "moduleResolution": "Bundler",
         "resolveJsonModule": true,
         "allowJs": true,
         "checkJs": true,
@@ -12,11 +12,18 @@
         /* Type Checking Rules */
         "strict": true,
         "noPropertyAccessFromIndexSignature": true,
+        "noUncheckedIndexedAccess": true,
         /* Other Options */
         "skipLibCheck": true,
         "esModuleInterop": true,
         "forceConsistentCasingInFileNames": true,
+        "isolatedModules": true,
+        "baseUrl": ".",
+        "paths": {
+            "@/*": ["src/*"]
+        },
         "types": ["bun-types"]
     },
-    "include": ["**/*.js", "**/*.ts", ".*.cjs"]
+    "include": ["src/**/*", "index.ts"],
+    "exclude": ["node_modules", "dist"]
 }
