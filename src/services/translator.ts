@@ -38,7 +38,10 @@ export class TranslatorService {
 	/**
 	 * OpenAI language model instance for translations
 	 */
-	private readonly llm = new OpenAI({ apiKey: import.meta.env.LLM_API_KEY! });
+	private readonly llm = new OpenAI({
+		baseURL: import.meta.env.LLM_BASE_URL,
+		apiKey: import.meta.env.LLM_API_KEY,
+	});
 
 	/**
 	 * Translation performance metrics tracker

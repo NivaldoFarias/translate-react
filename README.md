@@ -39,9 +39,10 @@ bun install
 3. Create a `.env` file with the following variables:
 
 ```env
-GITHUB_TOKEN=your_github_token                  # required
+GITHUB_TOKEN=your_github_token                 # required
 LLM_API_KEY=your_LLM_API_KEY                   # required
 LLM_MODEL=gpt-4                                # required
+LLM_BASE_URL=https://openrouter.ai/api/v1      # optional, defaults to openrouter.ai
 REPO_OWNER=target_repo_owner                   # required
 REPO_NAME=target_repo_name                     # required
 ORIGINAL_REPO_OWNER=original_repo_owner        # required
