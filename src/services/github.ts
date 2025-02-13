@@ -1,3 +1,13 @@
+/**
+ * # GitHub Integration Service
+ *
+ * Manages all GitHub-related operations for the translation workflow:
+ * - Repository content access
+ * - Branch management
+ * - Pull request creation
+ * - File content manipulation
+ */
+
 import { Octokit } from "@octokit/rest";
 
 import type { RestEndpointMethodTypes } from "@octokit/rest";
@@ -9,13 +19,30 @@ import { reconstructContent } from "../utils/content-parser";
 
 import { BranchManager } from "./branch-manager";
 
+/**
+ * # GitHub Service
+ *
+ * Core service for interacting with GitHub's API.
+ * Manages repository operations, content access, and version control.
+ */
 export class GitHubService {
+	/**
+	 * Octokit instance for GitHub API interactions
+	 */
 	private readonly octokit = new Octokit({ auth: import.meta.env.GITHUB_TOKEN });
+
+	/**
+	 * Branch manager for handling Git branch operations
+	 */
 	private readonly branchManager = new BranchManager(
 		import.meta.env.REPO_OWNER!,
 		import.meta.env.REPO_NAME!,
 		import.meta.env.GITHUB_TOKEN!,
 	);
+
+	/**
+	 * Current branch references for fork and upstream
+	 */
 	private branch: {
 		fork: RestEndpointMethodTypes["git"]["getRef"]["response"]["data"] | null;
 		upstream: RestEndpointMethodTypes["git"]["getRef"]["response"]["data"] | null;
@@ -24,6 +51,19 @@ export class GitHubService {
 		upstream: null,
 	};
 
+	/**
+	 * # Untranslated File Retrieval
+	 *
+	 * Fetches markdown files from the repository that need translation.
+	 *
+	 * ## Workflow
+	 * 1. Fetches repository tree
+	 * 2. Filters for markdown files
+	 * 3. Retrieves file contents
+	 * 4. Processes and validates files
+	 *
+	 * @param maxFiles - Optional limit on number of files to retrieve
+	 */
 	public async getUntranslatedFiles(maxFiles?: number) {
 		try {
 			const { data } = await this.octokit.git.getTree({
@@ -92,6 +132,16 @@ export class GitHubService {
 		}
 	}
 
+	/**
+	 * # Repository Tree Filter
+	 *
+	 * Filters repository tree for valid markdown files:
+	 * - Must have .md extension
+	 * - Must be in src/ directory
+	 * - Must be nested or be GLOSSARY.md
+	 *
+	 * @param tree - Repository tree from GitHub API
+	 */
 	private filterRepositoryTree(
 		tree: RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"],
 	) {
@@ -105,6 +155,19 @@ export class GitHubService {
 		});
 	}
 
+	/**
+	 * # Translation Branch Creation
+	 *
+	 * Creates or retrieves a branch for translation work.
+	 *
+	 * ## Workflow
+	 * 1. Generates branch name from file
+	 * 2. Checks for existing branch
+	 * 3. Creates new branch if needed
+	 *
+	 * @param fileName - Name of file being translated
+	 * @param baseBranch - Base branch to create from
+	 */
 	public async createTranslationBranch(fileName: string, baseBranch = "main") {
 		const branchName = `translate/${fileName}`;
 
@@ -120,6 +183,12 @@ export class GitHubService {
 		return branchRef.data;
 	}
 
+	/**
+	 * # Fork Commit Check
+	 *
+	 * Verifies if commits exist on the fork from the current user.
+	 * Used to determine if translation work has already been done.
+	 */
 	public async checkIfCommitExistsOnFork() {
 		const listCommitsResponse = await this.octokit.repos.listCommits({
 			owner: import.meta.env.REPO_OWNER!,
@@ -132,6 +201,22 @@ export class GitHubService {
 		);
 	}
 
+	/**
+	 * # Translation Commit
+	 *
+	 * Commits translated content to the repository.
+	 *
+	 * ## Workflow
+	 * 1. Retrieves current file state
+	 * 2. Prepares content for commit
+	 * 3. Creates or updates file
+	 * 4. Handles cleanup on failure
+	 *
+	 * @param branch - Target branch reference
+	 * @param file - File being translated
+	 * @param content - Translated content
+	 * @param message - Commit message
+	 */
 	public async commitTranslation(
 		branch: RestEndpointMethodTypes["git"]["getRef"]["response"]["data"],
 		file: TranslationFile,
@@ -171,6 +256,21 @@ export class GitHubService {
 		}
 	}
 
+	/**
+	 * # Pull Request Creation
+	 *
+	 * Creates or finds an existing pull request for translations.
+	 *
+	 * ## Workflow
+	 * 1. Checks for existing PRs
+	 * 2. Creates new PR if none exists
+	 * 3. Handles cleanup on failure
+	 *
+	 * @param branch - Source branch name
+	 * @param title - PR title
+	 * @param body - PR description
+	 * @param baseBranch - Target branch for PR
+	 */
 	public async createPullRequest(
 		branch: string,
 		title: string,
@@ -217,14 +317,33 @@ export class GitHubService {
 		}
 	}
 
+	/**
+	 * # Branch Cleanup
+	 *
+	 * Removes a branch after successful merge or on failure.
+	 *
+	 * @param branch - Branch to delete
+	 */
 	public async cleanupBranch(branch: string) {
 		await this.branchManager.deleteBranch(branch);
 	}
 
+	/**
+	 * # Active Branch List
+	 *
+	 * Retrieves list of currently active branches.
+	 */
 	public getActiveBranches(): string[] {
 		return this.branchManager.getActiveBranches();
 	}
 
+	/**
+	 * # File Content Retrieval
+	 *
+	 * Fetches raw content of a file from GitHub.
+	 *
+	 * @param file - File reference to fetch
+	 */
 	public async getFileContent(
 		file:
 			| TranslationFile
@@ -251,6 +370,14 @@ export class GitHubService {
 		}
 	}
 
+	/**
+	 * # Repository Tree Retrieval
+	 *
+	 * Fetches complete repository tree.
+	 *
+	 * @param baseBranch - Branch to get tree from
+	 * @param filterIgnored - Whether to filter ignored paths
+	 */
 	public async getRepositoryTree(baseBranch = "main", filterIgnored = true) {
 		const { data } = await this.octokit.git.getTree({
 			owner: import.meta.env.REPO_OWNER!,
@@ -262,6 +389,14 @@ export class GitHubService {
 		return filterIgnored ? this.filterRepositoryTree(data.tree) : data.tree;
 	}
 
+	/**
+	 * # Issue Comment Creation
+	 *
+	 * Posts translation results as comments on GitHub issues.
+	 *
+	 * @param issueNumber - Target issue number
+	 * @param results - Translation results to report
+	 */
 	public async commentCompiledResultsOnIssue(issueNumber: number, results: ProcessedFileResult[]) {
 		// check if the issue exists
 		const issue = await this.octokit.issues.get({
@@ -347,10 +482,16 @@ export class GitHubService {
 		return createCommentResponse.data;
 	}
 
+	/**
+	 * Comment header template for issue comments
+	 */
 	private get commentPrefix() {
 		return `As seguintes páginas foram traduzidas e PRs foram criados:`;
 	}
 
+	/**
+	 * Comment footer template for issue comments
+	 */
 	private get commentSufix() {
 		return `###### Observações
 
@@ -360,6 +501,12 @@ export class GitHubService {
 - A implementação não é perfeita e pode conter erros.`;
 	}
 
+	/**
+	 * # Token Permission Verification
+	 *
+	 * Verifies that the GitHub token has required permissions.
+	 * Checks for repository and pull request access.
+	 */
 	public async verifyTokenPermissions() {
 		try {
 			const authResponse = await this.octokit.rest.users.getAuthenticated();

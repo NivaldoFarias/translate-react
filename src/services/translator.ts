@@ -1,3 +1,10 @@
+/**
+ * # Translation Service Module
+ *
+ * Provides functionality for translating content using OpenAI's language models.
+ * Handles content parsing, translation, and reconstruction while maintaining formatting.
+ */
+
 import { franc } from "franc";
 import langs from "langs";
 import OpenAI from "openai";
@@ -7,6 +14,14 @@ import type { ParsedContent, TranslationFile } from "../types";
 import { parseContent, reconstructContent } from "../utils/content-parser";
 import { ErrorCodes, TranslationError } from "../utils/errors";
 
+/**
+ * # Translation Metrics
+ *
+ * Tracks performance and success rates of translation operations:
+ * - Total number of translations attempted
+ * - Success and failure counts
+ * - Average and total translation times
+ */
 export interface TranslationMetrics {
 	totalTranslations: number;
 	successfulTranslations: number;
@@ -15,11 +30,25 @@ export interface TranslationMetrics {
 	totalTranslationTime: number;
 }
 
+/**
+ * # Translation Service
+ *
+ * Core service for translating content using OpenAI's language models.
+ * Handles the entire translation workflow including:
+ * - Content parsing and block management
+ * - Language model interaction
+ * - Response processing
+ * - Metrics tracking
+ */
 export class TranslatorService {
-	/** The language model instance. */
+	/**
+	 * OpenAI language model instance for translations
+	 */
 	private readonly llm = new OpenAI({ apiKey: import.meta.env.LLM_API_KEY! });
 
-	/** The metrics for the translator. */
+	/**
+	 * Translation performance metrics tracker
+	 */
 	private metrics: TranslationMetrics = {
 		totalTranslations: 0,
 		successfulTranslations: 0,
@@ -29,11 +58,18 @@ export class TranslatorService {
 	};
 
 	/**
-	 * Calls the language model to translate the content.
+	 * # Language Model Interaction
 	 *
-	 * @param content The content to translate
-	 * @param blocksToTranslate The blocks to translate
-	 * @returns The translated content
+	 * Makes API calls to OpenAI for content translation.
+	 * Constructs appropriate prompts and handles response processing.
+	 *
+	 * ## Workflow
+	 * 1. Builds system and user prompts
+	 * 2. Adds block translations if needed
+	 * 3. Makes API call with configured model
+	 *
+	 * @param content - Main content to translate
+	 * @param blocksToTranslate - Optional code blocks requiring translation
 	 */
 	private async callLanguageModel(content: string, blocksToTranslate?: string) {
 		const messages = [
@@ -62,10 +98,18 @@ export class TranslatorService {
 	}
 
 	/**
-	 * Translates the content of a file.
+	 * # Content Translation
 	 *
-	 * @param file The file to translate
-	 * @returns The translated content
+	 * Main translation method that processes files and manages the translation workflow.
+	 *
+	 * ## Workflow
+	 * 1. Validates input content
+	 * 2. Parses content and extracts blocks
+	 * 3. Calls language model for translation
+	 * 4. Processes and reconstructs translated content
+	 * 5. Updates metrics
+	 *
+	 * @param file - File containing content to translate
 	 */
 	public async translateContent(file: TranslationFile) {
 		const startTime = Date.now();
@@ -150,10 +194,26 @@ export class TranslatorService {
 		}
 	}
 
+	/**
+	 * # User Prompt Generator
+	 *
+	 * Creates the user prompt for the language model.
+	 * Includes instructions for content translation and block handling.
+	 *
+	 * @param content - Content to be translated
+	 */
 	private getUserPrompt(content: string) {
 		return `CONTENT TO TRANSLATE:\n${content}\n\nIMPORTANT: MUST respond with the translated content first, followed by any translated blocks. DO NOT modify the {{BLOCK_X}} placeholders in the main content.`;
 	}
 
+	/**
+	 * # System Prompt Generator
+	 *
+	 * Creates the system prompt that defines translation rules and requirements.
+	 * Includes language specifications, formatting rules, and glossary.
+	 *
+	 * @param content - Content to determine source language
+	 */
 	private getSystemPrompt(content: string) {
 		const languages = {
 			target: langs.where("3", import.meta.env.TARGET_LANGUAGE)?.["1"] || "Brazilian Portuguese",
@@ -192,15 +252,21 @@ export class TranslatorService {
 	}
 
 	/**
-	 * Gets the metrics for the translator.
+	 * # Metrics Retriever
 	 *
-	 * @returns The metrics for the translator
+	 * Provides current translation performance metrics.
+	 * Returns a copy to prevent external modification.
 	 */
 	public getMetrics(): TranslationMetrics {
 		return { ...this.metrics };
 	}
 
-	/** The glossary rules. */
+	/**
+	 * # Translation Glossary
+	 *
+	 * Provides standardized translation rules and term mappings.
+	 * Ensures consistency in technical term translation.
+	 */
 	private get glossary() {
 		return `# Guia de Estilo Universal
 

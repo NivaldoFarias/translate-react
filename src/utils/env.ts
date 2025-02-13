@@ -1,5 +1,11 @@
 import { z } from "zod";
 
+/**
+ * # Environment Configuration Schema
+ *
+ * Defines and validates the required environment variables for the application.
+ * Uses Zod for runtime type checking and validation of environment variables.
+ */
 const envSchema = z.object({
 	GITHUB_TOKEN: z.string().min(1, "GitHub token is required"),
 	LLM_API_KEY: z.string().min(1, "OpenAI API key is required"),
@@ -15,8 +21,25 @@ const envSchema = z.object({
 	SOURCE_LANGUAGE: z.string().min(1, "Source language is required"),
 });
 
+/**
+ * Type definition for the environment configuration
+ * Inferred from the Zod schema to ensure type safety
+ */
 export type Environment = z.infer<typeof envSchema>;
 
+/**
+ * # Environment Validator
+ *
+ * Validates all environment variables against the defined schema.
+ * Performs runtime checks to ensure all required variables are present and correctly typed.
+ *
+ * ## Workflow
+ * 1. Parses environment variables using Zod schema
+ * 2. Updates `import.meta.env` with validated values
+ * 3. Throws detailed error messages for invalid configurations
+ *
+ * @throws {Error} Detailed validation errors if environment variables are invalid
+ */
 export function validateEnv() {
 	try {
 		const env = envSchema.parse(import.meta.env);
