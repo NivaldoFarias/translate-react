@@ -39,8 +39,8 @@ bun install
 
 ```env
 GITHUB_TOKEN=your_github_token                  # required
-OPENAI_API_KEY=your_openai_api_key              # required
-OPENAI_MODEL=gpt-4                              # required
+LLM_API_KEY=your_LLM_API_KEY              # required
+LLM_MODEL=gpt-4                              # required
 REPO_OWNER=target_repo_owner                    # required
 REPO_NAME=target_repo_name                      # required
 ORIGINAL_REPO_OWNER=original_repo_owner         # required
