@@ -1,10 +1,14 @@
 import { z } from "zod";
 
 /**
- * # Environment Configuration Schema
+ * Environment configuration schema for runtime validation.
+ * Uses Zod for type checking and validation of environment variables.
  *
- * Defines and validates the required environment variables for the application.
- * Uses Zod for runtime type checking and validation of environment variables.
+ * ## Required Variables
+ * - GitHub authentication and repository settings
+ * - OpenAI API configuration
+ * - Language settings
+ * - Environment mode settings
  */
 const envSchema = z.object({
 	GITHUB_TOKEN: z.string().min(1, "GitHub token is required"),
@@ -22,14 +26,12 @@ const envSchema = z.object({
 });
 
 /**
- * Type definition for the environment configuration
- * Inferred from the Zod schema to ensure type safety
+ * Type definition for the environment configuration.
+ * Inferred from the Zod schema to ensure type safety.
  */
 export type Environment = z.infer<typeof envSchema>;
 
 /**
- * # Environment Validator
- *
  * Validates all environment variables against the defined schema.
  * Performs runtime checks to ensure all required variables are present and correctly typed.
  *

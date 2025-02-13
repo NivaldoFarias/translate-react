@@ -1,18 +1,14 @@
-/**
- * # Language Detection Module
- *
- * Provides functionality for detecting and analyzing the language of content.
- * Uses the `franc` library for language detection and `langs` for language code conversion.
- */
-
 import { franc, francAll } from "franc";
 import langs from "langs";
 
 /**
- * # Language Configuration
+ * Configuration interface for language detection settings.
+ * Uses ISO 639-1 language codes for source and target languages.
  *
- * Configuration interface for specifying source and target languages.
- * Uses ISO 639-1 language codes (e.g., 'en' for English, 'pt' for Portuguese).
+ * ## Example
+ * ```typescript
+ * { source: 'en', target: 'pt' }
+ * ```
  */
 export interface LanguageConfig {
 	source: string;
@@ -20,13 +16,13 @@ export interface LanguageConfig {
 }
 
 /**
- * # Language Analysis Result
+ * Detailed analysis of content language detection results.
  *
- * Detailed analysis of content language detection including:
+ * ## Analysis Components
  * - Confidence scores for source and target languages
  * - Ratio of target language presence
- * - Translation status
- * - Detected primary language
+ * - Translation status determination
+ * - Primary detected language identification
  */
 export interface LanguageAnalysis {
 	languageScore: {
@@ -43,6 +39,12 @@ export interface LanguageAnalysis {
  *
  * Service for analyzing and detecting the language of content.
  * Helps determine if content needs translation based on language analysis.
+ *
+ * ## Responsibilities
+ * - Language detection and analysis
+ * - Translation status determination
+ * - Language code conversion
+ * - Confidence score calculation
  */
 export class LanguageDetector {
 	/**

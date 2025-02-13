@@ -1,10 +1,3 @@
-/**
- * # Translation Service Module
- *
- * Provides functionality for translating content using OpenAI's language models.
- * Handles content parsing, translation, and reconstruction while maintaining formatting.
- */
-
 import { franc } from "franc";
 import langs from "langs";
 import OpenAI from "openai";
@@ -15,12 +8,13 @@ import { parseContent, reconstructContent } from "../utils/content-parser";
 import { ErrorCodes, TranslationError } from "../utils/errors";
 
 /**
- * # Translation Metrics
+ * Translation performance and success rate metrics.
  *
- * Tracks performance and success rates of translation operations:
- * - Total number of translations attempted
+ * ## Tracked Metrics
+ * - Total translations attempted
  * - Success and failure counts
- * - Average and total translation times
+ * - Average translation time
+ * - Total processing time
  */
 export interface TranslationMetrics {
 	totalTranslations: number;

@@ -1,16 +1,10 @@
-/**
- * # Content Parser Module
- *
- * Provides utilities for parsing and reconstructing content with special handling for code blocks.
- * Helps in managing repeated content and maintaining content structure during translation.
- */
-
 import type { ParsedContent } from "../types";
 
 /**
  * # Content Parser
  *
  * Parses file content to identify and extract repeated code blocks.
+ * Helps manage repeated content and maintain content structure during translation.
  *
  * ## Workflow
  * 1. Identifies markdown code blocks using regex
@@ -74,7 +68,8 @@ export function parseContent(content: string) {
 /**
  * # Content Reconstructor
  *
- * Reconstructs the original content by replacing placeholders with their corresponding blocks.
+ * Reconstructs the original content by replacing placeholders with their blocks.
+ * Maintains document structure and formatting during reconstruction.
  *
  * ## Workflow
  * 1. Takes parsed content with placeholders
