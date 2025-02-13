@@ -1,5 +1,8 @@
+import ora from "ora";
+
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 import type { ChatCompletion } from "openai/resources/chat/completions.mjs";
+import type { Ora } from "ora";
 
 import type { TranslationFile } from "./types";
 
@@ -8,8 +11,18 @@ import { LanguageDetector } from "./services/language-detector";
 import { SnapshotManager } from "./services/snapshot-manager";
 import { TranslatorService } from "./services/translator";
 import { validateEnv } from "./utils/env";
-import Logger from "./utils/logger";
 
+/**
+ * # Translation Runner
+ *
+ * Orchestrates the entire translation workflow, managing the process of:
+ * - Repository tree fetching
+ * - File content retrieval
+ * - Language detection
+ * - Translation processing
+ * - Pull request creation
+ * - Progress tracking and reporting
+ */
 export interface ProcessedFileResult {
 	branch: RestEndpointMethodTypes["git"]["getRef"]["response"]["data"] | null;
 	filename: string;
@@ -21,48 +34,112 @@ export interface ProcessedFileResult {
 	error: Error | null;
 }
 
+/**
+ * # Translation Workflow Runner
+ *
+ * Main orchestrator class that manages the entire translation process workflow.
+ * Handles file processing, translation, GitHub operations, and progress tracking.
+ */
 export default class Runner {
-	private readonly logger = new Logger();
-	private readonly github = new GitHubService(this.logger);
+	/**
+	 * GitHub service instance for repository operations
+	 */
+	private readonly github = new GitHubService();
+
+	/**
+	 * Translation service for content translation operations
+	 */
 	private readonly translator = new TranslatorService();
-	private readonly languageDetector = new LanguageDetector();
-	private readonly snapshotManager = new SnapshotManager(this.logger);
+
+	/**
+	 * Language detection service to identify content language
+	 */
+	private readonly languageDetector = new LanguageDetector({
+		source: import.meta.env.SOURCE_LANGUAGE!,
+		target: import.meta.env.TARGET_LANGUAGE!,
+	});
+
+	/**
+	 * Snapshot manager to persist and retrieve workflow state
+	 */
+	private readonly snapshotManager = new SnapshotManager();
+
+	/**
+	 * Maximum number of files to process
+	 * Limited in non-production environments for testing purposes
+	 */
 	private get maxFiles(): number | undefined {
 		return import.meta.env.NODE_ENV === "production" ? undefined : 10;
 	}
+
+	/**
+	 * Statistics tracking for the translation process
+	 */
 	private stats = {
 		results: new Map<ProcessedFileResult["filename"], ProcessedFileResult>(),
 		startTime: Date.now(),
 	};
 
-	private cleanup = () => {
-		this.logger?.endProgress();
+	/**
+	 * Progress spinner for CLI feedback
+	 */
+	private spinner: Ora | null = null;
 
+	/**
+	 * Cleanup handler for process termination
+	 * Ensures graceful shutdown and cleanup of resources
+	 */
+	private cleanup = () => {
+		this.spinner?.stop();
 		// Force exit after a timeout to ensure cleanup handlers run
-		setTimeout(() => process.exit(0), 1000);
+		setTimeout(() => void process.exit(0), 1000);
 	};
 
+	/**
+	 * Initializes the runner with environment validation and signal handlers
+	 * Sets up process event listeners for graceful termination
+	 */
 	constructor() {
 		try {
 			validateEnv();
 		} catch (error) {
-			this.logger.error(error instanceof Error ? error.message : String(error));
+			console.error(error instanceof Error ? error.message : String(error));
 			process.exit(1);
 		}
 
 		process.on("SIGINT", this.cleanup);
 		process.on("SIGTERM", this.cleanup);
 		process.on("uncaughtException", (error) => {
-			this.logger.error(`Uncaught exception: ${error.message}`);
+			console.error(`Uncaught exception: ${error.message}`);
 			this.cleanup();
 		});
 	}
 
+	/**
+	 * # Main Workflow Execution
+	 *
+	 * Executes the complete translation workflow:
+	 * 1. Verifies GitHub token permissions
+	 * 2. Loads or creates workflow snapshot
+	 * 3. Fetches repository tree
+	 * 4. Identifies files for translation
+	 * 5. Processes files in batches
+	 * 6. Reports results
+	 *
+	 * In production, also comments results on the specified issue
+	 */
 	public async run() {
 		try {
-			this.logger.info("Starting translation workflow");
+			if (!this.spinner) {
+				this.spinner = ora({
+					text: "Starting translation workflow",
+					color: "cyan",
+					spinner: "dots",
+				}).start();
+			}
 
 			if (!(await this.github.verifyTokenPermissions())) {
+				this.spinner.fail("Token permissions verification failed");
 				throw new Error("Token permissions verification failed");
 			}
 
@@ -74,24 +151,24 @@ export default class Runner {
 			};
 
 			if (!snapshot.repositoryTree?.length) {
+				this.spinner.text = "Fetching repository tree...";
+
 				snapshot.repositoryTree = await this.github.getRepositoryTree("main");
-
 				await this.snapshotManager.append("repositoryTree", snapshot.repositoryTree);
-
-				this.logger.info(`Repository tree fetched`);
+				this.spinner.succeed("Repository tree fetched");
 			} else {
-				this.logger.info(`Repository tree already fetched`);
+				this.spinner.stopAndPersist({
+					symbol: "📦",
+					text: "Repository tree already fetched",
+				});
+				this.spinner.start();
 			}
 
 			if (!snapshot.filesToTranslate?.length) {
 				const uncheckedFiles: TranslationFile[] = [];
 
 				for (const [index, file] of snapshot.repositoryTree.slice(0, this.maxFiles).entries()) {
-					this.logger.updateProgress(
-						index + 1,
-						snapshot.repositoryTree.length,
-						`Fetching file ${index + 1}/${snapshot.repositoryTree.length}: ${file.path}`,
-					);
+					this.spinner.text = `Fetching file ${index + 1}/${snapshot.repositoryTree.length}: ${file.path}`;
 
 					if (uncheckedFiles.find((compareFile) => compareFile.path === file.path)) continue;
 
@@ -102,19 +179,24 @@ export default class Runner {
 					});
 				}
 
-				this.logger.endProgress();
+				this.spinner.stop();
 
 				const filesToTranslate = uncheckedFiles.filter(
-					(file) => !this.languageDetector.isFileTranslated(file.content),
+					(file) => !this.languageDetector.isFileTranslated(file.content as string),
 				);
 
 				await this.snapshotManager.append("filesToTranslate", filesToTranslate);
 
 				snapshot.filesToTranslate = filesToTranslate;
 
-				this.logger.info(`Found ${filesToTranslate.length} files to translate`);
+				this.spinner.succeed(`Found ${filesToTranslate.length} files to translate`);
+				this.spinner.start();
 			} else {
-				this.logger.info(`Found ${snapshot.filesToTranslate.length} files to translate`);
+				this.spinner.stopAndPersist({
+					symbol: "📦",
+					text: `Found ${snapshot.filesToTranslate.length} files to translate`,
+				});
+				this.spinner.start();
 			}
 
 			await this.processInBatches(snapshot.filesToTranslate, 10);
@@ -123,22 +205,28 @@ export default class Runner {
 
 			await this.snapshotManager.append("processedResults", snapshot.processedResults);
 
-			this.logger.success(`Translation completed`);
+			this.spinner.succeed("Translation completed");
 
 			if (
 				import.meta.env.NODE_ENV === "production" &&
 				import.meta.env.TRANSLATION_ISSUE_NUMBER &&
 				snapshot.processedResults.length > 0
 			) {
+				this.spinner.text = "Commenting on issue...";
 				const comment = await this.github.commentCompiledResultsOnIssue(
 					import.meta.env.TRANSLATION_ISSUE_NUMBER,
 					snapshot.processedResults,
 				);
-
-				this.logger.info(`Commented on translation issue: ${comment.html_url}`);
+				this.spinner.succeed(`Commented on translation issue: ${comment.html_url}`);
 			}
 
-			this.logger.table({
+			// Use stopAndPersist for final statistics
+			this.spinner.stopAndPersist({
+				symbol: "📊",
+				text: "Final Statistics",
+			});
+
+			console.table({
 				"Files processed successfully": Array.from(this.stats.results.values()).filter(
 					(file) => file.error === null,
 				).length,
@@ -151,40 +239,77 @@ export default class Runner {
 				await this.snapshotManager.clear();
 			}
 		} catch (error) {
-			this.logger.error(error instanceof Error ? error.message : "Unknown error");
+			this.spinner?.fail(error instanceof Error ? error.message : "Unknown error");
 			process.exit(1);
 		} finally {
 			const elapsedTime = Math.ceil(Date.now() - this.stats.startTime);
-
-			this.logger.info(`Elapsed time: ${elapsedTime}ms (${Math.ceil(elapsedTime / 1000)}s)`);
-			this.logger.endProgress();
+			this.spinner?.stopAndPersist({
+				symbol: "⏱️",
+				text: `Elapsed time: ${elapsedTime}ms (${Math.ceil(elapsedTime / 1000)}s)`,
+			});
 		}
 	}
 
+	/**
+	 * # Batch Processing
+	 *
+	 * Processes files in batches to manage resources and provide progress feedback
+	 *
+	 * @param files - List of files to process
+	 * @param batchSize - Number of files to process simultaneously
+	 */
 	private async processInBatches(files: TranslationFile[], batchSize = 10) {
+		if (!this.spinner) {
+			this.spinner = ora({
+				text: "Processing files",
+				color: "cyan",
+				spinner: "dots",
+			}).start();
+		}
+
 		const batches = [];
 		for (let i = 0; i < files.length; i += batchSize) {
 			batches.push(files.slice(i, i + batchSize));
 		}
 
-		this.logger.startProgress(`Processing ${batches.length} batches`);
+		for (const [batchIndex, batch] of batches.entries()) {
+			this.spinner!.text = `Processing batch ${batchIndex + 1}/${batches.length}`;
 
-		for (const batch of batches) {
-			this.logger.updateProgress(
-				batches.indexOf(batch) + 1,
-				batches.length,
-				`Processing batch ${batches.indexOf(batch) + 1} of ${batches.length}`,
+			await Promise.all(
+				batch.map((file, fileIndex) => {
+					const progress = {
+						batchIndex: batchIndex + 1,
+						fileIndex,
+						totalBatches: batches.length,
+						batchSize,
+					};
+
+					return this.processFile(file, progress);
+				}),
 			);
 
-			await Promise.all(batch.map(this.processFile.bind(this)));
+			this.spinner!.succeed(`Completed batch ${batchIndex + 1}/${batches.length}`);
 
-			this.logger.success(`Processed batch ${batches.indexOf(batch) + 1} of ${batches.length}`);
+			if (batchIndex < batches.length - 1) this.spinner!.start();
 		}
-
-		this.logger.endProgress();
 	}
 
-	private async processFile(file: TranslationFile) {
+	/**
+	 * # Single File Processing
+	 *
+	 * Processes an individual file through the translation workflow:
+	 * - Creates a branch
+	 * - Checks for existing translations
+	 * - Performs translation
+	 * - Creates pull request
+	 *
+	 * @param file - File to process
+	 * @param progress - Progress tracking information
+	 */
+	private async processFile(
+		file: TranslationFile,
+		progress: { batchIndex: number; fileIndex: number; totalBatches: number; batchSize: number },
+	) {
 		const metadata = this.stats.results.get(file.filename!) || {
 			branch: null,
 			filename: file.filename!,
@@ -193,23 +318,26 @@ export default class Runner {
 			error: null,
 		};
 
+		const suffixText = `[${progress.fileIndex + 1}/${progress.batchSize}]`;
+
 		try {
 			if (!metadata.branch) {
+				this.spinner!.suffixText = `${suffixText} Creating branch for ${file.filename}`;
 				metadata.branch = await this.github.createTranslationBranch(file.filename!);
 			}
 
 			const commitExists = await this.github.checkIfCommitExistsOnFork();
 
 			if (!metadata.translation) {
+				this.spinner!.suffixText = `${suffixText} Translating ${file.filename}`;
 				metadata.translation =
 					commitExists ?
 						await this.github.getFileContent(file)
 					:	await this.translator.translateContent(file);
 			}
 
-			if (commitExists) {
-				this.logger.info(`Branch ${metadata.branch.ref} already has a commit for ${file.filename}`);
-			} else {
+			if (!commitExists) {
+				this.spinner!.suffixText = `${suffixText} Committing ${file.filename}`;
 				const content =
 					typeof metadata.translation === "string" ?
 						metadata.translation
@@ -224,25 +352,23 @@ export default class Runner {
 			}
 
 			if (!metadata.pullRequest) {
+				this.spinner!.suffixText = `${suffixText} Creating PR for ${file.filename}`;
 				metadata.pullRequest = await this.github.createPullRequest(
 					metadata.branch.ref,
 					`Translate \`${file.filename}\` to pt-br`,
 					this.pullRequestDescription,
 				);
 			}
-
-			this.logger.success(`Processed ${file.filename} successfully`);
 		} catch (error) {
 			metadata.error = error instanceof Error ? error : new Error(String(error));
-
-			this.logger.error(`Failed to process ${file.filename}`);
+			this.spinner!.suffixText = `${suffixText} Failed: ${file.filename}`;
 		} finally {
 			this.stats.results.set(file.filename!, metadata);
 		}
 	}
 
 	private get pullRequestDescription() {
-		return `This pull request contains a translation of the referenced page into Portuguese (pt-BR). The translation was generated using OpenAI _(model \`${import.meta.env.OPENAI_MODEL}\`)_.
+		return `This pull request contains a translation of the referenced page into Portuguese (pt-BR). The translation was generated using OpenAI _(model \`${import.meta.env.LLM_MODEL}\`)_.
 
 Refer to the [source repository](https://github.com/${import.meta.env.REPO_OWNER}/translate-react) workflow that generated this translation for more details.
 

@@ -2,10 +2,14 @@ import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 import type { ProcessedFileResult } from "../runner";
 import type { TranslationFile } from "../types";
-import type Logger from "../utils/logger";
 
-import { SQLiteService } from "./sqlite";
+import { DatabaseService } from "./database";
 
+/**
+ * # Snapshot Interface
+ *
+ * Represents a snapshot of the translation workflow state.
+ */
 export interface Snapshot {
 	id: number;
 	timestamp: number;
@@ -14,12 +18,17 @@ export interface Snapshot {
 	processedResults: ProcessedFileResult[];
 }
 
+/**
+ * # Snapshot Manager
+ *
+ * Manages the creation, saving, and loading of translation workflow snapshots.
+ */
 export class SnapshotManager {
-	private readonly sqlite: SQLiteService;
+	private readonly dbService: DatabaseService;
 	private currentSnapshotId: number | null = null;
 
-	constructor(private readonly logger?: Logger) {
-		this.sqlite = new SQLiteService();
+	constructor() {
+		this.dbService = new DatabaseService();
 
 		process.on("SIGINT", async () => {
 			await this.cleanup();
@@ -33,16 +42,16 @@ export class SnapshotManager {
 	public async save(data: Omit<Snapshot, "id">) {
 		try {
 			if (!this.currentSnapshotId) {
-				this.currentSnapshotId = this.sqlite.createSnapshot(data.timestamp);
+				this.currentSnapshotId = this.dbService.createSnapshot(data.timestamp);
 			}
 
-			this.sqlite.saveRepositoryTree(this.currentSnapshotId, data.repositoryTree);
-			this.sqlite.saveFilesToTranslate(this.currentSnapshotId, data.filesToTranslate);
-			this.sqlite.saveProcessedResults(this.currentSnapshotId, data.processedResults);
+			this.dbService.saveRepositoryTree(this.currentSnapshotId, data.repositoryTree);
+			this.dbService.saveFilesToTranslate(this.currentSnapshotId, data.filesToTranslate);
+			this.dbService.saveProcessedResults(this.currentSnapshotId, data.processedResults);
 
-			this.logger?.info(`Snapshot saved with ID ${this.currentSnapshotId}`);
+			console.info(`Snapshot saved with ID ${this.currentSnapshotId}`);
 		} catch (error) {
-			this.logger?.error(
+			console.error(
 				`Failed to save snapshot: ${error instanceof Error ? error.message : "Unknown error"}`,
 			);
 		}
@@ -50,30 +59,33 @@ export class SnapshotManager {
 
 	public async append<K extends keyof Omit<Snapshot, "id">>(key: K, data: Snapshot[K]) {
 		if (!this.currentSnapshotId) {
-			this.currentSnapshotId = this.sqlite.createSnapshot();
+			this.currentSnapshotId = this.dbService.createSnapshot();
 		}
 
 		try {
 			switch (key) {
 				case "repositoryTree":
-					this.sqlite.saveRepositoryTree(
+					this.dbService.saveRepositoryTree(
 						this.currentSnapshotId,
 						data as RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"],
 					);
 					break;
 				case "filesToTranslate":
-					this.sqlite.saveFilesToTranslate(this.currentSnapshotId, data as TranslationFile[]);
+					this.dbService.saveFilesToTranslate(this.currentSnapshotId, data as TranslationFile[]);
 					break;
 				case "processedResults":
-					this.sqlite.saveProcessedResults(this.currentSnapshotId, data as ProcessedFileResult[]);
+					this.dbService.saveProcessedResults(
+						this.currentSnapshotId,
+						data as ProcessedFileResult[],
+					);
 					break;
 				default:
 					throw new Error(`Invalid key: ${key}`);
 			}
 
-			this.logger?.info(`Appended ${key} to snapshot ${this.currentSnapshotId}`);
+			console.info(`Appended ${key} to snapshot ${this.currentSnapshotId}`);
 		} catch (error) {
-			this.logger?.error(
+			console.error(
 				`Failed to append ${key}: ${error instanceof Error ? error.message : "Unknown error"}`,
 			);
 		}
@@ -81,16 +93,16 @@ export class SnapshotManager {
 
 	public async loadLatest(): Promise<Snapshot | null> {
 		try {
-			const snapshot = this.sqlite.getLatestSnapshot();
+			const snapshot = this.dbService.getLatestSnapshot();
 
 			if (snapshot) {
 				this.currentSnapshotId = snapshot.id;
-				this.logger?.info(`Loaded snapshot ${snapshot.id}`);
+				console.info(`Loaded snapshot ${snapshot.id}`);
 			}
 
 			return snapshot;
 		} catch (error) {
-			this.logger?.error(
+			console.error(
 				`Failed to load snapshot: ${error instanceof Error ? error.message : "Unknown error"}`,
 			);
 			return null;
@@ -99,17 +111,17 @@ export class SnapshotManager {
 
 	public async clear() {
 		try {
-			this.sqlite.clearSnapshots();
+			this.dbService.clearSnapshots();
 			this.currentSnapshotId = null;
-			this.logger?.info("Cleared all snapshots");
+			console.info("Cleared all snapshots");
 		} catch (error) {
-			this.logger?.error(
+			console.error(
 				`Failed to clear snapshots: ${error instanceof Error ? error.message : "Unknown error"}`,
 			);
 		}
 	}
 
 	private async cleanup() {
-		this.logger?.info("Cleaning up snapshots...");
+		console.info("Cleaning up snapshots...");
 	}
 }
