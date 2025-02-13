@@ -10,7 +10,7 @@ import { Octokit } from "@octokit/rest";
  * - Cleanup operations and process termination handling
  * - Active branch tracking and state management
  */
-export class BranchManager {
+export class BranchService {
 	/**
 	 * GitHub API client instance
 	 */

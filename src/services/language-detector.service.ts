@@ -46,7 +46,7 @@ export interface LanguageAnalysis {
  * - Language code conversion
  * - Confidence score calculation
  */
-export class LanguageDetector {
+export class LanguageDetectorService {
 	/**
 	 * Minimum content length required for reliable language detection
 	 */

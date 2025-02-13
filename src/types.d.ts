@@ -1,4 +1,7 @@
-import type { Environment } from "./utils/env";
+import type { RestEndpointMethodTypes } from "@octokit/rest";
+import type { ChatCompletion } from "openai/resources/chat/completions.mjs";
+
+import type { Environment } from "./utils/env.util";
 
 /**
  * Represents a parsed content object that contains the original content with placeholders for repeated blocks.
@@ -24,6 +27,28 @@ export interface TranslationFile {
     filename?: string;
     /** The content of the file */
     content: string | ParsedContent;
+}
+
+/**
+ * # Translation Runner
+ *
+ * Orchestrates the entire translation workflow, managing the process of:
+ * - Repository tree fetching
+ * - File content retrieval
+ * - Language detection
+ * - Translation processing
+ * - Pull request creation
+ * - Progress tracking and reporting
+ */
+export interface ProcessedFileResult {
+    branch: RestEndpointMethodTypes["git"]["getRef"]["response"]["data"] | null;
+    filename: string;
+    translation: ChatCompletion | string | null;
+    pullRequest:
+        | RestEndpointMethodTypes["pulls"]["create"]["response"]["data"]
+        | RestEndpointMethodTypes["pulls"]["list"]["response"]["data"][number]
+        | null;
+    error: Error | null;
 }
 
 declare global {

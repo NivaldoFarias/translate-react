@@ -4,8 +4,8 @@ import OpenAI from "openai";
 
 import type { ParsedContent, TranslationFile } from "../types";
 
-import { parseContent, reconstructContent } from "../utils/content-parser";
-import { ErrorCodes, TranslationError } from "../utils/errors";
+import { parseContent, reconstructContent } from "../utils/content-parser.util";
+import { ErrorCodes, TranslationError } from "../utils/errors.util";
 
 /**
  * Translation performance and success rate metrics.

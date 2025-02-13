@@ -1,9 +1,8 @@
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
-import type { ProcessedFileResult } from "../runner";
-import type { TranslationFile } from "../types";
+import type { ProcessedFileResult, TranslationFile } from "../types";
 
-import { DatabaseService } from "./database";
+import { DatabaseService } from "./database.service";
 
 /**
  * # Snapshot Interface
@@ -23,7 +22,7 @@ export interface Snapshot {
  *
  * Manages the creation, saving, and loading of translation workflow snapshots.
  */
-export class SnapshotManager {
+export class SnapshotService {
 	private readonly dbService: DatabaseService;
 	private currentSnapshotId: number | null = null;
 

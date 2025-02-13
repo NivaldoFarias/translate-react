@@ -17,8 +17,8 @@ This project aims to accelerate the translation process of React's documentation
 
 - [Bun](https://bun.sh) runtime
 - GitHub Personal Access Token with repo permissions
-- OpenAI API Key
-- Node.js v18+
+- OpenRouter API Key
+- Node.js v20+
 - SQLite3
 
 ## Setup
@@ -85,45 +85,45 @@ bun run index.ts
 ```
 src/
 ├── services/
-│   ├── github.ts             # GitHub API integration
-│   ├── translator.ts         # OpenAI translation service
-│   ├── language-detector.ts  # Language detection using franc
-│   ├── branch-manager.ts     # Git branch management
-│   ├── database.ts           # SQLite state persistence
-│   └── snapshot-manager.ts   # Workflow state management
+│   ├── github.service.ts              # GitHub API service
+│   ├── translator.service.ts          # Translation service
+│   ├── language-detector.service.ts   # Language detection service
+│   ├── branch.service.ts              # Branch management service
+│   ├── database.service.ts            # Database service
+│   └── snapshot.service.ts            # Snapshot service
 ├── utils/
-│   ├── content-parser.ts     # Markdown content parsing
-│   ├── env.ts                # Environment validation
-│   └── errors.ts             # Custom error handling
-├── runner.ts                 # Main workflow orchestrator
-└── types.d.ts                # Type definitions
+│   ├── content-parser.util.ts         # Content parser utility
+│   ├── env.util.ts                    # Environment validation
+│   └── errors.util.ts                 # Custom error handling
+├── runner.ts                          # Main workflow orchestrator
+└── types.d.ts                         # Type definitions
 
-snapshots.sqlite              # SQLite database for state persistence
+snapshots.sqlite                       # SQLite database for state persistence
 ```
 
 ## Architecture
 
 ### Core Services
 
-1. **GitHub Service** (`services/github.ts`)
+1. **GitHub Service** (`services/github.service.ts`)
 
    - Manages all GitHub API interactions
    - Handles repository access, branch creation, and PR management
    - Integrates with branch manager for version control
 
-2. **Translator Service** (`services/translator.ts`)
+2. **Translator Service** (`services/translator.service.ts`)
 
    - Interfaces with OpenAI's GPT models
    - Maintains translation glossary and rules
    - Tracks translation metrics and performance
 
-3. **Language Detector** (`services/language-detector.ts`)
+3. **Language Detector** (`services/language-detector.service.ts`)
 
    - Uses `franc` for language detection
    - Determines if content needs translation
    - Calculates language confidence scores
 
-4. **Database Service** (`services/database.ts`)
+4. **Database Service** (`services/database.service.ts`)
    - Manages persistent storage of workflow state
    - Handles snapshots for interruption recovery
    - Maintains translation history and results
@@ -136,13 +136,13 @@ snapshots.sqlite              # SQLite database for state persistence
    - Manages service interactions
    - Handles error recovery and reporting
 
-2. **Branch Manager** (`services/branch-manager.ts`)
+2. **Branch Manager** (`services/branch.service.ts`)
 
    - Manages Git branches for translations
    - Ensures proper cleanup of temporary branches
    - Tracks active translation branches
 
-3. **Content Parser** (`utils/content-parser.ts`)
+3. **Content Parser** (`utils/content-parser.util.ts`)
    - Parses markdown content
    - Handles code blocks and special formatting
    - Maintains document structure during translation
