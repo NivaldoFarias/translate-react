@@ -3,9 +3,9 @@ import { Octokit } from "@octokit/rest";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 import type { ProcessedFileResult } from "../runner";
-import type { TranslationFile } from "../types";
+import type { ParsedContent, TranslationFile } from "../types";
 
-import Logger from "../utils/logger";
+import { reconstructContent } from "../utils/content-parser";
 
 import { BranchManager } from "./branch-manager";
 
@@ -23,8 +23,6 @@ export class GitHubService {
 		fork: null,
 		upstream: null,
 	};
-
-	constructor(private readonly logger: Logger | undefined = undefined) {}
 
 	public async getUntranslatedFiles(maxFiles?: number) {
 		try {
@@ -44,12 +42,12 @@ export class GitHubService {
 
 			// Apply maxFiles limit after filtering but before content fetching
 			const filesToProcess = maxFiles ? markdownFiles.slice(0, maxFiles) : markdownFiles;
-			this.logger?.info(`Found ${filesToProcess.length} markdown files to process`);
+			console.info(`Found ${filesToProcess.length} markdown files to process`);
 
 			const files: TranslationFile[] = [];
 			for (const file of filesToProcess) {
 				if (!file.path) {
-					this.logger?.error("Skipping file with undefined path");
+					console.error("Skipping file with undefined path");
 					continue;
 				}
 
@@ -61,7 +59,7 @@ export class GitHubService {
 					});
 
 					if (!("content" in data)) {
-						this.logger?.error(`No content found for ${file.path}`);
+						console.error(`No content found for ${file.path}`);
 						continue;
 					}
 
@@ -73,7 +71,7 @@ export class GitHubService {
 					});
 				} catch (error) {
 					const message = error instanceof Error ? error.message : "Unknown error";
-					this.logger?.error(`Failed to fetch content for ${file.path}: ${message}`);
+					console.error(`Failed to fetch content for ${file.path}: ${message}`);
 
 					// Continue with other files instead of failing completely
 					continue;
@@ -81,15 +79,15 @@ export class GitHubService {
 			}
 
 			if (files.length === 0) {
-				this.logger?.error("No valid files were found to process");
+				console.error("No valid files were found to process");
 			} else {
-				this.logger?.info(`Successfully processed ${files.length} files`);
+				console.info(`Successfully processed ${files.length} files`);
 			}
 
 			return files;
 		} catch (error) {
 			const message = error instanceof Error ? error.message : "Unknown error";
-			this.logger?.error(`Failed to fetch untranslated files: ${message}`);
+			console.error(`Failed to fetch untranslated files: ${message}`);
 			throw error;
 		}
 	}
@@ -137,7 +135,7 @@ export class GitHubService {
 	public async commitTranslation(
 		branch: RestEndpointMethodTypes["git"]["getRef"]["response"]["data"],
 		file: TranslationFile,
-		content: string,
+		content: string | ParsedContent,
 		message: string,
 	) {
 		try {
@@ -150,21 +148,22 @@ export class GitHubService {
 			});
 
 			const fileSha = "sha" in currentFile.data ? currentFile.data.sha : undefined;
+			const finalContent = typeof content === "string" ? content : reconstructContent(content);
 
 			await this.octokit.repos.createOrUpdateFileContents({
 				owner: import.meta.env.REPO_OWNER!,
 				repo: import.meta.env.REPO_NAME!,
 				path: file.path!,
 				message,
-				content: Buffer.from(content).toString("base64"),
+				content: Buffer.from(finalContent).toString("base64"),
 				branch: branch.ref,
 				sha: fileSha,
 			});
 
-			this.logger?.info(`Committed translation to ${file.filename} on branch ${branch.ref}`);
+			console.info(`Committed translation to ${file.filename} on branch ${branch.ref}`);
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : "Unknown error";
-			this.logger?.error(`Failed to commit translation: ${errorMessage}`);
+			console.error(`Failed to commit translation: ${errorMessage}`);
 
 			// Clean up the branch on failure
 			await this.branchManager.deleteBranch(branch.ref);
@@ -190,7 +189,7 @@ export class GitHubService {
 			const pr = existingPRsResponse.data.find((pr) => pr.title === title);
 
 			if (pr) {
-				this.logger?.info(`Pull request already exists for branch ${branch}`);
+				console.info(`Pull request already exists for branch ${branch}`);
 
 				return pr;
 			}
@@ -205,12 +204,12 @@ export class GitHubService {
 				maintainer_can_modify: true,
 			});
 
-			this.logger?.info(`Created pull request #${data.number}: ${title}`);
+			console.info(`Created pull request #${data.number}: ${title}`);
 
 			return data;
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : "Unknown error";
-			this.logger?.error(`Failed to create pull request: ${errorMessage}`);
+			console.error(`Failed to create pull request: ${errorMessage}`);
 
 			// Clean up the branch on failure
 			await this.branchManager.deleteBranch(branch);
@@ -247,7 +246,7 @@ export class GitHubService {
 			return Buffer.from(data.content, "base64").toString();
 		} catch (error) {
 			const message = error instanceof Error ? error.message : "Unknown error";
-			this.logger?.error(`Failed to fetch file content: ${message}`);
+			console.error(`Failed to fetch file content: ${message}`);
 			throw error;
 		}
 	}
@@ -291,7 +290,7 @@ export class GitHubService {
 		});
 
 		if (userComment) {
-			this.logger?.info(`Comment already exists on issue ${issueNumber}`);
+			console.info(`Comment already exists on issue ${issueNumber}`);
 
 			const listResults = userComment.body
 				?.split("\n")
@@ -312,7 +311,7 @@ export class GitHubService {
 				}));
 
 			if (!newResults.length) {
-				this.logger?.info(`No new results to add to comment on issue ${issueNumber}`);
+				console.info(`No new results to add to comment on issue ${issueNumber}`);
 				return userComment;
 			}
 
@@ -365,7 +364,7 @@ export class GitHubService {
 		try {
 			const authResponse = await this.octokit.rest.users.getAuthenticated();
 
-			this.logger?.success(`Authenticated as ${authResponse.data.login}`);
+			console.info(`Authenticated as ${authResponse.data.login}`);
 
 			// Check access to original repo
 			await this.octokit.rest.repos.get({
@@ -373,11 +372,11 @@ export class GitHubService {
 				repo: import.meta.env.REPO_NAME!,
 			});
 
-			this.logger?.success(`Access to original repo verified`);
+			console.info(`Access to original repo verified`);
 
 			return true;
 		} catch (error) {
-			this.logger?.error(`Token permission verification failed: ${error}`);
+			console.error(`Token permission verification failed: ${error}`);
 			return false;
 		}
 	}

@@ -2,11 +2,12 @@ import { franc } from "franc";
 import langs from "langs";
 import OpenAI from "openai";
 
-import type { TranslationFile } from "../types";
+import type { ParsedContent, TranslationFile } from "../types";
 
+import { parseContent, reconstructContent } from "../utils/content-parser";
 import { ErrorCodes, TranslationError } from "../utils/errors";
 
-interface TranslationMetrics {
+export interface TranslationMetrics {
 	totalTranslations: number;
 	successfulTranslations: number;
 	failedTranslations: number;
@@ -15,8 +16,10 @@ interface TranslationMetrics {
 }
 
 export class TranslatorService {
-	private openai = new OpenAI({ apiKey: import.meta.env.OPENAI_API_KEY! });
-	private model = import.meta.env.OPENAI_MODEL! ?? "gpt-4o";
+	/** The language model instance. */
+	private readonly llm = new OpenAI({ apiKey: import.meta.env.LLM_API_KEY! });
+
+	/** The metrics for the translator. */
 	private metrics: TranslationMetrics = {
 		totalTranslations: 0,
 		successfulTranslations: 0,
@@ -25,31 +28,66 @@ export class TranslatorService {
 		totalTranslationTime: 0,
 	};
 
-	private async callOpenAIAPI(content: string) {
-		return await this.openai.chat.completions.create({
-			model: this.model,
-			messages: [
-				{
-					role: "user",
-					content: this.getTranslationPrompt(content),
-				},
-			],
+	/**
+	 * Calls the language model to translate the content.
+	 *
+	 * @param content The content to translate
+	 * @param blocksToTranslate The blocks to translate
+	 * @returns The translated content
+	 */
+	private async callLanguageModel(content: string, blocksToTranslate?: string) {
+		const messages = [
+			{
+				role: "system" as const,
+				content: this.getSystemPrompt(content),
+			},
+			{
+				role: "user" as const,
+				content: this.getUserPrompt(content),
+			},
+		];
+
+		// If we have blocks to translate, add them as a separate message
+		if (blocksToTranslate) {
+			messages.push({
+				role: "user" as const,
+				content: `BLOCKS TO TRANSLATE (MUST translate ONLY comments and strings that don't refer to code):\n\n${blocksToTranslate}`,
+			});
+		}
+
+		return await this.llm.chat.completions.create({
+			model: import.meta.env.LLM_MODEL,
+			messages,
 		});
 	}
 
+	/**
+	 * Translates the content of a file.
+	 *
+	 * @param file The file to translate
+	 * @returns The translated content
+	 */
 	public async translateContent(file: TranslationFile) {
 		const startTime = Date.now();
 		this.metrics.totalTranslations++;
 
 		try {
-			if (file.content.length === 0) {
+			if (typeof file.content === "string" && file.content.length === 0) {
 				throw new TranslationError(
 					`File content is empty: ${file.filename}`,
 					ErrorCodes.INVALID_CONTENT,
 				);
 			}
 
-			const response = await this.callOpenAIAPI(file.content);
+			// Parse content if it's a string
+			const parsedContent =
+				typeof file.content === "string" ? parseContent(file.content) : file.content;
+
+			// First translate the main content
+			const response = await this.callLanguageModel(
+				parsedContent.content,
+				parsedContent.uniqueBlocksForTranslation,
+			);
 
 			// Update metrics
 			const translationTime = Date.now() - startTime;
@@ -57,6 +95,49 @@ export class TranslatorService {
 			this.metrics.totalTranslationTime += translationTime;
 			this.metrics.averageTranslationTime =
 				this.metrics.totalTranslationTime / this.metrics.successfulTranslations;
+
+			// Process the response and extract translated blocks
+			if (response.choices[0]?.message?.content) {
+				const content = response.choices[0].message.content;
+				const translatedBlocks = new Map(parsedContent.blocks);
+
+				// Extract translated blocks from the response
+				const blockRegex = /BLOCK (\d+):\n(```[\s\S]*?```)/g;
+				let match: RegExpExecArray | null;
+
+				// Get the part after "BLOCKS TO TRANSLATE"
+				const parts = content.split("BLOCKS TO TRANSLATE");
+				const blocksSection = parts[1];
+				const mainContent = parts[0]?.trim() ?? content;
+
+				if (blocksSection) {
+					while ((match = blockRegex.exec(blocksSection)) !== null) {
+						const [, id, translatedBlock] = match;
+						if (id && translatedBlock) {
+							translatedBlocks.set(id, translatedBlock);
+						}
+					}
+				}
+
+				const translatedParsedContent: ParsedContent = {
+					content: mainContent,
+					blocks: translatedBlocks,
+					uniqueBlocksForTranslation: parsedContent.uniqueBlocksForTranslation,
+				};
+
+				return {
+					...response,
+					choices: [
+						{
+							...response.choices[0],
+							message: {
+								...response.choices[0].message,
+								content: reconstructContent(translatedParsedContent),
+							},
+						},
+					],
+				};
+			}
 
 			return response;
 		} catch (error) {
@@ -69,44 +150,57 @@ export class TranslatorService {
 		}
 	}
 
-	private getTranslationPrompt(content: string): string {
-		const detectedLangCode = franc(content);
-		const language = langs.where("3", detectedLangCode);
-		const sourceLang = language ? language.name : "English";
-
-		return `You are a precise translator specializing in technical documentation. 
-Your task is to translate React documentation from ${sourceLang} to Brazilian Portuguese in a single, high-quality pass.
-
-TRANSLATION AND VERIFICATION REQUIREMENTS - YOU MUST FOLLOW THESE EXACTLY:
-1. MUST maintain ALL original markdown formatting, including code blocks, links, and special syntax
-2. MUST preserve ALL original code examples exactly as they are
-3. MUST keep ALL original HTML tags intact and unchanged
-4. MUST follow the glossary rules below STRICTLY - these are non-negotiable terms
-5. MUST maintain ALL original frontmatter exactly as in original
-6. MUST preserve ALL original line breaks and paragraph structure
-7. MUST NOT translate code variables, function names, or technical terms not in the glossary
-8. MUST NOT add any content
-9. MUST NOT remove any content. This is very important, DO NOT DO IT!
-10. MUST NOT change any URLs or links
-11. MUST translate comments within code blocks according to the glossary
-12. MUST maintain consistent technical terminology throughout the translation
-13. MUST ensure the translation reads naturally in Brazilian Portuguese while preserving technical accuracy
-
-GLOSSARY RULES:
-You must translate the following terms according to the glossary:
-${this.glossary}
-
-CONTENT TO TRANSLATE:
-${content}
-
-IMPORTANT: MUST respond ONLY with the final translated content. Do not include any explanations, notes, or the original content.
-Start your response with the translation immediately.`;
+	private getUserPrompt(content: string) {
+		return `CONTENT TO TRANSLATE:\n${content}\n\nIMPORTANT: MUST respond with the translated content first, followed by any translated blocks. DO NOT modify the {{BLOCK_X}} placeholders in the main content.`;
 	}
 
+	private getSystemPrompt(content: string) {
+		const languages = {
+			target: langs.where("3", import.meta.env.TARGET_LANGUAGE)?.["1"] || "Brazilian Portuguese",
+			source: langs.where("3", franc(content))?.["1"] || "English",
+		};
+
+		return `
+			You are a precise translator specializing in technical documentation. 
+			Your task is to translate React documentation from ${languages.source} to ${languages.target} in a single, high-quality pass.
+
+			TRANSLATION AND VERIFICATION REQUIREMENTS - YOU MUST FOLLOW THESE EXACTLY:
+			1. MUST maintain ALL original markdown formatting, including code blocks, links, and special syntax
+			2. MUST preserve ALL original code examples exactly as they are
+			3. MUST keep ALL original HTML tags intact and unchanged
+			4. MUST follow the glossary rules below STRICTLY - these are non-negotiable terms
+			5. MUST maintain ALL original frontmatter exactly as in original
+			6. MUST preserve ALL original line breaks and paragraph structure
+			7. MUST NOT translate code variables, function names, or technical terms not in the glossary
+			8. MUST NOT add any content
+			9. MUST NOT remove any content. This is very important, DO NOT DO IT!
+			10. MUST NOT change any URLs or links
+			11. MUST translate comments within code blocks according to the glossary
+			12. MUST maintain consistent technical terminology throughout the translation
+			13. MUST ensure the translation reads naturally in ${languages.target} while preserving technical accuracy
+			14. MUST NOT modify any {{BLOCK_X}} placeholders in the main content
+			15. When translating code blocks, MUST only translate comments and string literals that don't refer to code
+
+			RESPONSE FORMAT:
+			1. First provide the translated main content, preserving all {{BLOCK_X}} placeholders exactly as they appear
+			2. If blocks are provided for translation, include them after "BLOCKS TO TRANSLATE:" with their IDs preserved
+
+			GLOSSARY RULES:
+			You must translate the following terms according to the glossary:
+			${this.glossary}
+		`;
+	}
+
+	/**
+	 * Gets the metrics for the translator.
+	 *
+	 * @returns The metrics for the translator
+	 */
 	public getMetrics(): TranslationMetrics {
 		return { ...this.metrics };
 	}
 
+	/** The glossary rules. */
 	private get glossary() {
 		return `# Guia de Estilo Universal
 

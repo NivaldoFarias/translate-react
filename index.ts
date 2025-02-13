@@ -1,3 +1,5 @@
 import Runner from "./src/runner";
 
-void new Runner().run();
+if (import.meta.main) {
+	void new Runner().run();
+}

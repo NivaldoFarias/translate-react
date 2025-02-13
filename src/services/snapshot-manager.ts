@@ -2,7 +2,6 @@ import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 import type { ProcessedFileResult } from "../runner";
 import type { TranslationFile } from "../types";
-import type Logger from "../utils/logger";
 
 import { SQLiteService } from "./sqlite";
 
@@ -18,7 +17,7 @@ export class SnapshotManager {
 	private readonly sqlite: SQLiteService;
 	private currentSnapshotId: number | null = null;
 
-	constructor(private readonly logger?: Logger) {
+	constructor() {
 		this.sqlite = new SQLiteService();
 
 		process.on("SIGINT", async () => {
@@ -40,9 +39,9 @@ export class SnapshotManager {
 			this.sqlite.saveFilesToTranslate(this.currentSnapshotId, data.filesToTranslate);
 			this.sqlite.saveProcessedResults(this.currentSnapshotId, data.processedResults);
 
-			this.logger?.info(`Snapshot saved with ID ${this.currentSnapshotId}`);
+			console.info(`Snapshot saved with ID ${this.currentSnapshotId}`);
 		} catch (error) {
-			this.logger?.error(
+			console.error(
 				`Failed to save snapshot: ${error instanceof Error ? error.message : "Unknown error"}`,
 			);
 		}
@@ -71,9 +70,9 @@ export class SnapshotManager {
 					throw new Error(`Invalid key: ${key}`);
 			}
 
-			this.logger?.info(`Appended ${key} to snapshot ${this.currentSnapshotId}`);
+			console.info(`Appended ${key} to snapshot ${this.currentSnapshotId}`);
 		} catch (error) {
-			this.logger?.error(
+			console.error(
 				`Failed to append ${key}: ${error instanceof Error ? error.message : "Unknown error"}`,
 			);
 		}
@@ -85,12 +84,12 @@ export class SnapshotManager {
 
 			if (snapshot) {
 				this.currentSnapshotId = snapshot.id;
-				this.logger?.info(`Loaded snapshot ${snapshot.id}`);
+				console.info(`Loaded snapshot ${snapshot.id}`);
 			}
 
 			return snapshot;
 		} catch (error) {
-			this.logger?.error(
+			console.error(
 				`Failed to load snapshot: ${error instanceof Error ? error.message : "Unknown error"}`,
 			);
 			return null;
@@ -101,15 +100,15 @@ export class SnapshotManager {
 		try {
 			this.sqlite.clearSnapshots();
 			this.currentSnapshotId = null;
-			this.logger?.info("Cleared all snapshots");
+			console.info("Cleared all snapshots");
 		} catch (error) {
-			this.logger?.error(
+			console.error(
 				`Failed to clear snapshots: ${error instanceof Error ? error.message : "Unknown error"}`,
 			);
 		}
 	}
 
 	private async cleanup() {
-		this.logger?.info("Cleaning up snapshots...");
+		console.info("Cleaning up snapshots...");
 	}
 }

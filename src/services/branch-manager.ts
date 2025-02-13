@@ -1,11 +1,8 @@
 import { Octokit } from "@octokit/rest";
 
-import Logger from "../utils/logger";
-
 export class BranchManager {
+	private readonly octokit: Octokit;
 	private activeBranches: Set<string> = new Set();
-	private logger = new Logger();
-	private octokit: Octokit;
 
 	constructor(
 		private readonly owner: string,
@@ -17,7 +14,7 @@ export class BranchManager {
 		process.on("SIGINT", async () => await this.cleanup());
 		process.on("SIGTERM", async () => await this.cleanup());
 		process.on("uncaughtException", async (error) => {
-			this.logger.error(`Uncaught exception: ${error.message}`);
+			console.error(`Uncaught exception: ${error.message}`);
 			await this.cleanup();
 		});
 	}
@@ -38,12 +35,12 @@ export class BranchManager {
 			});
 
 			this.activeBranches.add(branchName);
-			this.logger.info(`Created and tracking branch: ${branchName}`);
+			console.info(`Created and tracking branch: ${branchName}`);
 
 			return branchRef;
 		} catch (error) {
 			const message = error instanceof Error ? error.message : "Unknown error";
-			this.logger.error(`Failed to create branch ${branchName}: ${message}`);
+			console.error(`Failed to create branch ${branchName}: ${message}`);
 
 			this.activeBranches.delete(branchName);
 			throw error;
@@ -61,7 +58,7 @@ export class BranchManager {
 			if (error instanceof Error && error.message.includes("404")) {
 				const message = error instanceof Error ? error.message : "Unknown error";
 
-				this.logger.error(`Error checking branch ${branchName}: ${message}`);
+				console.error(`Error checking branch ${branchName}: ${message}`);
 			}
 
 			return null;
@@ -76,10 +73,10 @@ export class BranchManager {
 				ref: `heads/${branchName}`,
 			});
 
-			this.logger.info(`Deleted branch: ${branchName}`);
+			console.info(`Deleted branch: ${branchName}`);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : "Unknown error";
-			this.logger.error(`Failed to delete branch ${branchName}: ${message}`);
+			console.error(`Failed to delete branch ${branchName}: ${message}`);
 		} finally {
 			// Always remove from tracking, even if API call fails
 			this.activeBranches.delete(branchName);
@@ -91,7 +88,7 @@ export class BranchManager {
 	}
 
 	private async cleanup(): Promise<void> {
-		this.logger.info(`Cleaning up ${this.activeBranches.size} active branches...`);
+		console.info(`Cleaning up ${this.activeBranches.size} active branches...`);
 
 		const cleanupPromises = Array.from(this.activeBranches).map((branch) =>
 			this.deleteBranch(branch),
@@ -99,10 +96,10 @@ export class BranchManager {
 
 		try {
 			await Promise.all(cleanupPromises);
-			this.logger.info("Branch cleanup completed successfully");
+			console.info("Branch cleanup completed successfully");
 		} catch (error) {
 			const message = error instanceof Error ? error.message : "Unknown error";
-			this.logger.error(`Branch cleanup failed: ${message}`);
+			console.error(`Branch cleanup failed: ${message}`);
 		}
 	}
 }
