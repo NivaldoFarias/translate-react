@@ -1,6 +1,6 @@
 {
 	"name": "translate-react",
-	"version": "0.0.1",
+	"version": "0.0.2",
 	"description": "A tool to translate React docs to Portuguese",
 	"type": "module",
 	"main": "dist/index.js",
@@ -15,7 +15,6 @@
 	},
 	"dependencies": {
 		"@octokit/rest": "^21.1.0",
-		"@types/langs": "^2.0.5",
 		"franc": "^6.2.0",
 		"langs": "^2.0.0",
 		"openai": "^4.78.1",
@@ -24,11 +23,12 @@
 	},
 	"devDependencies": {
 		"@ianvs/prettier-plugin-sort-imports": "^4.4.1",
+		"@types/langs": "^2.0.5",
+		"@types/bun": "^1.2.2",
 		"@types/eslint": "^9.6.1",
 		"@types/node": "^20.11.24",
 		"@typescript-eslint/eslint-plugin": "^8.20.0",
 		"@typescript-eslint/parser": "^8.20.0",
-		"bun-types": "latest",
 		"eslint": "^9.18.0",
 		"eslint-config-prettier": "^10.0.1",
 		"eslint-plugin-prettier": "^5.2.2",

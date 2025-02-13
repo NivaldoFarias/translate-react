@@ -88,16 +88,16 @@ src/
 │   ├── translator.ts         # OpenAI translation service
 │   ├── language-detector.ts  # Language detection using franc
 │   ├── branch-manager.ts     # Git branch management
-│   ├── sqlite.ts            # SQLite state persistence
+│   ├── database.ts           # SQLite state persistence
 │   └── snapshot-manager.ts   # Workflow state management
 ├── utils/
 │   ├── content-parser.ts     # Markdown content parsing
-│   ├── env.ts               # Environment validation
-│   └── errors.ts            # Custom error handling
-├── runner.ts                # Main workflow orchestrator
-└── types.d.ts              # Type definitions
+│   ├── env.ts                # Environment validation
+│   └── errors.ts             # Custom error handling
+├── runner.ts                 # Main workflow orchestrator
+└── types.d.ts                # Type definitions
 
-snapshots.sqlite            # SQLite database for state persistence
+snapshots.sqlite              # SQLite database for state persistence
 ```
 
 ## Architecture
@@ -122,7 +122,7 @@ snapshots.sqlite            # SQLite database for state persistence
    - Determines if content needs translation
    - Calculates language confidence scores
 
-4. **SQLite Service** (`services/sqlite.ts`)
+4. **Database Service** (`services/database.ts`)
    - Manages persistent storage of workflow state
    - Handles snapshots for interruption recovery
    - Maintains translation history and results
