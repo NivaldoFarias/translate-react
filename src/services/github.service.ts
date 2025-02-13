@@ -2,12 +2,11 @@ import { Octokit } from "@octokit/rest";
 
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
-import type { ProcessedFileResult } from "../runner";
-import type { ParsedContent, TranslationFile } from "../types";
+import type { ParsedContent, ProcessedFileResult, TranslationFile } from "../types";
 
-import { reconstructContent } from "../utils/content-parser";
+import { reconstructContent } from "../utils/content-parser.util";
 
-import { BranchManager } from "./branch-manager";
+import { BranchService } from "./branch.service";
 
 /**
  * Core service for interacting with GitHub's API.
@@ -29,7 +28,7 @@ export class GitHubService {
 	/**
 	 * Branch manager for handling Git branch operations
 	 */
-	private readonly branchManager = new BranchManager(
+	private readonly branchManager = new BranchService(
 		import.meta.env.REPO_OWNER!,
 		import.meta.env.REPO_NAME!,
 		import.meta.env.GITHUB_TOKEN!,

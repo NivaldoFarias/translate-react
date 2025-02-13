@@ -1,38 +1,8 @@
 import ora from "ora";
 
-import type { RestEndpointMethodTypes } from "@octokit/rest";
-import type { ChatCompletion } from "openai/resources/chat/completions.mjs";
-import type { Ora } from "ora";
-
 import type { TranslationFile } from "./types";
 
-import { GitHubService } from "./services/github";
-import { LanguageDetector } from "./services/language-detector";
-import { SnapshotManager } from "./services/snapshot-manager";
-import { TranslatorService } from "./services/translator";
-import { validateEnv } from "./utils/env";
-
-/**
- * # Translation Runner
- *
- * Orchestrates the entire translation workflow, managing the process of:
- * - Repository tree fetching
- * - File content retrieval
- * - Language detection
- * - Translation processing
- * - Pull request creation
- * - Progress tracking and reporting
- */
-export interface ProcessedFileResult {
-	branch: RestEndpointMethodTypes["git"]["getRef"]["response"]["data"] | null;
-	filename: string;
-	translation: ChatCompletion | string | null;
-	pullRequest:
-		| RestEndpointMethodTypes["pulls"]["create"]["response"]["data"]
-		| RestEndpointMethodTypes["pulls"]["list"]["response"]["data"][number]
-		| null;
-	error: Error | null;
-}
+import { RunnerService } from "./services/runner.service";
 
 /**
  * # Translation Workflow Runner
@@ -40,81 +10,7 @@ export interface ProcessedFileResult {
  * Main orchestrator class that manages the entire translation process workflow.
  * Handles file processing, translation, GitHub operations, and progress tracking.
  */
-export default class Runner {
-	/**
-	 * GitHub service instance for repository operations
-	 */
-	private readonly github = new GitHubService();
-
-	/**
-	 * Translation service for content translation operations
-	 */
-	private readonly translator = new TranslatorService();
-
-	/**
-	 * Language detection service to identify content language
-	 */
-	private readonly languageDetector = new LanguageDetector({
-		source: import.meta.env.SOURCE_LANGUAGE!,
-		target: import.meta.env.TARGET_LANGUAGE!,
-	});
-
-	/**
-	 * Snapshot manager to persist and retrieve workflow state
-	 */
-	private readonly snapshotManager = new SnapshotManager();
-
-	/**
-	 * Maximum number of files to process
-	 * Limited in non-production environments for testing purposes
-	 */
-	private get maxFiles(): number | undefined {
-		return import.meta.env.NODE_ENV === "production" ? undefined : 10;
-	}
-
-	/**
-	 * Statistics tracking for the translation process
-	 */
-	private stats = {
-		results: new Map<ProcessedFileResult["filename"], ProcessedFileResult>(),
-		startTime: Date.now(),
-	};
-
-	/**
-	 * Progress spinner for CLI feedback
-	 */
-	private spinner: Ora | null = null;
-
-	/**
-	 * Cleanup handler for process termination
-	 * Ensures graceful shutdown and cleanup of resources
-	 */
-	private cleanup = () => {
-		this.spinner?.stop();
-		// Force exit after a timeout to ensure cleanup handlers run
-		setTimeout(() => void process.exit(0), 1000);
-	};
-
-	/**
-	 * Initializes the runner with environment validation and signal handlers
-	 * Sets up process event listeners for graceful termination
-	 */
-	constructor() {
-		try {
-			validateEnv();
-		} catch (error) {
-			console.error(error instanceof Error ? error.message : String(error));
-			process.exit(1);
-		}
-
-		process.on("SIGINT", this.cleanup);
-		process.on("SIGTERM", this.cleanup);
-		process.on("uncaughtException", (error) => {
-			console.error(`Uncaught exception: ${error.message}`);
-			this.cleanup();
-		});
-	}
-
+export default class Runner extends RunnerService {
 	/**
 	 * # Main Workflow Execution
 	 *
@@ -365,13 +261,5 @@ export default class Runner {
 		} finally {
 			this.stats.results.set(file.filename!, metadata);
 		}
-	}
-
-	private get pullRequestDescription() {
-		return `This pull request contains a translation of the referenced page into Portuguese (pt-BR). The translation was generated using OpenAI _(model \`${import.meta.env.LLM_MODEL}\`)_.
-
-Refer to the [source repository](https://github.com/${import.meta.env.REPO_OWNER}/translate-react) workflow that generated this translation for more details.
-
-Feel free to review and suggest any improvements to the translation.`;
 	}
 }
