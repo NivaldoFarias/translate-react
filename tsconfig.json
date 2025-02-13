@@ -21,8 +21,7 @@
         "baseUrl": ".",
         "paths": {
             "@/*": ["src/*"]
-        },
-        "types": ["bun-types"]
+        }
     },
     "include": ["src/**/*", "index.ts"],
     "exclude": ["node_modules", "dist"]
