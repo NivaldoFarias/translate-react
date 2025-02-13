@@ -1,17 +1,14 @@
-/**
- * # Branch Management Service
- *
- * Manages Git branch operations for the translation workflow.
- * Handles branch creation, deletion, and cleanup operations.
- */
-
 import { Octokit } from "@octokit/rest";
 
 /**
- * # Branch Manager
- *
  * Core service for managing Git branches in the translation workflow.
  * Tracks active branches and ensures proper cleanup on process termination.
+ *
+ * ## Responsibilities
+ * - Git branch operations for translation workflow
+ * - Branch creation and deletion management
+ * - Cleanup operations and process termination handling
+ * - Active branch tracking and state management
  */
 export class BranchManager {
 	/**

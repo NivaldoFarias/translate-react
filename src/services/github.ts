@@ -1,13 +1,3 @@
-/**
- * # GitHub Integration Service
- *
- * Manages all GitHub-related operations for the translation workflow:
- * - Repository content access
- * - Branch management
- * - Pull request creation
- * - File content manipulation
- */
-
 import { Octokit } from "@octokit/rest";
 
 import type { RestEndpointMethodTypes } from "@octokit/rest";
@@ -20,10 +10,15 @@ import { reconstructContent } from "../utils/content-parser";
 import { BranchManager } from "./branch-manager";
 
 /**
- * # GitHub Service
- *
  * Core service for interacting with GitHub's API.
  * Manages repository operations, content access, and version control.
+ *
+ * ## Responsibilities
+ * - Repository content access and manipulation
+ * - Branch management and version control
+ * - Pull request creation and tracking
+ * - File content handling and updates
+ * - Integration with branch manager for version control
  */
 export class GitHubService {
 	/**

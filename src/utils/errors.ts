@@ -1,8 +1,11 @@
 /**
- * # Translation Error
- *
  * Custom error class for handling translation-specific errors.
  * Extends the native Error class with additional context and error code support.
+ *
+ * ## Features
+ * - Custom error name for better error handling
+ * - Optional error code from ErrorCodes enum
+ * - Additional context for debugging
  */
 export class TranslationError extends Error {
 	/**
@@ -23,9 +26,10 @@ export class TranslationError extends Error {
 }
 
 /**
- * # Error Code Constants
+ * Standardized error codes for translation workflow errors.
+ * Used to categorize and handle different types of errors consistently.
  *
- * Defines the set of possible error codes that can occur during translation:
+ * ## Available Codes
  * - `GITHUB_API_ERROR`: Issues with GitHub API operations
  * - `OPENAI_API_ERROR`: Issues with OpenAI API operations
  * - `RATE_LIMIT_EXCEEDED`: API rate limits reached

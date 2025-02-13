@@ -1,10 +1,3 @@
-/**
- * # SQLite Storage Service
- *
- * Manages persistent storage of translation workflow data using SQLite.
- * Handles snapshots of repository state, files to translate, and results.
- */
-
 import { Database } from "bun:sqlite";
 
 import type { RestEndpointMethodTypes } from "@octokit/rest";
@@ -13,19 +6,25 @@ import type { ProcessedFileResult } from "../runner";
 import type { TranslationFile } from "../types";
 
 /**
- * # SQLite Service
+ * # Database Service
  *
  * Core service for managing persistent storage of translation workflow data.
  * Uses SQLite for storing snapshots, repository tree, files, and results.
+ *
+ * ## Responsibilities
+ * - Manages persistent storage of translation workflow data
+ * - Handles snapshots of repository state and files to translate
+ * - Maintains translation history and results
+ * - Provides data recovery and cleanup capabilities
  */
-export class SQLiteService {
+export class DatabaseService {
 	/**
 	 * SQLite database connection instance
 	 */
 	private db: Database;
 
 	/**
-	 * # SQLite Service Constructor
+	 * # Database Service Constructor
 	 *
 	 * Initializes database connection and creates required tables.
 	 */
