@@ -1,8 +1,18 @@
+/**
+ * # Language Detection Module
+ *
+ * Provides functionality for detecting and analyzing the language of content.
+ * Uses the `franc` library for language detection and `langs` for language code conversion.
+ */
+
 import { franc, francAll } from "franc";
 import langs from "langs";
 
 /**
- * Configuration for language detection
+ * # Language Configuration
+ *
+ * Configuration interface for specifying source and target languages.
+ * Uses ISO 639-1 language codes (e.g., 'en' for English, 'pt' for Portuguese).
  */
 export interface LanguageConfig {
 	source: string;
@@ -10,7 +20,13 @@ export interface LanguageConfig {
 }
 
 /**
- * Represents the analysis of a language.
+ * # Language Analysis Result
+ *
+ * Detailed analysis of content language detection including:
+ * - Confidence scores for source and target languages
+ * - Ratio of target language presence
+ * - Translation status
+ * - Detected primary language
  */
 export interface LanguageAnalysis {
 	languageScore: {
@@ -22,17 +38,40 @@ export interface LanguageAnalysis {
 	detectedLanguage: string;
 }
 
+/**
+ * # Language Detection Service
+ *
+ * Service for analyzing and detecting the language of content.
+ * Helps determine if content needs translation based on language analysis.
+ */
 export class LanguageDetector {
+	/**
+	 * Minimum content length required for reliable language detection
+	 */
 	private readonly MIN_CONTENT_LENGTH = 10;
+
+	/**
+	 * Threshold ratio above which content is considered translated
+	 */
 	private readonly TRANSLATION_THRESHOLD = 0.6;
+
+	/**
+	 * Current language configuration in ISO 639-3 format
+	 */
 	private languages: LanguageConfig | null = null;
 
 	/**
-	 * Creates a new LanguageDetector instance.
+	 * # Language Detector Constructor
 	 *
-	 * Converts the source and target languages to ISO 639-3 format for franc compatibility.
+	 * Initializes a new language detector with source and target languages.
+	 * Converts ISO 639-1 codes to ISO 639-3 for compatibility with franc.
 	 *
-	 * @param config Configuration specifying source and target languages in ISO 639-1 format
+	 * ## Example
+	 * ```typescript
+	 * const detector = new LanguageDetector({ source: 'en', target: 'pt' });
+	 * ```
+	 *
+	 * @param config - Language configuration with source and target languages
 	 */
 	public constructor(config: LanguageConfig) {
 		this.languages = {
@@ -42,20 +81,33 @@ export class LanguageDetector {
 	}
 
 	/**
-	 * Determines if the file is translated based on the language analysis.
+	 * # Translation Status Check
 	 *
-	 * @param content The content of the file
-	 * @returns `true` if the file is translated, `false` otherwise
+	 * Determines if content is already translated by analyzing its language composition.
+	 * Uses language detection and scoring to make the determination.
+	 *
+	 * ## Example
+	 * ```typescript
+	 * const isTranslated = detector.isFileTranslated('Olá mundo');
+	 * // Returns true if content is in target language
+	 * ```
+	 *
+	 * @param content - Text content to analyze
 	 */
 	public isFileTranslated(content: string) {
 		return this.analyzeLanguage(content).isTranslated;
 	}
 
 	/**
-	 * Analyzes the language of the content.
+	 * # Language Analysis
 	 *
-	 * @param content The content of the file
-	 * @returns The language analysis
+	 * Performs detailed language analysis on the content:
+	 * 1. Checks minimum content length
+	 * 2. Detects languages and their confidence scores
+	 * 3. Calculates target language ratio
+	 * 4. Determines translation status
+	 *
+	 * @param content - Text content to analyze
 	 */
 	private analyzeLanguage(content: string): LanguageAnalysis {
 		if (content.length < this.MIN_CONTENT_LENGTH) {
@@ -95,15 +147,14 @@ export class LanguageDetector {
 	}
 
 	/**
-	 * Determines the translation status based on the ratio and detected language.
+	 * # Translation Status Determination
 	 *
-	 * Consider it translated if:
-	 * 1. The detected language matches target language
-	 * 2. The target language ratio is above the threshold
+	 * Evaluates if content should be considered translated based on:
+	 * - Match between detected and target language
+	 * - Ratio of target language presence
 	 *
-	 * @param ratio The ratio of the target language
-	 * @param detectedLanguage The detected language
-	 * @returns `true` if the file is translated, `false` otherwise
+	 * @param ratio - Target language presence ratio
+	 * @param detectedLanguage - Primary detected language
 	 */
 	private determineTranslationStatus(ratio: number, detectedLanguage: string) {
 		return (

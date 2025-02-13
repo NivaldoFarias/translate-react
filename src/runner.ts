@@ -12,6 +12,17 @@ import { SnapshotManager } from "./services/snapshot-manager";
 import { TranslatorService } from "./services/translator";
 import { validateEnv } from "./utils/env";
 
+/**
+ * # Translation Runner
+ *
+ * Orchestrates the entire translation workflow, managing the process of:
+ * - Repository tree fetching
+ * - File content retrieval
+ * - Language detection
+ * - Translation processing
+ * - Pull request creation
+ * - Progress tracking and reporting
+ */
 export interface ProcessedFileResult {
 	branch: RestEndpointMethodTypes["git"]["getRef"]["response"]["data"] | null;
 	filename: string;
@@ -23,29 +34,71 @@ export interface ProcessedFileResult {
 	error: Error | null;
 }
 
+/**
+ * # Translation Workflow Runner
+ *
+ * Main orchestrator class that manages the entire translation process workflow.
+ * Handles file processing, translation, GitHub operations, and progress tracking.
+ */
 export default class Runner {
+	/**
+	 * GitHub service instance for repository operations
+	 */
 	private readonly github = new GitHubService();
+
+	/**
+	 * Translation service for content translation operations
+	 */
 	private readonly translator = new TranslatorService();
+
+	/**
+	 * Language detection service to identify content language
+	 */
 	private readonly languageDetector = new LanguageDetector({
 		source: import.meta.env.SOURCE_LANGUAGE!,
 		target: import.meta.env.TARGET_LANGUAGE!,
 	});
+
+	/**
+	 * Snapshot manager to persist and retrieve workflow state
+	 */
 	private readonly snapshotManager = new SnapshotManager();
+
+	/**
+	 * Maximum number of files to process
+	 * Limited in non-production environments for testing purposes
+	 */
 	private get maxFiles(): number | undefined {
 		return import.meta.env.NODE_ENV === "production" ? undefined : 10;
 	}
+
+	/**
+	 * Statistics tracking for the translation process
+	 */
 	private stats = {
 		results: new Map<ProcessedFileResult["filename"], ProcessedFileResult>(),
 		startTime: Date.now(),
 	};
+
+	/**
+	 * Progress spinner for CLI feedback
+	 */
 	private spinner: Ora | null = null;
 
+	/**
+	 * Cleanup handler for process termination
+	 * Ensures graceful shutdown and cleanup of resources
+	 */
 	private cleanup = () => {
 		this.spinner?.stop();
 		// Force exit after a timeout to ensure cleanup handlers run
 		setTimeout(() => void process.exit(0), 1000);
 	};
 
+	/**
+	 * Initializes the runner with environment validation and signal handlers
+	 * Sets up process event listeners for graceful termination
+	 */
 	constructor() {
 		try {
 			validateEnv();
@@ -62,6 +115,19 @@ export default class Runner {
 		});
 	}
 
+	/**
+	 * # Main Workflow Execution
+	 *
+	 * Executes the complete translation workflow:
+	 * 1. Verifies GitHub token permissions
+	 * 2. Loads or creates workflow snapshot
+	 * 3. Fetches repository tree
+	 * 4. Identifies files for translation
+	 * 5. Processes files in batches
+	 * 6. Reports results
+	 *
+	 * In production, also comments results on the specified issue
+	 */
 	public async run() {
 		try {
 			if (!this.spinner) {
@@ -184,6 +250,14 @@ export default class Runner {
 		}
 	}
 
+	/**
+	 * # Batch Processing
+	 *
+	 * Processes files in batches to manage resources and provide progress feedback
+	 *
+	 * @param files - List of files to process
+	 * @param batchSize - Number of files to process simultaneously
+	 */
 	private async processInBatches(files: TranslationFile[], batchSize = 10) {
 		if (!this.spinner) {
 			this.spinner = ora({
@@ -220,6 +294,18 @@ export default class Runner {
 		}
 	}
 
+	/**
+	 * # Single File Processing
+	 *
+	 * Processes an individual file through the translation workflow:
+	 * - Creates a branch
+	 * - Checks for existing translations
+	 * - Performs translation
+	 * - Creates pull request
+	 *
+	 * @param file - File to process
+	 * @param progress - Progress tracking information
+	 */
 	private async processFile(
 		file: TranslationFile,
 		progress: { batchIndex: number; fileIndex: number; totalBatches: number; batchSize: number },
