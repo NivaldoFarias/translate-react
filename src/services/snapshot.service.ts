@@ -23,11 +23,11 @@ export interface Snapshot {
  * Manages the creation, saving, and loading of translation workflow snapshots.
  */
 export class SnapshotService {
-	private readonly dbService: DatabaseService;
+	private readonly service: DatabaseService;
 	private currentSnapshotId: number | null = null;
 
 	constructor() {
-		this.dbService = new DatabaseService();
+		this.service = new DatabaseService();
 
 		process.on("SIGINT", async () => {
 			await this.cleanup();
@@ -41,14 +41,12 @@ export class SnapshotService {
 	public async save(data: Omit<Snapshot, "id">) {
 		try {
 			if (!this.currentSnapshotId) {
-				this.currentSnapshotId = this.dbService.createSnapshot(data.timestamp);
+				this.currentSnapshotId = this.service.createSnapshot(data.timestamp);
 			}
 
-			this.dbService.saveRepositoryTree(this.currentSnapshotId, data.repositoryTree);
-			this.dbService.saveFilesToTranslate(this.currentSnapshotId, data.filesToTranslate);
-			this.dbService.saveProcessedResults(this.currentSnapshotId, data.processedResults);
-
-			console.info(`Snapshot saved with ID ${this.currentSnapshotId}`);
+			this.service.saveRepositoryTree(this.currentSnapshotId, data.repositoryTree);
+			this.service.saveFilesToTranslate(this.currentSnapshotId, data.filesToTranslate);
+			this.service.saveProcessedResults(this.currentSnapshotId, data.processedResults);
 		} catch (error) {
 			console.error(
 				`Failed to save snapshot: ${error instanceof Error ? error.message : "Unknown error"}`,
@@ -58,31 +56,26 @@ export class SnapshotService {
 
 	public async append<K extends keyof Omit<Snapshot, "id">>(key: K, data: Snapshot[K]) {
 		if (!this.currentSnapshotId) {
-			this.currentSnapshotId = this.dbService.createSnapshot();
+			this.currentSnapshotId = this.service.createSnapshot();
 		}
 
 		try {
 			switch (key) {
 				case "repositoryTree":
-					this.dbService.saveRepositoryTree(
+					this.service.saveRepositoryTree(
 						this.currentSnapshotId,
 						data as RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"],
 					);
 					break;
 				case "filesToTranslate":
-					this.dbService.saveFilesToTranslate(this.currentSnapshotId, data as TranslationFile[]);
+					this.service.saveFilesToTranslate(this.currentSnapshotId, data as TranslationFile[]);
 					break;
 				case "processedResults":
-					this.dbService.saveProcessedResults(
-						this.currentSnapshotId,
-						data as ProcessedFileResult[],
-					);
+					this.service.saveProcessedResults(this.currentSnapshotId, data as ProcessedFileResult[]);
 					break;
 				default:
 					throw new Error(`Invalid key: ${key}`);
 			}
-
-			console.info(`Appended ${key} to snapshot ${this.currentSnapshotId}`);
 		} catch (error) {
 			console.error(
 				`Failed to append ${key}: ${error instanceof Error ? error.message : "Unknown error"}`,
@@ -92,11 +85,10 @@ export class SnapshotService {
 
 	public async loadLatest(): Promise<Snapshot | null> {
 		try {
-			const snapshot = this.dbService.getLatestSnapshot();
+			const snapshot = this.service.getLatestSnapshot();
 
 			if (snapshot) {
 				this.currentSnapshotId = snapshot.id;
-				console.info(`Loaded snapshot ${snapshot.id}`);
 			}
 
 			return snapshot;
@@ -110,9 +102,8 @@ export class SnapshotService {
 
 	public async clear() {
 		try {
-			this.dbService.clearSnapshots();
+			this.service.clearSnapshots();
 			this.currentSnapshotId = null;
-			console.info("Cleared all snapshots");
 		} catch (error) {
 			console.error(
 				`Failed to clear snapshots: ${error instanceof Error ? error.message : "Unknown error"}`,
@@ -120,7 +111,31 @@ export class SnapshotService {
 		}
 	}
 
+	/**
+	 * Cleans up old snapshots from the database to prevent excessive storage usage.
+	 * Keeps only the most recent snapshot and removes all others.
+	 *
+	 * @example
+	 * ```typescript
+	 * await snapshotService.cleanup();
+	 * ```
+	 */
 	private async cleanup() {
-		console.info("Cleaning up snapshots...");
+		try {
+			const latestSnapshot = await this.loadLatest();
+			if (!latestSnapshot) return;
+
+			const snapshots = this.service.getSnapshots();
+
+			for (const snapshot of snapshots) {
+				if (snapshot.id === latestSnapshot.id) continue;
+
+				this.service.deleteSnapshot(snapshot.id);
+			}
+		} catch (error) {
+			console.error(
+				`Failed to cleanup snapshots: ${error instanceof Error ? error.message : "Unknown error"}`,
+			);
+		}
 	}
 }

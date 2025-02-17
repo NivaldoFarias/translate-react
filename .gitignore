@@ -3,6 +3,7 @@
 .dotfiles
 .snapshots/
 .vscode/
+.cursor
 
 # Logs
 

@@ -39,6 +39,25 @@ export default class Runner extends RunnerService {
 				throw new Error("Token permissions verification failed");
 			}
 
+			this.spinner.text = "Checking fork status...";
+			const isSynced = await this.github.isForkSynced();
+
+			if (!isSynced) {
+				this.spinner.text = "Fork is out of sync. Updating...";
+				const syncSuccess = await this.github.syncFork();
+
+				if (!syncSuccess) {
+					this.spinner.fail("Failed to sync fork with upstream repository");
+					throw new Error("Failed to sync fork with upstream repository");
+				}
+
+				this.spinner.succeed("Fork synchronized with upstream repository");
+				this.spinner.start();
+			} else {
+				this.spinner.succeed("Fork is up to date");
+				this.spinner.start();
+			}
+
 			let snapshot = (await this.snapshotManager.loadLatest()) || {
 				repositoryTree: [],
 				filesToTranslate: [],
@@ -222,7 +241,7 @@ export default class Runner extends RunnerService {
 				metadata.branch = await this.github.createTranslationBranch(file.filename!);
 			}
 
-			const commitExists = await this.github.checkIfCommitExistsOnFork();
+			const commitExists = await this.github.checkIfCommitExistsOnFork(metadata.branch.ref);
 
 			if (!metadata.translation) {
 				this.spinner!.suffixText = `${suffixText} Translating ${file.filename}`;

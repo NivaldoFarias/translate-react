@@ -23,6 +23,7 @@ export default tseslint.config(
 		rules: {
 			...eslint.configs.recommended.rules,
 			"no-unused-vars": "off",
+			"no-console": ["error", { allow: ["warn", "error", "table"] }],
 
 			"prettier/prettier": "off",
 
