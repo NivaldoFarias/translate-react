@@ -261,4 +261,26 @@ export class DatabaseService {
 
 		transaction();
 	}
+
+	/**
+	 * # Snapshots Retrieval
+	 *
+	 * Fetches all workflow snapshots from database.
+	 *
+	 * @returns Array of snapshot objects
+	 */
+	public getSnapshots() {
+		return this.db.prepare("SELECT * FROM snapshots").all() as { id: number; timestamp: number }[];
+	}
+
+	/**
+	 * # Snapshot Deletion
+	 *
+	 * Deletes a specific workflow snapshot from database.
+	 *
+	 * @param id - ID of snapshot to delete
+	 */
+	public deleteSnapshot(id: number) {
+		this.db.run(`DELETE FROM snapshots WHERE id = ?`, [id]);
+	}
 }

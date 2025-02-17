@@ -21,8 +21,6 @@ const envSchema = z.object({
 	BUN_ENV: z.enum(["development", "production", "test"]).default("development"),
 	TRANSLATION_ISSUE_NUMBER: z.coerce.number().positive("Translation issue number is required"),
 	GITHUB_SINCE: z.string().optional(),
-	TARGET_LANGUAGE: z.string().min(1, "Target language is required"),
-	SOURCE_LANGUAGE: z.string().min(1, "Source language is required"),
 	LLM_BASE_URL: z.string().url().default("https://openrouter.ai/api/v1"),
 });
 

@@ -3,13 +3,18 @@ import type { Ora } from "ora";
 import type { ProcessedFileResult } from "../types";
 
 import { validateEnv } from "../utils/env.util";
+import { LanguageDetector } from "../utils/language-detector.util";
 
-import { GitHubService } from "./github.service";
-import { LanguageDetectorService } from "./language-detector.service";
+import { GitHubService } from "./github/";
 import { SnapshotService } from "./snapshot.service";
 import { TranslatorService } from "./translator.service";
 
-export class RunnerService {
+export interface RunnerOptions {
+	targetLanguage: string;
+	sourceLanguage: string;
+}
+
+export abstract class RunnerService {
 	/**
 	 * GitHub service instance for repository operations
 	 */
@@ -23,10 +28,7 @@ export class RunnerService {
 	/**
 	 * Language detection service to identify content language
 	 */
-	protected readonly languageDetector = new LanguageDetectorService({
-		source: import.meta.env.SOURCE_LANGUAGE!,
-		target: import.meta.env.TARGET_LANGUAGE!,
-	});
+	protected readonly languageDetector: LanguageDetector;
 
 	/**
 	 * Snapshot manager to persist and retrieve workflow state
@@ -68,13 +70,18 @@ export class RunnerService {
 	 * Initializes the runner with environment validation and signal handlers
 	 * Sets up process event listeners for graceful termination
 	 */
-	constructor() {
+	constructor(private readonly options: RunnerOptions) {
 		try {
 			validateEnv();
 		} catch (error) {
 			console.error(error instanceof Error ? error.message : String(error));
 			process.exit(1);
 		}
+
+		this.languageDetector = new LanguageDetector({
+			source: this.options.sourceLanguage,
+			target: this.options.targetLanguage,
+		});
 
 		process.on("SIGINT", this.cleanup);
 		process.on("SIGTERM", this.cleanup);

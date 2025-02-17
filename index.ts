@@ -1,5 +1,28 @@
+import type { RunnerOptions } from "./src/services/runner.service";
+
 import Runner from "./src/runner";
 
 if (import.meta.main) {
-	void new Runner().run();
+	void new Runner(parseCommandLineArgs()).run();
+
+	function parseCommandLineArgs() {
+		const commandLineArgs = process.argv.slice(2);
+		const sourceArg = commandLineArgs.find((arg) => arg.startsWith("--source="))?.split("=")[1];
+		const targetArg = commandLineArgs.find((arg) => arg.startsWith("--target="))?.split("=")[1];
+
+		if (
+			(commandLineArgs.length > 0 && sourceArg?.includes("=") === false) ||
+			targetArg?.includes("=") === false
+		) {
+			console.error("Invalid argument format. Use: --source=<lang> and/or --target=<lang>");
+			process.exit(1);
+		}
+
+		const options: RunnerOptions = {
+			targetLanguage: targetArg ?? "pt-BR",
+			sourceLanguage: sourceArg ?? "en",
+		};
+
+		return options;
+	}
 }
