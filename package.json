@@ -1,7 +1,7 @@
 {
 	"name": "translate-react",
 	"version": "0.1.0",
-	"description": "A tool to translate React docs to Portuguese",
+	"description": "A tool to translate React docs to any language",
 	"type": "module",
 	"main": "index.ts",
 	"scripts": {
