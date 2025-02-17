@@ -1,14 +1,13 @@
 {
 	"name": "translate-react",
-	"version": "0.0.2",
+	"version": "0.1.0",
 	"description": "A tool to translate React docs to Portuguese",
 	"type": "module",
-	"main": "dist/index.js",
+	"main": "index.ts",
 	"scripts": {
-		"start": "bun run dist/index.js",
+		"start": "bun run index.ts",
 		"dev": "bun --watch index.ts",
-		"start:dev": "bun run --env-file=.env.development dist/index.js",
-		"build": "bun build index.ts --outdir dist --target bun",
+		"start:dev": "bun run --env-file=.env.development index.ts",
 		"lint": "eslint .",
 		"lint:fix": "eslint . --fix",
 		"format": "prettier --write '**/*.{ts,js,cjs,mjs,json,md}'"
