@@ -1,6 +1,6 @@
-import type { RunnerOptions } from "./src/services/runner.service";
+import type { RunnerOptions } from "@/services/runner.service";
 
-import Runner from "./src/runner";
+import Runner from "@/runner";
 
 if (import.meta.main) {
 	void new Runner(parseCommandLineArgs()).run();

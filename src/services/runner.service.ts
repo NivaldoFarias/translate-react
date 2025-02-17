@@ -1,13 +1,11 @@
+import type { ProcessedFileResult } from "@/types";
 import type { Ora } from "ora";
 
-import type { ProcessedFileResult } from "../types";
-
-import { validateEnv } from "../utils/env.util";
-import { LanguageDetector } from "../utils/language-detector.util";
-
-import { GitHubService } from "./github/";
-import { SnapshotService } from "./snapshot.service";
-import { TranslatorService } from "./translator.service";
+import { GitHubService } from "@/services/github/";
+import { SnapshotService } from "@/services/snapshot.service";
+import { TranslatorService } from "@/services/translator.service";
+import { validateEnv } from "@/utils/env.util";
+import { LanguageDetector } from "@/utils/language-detector.util";
 
 export interface RunnerOptions {
 	targetLanguage: string;
@@ -23,7 +21,7 @@ export abstract class RunnerService {
 	/**
 	 * Translation service for content translation operations
 	 */
-	protected readonly translator = new TranslatorService();
+	protected readonly translator: TranslatorService;
 
 	/**
 	 * Language detection service to identify content language
@@ -79,8 +77,13 @@ export abstract class RunnerService {
 		}
 
 		this.languageDetector = new LanguageDetector({
-			source: this.options.sourceLanguage,
-			target: this.options.targetLanguage,
+			sourceLanguage: this.options.sourceLanguage,
+			targetLanguage: this.options.targetLanguage,
+		});
+
+		this.translator = new TranslatorService({
+			sourceLanguage: this.options.sourceLanguage,
+			targetLanguage: this.options.targetLanguage,
 		});
 
 		process.on("SIGINT", this.cleanup);

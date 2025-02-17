@@ -1,10 +1,8 @@
+import type { ParsedContent, ProcessedFileResult, TranslationFile } from "@/types";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
-import type { ParsedContent, ProcessedFileResult, TranslationFile } from "../../types";
-
-import { reconstructContent } from "../../utils/content-parser.util";
-
-import { BaseGitHubService } from "./base.service";
+import { BaseGitHubService } from "@/services/github/base.service";
+import { reconstructContent } from "@/utils/content-parser.util";
 
 /**
  * Service responsible for managing repository content and translations.

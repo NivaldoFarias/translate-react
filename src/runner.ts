@@ -1,8 +1,8 @@
 import ora from "ora";
 
-import type { TranslationFile } from "./types";
+import type { TranslationFile } from "@/types";
 
-import { RunnerService } from "./services/runner.service";
+import { RunnerService } from "@/services/runner.service";
 
 /**
  * # Translation Workflow Runner

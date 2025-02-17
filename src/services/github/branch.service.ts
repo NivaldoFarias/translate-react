@@ -1,4 +1,4 @@
-import { BaseGitHubService } from "./base.service";
+import { BaseGitHubService } from "@/services/github/base.service";
 
 /**
  * Service responsible for Git branch operations and lifecycle management.

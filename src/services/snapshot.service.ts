@@ -1,8 +1,7 @@
+import type { ProcessedFileResult, TranslationFile } from "@/types";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
-import type { ProcessedFileResult, TranslationFile } from "../types";
-
-import { DatabaseService } from "./database.service";
+import { DatabaseService } from "@/services/database.service";
 
 /**
  * # Snapshot Interface
