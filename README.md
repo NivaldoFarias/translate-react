@@ -85,13 +85,17 @@ bun run index.ts
 ```
 src/
 ├── services/
-│   ├── github.service.ts              # GitHub API service
+│   ├── github/                        # GitHub API services
+│   │   ├── base.service.ts            # Base GitHub service
+│   │   ├── branch.service.ts          # Branch management
+│   │   ├── content.service.ts         # Content and PR management
+│   │   ├── repository.service.ts      # Repository operations
+│   │   └── index.ts                   # Main GitHub service
 │   ├── translator.service.ts          # Translation service
-│   ├── language-detector.service.ts   # Language detection service
-│   ├── branch.service.ts              # Branch management service
 │   ├── database.service.ts            # Database service
 │   └── snapshot.service.ts            # Snapshot service
 ├── utils/
+│   ├── language-detector.util.ts      # Language detection utility
 │   ├── content-parser.util.ts         # Content parser utility
 │   ├── env.util.ts                    # Environment validation
 │   └── errors.util.ts                 # Custom error handling
@@ -105,11 +109,16 @@ snapshots.sqlite                       # SQLite database for state persistence
 
 ### Core Services
 
-1. **GitHub Service** (`services/github.service.ts`)
+1. **GitHub Service** (`services/github/`)
 
-   - Manages all GitHub API interactions
-   - Handles repository access, branch creation, and PR management
-   - Integrates with branch manager for version control
+   - Modular architecture with specialized services:
+     - **Base Service**: Common GitHub functionality and error handling
+     - **Branch Service**: Branch lifecycle and cleanup management
+     - **Content Service**: File operations and PR management
+     - **Repository Service**: Repository and fork synchronization
+   - Inheritance-based design for code reuse
+   - Protected access modifiers for internal operations
+   - Unified error handling through base service
 
 2. **Translator Service** (`services/translator.service.ts`)
 
@@ -136,7 +145,7 @@ snapshots.sqlite                       # SQLite database for state persistence
    - Manages service interactions
    - Handles error recovery and reporting
 
-2. **Branch Manager** (`services/branch.service.ts`)
+2. **Branch Manager** (`services/github/branch.service.ts`)
 
    - Manages Git branches for translations
    - Ensures proper cleanup of temporary branches
