@@ -301,6 +301,42 @@ export class ContentService extends BaseGitHubService {
 	}
 
 	/**
+	 * # Pull Request Retrieval
+	 *
+	 * Retrieves a pull request by branch name.
+	 *
+	 * @param branchName - Source branch name
+	 */
+	public async findPullRequestByBranch(branchName: string) {
+		const pr = await this.octokit.pulls.list({
+			...this.upstream,
+			head: `${this.fork.owner}:${branchName}`,
+		});
+
+		return pr.data[0];
+	}
+
+	/**
+	 * # Pull Request Closure
+	 *
+	 * Closes a pull request by number.
+	 *
+	 * @param prNumber - Pull request number
+	 * @throws {Error} If pull request closure fails
+	 */
+	public async closePullRequest(prNumber: number) {
+		const response = await this.octokit.pulls.update({
+			...this.upstream,
+			pull_number: prNumber,
+			state: "closed",
+		});
+
+		if (response.status !== 200) {
+			throw new Error(`Failed to close pull request ${prNumber}`);
+		}
+	}
+
+	/**
 	 * Comment header template for issue comments
 	 */
 	private get commentPrefix() {

@@ -68,7 +68,7 @@ export abstract class RunnerService {
 	 * Initializes the runner with environment validation and signal handlers
 	 * Sets up process event listeners for graceful termination
 	 */
-	constructor(private readonly options: RunnerOptions) {
+	constructor(protected readonly options: RunnerOptions) {
 		try {
 			validateEnv();
 		} catch (error) {

@@ -110,22 +110,37 @@ export class GitHubService {
 	}
 
 	/**
-	 * Creates a new branch for translation work.
+	 * Creates a new branch for translation work, or gets the existing branch if it exists.
 	 *
 	 * @param fileName - Name of file being translated
 	 * @param baseBranch - Branch to create from
 	 *
 	 * @example
 	 * ```typescript
-	 * const branch = await github.createTranslationBranch('homepage.md');
+	 * const branch = await github.createOrGetTranslationBranch('homepage.md');
 	 * ```
 	 */
-	public async createTranslationBranch(fileName: string, baseBranch = "main") {
+	public async createOrGetTranslationBranch(fileName: string, baseBranch = "main") {
 		const branchName = `translate/${fileName}`;
 		const existingBranch = await this.branchService.getBranch(branchName);
-		if (existingBranch) return existingBranch.data;
 
-		return (await this.branchService.createBranch(branchName, baseBranch)).data;
+		if (existingBranch) {
+			const mainBranchRef = await this.branchService.getBranch(baseBranch);
+			if (!mainBranchRef) throw new Error(`Base branch ${baseBranch} not found`);
+
+			if (existingBranch.data.object.sha === mainBranchRef.data.object.sha) {
+				return existingBranch.data;
+			}
+
+			const upstreamPR = await this.contentService.findPullRequestByBranch(branchName);
+			if (upstreamPR) await this.contentService.closePullRequest(upstreamPR.number);
+
+			await this.branchService.deleteBranch(branchName);
+		}
+
+		const newBranch = await this.branchService.createBranch(branchName, baseBranch);
+
+		return newBranch.data;
 	}
 
 	/**

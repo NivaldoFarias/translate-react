@@ -27,7 +27,15 @@ export abstract class BaseGitHubService {
 		protected readonly fork: { owner: string; repo: string },
 		protected readonly githubToken: string,
 	) {
-		this.octokit = new Octokit({ auth: this.githubToken });
+		this.octokit = new Octokit({
+			auth: this.githubToken,
+			log: {
+				debug: () => {},
+				info: () => {},
+				warn: () => {},
+				error: () => {},
+			},
+		});
 	}
 
 	/**
