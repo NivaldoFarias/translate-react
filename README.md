@@ -1,14 +1,14 @@
 # translate-react
 
-A CLI tool to automate the translation of React documentation from English to Brazilian Portuguese (pt-BR) using OpenAI's GPT models.
+A CLI tool to automate the translation of React documentation from English to any other language using Large Language Models (LLMs).
 
 ## Overview
 
-This project aims to accelerate the translation process of React's documentation to Brazilian Portuguese, which is currently _(2025-01-17)_ only 42% complete. It automates the workflow of:
+This project automates the translation process of React's documentation to any language. It uses the following workflow:
 
 1. Fetching untranslated markdown files from the React docs repository
 2. Managing translation state through SQLite snapshots to handle interruptions
-3. Translating content using OpenAI's GPT models with strict glossary rules
+3. Translating content using OpenRouter models with strict glossary rules
 4. Creating branches and pull requests with translations
 5. Tracking progress through GitHub issues
 6. Managing cleanup and error recovery
@@ -48,10 +48,8 @@ REPO_NAME=target_repo_name                     # required
 ORIGINAL_REPO_OWNER=original_repo_owner        # required
 NODE_ENV=development|production|test           # optional, defaults to development
 BUN_ENV=development|production|test            # optional, defaults to development
-TRANSLATION_ISSUE_NUMBER=123                   # required for production
+TRANSLATION_ISSUE_NUMBER=123                   # optional, only used for tracking progress
 GITHUB_SINCE=2024-01-01                        # optional, filters issue comments since date
-TARGET_LANGUAGE=pt                             # required, target language code
-SOURCE_LANGUAGE=en                             # required, source language code
 ```
 
 > [!NOTE]
@@ -163,7 +161,7 @@ snapshots.sqlite                       # SQLite database for state persistence
 - Enforces strict glossary rules for technical terms
 - Preserves markdown formatting and structure
 - Maintains code blocks and technical references
-- Supports Brazilian Portuguese localization standards
+- Supports any language localization standards
 
 ### State Management
 
