@@ -1,7 +1,6 @@
+import type { Environment } from "@/utils/env.util";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 import type { ChatCompletion } from "openai/resources/chat/completions.mjs";
-
-import type { Environment } from "./utils/env.util";
 
 /**
  * Represents a parsed content object that contains the original content with placeholders for repeated blocks.
