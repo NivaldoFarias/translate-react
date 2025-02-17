@@ -7,12 +7,12 @@ import langs from "langs";
  *
  * ## Example
  * ```typescript
- * { source: 'en', target: 'pt' }
+ * { sourceLanguage: 'en', targetLanguage: 'pt' }
  * ```
  */
 export interface LanguageConfig {
-	source: string;
-	target: string;
+	sourceLanguage: string;
+	targetLanguage: string;
 }
 
 /**
@@ -77,8 +77,8 @@ export class LanguageDetector {
 	 */
 	public constructor(config: LanguageConfig) {
 		this.languages = {
-			source: langs.where("1", config.source)?.["3"] ?? "eng",
-			target: langs.where("1", config.target)?.["3"] ?? "und",
+			sourceLanguage: langs.where("1", config.sourceLanguage)?.["3"] ?? "eng",
+			targetLanguage: langs.where("1", config.targetLanguage)?.["3"] ?? "und",
 		};
 	}
 
@@ -160,7 +160,7 @@ export class LanguageDetector {
 	 */
 	private determineTranslationStatus(ratio: number, detectedLanguage: string) {
 		return (
-			detectedLanguage === langs.where("3", this.languages!.target)?.["1"] ||
+			detectedLanguage === langs.where("3", this.languages!.targetLanguage)?.["1"] ||
 			ratio >= this.TRANSLATION_THRESHOLD
 		);
 	}

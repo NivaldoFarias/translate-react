@@ -1,8 +1,7 @@
 import { Database } from "bun:sqlite";
 
+import type { ProcessedFileResult, TranslationFile } from "@/types";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
-
-import type { ProcessedFileResult, TranslationFile } from "../types";
 
 /**
  * # Database Service

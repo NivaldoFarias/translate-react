@@ -2,10 +2,11 @@ import { franc } from "franc";
 import langs from "langs";
 import OpenAI from "openai";
 
-import type { ParsedContent, TranslationFile } from "../types";
+import type { ParsedContent, TranslationFile } from "@/types";
+import type { LanguageConfig } from "@/utils/language-detector.util";
 
-import { parseContent, reconstructContent } from "../utils/content-parser.util";
-import { ErrorCodes, TranslationError } from "../utils/errors.util";
+import { parseContent, reconstructContent } from "@/utils/content-parser.util";
+import { ErrorCodes, TranslationError } from "@/utils/errors.util";
 
 /**
  * Translation performance and success rate metrics.
@@ -53,6 +54,8 @@ export class TranslatorService {
 		averageTranslationTime: 0,
 		totalTranslationTime: 0,
 	};
+
+	public constructor(private readonly options: LanguageConfig) {}
 
 	/**
 	 * # Language Model Interaction
@@ -213,7 +216,7 @@ export class TranslatorService {
 	 */
 	private getSystemPrompt(content: string) {
 		const languages = {
-			target: langs.where("3", import.meta.env.TARGET_LANGUAGE)?.["1"] || "Brazilian Portuguese",
+			target: langs.where("3", this.options.targetLanguage)?.["1"] || "Brazilian Portuguese",
 			source: langs.where("3", franc(content))?.["1"] || "English",
 		};
 

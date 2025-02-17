@@ -19,7 +19,7 @@ const envSchema = z.object({
 	ORIGINAL_REPO_OWNER: z.string().min(1, "Original repository owner is required"),
 	NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
 	BUN_ENV: z.enum(["development", "production", "test"]).default("development"),
-	TRANSLATION_ISSUE_NUMBER: z.coerce.number().positive("Translation issue number is required"),
+	TRANSLATION_ISSUE_NUMBER: z.coerce.number().positive().optional(),
 	GITHUB_SINCE: z.string().optional(),
 	LLM_BASE_URL: z.string().url().default("https://openrouter.ai/api/v1"),
 });
