@@ -7,6 +7,7 @@
 	"scripts": {
 		"start": "bun run index.ts",
 		"dev": "bun --watch --env-file=.env.development index.ts",
+		"debug": "bun --inspect --env-file=.env.development index.ts",
 		"lint": "eslint .",
 		"lint:fix": "eslint . --fix",
 		"format": "prettier --write '**/*.{ts,js,cjs,mjs,json,md}'"

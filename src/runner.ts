@@ -26,13 +26,11 @@ export default class Runner extends RunnerService {
 	 */
 	public async run() {
 		try {
-			if (!this.spinner) {
-				this.spinner = ora({
-					text: "Starting translation workflow",
-					color: "cyan",
-					spinner: "dots",
-				}).start();
-			}
+			this.spinner = ora({
+				text: "Starting translation workflow",
+				color: "cyan",
+				spinner: "dots",
+			}).start();
 
 			if (!(await this.github.verifyTokenPermissions())) {
 				this.spinner.fail("Token permissions verification failed");
@@ -162,6 +160,7 @@ export default class Runner extends RunnerService {
 				symbol: "⏱️",
 				text: `Elapsed time: ${elapsedTime}ms (${Math.ceil(elapsedTime / 1000)}s)`,
 			});
+			this.spinner?.stop();
 		}
 	}
 
@@ -182,7 +181,7 @@ export default class Runner extends RunnerService {
 			}).start();
 		}
 
-		const batches = [];
+		const batches: TranslationFile[][] = [];
 		for (let i = 0; i < files.length; i += batchSize) {
 			batches.push(files.slice(i, i + batchSize));
 		}
@@ -236,44 +235,32 @@ export default class Runner extends RunnerService {
 		const suffixText = `[${progress.fileIndex + 1}/${progress.batchSize}]`;
 
 		try {
-			if (!metadata.branch) {
-				this.spinner!.suffixText = `${suffixText} Creating branch for ${file.filename}`;
-				metadata.branch = await this.github.createTranslationBranch(file.filename!);
-			}
+			this.spinner!.suffixText = `${suffixText} Creating branch for ${file.filename}`;
 
-			const commitExists = await this.github.checkIfCommitExistsOnFork(metadata.branch.ref);
+			metadata.branch = await this.github.createOrGetTranslationBranch(file.filename!);
 
-			if (!metadata.translation) {
-				this.spinner!.suffixText = `${suffixText} Translating ${file.filename}`;
-				metadata.translation =
-					commitExists ?
-						await this.github.getFileContent(file)
-					:	await this.translator.translateContent(file);
-			}
+			this.spinner!.suffixText = `${suffixText} Translating ${file.filename}`;
+			metadata.translation = await this.translator.translateContent(file);
 
-			if (!commitExists) {
-				this.spinner!.suffixText = `${suffixText} Committing ${file.filename}`;
-				const content =
-					typeof metadata.translation === "string" ?
-						metadata.translation
-					:	metadata.translation?.choices[0]?.message?.content;
+			this.spinner!.suffixText = `${suffixText} Committing ${file.filename}`;
+			const content =
+				typeof metadata.translation === "string" ?
+					metadata.translation
+				:	metadata.translation?.choices[0]?.message?.content;
 
-				await this.github.commitTranslation(
-					metadata.branch,
-					file,
-					content ?? "",
-					`Translate \`${file.filename}\` to pt-br`,
-				);
-			}
+			await this.github.commitTranslation(
+				metadata.branch,
+				file,
+				content ?? "",
+				`Translate \`${file.filename}\` to ${this.options.targetLanguage}`,
+			);
 
-			if (!metadata.pullRequest) {
-				this.spinner!.suffixText = `${suffixText} Creating PR for ${file.filename}`;
-				metadata.pullRequest = await this.github.createPullRequest(
-					metadata.branch.ref,
-					`Translate \`${file.filename}\` to pt-br`,
-					this.pullRequestDescription,
-				);
-			}
+			this.spinner!.suffixText = `${suffixText} Creating PR for ${file.filename}`;
+			metadata.pullRequest = await this.github.createPullRequest(
+				metadata.branch.ref,
+				`Translate \`${file.filename}\` to ${this.options.targetLanguage}`,
+				this.pullRequestDescription,
+			);
 		} catch (error) {
 			metadata.error = error instanceof Error ? error : new Error(String(error));
 			this.spinner!.suffixText = `${suffixText} Failed: ${file.filename}`;
