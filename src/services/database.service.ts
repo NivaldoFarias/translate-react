@@ -1,3 +1,5 @@
+import { existsSync, writeFileSync } from "fs";
+
 import { Database } from "bun:sqlite";
 
 import type { ProcessedFileResult, TranslationFile } from "@/types";
@@ -19,15 +21,19 @@ export class DatabaseService {
 	/**
 	 * SQLite database connection instance
 	 */
-	private db: Database;
+	private readonly db: Database;
 
 	/**
 	 * # Database Service Constructor
 	 *
 	 * Initializes database connection and creates required tables.
+	 *
+	 * @param dbPath Optional path to the database file. Defaults to 'snapshots.sqlite'
 	 */
-	constructor() {
-		this.db = new Database("snapshots.sqlite");
+	constructor(dbPath = "snapshots.sqlite") {
+		if (!existsSync(dbPath)) writeFileSync(dbPath, "");
+
+		this.db = new Database(dbPath);
 		this.initializeTables();
 	}
 
@@ -249,16 +255,13 @@ export class DatabaseService {
 	 * Removes all data from database tables.
 	 * Uses transaction to ensure all-or-nothing deletion.
 	 */
-	public clearSnapshots() {
-		const tables = ["processed_results", "files_to_translate", "repository_tree", "snapshots"];
-
-		const transaction = this.db.transaction(() => {
-			for (const table of tables) {
-				this.db.run(`DELETE FROM ${table}`);
-			}
-		});
-
-		transaction();
+	public async clearSnapshots() {
+		this.db.transaction(() => {
+			this.db.prepare("DELETE FROM processed_results").run();
+			this.db.prepare("DELETE FROM files_to_translate").run();
+			this.db.prepare("DELETE FROM repository_tree").run();
+			this.db.prepare("DELETE FROM snapshots").run();
+		})();
 	}
 
 	/**
