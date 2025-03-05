@@ -5,6 +5,7 @@ import { GitHubService } from "@/services/github/";
 import { SnapshotService } from "@/services/snapshot.service";
 import { TranslatorService } from "@/services/translator.service";
 import { validateEnv } from "@/utils/env.util";
+import { extractErrorMessage } from "@/utils/errors.util";
 import { LanguageDetector } from "@/utils/language-detector.util";
 
 export interface RunnerOptions {
@@ -72,7 +73,7 @@ export abstract class RunnerService {
 		try {
 			validateEnv();
 		} catch (error) {
-			console.error(error instanceof Error ? error.message : String(error));
+			console.error(extractErrorMessage(error));
 			process.exit(1);
 		}
 

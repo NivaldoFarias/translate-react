@@ -1,6 +1,7 @@
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 import { BaseGitHubService } from "@/services/github/base.service";
+import { extractErrorMessage } from "@/utils/errors.util";
 
 /**
  * Service responsible for repository operations and fork management.
@@ -50,14 +51,14 @@ export class RepositoryService extends BaseGitHubService {
 			const response = await this.octokit.rest.users.getAuthenticated();
 
 			if (response.status !== 200) {
-				console.error(this.formatError(response, "Failed to verify token permissions"));
+				console.error(`Failed to verify token permissions: ${extractErrorMessage(response)}`);
 				return false;
 			}
 
 			await this.octokit.rest.repos.get(this.upstream);
 			return true;
 		} catch (error) {
-			console.error(this.formatError(error, "Token permission verification failed"));
+			console.error(`Token permission verification failed: ${extractErrorMessage(error)}`);
 			return false;
 		}
 	}
@@ -94,7 +95,7 @@ export class RepositoryService extends BaseGitHubService {
 
 			return upstreamCommits.data[0]?.sha === forkedCommits.data[0]?.sha;
 		} catch (error) {
-			console.error(this.formatError(error, "Failed to check fork sync status"));
+			console.error(`Failed to check fork sync status: ${extractErrorMessage(error)}`);
 			return false;
 		}
 	}
@@ -118,7 +119,7 @@ export class RepositoryService extends BaseGitHubService {
 
 			return mergeResponse.status === 200;
 		} catch (error) {
-			console.error(this.formatError(error, "Failed to sync fork"));
+			console.error(`Failed to sync fork: ${extractErrorMessage(error)}`);
 			return false;
 		}
 	}

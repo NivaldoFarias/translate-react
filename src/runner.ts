@@ -1,8 +1,11 @@
 import ora from "ora";
 
-import type { TranslationFile } from "@/types";
+import type { ProcessedFileResult, TranslationFile } from "@/types";
+import type { SetNonNullable } from "type-fest";
 
 import { RunnerService } from "@/services/runner.service";
+
+import { extractErrorMessage } from "./utils/errors.util";
 
 /**
  * # Translation Workflow Runner
@@ -11,6 +14,8 @@ import { RunnerService } from "@/services/runner.service";
  * Handles file processing, translation, GitHub operations, and progress tracking.
  */
 export default class Runner extends RunnerService {
+	private exitCode = 0;
+
 	/**
 	 * # Main Workflow Execution
 	 *
@@ -133,36 +138,74 @@ export default class Runner extends RunnerService {
 				this.spinner.succeed(`Commented on translation issue: ${comment.html_url}`);
 			}
 
-			// Use stopAndPersist for final statistics
-			this.spinner.stopAndPersist({
-				symbol: "📊",
-				text: "Final Statistics",
-			});
-
-			console.table({
-				"Files processed successfully": Array.from(this.stats.results.values()).filter(
-					(file) => file.error === null,
-				).length,
-				"Failed translations": Array.from(this.stats.results.values()).filter(
-					(file) => file.error !== null,
-				).length,
-			});
-
 			if (import.meta.env.NODE_ENV === "production") {
 				await this.snapshotManager.clear();
 			}
+
+			this.exitCode = 0;
 		} catch (error) {
-			this.spinner?.fail(error instanceof Error ? error.message : "Unknown error");
-			process.exit(1);
+			this.spinner?.fail(extractErrorMessage(error));
+			this.exitCode = 1;
 		} finally {
-			const elapsedTime = Math.ceil(Date.now() - this.stats.startTime);
-			this.spinner?.stopAndPersist({
-				symbol: "⏱️",
-				text: `Elapsed time: ${elapsedTime}ms (${Math.ceil(elapsedTime / 1000)}s)`,
-			});
-			this.spinner?.stop();
-			process.exit(1);
+			this.printFinalStatistics();
+
+			process.exit(this.exitCode);
 		}
+	}
+
+	private async printFinalStatistics() {
+		if (!this.spinner) return;
+
+		const elapsedTime = Math.ceil(Date.now() - this.stats.startTime);
+
+		this.spinner.stopAndPersist({ symbol: "📊", text: "Final Statistics" });
+
+		const results = Array.from(this.stats.results.values());
+
+		console.table({
+			"Files processed successfully": results.filter(({ error }) => !error).length,
+			"Failed translations": results.filter(({ error }) => !!error).length,
+		});
+
+		if (results.some(({ error }) => !!error)) {
+			const failedFiles = results.filter(({ error }) => !!error) as SetNonNullable<
+				ProcessedFileResult,
+				"error"
+			>[];
+
+			try {
+				if (!this.snapshotManager.getCurrentSnapshotId()) {
+					this.spinner.text = "Creating snapshot for error logging...";
+					await this.snapshotManager.createErrorSnapshot();
+				}
+
+				await this.snapshotManager.storeFailedTranslations(
+					failedFiles.map(({ filename, error }) => ({
+						filename,
+						error_message: error.message || "Unknown error",
+						timestamp: this.stats.startTime,
+					})),
+				);
+
+				this.spinner.succeed("Failed translations stored in database");
+			} catch (error) {
+				this.spinner.warn(`Failed to store errors in database: ${extractErrorMessage(error)}`);
+			}
+
+			for (const [index, { filename, error }] of failedFiles.entries()) {
+				this.spinner.stopAndPersist({
+					symbol: "  •",
+					text: `${index + 1}. ${filename}: ${error?.message}`,
+				});
+			}
+		}
+
+		this.spinner.stopAndPersist({
+			symbol: "⏱️",
+			text: ` Elapsed time: ${elapsedTime}ms (${Math.ceil(elapsedTime / 1000)}s)`,
+		});
+
+		this.spinner.stop();
 	}
 
 	/**
@@ -259,7 +302,7 @@ export default class Runner extends RunnerService {
 			);
 		} catch (error) {
 			metadata.error = error instanceof Error ? error : new Error(String(error));
-			this.spinner!.suffixText = `${suffixText} Failed: ${file.filename}`;
+			this.spinner!.suffixText = `${suffixText} Failed: ${file.filename} :: ${metadata.error.message}`;
 		} finally {
 			this.stats.results.set(file.filename!, metadata);
 		}

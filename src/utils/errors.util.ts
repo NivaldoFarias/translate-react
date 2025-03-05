@@ -1,4 +1,29 @@
 /**
+ * Standardized error codes for translation workflow errors.
+ * Used to categorize and handle different types of errors consistently.
+ *
+ * ## Available Codes
+ * - `GITHUB_API_ERROR`: Issues with GitHub API operations
+ * - `OPENAI_API_ERROR`: Issues with OpenAI API operations
+ * - `RATE_LIMIT_EXCEEDED`: API rate limits reached
+ * - `INVALID_CONTENT`: Content validation failures
+ * - `TRANSLATION_FAILED`: General translation process failures
+ * - `NO_FILES_FOUND`: No files found for translation
+ * - `FORMAT_VALIDATION_FAILED`: Content format validation issues
+ */
+export const ErrorCodes = {
+	GITHUB_API_ERROR: "GITHUB_API_ERROR",
+	LLM_API_ERROR: "OPENAI_API_ERROR",
+	RATE_LIMIT_EXCEEDED: "RATE_LIMIT_EXCEEDED",
+	INVALID_CONTENT: "INVALID_CONTENT",
+	TRANSLATION_FAILED: "TRANSLATION_FAILED",
+	NO_FILES_FOUND: "NO_FILES_FOUND",
+	FORMAT_VALIDATION_FAILED: "FORMAT_VALIDATION_FAILED",
+	CONTENT_TOO_LONG: "CONTENT_TOO_LONG",
+	NO_CONTENT: "NO_CONTENT",
+} as const;
+
+/**
  * Custom error class for handling translation-specific errors.
  * Extends the native Error class with additional context and error code support.
  *
@@ -25,27 +50,7 @@ export class TranslationError extends Error {
 	}
 }
 
-/**
- * Standardized error codes for translation workflow errors.
- * Used to categorize and handle different types of errors consistently.
- *
- * ## Available Codes
- * - `GITHUB_API_ERROR`: Issues with GitHub API operations
- * - `OPENAI_API_ERROR`: Issues with OpenAI API operations
- * - `RATE_LIMIT_EXCEEDED`: API rate limits reached
- * - `INVALID_CONTENT`: Content validation failures
- * - `TRANSLATION_FAILED`: General translation process failures
- * - `NO_FILES_FOUND`: No files found for translation
- * - `FORMAT_VALIDATION_FAILED`: Content format validation issues
- */
-export const ErrorCodes = {
-	GITHUB_API_ERROR: "GITHUB_API_ERROR",
-	LLM_API_ERROR: "OPENAI_API_ERROR",
-	RATE_LIMIT_EXCEEDED: "RATE_LIMIT_EXCEEDED",
-	INVALID_CONTENT: "INVALID_CONTENT",
-	TRANSLATION_FAILED: "TRANSLATION_FAILED",
-	NO_FILES_FOUND: "NO_FILES_FOUND",
-	FORMAT_VALIDATION_FAILED: "FORMAT_VALIDATION_FAILED",
-	CONTENT_TOO_LONG: "CONTENT_TOO_LONG",
-	NO_CONTENT: "NO_CONTENT",
-} as const;
+export function extractErrorMessage(error: unknown) {
+	if (error instanceof Error) return error.message;
+	else return "Unexpected error";
+}

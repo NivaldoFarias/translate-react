@@ -1,4 +1,5 @@
 import { BaseGitHubService } from "@/services/github/base.service";
+import { extractErrorMessage } from "@/utils/errors.util";
 
 /**
  * Service responsible for Git branch operations and lifecycle management.
@@ -42,7 +43,7 @@ export class BranchService extends BaseGitHubService {
 		process.on("SIGINT", async () => await this.cleanup());
 		process.on("SIGTERM", async () => await this.cleanup());
 		process.on("uncaughtException", async (error) => {
-			console.error(this.formatError(error, "Uncaught exception"));
+			console.error(`Uncaught exception: ${extractErrorMessage(error)}`);
 			await this.cleanup();
 		});
 	}
@@ -76,7 +77,7 @@ export class BranchService extends BaseGitHubService {
 
 			return branchRef;
 		} catch (error) {
-			console.error(this.formatError(error, `Failed to create branch ${branchName}`));
+			console.error(`Failed to create branch ${branchName}: ${extractErrorMessage(error)}`);
 			this.activeBranches.delete(branchName);
 			throw error;
 		}
@@ -101,7 +102,7 @@ export class BranchService extends BaseGitHubService {
 			});
 		} catch (error) {
 			if (error instanceof Error && error.message.includes("404")) {
-				console.error(this.formatError(error, `Branch ${branchName} not found`));
+				console.error(`Branch ${branchName} not found: ${extractErrorMessage(error)}`);
 			}
 			return null;
 		}
@@ -127,7 +128,7 @@ export class BranchService extends BaseGitHubService {
 
 			return response.status === 204;
 		} catch (error) {
-			console.error(this.formatError(error, `Failed to delete branch ${branchName}`));
+			console.error(`Failed to delete branch ${branchName}: ${extractErrorMessage(error)}`);
 		} finally {
 			this.activeBranches.delete(branchName);
 		}

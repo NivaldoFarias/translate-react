@@ -5,7 +5,7 @@ import OpenAI from "openai";
 import type { ParsedContent, TranslationFile } from "@/types";
 import type { LanguageConfig } from "@/utils/language-detector.util";
 
-import { ErrorCodes, TranslationError } from "@/utils/errors.util";
+import { ErrorCodes, extractErrorMessage, TranslationError } from "@/utils/errors.util";
 
 /**
  * # Translation Service
@@ -126,14 +126,26 @@ export class TranslatorService {
 				throw new TranslationError("No content returned", ErrorCodes.NO_CONTENT);
 			}
 
-			return content;
+			return this.removeFences(content);
 		} catch (error) {
-			const message = error instanceof Error ? error.message : "Unknown error";
+			if (error instanceof TranslationError) throw error;
 
-			throw new TranslationError(`Translation failed: ${message}`, ErrorCodes.LLM_API_ERROR, {
-				filePath: file.filename,
-			});
+			throw new TranslationError(
+				`Translation failed: ${extractErrorMessage(error)}`,
+				ErrorCodes.LLM_API_ERROR,
+				{
+					filePath: file.filename,
+				},
+			);
 		}
+	}
+
+	/**
+	 * For some reason, some LLMs return the content with fences prepended and appended.
+	 * This method removes them.
+	 */
+	private removeFences(content: string) {
+		return content.replace(/^```\n?|\n?```$/g, "");
 	}
 
 	/**

@@ -2,6 +2,7 @@ import type { ProcessedFileResult, TranslationFile } from "@/types";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 import { DatabaseService } from "@/services/database.service";
+import { extractErrorMessage } from "@/utils/errors.util";
 
 /**
  * # Snapshot Interface
@@ -47,9 +48,7 @@ export class SnapshotService {
 			this.service.saveFilesToTranslate(this.currentSnapshotId, data.filesToTranslate);
 			this.service.saveProcessedResults(this.currentSnapshotId, data.processedResults);
 		} catch (error) {
-			console.error(
-				`Failed to save snapshot: ${error instanceof Error ? error.message : "Unknown error"}`,
-			);
+			console.error(`Failed to save snapshot: ${extractErrorMessage(error)}`);
 		}
 	}
 
@@ -76,9 +75,7 @@ export class SnapshotService {
 					throw new Error(`Invalid key: ${key}`);
 			}
 		} catch (error) {
-			console.error(
-				`Failed to append ${key}: ${error instanceof Error ? error.message : "Unknown error"}`,
-			);
+			console.error(`Failed to append ${key}: ${extractErrorMessage(error)}`);
 		}
 	}
 
@@ -86,15 +83,11 @@ export class SnapshotService {
 		try {
 			const snapshot = this.service.getLatestSnapshot();
 
-			if (snapshot) {
-				this.currentSnapshotId = snapshot.id;
-			}
+			if (snapshot) this.currentSnapshotId = snapshot.id;
 
 			return snapshot;
 		} catch (error) {
-			console.error(
-				`Failed to load snapshot: ${error instanceof Error ? error.message : "Unknown error"}`,
-			);
+			console.error(`Failed to load snapshot: ${extractErrorMessage(error)}`);
 			return null;
 		}
 	}
@@ -104,9 +97,7 @@ export class SnapshotService {
 			this.service.clearSnapshots();
 			this.currentSnapshotId = null;
 		} catch (error) {
-			console.error(
-				`Failed to clear snapshots: ${error instanceof Error ? error.message : "Unknown error"}`,
-			);
+			console.error(`Failed to clear snapshots: ${extractErrorMessage(error)}`);
 		}
 	}
 
@@ -132,9 +123,41 @@ export class SnapshotService {
 				this.service.deleteSnapshot(snapshot.id);
 			}
 		} catch (error) {
-			console.error(
-				`Failed to cleanup snapshots: ${error instanceof Error ? error.message : "Unknown error"}`,
-			);
+			console.error(`Failed to cleanup snapshots: ${extractErrorMessage(error)}`);
 		}
+	}
+
+	/**
+	 * Gets the current snapshot ID
+	 *
+	 * @returns The current snapshot ID or null if no snapshot exists
+	 */
+	public getCurrentSnapshotId(): number | null {
+		return this.currentSnapshotId;
+	}
+
+	/**
+	 * Creates a new snapshot specifically for error logging
+	 *
+	 * @returns The ID of the created snapshot
+	 */
+	public async createErrorSnapshot(): Promise<number> {
+		this.currentSnapshotId = this.service.createSnapshot(Date.now());
+		return this.currentSnapshotId;
+	}
+
+	/**
+	 * Stores failed translation information in the database
+	 *
+	 * @param failedTranslations Array of failed translations with filename and error message
+	 */
+	public async storeFailedTranslations(
+		failedTranslations: Array<{ filename: string; error_message: string; timestamp: number }>,
+	): Promise<void> {
+		if (!this.currentSnapshotId) {
+			throw new Error("No active snapshot to store failed translations");
+		}
+
+		this.service.storeFailedTranslations(this.currentSnapshotId, failedTranslations);
 	}
 }
