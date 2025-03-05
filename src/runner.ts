@@ -173,25 +173,6 @@ export default class Runner extends RunnerService {
 				"error"
 			>[];
 
-			try {
-				if (!this.snapshotManager.getCurrentSnapshotId()) {
-					this.spinner.text = "Creating snapshot for error logging...";
-					await this.snapshotManager.createErrorSnapshot();
-				}
-
-				await this.snapshotManager.storeFailedTranslations(
-					failedFiles.map(({ filename, error }) => ({
-						filename,
-						error_message: error.message || "Unknown error",
-						timestamp: this.stats.startTime,
-					})),
-				);
-
-				this.spinner.succeed("Failed translations stored in database");
-			} catch (error) {
-				this.spinner.warn(`Failed to store errors in database: ${extractErrorMessage(error)}`);
-			}
-
 			for (const [index, { filename, error }] of failedFiles.entries()) {
 				this.spinner.stopAndPersist({
 					symbol: "  •",
