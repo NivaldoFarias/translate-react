@@ -5,7 +5,7 @@ import Runner from "@/runner";
 if (import.meta.main) {
 	void new Runner(parseCommandLineArgs()).run();
 
-	function parseCommandLineArgs() {
+	function parseCommandLineArgs(): RunnerOptions {
 		const commandLineArgs = process.argv.slice(2);
 		const sourceArg = commandLineArgs.find((arg) => arg.startsWith("--source="))?.split("=")[1];
 		const targetArg = commandLineArgs.find((arg) => arg.startsWith("--target="))?.split("=")[1];
@@ -18,11 +18,9 @@ if (import.meta.main) {
 			process.exit(1);
 		}
 
-		const options: RunnerOptions = {
+		return {
 			targetLanguage: targetArg ?? "pt-BR",
 			sourceLanguage: sourceArg ?? "en",
 		};
-
-		return options;
 	}
 }
