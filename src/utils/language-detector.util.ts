@@ -11,8 +11,8 @@ import langs from "langs";
  * ```
  */
 export interface LanguageConfig {
-	sourceLanguage: string;
-	targetLanguage: string;
+	source: string;
+	target: string;
 }
 
 /**
@@ -47,19 +47,13 @@ export interface LanguageAnalysis {
  * - Confidence score calculation
  */
 export class LanguageDetector {
-	/**
-	 * Minimum content length required for reliable language detection
-	 */
+	/** Minimum content length required for reliable language detection */
 	private readonly MIN_CONTENT_LENGTH = 10;
 
-	/**
-	 * Threshold ratio above which content is considered translated
-	 */
+	/** Threshold ratio above which content is considered translated */
 	private readonly TRANSLATION_THRESHOLD = 0.6;
 
-	/**
-	 * Current language configuration in ISO 639-3 format
-	 */
+	/** Current language configuration in ISO 639-3 format */
 	private languages: LanguageConfig | null = null;
 
 	/**
@@ -77,8 +71,8 @@ export class LanguageDetector {
 	 */
 	public constructor(config: LanguageConfig) {
 		this.languages = {
-			sourceLanguage: langs.where("1", config.sourceLanguage)?.["3"] ?? "eng",
-			targetLanguage: langs.where("1", config.targetLanguage)?.["3"] ?? "und",
+			source: langs.where("1", config.source)?.["3"] ?? "eng",
+			target: langs.where("1", config.target)?.["3"] ?? "und",
 		};
 	}
 
@@ -104,44 +98,40 @@ export class LanguageDetector {
 	 * # Language Analysis
 	 *
 	 * Performs detailed language analysis on the content:
-	 * 1. Checks minimum content length
-	 * 2. Detects languages and their confidence scores
-	 * 3. Calculates target language ratio
-	 * 4. Determines translation status
+	 * 1. Removes code blocks from content
+	 * 2. Checks minimum content length
+	 * 3. Detects languages and their confidence scores
+	 * 4. Calculates target language ratio
+	 * 5. Determines translation status
 	 *
 	 * @param content - Text content to analyze
 	 */
 	private analyzeLanguage(content: string): LanguageAnalysis {
+		const contentWithoutCode = content.replace(/```[\s\S]*?```/g, "");
+
 		if (content.length < this.MIN_CONTENT_LENGTH) {
 			return {
-				languageScore: {
-					target: 0,
-					source: 0,
-				},
+				languageScore: { target: 0, source: 0 },
 				ratio: 0,
 				detectedLanguage: "und",
 				isTranslated: false,
 			};
 		}
 
-		const allDetections = francAll(content) as [string, number][];
+		const allDetections = francAll(contentWithoutCode);
 		const scores = new Map(allDetections);
 
-		const targetLanguageScore = scores.get("por") ?? 0;
-		const sourceLanguageScore = scores.get("eng") ?? 0;
-		const detectedLang = franc(content, { minLength: this.MIN_CONTENT_LENGTH });
+		const targetLanguageScore = scores.get(this.languages!.target) ?? 0;
+		const sourceLanguageScore = scores.get(this.languages!.source) ?? 0;
+		const detectedLang = franc(contentWithoutCode, { minLength: this.MIN_CONTENT_LENGTH });
 
-		// Convert ISO 639-3 to ISO 639-1
 		const language = langs.where("3", detectedLang);
 		const detectedLanguage = language?.["1"] ?? "und";
 
 		const ratio = targetLanguageScore / (targetLanguageScore + sourceLanguageScore) || 0;
 
 		return {
-			languageScore: {
-				target: targetLanguageScore,
-				source: sourceLanguageScore,
-			},
+			languageScore: { target: targetLanguageScore, source: sourceLanguageScore },
 			ratio,
 			detectedLanguage,
 			isTranslated: this.determineTranslationStatus(ratio, detectedLanguage),
@@ -160,7 +150,7 @@ export class LanguageDetector {
 	 */
 	private determineTranslationStatus(ratio: number, detectedLanguage: string) {
 		return (
-			detectedLanguage === langs.where("3", this.languages!.targetLanguage)?.["1"] ||
+			detectedLanguage === langs.where("3", this.languages!.target)?.["1"] ||
 			ratio >= this.TRANSLATION_THRESHOLD
 		);
 	}

@@ -1,6 +1,5 @@
 import type { Environment } from "@/utils/env.util";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
-import type { ChatCompletion } from "openai/resources/chat/completions.mjs";
 
 /**
  * Represents a parsed content object that contains the original content with placeholders for repeated blocks.
@@ -42,7 +41,7 @@ export interface TranslationFile {
 export interface ProcessedFileResult {
     branch: RestEndpointMethodTypes["git"]["getRef"]["response"]["data"] | null;
     filename: string;
-    translation: ChatCompletion | string | null;
+    translation: string | null;
     pullRequest:
         | RestEndpointMethodTypes["pulls"]["create"]["response"]["data"]
         | RestEndpointMethodTypes["pulls"]["list"]["response"]["data"][number]

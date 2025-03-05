@@ -8,8 +8,8 @@ import { LanguageDetector } from "@/utils/language-detector.util";
  */
 describe("Language Detector Utility", () => {
 	const detector = new LanguageDetector({
-		sourceLanguage: "en",
-		targetLanguage: "pt",
+		source: "en",
+		target: "pt",
 	});
 
 	test("should detect English content as not translated", () => {

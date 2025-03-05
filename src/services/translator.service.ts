@@ -5,25 +5,7 @@ import OpenAI from "openai";
 import type { ParsedContent, TranslationFile } from "@/types";
 import type { LanguageConfig } from "@/utils/language-detector.util";
 
-import { parseContent, reconstructContent } from "@/utils/content-parser.util";
 import { ErrorCodes, TranslationError } from "@/utils/errors.util";
-
-/**
- * Translation performance and success rate metrics.
- *
- * ## Tracked Metrics
- * - Total translations attempted
- * - Success and failure counts
- * - Average translation time
- * - Total processing time
- */
-export interface TranslationMetrics {
-	totalTranslations: number;
-	successfulTranslations: number;
-	failedTranslations: number;
-	averageTranslationTime: number;
-	totalTranslationTime: number;
-}
 
 /**
  * # Translation Service
@@ -37,7 +19,9 @@ export interface TranslationMetrics {
  */
 export class TranslatorService {
 	/**
-	 * OpenAI language model instance for translations
+	 * # Language Model Instance
+	 *
+	 * Language model instance for translations
 	 */
 	private readonly llm = new OpenAI({
 		baseURL: import.meta.env.LLM_BASE_URL,
@@ -45,16 +29,11 @@ export class TranslatorService {
 	});
 
 	/**
-	 * Translation performance metrics tracker
+	 * # Constructor
+	 *
+	 * Initializes the translator service with the given language configuration
+	 * @param options - Language configuration for translation
 	 */
-	private metrics: TranslationMetrics = {
-		totalTranslations: 0,
-		successfulTranslations: 0,
-		failedTranslations: 0,
-		averageTranslationTime: 0,
-		totalTranslationTime: 0,
-	};
-
 	public constructor(private readonly options: LanguageConfig) {}
 
 	/**
@@ -65,13 +44,11 @@ export class TranslatorService {
 	 *
 	 * ## Workflow
 	 * 1. Builds system and user prompts
-	 * 2. Adds block translations if needed
-	 * 3. Makes API call with configured model
+	 * 2. Makes API call with configured model
 	 *
 	 * @param content - Main content to translate
-	 * @param blocksToTranslate - Optional code blocks requiring translation
 	 */
-	private async callLanguageModel(content: string, blocksToTranslate?: string) {
+	private async callLanguageModel(content: string) {
 		const messages = [
 			{
 				role: "system" as const,
@@ -83,18 +60,33 @@ export class TranslatorService {
 			},
 		];
 
-		// If we have blocks to translate, add them as a separate message
-		if (blocksToTranslate) {
-			messages.push({
-				role: "user" as const,
-				content: `BLOCKS TO TRANSLATE (MUST translate ONLY comments and strings that don't refer to code):\n\n${blocksToTranslate}`,
-			});
-		}
-
 		return await this.llm.chat.completions.create({
 			model: import.meta.env.LLM_MODEL,
 			messages,
 		});
+	}
+
+	/**
+	 * # Message Generator
+	 *
+	 * Creates the messages array for the language model.
+	 * Simplified to only include the main content without block translations.
+	 *
+	 * @param file - Parsed content object
+	 */
+	public getMessages(file: ParsedContent) {
+		const messages = [
+			{
+				role: "system" as const,
+				content: this.getSystemPrompt(file.content),
+			},
+			{
+				role: "user" as const,
+				content: this.getUserPrompt(file.content),
+			},
+		];
+
+		return messages;
 	}
 
 	/**
@@ -104,17 +96,14 @@ export class TranslatorService {
 	 *
 	 * ## Workflow
 	 * 1. Validates input content
-	 * 2. Parses content and extracts blocks
+	 * 2. Parses content (without modifying code blocks)
 	 * 3. Calls language model for translation
-	 * 4. Processes and reconstructs translated content
+	 * 4. Returns translated content
 	 * 5. Updates metrics
 	 *
 	 * @param file - File containing content to translate
 	 */
 	public async translateContent(file: TranslationFile) {
-		const startTime = Date.now();
-		this.metrics.totalTranslations++;
-
 		try {
 			if (typeof file.content === "string" && file.content.length === 0) {
 				throw new TranslationError(
@@ -123,72 +112,25 @@ export class TranslatorService {
 				);
 			}
 
-			// Parse content if it's a string
-			const parsedContent =
-				typeof file.content === "string" ? parseContent(file.content) : file.content;
-
-			// First translate the main content
 			const response = await this.callLanguageModel(
-				parsedContent.content,
-				parsedContent.uniqueBlocksForTranslation,
+				typeof file.content === "string" ? file.content : file.content.content,
 			);
 
-			// Update metrics
-			const translationTime = Date.now() - startTime;
-			this.metrics.successfulTranslations++;
-			this.metrics.totalTranslationTime += translationTime;
-			this.metrics.averageTranslationTime =
-				this.metrics.totalTranslationTime / this.metrics.successfulTranslations;
-
-			// Process the response and extract translated blocks
-			if (response.choices[0]?.message?.content) {
-				const content = response.choices[0].message.content;
-				const translatedBlocks = new Map(parsedContent.blocks);
-
-				// Extract translated blocks from the response
-				const blockRegex = /BLOCK (\d+):\n(```[\s\S]*?```)/g;
-				let match: RegExpExecArray | null;
-
-				// Get the part after "BLOCKS TO TRANSLATE"
-				const parts = content.split("BLOCKS TO TRANSLATE");
-				const blocksSection = parts[1];
-				const mainContent = parts[0]?.trim() ?? content;
-
-				if (blocksSection) {
-					while ((match = blockRegex.exec(blocksSection)) !== null) {
-						const [, id, translatedBlock] = match;
-						if (id && translatedBlock) {
-							translatedBlocks.set(id, translatedBlock);
-						}
-					}
-				}
-
-				const translatedParsedContent: ParsedContent = {
-					content: mainContent,
-					blocks: translatedBlocks,
-					uniqueBlocksForTranslation: parsedContent.uniqueBlocksForTranslation,
-				};
-
-				return {
-					...response,
-					choices: [
-						{
-							...response.choices[0],
-							message: {
-								...response.choices[0].message,
-								content: reconstructContent(translatedParsedContent),
-							},
-						},
-					],
-				};
+			if (response.choices[0]?.finish_reason === "length") {
+				throw new TranslationError("Content is too long", ErrorCodes.CONTENT_TOO_LONG);
 			}
 
-			return response;
-		} catch (error) {
-			this.metrics.failedTranslations++;
+			const content = response.choices[0]?.message.content;
 
+			if (!content) {
+				throw new TranslationError("No content returned", ErrorCodes.NO_CONTENT);
+			}
+
+			return content;
+		} catch (error) {
 			const message = error instanceof Error ? error.message : "Unknown error";
-			throw new TranslationError(`Translation failed: ${message}`, ErrorCodes.OPENAI_API_ERROR, {
+
+			throw new TranslationError(`Translation failed: ${message}`, ErrorCodes.LLM_API_ERROR, {
 				filePath: file.filename,
 			});
 		}
@@ -203,7 +145,7 @@ export class TranslatorService {
 	 * @param content - Content to be translated
 	 */
 	private getUserPrompt(content: string) {
-		return `CONTENT TO TRANSLATE:\n${content}\n\nIMPORTANT: MUST respond with the translated content first, followed by any translated blocks. DO NOT modify the {{BLOCK_X}} placeholders in the main content.`;
+		return `CONTENT TO TRANSLATE:\n${content}\n\n`;
 	}
 
 	/**
@@ -216,7 +158,7 @@ export class TranslatorService {
 	 */
 	private getSystemPrompt(content: string) {
 		const languages = {
-			target: langs.where("3", this.options.targetLanguage)?.["1"] || "Brazilian Portuguese",
+			target: langs.where("3", this.options.target)?.["1"] || "Brazilian Portuguese",
 			source: langs.where("3", franc(content))?.["1"] || "English",
 		};
 
@@ -238,27 +180,13 @@ export class TranslatorService {
 			11. MUST translate comments within code blocks according to the glossary
 			12. MUST maintain consistent technical terminology throughout the translation
 			13. MUST ensure the translation reads naturally in ${languages.target} while preserving technical accuracy
-			14. MUST NOT modify any {{BLOCK_X}} placeholders in the main content
-			15. When translating code blocks, MUST only translate comments and string literals that don't refer to code
-
-			RESPONSE FORMAT:
-			1. First provide the translated main content, preserving all {{BLOCK_X}} placeholders exactly as they appear
-			2. If blocks are provided for translation, include them after "BLOCKS TO TRANSLATE:" with their IDs preserved
-
+			14. When translating code blocks, MUST only translate comments and string literals that don't refer to code
+			15. MUST respond only with the translated content.
+			
 			GLOSSARY RULES:
 			You must translate the following terms according to the glossary:
 			${this.glossary}
 		`;
-	}
-
-	/**
-	 * # Metrics Retriever
-	 *
-	 * Provides current translation performance metrics.
-	 * Returns a copy to prevent external modification.
-	 */
-	public getMetrics(): TranslationMetrics {
-		return { ...this.metrics };
 	}
 
 	/**

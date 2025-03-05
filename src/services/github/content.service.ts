@@ -1,8 +1,7 @@
-import type { ParsedContent, ProcessedFileResult, TranslationFile } from "@/types";
+import type { ProcessedFileResult, TranslationFile } from "@/types";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 import { BaseGitHubService } from "@/services/github/base.service";
-import { reconstructContent } from "@/utils/content-parser.util";
 
 /**
  * Service responsible for managing repository content and translations.
@@ -95,7 +94,7 @@ export class ContentService extends BaseGitHubService {
 	public async commitTranslation(
 		branch: RestEndpointMethodTypes["git"]["getRef"]["response"]["data"],
 		file: TranslationFile,
-		content: string | ParsedContent,
+		content: string,
 		message: string,
 	) {
 		try {
@@ -106,13 +105,12 @@ export class ContentService extends BaseGitHubService {
 			});
 
 			const fileSha = "sha" in currentFile.data ? currentFile.data.sha : undefined;
-			const finalContent = typeof content === "string" ? content : reconstructContent(content);
 
 			await this.octokit.repos.createOrUpdateFileContents({
 				...this.fork,
 				path: file.path!,
 				message,
-				content: Buffer.from(finalContent).toString("base64"),
+				content: Buffer.from(content).toString("base64"),
 				branch: branch.ref,
 				sha: fileSha,
 			});

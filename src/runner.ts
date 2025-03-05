@@ -161,6 +161,7 @@ export default class Runner extends RunnerService {
 				text: `Elapsed time: ${elapsedTime}ms (${Math.ceil(elapsedTime / 1000)}s)`,
 			});
 			this.spinner?.stop();
+			process.exit(1);
 		}
 	}
 
@@ -236,22 +237,17 @@ export default class Runner extends RunnerService {
 
 		try {
 			this.spinner!.suffixText = `${suffixText} Creating branch for ${file.filename}`;
-
 			metadata.branch = await this.github.createOrGetTranslationBranch(file.filename!);
 
 			this.spinner!.suffixText = `${suffixText} Translating ${file.filename}`;
 			metadata.translation = await this.translator.translateContent(file);
 
 			this.spinner!.suffixText = `${suffixText} Committing ${file.filename}`;
-			const content =
-				typeof metadata.translation === "string" ?
-					metadata.translation
-				:	metadata.translation?.choices[0]?.message?.content;
 
 			await this.github.commitTranslation(
 				metadata.branch,
 				file,
-				content ?? "",
+				metadata.translation,
 				`Translate \`${file.filename}\` to ${this.options.targetLanguage}`,
 			);
 
