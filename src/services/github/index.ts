@@ -1,4 +1,4 @@
-import type { ParsedContent, ProcessedFileResult, TranslationFile } from "@/types";
+import type { ProcessedFileResult, TranslationFile } from "@/types";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 import { BranchService } from "@/services/github/branch.service";
@@ -164,7 +164,7 @@ export class GitHubService {
 	public async commitTranslation(
 		branch: RestEndpointMethodTypes["git"]["getRef"]["response"]["data"],
 		file: TranslationFile,
-		content: string | ParsedContent,
+		content: string,
 		message: string,
 	) {
 		await this.contentService.commitTranslation(branch, file, content, message);

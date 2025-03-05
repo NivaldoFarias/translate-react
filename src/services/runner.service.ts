@@ -77,13 +77,13 @@ export abstract class RunnerService {
 		}
 
 		this.languageDetector = new LanguageDetector({
-			sourceLanguage: this.options.sourceLanguage,
-			targetLanguage: this.options.targetLanguage,
+			source: this.options.sourceLanguage,
+			target: this.options.targetLanguage,
 		});
 
 		this.translator = new TranslatorService({
-			sourceLanguage: this.options.sourceLanguage,
-			targetLanguage: this.options.targetLanguage,
+			source: this.options.sourceLanguage,
+			target: this.options.targetLanguage,
 		});
 
 		process.on("SIGINT", this.cleanup);
