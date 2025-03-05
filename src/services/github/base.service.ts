@@ -1,5 +1,7 @@
 import { Octokit } from "@octokit/rest";
 
+import { extractErrorMessage } from "@/utils/errors.util";
+
 /**
  * Base service for GitHub operations.
  * Provides common functionality and configuration for all GitHub services.
@@ -36,16 +38,5 @@ export abstract class BaseGitHubService {
 				error: () => {},
 			},
 		});
-	}
-
-	/**
-	 * Formats error messages consistently.
-	 *
-	 * @param error - Error to format
-	 * @param context - Additional context for the error
-	 */
-	protected formatError(error: unknown, context: string) {
-		const message = error instanceof Error ? error.message : "Unknown error";
-		return `${context}: ${message}`;
 	}
 }

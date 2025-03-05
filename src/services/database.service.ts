@@ -45,6 +45,7 @@ export class DatabaseService {
 	 * - repository_tree: Git repository structure
 	 * - files_to_translate: Files pending translation
 	 * - processed_results: Translation results and status
+	 * - failed_translations: Detailed error tracking for failed translations
 	 */
 	private initializeTables() {
 		// Create snapshots table
@@ -96,6 +97,19 @@ export class DatabaseService {
 				pull_request_number INTEGER,
 				pull_request_url TEXT,
 				error TEXT,
+				FOREIGN KEY (snapshot_id) REFERENCES snapshots(id)
+			)
+		`);
+
+		// Create failed_translations table for detailed error tracking
+		this.db.run(`
+			CREATE TABLE IF NOT EXISTS failed_translations (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				snapshot_id INTEGER NOT NULL,
+				filename TEXT NOT NULL,
+				error_message TEXT NOT NULL,
+				timestamp INTEGER NOT NULL,
+				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 				FOREIGN KEY (snapshot_id) REFERENCES snapshots(id)
 			)
 		`);
@@ -284,5 +298,34 @@ export class DatabaseService {
 	 */
 	public deleteSnapshot(id: number) {
 		this.db.run(`DELETE FROM snapshots WHERE id = ?`, [id]);
+	}
+
+	/**
+	 * # Failed Translations Storage
+	 *
+	 * Stores detailed information about failed translations for analysis.
+	 * Includes filename, error message, and timestamp.
+	 *
+	 * @param snapshotId - ID of associated snapshot
+	 * @param failedTranslations - Array of failed translation details
+	 */
+	public storeFailedTranslations(
+		snapshotId: number,
+		failedTranslations: Array<{ filename: string; error_message: string; timestamp: number }>,
+	): void {
+		const stmt = this.db.prepare(`
+			INSERT INTO failed_translations (
+				snapshot_id, filename, error_message, timestamp
+			)
+			VALUES (?, ?, ?, ?)
+		`);
+
+		const transaction = this.db.transaction((items) => {
+			for (const item of items) {
+				stmt.run(snapshotId, item.filename, item.error_message, item.timestamp);
+			}
+		});
+
+		transaction(failedTranslations);
 	}
 }

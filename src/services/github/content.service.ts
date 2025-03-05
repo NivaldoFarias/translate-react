@@ -2,6 +2,7 @@ import type { ProcessedFileResult, TranslationFile } from "@/types";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 import { BaseGitHubService } from "@/services/github/base.service";
+import { extractErrorMessage } from "@/utils/errors.util";
 
 /**
  * Service responsible for managing repository content and translations.
@@ -59,14 +60,14 @@ export class ContentService extends BaseGitHubService {
 						sha: data.sha,
 					});
 				} catch (error) {
-					console.error(this.formatError(error, `Failed to fetch content for ${file.path}`));
+					console.error(`Failed to fetch content for ${file.path}: ${extractErrorMessage(error)}`);
 					continue;
 				}
 			}
 
 			return files;
 		} catch (error) {
-			console.error(this.formatError(error, "Failed to fetch untranslated files"));
+			console.error(`Failed to fetch untranslated files: ${extractErrorMessage(error)}`);
 			throw error;
 		}
 	}
@@ -115,7 +116,7 @@ export class ContentService extends BaseGitHubService {
 				sha: fileSha,
 			});
 		} catch (error) {
-			console.error(this.formatError(error, "Failed to commit translation"));
+			console.error(`Failed to commit translation: ${extractErrorMessage(error)}`);
 			throw error;
 		}
 	}
@@ -160,7 +161,7 @@ export class ContentService extends BaseGitHubService {
 
 			return data;
 		} catch (error) {
-			console.error(this.formatError(error, "Failed to create pull request"));
+			console.error(`Failed to create pull request: ${extractErrorMessage(error)}`);
 			throw error;
 		}
 	}
@@ -206,8 +207,7 @@ export class ContentService extends BaseGitHubService {
 
 			return Buffer.from(data.content, "base64").toString();
 		} catch (error) {
-			const message = error instanceof Error ? error.message : "Unknown error";
-			console.error(`Failed to fetch file content: ${message}`);
+			console.error(`Failed to fetch file content: ${extractErrorMessage(error)}`);
 			throw error;
 		}
 	}
