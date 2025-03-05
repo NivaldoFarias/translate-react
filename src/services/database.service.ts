@@ -299,33 +299,4 @@ export class DatabaseService {
 	public deleteSnapshot(id: number) {
 		this.db.run(`DELETE FROM snapshots WHERE id = ?`, [id]);
 	}
-
-	/**
-	 * # Failed Translations Storage
-	 *
-	 * Stores detailed information about failed translations for analysis.
-	 * Includes filename, error message, and timestamp.
-	 *
-	 * @param snapshotId - ID of associated snapshot
-	 * @param failedTranslations - Array of failed translation details
-	 */
-	public storeFailedTranslations(
-		snapshotId: number,
-		failedTranslations: Array<{ filename: string; error_message: string; timestamp: number }>,
-	): void {
-		const stmt = this.db.prepare(`
-			INSERT INTO failed_translations (
-				snapshot_id, filename, error_message, timestamp
-			)
-			VALUES (?, ?, ?, ?)
-		`);
-
-		const transaction = this.db.transaction((items) => {
-			for (const item of items) {
-				stmt.run(snapshotId, item.filename, item.error_message, item.timestamp);
-			}
-		});
-
-		transaction(failedTranslations);
-	}
 }

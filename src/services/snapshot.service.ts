@@ -126,38 +126,4 @@ export class SnapshotService {
 			console.error(`Failed to cleanup snapshots: ${extractErrorMessage(error)}`);
 		}
 	}
-
-	/**
-	 * Gets the current snapshot ID
-	 *
-	 * @returns The current snapshot ID or null if no snapshot exists
-	 */
-	public getCurrentSnapshotId(): number | null {
-		return this.currentSnapshotId;
-	}
-
-	/**
-	 * Creates a new snapshot specifically for error logging
-	 *
-	 * @returns The ID of the created snapshot
-	 */
-	public async createErrorSnapshot(): Promise<number> {
-		this.currentSnapshotId = this.service.createSnapshot(Date.now());
-		return this.currentSnapshotId;
-	}
-
-	/**
-	 * Stores failed translation information in the database
-	 *
-	 * @param failedTranslations Array of failed translations with filename and error message
-	 */
-	public async storeFailedTranslations(
-		failedTranslations: Array<{ filename: string; error_message: string; timestamp: number }>,
-	): Promise<void> {
-		if (!this.currentSnapshotId) {
-			throw new Error("No active snapshot to store failed translations");
-		}
-
-		this.service.storeFailedTranslations(this.currentSnapshotId, failedTranslations);
-	}
 }
