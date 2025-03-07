@@ -50,10 +50,12 @@ export class TranslatorService {
 	 * @param content Main content to translate
 	 */
 	private async callLanguageModel(content: string) {
-		return await this.llm.chat.completions.create({
+		return (await this.llm.chat.completions.create({
 			model: import.meta.env.LLM_MODEL,
 			messages: this.createPrompt(content),
-		});
+		})) as
+			| OpenAI.Chat.Completions.ChatCompletion
+			| { error: OpenAI.ErrorObject; _request_id: string | null };
 	}
 
 	/**
@@ -96,6 +98,13 @@ export class TranslatorService {
 			}
 
 			const response = await this.callLanguageModel(file.content);
+
+			if ("error" in response) {
+				throw new TranslationError(
+					`Translation failed: ${response.error.message}`,
+					ErrorCodes.LLM_API_ERROR,
+				);
+			}
 
 			if (response.choices[0]?.finish_reason === "length") {
 				throw new TranslationError("Content is too long", ErrorCodes.CONTENT_TOO_LONG);

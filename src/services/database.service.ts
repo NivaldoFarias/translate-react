@@ -73,7 +73,8 @@ export class DatabaseService {
 				snapshot_id INTEGER NOT NULL,
 				content TEXT NOT NULL,
 				sha TEXT NOT NULL,
-				filename TEXT,
+				filename TEXT NOT NULL,
+				path TEXT NOT NULL,
 				FOREIGN KEY (snapshot_id) REFERENCES snapshots(id)
 			)
 		`);
@@ -166,13 +167,13 @@ export class DatabaseService {
 	 */
 	public saveFilesToTranslate(snapshotId: number, files: TranslationFile[]) {
 		const statement = this.db.prepare(`
-			INSERT INTO files_to_translate (snapshot_id, content, sha, filename)
-			VALUES (?, ?, ?, ?)
+			INSERT INTO files_to_translate (snapshot_id, content, sha, filename, path)
+			VALUES (?, ?, ?, ?, ?)
 		`);
 
 		const transaction = this.db.transaction((items: TranslationFile[]) => {
 			for (const item of items) {
-				const params = [snapshotId, item.content, item.sha, item.filename] as const;
+				const params = [snapshotId, item.content, item.sha, item.filename, item.path] as const;
 
 				statement.run(...params);
 			}
