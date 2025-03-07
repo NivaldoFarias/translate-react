@@ -302,11 +302,7 @@ export class ContentService extends BaseGitHubService {
 			head: `${this.fork.owner}:${branchName}`,
 		});
 
-		const pr = response.data[0];
-
-		if (!pr) throw new Error(`Pull request ${branchName} not found`);
-
-		return pr;
+		return response.data[0];
 	}
 
 	/**

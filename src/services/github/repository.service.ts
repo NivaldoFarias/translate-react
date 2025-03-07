@@ -27,13 +27,13 @@ export class RepositoryService extends BaseGitHubService {
 	 * ```
 	 */
 	public async getRepositoryTree(baseBranch = "main", filterIgnored = true) {
-		const { data } = await this.octokit.git.getTree({
+		const response = await this.octokit.git.getTree({
 			...this.fork,
 			tree_sha: baseBranch,
-			recursive: "1",
+			recursive: "true",
 		});
 
-		return filterIgnored ? this.filterRepositoryTree(data.tree) : data.tree;
+		return filterIgnored ? this.filterRepositoryTree(response.data.tree) : response.data.tree;
 	}
 
 	/**
@@ -139,5 +139,43 @@ export class RepositoryService extends BaseGitHubService {
 			else if (!item.path.includes("src/")) return false;
 			else return true;
 		});
+	}
+
+	/**
+	 * Fetches the glossary.md file from the repository.
+	 *
+	 * This method retrieves the content of the glossary file which contains
+	 * standardized terminology and translations for the project. The glossary
+	 * is essential for maintaining consistent translations across documentation.
+	 *
+	 * @returns The content of the glossary file as a string, or null if the file doesn't exist or cannot be retrieved
+	 *
+	 * @example
+	 * ```typescript
+	 * const glossary = await repositoryService.fetchGlossary();
+	 * if (glossary) {
+	 *   // Process glossary content
+	 * } else {
+	 *   console.error('Failed to fetch glossary');
+	 * }
+	 * ```
+	 */
+	public async fetchGlossary() {
+		try {
+			const response = await this.octokit.repos.getContent({
+				...this.upstream,
+				path: "GLOSSARY.md",
+			});
+
+			if ("content" in response.data) {
+				const content = Buffer.from(response.data.content, "base64").toString();
+				return content;
+			}
+
+			return null;
+		} catch (error) {
+			console.error(`Failed to fetch glossary: ${extractErrorMessage(error)}`);
+			return null;
+		}
 	}
 }

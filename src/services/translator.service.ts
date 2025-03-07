@@ -1,11 +1,10 @@
 import { franc } from "franc";
-import langs from "langs";
 import OpenAI from "openai";
 
-import type { ParsedContent, TranslationFile } from "@/types";
+import type { TranslationFile } from "@/types";
 import type { LanguageConfig } from "@/utils/language-detector.util";
 
-import { ErrorCodes, extractErrorMessage, GLOSSARY, TranslationError } from "@/utils/";
+import { ErrorCodes, extractErrorMessage, LanguageDetector, TranslationError } from "@/utils/";
 
 /**
  * # Translation Service
@@ -24,12 +23,21 @@ export class TranslatorService {
 		apiKey: import.meta.env.LLM_API_KEY,
 	});
 
+	private readonly languageDetector: LanguageDetector;
+
+	public glossary: string | null = null;
+
 	/**
 	 * Initializes the translator service with the given language configuration
 	 *
 	 * @param options Language configuration for translation
 	 */
-	public constructor(private readonly options: LanguageConfig) {}
+	public constructor(private readonly options: LanguageConfig) {
+		this.languageDetector = new LanguageDetector({
+			source: this.options.source,
+			target: this.options.target,
+		});
+	}
 
 	/**
 	 * Makes API calls to OpenAI for content translation.
@@ -42,7 +50,19 @@ export class TranslatorService {
 	 * @param content Main content to translate
 	 */
 	private async callLanguageModel(content: string) {
-		const messages = [
+		return await this.llm.chat.completions.create({
+			model: import.meta.env.LLM_MODEL,
+			messages: this.createPrompt(content),
+		});
+	}
+
+	/**
+	 * Creates the messages array for the language model.
+	 *
+	 * @param content Main content to translate
+	 */
+	private createPrompt(content: string) {
+		return [
 			{
 				role: "system" as const,
 				content: this.getSystemPrompt(content),
@@ -52,32 +72,6 @@ export class TranslatorService {
 				content: this.getUserPrompt(content),
 			},
 		];
-
-		return await this.llm.chat.completions.create({
-			model: import.meta.env.LLM_MODEL,
-			messages,
-		});
-	}
-
-	/**
-	 * Creates the messages array for the language model.
-	 * Simplified to only include the main content without block translations.
-	 *
-	 * @param file Parsed content object
-	 */
-	public getMessages(file: ParsedContent) {
-		const messages = [
-			{
-				role: "system" as const,
-				content: this.getSystemPrompt(file.content),
-			},
-			{
-				role: "user" as const,
-				content: this.getUserPrompt(file.content),
-			},
-		];
-
-		return messages;
 	}
 
 	/**
@@ -101,9 +95,7 @@ export class TranslatorService {
 				);
 			}
 
-			const response = await this.callLanguageModel(
-				typeof file.content === "string" ? file.content : file.content.content,
-			);
+			const response = await this.callLanguageModel(file.content);
 
 			if (response.choices[0]?.finish_reason === "length") {
 				throw new TranslationError("Content is too long", ErrorCodes.CONTENT_TOO_LONG);
@@ -122,11 +114,28 @@ export class TranslatorService {
 			throw new TranslationError(
 				`Translation failed: ${extractErrorMessage(error)}`,
 				ErrorCodes.LLM_API_ERROR,
-				{
-					filePath: file.filename,
-				},
+				{ filename: file.filename },
 			);
 		}
+	}
+
+	/**
+	 * Determines if content is already translated by analyzing its language composition.
+	 * Uses language detection and scoring to make the determination.
+	 *
+	 * @param file File containing content to analyze
+	 *
+	 * @returns `true` if content is in target language, `false` otherwise
+	 *
+	 * @example
+	 * ```typescript
+	 * const isTranslated = detector.isFileTranslated('Olá mundo');
+	 * ```
+	 */
+	public isFileTranslated(file: TranslationFile) {
+		const analysis = this.languageDetector.analyzeLanguage(file.filename, file.content);
+
+		return analysis.isTranslated;
 	}
 
 	/**
@@ -155,8 +164,8 @@ export class TranslatorService {
 	 */
 	private getSystemPrompt(content: string) {
 		const languages = {
-			target: langs.where("3", this.options.target)?.["1"] || "Brazilian Portuguese",
-			source: langs.where("3", franc(content))?.["1"] || "English",
+			target: this.languageDetector.detectLanguage(this.options.target)?.["1"] || "Portuguese",
+			source: this.languageDetector.detectLanguage(franc(content))?.["1"] || "English",
 		};
 
 		return `
@@ -182,7 +191,7 @@ export class TranslatorService {
 			
 			GLOSSARY RULES:
 			You must translate the following terms according to the glossary:
-			${GLOSSARY}
+			${this.glossary}
 		`;
 	}
 }
