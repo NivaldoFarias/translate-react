@@ -16,9 +16,7 @@ import { RepositoryService } from "@/services/github/repository.service";
  * - Error handling and recovery
  */
 export class GitHubService {
-	/**
-	 * Repository configuration for upstream and fork
-	 */
+	/** Repository configuration for upstream and fork */
 	protected readonly repos = {
 		upstream: {
 			owner: import.meta.env.ORIGINAL_REPO_OWNER!,
@@ -30,23 +28,23 @@ export class GitHubService {
 		},
 	};
 
-	private readonly branchService = new BranchService(
-		this.repos.fork.owner,
-		this.repos.fork.repo,
-		import.meta.env.GITHUB_TOKEN!,
-	);
-
-	private readonly repositoryService = new RepositoryService(
-		this.repos.upstream,
-		this.repos.fork,
-		import.meta.env.GITHUB_TOKEN!,
-	);
-
-	private readonly contentService = new ContentService(
-		this.repos.upstream,
-		this.repos.fork,
-		import.meta.env.GITHUB_TOKEN!,
-	);
+	private readonly services = {
+		branch: new BranchService(
+			this.repos.fork.owner,
+			this.repos.fork.repo,
+			import.meta.env.GITHUB_TOKEN!,
+		),
+		repository: new RepositoryService(
+			this.repos.upstream,
+			this.repos.fork,
+			import.meta.env.GITHUB_TOKEN!,
+		),
+		content: new ContentService(
+			this.repos.upstream,
+			this.repos.fork,
+			import.meta.env.GITHUB_TOKEN!,
+		),
+	};
 
 	/**
 	 * Creates a new GitHub service instance.
@@ -73,7 +71,7 @@ export class GitHubService {
 	 * ```
 	 */
 	public async getRepositoryTree(baseBranch = "main", filterIgnored = true) {
-		return this.repositoryService.getRepositoryTree(baseBranch, filterIgnored);
+		return this.services.repository.getRepositoryTree(baseBranch, filterIgnored);
 	}
 
 	/**
@@ -92,7 +90,7 @@ export class GitHubService {
 			| TranslationFile
 			| RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"][number],
 	) {
-		return this.contentService.getFileContent(file);
+		return this.services.content.getFileContent(file);
 	}
 
 	/**
@@ -106,7 +104,7 @@ export class GitHubService {
 	 * ```
 	 */
 	public async getUntranslatedFiles(maxFiles?: number) {
-		return this.contentService.getUntranslatedFiles(maxFiles);
+		return this.services.content.getUntranslatedFiles(maxFiles);
 	}
 
 	/**
@@ -122,23 +120,23 @@ export class GitHubService {
 	 */
 	public async createOrGetTranslationBranch(fileName: string, baseBranch = "main") {
 		const branchName = `translate/${fileName}`;
-		const existingBranch = await this.branchService.getBranch(branchName);
+		const existingBranch = await this.services.branch.getBranch(branchName);
 
 		if (existingBranch) {
-			const mainBranchRef = await this.branchService.getBranch(baseBranch);
+			const mainBranchRef = await this.services.branch.getBranch(baseBranch);
 			if (!mainBranchRef) throw new Error(`Base branch ${baseBranch} not found`);
 
 			if (existingBranch.data.object.sha === mainBranchRef.data.object.sha) {
 				return existingBranch.data;
 			}
 
-			const upstreamPR = await this.contentService.findPullRequestByBranch(branchName);
-			if (upstreamPR) await this.contentService.closePullRequest(upstreamPR.number);
+			const upstreamPR = await this.services.content.findPullRequestByBranch(branchName);
+			if (upstreamPR) await this.services.content.closePullRequest(upstreamPR.number);
 
-			await this.branchService.deleteBranch(branchName);
+			await this.services.branch.deleteBranch(branchName);
 		}
 
-		const newBranch = await this.branchService.createBranch(branchName, baseBranch);
+		const newBranch = await this.services.branch.createBranch(branchName, baseBranch);
 
 		return newBranch.data;
 	}
@@ -167,7 +165,7 @@ export class GitHubService {
 		content: string,
 		message: string,
 	) {
-		await this.contentService.commitTranslation(branch, file, content, message);
+		await this.services.content.commitTranslation(branch, file, content, message);
 	}
 
 	/**
@@ -188,7 +186,7 @@ export class GitHubService {
 	 * ```
 	 */
 	public async createPullRequest(branch: string, title: string, body: string, baseBranch = "main") {
-		return this.contentService.createPullRequest(branch, title, body, baseBranch);
+		return this.services.content.createPullRequest(branch, title, body, baseBranch);
 	}
 
 	/**
@@ -202,7 +200,7 @@ export class GitHubService {
 	 * ```
 	 */
 	public async cleanupBranch(branch: string) {
-		await this.branchService.deleteBranch(branch);
+		await this.services.branch.deleteBranch(branch);
 	}
 
 	/**
@@ -214,7 +212,7 @@ export class GitHubService {
 	 * ```
 	 */
 	public getActiveBranches() {
-		return this.branchService.getActiveBranches();
+		return this.services.branch.getActiveBranches();
 	}
 
 	/**
@@ -226,7 +224,7 @@ export class GitHubService {
 	 * ```
 	 */
 	public async verifyTokenPermissions() {
-		return this.repositoryService.verifyTokenPermissions();
+		return this.services.repository.verifyTokenPermissions();
 	}
 
 	/**
@@ -238,7 +236,7 @@ export class GitHubService {
 	 * ```
 	 */
 	public async isForkSynced() {
-		return this.repositoryService.isForkSynced();
+		return this.services.repository.isForkSynced();
 	}
 
 	/**
@@ -252,7 +250,7 @@ export class GitHubService {
 	 * ```
 	 */
 	public async syncFork() {
-		return this.repositoryService.syncFork();
+		return this.services.repository.syncFork();
 	}
 
 	/**
@@ -267,7 +265,7 @@ export class GitHubService {
 	 * ```
 	 */
 	public async commentCompiledResultsOnIssue(issueNumber: number, results: ProcessedFileResult[]) {
-		return this.contentService.commentCompiledResultsOnIssue(issueNumber, results);
+		return this.services.content.commentCompiledResultsOnIssue(issueNumber, results);
 	}
 
 	/**
@@ -277,8 +275,11 @@ export class GitHubService {
 	 * @param commitSha - SHA of commit to check
 	 *
 	 * @example
+	 * ```typescript
+	 * const exists = await github.checkIfCommitExistsOnFork('main', '1234567890');
+	 * ```
 	 */
 	public async checkIfCommitExistsOnFork(branchName: string) {
-		return this.branchService.checkIfCommitExistsOnFork(branchName);
+		return this.services.branch.checkIfCommitExistsOnFork(branchName);
 	}
 }

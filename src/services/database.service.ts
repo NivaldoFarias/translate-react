@@ -18,14 +18,10 @@ import type { RestEndpointMethodTypes } from "@octokit/rest";
  * - Provides data recovery and cleanup capabilities
  */
 export class DatabaseService {
-	/**
-	 * SQLite database connection instance
-	 */
+	/** SQLite database connection instance */
 	private readonly db: Database;
 
 	/**
-	 * # Database Service Constructor
-	 *
 	 * Initializes database connection and creates required tables.
 	 *
 	 * @param dbPath Optional path to the database file. Defaults to 'snapshots.sqlite'
@@ -38,8 +34,6 @@ export class DatabaseService {
 	}
 
 	/**
-	 * # Database Schema Initialization
-	 *
 	 * Creates required database tables if they don't exist:
 	 * - snapshots: Workflow state snapshots
 	 * - repository_tree: Git repository structure
@@ -116,40 +110,36 @@ export class DatabaseService {
 	}
 
 	/**
-	 * # Snapshot Creation
-	 *
 	 * Creates a new workflow state snapshot.
 	 *
-	 * @param timestamp - Optional timestamp for the snapshot
+	 * @param timestamp Optional timestamp for the snapshot
 	 */
 	public createSnapshot(timestamp: number = Date.now()): number {
-		const stmt = this.db.prepare("INSERT INTO snapshots (timestamp) VALUES (?)");
-		const result = stmt.run(timestamp);
+		const statement = this.db.prepare("INSERT INTO snapshots (timestamp) VALUES (?)");
+		const result = statement.run(timestamp);
 
 		return Number(result.lastInsertRowid);
 	}
 
 	/**
-	 * # Repository Tree Storage
-	 *
 	 * Saves repository tree structure to database.
 	 * Uses transactions for data integrity.
 	 *
-	 * @param snapshotId - ID of associated snapshot
-	 * @param tree - Repository tree structure from GitHub
+	 * @param snapshotId ID of associated snapshot
+	 * @param tree Repository tree structure from GitHub
 	 */
 	public saveRepositoryTree(
 		snapshotId: number,
 		tree: RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"],
 	) {
-		const stmt = this.db.prepare(`
+		const statement = this.db.prepare(`
 			INSERT INTO repository_tree (snapshot_id, path, mode, type, sha, size, url)
 			VALUES (?, ?, ?, ?, ?, ?, ?)
 		`);
 
 		const transaction = this.db.transaction((items) => {
 			for (const item of items) {
-				stmt.run(snapshotId, item.path, item.mode, item.type, item.sha, item.size, item.url);
+				statement.run(snapshotId, item.path, item.mode, item.type, item.sha, item.size, item.url);
 			}
 		});
 
@@ -157,23 +147,21 @@ export class DatabaseService {
 	}
 
 	/**
-	 * # Translation Files Storage
-	 *
 	 * Saves files pending translation to database.
 	 * Uses transactions for data integrity.
 	 *
-	 * @param snapshotId - ID of associated snapshot
-	 * @param files - Files to be translated
+	 * @param snapshotId ID of associated snapshot
+	 * @param files Files to be translated
 	 */
 	public saveFilesToTranslate(snapshotId: number, files: TranslationFile[]) {
-		const stmt = this.db.prepare(`
+		const statement = this.db.prepare(`
 			INSERT INTO files_to_translate (snapshot_id, path, content, sha, filename)
 			VALUES (?, ?, ?, ?, ?)
 		`);
 
 		const transaction = this.db.transaction((items) => {
 			for (const item of items) {
-				stmt.run(snapshotId, item.path, item.content, item.sha, item.filename);
+				statement.run(snapshotId, item.path, item.content, item.sha, item.filename);
 			}
 		});
 
@@ -181,17 +169,15 @@ export class DatabaseService {
 	}
 
 	/**
-	 * # Results Storage
-	 *
 	 * Saves translation results to database.
 	 * Includes branch info, PR details, and any errors.
 	 * Uses transactions for data integrity.
 	 *
-	 * @param snapshotId - ID of associated snapshot
-	 * @param results - Translation processing results
+	 * @param snapshotId ID of associated snapshot
+	 * @param results Translation processing results
 	 */
 	public saveProcessedResults(snapshotId: number, results: ProcessedFileResult[]) {
-		const stmt = this.db.prepare(`
+		const statement = this.db.prepare(`
 			INSERT INTO processed_results (
 				snapshot_id, filename, branch_ref, branch_object_sha,
 				translation, pull_request_number, pull_request_url, error
@@ -201,7 +187,7 @@ export class DatabaseService {
 
 		const transaction = this.db.transaction((items) => {
 			for (const item of items) {
-				stmt.run(
+				statement.run(
 					snapshotId,
 					item.filename,
 					item.branch?.ref,
@@ -220,8 +206,6 @@ export class DatabaseService {
 	}
 
 	/**
-	 * # Latest Snapshot Retrieval
-	 *
 	 * Fetches most recent workflow snapshot with all related data:
 	 * - Repository tree
 	 * - Files to translate
@@ -264,8 +248,6 @@ export class DatabaseService {
 	}
 
 	/**
-	 * # Database Cleanup
-	 *
 	 * Removes all data from database tables.
 	 * Uses transaction to ensure all-or-nothing deletion.
 	 */
@@ -279,8 +261,6 @@ export class DatabaseService {
 	}
 
 	/**
-	 * # Snapshots Retrieval
-	 *
 	 * Fetches all workflow snapshots from database.
 	 *
 	 * @returns Array of snapshot objects
@@ -290,11 +270,9 @@ export class DatabaseService {
 	}
 
 	/**
-	 * # Snapshot Deletion
-	 *
 	 * Deletes a specific workflow snapshot from database.
 	 *
-	 * @param id - ID of snapshot to delete
+	 * @param id ID of snapshot to delete
 	 */
 	public deleteSnapshot(id: number) {
 		this.db.run(`DELETE FROM snapshots WHERE id = ?`, [id]);

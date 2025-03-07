@@ -7,13 +7,17 @@
         "resolveJsonModule": true,
         "allowJs": true,
         "checkJs": true,
+
         /* Emit Rules */
+
         "noEmit": true,
         /* Type Checking Rules */
+
         "strict": true,
         "noPropertyAccessFromIndexSignature": true,
         "noUncheckedIndexedAccess": true,
         /* Other Options */
+
         "skipLibCheck": true,
         "esModuleInterop": true,
         "forceConsistentCasingInFileNames": true,
@@ -23,6 +27,6 @@
             "@/*": ["src/*"]
         }
     },
-    "include": ["src/**/*", "index.ts", "tests/**/*"],
+    "include": ["src/**/*", "tests/**/*"],
     "exclude": ["node_modules", "dist"]
 }

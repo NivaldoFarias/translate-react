@@ -57,12 +57,10 @@ export class LanguageDetector {
 	private languages: LanguageConfig | null = null;
 
 	/**
-	 * # Language Detector Constructor
-	 *
 	 * Initializes a new language detector with source and target languages.
 	 * Converts ISO 639-1 codes to ISO 639-3 for compatibility with franc.
 	 *
-	 * ## Example
+	 * @example
 	 * ```typescript
 	 * const detector = new LanguageDetector({ source: 'en', target: 'pt' });
 	 * ```
@@ -77,26 +75,23 @@ export class LanguageDetector {
 	}
 
 	/**
-	 * # Translation Status Check
-	 *
 	 * Determines if content is already translated by analyzing its language composition.
 	 * Uses language detection and scoring to make the determination.
 	 *
-	 * ## Example
+	 * @param content Text content to analyze
+	 *
+	 * @returns `true` if content is in target language, `false` otherwise
+	 *
+	 * @example
 	 * ```typescript
 	 * const isTranslated = detector.isFileTranslated('Olá mundo');
-	 * // Returns true if content is in target language
 	 * ```
-	 *
-	 * @param content - Text content to analyze
 	 */
 	public isFileTranslated(content: string) {
 		return this.analyzeLanguage(content).isTranslated;
 	}
 
 	/**
-	 * # Language Analysis
-	 *
 	 * Performs detailed language analysis on the content:
 	 * 1. Removes code blocks from content
 	 * 2. Checks minimum content length
@@ -104,7 +99,14 @@ export class LanguageDetector {
 	 * 4. Calculates target language ratio
 	 * 5. Determines translation status
 	 *
-	 * @param content - Text content to analyze
+	 * @param content Text content to analyze
+	 *
+	 * @returns Language analysis results
+	 *
+	 * @example
+	 * ```typescript
+	 * const analysis = detector.analyzeLanguage('Olá mundo');
+	 * ```
 	 */
 	private analyzeLanguage(content: string): LanguageAnalysis {
 		const contentWithoutCode = content.replace(/```[\s\S]*?```/g, "");
@@ -139,14 +141,19 @@ export class LanguageDetector {
 	}
 
 	/**
-	 * # Translation Status Determination
-	 *
 	 * Evaluates if content should be considered translated based on:
 	 * - Match between detected and target language
 	 * - Ratio of target language presence
 	 *
-	 * @param ratio - Target language presence ratio
-	 * @param detectedLanguage - Primary detected language
+	 * @param ratio Target language presence ratio
+	 * @param detectedLanguage Primary detected language
+	 *
+	 * @returns `true` if content should be considered translated, `false` otherwise
+	 *
+	 * @example
+	 * ```typescript
+	 * const isTranslated = detector.determineTranslationStatus(0.7, 'pt');
+	 * ```
 	 */
 	private determineTranslationStatus(ratio: number, detectedLanguage: string) {
 		return (
