@@ -5,7 +5,7 @@ if (import.meta.main) {
 	let exitCode = 0;
 
 	try {
-		void new Runner(parseCommandLineArgs()).run();
+		await new Runner(parseCommandLineArgs()).run();
 	} catch (error) {
 		console.error(error);
 		exitCode = 1;
