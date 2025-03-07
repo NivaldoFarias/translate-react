@@ -228,12 +228,12 @@ export class ContentService extends BaseGitHubService {
 		const listCommentsResponse = await this.octokit.issues.listComments({
 			...this.upstream,
 			issue_number: issueNumber,
-			since: import.meta.env.GITHUB_SINCE,
+			since: "2025-01-20",
 		});
 
 		const userComment = listCommentsResponse.data.find((comment) => {
 			return (
-				comment.user?.login === import.meta.env.REPO_OWNER! &&
+				comment.user?.login === import.meta.env.REPO_FORK_OWNER! &&
 				comment.body?.includes("###### Observações")
 			);
 		});
@@ -336,7 +336,7 @@ export class ContentService extends BaseGitHubService {
 	
 	- As traduções foram geradas por uma LLM e requerem revisão humana para garantir precisão técnica e fluência.
 	- Alguns arquivos podem ter PRs de tradução existentes em análise. Verifiquei duplicações, mas recomendo conferir.
-	- O fluxo de trabalho de automação completo está disponível no repositório [\`translate-react\`](https://github.com/${import.meta.env.REPO_OWNER}/translate-react) para referência e contribuições.
+	- O fluxo de trabalho de automação completo está disponível no repositório [\`translate-react\`](https://github.com/${import.meta.env.REPO_FORK_OWNER}/translate-react) para referência e contribuições.
 	- Esta implementação é um trabalho em progresso e pode apresentar inconsistências em conteúdos técnicos complexos ou formatação específica.`;
 	}
 }

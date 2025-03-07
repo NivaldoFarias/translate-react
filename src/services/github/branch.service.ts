@@ -170,7 +170,7 @@ export class BranchService extends BaseGitHubService {
 		});
 
 		return listCommitsResponse.data.some(
-			(commit) => commit?.author?.login === import.meta.env.REPO_OWNER!,
+			(commit) => commit?.author?.login === import.meta.env.REPO_FORK_OWNER!,
 		);
 	}
 }

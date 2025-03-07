@@ -126,12 +126,12 @@ export default class Runner extends RunnerService {
 
 			if (
 				import.meta.env.NODE_ENV === "production" &&
-				import.meta.env.TRANSLATION_ISSUE_NUMBER &&
+				import.meta.env.PROGRESS_ISSUE_NUMBER &&
 				snapshot.processedResults.length > 0
 			) {
 				this.spinner.text = "Commenting on issue...";
 				const comment = await this.github.commentCompiledResultsOnIssue(
-					import.meta.env.TRANSLATION_ISSUE_NUMBER,
+					import.meta.env.PROGRESS_ISSUE_NUMBER,
 					snapshot.processedResults,
 				);
 				this.spinner.succeed(`Commented on translation issue: ${comment.html_url}`);
