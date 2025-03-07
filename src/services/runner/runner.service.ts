@@ -64,10 +64,12 @@ export default class Runner extends RunnerService {
 			}
 
 			this.spinner.text = "Checking fork status...";
-			const isSynced = await this.github.isForkSynced();
+			const isForkSynced = await this.github.isForkSynced();
 
-			if (!isSynced) {
-				this.spinner.text = "Fork is out of sync. Updating...";
+			if (!isForkSynced) {
+				this.spinner.text = "Fork is out of sync. Updating fork and resetting snapshot...";
+
+				await this.snapshotManager.clear();
 				const syncSuccess = await this.github.syncFork();
 
 				if (!syncSuccess) {
@@ -82,12 +84,15 @@ export default class Runner extends RunnerService {
 				this.spinner.start();
 			}
 
-			let snapshot = (await this.snapshotManager.loadLatest()) || {
-				repositoryTree: [],
-				filesToTranslate: [],
-				processedResults: [],
-				timestamp: Date.now(),
-			};
+			let snapshot =
+				isForkSynced ?
+					await this.snapshotManager.loadLatest()
+				:	{
+						repositoryTree: [],
+						filesToTranslate: [],
+						processedResults: [],
+						timestamp: Date.now(),
+					};
 
 			if (!snapshot.repositoryTree?.length) {
 				this.spinner.text = "Fetching repository tree...";
@@ -146,11 +151,7 @@ export default class Runner extends RunnerService {
 
 			this.spinner.succeed("Translation completed");
 
-			if (
-				import.meta.env.NODE_ENV === "production" &&
-				import.meta.env.PROGRESS_ISSUE_NUMBER &&
-				snapshot.processedResults.length > 0
-			) {
+			if (this.shouldUpdateIssueComment) {
 				this.spinner.text = "Commenting on issue...";
 				const comment = await this.github.commentCompiledResultsOnIssue(
 					Number(import.meta.env.PROGRESS_ISSUE_NUMBER),
@@ -167,6 +168,14 @@ export default class Runner extends RunnerService {
 		} finally {
 			this.printFinalStatistics();
 		}
+	}
+
+	private get shouldUpdateIssueComment() {
+		return (
+			import.meta.env.NODE_ENV === "production" &&
+			import.meta.env.PROGRESS_ISSUE_NUMBER &&
+			this.stats.results.size > 0
+		);
 	}
 
 	private async printFinalStatistics() {
