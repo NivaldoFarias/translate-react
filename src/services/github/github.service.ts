@@ -282,4 +282,18 @@ export class GitHubService {
 	public async checkIfCommitExistsOnFork(branchName: string) {
 		return this.services.branch.checkIfCommitExistsOnFork(branchName);
 	}
+
+	/**
+	 * Fetches the glossary.md file from the repository.
+	 *
+	 * @returns The content of the glossary file as a string, or null if the file doesn't exist or cannot be retrieved
+	 *
+	 * @example
+	 * ```typescript
+	 * const glossary = await github.fetchGlossary();
+	 * ```
+	 */
+	public async getGlossary() {
+		return this.services.repository.fetchGlossary();
+	}
 }

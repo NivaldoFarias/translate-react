@@ -1,6 +1,8 @@
 import { franc, francAll } from "franc";
 import langs from "langs";
 
+import type { Type as LangsType } from "langs";
+
 /**
  * Configuration interface for language detection settings.
  * Uses ISO 639-1 language codes for source and target languages.
@@ -31,7 +33,7 @@ export interface LanguageAnalysis {
 	};
 	ratio: number;
 	isTranslated: boolean;
-	detectedLanguage: string;
+	detectedLanguage: ReturnType<typeof langs.where>;
 }
 
 /**
@@ -51,44 +53,37 @@ export class LanguageDetector {
 	private readonly MIN_CONTENT_LENGTH = 10;
 
 	/** Threshold ratio above which content is considered translated */
-	private readonly TRANSLATION_THRESHOLD = 0.6;
+	private readonly TRANSLATION_THRESHOLD = 0.5;
 
 	/** Current language configuration in ISO 639-3 format */
-	private languages: LanguageConfig | null = null;
+	private readonly languages: LanguageConfig;
+
+	/** Map of detected languages by filename */
+	public detected: Map<string, ReturnType<typeof langs.where>> = new Map();
 
 	/**
 	 * Initializes a new language detector with source and target languages.
 	 * Converts ISO 639-1 codes to ISO 639-3 for compatibility with franc.
 	 *
+	 * @param config Language configuration with source and target languages
+	 *
 	 * @example
 	 * ```typescript
 	 * const detector = new LanguageDetector({ source: 'en', target: 'pt' });
 	 * ```
-	 *
-	 * @param config Language configuration with source and target languages
 	 */
 	public constructor(config: LanguageConfig) {
-		this.languages = {
-			source: langs.where("1", config.source)?.["3"] ?? "eng",
-			target: langs.where("1", config.target)?.["3"] ?? "und",
-		};
-	}
+		const source = this.detectLanguage(config.source, "1");
+		const target = this.detectLanguage(config.target, "1");
 
-	/**
-	 * Determines if content is already translated by analyzing its language composition.
-	 * Uses language detection and scoring to make the determination.
-	 *
-	 * @param content Text content to analyze
-	 *
-	 * @returns `true` if content is in target language, `false` otherwise
-	 *
-	 * @example
-	 * ```typescript
-	 * const isTranslated = detector.isFileTranslated('Olá mundo');
-	 * ```
-	 */
-	public isFileTranslated(content: string) {
-		return this.analyzeLanguage(content).isTranslated;
+		if (!source || !target) {
+			throw new Error(`Invalid language code: ${config.source} or ${config.target}`);
+		}
+
+		this.languages = {
+			source: source["3"],
+			target: target["3"],
+		};
 	}
 
 	/**
@@ -99,6 +94,7 @@ export class LanguageDetector {
 	 * 4. Calculates target language ratio
 	 * 5. Determines translation status
 	 *
+	 * @param filename Filename of the content
 	 * @param content Text content to analyze
 	 *
 	 * @returns Language analysis results
@@ -108,14 +104,14 @@ export class LanguageDetector {
 	 * const analysis = detector.analyzeLanguage('Olá mundo');
 	 * ```
 	 */
-	private analyzeLanguage(content: string): LanguageAnalysis {
+	public analyzeLanguage(filename: string, content: string): LanguageAnalysis {
 		const contentWithoutCode = content.replace(/```[\s\S]*?```/g, "");
 
 		if (content.length < this.MIN_CONTENT_LENGTH) {
 			return {
 				languageScore: { target: 0, source: 0 },
 				ratio: 0,
-				detectedLanguage: "und",
+				detectedLanguage: this.detectLanguage("und"),
 				isTranslated: false,
 			};
 		}
@@ -123,12 +119,13 @@ export class LanguageDetector {
 		const allDetections = francAll(contentWithoutCode);
 		const scores = new Map(allDetections);
 
-		const targetLanguageScore = scores.get(this.languages!.target) ?? 0;
-		const sourceLanguageScore = scores.get(this.languages!.source) ?? 0;
+		const targetLanguageScore = scores.get(this.languages.target) ?? 0;
+		const sourceLanguageScore = scores.get(this.languages.source) ?? 0;
 		const detectedLang = franc(contentWithoutCode, { minLength: this.MIN_CONTENT_LENGTH });
 
-		const language = langs.where("3", detectedLang);
-		const detectedLanguage = language?.["1"] ?? "und";
+		const detectedLanguage = this.detectLanguage(detectedLang);
+
+		this.detected.set(filename, detectedLanguage);
 
 		const ratio = targetLanguageScore / (targetLanguageScore + sourceLanguageScore) || 0;
 
@@ -136,7 +133,8 @@ export class LanguageDetector {
 			languageScore: { target: targetLanguageScore, source: sourceLanguageScore },
 			ratio,
 			detectedLanguage,
-			isTranslated: this.determineTranslationStatus(ratio, detectedLanguage),
+			isTranslated:
+				targetLanguageScore === 1 || this.determineTranslationStatus(ratio, detectedLanguage),
 		};
 	}
 
@@ -155,10 +153,17 @@ export class LanguageDetector {
 	 * const isTranslated = detector.determineTranslationStatus(0.7, 'pt');
 	 * ```
 	 */
-	private determineTranslationStatus(ratio: number, detectedLanguage: string) {
+	private determineTranslationStatus(
+		ratio: number,
+		detectedLanguage: ReturnType<typeof langs.where>,
+	) {
 		return (
-			detectedLanguage === langs.where("3", this.languages!.target)?.["1"] ||
+			(detectedLanguage && Object.values(detectedLanguage).includes(this.languages.target)) ||
 			ratio >= this.TRANSLATION_THRESHOLD
 		);
+	}
+
+	public detectLanguage(language: string, type: LangsType = "3") {
+		return langs.where(type, language);
 	}
 }

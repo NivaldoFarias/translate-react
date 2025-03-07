@@ -4,7 +4,7 @@ import type { Ora } from "ora";
 import { GitHubService } from "@/services/github/github.service";
 import { SnapshotService } from "@/services/snapshot.service";
 import { TranslatorService } from "@/services/translator.service";
-import { extractErrorMessage, LanguageDetector, setupSignalHandlers, validateEnv } from "@/utils/";
+import { extractErrorMessage, setupSignalHandlers, validateEnv } from "@/utils/";
 
 export interface RunnerOptions {
 	targetLanguage: string;
@@ -12,37 +12,28 @@ export interface RunnerOptions {
 }
 
 export abstract class RunnerService {
-	/** GitHub service instance for repository operations */
-	protected readonly github = new GitHubService();
+	protected readonly services: {
+		/** GitHub service instance for repository operations */
+		github: GitHubService;
 
-	/** Translation service for content translation operations */
-	protected readonly translator: TranslatorService;
+		/** Translation service for content translation operations */
+		translator: TranslatorService;
 
-	/** Language detection service to identify content language */
-	protected readonly languageDetector: LanguageDetector;
-
-	/** Snapshot manager to persist and retrieve workflow state */
-	protected readonly snapshotManager = new SnapshotService();
-
-	/**
-	 * Maximum number of files to process
-	 * Limited in non-production environments for testing purposes
-	 */
-	protected get maxFiles(): number | undefined {
-		return import.meta.env.NODE_ENV === "production" ? undefined : 10;
-	}
+		/** Snapshot manager to persist and retrieve workflow state */
+		snapshot: SnapshotService;
+	};
 
 	/** Statistics tracking for the translation process */
 	protected stats = {
 		results: new Map<ProcessedFileResult["filename"], ProcessedFileResult>(),
-		startTime: Date.now(),
+		timestamp: Date.now(),
 	};
 
 	/** Progress spinner for CLI feedback */
 	protected spinner: Ora | null = null;
 
 	/**
-	 * Cleanup handler for process termination
+	 * Cleanup handler for process termination.
 	 * Ensures graceful shutdown and cleanup of resources
 	 */
 	protected cleanup = () => {
@@ -63,15 +54,14 @@ export abstract class RunnerService {
 			process.exit(1);
 		}
 
-		this.languageDetector = new LanguageDetector({
-			source: this.options.sourceLanguage,
-			target: this.options.targetLanguage,
-		});
-
-		this.translator = new TranslatorService({
-			source: this.options.sourceLanguage,
-			target: this.options.targetLanguage,
-		});
+		this.services = {
+			github: new GitHubService(),
+			translator: new TranslatorService({
+				source: this.options.sourceLanguage,
+				target: this.options.targetLanguage,
+			}),
+			snapshot: new SnapshotService(),
+		};
 
 		setupSignalHandlers(this.cleanup);
 	}

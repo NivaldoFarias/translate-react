@@ -3,6 +3,8 @@ import ora from "ora";
 import type { FileProcessingProgress, ProcessedFileResult, TranslationFile } from "@/types";
 import type { SetNonNullable } from "type-fest";
 
+import type { Snapshot } from "../snapshot.service";
+
 import { RunnerService } from "@/services/runner/base.service";
 import { extractErrorMessage } from "@/utils/errors.util";
 
@@ -40,7 +42,7 @@ export default class Runner extends RunnerService {
 	 *
 	 * Executes the complete translation workflow:
 	 * 1. Verifies GitHub token permissions
-	 * 2. Loads or creates workflow snapshot
+	 * 2. Loads or creates workflow snapshot (development only)
 	 * 3. Fetches repository tree
 	 * 4. Identifies files for translation
 	 * 5. Processes files in batches
@@ -56,21 +58,25 @@ export default class Runner extends RunnerService {
 				spinner: "dots",
 			}).start();
 
-			const hasPermissions = await this.github.verifyTokenPermissions();
+			const hasPermissions = await this.services.github.verifyTokenPermissions();
 
 			if (!hasPermissions) {
 				this.spinner.fail("Token permissions verification failed");
+
 				throw new Error("Token permissions verification failed");
 			}
 
 			this.spinner.text = "Checking fork status...";
-			const isForkSynced = await this.github.isForkSynced();
+			const isForkSynced = await this.services.github.isForkSynced();
 
 			if (!isForkSynced) {
-				this.spinner.text = "Fork is out of sync. Updating fork and resetting snapshot...";
+				this.spinner.text = "Fork is out of sync. Updating fork...";
 
-				await this.snapshotManager.clear();
-				const syncSuccess = await this.github.syncFork();
+				if (import.meta.env.NODE_ENV === "development") {
+					await this.services.snapshot.clear();
+				}
+
+				const syncSuccess = await this.services.github.syncFork();
 
 				if (!syncSuccess) {
 					this.spinner.fail("Failed to sync fork with upstream repository");
@@ -84,84 +90,129 @@ export default class Runner extends RunnerService {
 				this.spinner.start();
 			}
 
-			let snapshot =
-				isForkSynced ?
-					await this.snapshotManager.loadLatest()
-				:	{
-						repositoryTree: [],
-						filesToTranslate: [],
-						processedResults: [],
-						timestamp: Date.now(),
-					};
+			let data: Omit<Snapshot, "id"> = {
+				repositoryTree: [],
+				filesToTranslate: [],
+				processedResults: [],
+				timestamp: Date.now(),
+			};
 
-			if (!snapshot.repositoryTree?.length) {
-				this.spinner.text = "Fetching repository tree...";
+			if (import.meta.env.NODE_ENV === "development") {
+				const latestSnapshot = await this.services.snapshot.loadLatest();
 
-				snapshot.repositoryTree = await this.github.getRepositoryTree("main");
-				await this.snapshotManager.append("repositoryTree", snapshot.repositoryTree);
-				this.spinner.succeed("Repository tree fetched");
+				if (latestSnapshot && !isForkSynced) data = latestSnapshot;
+			}
+
+			if (!data.repositoryTree?.length) {
+				this.spinner.text = "Fetching repository content...";
+				data.repositoryTree = await this.services.github.getRepositoryTree("main");
+
+				if (import.meta.env.NODE_ENV === "development") {
+					await this.services.snapshot.append("repositoryTree", data.repositoryTree);
+				}
+
+				this.spinner.text = "Repository tree fetched. Fetching glossary...";
+
+				const glossary = await this.services.github.getGlossary();
+
+				if (!glossary) {
+					this.spinner.fail("Failed to fetch glossary");
+					throw new Error("Failed to fetch glossary");
+				}
+
+				this.services.translator.glossary = glossary;
+
+				this.spinner.succeed("Repository content fetched");
 			} else {
 				this.spinner.stopAndPersist({
 					symbol: "📦",
 					text: "Repository tree already fetched",
 				});
-				this.spinner.start();
 			}
 
-			if (!snapshot.filesToTranslate?.length) {
+			this.spinner.start();
+
+			if (!data.filesToTranslate?.length) {
 				const uncheckedFiles: TranslationFile[] = [];
 
-				for (const [index, file] of snapshot.repositoryTree.slice(0, this.maxFiles).entries()) {
-					this.spinner.text = `Fetching file ${index + 1}/${snapshot.repositoryTree.length}: ${file.path}`;
+				this.spinner.text = `Fetching ${data.repositoryTree.length} files...`;
 
-					if (uncheckedFiles.find((compareFile) => compareFile.path === file.path)) continue;
+				const totalFiles = data.repositoryTree.length;
+				let completedFiles = 0;
 
-					uncheckedFiles.push({
-						content: await this.github.getFileContent(file),
-						filename: file.path?.split("/").pop(),
-						...file,
-					});
-				}
+				const updateSpinner = () => {
+					completedFiles++;
+					const percentage = Math.floor((completedFiles / totalFiles) * 100);
+					this.spinner!.text = `Fetching files: ${completedFiles}/${totalFiles} (${percentage}%)`;
+				};
 
-				this.spinner.stop();
-
-				const filesToTranslate = uncheckedFiles.filter(
-					(file) => !this.languageDetector.isFileTranslated(file.content as string),
+				const uniqueFiles = data.repositoryTree.filter(
+					(file, index, self) => index === self.findIndex((f) => f.path === file.path),
 				);
 
-				await this.snapshotManager.append("filesToTranslate", filesToTranslate);
+				const batchSize = 10;
+				for (let i = 0; i < uniqueFiles.length; i += batchSize) {
+					const batch = uniqueFiles.slice(i, i + batchSize);
 
-				snapshot.filesToTranslate = filesToTranslate;
+					const batchResults = await Promise.all(
+						batch.map(async (file) => {
+							const filename = file.path?.split("/").pop();
 
-				this.spinner.succeed(`Found ${filesToTranslate.length} files to translate`);
-				this.spinner.start();
+							if (!filename || !file.sha) return null;
+
+							const content = await this.services.github.getFileContent(file);
+							updateSpinner();
+
+							return {
+								content,
+								filename,
+								sha: file.sha,
+							};
+						}),
+					);
+
+					uncheckedFiles.push(...batchResults.filter((file) => !!file));
+				}
+
+				data.filesToTranslate = uncheckedFiles.filter(
+					(file) => !this.services.translator.isFileTranslated(file),
+				);
+
+				if (import.meta.env.NODE_ENV === "development") {
+					await this.services.snapshot.append("filesToTranslate", data.filesToTranslate);
+				}
+
+				this.spinner.succeed(`Found ${data.filesToTranslate.length} files to translate`);
 			} else {
 				this.spinner.stopAndPersist({
 					symbol: "📦",
-					text: `Found ${snapshot.filesToTranslate.length} files to translate`,
+					text: `Found ${data.filesToTranslate.length} files to translate`,
 				});
-				this.spinner.start();
 			}
 
-			await this.processInBatches(snapshot.filesToTranslate, 10);
+			this.spinner.start();
 
-			snapshot.processedResults = Array.from(this.stats.results.values());
+			await this.processInBatches(data.filesToTranslate, 10);
 
-			await this.snapshotManager.append("processedResults", snapshot.processedResults);
+			data.processedResults = Array.from(this.stats.results.values());
+
+			if (import.meta.env.NODE_ENV === "development") {
+				await this.services.snapshot.append("processedResults", data.processedResults);
+			}
 
 			this.spinner.succeed("Translation completed");
 
 			if (this.shouldUpdateIssueComment) {
 				this.spinner.text = "Commenting on issue...";
-				const comment = await this.github.commentCompiledResultsOnIssue(
+				const comment = await this.services.github.commentCompiledResultsOnIssue(
 					Number(import.meta.env.PROGRESS_ISSUE_NUMBER),
-					snapshot.processedResults,
+					data.processedResults,
 				);
 				this.spinner.succeed(`Commented on translation issue: ${comment.html_url}`);
 			}
 
 			if (import.meta.env.NODE_ENV === "production") {
-				await this.snapshotManager.clear();
+				await this.services.snapshot.clear();
 			}
 		} catch (error) {
 			this.spinner?.fail(extractErrorMessage(error));
@@ -170,18 +221,22 @@ export default class Runner extends RunnerService {
 		}
 	}
 
+	/**
+	 * @returns `true` if the issue comment should be updated, `false` otherwise
+	 */
 	private get shouldUpdateIssueComment() {
-		return (
+		return !!(
 			import.meta.env.NODE_ENV === "production" &&
 			import.meta.env.PROGRESS_ISSUE_NUMBER &&
 			this.stats.results.size > 0
 		);
 	}
 
+	/** Prints the final statistics of the translation workflow */
 	private async printFinalStatistics() {
 		if (!this.spinner) return;
 
-		const elapsedTime = Math.ceil(Date.now() - this.stats.startTime);
+		const elapsedTime = Math.ceil(Date.now() - this.stats.timestamp);
 
 		this.spinner.stopAndPersist({ symbol: "📊", text: "Final Statistics" });
 
@@ -289,17 +344,17 @@ export default class Runner extends RunnerService {
 		};
 
 		try {
-			metadata.branch = await this.github.createOrGetTranslationBranch(file.filename!);
-			metadata.translation = await this.translator.translateContent(file);
+			metadata.branch = await this.services.github.createOrGetTranslationBranch(file.filename!);
+			metadata.translation = await this.services.translator.translateContent(file);
 
-			await this.github.commitTranslation(
+			await this.services.github.commitTranslation(
 				metadata.branch,
 				file,
 				metadata.translation,
 				`Translate \`${file.filename}\` to ${this.options.targetLanguage}`,
 			);
 
-			metadata.pullRequest = await this.github.createPullRequest(
+			metadata.pullRequest = await this.services.github.createPullRequest(
 				metadata.branch.ref,
 				`Translate \`${file.filename}\` to ${this.options.targetLanguage}`,
 				this.pullRequestDescription,

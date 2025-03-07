@@ -7,7 +7,7 @@ import type { RunnerOptions } from "@/services/runner/base.service";
  * Defines the expected structure and types for the runner options
  */
 const runnerOptionsSchema = z.object({
-	targetLanguage: z.string().default("pt-BR"),
+	targetLanguage: z.string().default("pt"),
 	sourceLanguage: z.string().default("en"),
 });
 
