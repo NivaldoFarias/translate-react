@@ -1,11 +1,10 @@
 import ora from "ora";
 
-import type { ProcessedFileResult, TranslationFile } from "@/types";
+import type { FileProcessingProgress, ProcessedFileResult, TranslationFile } from "@/types";
 import type { SetNonNullable } from "type-fest";
 
-import { RunnerService } from "@/services/runner.service";
-
-import { extractErrorMessage } from "./utils/errors.util";
+import { RunnerService } from "@/services/runner/base.service";
+import { extractErrorMessage } from "@/utils/errors.util";
 
 /**
  * # Translation Workflow Runner
@@ -173,6 +172,8 @@ export default class Runner extends RunnerService {
 				"error"
 			>[];
 
+			this.spinner.stopAndPersist({ symbol: "❌", text: `Failed translations:` });
+
 			for (const [index, { filename, error }] of failedFiles.entries()) {
 				this.spinner.stopAndPersist({
 					symbol: "  •",
@@ -245,10 +246,7 @@ export default class Runner extends RunnerService {
 	 * @param file - File to process
 	 * @param progress - Progress tracking information
 	 */
-	private async processFile(
-		file: TranslationFile,
-		progress: { batchIndex: number; fileIndex: number; totalBatches: number; batchSize: number },
-	) {
+	private async processFile(file: TranslationFile, progress: FileProcessingProgress) {
 		const metadata = this.stats.results.get(file.filename!) || {
 			branch: null,
 			filename: file.filename!,
@@ -283,7 +281,7 @@ export default class Runner extends RunnerService {
 			);
 		} catch (error) {
 			metadata.error = error instanceof Error ? error : new Error(String(error));
-			this.spinner!.suffixText = `${suffixText} Failed: ${file.filename} :: ${metadata.error.message}`;
+			this.spinner!.suffixText = `${suffixText} Failed: ${metadata.error.message}`;
 		} finally {
 			this.stats.results.set(file.filename!, metadata);
 		}

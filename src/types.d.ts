@@ -2,6 +2,20 @@ import type { Environment } from "@/utils/env.util";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 /**
+ * Represents the progress of file processing in batches.
+ */
+export interface FileProcessingProgress {
+    /** The index of the current batch */
+    batchIndex: number;
+    /** The index of the current file in the batch */
+    fileIndex: number;
+    /** The total number of batches */
+    totalBatches: number;
+    /** The number of files to process in each batch */
+    batchSize: number;
+}
+
+/**
  * Represents a parsed content object that contains the original content with placeholders for repeated blocks.
  */
 export interface ParsedContent {

@@ -14,6 +14,7 @@ export default tseslint.config(
 			globals: {
 				...globals.node,
 				Bun: "readonly",
+				NodeJS: "readonly",
 			},
 			parser: tseslint.parser,
 			parserOptions: {

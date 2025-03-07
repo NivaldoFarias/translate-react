@@ -4,11 +4,7 @@ import type { RestEndpointMethodTypes } from "@octokit/rest";
 import { DatabaseService } from "@/services/database.service";
 import { extractErrorMessage } from "@/utils/errors.util";
 
-/**
- * # Snapshot Interface
- *
- * Represents a snapshot of the translation workflow state.
- */
+/** Represents a snapshot of the translation workflow state */
 export interface Snapshot {
 	id: number;
 	timestamp: number;
@@ -17,11 +13,7 @@ export interface Snapshot {
 	processedResults: ProcessedFileResult[];
 }
 
-/**
- * # Snapshot Manager
- *
- * Manages the creation, saving, and loading of translation workflow snapshots.
- */
+/** Manages the creation, saving, and loading of translation workflow snapshots */
 export class SnapshotService {
 	private readonly service: DatabaseService;
 	private currentSnapshotId: number | null = null;
@@ -38,6 +30,23 @@ export class SnapshotService {
 		});
 	}
 
+	/**
+	 * Saves a snapshot of the translation workflow state
+	 *
+	 * @param data The data to save
+	 *
+	 * @example
+	 * ```typescript
+	 * const data = {
+	 * 	timestamp: Date.now(),
+	 * 	repositoryTree: [],
+	 * 	filesToTranslate: [],
+	 * 	processedResults: [],
+	 * };
+	 *
+	 * await snapshotService.save(data);
+	 * ```
+	 */
 	public async save(data: Omit<Snapshot, "id">) {
 		try {
 			if (!this.currentSnapshotId) {
@@ -52,6 +61,17 @@ export class SnapshotService {
 		}
 	}
 
+	/**
+	 * Appends data to the current snapshot
+	 *
+	 * @param key The key of the data to append
+	 * @param data The data to append
+	 *
+	 * @example
+	 * ```typescript
+	 * await snapshotService.append("repositoryTree", []);
+	 * ```
+	 */
 	public async append<K extends keyof Omit<Snapshot, "id">>(key: K, data: Snapshot[K]) {
 		if (!this.currentSnapshotId) {
 			this.currentSnapshotId = this.service.createSnapshot();
@@ -79,19 +99,34 @@ export class SnapshotService {
 		}
 	}
 
-	public async loadLatest(): Promise<Snapshot | null> {
+	/**
+	 * Loads the latest snapshot
+	 *
+	 * @example
+	 * ```typescript
+	 * const snapshot = await snapshotService.loadLatest();
+	 * ```
+	 */
+	public async loadLatest() {
 		try {
 			const snapshot = this.service.getLatestSnapshot();
-
 			if (snapshot) this.currentSnapshotId = snapshot.id;
 
-			return snapshot;
+			return snapshot as Snapshot;
 		} catch (error) {
 			console.error(`Failed to load snapshot: ${extractErrorMessage(error)}`);
 			return null;
 		}
 	}
 
+	/**
+	 * Clears all snapshots from the database
+	 *
+	 * @example
+	 * ```typescript
+	 * await snapshotService.clear();
+	 * ```
+	 */
 	public async clear() {
 		try {
 			this.service.clearSnapshots();

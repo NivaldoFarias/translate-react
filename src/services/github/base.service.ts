@@ -1,7 +1,5 @@
 import { Octokit } from "@octokit/rest";
 
-import { extractErrorMessage } from "@/utils/errors.util";
-
 /**
  * Base service for GitHub operations.
  * Provides common functionality and configuration for all GitHub services.
@@ -12,17 +10,15 @@ import { extractErrorMessage } from "@/utils/errors.util";
  * - Common error handling
  */
 export abstract class BaseGitHubService {
-	/**
-	 * GitHub API client instance
-	 */
+	/** GitHub API client instance */
 	protected readonly octokit: Octokit;
 
 	/**
 	 * Creates a new base GitHub service instance.
 	 *
-	 * @param upstream - Original repository details
-	 * @param fork - Forked repository details
-	 * @param githubToken - GitHub personal access token
+	 * @param upstream Original repository details
+	 * @param fork Forked repository details
+	 * @param githubToken GitHub personal access token
 	 */
 	constructor(
 		protected readonly upstream: { owner: string; repo: string },

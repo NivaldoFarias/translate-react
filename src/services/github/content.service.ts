@@ -29,17 +29,17 @@ export class ContentService extends BaseGitHubService {
 	 */
 	public async getUntranslatedFiles(maxFiles?: number) {
 		try {
-			const { data } = await this.octokit.git.getTree({
+			const repoTreeResponse = await this.octokit.git.getTree({
 				...this.fork,
 				tree_sha: "main",
-				recursive: "1",
+				recursive: "true",
 			});
 
-			if (!data.tree) {
+			if (!repoTreeResponse.data.tree) {
 				throw new Error("Repository tree is empty");
 			}
 
-			const markdownFiles = this.filterMarkdownFiles(data.tree);
+			const markdownFiles = this.filterMarkdownFiles(repoTreeResponse.data.tree);
 			const filesToProcess = maxFiles ? markdownFiles.slice(0, maxFiles) : markdownFiles;
 
 			const files: TranslationFile[] = [];
@@ -47,17 +47,17 @@ export class ContentService extends BaseGitHubService {
 				if (!file.path) continue;
 
 				try {
-					const { data } = await this.octokit.repos.getContent({
+					const response = await this.octokit.repos.getContent({
 						...this.fork,
 						path: file.path,
 					});
 
-					if (!("content" in data)) continue;
+					if (!("content" in response.data)) continue;
 
 					files.push({
 						path: file.path,
-						content: Buffer.from(data.content, "base64").toString(),
-						sha: data.sha,
+						content: Buffer.from(response.data.content, "base64").toString(),
+						sha: response.data.sha,
 					});
 				} catch (error) {
 					console.error(`Failed to fetch content for ${file.path}: ${extractErrorMessage(error)}`);
@@ -141,16 +141,17 @@ export class ContentService extends BaseGitHubService {
 	 */
 	public async createPullRequest(branch: string, title: string, body: string, baseBranch = "main") {
 		try {
-			const existingPRsResponse = await this.octokit.pulls.list({
+			const prExistsResponse = await this.octokit.pulls.list({
 				...this.upstream,
 				head: `${this.fork.owner}:${branch}`,
 				state: "open",
 			});
 
-			const pr = existingPRsResponse.data.find((pr) => pr.title === title);
-			if (pr) return pr;
+			const existingPullRequest = prExistsResponse.data.find((pr) => pr.title === title);
 
-			const { data } = await this.octokit.pulls.create({
+			if (existingPullRequest) return existingPullRequest;
+
+			const createPullRequestResponse = await this.octokit.pulls.create({
 				...this.upstream,
 				title,
 				body,
@@ -159,7 +160,7 @@ export class ContentService extends BaseGitHubService {
 				maintainer_can_modify: true,
 			});
 
-			return data;
+			return createPullRequestResponse.data;
 		} catch (error) {
 			console.error(`Failed to create pull request: ${extractErrorMessage(error)}`);
 			throw error;
@@ -182,11 +183,9 @@ export class ContentService extends BaseGitHubService {
 	}
 
 	/**
-	 * # File Content Retrieval
-	 *
 	 * Fetches raw content of a file from GitHub.
 	 *
-	 * @param file - File reference to fetch
+	 * @param file File reference to fetch
 	 */
 	public async getFileContent(
 		file:
@@ -196,16 +195,14 @@ export class ContentService extends BaseGitHubService {
 		try {
 			const blobSha = file.sha;
 
-			if (!blobSha) {
-				throw new Error("Invalid blob URL");
-			}
+			if (!blobSha) throw new Error("Invalid blob URL");
 
-			const { data } = await this.octokit.git.getBlob({
+			const response = await this.octokit.git.getBlob({
 				...this.fork,
 				file_sha: blobSha,
 			});
 
-			return Buffer.from(data.content, "base64").toString();
+			return Buffer.from(response.data.content, "base64").toString();
 		} catch (error) {
 			console.error(`Failed to fetch file content: ${extractErrorMessage(error)}`);
 			throw error;
@@ -213,25 +210,21 @@ export class ContentService extends BaseGitHubService {
 	}
 
 	/**
-	 * # Issue Comment Creation
-	 *
 	 * Posts translation results as comments on GitHub issues.
 	 *
-	 * @param issueNumber - Target issue number
-	 * @param results - Translation results to report
+	 * @param issueNumber Target issue number
+	 * @param results Translation results to report
 	 */
 	public async commentCompiledResultsOnIssue(issueNumber: number, results: ProcessedFileResult[]) {
-		// check if the issue exists
-		const issue = await this.octokit.issues.get({
+		const issueExistsResponse = await this.octokit.issues.get({
 			...this.upstream,
 			issue_number: issueNumber,
 		});
 
-		if (!issue.data) {
+		if (!issueExistsResponse.data) {
 			throw new Error(`Issue ${issueNumber} not found`);
 		}
 
-		// check if the issue contains the comment
 		const listCommentsResponse = await this.octokit.issues.listComments({
 			...this.upstream,
 			issue_number: issueNumber,
@@ -299,27 +292,27 @@ export class ContentService extends BaseGitHubService {
 	}
 
 	/**
-	 * # Pull Request Retrieval
-	 *
 	 * Retrieves a pull request by branch name.
 	 *
-	 * @param branchName - Source branch name
+	 * @param branchName Source branch name
 	 */
 	public async findPullRequestByBranch(branchName: string) {
-		const pr = await this.octokit.pulls.list({
+		const response = await this.octokit.pulls.list({
 			...this.upstream,
 			head: `${this.fork.owner}:${branchName}`,
 		});
 
-		return pr.data[0];
+		const pr = response.data[0];
+
+		if (!pr) throw new Error(`Pull request ${branchName} not found`);
+
+		return pr;
 	}
 
 	/**
-	 * # Pull Request Closure
-	 *
 	 * Closes a pull request by number.
 	 *
-	 * @param prNumber - Pull request number
+	 * @param prNumber Pull request number
 	 * @throws {Error} If pull request closure fails
 	 */
 	public async closePullRequest(prNumber: number) {
@@ -329,27 +322,21 @@ export class ContentService extends BaseGitHubService {
 			state: "closed",
 		});
 
-		if (response.status !== 200) {
-			throw new Error(`Failed to close pull request ${prNumber}`);
-		}
+		if (response.status !== 200) throw new Error(`Failed to close pull request ${prNumber}`);
 	}
 
-	/**
-	 * Comment header template for issue comments
-	 */
+	/** Comment header template for issue comments */
 	private get commentPrefix() {
 		return `As seguintes páginas foram traduzidas e PRs foram criados:`;
 	}
 
-	/**
-	 * Comment footer template for issue comments
-	 */
+	/** Comment footer template for issue comments */
 	private get commentSufix() {
 		return `###### Observações
 	
-	- As traduções foram geradas por IA e precisam de revisão.
-	- Talvez algumas traduções já tenham PRs criados, mas ainda não foram fechados.
-	- O fluxo que escrevi para gerar as traduções está disponível no repositório [\`translate-react\`](https://github.com/${import.meta.env.REPO_OWNER}/translate-react).
-	- A implementação não é perfeita e pode conter erros.`;
+	- As traduções foram geradas por uma LLM e requerem revisão humana para garantir precisão técnica e fluência.
+	- Alguns arquivos podem ter PRs de tradução existentes em análise. Verifiquei duplicações, mas recomendo conferir.
+	- O fluxo de trabalho de automação completo está disponível no repositório [\`translate-react\`](https://github.com/${import.meta.env.REPO_OWNER}/translate-react) para referência e contribuições.
+	- Esta implementação é um trabalho em progresso e pode apresentar inconsistências em conteúdos técnicos complexos ou formatação específica.`;
 	}
 }

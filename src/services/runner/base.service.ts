@@ -1,12 +1,10 @@
 import type { ProcessedFileResult } from "@/types";
 import type { Ora } from "ora";
 
-import { GitHubService } from "@/services/github/";
+import { GitHubService } from "@/services/github/github.service";
 import { SnapshotService } from "@/services/snapshot.service";
 import { TranslatorService } from "@/services/translator.service";
-import { validateEnv } from "@/utils/env.util";
-import { extractErrorMessage } from "@/utils/errors.util";
-import { LanguageDetector } from "@/utils/language-detector.util";
+import { extractErrorMessage, LanguageDetector, setupSignalHandlers, validateEnv } from "@/utils/";
 
 export interface RunnerOptions {
 	targetLanguage: string;
@@ -14,24 +12,16 @@ export interface RunnerOptions {
 }
 
 export abstract class RunnerService {
-	/**
-	 * GitHub service instance for repository operations
-	 */
+	/** GitHub service instance for repository operations */
 	protected readonly github = new GitHubService();
 
-	/**
-	 * Translation service for content translation operations
-	 */
+	/** Translation service for content translation operations */
 	protected readonly translator: TranslatorService;
 
-	/**
-	 * Language detection service to identify content language
-	 */
+	/** Language detection service to identify content language */
 	protected readonly languageDetector: LanguageDetector;
 
-	/**
-	 * Snapshot manager to persist and retrieve workflow state
-	 */
+	/** Snapshot manager to persist and retrieve workflow state */
 	protected readonly snapshotManager = new SnapshotService();
 
 	/**
@@ -42,17 +32,13 @@ export abstract class RunnerService {
 		return import.meta.env.NODE_ENV === "production" ? undefined : 10;
 	}
 
-	/**
-	 * Statistics tracking for the translation process
-	 */
+	/** Statistics tracking for the translation process */
 	protected stats = {
 		results: new Map<ProcessedFileResult["filename"], ProcessedFileResult>(),
 		startTime: Date.now(),
 	};
 
-	/**
-	 * Progress spinner for CLI feedback
-	 */
+	/** Progress spinner for CLI feedback */
 	protected spinner: Ora | null = null;
 
 	/**
@@ -61,7 +47,7 @@ export abstract class RunnerService {
 	 */
 	protected cleanup = () => {
 		this.spinner?.stop();
-		// Force exit after a timeout to ensure cleanup handlers run
+
 		setTimeout(() => void process.exit(0), 1000);
 	};
 
@@ -87,12 +73,7 @@ export abstract class RunnerService {
 			target: this.options.targetLanguage,
 		});
 
-		process.on("SIGINT", this.cleanup);
-		process.on("SIGTERM", this.cleanup);
-		process.on("uncaughtException", (error) => {
-			console.error(`Uncaught exception: ${error.message}`);
-			this.cleanup();
-		});
+		setupSignalHandlers(this.cleanup);
 	}
 
 	protected get pullRequestDescription() {

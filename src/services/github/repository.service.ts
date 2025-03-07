@@ -18,8 +18,8 @@ export class RepositoryService extends BaseGitHubService {
 	 * Retrieves the repository file tree.
 	 * Can optionally filter out ignored paths.
 	 *
-	 * @param baseBranch - Branch to get tree from
-	 * @param filterIgnored - Whether to filter ignored paths
+	 * @param baseBranch Branch to get tree from
+	 * @param filterIgnored Whether to filter ignored paths
 	 *
 	 * @example
 	 * ```typescript
@@ -127,7 +127,7 @@ export class RepositoryService extends BaseGitHubService {
 	/**
 	 * Filters repository tree for valid markdown files.
 	 *
-	 * @param tree - Repository tree from GitHub API
+	 * @param tree Repository tree from GitHub API
 	 */
 	protected filterRepositoryTree(
 		tree: RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"],
