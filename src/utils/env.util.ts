@@ -24,7 +24,10 @@ const envSchema = z.object({
 	LLM_MODEL: z.string().min(1, "LLM model is required"),
 	LLM_BASE_URL: z.string().url().default("https://openrouter.ai/api/v1"),
 
-	PROGRESS_ISSUE_NUMBER: z.coerce.number().positive().optional(),
+	PROGRESS_ISSUE_NUMBER: z
+		.union([z.coerce.number().positive(), z.string().length(0), z.undefined()])
+		.optional()
+		.transform((value) => (value === "" ? undefined : value)),
 });
 
 /**

@@ -13,7 +13,27 @@ import { extractErrorMessage } from "@/utils/errors.util";
  * Handles file processing, translation, GitHub operations, and progress tracking.
  */
 export default class Runner extends RunnerService {
-	private exitCode = 0;
+	/** Batch progress tracking */
+	private readonly batchProgress = {
+		completed: 0,
+		successful: 0,
+		failed: 0,
+	};
+
+	/**
+	 * Updates the batch progress tracking and spinner text
+	 *
+	 * @param status The status of the completed file ('success' | 'error')
+	 */
+	private updateBatchProgress(status: "success" | "error") {
+		this.batchProgress.completed++;
+
+		if (status === "success") {
+			this.batchProgress.successful++;
+		} else {
+			this.batchProgress.failed++;
+		}
+	}
 
 	/**
 	 * # Main Workflow Execution
@@ -36,7 +56,9 @@ export default class Runner extends RunnerService {
 				spinner: "dots",
 			}).start();
 
-			if (!(await this.github.verifyTokenPermissions())) {
+			const hasPermissions = await this.github.verifyTokenPermissions();
+
+			if (!hasPermissions) {
 				this.spinner.fail("Token permissions verification failed");
 				throw new Error("Token permissions verification failed");
 			}
@@ -131,7 +153,7 @@ export default class Runner extends RunnerService {
 			) {
 				this.spinner.text = "Commenting on issue...";
 				const comment = await this.github.commentCompiledResultsOnIssue(
-					import.meta.env.PROGRESS_ISSUE_NUMBER,
+					Number(import.meta.env.PROGRESS_ISSUE_NUMBER),
 					snapshot.processedResults,
 				);
 				this.spinner.succeed(`Commented on translation issue: ${comment.html_url}`);
@@ -140,15 +162,10 @@ export default class Runner extends RunnerService {
 			if (import.meta.env.NODE_ENV === "production") {
 				await this.snapshotManager.clear();
 			}
-
-			this.exitCode = 0;
 		} catch (error) {
 			this.spinner?.fail(extractErrorMessage(error));
-			this.exitCode = 1;
 		} finally {
 			this.printFinalStatistics();
-
-			process.exit(this.exitCode);
 		}
 	}
 
@@ -191,12 +208,10 @@ export default class Runner extends RunnerService {
 	}
 
 	/**
-	 * # Batch Processing
-	 *
 	 * Processes files in batches to manage resources and provide progress feedback
 	 *
-	 * @param files - List of files to process
-	 * @param batchSize - Number of files to process simultaneously
+	 * @param files List of files to process
+	 * @param batchSize Number of files to process simultaneously
 	 */
 	private async processInBatches(files: TranslationFile[], batchSize = 10) {
 		if (!this.spinner) {
@@ -213,13 +228,18 @@ export default class Runner extends RunnerService {
 		}
 
 		for (const [batchIndex, batch] of batches.entries()) {
-			this.spinner!.text = `Processing batch ${batchIndex + 1}/${batches.length}`;
+			this.batchProgress.completed = 0;
+			this.batchProgress.successful = 0;
+			this.batchProgress.failed = 0;
+
+			this.spinner.text = `Processing batch ${batchIndex + 1}/${batches.length}`;
+			this.spinner.suffixText = `:: 0 out of ${batch.length} files completed (0% done)`;
 
 			await Promise.all(
-				batch.map((file, fileIndex) => {
+				batch.map((file) => {
 					const progress = {
 						batchIndex: batchIndex + 1,
-						fileIndex,
+						fileIndex: this.batchProgress.completed,
 						totalBatches: batches.length,
 						batchSize,
 					};
@@ -228,9 +248,13 @@ export default class Runner extends RunnerService {
 				}),
 			);
 
-			this.spinner!.succeed(`Completed batch ${batchIndex + 1}/${batches.length}`);
+			const successRate = Math.round((this.batchProgress.successful / batch.length) * 100);
+			this.spinner.succeed(
+				`Completed batch ${batchIndex + 1}/${batches.length} - ` +
+					`${this.batchProgress.successful}/${batch.length} successful (${successRate}% success rate)`,
+			);
 
-			if (batchIndex < batches.length - 1) this.spinner!.start();
+			if (batchIndex < batches.length - 1) this.spinner.start();
 		}
 	}
 
@@ -243,8 +267,8 @@ export default class Runner extends RunnerService {
 	 * - Performs translation
 	 * - Creates pull request
 	 *
-	 * @param file - File to process
-	 * @param progress - Progress tracking information
+	 * @param file File to process
+	 * @param progress Progress tracking information
 	 */
 	private async processFile(file: TranslationFile, progress: FileProcessingProgress) {
 		const metadata = this.stats.results.get(file.filename!) || {
@@ -255,16 +279,9 @@ export default class Runner extends RunnerService {
 			error: null,
 		};
 
-		const suffixText = `[${progress.fileIndex + 1}/${progress.batchSize}]`;
-
 		try {
-			this.spinner!.suffixText = `${suffixText} Creating branch for ${file.filename}`;
 			metadata.branch = await this.github.createOrGetTranslationBranch(file.filename!);
-
-			this.spinner!.suffixText = `${suffixText} Translating ${file.filename}`;
 			metadata.translation = await this.translator.translateContent(file);
-
-			this.spinner!.suffixText = `${suffixText} Committing ${file.filename}`;
 
 			await this.github.commitTranslation(
 				metadata.branch,
@@ -273,17 +290,25 @@ export default class Runner extends RunnerService {
 				`Translate \`${file.filename}\` to ${this.options.targetLanguage}`,
 			);
 
-			this.spinner!.suffixText = `${suffixText} Creating PR for ${file.filename}`;
 			metadata.pullRequest = await this.github.createPullRequest(
 				metadata.branch.ref,
 				`Translate \`${file.filename}\` to ${this.options.targetLanguage}`,
 				this.pullRequestDescription,
 			);
+
+			this.updateBatchProgress("success");
 		} catch (error) {
 			metadata.error = error instanceof Error ? error : new Error(String(error));
-			this.spinner!.suffixText = `${suffixText} Failed: ${metadata.error.message}`;
+			this.updateBatchProgress("error");
 		} finally {
 			this.stats.results.set(file.filename!, metadata);
+
+			if (this.spinner) {
+				const percentComplete = Math.round(
+					(this.batchProgress.completed / progress.batchSize) * 100,
+				);
+				this.spinner.suffixText = `[${this.batchProgress.completed}/${progress.batchSize}] files completed (${percentComplete}% done)`;
+			}
 		}
 	}
 }
