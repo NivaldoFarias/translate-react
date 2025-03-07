@@ -114,8 +114,7 @@ export class SnapshotService {
 
 			return snapshot as Snapshot;
 		} catch (error) {
-			console.error(`Failed to load snapshot: ${extractErrorMessage(error)}`);
-			return null;
+			throw new Error(`Failed to load snapshot: ${extractErrorMessage(error)}`);
 		}
 	}
 
