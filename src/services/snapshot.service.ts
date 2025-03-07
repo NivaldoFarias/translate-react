@@ -1,17 +1,9 @@
-import type { ProcessedFileResult, TranslationFile } from "@/types";
+import type { ProcessedFileResult, Snapshot, TranslationFile } from "@/types";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 import { DatabaseService } from "@/services/database.service";
+import { ERROR_MESSAGE } from "@/utils/constants.util";
 import { extractErrorMessage } from "@/utils/errors.util";
-
-/** Represents a snapshot of the translation workflow state */
-export interface Snapshot {
-	id: number;
-	timestamp: number;
-	repositoryTree: RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"];
-	filesToTranslate: TranslationFile[];
-	processedResults: ProcessedFileResult[];
-}
 
 /** Manages the creation, saving, and loading of translation workflow snapshots */
 export class SnapshotService {
@@ -130,6 +122,10 @@ export class SnapshotService {
 		try {
 			this.service.clearSnapshots();
 			this.currentSnapshotId = null;
+
+			if (import.meta.env.FORCE_SNAPSHOT_CLEAR) {
+				console.info(ERROR_MESSAGE.SNAPSHOT_FORCE_CLEAR);
+			}
 		} catch (error) {
 			console.error(`Failed to clear snapshots: ${extractErrorMessage(error)}`);
 		}

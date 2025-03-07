@@ -28,6 +28,8 @@ const envSchema = z.object({
 		.union([z.coerce.number().positive(), z.string().length(0), z.undefined()])
 		.optional()
 		.transform((value) => (value === "" ? undefined : value)),
+
+	FORCE_SNAPSHOT_CLEAR: z.coerce.boolean().default(false),
 });
 
 /**
@@ -51,7 +53,6 @@ export function validateEnv() {
 	try {
 		const env = envSchema.parse(import.meta.env);
 
-		// Update import.meta.env with parsed and transformed values
 		Object.assign(import.meta.env, env);
 
 		return env;

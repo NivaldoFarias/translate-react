@@ -63,6 +63,10 @@ export abstract class RunnerService {
 			snapshot: new SnapshotService(),
 		};
 
+		if (import.meta.env.FORCE_SNAPSHOT_CLEAR) {
+			this.services.snapshot.clear();
+		}
+
 		setupSignalHandlers(this.cleanup);
 	}
 
