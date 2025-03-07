@@ -136,11 +136,23 @@ export class DatabaseService {
 			VALUES (?, ?, ?, ?, ?, ?, ?)
 		`);
 
-		const transaction = this.db.transaction((items) => {
-			for (const item of items) {
-				statement.run(snapshotId, item.path, item.mode, item.type, item.sha, item.size, item.url);
-			}
-		});
+		const transaction = this.db.transaction(
+			(items: RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"]) => {
+				for (const item of items) {
+					const params = [
+						snapshotId,
+						item.path ?? null,
+						item.mode ?? null,
+						item.type ?? null,
+						item.sha ?? null,
+						item.size ?? null,
+						item.url ?? null,
+					] as const;
+
+					statement.run(...params);
+				}
+			},
+		);
 
 		transaction(tree);
 	}
@@ -155,12 +167,14 @@ export class DatabaseService {
 	public saveFilesToTranslate(snapshotId: number, files: TranslationFile[]) {
 		const statement = this.db.prepare(`
 			INSERT INTO files_to_translate (snapshot_id, content, sha, filename)
-			VALUES (?, ?, ?, ?, ?)
+			VALUES (?, ?, ?, ?)
 		`);
 
-		const transaction = this.db.transaction((items) => {
+		const transaction = this.db.transaction((items: TranslationFile[]) => {
 			for (const item of items) {
-				statement.run(snapshotId, item.path, item.content, item.sha, item.filename);
+				const params = [snapshotId, item.content, item.sha, item.filename] as const;
+
+				statement.run(...params);
 			}
 		});
 
@@ -184,20 +198,20 @@ export class DatabaseService {
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 		`);
 
-		const transaction = this.db.transaction((items) => {
+		const transaction = this.db.transaction((items: ProcessedFileResult[]) => {
 			for (const item of items) {
-				statement.run(
+				const params = [
 					snapshotId,
 					item.filename,
-					item.branch?.ref,
-					item.branch?.object.sha,
-					typeof item.translation === "string" ?
-						item.translation
-					:	item.translation?.choices[0].message.content,
-					item.pullRequest?.number,
-					item.pullRequest?.html_url,
-					item.error?.message,
-				);
+					item.branch?.ref ?? null,
+					item.branch?.object.sha ?? null,
+					item.translation ?? null,
+					item.pullRequest?.number ?? null,
+					item.pullRequest?.html_url ?? null,
+					item.error?.message ?? null,
+				] as const;
+
+				statement.run(...params);
 			}
 		});
 
