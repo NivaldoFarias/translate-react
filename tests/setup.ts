@@ -12,14 +12,13 @@ beforeEach(() => {
 		GITHUB_TOKEN: "test-token",
 		LLM_API_KEY: "test-key",
 		LLM_MODEL: "test-model",
-		REPO_OWNER: "test-owner",
-		REPO_NAME: "test-repo",
-		ORIGINAL_REPO_OWNER: "test-original-owner",
+		REPO_FORK_OWNER: "test-owner",
+		REPO_FORK_NAME: "test-repo",
+		REPO_UPSTREAM_OWNER: "test-original-owner",
 		NODE_ENV: "test",
 		BUN_ENV: "test",
 		LLM_BASE_URL: "https://openrouter.ai/api/v1",
-		TRANSLATION_ISSUE_NUMBER: "1",
-		GITHUB_SINCE: "2024-01-01T00:00:00Z",
+		PROGRESS_ISSUE_NUMBER: "1",
 	};
 
 	// Assign to process.env ensuring all values are strings

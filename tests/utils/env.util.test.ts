@@ -16,9 +16,9 @@ describe("Environment Utilities", () => {
 			GITHUB_TOKEN: "test-token",
 			LLM_API_KEY: "test-key",
 			LLM_MODEL: "test-model",
-			REPO_OWNER: "test-owner",
-			REPO_NAME: "test-repo",
-			ORIGINAL_REPO_OWNER: "test-original-owner",
+			REPO_FORK_OWNER: "test-owner",
+			REPO_FORK_NAME: "test-repo",
+			REPO_UPSTREAM_OWNER: "test-original-owner",
 			NODE_ENV: "test",
 			BUN_ENV: "test",
 		});

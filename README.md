@@ -43,13 +43,12 @@ GITHUB_TOKEN=your_github_token                 # required
 LLM_API_KEY=your_LLM_API_KEY                   # required
 LLM_MODEL=gpt-4                                # required
 LLM_BASE_URL=https://openrouter.ai/api/v1      # optional, defaults to openrouter.ai
-REPO_OWNER=target_repo_owner                   # required
-REPO_NAME=target_repo_name                     # required
-ORIGINAL_REPO_OWNER=original_repo_owner        # required
+REPO_FORK_OWNER=target_REPO_FORK_OWNER                   # required
+REPO_FORK_NAME=target_REPO_FORK_NAME                     # required
+REPO_UPSTREAM_OWNER=REPO_UPSTREAM_OWNER        # required
 NODE_ENV=development|production|test           # optional, defaults to development
 BUN_ENV=development|production|test            # optional, defaults to development
-TRANSLATION_ISSUE_NUMBER=123                   # optional, only used for tracking progress
-GITHUB_SINCE=2024-01-01                        # optional, filters issue comments since date
+PROGRESS_ISSUE_NUMBER=123                   # optional, only used for tracking progress
 ```
 
 > [!NOTE]

@@ -19,12 +19,12 @@ export class GitHubService {
 	/** Repository configuration for upstream and fork */
 	protected readonly repos = {
 		upstream: {
-			owner: import.meta.env.ORIGINAL_REPO_OWNER!,
-			repo: import.meta.env.REPO_NAME!,
+			owner: import.meta.env.REPO_UPSTREAM_OWNER!,
+			repo: import.meta.env.REPO_FORK_NAME!,
 		},
 		fork: {
-			owner: import.meta.env.REPO_OWNER!,
-			repo: import.meta.env.REPO_NAME!,
+			owner: import.meta.env.REPO_FORK_OWNER!,
+			repo: import.meta.env.REPO_FORK_NAME!,
 		},
 	};
 
