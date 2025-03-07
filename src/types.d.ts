@@ -21,6 +21,9 @@ export interface TranslationFile {
     /** The SHA of the file */
     sha: string;
 
+    /** The path of the file */
+    path: string;
+
     /** The filename of the file */
     filename: string;
 

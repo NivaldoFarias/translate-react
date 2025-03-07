@@ -162,7 +162,7 @@ export default class Runner extends RunnerService {
 						batch.map(async (file) => {
 							const filename = file.path?.split("/").pop();
 
-							if (!filename || !file.sha) return null;
+							if (!filename || !file.sha || !file.path) return null;
 
 							const content = await this.services.github.getFileContent(file);
 							updateSpinner();
@@ -170,6 +170,7 @@ export default class Runner extends RunnerService {
 							return {
 								content,
 								filename,
+								path: file.path,
 								sha: file.sha,
 							};
 						}),

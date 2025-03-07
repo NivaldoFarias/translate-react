@@ -43,6 +43,7 @@ export class ContentService extends BaseGitHubService {
 			const filesToProcess = maxFiles ? markdownFiles.slice(0, maxFiles) : markdownFiles;
 
 			const files: TranslationFile[] = [];
+
 			for (const file of filesToProcess) {
 				if (!file.path) continue;
 
@@ -58,6 +59,7 @@ export class ContentService extends BaseGitHubService {
 						path: file.path,
 						content: Buffer.from(response.data.content, "base64").toString(),
 						sha: response.data.sha,
+						filename: file.path.split("/").pop()!,
 					});
 				} catch (error) {
 					console.error(`Failed to fetch content for ${file.path}: ${extractErrorMessage(error)}`);
@@ -101,7 +103,7 @@ export class ContentService extends BaseGitHubService {
 		try {
 			const currentFile = await this.octokit.repos.getContent({
 				...this.fork,
-				path: file.path!,
+				path: file.path,
 				ref: branch.object.sha,
 			});
 
@@ -109,7 +111,7 @@ export class ContentService extends BaseGitHubService {
 
 			await this.octokit.repos.createOrUpdateFileContents({
 				...this.fork,
-				path: file.path!,
+				path: file.path,
 				message,
 				content: Buffer.from(content).toString("base64"),
 				branch: branch.ref,
