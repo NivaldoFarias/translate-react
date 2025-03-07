@@ -65,7 +65,7 @@ export class LanguageDetector {
 	 * const detector = new LanguageDetector({ source: 'en', target: 'pt' });
 	 * ```
 	 *
-	 * @param config - Language configuration with source and target languages
+	 * @param config Language configuration with source and target languages
 	 */
 	public constructor(config: LanguageConfig) {
 		this.languages = {
