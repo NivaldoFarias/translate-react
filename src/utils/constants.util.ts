@@ -14,6 +14,7 @@ export const ERROR_MESSAGE = {
 	SNAPSHOT_LOAD_FAILED: "Failed to load snapshot",
 	SNAPSHOT_CLEAR_FAILED: "Failed to clear snapshots",
 	SNAPSHOT_CLEANUP_FAILED: "Failed to cleanup snapshots",
+	SNAPSHOT_FORCE_CLEAR: "Forcefully cleared all snapshots as requested by FORCE_SNAPSHOT_CLEAR",
 } as const;
 
 /** Keys used in snapshot data structure */

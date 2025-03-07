@@ -71,7 +71,6 @@ export class DatabaseService {
 			CREATE TABLE IF NOT EXISTS files_to_translate (
 				id INTEGER PRIMARY KEY AUTOINCREMENT,
 				snapshot_id INTEGER NOT NULL,
-				path TEXT NOT NULL,
 				content TEXT NOT NULL,
 				sha TEXT NOT NULL,
 				filename TEXT,
@@ -155,7 +154,7 @@ export class DatabaseService {
 	 */
 	public saveFilesToTranslate(snapshotId: number, files: TranslationFile[]) {
 		const statement = this.db.prepare(`
-			INSERT INTO files_to_translate (snapshot_id, path, content, sha, filename)
+			INSERT INTO files_to_translate (snapshot_id, content, sha, filename)
 			VALUES (?, ?, ?, ?, ?)
 		`);
 

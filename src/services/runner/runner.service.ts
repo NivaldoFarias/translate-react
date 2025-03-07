@@ -1,9 +1,12 @@
 import ora from "ora";
 
-import type { FileProcessingProgress, ProcessedFileResult, TranslationFile } from "@/types";
+import type {
+	FileProcessingProgress,
+	ProcessedFileResult,
+	Snapshot,
+	TranslationFile,
+} from "@/types";
 import type { SetNonNullable } from "type-fest";
-
-import type { Snapshot } from "../snapshot.service";
 
 import { RunnerService } from "@/services/runner/base.service";
 import { extractErrorMessage } from "@/utils/errors.util";
@@ -20,6 +23,14 @@ export default class Runner extends RunnerService {
 		completed: 0,
 		successful: 0,
 		failed: 0,
+	};
+
+	/** State of the runner's workflow */
+	private state: Snapshot = {
+		repositoryTree: [],
+		filesToTranslate: [],
+		processedResults: [],
+		timestamp: Date.now(),
 	};
 
 	/**
@@ -90,25 +101,18 @@ export default class Runner extends RunnerService {
 				this.spinner.start();
 			}
 
-			let data: Omit<Snapshot, "id"> = {
-				repositoryTree: [],
-				filesToTranslate: [],
-				processedResults: [],
-				timestamp: Date.now(),
-			};
-
 			if (import.meta.env.NODE_ENV === "development") {
 				const latestSnapshot = await this.services.snapshot.loadLatest();
 
-				if (latestSnapshot && !isForkSynced) data = latestSnapshot;
+				if (latestSnapshot && !isForkSynced) this.state = latestSnapshot;
 			}
 
-			if (!data.repositoryTree?.length) {
+			if (!this.state.repositoryTree?.length) {
 				this.spinner.text = "Fetching repository content...";
-				data.repositoryTree = await this.services.github.getRepositoryTree("main");
+				this.state.repositoryTree = await this.services.github.getRepositoryTree("main");
 
 				if (import.meta.env.NODE_ENV === "development") {
-					await this.services.snapshot.append("repositoryTree", data.repositoryTree);
+					await this.services.snapshot.append("repositoryTree", this.state.repositoryTree);
 				}
 
 				this.spinner.text = "Repository tree fetched. Fetching glossary...";
@@ -132,12 +136,12 @@ export default class Runner extends RunnerService {
 
 			this.spinner.start();
 
-			if (!data.filesToTranslate?.length) {
+			if (!this.state.filesToTranslate?.length) {
 				const uncheckedFiles: TranslationFile[] = [];
 
-				this.spinner.text = `Fetching ${data.repositoryTree.length} files...`;
+				this.spinner.text = `Fetching ${this.state.repositoryTree.length} files...`;
 
-				const totalFiles = data.repositoryTree.length;
+				const totalFiles = this.state.repositoryTree.length;
 				let completedFiles = 0;
 
 				const updateSpinner = () => {
@@ -146,7 +150,7 @@ export default class Runner extends RunnerService {
 					this.spinner!.text = `Fetching files: ${completedFiles}/${totalFiles} (${percentage}%)`;
 				};
 
-				const uniqueFiles = data.repositoryTree.filter(
+				const uniqueFiles = this.state.repositoryTree.filter(
 					(file, index, self) => index === self.findIndex((f) => f.path === file.path),
 				);
 
@@ -174,30 +178,30 @@ export default class Runner extends RunnerService {
 					uncheckedFiles.push(...batchResults.filter((file) => !!file));
 				}
 
-				data.filesToTranslate = uncheckedFiles.filter(
+				this.state.filesToTranslate = uncheckedFiles.filter(
 					(file) => !this.services.translator.isFileTranslated(file),
 				);
 
 				if (import.meta.env.NODE_ENV === "development") {
-					await this.services.snapshot.append("filesToTranslate", data.filesToTranslate);
+					await this.services.snapshot.append("filesToTranslate", this.state.filesToTranslate);
 				}
 
-				this.spinner.succeed(`Found ${data.filesToTranslate.length} files to translate`);
+				this.spinner.succeed(`Found ${this.state.filesToTranslate.length} files to translate`);
 			} else {
 				this.spinner.stopAndPersist({
 					symbol: "📦",
-					text: `Found ${data.filesToTranslate.length} files to translate`,
+					text: `Found ${this.state.filesToTranslate.length} files to translate`,
 				});
 			}
 
 			this.spinner.start();
 
-			await this.processInBatches(data.filesToTranslate, 10);
+			await this.processInBatches(this.state.filesToTranslate, 10);
 
-			data.processedResults = Array.from(this.stats.results.values());
+			this.state.processedResults = Array.from(this.stats.results.values());
 
 			if (import.meta.env.NODE_ENV === "development") {
-				await this.services.snapshot.append("processedResults", data.processedResults);
+				await this.services.snapshot.append("processedResults", this.state.processedResults);
 			}
 
 			this.spinner.succeed("Translation completed");
@@ -206,7 +210,7 @@ export default class Runner extends RunnerService {
 				this.spinner.text = "Commenting on issue...";
 				const comment = await this.services.github.commentCompiledResultsOnIssue(
 					Number(import.meta.env.PROGRESS_ISSUE_NUMBER),
-					data.processedResults,
+					this.state.processedResults,
 				);
 				this.spinner.succeed(`Commented on translation issue: ${comment.html_url}`);
 			}
