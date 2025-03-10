@@ -1,3 +1,5 @@
+import { TranslateError } from "@/errors";
+
 /**
  * Standardized error codes for translation workflow errors.
  * Used to categorize and handle different types of errors consistently.
@@ -50,7 +52,49 @@ export class TranslationError extends Error {
 	}
 }
 
-export function extractErrorMessage(error: unknown) {
-	if (error instanceof Error) return error.message;
-	else return "Unexpected error";
+/**
+ * Extracts a human-readable error message from various error types
+ *
+ * ## Handling
+ * - TranslateError: Uses the formatted message with context
+ * - Error: Uses the native error message
+ * - Other types: Converts to string
+ *
+ * @param error - The error to extract a message from
+ */
+export function extractErrorMessage(error: unknown): string {
+	if (error instanceof TranslateError) {
+		const context = error.context.operation ? ` (in ${error.context.operation})` : "";
+		return `${error.message}${context}`;
+	}
+
+	if (error instanceof Error) {
+		return error.message;
+	}
+
+	return String(error);
+}
+
+/**
+ * Creates a standardized error context object for logging
+ *
+ * @param error - The error to create context for
+ * @param operation - The operation where the error occurred
+ * @param metadata - Additional context information
+ */
+export function createErrorContext(
+	error: unknown,
+	operation: string,
+	metadata?: Record<string, unknown>,
+) {
+	return {
+		timestamp: new Date().toISOString(),
+		operation,
+		error: extractErrorMessage(error),
+		metadata: {
+			...metadata,
+			errorType: error instanceof Error ? error.constructor.name : typeof error,
+			stack: error instanceof Error ? error.stack : undefined,
+		},
+	};
 }
