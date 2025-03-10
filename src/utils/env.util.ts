@@ -64,6 +64,7 @@ export function validateEnv() {
 				.join("\n");
 			throw new Error(`❌ Invalid environment variables:\n${issues}`);
 		}
+
 		throw error;
 	}
 }
