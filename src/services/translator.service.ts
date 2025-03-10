@@ -1,10 +1,12 @@
 import { franc } from "franc";
 import OpenAI from "openai";
 
-import type { TranslationFile } from "@/types";
 import type { LanguageConfig } from "@/utils/language-detector.util";
 
-import { ErrorCodes, extractErrorMessage, LanguageDetector, TranslationError } from "@/utils/";
+import { ErrorCode } from "@/errors/base.error";
+import { createErrorHandlingProxy } from "@/errors/proxy.handler";
+import { LanguageDetector } from "@/utils/";
+import TranslationFile from "@/utils/translation-file.util";
 
 /**
  * # Translation Service
@@ -38,25 +40,53 @@ export class TranslatorService {
 			source: this.options.source,
 			target: this.options.target,
 		});
+
+		// Wrap the OpenAI client with error handling
+		this.llm = createErrorHandlingProxy(this.llm, {
+			serviceName: "OpenAI",
+			errorMap: {
+				APIError: {
+					code: ErrorCode.LLM_API_ERROR,
+					transform: (error: Error) => ({
+						metadata: {
+							statusCode: (error as any).status,
+							type: (error as any).type,
+						},
+					}),
+				},
+				RateLimitError: {
+					code: ErrorCode.RATE_LIMIT_EXCEEDED,
+				},
+			},
+		});
 	}
 
 	/**
 	 * Makes API calls to OpenAI for content translation.
 	 * Constructs appropriate prompts and handles response processing.
 	 *
-	 * ## Workflow
-	 * 1. Builds system and user prompts
-	 * 2. Makes API call with configured model
-	 *
 	 * @param content Main content to translate
 	 */
 	private async callLanguageModel(content: string) {
-		return (await this.llm.chat.completions.create({
+		const response = (await this.llm.chat.completions.create({
 			model: import.meta.env.LLM_MODEL,
 			messages: this.createPrompt(content),
-		})) as
-			| OpenAI.Chat.Completions.ChatCompletion
-			| { error: OpenAI.ErrorObject; _request_id: string | null };
+		})) as OpenAI.Chat.Completions.ChatCompletion | { error: { message: string } };
+
+		if ("error" in response) {
+			throw new Error(response.error.message);
+		}
+
+		if (response.choices[0]?.finish_reason === "length") {
+			throw new Error("Content is too long");
+		}
+
+		const translatedContent = response.choices[0]?.message.content;
+		if (!translatedContent) {
+			throw new Error("No content returned");
+		}
+
+		return translatedContent;
 	}
 
 	/**
@@ -90,43 +120,12 @@ export class TranslatorService {
 	 * @param file File containing content to translate
 	 */
 	public async translateContent(file: TranslationFile) {
-		try {
-			if (typeof file.content === "string" && file.content.length === 0) {
-				throw new TranslationError(
-					`File content is empty: ${file.filename}`,
-					ErrorCodes.INVALID_CONTENT,
-				);
-			}
-
-			const response = await this.callLanguageModel(file.content);
-
-			if ("error" in response) {
-				throw new TranslationError(
-					`Translation failed: ${response.error.message}`,
-					ErrorCodes.LLM_API_ERROR,
-				);
-			}
-
-			if (response.choices[0]?.finish_reason === "length") {
-				throw new TranslationError("Content is too long", ErrorCodes.CONTENT_TOO_LONG);
-			}
-
-			const content = response.choices[0]?.message.content;
-
-			if (!content) {
-				throw new TranslationError("No content returned", ErrorCodes.NO_CONTENT);
-			}
-
-			return this.removeFences(content);
-		} catch (error) {
-			if (error instanceof TranslationError) throw error;
-
-			throw new TranslationError(
-				`Translation failed: ${extractErrorMessage(error)}`,
-				ErrorCodes.LLM_API_ERROR,
-				{ filename: file.filename },
-			);
+		if (!file.content?.length) {
+			throw new Error(`File content is empty: ${file.filename}`);
 		}
+
+		const content = await this.callLanguageModel(file.content);
+		return this.removeFences(content);
 	}
 
 	/**

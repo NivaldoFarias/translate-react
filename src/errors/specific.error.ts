@@ -1,6 +1,6 @@
 import type { ErrorContext } from "./base.error";
 
-import { ErrorCodes, TranslateError } from "./base.error";
+import { ErrorCode, TranslateError } from "./base.error";
 
 /** Thrown when the translation service fails to initialize */
 export class InitializationError extends TranslateError {
@@ -11,7 +11,7 @@ export class InitializationError extends TranslateError {
 	 * @param context The error context
 	 */
 	constructor(message: string, context?: Partial<ErrorContext>) {
-		super(message, ErrorCodes.INITIALIZATION_ERROR, context);
+		super(message, ErrorCode.INITIALIZATION_ERROR, context);
 	}
 }
 
@@ -24,7 +24,7 @@ export class MissingKeyError extends TranslateError {
 	 * @param context The error context
 	 */
 	constructor(key: string, context?: Partial<ErrorContext>) {
-		super(`Translation key "${key}" not found`, ErrorCodes.MISSING_KEY, context);
+		super(`Translation key "${key}" not found`, ErrorCode.MISSING_KEY, context);
 	}
 }
 
@@ -37,7 +37,7 @@ export class UnsupportedLanguageError extends TranslateError {
 	 * @param context The error context
 	 */
 	constructor(language: string, context?: Partial<ErrorContext>) {
-		super(`Language "${language}" is not supported`, ErrorCodes.UNSUPPORTED_LANG, context);
+		super(`Language "${language}" is not supported`, ErrorCode.UNSUPPORTED_LANG, context);
 	}
 }
 
@@ -52,7 +52,7 @@ export class ResourceLoadError extends TranslateError {
 	constructor(resource: string, context?: Partial<ErrorContext>) {
 		super(
 			`Failed to load translation resource "${resource}"`,
-			ErrorCodes.RESOURCE_LOAD_ERROR,
+			ErrorCode.RESOURCE_LOAD_ERROR,
 			context,
 		);
 	}
@@ -70,7 +70,7 @@ export class APIError extends TranslateError {
 	constructor(endpoint: string, statusCode: number, context?: Partial<ErrorContext>) {
 		super(
 			`API request to "${endpoint}" failed with status ${statusCode}`,
-			ErrorCodes.API_ERROR,
+			ErrorCode.API_ERROR,
 			context,
 		);
 	}
@@ -85,6 +85,6 @@ export class ValidationError extends TranslateError {
 	 * @param context The error context
 	 */
 	constructor(message: string, context?: Partial<ErrorContext>) {
-		super(message, ErrorCodes.VALIDATION_ERROR, context);
+		super(message, ErrorCode.VALIDATION_ERROR, context);
 	}
 }

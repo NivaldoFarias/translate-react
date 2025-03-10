@@ -1,8 +1,7 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 
-import type { TranslationFile } from "@/types";
-
 import { TranslatorService } from "@/services/translator.service";
+import TranslationFile from "@/utils/translation-file.util";
 
 /**
  * Test suite for Translator Service
