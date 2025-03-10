@@ -14,7 +14,7 @@ describe("Environment Utilities", () => {
 		// Reset import.meta.env for each test
 		Object.assign(import.meta.env, {
 			GITHUB_TOKEN: "test-token",
-			LLM_API_KEY: "test-key",
+			OPENAI_API_KEY: "test-key",
 			LLM_MODEL: "test-model",
 			REPO_FORK_OWNER: "test-owner",
 			REPO_FORK_NAME: "test-repo",
@@ -27,7 +27,7 @@ describe("Environment Utilities", () => {
 	test("should validate correct environment variables", () => {
 		const env = validateEnv();
 		expect(env.GITHUB_TOKEN).toBe("test-token");
-		expect(env.LLM_API_KEY).toBe("test-key");
+		expect(env.OPENAI_API_KEY).toBe("test-key");
 		expect(env.NODE_ENV).toBe("test");
 	});
 
@@ -42,7 +42,7 @@ describe("Environment Utilities", () => {
 
 	test("should use default values for optional variables", () => {
 		const env = validateEnv();
-		expect(env.LLM_BASE_URL).toBe("https://openrouter.ai/api/v1");
+		expect(env.OPENAI_BASE_URL).toBe("https://openrouter.ai/api/v1");
 	});
 
 	test("should validate enum values", () => {

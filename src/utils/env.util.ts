@@ -20,9 +20,10 @@ const envSchema = z.object({
 	REPO_FORK_NAME: z.string().min(1, "Repository name is required"),
 	REPO_UPSTREAM_OWNER: z.string().min(1, "Original repository owner is required"),
 
-	LLM_API_KEY: z.string().min(1, "LLM API key is required"),
 	LLM_MODEL: z.string().min(1, "LLM model is required"),
-	LLM_BASE_URL: z.string().url().default("https://openrouter.ai/api/v1"),
+	OPENAI_API_KEY: z.string().min(1, "LLM API key is required"),
+	OPENAI_BASE_URL: z.string().url().default("https://openrouter.ai/api/v1"),
+	OPENAI_PROJECT_ID: z.string().min(1, "OpenAI project ID is required"),
 
 	PROGRESS_ISSUE_NUMBER: z
 		.union([z.coerce.number().positive(), z.string().length(0), z.undefined()])
