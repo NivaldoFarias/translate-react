@@ -10,14 +10,14 @@ beforeEach(() => {
 	// Set up test environment variables
 	const testEnv = {
 		GITHUB_TOKEN: "test-token",
-		LLM_API_KEY: "test-key",
+		OPENAI_API_KEY: "test-key",
 		LLM_MODEL: "test-model",
 		REPO_FORK_OWNER: "test-owner",
 		REPO_FORK_NAME: "test-repo",
 		REPO_UPSTREAM_OWNER: "test-original-owner",
 		NODE_ENV: "test",
 		BUN_ENV: "test",
-		LLM_BASE_URL: "https://openrouter.ai/api/v1",
+		OPENAI_BASE_URL: "https://openrouter.ai/api/v1",
 		PROGRESS_ISSUE_NUMBER: "1",
 	};
 

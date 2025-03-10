@@ -19,8 +19,9 @@ import { ErrorCodes, extractErrorMessage, LanguageDetector, TranslationError } f
 export class TranslatorService {
 	/** Language model instance for translation */
 	private readonly llm = new OpenAI({
-		baseURL: import.meta.env.LLM_BASE_URL,
-		apiKey: import.meta.env.LLM_API_KEY,
+		baseURL: import.meta.env.OPENAI_BASE_URL,
+		apiKey: import.meta.env.OPENAI_API_KEY,
+		defaultHeaders: { "X-Title": "Translate React" },
 	});
 
 	private readonly languageDetector: LanguageDetector;
