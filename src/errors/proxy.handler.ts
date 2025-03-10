@@ -1,9 +1,8 @@
-import Bun from "bun";
-
-import type { BunFile } from "bun";
-
 import type { ErrorContext } from "./base.error";
 
+import TranslationFile from "@/utils/translation-file.util";
+
+import { ErrorCode, TranslateError } from "./base.error";
 import { ErrorHandler } from "./error-handler";
 
 /** Configuration options for creating an error-handling proxy */
@@ -19,6 +18,14 @@ export interface ProxyHandlerOptions {
 
 	/** Methods that should be excluded from error handling */
 	excludeMethods?: string[];
+
+	/** Error mapping for specific error types */
+	errorMap?: {
+		[key: string]: {
+			code: ErrorCode;
+			transform?: (error: Error) => Partial<ErrorContext>;
+		};
+	};
 }
 
 /**
@@ -37,11 +44,12 @@ export interface ProxyHandlerOptions {
  *
  * // After proxying - all methods automatically handle errors
  * const safeGithubService = createErrorHandlingProxy(githubService, {
- *   serviceName: 'GitHubService'
+ *   serviceName: 'GitHubService',
+ *   errorMap: {
+ *     'HttpError': { code: ErrorCode.GITHUB_API_ERROR },
+ *     'RateLimitError': { code: ErrorCode.RATE_LIMIT_EXCEEDED }
+ *   }
  * });
- *
- * // Now you can call methods directly without try/catch
- * await safeGithubService.createPullRequest(...);
  * ```
  */
 export function createErrorHandlingProxy<T extends object>(
@@ -49,7 +57,7 @@ export function createErrorHandlingProxy<T extends object>(
 	options: ProxyHandlerOptions,
 ): T {
 	const errorHandler = ErrorHandler.getInstance();
-	const { serviceName, baseContext = {}, excludeMethods = [] } = options;
+	const { serviceName, baseContext = {}, excludeMethods = [], errorMap = {} } = options;
 
 	return new Proxy(target, {
 		get(obj, prop) {
@@ -70,18 +78,66 @@ export function createErrorHandlingProxy<T extends object>(
 						...baseContext.metadata,
 						arguments: args.map((arg) =>
 							// Don't include file contents in metadata to avoid bloat
-							arg instanceof Bun.file ? `BunFile(${(arg as BunFile).name})` : arg,
+							arg && arg instanceof TranslationFile ? `TranslationFile(${arg.filename})` : arg,
 						),
 					},
 				};
 
-				// Handle async methods
-				if (value.constructor.name === "AsyncFunction") {
-					return errorHandler.wrapAsync(async () => await value.apply(obj, args), context)();
-				}
+				const handleError = (error: unknown) => {
+					// If it's already our error type, just add the context
+					if (error instanceof TranslateError) {
+						error.context.operation = context.operation;
+						error.context.metadata = {
+							...error.context.metadata,
+							...context.metadata,
+						};
+						throw error;
+					}
 
-				// Handle synchronous methods
-				return errorHandler.wrapSync(() => value.apply(obj, args), context)();
+					// Check if we have a specific error mapping
+					if (error instanceof Error) {
+						const errorType = error.constructor.name;
+						const mapping = errorMap[errorType];
+						if (mapping) {
+							const additionalContext = mapping.transform?.(error) ?? {};
+							throw new TranslateError(error.message, mapping.code, {
+								...context,
+								...additionalContext,
+							});
+						}
+					}
+
+					// Default error handling
+					throw new TranslateError(
+						error instanceof Error ? error.message : String(error),
+						ErrorCode.UNKNOWN_ERROR,
+						context,
+					);
+				};
+
+				try {
+					// Handle async methods
+					if (value.constructor.name === "AsyncFunction") {
+						return errorHandler.wrapAsync(async () => {
+							try {
+								return await value.apply(obj, args);
+							} catch (error) {
+								handleError(error);
+							}
+						}, context)();
+					}
+
+					// Handle synchronous methods
+					return errorHandler.wrapSync(() => {
+						try {
+							return value.apply(obj, args);
+						} catch (error) {
+							handleError(error);
+						}
+					}, context)();
+				} catch (error) {
+					handleError(error);
+				}
 			};
 		},
 	});

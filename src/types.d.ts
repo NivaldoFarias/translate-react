@@ -1,6 +1,8 @@
 import type { Environment } from "@/utils/env.util";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
+import TranslationFile from "@/utils/translation-file.util";
+
 /** Represents the progress of file processing in batches */
 export interface FileProcessingProgress {
     /** The index of the current batch */
@@ -14,21 +16,6 @@ export interface FileProcessingProgress {
 
     /** The number of files to process in each batch */
     batchSize: number;
-}
-
-/** Represents a file that needs to be translated */
-export interface TranslationFile {
-    /** The SHA of the file */
-    sha: string;
-
-    /** The path of the file */
-    path: string;
-
-    /** The filename of the file */
-    filename: string;
-
-    /** The content of the file */
-    content: string;
 }
 
 export interface ProcessedFileResult {

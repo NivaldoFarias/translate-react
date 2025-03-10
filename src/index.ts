@@ -7,7 +7,9 @@ import Runner from "@/services/runner/runner.service";
 import { parseCommandLineArgs } from "@/utils/parse-command-args.util";
 
 if (import.meta.main) {
-	const errorHandler = initializeErrorHandler(Bun.file("logs/translate-react.log"));
+	const errorHandler = initializeErrorHandler(
+		Bun.file(`logs/translate-react-${new Date().toISOString()}.log`),
+	);
 
 	const runTranslation = errorHandler.wrapAsync(
 		async () => {
@@ -44,7 +46,7 @@ function initializeErrorHandler(logFile?: BunFile) {
 		logToFile: !!logFile,
 		logFilePath: logFile?.name,
 		customReporter: (error) => {
-			if (error.context.severity === ErrorSeverity.FATAL) {
+			if (error.context.sanity === ErrorSeverity.FATAL) {
 				process.exit(1);
 			}
 		},

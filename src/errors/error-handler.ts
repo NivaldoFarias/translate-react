@@ -4,7 +4,7 @@ import type { BunFile } from "bun";
 
 import type { ErrorContext } from "./base.error";
 
-import { ErrorSeverity, TranslateError } from "./base.error";
+import { ErrorCode, ErrorSeverity, TranslateError } from "./base.error";
 
 /* eslint-disable no-console */
 
@@ -59,9 +59,8 @@ export class ErrorHandler {
 	 * @returns The singleton instance of ErrorHandler
 	 */
 	public static getInstance(config?: ErrorHandlerConfig): ErrorHandler {
-		if (!ErrorHandler.instance) {
-			ErrorHandler.instance = new ErrorHandler(config);
-		}
+		if (!ErrorHandler.instance) ErrorHandler.instance = new ErrorHandler(config);
+
 		return ErrorHandler.instance;
 	}
 
@@ -143,11 +142,13 @@ export class ErrorHandler {
 	private wrapError(error: Error, context?: Partial<ErrorContext>): TranslateError {
 		if (error instanceof TranslateError) return error;
 
-		return new TranslateError(error.message, "UNKNOWN_ERROR", {
-			severity: ErrorSeverity.ERROR,
+		const originalError = error instanceof Error ? error : new Error(String(error));
+
+		return new TranslateError(originalError.message, ErrorCode.UNKNOWN_ERROR, {
+			sanity: ErrorSeverity.ERROR,
 			...context,
 			metadata: {
-				originalError: error,
+				originalError,
 				...context?.metadata,
 			},
 		});
@@ -159,16 +160,14 @@ export class ErrorHandler {
 	 * @param error The error to log
 	 */
 	private logError(error: TranslateError) {
-		const severity = error.context.severity ?? ErrorSeverity.ERROR;
+		const severity = error.context.sanity ?? ErrorSeverity.ERROR;
 		if (this.shouldLog(severity)) {
-			const logMessage = JSON.stringify(error.toJSON(), null, 2);
 			const method = this.getSeverityMethod(severity);
 
-			// Use type assertion to handle dynamic console method call
-			(console[method] as (...args: any[]) => void)(logMessage);
+			(console[method] as (...args: any[]) => void)(error.message);
 
 			if (this.logStream) {
-				this.logStream.write(logMessage + "\n");
+				this.logStream.write(JSON.stringify(error.toJSON(), null, 2) + "\n");
 			}
 		}
 	}

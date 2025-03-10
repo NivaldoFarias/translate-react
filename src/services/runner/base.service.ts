@@ -1,11 +1,6 @@
 import ora from "ora";
 
-import type {
-	FileProcessingProgress,
-	ProcessedFileResult,
-	Snapshot,
-	TranslationFile,
-} from "@/types";
+import type { FileProcessingProgress, ProcessedFileResult, Snapshot } from "@/types";
 import type { SetNonNullable } from "type-fest";
 
 import { ErrorHandler } from "@/errors/error-handler";
@@ -15,6 +10,7 @@ import { GitHubService } from "@/services/github/github.service";
 import { SnapshotService } from "@/services/snapshot.service";
 import { TranslatorService } from "@/services/translator.service";
 import { extractErrorMessage, setupSignalHandlers, validateEnv } from "@/utils/";
+import TranslationFile from "@/utils/translation-file.util";
 
 export interface RunnerOptions {
 	targetLanguage: string;
@@ -295,14 +291,10 @@ export abstract class RunnerService {
 				if (!filename || !file.sha || !file.path) return null;
 
 				const content = await this.services.github.getFileContent(file);
+
 				updateSpinnerFn();
 
-				return {
-					content,
-					filename,
-					path: file.path,
-					sha: file.sha,
-				};
+				return new TranslationFile(content, filename, file.path, file.sha);
 			}),
 		);
 	}

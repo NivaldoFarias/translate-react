@@ -1,8 +1,9 @@
-import type { ProcessedFileResult, TranslationFile } from "@/types";
+import type { ProcessedFileResult } from "@/types";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 import { BaseGitHubService } from "@/services/github/base.service";
 import { extractErrorMessage } from "@/utils/errors.util";
+import TranslationFile from "@/utils/translation-file.util";
 
 /**
  * Service responsible for managing repository content and translations.

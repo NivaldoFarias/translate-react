@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 
-import type { TranslationFile } from "../../../src/types";
+import TranslationFile from "@/utils/translation-file.util";
 
 import { ContentService } from "../../../src/services/github/content.service";
 
@@ -75,6 +75,7 @@ describe("GitHub Content Service", () => {
 			path: "src/test/file.md",
 			content: "# Original Content",
 			sha: "abc123",
+			filename: "file.md",
 		};
 
 		const mockGetContent = {
@@ -153,6 +154,7 @@ describe("GitHub Content Service", () => {
 			path: "src/test/file.md",
 			content: "# Original Content",
 			sha: "abc123",
+			filename: "file.md",
 		};
 
 		const content = await contentService.getFileContent(file);
@@ -171,6 +173,7 @@ describe("GitHub Content Service", () => {
 			path: "src/test/non-existent.md",
 			content: "",
 			sha: "missing",
+			filename: "non-existent.md",
 		};
 
 		expect(contentService.getFileContent(file)).rejects.toThrow("Not Found");
