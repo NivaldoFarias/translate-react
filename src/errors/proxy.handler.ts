@@ -2,8 +2,8 @@ import type { ErrorContext } from "./base.error";
 
 import TranslationFile from "@/utils/translation-file.util";
 
-import { ErrorCode, TranslateError } from "./base.error";
-import { ErrorHandler } from "./error-handler";
+import { ErrorCode, TranslationError } from "./base.error";
+import { ErrorHandler } from "./error.handler";
 
 /** Configuration options for creating an error-handling proxy */
 export interface ProxyHandlerOptions {
@@ -85,7 +85,7 @@ export function createErrorHandlingProxy<T extends object>(
 
 				const handleError = (error: unknown) => {
 					// If it's already our error type, just add the context
-					if (error instanceof TranslateError) {
+					if (error instanceof TranslationError) {
 						error.context.operation = context.operation;
 						error.context.metadata = {
 							...error.context.metadata,
@@ -100,7 +100,7 @@ export function createErrorHandlingProxy<T extends object>(
 						const mapping = errorMap[errorType];
 						if (mapping) {
 							const additionalContext = mapping.transform?.(error) ?? {};
-							throw new TranslateError(error.message, mapping.code, {
+							throw new TranslationError(error.message, mapping.code, {
 								...context,
 								...additionalContext,
 							});
@@ -108,7 +108,7 @@ export function createErrorHandlingProxy<T extends object>(
 					}
 
 					// Default error handling
-					throw new TranslateError(
+					throw new TranslationError(
 						error instanceof Error ? error.message : String(error),
 						ErrorCode.UNKNOWN_ERROR,
 						context,

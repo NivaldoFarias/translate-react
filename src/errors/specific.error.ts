@@ -1,9 +1,9 @@
 import type { ErrorContext } from "./base.error";
 
-import { ErrorCode, TranslateError } from "./base.error";
+import { ErrorCode, TranslationError } from "./base.error";
 
 /** Thrown when the translation service fails to initialize */
-export class InitializationError extends TranslateError {
+export class InitializationError extends TranslationError {
 	/**
 	 * Creates a new InitializationError instance
 	 *
@@ -16,7 +16,7 @@ export class InitializationError extends TranslateError {
 }
 
 /** Thrown when a required translation key is missing */
-export class MissingKeyError extends TranslateError {
+export class MissingKeyError extends TranslationError {
 	/**
 	 * Creates a new MissingKeyError instance
 	 *
@@ -29,7 +29,7 @@ export class MissingKeyError extends TranslateError {
 }
 
 /** Thrown when an unsupported language is requested */
-export class UnsupportedLanguageError extends TranslateError {
+export class UnsupportedLanguageError extends TranslationError {
 	/**
 	 * Creates a new UnsupportedLanguageError instance
 	 *
@@ -42,7 +42,7 @@ export class UnsupportedLanguageError extends TranslateError {
 }
 
 /** Thrown when loading translation resources fails */
-export class ResourceLoadError extends TranslateError {
+export class ResourceLoadError extends TranslationError {
 	/**
 	 * Creates a new ResourceLoadError instance
 	 *
@@ -59,7 +59,7 @@ export class ResourceLoadError extends TranslateError {
 }
 
 /** Thrown when API requests fail */
-export class APIError extends TranslateError {
+export class APIError extends TranslationError {
 	/**
 	 * Creates a new APIError instance
 	 *
@@ -77,7 +77,7 @@ export class APIError extends TranslateError {
 }
 
 /** Thrown when validation fails */
-export class ValidationError extends TranslateError {
+export class ValidationError extends TranslationError {
 	/**
 	 * Creates a new ValidationError instance
 	 *

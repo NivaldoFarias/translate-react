@@ -1,7 +1,7 @@
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
+import { extractErrorMessage } from "@/errors/error.handler";
 import { BaseGitHubService } from "@/services/github/base.service";
-import { extractErrorMessage } from "@/utils/errors.util";
 
 /**
  * Service responsible for repository operations and fork management.

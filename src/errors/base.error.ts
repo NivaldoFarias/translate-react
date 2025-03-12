@@ -50,7 +50,7 @@ export interface ErrorContext {
  * Base error class for all translation-related errors
  * Extends the native Error class with additional context and tracking capabilities
  */
-export class TranslateError extends Error {
+export class TranslationError extends Error {
 	public readonly code: ErrorCode;
 	public readonly timestamp: Date;
 	public readonly context: ErrorContext;

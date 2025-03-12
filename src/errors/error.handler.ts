@@ -4,7 +4,7 @@ import type { BunFile } from "bun";
 
 import type { ErrorContext } from "./base.error";
 
-import { ErrorCode, ErrorSeverity, TranslateError } from "./base.error";
+import { ErrorCode, ErrorSeverity, TranslationError } from "./base.error";
 
 /* eslint-disable no-console */
 
@@ -20,7 +20,24 @@ export interface ErrorHandlerConfig {
 	logFilePath?: string;
 
 	/** A custom reporter function */
-	customReporter?: (error: TranslateError) => void;
+	customReporter?: (error: TranslationError) => void;
+}
+
+/**
+ * Extracts a human-readable error message from various error types
+ *
+ * ## Handling
+ * - TranslateError: Uses the formatted message with context
+ * - Error: Uses the native error message
+ * - Other types: Converts to string
+ *
+ * @param error - The error to extract a message from
+ */
+export function extractErrorMessage(error: unknown): string {
+	if (error instanceof TranslationError) return error.getDisplayMessage();
+	else if (error instanceof Error) return error.message;
+
+	return String(error);
 }
 
 /** Centralized error handling service implementing the singleton pattern */
@@ -139,12 +156,12 @@ export class ErrorHandler {
 	 *
 	 * @returns The translated error
 	 */
-	private wrapError(error: Error, context?: Partial<ErrorContext>): TranslateError {
-		if (error instanceof TranslateError) return error;
+	private wrapError(error: Error, context?: Partial<ErrorContext>): TranslationError {
+		if (error instanceof TranslationError) return error;
 
 		const originalError = error instanceof Error ? error : new Error(String(error));
 
-		return new TranslateError(originalError.message, ErrorCode.UNKNOWN_ERROR, {
+		return new TranslationError(originalError.message, ErrorCode.UNKNOWN_ERROR, {
 			sanity: ErrorSeverity.ERROR,
 			...context,
 			metadata: {
@@ -159,7 +176,7 @@ export class ErrorHandler {
 	 *
 	 * @param error The error to log
 	 */
-	private logError(error: TranslateError) {
+	private logError(error: TranslationError) {
 		const severity = error.context.sanity ?? ErrorSeverity.ERROR;
 		if (this.shouldLog(severity)) {
 			const method = this.getSeverityMethod(severity);

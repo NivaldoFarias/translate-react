@@ -1,5 +1,5 @@
+import { extractErrorMessage } from "@/errors/error.handler";
 import { BaseGitHubService } from "@/services/github/base.service";
-import { extractErrorMessage } from "@/utils/errors.util";
 
 /**
  * Service responsible for Git branch operations and lifecycle management.

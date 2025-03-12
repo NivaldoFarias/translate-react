@@ -3,13 +3,13 @@ import ora from "ora";
 import type { FileProcessingProgress, ProcessedFileResult, Snapshot } from "@/types";
 import type { SetNonNullable } from "type-fest";
 
-import { ErrorHandler } from "@/errors/error-handler";
+import { ErrorHandler, extractErrorMessage } from "@/errors/error.handler";
 import { createErrorHandlingProxy } from "@/errors/proxy.handler";
 import { InitializationError, ResourceLoadError } from "@/errors/specific.error";
 import { GitHubService } from "@/services/github/github.service";
 import { SnapshotService } from "@/services/snapshot.service";
 import { TranslatorService } from "@/services/translator.service";
-import { extractErrorMessage, setupSignalHandlers, validateEnv } from "@/utils/";
+import { setupSignalHandlers, validateEnv } from "@/utils/";
 import TranslationFile from "@/utils/translation-file.util";
 
 export interface RunnerOptions {
