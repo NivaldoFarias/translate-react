@@ -1,11 +1,16 @@
+import langs from "langs";
 import ora from "ora";
 
 import type { FileProcessingProgress, ProcessedFileResult, Snapshot } from "@/types";
 import type { SetNonNullable } from "type-fest";
 
-import { ErrorHandler, extractErrorMessage } from "@/errors/error.handler";
-import { createErrorHandlingProxy } from "@/errors/proxy.handler";
-import { InitializationError, ResourceLoadError } from "@/errors/specific.error";
+import {
+	createErrorHandlingProxy,
+	ErrorHandler,
+	extractErrorMessage,
+	InitializationError,
+	ResourceLoadError,
+} from "@/errors/";
 import { GitHubService } from "@/services/github/github.service";
 import { SnapshotService } from "@/services/snapshot.service";
 import { TranslatorService } from "@/services/translator.service";
@@ -508,17 +513,18 @@ export abstract class RunnerService {
 			async () => {
 				metadata.branch = await this.services.github.createOrGetTranslationBranch(file.filename!);
 				metadata.translation = await this.services.translator.translateContent(file);
+				const language = langs.where("3", this.options.targetLanguage);
 
 				await this.services.github.commitTranslation(
 					metadata.branch,
 					file,
 					metadata.translation,
-					`Translate \`${file.filename}\` to ${this.options.targetLanguage}`,
+					`Translate \`${file.filename}\` to ${language?.name}`,
 				);
 
 				metadata.pullRequest = await this.services.github.createPullRequest(
 					metadata.branch.ref,
-					`Translate \`${file.filename}\` to ${this.options.targetLanguage}`,
+					`Translate \`${file.filename}\` to ${language?.name}`,
 					this.pullRequestDescription,
 				);
 
