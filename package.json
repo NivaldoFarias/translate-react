@@ -1,6 +1,6 @@
 {
 	"name": "translate-react",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"description": "A tool to translate React docs to any language",
 	"type": "module",
 	"scripts": {
