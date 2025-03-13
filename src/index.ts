@@ -1,4 +1,5 @@
 import Bun from "bun";
+import { z } from "zod";
 
 import type { BunFile } from "bun";
 
@@ -6,14 +7,25 @@ import { ErrorHandler, ErrorSeverity } from "@/errors";
 import Runner from "@/services/runner/runner.service";
 import { parseCommandLineArgs } from "@/utils/parse-command-args.util";
 
+/** Defines the expected structure and types for the runner options */
+const runnerOptionsSchema = z.object({
+	targetLanguage: z.string().min(2).max(5).default("pt"),
+	sourceLanguage: z.string().min(2).max(5).default("en"),
+	batchSize: z.coerce.number().positive().default(10),
+});
+
 if (import.meta.main) {
 	const errorHandler = initializeErrorHandler(
-		Bun.file(`logs/translate-react-${new Date().toISOString()}.log`),
+		Bun.file(`logs/translate-react-${new Date().toISOString()}.log.json`),
 	);
 
 	const runTranslation = errorHandler.wrapAsync(
 		async () => {
-			const args = parseCommandLineArgs();
+			const args = parseCommandLineArgs(
+				["--target", "--source", "--batch-size"],
+				runnerOptionsSchema,
+			);
+
 			const runner = new Runner(args);
 			await runner.run();
 		},

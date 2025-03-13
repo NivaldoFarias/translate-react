@@ -2,7 +2,8 @@ import { existsSync, writeFileSync } from "fs";
 
 import { Database } from "bun:sqlite";
 
-import type { ProcessedFileResult, TranslationFile } from "@/types";
+import type { ProcessedFileResult, Snapshot } from "@/types";
+import type TranslationFile from "@/utils/translation-file.util";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 /**
@@ -42,71 +43,11 @@ export class DatabaseService {
 	 * - failed_translations: Detailed error tracking for failed translations
 	 */
 	private initializeTables() {
-		// Create snapshots table
-		this.db.run(`
-			CREATE TABLE IF NOT EXISTS snapshots (
-				id INTEGER PRIMARY KEY AUTOINCREMENT,
-				timestamp INTEGER NOT NULL,
-				created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-			)
-		`);
+		for (const script of Object.values(this.scripts.create)) {
+			const sanitizedScript = script.replace(/\s+/g, " ");
 
-		// Create repository_tree table
-		this.db.run(`
-			CREATE TABLE IF NOT EXISTS repository_tree (
-				id INTEGER PRIMARY KEY AUTOINCREMENT,
-				snapshot_id INTEGER NOT NULL,
-				path TEXT,
-				mode TEXT,
-				type TEXT,
-				sha TEXT,
-				size INTEGER,
-				url TEXT,
-				FOREIGN KEY (snapshot_id) REFERENCES snapshots(id)
-			)
-		`);
-
-		// Create files_to_translate table
-		this.db.run(`
-			CREATE TABLE IF NOT EXISTS files_to_translate (
-				id INTEGER PRIMARY KEY AUTOINCREMENT,
-				snapshot_id INTEGER NOT NULL,
-				content TEXT NOT NULL,
-				sha TEXT NOT NULL,
-				filename TEXT NOT NULL,
-				path TEXT NOT NULL,
-				FOREIGN KEY (snapshot_id) REFERENCES snapshots(id)
-			)
-		`);
-
-		// Create processed_results table
-		this.db.run(`
-			CREATE TABLE IF NOT EXISTS processed_results (
-				id INTEGER PRIMARY KEY AUTOINCREMENT,
-				snapshot_id INTEGER NOT NULL,
-				filename TEXT NOT NULL,
-				branch_ref TEXT,
-				branch_object_sha TEXT,
-				translation TEXT,
-				pull_request_number INTEGER,
-				pull_request_url TEXT,
-				error TEXT,
-				FOREIGN KEY (snapshot_id) REFERENCES snapshots(id)
-			)
-		`);
-
-		// Create failed_translations table for detailed error tracking
-		this.db.run(`
-			CREATE TABLE IF NOT EXISTS failed_translations (
-				id INTEGER PRIMARY KEY AUTOINCREMENT,
-				snapshot_id INTEGER NOT NULL,
-				filename TEXT NOT NULL,
-				error_message TEXT NOT NULL,
-				timestamp INTEGER NOT NULL,
-				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-				FOREIGN KEY (snapshot_id) REFERENCES snapshots(id)
-			)
-		`);
+			this.db.run(sanitizedScript);
+		}
 	}
 
 	/**
@@ -227,13 +168,7 @@ export class DatabaseService {
 	 *
 	 * Returns null if no snapshots exist.
 	 */
-	public getLatestSnapshot(): {
-		id: number;
-		timestamp: number;
-		repositoryTree: RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"];
-		filesToTranslate: TranslationFile[];
-		processedResults: ProcessedFileResult[];
-	} | null {
+	public getLatestSnapshot(): Snapshot | null {
 		const snapshot = this.db
 			.prepare("SELECT * FROM snapshots ORDER BY timestamp DESC LIMIT 1")
 			.get() as { id: number; timestamp: number } | null;
@@ -280,7 +215,23 @@ export class DatabaseService {
 	 * @returns Array of snapshot objects
 	 */
 	public getSnapshots() {
-		return this.db.prepare("SELECT * FROM snapshots").all() as { id: number; timestamp: number }[];
+		return this.db.prepare(this.scripts.select.allSnapshots).all() as {
+			id: number;
+			timestamp: number;
+		}[];
+	}
+
+	/**
+	 * Fetches a specific file to translate from database.
+	 *
+	 * @param filenames Filenames of files to fetch
+	 *
+	 * @returns Files to translate or null if not found
+	 */
+	public getFilesToTranslateByFilename(filenames: string[]) {
+		return this.db
+			.prepare(this.scripts.select.filesToTranslateByFilename)
+			.all(filenames.join(",")) as TranslationFile[];
 	}
 
 	/**
@@ -289,6 +240,97 @@ export class DatabaseService {
 	 * @param id ID of snapshot to delete
 	 */
 	public deleteSnapshot(id: number) {
-		this.db.run(`DELETE FROM snapshots WHERE id = ?`, [id]);
+		this.db.run(this.scripts.delete.snapshotById, [id]);
+	}
+
+	/** The SQL scripts for creating database tables */
+	private get scripts() {
+		return {
+			create: {
+				/** Creates the snapshots table */
+				snapshotsTable: `
+					CREATE TABLE IF NOT EXISTS snapshots (
+						id INTEGER PRIMARY KEY AUTOINCREMENT,
+						timestamp INTEGER NOT NULL,
+						created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+					)
+				`,
+				/** Creates the repository_tree table */
+				repositoryTreeTable: `
+					CREATE TABLE IF NOT EXISTS repository_tree (
+						id INTEGER PRIMARY KEY AUTOINCREMENT,
+						snapshot_id INTEGER NOT NULL,
+						path TEXT,
+						mode TEXT,
+						type TEXT,
+						sha TEXT,
+						size INTEGER,
+						url TEXT,
+						FOREIGN KEY (snapshot_id) REFERENCES snapshots(id)
+					)
+				`,
+				/** Creates the files_to_translate table */
+				filesToTranslateTable: `
+					CREATE TABLE IF NOT EXISTS files_to_translate (
+						id INTEGER PRIMARY KEY AUTOINCREMENT,
+						snapshot_id INTEGER NOT NULL,
+						content TEXT NOT NULL,
+						sha TEXT NOT NULL,
+						filename TEXT NOT NULL,
+						path TEXT NOT NULL,
+						FOREIGN KEY (snapshot_id) REFERENCES snapshots(id)
+					)
+				`,
+				/** Creates the processed_results table */
+				processedResultsTable: `
+					CREATE TABLE IF NOT EXISTS processed_results (
+						id INTEGER PRIMARY KEY AUTOINCREMENT,
+						snapshot_id INTEGER NOT NULL,
+						filename TEXT NOT NULL,
+						branch_ref TEXT,
+						branch_object_sha TEXT,
+						translation TEXT,
+						pull_request_number INTEGER,
+						pull_request_url TEXT,
+						error TEXT,
+						FOREIGN KEY (snapshot_id) REFERENCES snapshots(id)
+					)
+				`,
+				/** Creates the failed_translations table */
+				failedTranslationsTable: `
+					CREATE TABLE IF NOT EXISTS failed_translations (
+						id INTEGER PRIMARY KEY AUTOINCREMENT,
+						snapshot_id INTEGER NOT NULL,
+						filename TEXT NOT NULL,
+						error_message TEXT NOT NULL,
+						timestamp INTEGER NOT NULL,
+						created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+						FOREIGN KEY (snapshot_id) REFERENCES snapshots(id)
+					)
+				`,
+			},
+			select: {
+				filesToTranslateByFilename: `
+					SELECT * FROM files_to_translate WHERE filename IN (?)
+				`,
+				allSnapshots: `
+					SELECT * FROM snapshots
+				`,
+			},
+			drop: {
+				snapshotsTable: "DROP TABLE IF EXISTS snapshots",
+				repositoryTreeTable: "DROP TABLE IF EXISTS repository_tree",
+				filesToTranslateTable: "DROP TABLE IF EXISTS files_to_translate",
+				processedResultsTable: "DROP TABLE IF EXISTS processed_results",
+				failedTranslationsTable: "DROP TABLE IF EXISTS failed_translations",
+			},
+			delete: {
+				snapshotById: "DELETE FROM snapshots WHERE id = ?",
+				repositoryTreeById: "DELETE FROM repository_tree WHERE id = ?",
+				filesToTranslateById: "DELETE FROM files_to_translate WHERE id = ?",
+				processedResultsById: "DELETE FROM processed_results WHERE id = ?",
+				failedTranslationsById: "DELETE FROM failed_translations WHERE id = ?",
+			},
+		};
 	}
 }

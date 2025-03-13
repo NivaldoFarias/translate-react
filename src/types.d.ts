@@ -32,7 +32,7 @@ export interface ProcessedFileResult {
 /** Represents a snapshot of the translation workflow state */
 export interface Snapshot {
     /** The ID of the snapshot */
-    id?: number;
+    id: number;
 
     /** The timestamp of the snapshot */
     timestamp: number;
