@@ -1,14 +1,12 @@
 import { franc } from "franc";
 import OpenAI from "openai";
-import { encoding_for_model, TiktokenModel } from "tiktoken";
-import { match, P } from "ts-pattern";
 
 import type { LanguageConfig } from "@/utils/language-detector.util";
 import type { APIError } from "openai/error";
 
 import { ErrorCode } from "@/errors/base.error";
 import { createErrorHandlingProxy } from "@/errors/proxy.handler";
-import { LanguageDetector, MAX_CHUNK_TOKENS } from "@/utils/";
+import { LanguageDetector } from "@/utils/language-detector.util";
 import TranslationFile from "@/utils/translation-file.util";
 
 /**
@@ -103,8 +101,10 @@ export class TranslatorService {
 	 * Constructs appropriate prompts and handles response processing.
 	 *
 	 * @param content Main content to translate
+	 *
+	 * @returns Translated content from the language model
 	 */
-	private async callLanguageModel(content: string) {
+	private async callLanguageModel(content: string): Promise<string> {
 		const response = (await this.llm.chat.completions.create({
 			model: import.meta.env.LLM_MODEL,
 			messages: this.createPrompt(content),
@@ -202,36 +202,15 @@ export class TranslatorService {
 	}
 
 	/**
-	 * Gets the appropriate encoding model for the given model name using pattern matching.
-	 * Maps various LLM models to their closest tiktoken encoding model.
-	 *
-	 * @param modelName The name of the model to get the encoding for (defaults to env LLM_MODEL)
-	 *
-	 * @returns The appropriate TiktokenModel to use for encoding
-	 *
-	 * @example
-	 * ```typescript
-	 * // Returns "gpt-4" for "gemini-2.0-flash-lite-001"
-	 * const encodingModel = this.getEncodingModel("gemini-2.0-flash-lite-001");
-	 * ```
-	 */
-	private getEncodingModel(modelName = import.meta.env.LLM_MODEL.toLowerCase()): TiktokenModel {
-		return match(modelName)
-			.with(P.string.includes("gpt-4"), () => "gpt-4" as const)
-			.with(P.string.includes("gpt-3.5"), () => "gpt-3.5-turbo" as const)
-			.with(P.string.includes("gemini"), () => "gpt-4" as const)
-			.otherwise(() => "gpt-3.5-turbo" as const);
-	}
-
-	/**
 	 * Handles content that exceeds the model's context window by splitting it into
 	 * smaller chunks and translating each chunk separately, then combining the results.
 	 *
 	 * ## Workflow
 	 * 1. Estimates token count using tiktoken
-	 * 2. Splits content into logical sections (paragraphs, code blocks)
-	 * 3. Translates each chunk while maintaining context
-	 * 4. Combines translated chunks preserving original structure
+	 * 2. Splits content at natural break points (middle of paragraphs, end of code blocks)
+	 * 3. Recursively splits chunks that are still too large
+	 * 4. Translates each chunk while maintaining context
+	 * 5. Combines translated chunks preserving original structure
 	 *
 	 * @param content Content that exceeded the model's context window
 	 *
@@ -239,33 +218,8 @@ export class TranslatorService {
 	 *
 	 * @throws {Error} If chunking fails or if all chunk translation attempts fail
 	 */
-	private async chunkAndRetryTranslation(content: string): Promise<string> {
-		const sections = this.splitIntoLogicalSections(content);
-		const encoding = encoding_for_model(this.getEncodingModel());
-
-		const chunks: Array<string> = [];
-		const current: { chunk: string; tokenCount: number } = {
-			chunk: "",
-			tokenCount: 0,
-		};
-
-		for (const section of sections) {
-			const sectionTokens = encoding.encode(section).length;
-			const chunkExceedsLimit = current.tokenCount + sectionTokens > MAX_CHUNK_TOKENS;
-
-			if (chunkExceedsLimit && current.chunk.length > 0) {
-				chunks.push(current.chunk);
-				current.chunk = section;
-				current.tokenCount = sectionTokens;
-			} else {
-				current.chunk += section;
-				current.tokenCount += sectionTokens;
-			}
-		}
-
-		if (current.chunk.length > 0) chunks.push(current.chunk);
-
-		encoding.free();
+	public async chunkAndRetryTranslation(content: string): Promise<string> {
+		const chunks = this.splitIntoSections(content);
 
 		return this.translateChunks(chunks);
 	}
@@ -313,66 +267,105 @@ export class TranslatorService {
 	}
 
 	/**
-	 * Splits content into logical sections that preserve context
-	 * and structure *(paragraphs, code blocks, headers)*.
-	 *
-	 * Ensures that related content stays together during chunking.
+	 * Splits content at a natural break point closest to the middle.
+	 * Finds logical boundaries like paragraph breaks, code blocks, or headers
+	 * that are nearest to the middle of the content.
 	 *
 	 * ## Workflow
-	 * 1. Match patterns for:
-	 * 	- Code blocks `(```...```)`
-	 * 	- Headers `(# Header)`
-	 * 	- Horizontal rules `(---, ***)`
-	 * 	- Paragraphs `(\n\n)`
-	 * 2. Add the matched delimiter or block as its own section
-	 * 3. Merge very small sections with adjacent ones to maintain context
+	 * 1. Identifies natural break points (paragraph breaks, end of code blocks, headers)
+	 * 2. Finds the break point closest to the middle of the content
+	 * 3. Returns the content split at that point
 	 *
-	 * @param content Content to split into logical sections
+	 * @param content Content to split
 	 *
-	 * @returns Array of content sections
+	 * @returns Array containing two parts of the content, split at a natural break
 	 */
-	private splitIntoLogicalSections(content: string): Array<string> {
-		const sections: Array<string> = [];
+	private splitIntoSections(content: string): Array<string> {
+		// If content is small enough, return it as a single section
+		if (content.length < 1000) {
+			return [content];
+		}
 
-		const regex = /(```[\s\S]*?```)|(\n#{1,6} .*\n)|(^---$)|(^\*\*\*$)|(\n\n)/gm;
+		const midpoint = Math.floor(content.length / 2);
 
-		let lastIndex = 0;
+		// Find natural break points: paragraph breaks, end of code blocks, headers
+		const breakPointRegex = /(\n\n)|(\n#{1,6} )|(\n```\n)|(```\n)/g;
+
+		let bestBreakPoint = 0;
+		let minDistance = content.length;
 		let match;
 
-		while ((match = regex.exec(content)) !== null) {
-			// If there's content before this match, add it as a section
-			if (match.index > lastIndex) {
-				sections.push(content.substring(lastIndex, match.index));
+		// Reset regex search
+		breakPointRegex.lastIndex = 0;
+
+		// Find the break point closest to the middle
+		while ((match = breakPointRegex.exec(content)) !== null) {
+			const breakPointPosition = match.index + match[0].length;
+			const distance = Math.abs(breakPointPosition - midpoint);
+
+			if (distance < minDistance) {
+				minDistance = distance;
+				bestBreakPoint = breakPointPosition;
 			}
 
-			// Add the matched delimiter or block as its own section
-			sections.push(match[0]);
-
-			lastIndex = match.index + match[0].length;
+			// If we've passed the midpoint by a significant margin, stop searching
+			if (breakPointPosition > midpoint * 1.5) {
+				break;
+			}
 		}
 
-		if (lastIndex < content.length) {
-			sections.push(content.substring(lastIndex));
-		}
+		// If no good break point was found, use the midpoint
+		if (bestBreakPoint === 0) {
+			// Try to find a sentence break near the midpoint
+			const sentenceBreakRegex = /[.!?]\s+/g;
+			sentenceBreakRegex.lastIndex = midpoint - 200 > 0 ? midpoint - 200 : 0;
 
-		const mergedSections: Array<string> = [];
-		let currentSection = "";
+			while ((match = sentenceBreakRegex.exec(content)) !== null) {
+				const breakPointPosition = match.index + match[0].length;
+				const distance = Math.abs(breakPointPosition - midpoint);
 
-		for (const section of sections) {
-			// If current section is small, merge it with the next one
-			if (currentSection.length < 50) {
-				currentSection += section;
-			} else {
-				// If we have accumulated content, add it as a section
-				if (currentSection.length > 0) {
-					mergedSections.push(currentSection);
+				if (distance < minDistance) {
+					minDistance = distance;
+					bestBreakPoint = breakPointPosition;
 				}
-				currentSection = section;
+
+				if (breakPointPosition > midpoint + 200) {
+					break;
+				}
+			}
+
+			// If still no good break point, use the midpoint at a space
+			if (bestBreakPoint === 0) {
+				// Find the nearest space to the midpoint
+				let left = midpoint;
+				let right = midpoint;
+
+				while (left > 0 || right < content.length) {
+					if (left > 0) {
+						left--;
+						if (content[left] === " " || content[left] === "\n") {
+							bestBreakPoint = left + 1;
+							break;
+						}
+					}
+
+					if (right < content.length) {
+						if (content[right] === " " || content[right] === "\n") {
+							bestBreakPoint = right + 1;
+							break;
+						}
+						right++;
+					}
+				}
 			}
 		}
 
-		if (currentSection.length > 0) mergedSections.push(currentSection);
+		// If we still couldn't find a break point, just use the midpoint
+		if (bestBreakPoint === 0) {
+			bestBreakPoint = midpoint;
+		}
 
-		return mergedSections;
+		// Split the content at the best break point
+		return [content.substring(0, bestBreakPoint), content.substring(bestBreakPoint)];
 	}
 }

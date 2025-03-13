@@ -40,7 +40,7 @@ export abstract class RunnerService {
 	 * Maintains the current state of the translation workflow
 	 * In development mode, this state can be persisted between runs
 	 */
-	protected state: Snapshot = {
+	protected state: Omit<Snapshot, "id"> = {
 		repositoryTree: [],
 		filesToTranslate: [],
 		processedResults: [],
