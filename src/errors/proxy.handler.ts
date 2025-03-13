@@ -20,12 +20,7 @@ export interface ProxyHandlerOptions {
 	excludeMethods?: string[];
 
 	/** Error mapping for specific error types */
-	errorMap?: {
-		[key: string]: {
-			code: ErrorCode;
-			transform?: (error: Error) => Partial<ErrorContext>;
-		};
-	};
+	errorMap?: Map<string, { code: ErrorCode; transform?: (error: Error) => Partial<ErrorContext> }>;
 }
 
 /**
@@ -34,8 +29,8 @@ export interface ProxyHandlerOptions {
  * This utility reduces boilerplate by applying error handling to all methods
  * of a service without requiring explicit wrapping of each method.
  *
- * @param target - The service or object to wrap with error handling
- * @param options - Configuration options for the proxy
+ * @param target The service or object to wrap with error handling
+ * @param options Configuration options for the proxy
  *
  * @example
  * ```typescript
@@ -45,10 +40,10 @@ export interface ProxyHandlerOptions {
  * // After proxying - all methods automatically handle errors
  * const safeGithubService = createErrorHandlingProxy(githubService, {
  *   serviceName: 'GitHubService',
- *   errorMap: {
- *     'HttpError': { code: ErrorCode.GITHUB_API_ERROR },
- *     'RateLimitError': { code: ErrorCode.RATE_LIMIT_EXCEEDED }
- *   }
+ *   errorMap: new Map([
+ *     ['HttpError', { code: ErrorCode.GITHUB_API_ERROR }],
+ *     ['RateLimitError', { code: ErrorCode.RATE_LIMIT_EXCEEDED }]
+ *   ])
  * });
  * ```
  */
@@ -57,7 +52,7 @@ export function createErrorHandlingProxy<T extends object>(
 	options: ProxyHandlerOptions,
 ): T {
 	const errorHandler = ErrorHandler.getInstance();
-	const { serviceName, baseContext = {}, excludeMethods = [], errorMap = {} } = options;
+	const { serviceName, baseContext = {}, excludeMethods = [], errorMap = new Map() } = options;
 
 	return new Proxy(target, {
 		get(obj, prop) {
@@ -97,7 +92,7 @@ export function createErrorHandlingProxy<T extends object>(
 					// Check if we have a specific error mapping
 					if (error instanceof Error) {
 						const errorType = error.constructor.name;
-						const mapping = errorMap[errorType];
+						const mapping = errorMap.get(errorType);
 						if (mapping) {
 							const additionalContext = mapping.transform?.(error) ?? {};
 							throw new TranslationError(error.message, mapping.code, {

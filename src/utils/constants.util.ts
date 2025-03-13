@@ -24,3 +24,6 @@ export const SNAPSHOT_KEYS = {
 	PROCESSED_RESULTS: "processedResults",
 	TIMESTAMP: "timestamp",
 } as const;
+
+/** Maximum number of tokens that can be translated in a single request */
+export const MAX_CHUNK_TOKENS = 4000;

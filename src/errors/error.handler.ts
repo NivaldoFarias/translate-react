@@ -31,7 +31,7 @@ export interface ErrorHandlerConfig {
  * - Error: Uses the native error message
  * - Other types: Converts to string
  *
- * @param error - The error to extract a message from
+ * @param error  The error to extract a message from
  */
 export function extractErrorMessage(error: unknown): string {
 	if (error instanceof TranslationError) return error.getDisplayMessage();

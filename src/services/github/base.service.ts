@@ -14,7 +14,7 @@ export abstract class BaseGitHubService {
 	protected readonly octokit: Octokit;
 
 	/**
-	 * Creates a new base GitHub service instance.
+	 * Creates a new base GitHub service instance
 	 *
 	 * @param upstream Original repository details
 	 * @param fork Forked repository details
@@ -23,7 +23,7 @@ export abstract class BaseGitHubService {
 	constructor(
 		protected readonly upstream: { owner: string; repo: string },
 		protected readonly fork: { owner: string; repo: string },
-		protected readonly githubToken: string,
+		protected readonly githubToken = import.meta.env.GITHUB_TOKEN,
 	) {
 		this.octokit = new Octokit({
 			auth: this.githubToken,

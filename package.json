@@ -17,6 +17,7 @@
 		"openai": "^4.78.1",
 		"ora": "^8.1.1",
 		"tiktoken": "^1.0.20",
+		"ts-pattern": "^5.6.2",
 		"zod": "^3.22.4"
 	},
 	"devDependencies": {
