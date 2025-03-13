@@ -20,7 +20,7 @@ export class ContentService extends BaseGitHubService {
 	 * Retrieves markdown files that need translation.
 	 * Filters and processes files based on content type.
 	 *
-	 * @param maxFiles - Optional limit on number of files to retrieve
+	 * @param maxFiles Optional limit on number of files to retrieve
 	 * @throws {Error} If repository tree is empty or retrieval fails
 	 *
 	 * @example
@@ -79,10 +79,10 @@ export class ContentService extends BaseGitHubService {
 	 * Commits translated content to a branch.
 	 * Updates existing file or creates new one.
 	 *
-	 * @param branch - Target branch reference
-	 * @param file - File being translated
-	 * @param content - Translated content
-	 * @param message - Commit message
+	 * @param branch Target branch reference
+	 * @param file File being translated
+	 * @param content Translated content
+	 * @param message Commit message
 	 * @throws {Error} If commit operation fails
 	 *
 	 * @example
@@ -127,10 +127,10 @@ export class ContentService extends BaseGitHubService {
 	/**
 	 * Creates or finds an existing pull request.
 	 *
-	 * @param branch - Source branch name
-	 * @param title - Pull request title
-	 * @param body - Pull request description
-	 * @param baseBranch - Target branch for PR
+	 * @param branch Source branch name
+	 * @param title Pull request title
+	 * @param body Pull request description
+	 * @param baseBranch Target branch for PR
 	 * @throws {Error} If pull request creation fails
 	 *
 	 * @example
@@ -173,7 +173,7 @@ export class ContentService extends BaseGitHubService {
 	/**
 	 * Filters repository tree for markdown files.
 	 *
-	 * @param tree - Repository tree from GitHub API
+	 * @param tree Repository tree from GitHub API
 	 */
 	protected filterMarkdownFiles(
 		tree: RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"],

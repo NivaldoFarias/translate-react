@@ -12,25 +12,23 @@ import { BaseGitHubService } from "@/services/github/base.service";
  * - Error handling and recovery
  */
 export class BranchService extends BaseGitHubService {
-	/**
-	 * Set of branch names currently being tracked for cleanup
-	 */
+	/** Set of branch names currently being tracked for cleanup */
 	protected activeBranches: Set<string> = new Set();
 
 	/**
 	 * Creates a new branch service instance.
 	 * Initializes the GitHub client and sets up cleanup handlers.
 	 *
-	 * @param owner - GitHub repository owner
-	 * @param repo - GitHub repository name
-	 * @param githubToken - GitHub personal access token
+	 * @param owner GitHub repository owner
+	 * @param repo GitHub repository name
+	 * @param githubToken GitHub personal access token
 	 *
 	 * @example
 	 * ```typescript
 	 * const branchService = new BranchService('owner', 'repo', 'token');
 	 * ```
 	 */
-	constructor(owner: string, repo: string, githubToken: string) {
+	constructor(owner: string, repo: string, githubToken?: string) {
 		super({ owner, repo }, { owner, repo }, githubToken);
 		this.setupCleanupHandlers();
 	}
@@ -52,8 +50,8 @@ export class BranchService extends BaseGitHubService {
 	 * Creates a new Git branch from a base branch.
 	 * Tracks the branch for cleanup if created successfully.
 	 *
-	 * @param branchName - Name for the new branch
-	 * @param baseBranch - Branch to create from
+	 * @param branchName Name for the new branch
+	 * @param baseBranch Branch to create from
 	 *
 	 * @example
 	 * ```typescript
@@ -86,7 +84,7 @@ export class BranchService extends BaseGitHubService {
 	/**
 	 * Retrieves information about an existing branch.
 	 *
-	 * @param branchName - Name of branch to retrieve
+	 * @param branchName Name of branch to retrieve
 	 *
 	 * @example
 	 * ```typescript
@@ -112,7 +110,7 @@ export class BranchService extends BaseGitHubService {
 	 * Deletes a Git branch and removes it from tracking.
 	 * Always removes from tracking even if deletion fails.
 	 *
-	 * @param branchName - Name of branch to delete
+	 * @param branchName Name of branch to delete
 	 *
 	 * @example
 	 * ```typescript

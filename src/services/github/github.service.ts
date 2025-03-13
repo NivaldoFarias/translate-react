@@ -30,21 +30,9 @@ export class GitHubService {
 	};
 
 	private readonly services = {
-		branch: new BranchService(
-			this.repos.fork.owner,
-			this.repos.fork.repo,
-			import.meta.env.GITHUB_TOKEN!,
-		),
-		repository: new RepositoryService(
-			this.repos.upstream,
-			this.repos.fork,
-			import.meta.env.GITHUB_TOKEN!,
-		),
-		content: new ContentService(
-			this.repos.upstream,
-			this.repos.fork,
-			import.meta.env.GITHUB_TOKEN!,
-		),
+		branch: new BranchService(this.repos.fork.owner, this.repos.fork.repo),
+		repository: new RepositoryService(this.repos.upstream, this.repos.fork),
+		content: new ContentService(this.repos.upstream, this.repos.fork),
 	};
 
 	/**
@@ -63,8 +51,8 @@ export class GitHubService {
 	 * Retrieves the repository file tree.
 	 * Can optionally filter out ignored paths.
 	 *
-	 * @param baseBranch - Branch to get tree from
-	 * @param filterIgnored - Whether to filter ignored paths
+	 * @param baseBranch Branch to get tree from
+	 * @param filterIgnored Whether to filter ignored paths
 	 *
 	 * @example
 	 * ```typescript
@@ -78,7 +66,7 @@ export class GitHubService {
 	/**
 	 * Fetches raw content of a file from GitHub.
 	 *
-	 * @param file - File reference to fetch
+	 * @param file File reference to fetch
 	 * @returns The raw content of the file
 	 *
 	 * @example
@@ -97,7 +85,7 @@ export class GitHubService {
 	/**
 	 * Retrieves markdown files that need translation.
 	 *
-	 * @param maxFiles - Optional limit on number of files to retrieve
+	 * @param maxFiles Optional limit on number of files to retrieve
 	 *
 	 * @example
 	 * ```typescript
@@ -111,16 +99,16 @@ export class GitHubService {
 	/**
 	 * Creates a new branch for translation work, or gets the existing branch if it exists.
 	 *
-	 * @param fileName - Name of file being translated
-	 * @param baseBranch - Branch to create from
+	 * @param file File being translated
+	 * @param baseBranch Branch to create from
 	 *
 	 * @example
 	 * ```typescript
-	 * const branch = await github.createOrGetTranslationBranch('homepage.md');
+	 * const branch = await github.createOrGetTranslationBranch(file);
 	 * ```
 	 */
-	public async createOrGetTranslationBranch(fileName: string, baseBranch = "main") {
-		const branchName = `translate/${fileName}`;
+	public async createOrGetTranslationBranch(file: TranslationFile, baseBranch = "main") {
+		const branchName = `translate/${file.path.split("/").slice(1).join("/")}`;
 		const existingBranch = await this.services.branch.getBranch(branchName);
 
 		if (existingBranch) {
@@ -145,10 +133,10 @@ export class GitHubService {
 	/**
 	 * Commits translated content to a branch.
 	 *
-	 * @param branch - Target branch reference
-	 * @param file - File being translated
-	 * @param content - Translated content
-	 * @param message - Commit message
+	 * @param branch Target branch reference
+	 * @param file File being translated
+	 * @param content Translated content
+	 * @param message Commit message
 	 *
 	 * @example
 	 * ```typescript
@@ -172,10 +160,10 @@ export class GitHubService {
 	/**
 	 * Creates a pull request for translated content.
 	 *
-	 * @param branch - Source branch name
-	 * @param title - Pull request title
-	 * @param body - Pull request description
-	 * @param baseBranch - Target branch for PR
+	 * @param branch Source branch name
+	 * @param title Pull request title
+	 * @param body Pull request description
+	 * @param baseBranch Target branch for PR
 	 *
 	 * @example
 	 * ```typescript
@@ -193,7 +181,7 @@ export class GitHubService {
 	/**
 	 * Removes a branch after successful merge or on failure.
 	 *
-	 * @param branch - Branch to delete
+	 * @param branch Branch to delete
 	 *
 	 * @example
 	 * ```typescript
@@ -257,8 +245,8 @@ export class GitHubService {
 	/**
 	 * Comments compiled results on a GitHub issue.
 	 *
-	 * @param issueNumber - Target issue number
-	 * @param results - Translation results to report
+	 * @param issueNumber Target issue number
+	 * @param results Translation results to report
 	 *
 	 * @example
 	 * ```typescript
@@ -272,8 +260,8 @@ export class GitHubService {
 	/**
 	 * Checks if a commit exists on a branch.
 	 *
-	 * @param branchName - Name of branch to check
-	 * @param commitSha - SHA of commit to check
+	 * @param branchName Name of branch to check
+	 * @param commitSha SHA of commit to check
 	 *
 	 * @example
 	 * ```typescript

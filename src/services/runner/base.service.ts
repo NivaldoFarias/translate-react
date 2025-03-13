@@ -392,8 +392,8 @@ export abstract class RunnerService {
 	 * 3. Updates progress in real-time
 	 * 4. Reports batch completion statistics
 	 *
-	 * @param files - List of files to process
-	 * @param batchSize - Number of files to process simultaneously
+	 * @param files List of files to process
+	 * @param batchSize Number of files to process simultaneously
 	 * @throws {ResourceLoadError} If file content cannot be loaded
 	 * @throws {APIError} If GitHub operations fail
 	 */
@@ -414,8 +414,8 @@ export abstract class RunnerService {
 	/**
 	 * Creates evenly sized batches from a list of files
 	 *
-	 * @param files - Files to split into batches
-	 * @param batchSize - Maximum size of each batch
+	 * @param files Files to split into batches
+	 * @param batchSize Maximum size of each batch
 	 */
 	private createBatches(files: TranslationFile[], batchSize: number): TranslationFile[][] {
 		const batches: TranslationFile[][] = [];
@@ -430,8 +430,8 @@ export abstract class RunnerService {
 	/**
 	 * Processes a single batch of files concurrently
 	 *
-	 * @param batch - Files in the current batch
-	 * @param batchInfo - Information about the batch's position in the overall process
+	 * @param batch Files in the current batch
+	 * @param batchInfo Information about the batch's position in the overall process
 	 */
 	private async processBatch(
 		batch: TranslationFile[],
@@ -459,15 +459,13 @@ export abstract class RunnerService {
 					}),
 				);
 			},
-			{
-				operation: "processBatch",
-				metadata: { batchNumber: batchInfo.currentBatch },
-			},
+			{ operation: "processBatch", metadata: batchInfo },
 		);
 
 		await processBatchFiles();
 
 		const successRate = Math.round((this.batchProgress.successful / batch.length) * 100);
+
 		this.spinner.succeed(
 			`Completed batch ${batchInfo.currentBatch}/${batchInfo.totalBatches} - ` +
 				`${this.batchProgress.successful}/${batch.length} successful (${successRate}% success rate)`,
@@ -499,8 +497,6 @@ export abstract class RunnerService {
 	 * @throws {ResourceLoadError} If translation resources cannot be loaded
 	 */
 	private async processFile(file: TranslationFile, progress: FileProcessingProgress) {
-		if (!file.filename) return;
-
 		const metadata = this.stats.results.get(file.filename) || {
 			branch: null,
 			filename: file.filename,
@@ -509,35 +505,25 @@ export abstract class RunnerService {
 			error: null,
 		};
 
-		const processFileOperation = this.errorHandler.wrapAsync(
-			async () => {
-				metadata.branch = await this.services.github.createOrGetTranslationBranch(file.filename!);
-				metadata.translation = await this.services.translator.translateContent(file);
-				const language = langs.where("3", this.options.targetLanguage);
-
-				await this.services.github.commitTranslation(
-					metadata.branch,
-					file,
-					metadata.translation,
-					`Translate \`${file.filename}\` to ${language?.name}`,
-				);
-
-				metadata.pullRequest = await this.services.github.createPullRequest(
-					metadata.branch.ref,
-					`Translate \`${file.filename}\` to ${language?.name}`,
-					this.pullRequestDescription,
-				);
-
-				this.updateBatchProgress("success");
-			},
-			{
-				operation: "processFile",
-				metadata: { filename: file.filename },
-			},
-		);
-
 		try {
-			await processFileOperation();
+			metadata.branch = await this.services.github.createOrGetTranslationBranch(file);
+			metadata.translation = await this.services.translator.translateContent(file);
+			const language = langs.where("3", this.options.targetLanguage);
+
+			await this.services.github.commitTranslation(
+				metadata.branch,
+				file,
+				metadata.translation,
+				`Translate \`${file.filename}\` to ${language?.name}`,
+			);
+
+			metadata.pullRequest = await this.services.github.createPullRequest(
+				metadata.branch.ref,
+				`Translate \`${file.filename}\` to ${language?.name}`,
+				this.pullRequestDescription,
+			);
+
+			this.updateBatchProgress("success");
 		} catch (error) {
 			metadata.error = error instanceof Error ? error : new Error(String(error));
 			this.updateBatchProgress("error");
@@ -550,7 +536,7 @@ export abstract class RunnerService {
 	/**
 	 * Updates the spinner with current progress information
 	 *
-	 * @param progress - Current progress information
+	 * @param progress Current progress information
 	 */
 	private updateProgressSpinner(progress: FileProcessingProgress) {
 		const percentComplete = Math.round((this.batchProgress.completed / progress.batchSize) * 100);
