@@ -139,9 +139,24 @@ export class ContentService extends BaseGitHubService {
 			state: "open",
 		});
 
-		const existingPullRequest = prExistsResponse.data.find((pr) => pr.title === title);
+		const existingPullRequest = prExistsResponse.data.find(
+			(pr) => pr.head.ref === branch && pr.base.ref === baseBranch,
+		);
 
-		if (existingPullRequest) return existingPullRequest;
+		if (existingPullRequest) {
+			const prDetails = await this.octokit.pulls.get({
+				...this.upstream,
+				pull_number: existingPullRequest.number,
+			});
+
+			if (prDetails.data.mergeable) return existingPullRequest;
+
+			await this.octokit.pulls.update({
+				...this.upstream,
+				pull_number: existingPullRequest.number,
+				state: "closed",
+			});
+		}
 
 		const createPullRequestResponse = await this.octokit.pulls.create({
 			...this.upstream,
