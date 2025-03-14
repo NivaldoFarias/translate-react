@@ -488,7 +488,7 @@ export abstract class RunnerService {
 		const successRate = Math.round((this.batchProgress.successful / batch.length) * 100);
 
 		this.spinner.succeed(
-			`Completed batch ${batchInfo.currentBatch}/${batchInfo.totalBatches} - ` +
+			`Completed batch ${batchInfo.currentBatch}/${batchInfo.totalBatches} :: ` +
 				`${this.batchProgress.successful}/${batch.length} successful (${successRate}% success rate)`,
 		);
 
