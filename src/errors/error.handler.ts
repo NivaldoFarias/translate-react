@@ -179,9 +179,9 @@ export class ErrorHandler {
 	private logError(error: TranslationError) {
 		const severity = error.context.sanity ?? ErrorSeverity.ERROR;
 		if (this.shouldLog(severity)) {
-			const method = this.getSeverityMethod(severity);
+			// const method = this.getSeverityMethod(severity);
 
-			(console[method] as (...args: any[]) => void)(error.message);
+			// (console[method] as (...args: any[]) => void)(error.message);
 
 			if (this.logStream) {
 				this.logStream.write(JSON.stringify(error.toJSON(), null, 2) + "\n");

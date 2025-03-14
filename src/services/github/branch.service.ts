@@ -40,8 +40,7 @@ export class BranchService extends BaseGitHubService {
 	protected setupCleanupHandlers() {
 		process.on("SIGINT", async () => await this.cleanup());
 		process.on("SIGTERM", async () => await this.cleanup());
-		process.on("uncaughtException", async (error) => {
-			console.error(`Uncaught exception: ${extractErrorMessage(error)}`);
+		process.on("uncaughtException", async () => {
 			await this.cleanup();
 		});
 	}
@@ -75,7 +74,6 @@ export class BranchService extends BaseGitHubService {
 
 			return branchRef;
 		} catch (error) {
-			console.error(`Failed to create branch ${branchName}: ${extractErrorMessage(error)}`);
 			this.activeBranches.delete(branchName);
 			throw error;
 		}
@@ -98,10 +96,7 @@ export class BranchService extends BaseGitHubService {
 				...this.fork,
 				ref: `heads/${branchName}`,
 			});
-		} catch (error) {
-			if (error instanceof Error && error.message.includes("404")) {
-				console.error(`Branch ${branchName} not found: ${extractErrorMessage(error)}`);
-			}
+		} catch {
 			return null;
 		}
 	}
@@ -118,18 +113,14 @@ export class BranchService extends BaseGitHubService {
 	 * ```
 	 */
 	public async deleteBranch(branchName: string) {
-		try {
-			const response = await this.octokit.git.deleteRef({
-				...this.fork,
-				ref: `heads/${branchName}`,
-			});
+		const response = await this.octokit.git.deleteRef({
+			...this.fork,
+			ref: `heads/${branchName}`,
+		});
 
-			return response.status === 204;
-		} catch (error) {
-			console.error(`Failed to delete branch ${branchName}: ${extractErrorMessage(error)}`);
-		} finally {
-			this.activeBranches.delete(branchName);
-		}
+		this.activeBranches.delete(branchName);
+
+		return response.status === 204;
 	}
 
 	/**

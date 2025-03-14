@@ -1,7 +1,6 @@
 import type { ProcessedFileResult } from "@/types";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
-import { extractErrorMessage } from "@/errors/error.handler";
 import { BaseGitHubService } from "@/services/github/base.service";
 import TranslationFile from "@/utils/translation-file.util";
 
@@ -31,50 +30,44 @@ export class ContentService extends BaseGitHubService {
 	 * ```
 	 */
 	public async getUntranslatedFiles(maxFiles?: number) {
-		try {
-			const repoTreeResponse = await this.octokit.git.getTree({
-				...this.fork,
-				tree_sha: "main",
-				recursive: "true",
-			});
+		const repoTreeResponse = await this.octokit.git.getTree({
+			...this.fork,
+			tree_sha: "main",
+			recursive: "true",
+		});
 
-			if (!repoTreeResponse.data.tree) {
-				throw new Error("Repository tree is empty");
-			}
-
-			const markdownFiles = this.filterMarkdownFiles(repoTreeResponse.data.tree);
-			const filesToProcess = maxFiles ? markdownFiles.slice(0, maxFiles) : markdownFiles;
-
-			const files: TranslationFile[] = [];
-
-			for (const file of filesToProcess) {
-				if (!file.path) continue;
-
-				try {
-					const response = await this.octokit.repos.getContent({
-						...this.fork,
-						path: file.path,
-					});
-
-					if (!("content" in response.data)) continue;
-
-					files.push({
-						path: file.path,
-						content: Buffer.from(response.data.content, "base64").toString(),
-						sha: response.data.sha,
-						filename: file.path.split("/").pop()!,
-					});
-				} catch (error) {
-					console.error(`Failed to fetch content for ${file.path}: ${extractErrorMessage(error)}`);
-					continue;
-				}
-			}
-
-			return files;
-		} catch (error) {
-			console.error(`Failed to fetch untranslated files: ${extractErrorMessage(error)}`);
-			throw error;
+		if (!repoTreeResponse.data.tree) {
+			throw new Error("Repository tree is empty");
 		}
+
+		const markdownFiles = this.filterMarkdownFiles(repoTreeResponse.data.tree);
+		const filesToProcess = maxFiles ? markdownFiles.slice(0, maxFiles) : markdownFiles;
+
+		const files: TranslationFile[] = [];
+
+		for (const file of filesToProcess) {
+			if (!file.path) continue;
+
+			try {
+				const response = await this.octokit.repos.getContent({
+					...this.fork,
+					path: file.path,
+				});
+
+				if (!("content" in response.data)) continue;
+
+				files.push({
+					path: file.path,
+					content: Buffer.from(response.data.content, "base64").toString(),
+					sha: response.data.sha,
+					filename: file.path.split("/").pop()!,
+				});
+			} catch {
+				continue;
+			}
+		}
+
+		return files;
 	}
 
 	/**
@@ -103,27 +96,22 @@ export class ContentService extends BaseGitHubService {
 		content: string,
 		message: string,
 	) {
-		try {
-			const currentFile = await this.octokit.repos.getContent({
-				...this.fork,
-				path: file.path,
-				ref: branch.object.sha,
-			});
+		const currentFile = await this.octokit.repos.getContent({
+			...this.fork,
+			path: file.path,
+			ref: branch.object.sha,
+		});
 
-			const fileSha = "sha" in currentFile.data ? currentFile.data.sha : undefined;
+		const fileSha = "sha" in currentFile.data ? currentFile.data.sha : undefined;
 
-			await this.octokit.repos.createOrUpdateFileContents({
-				...this.fork,
-				path: file.path,
-				message,
-				content: Buffer.from(content).toString("base64"),
-				branch: branch.ref,
-				sha: fileSha,
-			});
-		} catch (error) {
-			console.error(`Failed to commit translation: ${extractErrorMessage(error)}`);
-			throw error;
-		}
+		await this.octokit.repos.createOrUpdateFileContents({
+			...this.fork,
+			path: file.path,
+			message,
+			content: Buffer.from(content).toString("base64"),
+			branch: branch.ref,
+			sha: fileSha,
+		});
 	}
 
 	/**
@@ -145,31 +133,26 @@ export class ContentService extends BaseGitHubService {
 	 * ```
 	 */
 	public async createPullRequest(branch: string, title: string, body: string, baseBranch = "main") {
-		try {
-			const prExistsResponse = await this.octokit.pulls.list({
-				...this.upstream,
-				head: `${this.fork.owner}:${branch}`,
-				state: "open",
-			});
+		const prExistsResponse = await this.octokit.pulls.list({
+			...this.upstream,
+			head: `${this.fork.owner}:${branch}`,
+			state: "open",
+		});
 
-			const existingPullRequest = prExistsResponse.data.find((pr) => pr.title === title);
+		const existingPullRequest = prExistsResponse.data.find((pr) => pr.title === title);
 
-			if (existingPullRequest) return existingPullRequest;
+		if (existingPullRequest) return existingPullRequest;
 
-			const createPullRequestResponse = await this.octokit.pulls.create({
-				...this.upstream,
-				title,
-				body,
-				head: `${this.fork.owner}:${branch}`,
-				base: baseBranch,
-				maintainer_can_modify: true,
-			});
+		const createPullRequestResponse = await this.octokit.pulls.create({
+			...this.upstream,
+			title,
+			body,
+			head: `${this.fork.owner}:${branch}`,
+			base: baseBranch,
+			maintainer_can_modify: true,
+		});
 
-			return createPullRequestResponse.data;
-		} catch (error) {
-			console.error(`Failed to create pull request: ${extractErrorMessage(error)}`);
-			throw error;
-		}
+		return createPullRequestResponse.data;
 	}
 
 	/**
@@ -197,21 +180,16 @@ export class ContentService extends BaseGitHubService {
 			| TranslationFile
 			| RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"][number],
 	) {
-		try {
-			const blobSha = file.sha;
+		const blobSha = file.sha;
 
-			if (!blobSha) throw new Error("Invalid blob URL");
+		if (!blobSha) throw new Error("Invalid blob URL");
 
-			const response = await this.octokit.git.getBlob({
-				...this.fork,
-				file_sha: blobSha,
-			});
+		const response = await this.octokit.git.getBlob({
+			...this.fork,
+			file_sha: blobSha,
+		});
 
-			return Buffer.from(response.data.content, "base64").toString();
-		} catch (error) {
-			console.error(`Failed to fetch file content: ${extractErrorMessage(error)}`);
-			throw error;
-		}
+		return Buffer.from(response.data.content, "base64").toString();
 	}
 
 	/**
@@ -258,7 +236,7 @@ export class ContentService extends BaseGitHubService {
 		const userComment = listCommentsResponse.data.find((comment) => {
 			return (
 				comment.user?.login === import.meta.env.REPO_FORK_OWNER &&
-				comment.body?.includes(this.commentSufix)
+				comment.body?.includes(this.comment.suffix)
 			);
 		});
 
@@ -290,7 +268,7 @@ export class ContentService extends BaseGitHubService {
 	 * @returns The concatenated comment
 	 */
 	private concatComment(content: string) {
-		return `${this.commentPrefix}\n\n${content}\n\n${this.commentSufix}`;
+		return `${this.comment.prefix}\n\n${content}\n\n${this.comment.suffix}`;
 	}
 
 	/**
@@ -301,98 +279,133 @@ export class ContentService extends BaseGitHubService {
 	 *
 	 * @returns The comment to be posted on the issue
 	 */
-	private buildComment(results: ProcessedFileResult[], filesToTranslate: TranslationFile[]) {
+	public buildComment(results: ProcessedFileResult[], filesToTranslate: TranslationFile[]) {
 		const concattedData = results
 			.map((result) => {
 				const translationFile = filesToTranslate.find((file) => file.filename === result.filename);
 
 				if (!translationFile) return null;
 
-				const directory = translationFile.path.split("/").slice(0, -1).join("/");
-				const strippedDirectory = directory.replace(/\/\d+(?:\/\d+)*\/$/, "");
+				// Extract the directory path and clean it
+				const pathParts = translationFile.path.split("/");
+				const filename = pathParts.pop() || "";
 
+				// Create an object with the proper levels for hierarchy
 				return {
-					directory: strippedDirectory,
-					filename: translationFile.filename,
+					pathParts: this.simplifyPathParts(pathParts),
+					filename,
 					pr_number: result.pullRequest?.number || 0,
 				};
 			})
 			.filter(Boolean);
 
-		const filesByDirectory = concattedData.reduce<Map<string, typeof concattedData>>(
-			(acc, file) => {
-				if (!acc.has(file.directory)) acc.set(file.directory, []);
+		// Build a hierarchical structure instead of a flat map
+		return this.buildHierarchicalComment(concattedData);
+	}
 
-				acc.get(file.directory)?.push(file);
-
-				return acc;
-			},
-			new Map(),
-		);
-
-		const commonPrefix = findCommonPrefix(Array.from(filesByDirectory.keys()));
-
-		if (!commonPrefix) return mapToComment(filesByDirectory);
-
-		const filesByDirStrippedPrefix = new Map<string, typeof concattedData>();
-
-		for (const [dir, files] of filesByDirectory.entries()) {
-			filesByDirStrippedPrefix.set(dir.replace(commonPrefix, ""), files);
+	/**
+	 * Simplifies path parts by removing date-based segments and other unnecessary elements.
+	 *
+	 * @param pathParts Array of path segments
+	 * @returns Simplified path parts
+	 */
+	private simplifyPathParts(pathParts: string[]): string[] {
+		// Remove the common prefix "src/content"
+		if (pathParts[0] === "src" && pathParts[1] === "content") {
+			pathParts = pathParts.slice(2);
 		}
 
-		return mapToComment(filesByDirStrippedPrefix);
+		// Special handling for blog posts
+		if (pathParts[0] === "blog") {
+			// For blog posts, we want to flatten the structure
+			// Keep only the files directly under "blog" regardless of date directories
+			return ["blog"];
+		}
 
-		/**
-		 * Finds the common prefix of an array of paths.
-		 *
-		 * @param paths Array of paths
-		 *
-		 * @returns Common prefix or null if no common prefix is found
-		 */
-		function findCommonPrefix(paths: string[]) {
-			if (!paths.length) return null;
+		return pathParts;
+	}
 
-			const firstPath = paths[0];
+	/**
+	 * Builds a hierarchical comment from the processed data.
+	 *
+	 * @param data Processed file data with path parts
+	 * @returns Formatted hierarchical comment
+	 */
+	private buildHierarchicalComment(
+		data: Array<{
+			pathParts: string[];
+			filename: string;
+			pr_number: number;
+		}>,
+	): string {
+		// Sort data by path and filename
+		data.sort((a, b) => {
+			const pathA = a.pathParts.join("/");
+			const pathB = b.pathParts.join("/");
 
-			if (!firstPath) return null;
+			return pathA === pathB ? a.filename.localeCompare(b.filename) : pathA.localeCompare(pathB);
+		});
 
-			let prefixLength = firstPath.length;
+		// Build a nested structure
+		const structure: any = {};
 
-			for (const path of paths) {
-				let j = 0;
+		for (const item of data) {
+			let currentLevel = structure;
 
-				while (j < prefixLength && j < path.length && firstPath[j] === path[j]) {
-					j++;
+			// Build the nested structure based on path parts
+			for (const part of item.pathParts) {
+				if (!currentLevel[part]) {
+					currentLevel[part] = {
+						__files: [],
+					};
 				}
-
-				prefixLength = j;
-
-				if (prefixLength === 0) return null;
+				currentLevel = currentLevel[part];
 			}
 
-			return firstPath.substring(0, prefixLength);
+			// Add file to the current level
+			currentLevel.__files.push({
+				filename: item.filename,
+				pr_number: item.pr_number,
+			});
 		}
 
-		/**
-		 * Maps the data to a comment.
-		 *
-		 * @param data Data to map
-		 *
-		 * @returns Comment
-		 */
-		function mapToComment(data: Map<string, typeof concattedData>) {
-			const filesByDirStrippedPrefixArraySorted = Array.from(data.entries()).sort(
-				([current], [next]) => current.localeCompare(next),
-			);
+		// Convert the structure to a formatted string
+		return this.formatStructure(structure, 0);
+	}
 
-			const comment = filesByDirStrippedPrefixArraySorted
-				.map(([dir, files]) => {
-					return `- ${dir}\n${files.map((file) => `	- \`${file.filename}\`: #${file.pr_number}`).join("\n")}`;
-				})
-				.join("\n");
+	/**
+	 * Recursively formats the hierarchical structure into a Markdown comment.
+	 *
+	 * @param structure The hierarchical structure to format
+	 * @param level Current indentation level
+	 * @returns Formatted Markdown string
+	 */
+	private formatStructure(structure: any, level: number): string {
+		const lines: string[] = [];
+		const indent = "  ".repeat(level);
 
-			return comment;
+		// Process each directory in alphabetical order
+		const dirs = Object.keys(structure)
+			.filter((key) => key !== "__files")
+			.sort();
+
+		for (const dir of dirs) {
+			lines.push(`${indent}- ${dir}`);
+
+			// Add files at this level
+			const files = structure[dir].__files || [];
+			for (const file of files.sort((a: any, b: any) => a.filename.localeCompare(b.filename))) {
+				lines.push(`${indent}  - \`${file.filename}\`: #${file.pr_number}`);
+			}
+
+			// Process subdirectories recursively
+			const subDirs = Object.keys(structure[dir]).filter((key) => key !== "__files");
+			if (subDirs.length > 0) {
+				lines.push(this.formatStructure(structure[dir], level + 1));
+			}
 		}
+
+		return lines.join("\n");
 	}
 
 	/**
@@ -425,18 +438,16 @@ export class ContentService extends BaseGitHubService {
 		if (response.status !== 200) throw new Error(`Failed to close pull request ${prNumber}`);
 	}
 
-	/** Comment header template for issue comments */
-	private get commentPrefix() {
-		return `As seguintes páginas foram traduzidas e PRs foram criados:`;
-	}
-
-	/** Comment footer template for issue comments */
-	private get commentSufix() {
-		return `###### Observações
+	/** Comment template for issue comments */
+	private get comment() {
+		return {
+			prefix: `As seguintes páginas foram traduzidas e PRs foram criados:`,
+			suffix: `###### Observações
 	
 	- As traduções foram geradas por uma LLM e requerem revisão humana para garantir precisão técnica e fluência.
 	- Alguns arquivos podem ter PRs de tradução existentes em análise. Verifiquei duplicações, mas recomendo conferir.
 	- O fluxo de trabalho de automação completo está disponível no repositório [\`translate-react\`](https://github.com/${import.meta.env.REPO_FORK_OWNER}/translate-react) para referência e contribuições.
-	- Esta implementação é um trabalho em progresso e pode apresentar inconsistências em conteúdos técnicos complexos ou formatação específica.`;
+	- Esta implementação é um trabalho em progresso e pode apresentar inconsistências em conteúdos técnicos complexos ou formatação específica.`,
+		};
 	}
 }

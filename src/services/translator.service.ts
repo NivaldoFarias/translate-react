@@ -82,7 +82,7 @@ export class TranslatorService {
 
 		const content = await this.callLanguageModel(file.content);
 
-		return this.removeFences(content);
+		return this.cleanupTranslatedContent(content);
 	}
 
 	/**
@@ -156,8 +156,20 @@ export class TranslatorService {
 	 * For some reason, some LLMs return the content with fences prepended and appended.
 	 * This method removes them.
 	 */
-	private removeFences(content: string) {
-		return content.replace(/^```\n?|\n?```$/g, "");
+	private cleanupTranslatedContent(content: string) {
+		const shouldStartWith = `---\ntitle:`;
+
+		if (!content.startsWith(shouldStartWith)) {
+			content = content.replace(/^[\s\S]*?(?=---\ntitle:)/, "");
+		}
+
+		// Remove trailing code fence only if it's not closing a legitimate code block
+		// This means we only remove it if it's a standalone closing fence
+		if (content.endsWith("```") && !content.includes("\n```") && !content.includes("```\n")) {
+			content = content.replace(/\n?```$/, "");
+		}
+
+		return content;
 	}
 
 	/**
@@ -181,6 +193,10 @@ export class TranslatorService {
 			target: this.languageDetector.detectLanguage(this.options.target)?.["1"] || "Portuguese",
 			source: this.languageDetector.detectLanguage(franc(content))?.["1"] || "English",
 		};
+
+		if (languages.target === "Portuguese") {
+			languages.target = "Brazilian Portuguese";
+		}
 
 		return `
 			You are a precise translator specializing in technical documentation. 
@@ -228,7 +244,7 @@ export class TranslatorService {
 	public async chunkAndRetryTranslation(content: string) {
 		const chunks = this.splitIntoSections(content);
 
-		return this.removeFences(await this.translateChunks(chunks));
+		return this.cleanupTranslatedContent(await this.translateChunks(chunks));
 	}
 
 	/**
@@ -246,7 +262,6 @@ export class TranslatorService {
 	 */
 	private async translateChunks(chunks: Array<string>) {
 		const chunkContext = (index: number, total: number) => `PART ${index + 1} OF ${total}:\n\n`;
-		const cleanChunk = (chunk: string) => chunk.replace(/^PART \d+ OF \d+:\s*\n*/i, "");
 
 		const translatedChunks: Array<string> = [];
 
@@ -256,7 +271,7 @@ export class TranslatorService {
 					chunkContext(index + 1, chunks.length) + chunk,
 				);
 
-				translatedChunks.push(cleanChunk(translatedChunk));
+				translatedChunks.push(this.cleanupTranslatedContent(translatedChunk));
 			} catch (error) {
 				if (error instanceof Error && error.message === "Content is too long") {
 					const furtherChunkedTranslation = await this.chunkAndRetryTranslation(chunk);
