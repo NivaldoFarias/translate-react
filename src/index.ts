@@ -7,6 +7,8 @@ import { ErrorHandler, ErrorSeverity } from "@/errors";
 import Runner from "@/services/runner/runner.service";
 import { parseCommandLineArgs } from "@/utils/parse-command-args.util";
 
+import { name, version } from "../package.json";
+
 /** Defines the expected structure and types for the runner options */
 const runnerOptionsSchema = z.object({
 	targetLanguage: z.string().min(2).max(5).default("pt"),
@@ -16,27 +18,17 @@ const runnerOptionsSchema = z.object({
 
 if (import.meta.main) {
 	const errorHandler = initializeErrorHandler(
-		Bun.file(`logs/translate-react-${new Date().toISOString()}.log.json`),
+		Bun.file(`logs/${new Date().toISOString()}.log.json`),
 	);
 
-	const runTranslation = errorHandler.wrapAsync(
-		async () => {
-			const args = parseCommandLineArgs(
-				["--target", "--source", "--batch-size"],
-				runnerOptionsSchema,
-			);
-
-			const runner = new Runner(args);
-			await runner.run();
+	const runTranslation = errorHandler.wrapAsync(workflow, {
+		operation: "main",
+		metadata: {
+			version,
+			component: name,
+			environment: process.env.NODE_ENV,
 		},
-		{
-			operation: "main",
-			metadata: {
-				component: "translate-react",
-				version: process.env["npm_package_version"],
-			},
-		},
-	);
+	});
 
 	try {
 		await runTranslation();
@@ -45,6 +37,14 @@ if (import.meta.main) {
 	} catch {
 		process.exit(1);
 	}
+}
+
+async function workflow() {
+	const args = parseCommandLineArgs(["--target", "--source", "--batch-size"], runnerOptionsSchema);
+
+	const runner = new Runner(args);
+
+	await runner.run();
 }
 
 /**
