@@ -58,7 +58,7 @@ export default class Runner extends RunnerService {
 
 			await this.processInBatches(this.state.filesToTranslate, this.options.batchSize);
 
-			this.state.processedResults = Array.from(this.stats.results.values());
+			this.state.processedResults = Array.from(this.metadata.results.values());
 
 			if (import.meta.env.NODE_ENV === "development") {
 				await this.services.snapshot.append("processedResults", this.state.processedResults);

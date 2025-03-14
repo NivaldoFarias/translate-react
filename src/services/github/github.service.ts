@@ -245,16 +245,19 @@ export class GitHubService {
 	/**
 	 * Comments compiled results on a GitHub issue.
 	 *
-	 * @param issueNumber Target issue number
 	 * @param results Translation results to report
+	 * @param filesToTranslate Files that were translated
 	 *
 	 * @example
 	 * ```typescript
-	 * const comment = await github.commentCompiledResultsOnIssue(123, results);
+	 * const comment = await github.commentCompiledResultsOnIssue(results, filesToTranslate);
 	 * ```
 	 */
-	public async commentCompiledResultsOnIssue(issueNumber: number, results: ProcessedFileResult[]) {
-		return this.services.content.commentCompiledResultsOnIssue(issueNumber, results);
+	public async commentCompiledResultsOnIssue(
+		results: ProcessedFileResult[],
+		filesToTranslate: TranslationFile[],
+	) {
+		return this.services.content.commentCompiledResultsOnIssue(results, filesToTranslate);
 	}
 
 	/**

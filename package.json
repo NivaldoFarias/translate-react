@@ -1,6 +1,14 @@
 {
 	"name": "translate-react",
-	"version": "0.1.1",
+	"version": "0.1.2",
+	"contributors": [
+		{
+			"name": "Nivaldo Farias",
+			"url": "https://github.com/NivaldoFarias"
+		}
+	],
+	"license": "MIT",
+	"homepage": "https://github.com/NivaldoFarias/translate-react",
 	"description": "A tool to translate React docs to any language",
 	"type": "module",
 	"scripts": {
@@ -20,6 +28,7 @@
 	},
 	"devDependencies": {
 		"@ianvs/prettier-plugin-sort-imports": "^4.4.1",
+		"@total-typescript/ts-reset": "^0.6.1",
 		"@types/bun": "^1.2.2",
 		"@types/eslint": "^9.6.1",
 		"@types/langs": "^2.0.5",

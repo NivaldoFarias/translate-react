@@ -1,3 +1,5 @@
+import "@total-typescript/ts-reset";
+
 import type { Environment } from "@/utils/env.util";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 

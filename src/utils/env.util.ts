@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { homepage, name, version } from "../../package.json";
+
 /**
  * Environment configuration schema for runtime validation.
  * Uses Zod for type checking and validation of environment variables.
@@ -30,7 +32,23 @@ const envSchema = z.object({
 		.optional()
 		.transform((value) => (value === "" ? undefined : value)),
 
-	FORCE_SNAPSHOT_CLEAR: z.coerce.boolean().default(false),
+	FORCE_SNAPSHOT_CLEAR: z.coerce
+		.boolean()
+		.default(false)
+		.superRefine((value, context) => {
+			const isDevEnvironment =
+				import.meta.env.NODE_ENV === "development" && import.meta.env.BUN_ENV === "development";
+
+			if (value === true && !isDevEnvironment) {
+				context.addIssue({
+					code: z.ZodIssueCode.custom,
+					message: "FORCE_SNAPSHOT_CLEAR can only be true in development environment",
+				});
+			}
+		}),
+
+	HEADER_APP_URL: z.string().url().default(homepage),
+	HEADER_APP_NAME: z.string().default(`${name} v${version}`),
 });
 
 /**
