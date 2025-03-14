@@ -1,8 +1,9 @@
 import { franc } from "franc";
 import OpenAI from "openai";
+import { APIError } from "openai/error";
 
+import type { ProxyHandlerOptions } from "@/errors/proxy.handler";
 import type { LanguageConfig } from "@/utils/language-detector.util";
-import type { APIError } from "openai/error";
 
 import { ErrorCode } from "@/errors/base.error";
 import { createErrorHandlingProxy } from "@/errors/proxy.handler";
@@ -45,13 +46,17 @@ export class TranslatorService {
 			target: this.options.target,
 		});
 
-		const errorMap = new Map();
+		const errorMap: ProxyHandlerOptions["errorMap"] = new Map();
 
 		errorMap.set("APIError", {
 			code: ErrorCode.LLM_API_ERROR,
-			transform: (error: APIError) => ({
-				metadata: { statusCode: error.status, type: error.type },
-			}),
+			transform: (error: Error) => {
+				if (error instanceof APIError) {
+					return { metadata: { statusCode: error.status, type: error.type } };
+				}
+
+				return { metadata: { statusCode: 500, type: "UnknownError" } };
+			},
 		});
 		errorMap.set("RateLimitError", { code: ErrorCode.RATE_LIMIT_EXCEEDED });
 

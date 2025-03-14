@@ -20,7 +20,13 @@ export interface ProxyHandlerOptions {
 	excludeMethods?: string[];
 
 	/** Error mapping for specific error types */
-	errorMap?: Map<string, { code: ErrorCode; transform?: (error: Error) => Partial<ErrorContext> }>;
+	errorMap?: Map<
+		string,
+		{
+			code: ErrorCode;
+			transform?: <T extends Error>(error: T) => Partial<ErrorContext>;
+		}
+	>;
 }
 
 /**
