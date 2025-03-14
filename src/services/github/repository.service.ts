@@ -51,14 +51,12 @@ export class RepositoryService extends BaseGitHubService {
 			const response = await this.octokit.rest.users.getAuthenticated();
 
 			if (response.status !== 200) {
-				console.error(`Failed to verify token permissions: ${extractErrorMessage(response)}`);
 				return false;
 			}
 
 			await this.octokit.rest.repos.get(this.upstream);
 			return true;
-		} catch (error) {
-			console.error(`Token permission verification failed: ${extractErrorMessage(error)}`);
+		} catch {
 			return false;
 		}
 	}
@@ -94,8 +92,7 @@ export class RepositoryService extends BaseGitHubService {
 			]);
 
 			return upstreamCommits.data[0]?.sha === forkedCommits.data[0]?.sha;
-		} catch (error) {
-			console.error(`Failed to check fork sync status: ${extractErrorMessage(error)}`);
+		} catch {
 			return false;
 		}
 	}
@@ -118,8 +115,7 @@ export class RepositoryService extends BaseGitHubService {
 			});
 
 			return mergeResponse.status === 200;
-		} catch (error) {
-			console.error(`Failed to sync fork: ${extractErrorMessage(error)}`);
+		} catch {
 			return false;
 		}
 	}
@@ -173,8 +169,7 @@ export class RepositoryService extends BaseGitHubService {
 			}
 
 			return null;
-		} catch (error) {
-			console.error(`Failed to fetch glossary: ${extractErrorMessage(error)}`);
+		} catch {
 			return null;
 		}
 	}

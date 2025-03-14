@@ -40,17 +40,13 @@ export class SnapshotService {
 	 * ```
 	 */
 	public async save(data: Omit<Snapshot, "id">) {
-		try {
-			if (!this.currentSnapshotId) {
-				this.currentSnapshotId = this.service.createSnapshot(data.timestamp);
-			}
-
-			this.service.saveRepositoryTree(this.currentSnapshotId, data.repositoryTree);
-			this.service.saveFilesToTranslate(this.currentSnapshotId, data.filesToTranslate);
-			this.service.saveProcessedResults(this.currentSnapshotId, data.processedResults);
-		} catch (error) {
-			console.error(`Failed to save snapshot: ${extractErrorMessage(error)}`);
+		if (!this.currentSnapshotId) {
+			this.currentSnapshotId = this.service.createSnapshot(data.timestamp);
 		}
+
+		this.service.saveRepositoryTree(this.currentSnapshotId, data.repositoryTree);
+		this.service.saveFilesToTranslate(this.currentSnapshotId, data.filesToTranslate);
+		this.service.saveProcessedResults(this.currentSnapshotId, data.processedResults);
 	}
 
 	/**
@@ -69,25 +65,21 @@ export class SnapshotService {
 			this.currentSnapshotId = this.service.createSnapshot();
 		}
 
-		try {
-			switch (key) {
-				case "repositoryTree":
-					this.service.saveRepositoryTree(
-						this.currentSnapshotId,
-						data as RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"],
-					);
-					break;
-				case "filesToTranslate":
-					this.service.saveFilesToTranslate(this.currentSnapshotId, data as TranslationFile[]);
-					break;
-				case "processedResults":
-					this.service.saveProcessedResults(this.currentSnapshotId, data as ProcessedFileResult[]);
-					break;
-				default:
-					throw new Error(`Invalid key: ${key}`);
-			}
-		} catch (error) {
-			console.error(`Failed to append ${key}: ${extractErrorMessage(error)}`);
+		switch (key) {
+			case "repositoryTree":
+				this.service.saveRepositoryTree(
+					this.currentSnapshotId,
+					data as RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"],
+				);
+				break;
+			case "filesToTranslate":
+				this.service.saveFilesToTranslate(this.currentSnapshotId, data as TranslationFile[]);
+				break;
+			case "processedResults":
+				this.service.saveProcessedResults(this.currentSnapshotId, data as ProcessedFileResult[]);
+				break;
+			default:
+				throw new Error(`Invalid key: ${key}`);
 		}
 	}
 
@@ -119,12 +111,8 @@ export class SnapshotService {
 	 * ```
 	 */
 	public async clear() {
-		try {
-			this.service.clearSnapshots();
-			this.currentSnapshotId = null;
-		} catch (error) {
-			console.error(`Failed to clear snapshots: ${extractErrorMessage(error)}`);
-		}
+		this.service.clearSnapshots();
+		this.currentSnapshotId = null;
 	}
 
 	/**
@@ -137,19 +125,15 @@ export class SnapshotService {
 	 * ```
 	 */
 	private async cleanup() {
-		try {
-			const latestSnapshot = await this.loadLatest();
-			if (!latestSnapshot) return;
+		const latestSnapshot = await this.loadLatest();
+		if (!latestSnapshot) return;
 
-			const snapshots = this.service.getSnapshots();
+		const snapshots = this.service.getSnapshots();
 
-			for (const snapshot of snapshots) {
-				if (snapshot.id === latestSnapshot.id) continue;
+		for (const snapshot of snapshots) {
+			if (snapshot.id === latestSnapshot.id) continue;
 
-				this.service.deleteSnapshot(snapshot.id);
-			}
-		} catch (error) {
-			console.error(`Failed to cleanup snapshots: ${extractErrorMessage(error)}`);
+			this.service.deleteSnapshot(snapshot.id);
 		}
 	}
 }

@@ -508,18 +508,18 @@ export abstract class RunnerService {
 		try {
 			metadata.branch = await this.services.github.createOrGetTranslationBranch(file);
 			metadata.translation = await this.services.translator.translateContent(file);
-			const language = langs.where("3", this.options.targetLanguage);
+			const language = langs.where("1", this.options.targetLanguage);
 
 			await this.services.github.commitTranslation(
 				metadata.branch,
 				file,
 				metadata.translation,
-				`Translate \`${file.filename}\` to ${language?.name}`,
+				`Translate \`${file.filename}\` to ${language?.name || "Portuguese"}`,
 			);
 
 			metadata.pullRequest = await this.services.github.createPullRequest(
 				metadata.branch.ref,
-				`Translate \`${file.filename}\` to ${language?.name}`,
+				`Translate \`${file.filename}\` to ${language?.name || "Portuguese"}`,
 				this.pullRequestDescription,
 			);
 
