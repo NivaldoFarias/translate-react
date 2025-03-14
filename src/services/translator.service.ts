@@ -236,7 +236,7 @@ export class TranslatorService {
 	 *
 	 * @returns The translated content
 	 */
-	public async translateChunks(chunks: Array<string>) {
+	private async translateChunks(chunks: Array<string>) {
 		const chunkContext = (index: number, total: number) => `PART ${index + 1} OF ${total}:\n\n`;
 		const cleanChunk = (chunk: string) => chunk.replace(/^PART \d+ OF \d+:\s*\n*/i, "");
 
@@ -277,7 +277,7 @@ export class TranslatorService {
 	 *
 	 * @returns Array containing two parts of the content, split at a natural break
 	 */
-	public splitIntoSections(content: string): Array<string> {
+	private splitIntoSections(content: string): Array<string> {
 		if (content.length < 1000) return [content];
 
 		const midpoint = Math.floor(content.length / 2);
