@@ -133,13 +133,13 @@ export class ContentService extends BaseGitHubService {
 	 * ```
 	 */
 	public async createPullRequest(branch: string, title: string, body: string, baseBranch = "main") {
-		const prExistsResponse = await this.octokit.pulls.list({
+		const listPullsResponse = await this.octokit.pulls.list({
 			...this.upstream,
 			head: `${this.fork.owner}:${branch}`,
 			state: "open",
 		});
 
-		const existingPullRequest = prExistsResponse.data.find(
+		const existingPullRequest = listPullsResponse.data.find(
 			(pr) => pr.head.ref === branch && pr.base.ref === baseBranch,
 		);
 

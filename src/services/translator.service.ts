@@ -82,7 +82,7 @@ export class TranslatorService {
 
 		const content = await this.callLanguageModel(file.content);
 
-		return this.cleanupTranslatedContent(content);
+		return this.cleanupTranslatedContent(content, file.content);
 	}
 
 	/**
@@ -126,10 +126,13 @@ export class TranslatorService {
 			return this.chunkAndRetryTranslation(content);
 		}
 
-		const translatedContent = response.choices[0]?.message.content;
+		let translatedContent = response.choices[0]?.message.content;
 		if (!translatedContent) {
 			throw new Error("No content returned");
 		}
+
+		if (translatedContent.startsWith("```")) translatedContent = translatedContent.slice(1);
+		if (translatedContent.endsWith("```")) translatedContent = translatedContent.slice(0, -1);
 
 		return translatedContent;
 	}
@@ -156,18 +159,14 @@ export class TranslatorService {
 	 * For some reason, some LLMs return the content with fences prepended and appended.
 	 * This method removes them.
 	 */
-	private cleanupTranslatedContent(content: string) {
+	private cleanupTranslatedContent(content: string, originalContent?: string) {
 		const shouldStartWith = `---\ntitle:`;
 
 		if (!content.startsWith(shouldStartWith)) {
 			content = content.replace(/^[\s\S]*?(?=---\ntitle:)/, "");
 		}
 
-		const contentEndsWithCodeBlockRegex = /```(?:[a-zA-Z0-9_+-]+)?(?:\s|\n)?$|^```$/;
-
-		// Remove trailing code fence only if it's not closing a legitimate code block
-		// This means we only remove it if it's a standalone closing fence
-		if (content.endsWith("```") && !contentEndsWithCodeBlockRegex.test(content)) {
+		if (content.endsWith("```") && !originalContent?.endsWith("```")) {
 			content = content.replace(/\n?```$/, "");
 		}
 
@@ -273,7 +272,7 @@ export class TranslatorService {
 					chunkContext(index + 1, chunks.length) + chunk,
 				);
 
-				translatedChunks.push(this.cleanupTranslatedContent(translatedChunk));
+				translatedChunks.push(this.cleanupTranslatedContent(translatedChunk, chunk));
 			} catch (error) {
 				if (error instanceof Error && error.message === "Content is too long") {
 					const furtherChunkedTranslation = await this.chunkAndRetryTranslation(chunk);
