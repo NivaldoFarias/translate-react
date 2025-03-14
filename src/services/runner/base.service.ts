@@ -59,7 +59,7 @@ export abstract class RunnerService {
 	};
 
 	/** Statistics tracking for the translation process */
-	protected stats = {
+	protected metadata = {
 		results: new Map<ProcessedFileResult["filename"], ProcessedFileResult>(),
 		timestamp: Date.now(),
 	};
@@ -313,8 +313,8 @@ export abstract class RunnerService {
 		this.spinner.text = "Commenting on issue...";
 
 		const comment = await this.services.github.commentCompiledResultsOnIssue(
-			Number(import.meta.env.PROGRESS_ISSUE_NUMBER),
 			this.state.processedResults,
+			this.state.filesToTranslate,
 		);
 
 		this.spinner.succeed(`Commented on translation issue. Comment URL: ${comment.html_url}`);
@@ -327,7 +327,7 @@ export abstract class RunnerService {
 		return !!(
 			import.meta.env.NODE_ENV === "production" &&
 			import.meta.env.PROGRESS_ISSUE_NUMBER &&
-			this.stats.results.size > 0
+			this.metadata.results.size > 0
 		);
 	}
 
@@ -346,8 +346,8 @@ export abstract class RunnerService {
 	 * - Timing information
 	 */
 	protected async printFinalStatistics() {
-		const elapsedTime = Math.ceil(Date.now() - this.stats.timestamp);
-		const results = Array.from(this.stats.results.values());
+		const elapsedTime = Math.ceil(Date.now() - this.metadata.timestamp);
+		const results = Array.from(this.metadata.results.values());
 
 		this.spinner.stopAndPersist({ symbol: "📊", text: "Final Statistics" });
 
@@ -497,7 +497,7 @@ export abstract class RunnerService {
 	 * @throws {ResourceLoadError} If translation resources cannot be loaded
 	 */
 	private async processFile(file: TranslationFile, progress: FileProcessingProgress) {
-		const metadata = this.stats.results.get(file.filename) || {
+		const metadata = this.metadata.results.get(file.filename) || {
 			branch: null,
 			filename: file.filename,
 			translation: null,
@@ -528,7 +528,7 @@ export abstract class RunnerService {
 			metadata.error = error instanceof Error ? error : new Error(String(error));
 			this.updateBatchProgress("error");
 		} finally {
-			this.stats.results.set(file.filename, metadata);
+			this.metadata.results.set(file.filename, metadata);
 			this.updateProgressSpinner(progress);
 		}
 	}

@@ -16,6 +16,8 @@ import TranslationFile from "@/utils/translation-file.util";
  * - Content filtering and validation
  */
 export class ContentService extends BaseGitHubService {
+	private readonly issueNumber = Number(import.meta.env.PROGRESS_ISSUE_NUMBER);
+
 	/**
 	 * Retrieves markdown files that need translation.
 	 * Filters and processes files based on content type.
@@ -215,83 +217,182 @@ export class ContentService extends BaseGitHubService {
 	/**
 	 * Posts translation results as comments on GitHub issues.
 	 *
-	 * @param issueNumber Target issue number
+	 * ## Workflow
+	 * 1. Checks if the issue exists
+	 * 2. Lists comments on the issue
+	 * 3. Finds the user's comment with the correct prefix
+	 * 4. Updates the comment with new results
+	 * 5. Creates a new comment if the user's comment is not found
+	 *
 	 * @param results Translation results to report
+	 * @param filesToTranslate Files that were translated
+	 *
+	 * @throws {Error} If the issue is not found
+	 *
+	 * @returns The comment created on the issue
+	 *
+	 * @example
+	 * ```typescript
+	 * const comment = await contentService.commentCompiledResultsOnIssue(results, filesToTranslate);
+	 * ```
 	 */
-	public async commentCompiledResultsOnIssue(issueNumber: number, results: ProcessedFileResult[]) {
+	public async commentCompiledResultsOnIssue(
+		results: ProcessedFileResult[],
+		filesToTranslate: TranslationFile[],
+	) {
 		const issueExistsResponse = await this.octokit.issues.get({
 			...this.upstream,
-			issue_number: issueNumber,
+			issue_number: this.issueNumber,
 		});
 
 		if (!issueExistsResponse.data) {
-			throw new Error(`Issue ${issueNumber} not found`);
+			throw new Error(`Issue ${this.issueNumber} not found`);
 		}
 
 		const listCommentsResponse = await this.octokit.issues.listComments({
 			...this.upstream,
-			issue_number: issueNumber,
+			issue_number: this.issueNumber,
 			since: "2025-01-20",
 		});
 
 		const userComment = listCommentsResponse.data.find((comment) => {
 			return (
-				comment.user?.login === import.meta.env.REPO_FORK_OWNER! &&
-				comment.body?.includes("###### Observações")
+				comment.user?.login === import.meta.env.REPO_FORK_OWNER &&
+				comment.body?.includes(this.commentSufix)
 			);
 		});
 
 		if (userComment) {
-			const listResults = userComment.body
-				?.split("\n")
-				.filter((line) => line.includes("- ["))
-				.map((line) => {
-					const match = line.match(/-\s*\[(?<filename>.*?)\]\((?<html_url>.*?)\)/);
-					const data = match ? match.groups : null;
-
-					return data ? { filename: data["filename"], html_url: data["html_url"] } : null;
-				})
-				.filter((result) => result !== null) as { filename: string; html_url: string }[];
-
-			const newResults = results
-				.filter((result) => !listResults.find((compare) => compare.filename === result.filename))
-				.map((result) => ({
-					filename: result.filename,
-					html_url: result.pullRequest?.html_url,
-				}));
-
-			if (!newResults.length) {
-				return userComment;
-			}
-
-			const newResultsComment = newResults
-				.concat(listResults)
-				.map((result) => `- [${result.filename}](${result.html_url})`)
-				.join("\n");
-
-			const newComment = `${this.commentPrefix}\n\n${newResultsComment}\n\n${this.commentSufix}`;
-
 			const updateCommentResponse = await this.octokit.issues.updateComment({
 				...this.upstream,
-				issue_number: issueNumber,
-				body: newComment,
+				issue_number: this.issueNumber,
+				body: this.concatComment(this.buildComment(results, filesToTranslate)),
 				comment_id: userComment.id,
 			});
 
 			return updateCommentResponse.data;
 		}
 
-		const listResults = results
-			.map((result) => `- [${result.filename}](${result.pullRequest?.html_url})`)
-			.join("\n");
-
 		const createCommentResponse = await this.octokit.issues.createComment({
 			...this.upstream,
-			issue_number: issueNumber,
-			body: `${this.commentPrefix}\n\n${listResults}\n\n${this.commentSufix}`,
+			issue_number: this.issueNumber,
+			body: this.concatComment(this.buildComment(results, filesToTranslate)),
 		});
 
 		return createCommentResponse.data;
+	}
+
+	/**
+	 * Concatenates the comment prefix and suffix to the main content.
+	 *
+	 * @param content The content to concatenate
+	 *
+	 * @returns The concatenated comment
+	 */
+	private concatComment(content: string) {
+		return `${this.commentPrefix}\n\n${content}\n\n${this.commentSufix}`;
+	}
+
+	/**
+	 * Builds a comment for the issue based on the translation results and files that were translated.
+	 *
+	 * @param results Translation results
+	 * @param filesToTranslate Files that were translated
+	 *
+	 * @returns The comment to be posted on the issue
+	 */
+	private buildComment(results: ProcessedFileResult[], filesToTranslate: TranslationFile[]) {
+		const concattedData = results
+			.map((result) => {
+				const translationFile = filesToTranslate.find((file) => file.filename === result.filename);
+
+				if (!translationFile) return null;
+
+				const directory = translationFile.path.split("/").slice(0, -1).join("/");
+				const strippedDirectory = directory.replace(/\/\d+(?:\/\d+)*\/$/, "");
+
+				return {
+					directory: strippedDirectory,
+					filename: translationFile.filename,
+					pr_number: result.pullRequest?.number || 0,
+				};
+			})
+			.filter(Boolean);
+
+		const filesByDirectory = concattedData.reduce<Map<string, typeof concattedData>>(
+			(acc, file) => {
+				if (!acc.has(file.directory)) acc.set(file.directory, []);
+
+				acc.get(file.directory)?.push(file);
+
+				return acc;
+			},
+			new Map(),
+		);
+
+		const commonPrefix = findCommonPrefix(Array.from(filesByDirectory.keys()));
+
+		if (!commonPrefix) return mapToComment(filesByDirectory);
+
+		const filesByDirStrippedPrefix = new Map<string, typeof concattedData>();
+
+		for (const [dir, files] of filesByDirectory.entries()) {
+			filesByDirStrippedPrefix.set(dir.replace(commonPrefix, ""), files);
+		}
+
+		return mapToComment(filesByDirStrippedPrefix);
+
+		/**
+		 * Finds the common prefix of an array of paths.
+		 *
+		 * @param paths Array of paths
+		 *
+		 * @returns Common prefix or null if no common prefix is found
+		 */
+		function findCommonPrefix(paths: string[]) {
+			if (!paths.length) return null;
+
+			const firstPath = paths[0];
+
+			if (!firstPath) return null;
+
+			let prefixLength = firstPath.length;
+
+			for (const path of paths) {
+				let j = 0;
+
+				while (j < prefixLength && j < path.length && firstPath[j] === path[j]) {
+					j++;
+				}
+
+				prefixLength = j;
+
+				if (prefixLength === 0) return null;
+			}
+
+			return firstPath.substring(0, prefixLength);
+		}
+
+		/**
+		 * Maps the data to a comment.
+		 *
+		 * @param data Data to map
+		 *
+		 * @returns Comment
+		 */
+		function mapToComment(data: Map<string, typeof concattedData>) {
+			const filesByDirStrippedPrefixArraySorted = Array.from(data.entries()).sort(
+				([current], [next]) => current.localeCompare(next),
+			);
+
+			const comment = filesByDirStrippedPrefixArraySorted
+				.map(([dir, files]) => {
+					return `- ${dir}\n${files.map((file) => `	- \`${file.filename}\`: #${file.pr_number}`).join("\n")}`;
+				})
+				.join("\n");
+
+			return comment;
+		}
 	}
 
 	/**

@@ -24,7 +24,10 @@ export class TranslatorService {
 	private readonly llm = new OpenAI({
 		baseURL: import.meta.env.OPENAI_BASE_URL,
 		apiKey: import.meta.env.OPENAI_API_KEY,
-		defaultHeaders: { "X-Title": "Translate React" },
+		defaultHeaders: {
+			"X-Title": import.meta.env.HEADER_APP_NAME,
+			"HTTP-Referer": import.meta.env.HEADER_APP_URL,
+		},
 	});
 
 	private readonly languageDetector: LanguageDetector;
