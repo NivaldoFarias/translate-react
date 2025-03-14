@@ -354,8 +354,7 @@ export abstract class RunnerService {
 		console.table({
 			"Files processed successfully": results.filter(({ error }) => !error).length,
 			"Failed translations": results.filter(({ error }) => !!error).length,
-			"Total elapsed time (ms)": elapsedTime,
-			"Total elapsed time (s)": Math.ceil(elapsedTime / 1000),
+			"Total elapsed time": this.formatElapsedTime(elapsedTime),
 		});
 
 		const failedFiles = results.filter(({ error }) => !!error) as SetNonNullable<
@@ -379,8 +378,30 @@ export abstract class RunnerService {
 
 		this.spinner.stopAndPersist({
 			symbol: "⏱️",
-			text: `Workflow completed in ${elapsedTime}ms (${Math.ceil(elapsedTime / 1000)}s)`,
+			text: ` Workflow completed in ${elapsedTime}ms (${Math.ceil(elapsedTime / 1000)}s)`,
 		});
+	}
+
+	/**
+	 * Formats a time duration in milliseconds to a human-readable string
+	 * using the Intl.RelativeTimeFormat API for localization
+	 *
+	 * @param elapsedTime The elapsed time in milliseconds
+	 *
+	 * @returns A formatted duration string
+	 */
+	private formatElapsedTime(elapsedTime: number) {
+		const formatter = new Intl.RelativeTimeFormat("en", { numeric: "always", style: "long" });
+
+		const seconds = Math.floor(elapsedTime / 1000);
+
+		if (seconds < 60) {
+			return formatter.format(seconds, "second").replace("in ", "");
+		} else if (seconds < 3600) {
+			return formatter.format(Math.floor(seconds / 60), "minute").replace("in ", "");
+		} else {
+			return formatter.format(Math.floor(seconds / 3600), "hour").replace("in ", "");
+		}
 	}
 
 	/**
