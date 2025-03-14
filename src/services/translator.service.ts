@@ -163,9 +163,11 @@ export class TranslatorService {
 			content = content.replace(/^[\s\S]*?(?=---\ntitle:)/, "");
 		}
 
+		const contentEndsWithCodeBlockRegex = /```(?:[a-zA-Z0-9_+-]+)?(?:\s|\n)?$|^```$/;
+
 		// Remove trailing code fence only if it's not closing a legitimate code block
 		// This means we only remove it if it's a standalone closing fence
-		if (content.endsWith("```") && !content.includes("\n```") && !content.includes("```\n")) {
+		if (content.endsWith("```") && !contentEndsWithCodeBlockRegex.test(content)) {
 			content = content.replace(/\n?```$/, "");
 		}
 
