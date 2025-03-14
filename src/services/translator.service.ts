@@ -206,11 +206,10 @@ export class TranslatorService {
 	 * smaller chunks and translating each chunk separately, then combining the results.
 	 *
 	 * ## Workflow
-	 * 1. Estimates token count using tiktoken
-	 * 2. Splits content at natural break points (middle of paragraphs, end of code blocks)
-	 * 3. Recursively splits chunks that are still too large
-	 * 4. Translates each chunk while maintaining context
-	 * 5. Combines translated chunks preserving original structure
+	 * 1. Splits content at natural break points (middle of paragraphs, end of code blocks)
+	 * 2. Recursively splits chunks that are still too large
+	 * 3. Translates each chunk while maintaining context
+	 * 4. Combines translated chunks preserving original structure
 	 *
 	 * @param content Content that exceeded the model's context window
 	 *
@@ -218,10 +217,10 @@ export class TranslatorService {
 	 *
 	 * @throws {Error} If chunking fails or if all chunk translation attempts fail
 	 */
-	public async chunkAndRetryTranslation(content: string): Promise<string> {
+	public async chunkAndRetryTranslation(content: string) {
 		const chunks = this.splitIntoSections(content);
 
-		return this.translateChunks(chunks);
+		return this.removeFences(await this.translateChunks(chunks));
 	}
 
 	/**
@@ -237,9 +236,9 @@ export class TranslatorService {
 	 *
 	 * @returns The translated content
 	 */
-	private async translateChunks(chunks: Array<string>) {
+	public async translateChunks(chunks: Array<string>) {
 		const chunkContext = (index: number, total: number) => `PART ${index + 1} OF ${total}:\n\n`;
-		const cleanedChunk = (chunk: string) => chunk.replace(/^PART \d+ OF \d+:\s*\n*/i, "");
+		const cleanChunk = (chunk: string) => chunk.replace(/^PART \d+ OF \d+:\s*\n*/i, "");
 
 		const translatedChunks: Array<string> = [];
 
@@ -249,9 +248,7 @@ export class TranslatorService {
 					chunkContext(index + 1, chunks.length) + chunk,
 				);
 
-				if (!translatedChunk) throw new Error("No content returned");
-
-				translatedChunks.push(cleanedChunk(translatedChunk));
+				translatedChunks.push(cleanChunk(translatedChunk));
 			} catch (error) {
 				if (error instanceof Error && error.message === "Content is too long") {
 					const furtherChunkedTranslation = await this.chunkAndRetryTranslation(chunk);
@@ -280,38 +277,32 @@ export class TranslatorService {
 	 *
 	 * @returns Array containing two parts of the content, split at a natural break
 	 */
-	private splitIntoSections(content: string): Array<string> {
-		// If content is small enough, return it as a single section
-		if (content.length < 1000) {
-			return [content];
-		}
+	public splitIntoSections(content: string): Array<string> {
+		if (content.length < 1000) return [content];
 
 		const midpoint = Math.floor(content.length / 2);
 
-		// Find natural break points: paragraph breaks, end of code blocks, headers
 		const breakPointRegex = /(\n\n)|(\n#{1,6} )|(\n```\n)|(```\n)/g;
 
 		let bestBreakPoint = 0;
 		let minDistance = content.length;
 		let match;
 
-		// Reset regex search
 		breakPointRegex.lastIndex = 0;
 
-		// Find the break point closest to the middle
 		while ((match = breakPointRegex.exec(content)) !== null) {
 			const breakPointPosition = match.index + match[0].length;
 			const distance = Math.abs(breakPointPosition - midpoint);
+			const exceededSearchBoundary = breakPointPosition > midpoint * 1.5;
 
+			// If the distance is smaller than the minimum distance,
+			// update the minimum distance and the best break point
 			if (distance < minDistance) {
 				minDistance = distance;
 				bestBreakPoint = breakPointPosition;
 			}
 
-			// If we've passed the midpoint by a significant margin, stop searching
-			if (breakPointPosition > midpoint * 1.5) {
-				break;
-			}
+			if (exceededSearchBoundary) break;
 		}
 
 		// If no good break point was found, use the midpoint
@@ -320,18 +311,18 @@ export class TranslatorService {
 			const sentenceBreakRegex = /[.!?]\s+/g;
 			sentenceBreakRegex.lastIndex = midpoint - 200 > 0 ? midpoint - 200 : 0;
 
+			// Try to find a sentence break near the midpoint
 			while ((match = sentenceBreakRegex.exec(content)) !== null) {
 				const breakPointPosition = match.index + match[0].length;
 				const distance = Math.abs(breakPointPosition - midpoint);
+				const exceededSearchBoundary = breakPointPosition > midpoint + 200;
 
 				if (distance < minDistance) {
 					minDistance = distance;
 					bestBreakPoint = breakPointPosition;
 				}
 
-				if (breakPointPosition > midpoint + 200) {
-					break;
-				}
+				if (exceededSearchBoundary) break;
 			}
 
 			// If still no good break point, use the midpoint at a space
