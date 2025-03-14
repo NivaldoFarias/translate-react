@@ -6,18 +6,20 @@ A CLI tool to automate the translation of React documentation from English to an
 
 This project automates the translation process of React's documentation to any language. It uses the following workflow:
 
-1. Fetching untranslated markdown files from the React docs repository
-2. Managing translation state through SQLite snapshots to handle interruptions
-3. Translating content using OpenRouter models with strict glossary rules
-4. Creating branches and pull requests with translations
-5. Tracking progress through GitHub issues
-6. Managing cleanup and error recovery
+1. Verifying GitHub token permissions and synchronizing fork with upstream
+2. Managing translation state through SQLite snapshots for interruption recovery
+3. Fetching repository tree and identifying files for translation
+4. Processing files in batches with real-time progress tracking
+5. Translating content using OpenAI models with strict glossary rules
+6. Creating branches and pull requests with translations
+7. Tracking progress through GitHub issues
+8. Managing cleanup and error recovery
 
 ## Prerequisites
 
 - [Bun](https://bun.sh) runtime
 - GitHub Personal Access Token with repo permissions
-- OpenRouter API Key
+- OpenAI API Key
 - Node.js v20+
 - SQLite3
 
@@ -40,19 +42,19 @@ bun install
 
 ```env
 GITHUB_TOKEN=your_github_token                 # required
-OPENAI_API_KEY=your_OPENAI_API_KEY                   # required
+OPENAI_API_KEY=your_openai_api_key             # required
+OPENAI_BASE_URL=https://api.openai.com/v1      # optional, defaults to OpenAI API
 LLM_MODEL=gpt-4                                # required
-OPENAI_BASE_URL=https://openrouter.ai/api/v1      # optional, defaults to openrouter.ai
-REPO_FORK_OWNER=target_REPO_FORK_OWNER                   # required
-REPO_FORK_NAME=target_REPO_FORK_NAME                     # required
-REPO_UPSTREAM_OWNER=REPO_UPSTREAM_OWNER        # required
+REPO_FORK_OWNER=target_fork_owner              # required
+REPO_FORK_NAME=target_fork_name                # required
+REPO_UPSTREAM_OWNER=upstream_owner             # required
 NODE_ENV=development|production|test           # optional, defaults to development
 BUN_ENV=development|production|test            # optional, defaults to development
-PROGRESS_ISSUE_NUMBER=123                   # optional, only used for tracking progress
+PROGRESS_ISSUE_NUMBER=123                      # optional, only used for tracking progress
 ```
 
 > [!NOTE]
-> These variables are validated at runtime using Zod. Refer to the `src/utils/env.ts` file for the validation schema.
+> These variables are validated at runtime using Zod. Refer to the `src/utils/env.util.ts` file for the validation schema.
 
 ## Usage
 
@@ -67,91 +69,119 @@ bun run dev
 ### Production
 
 ```bash
-bun run build
-bun run start
+bun start
 ```
 
-Or run directly using Bun:
+Or run the script directly:
 
 ```bash
-bun run index.ts
+bun run src/index.ts
 ```
+
+### Command Line Arguments
+
+The tool supports the following command line arguments:
+
+```bash
+bun run start --target pt --source en --batch-size 10
+```
+
+- `--target`: Target language code (default: "pt")
+- `--source`: Source language code (default: "en")
+- `--batch-size`: Number of files to process in each batch (default: 10)
 
 ## Project Structure
 
 ```
 src/
+├── errors/                              # Error handling system
+│   ├── base.error.ts                    # Base error classes and types
+│   ├── error.handler.ts                 # Error handler implementation
+│   ├── proxy.handler.ts                 # Error handling proxy
+│   └── specific.error.ts                # Specific error implementations
 ├── services/
-│   ├── github/                        # GitHub API services
-│   │   ├── base.service.ts            # Base GitHub service
-│   │   ├── branch.service.ts          # Branch management
-│   │   ├── content.service.ts         # Content and PR management
-│   │   ├── repository.service.ts      # Repository operations
-│   │   └── index.ts                   # Main GitHub service
-│   ├── translator.service.ts          # Translation service
-│   ├── database.service.ts            # Database service
-│   └── snapshot.service.ts            # Snapshot service
+│   ├── github/                          # GitHub API services
+│   │   ├── base.service.ts              # Base GitHub service
+│   │   ├── branch.service.ts            # Branch management
+│   │   ├── content.service.ts           # Content and PR management
+│   │   ├── github.service.ts            # Main GitHub service
+│   │   └── repository.service.ts        # Repository operations
+│   ├── runner/                          # Workflow orchestration
+│   │   ├── base.service.ts              # Base runner implementation
+│   │   └── runner.service.ts            # Main workflow orchestrator
+│   ├── database.service.ts              # Database service
+│   ├── snapshot.service.ts              # Snapshot service
+│   └── translator.service.ts            # Translation service
 ├── utils/
-│   ├── language-detector.util.ts      # Language detection utility
-│   ├── content-parser.util.ts         # Content parser utility
-│   ├── env.util.ts                    # Environment validation
-│   └── errors.util.ts                 # Custom error handling
-├── runner.ts                          # Main workflow orchestrator
-└── types.d.ts                         # Type definitions
-
-snapshots.sqlite                       # SQLite database for state persistence
+│   ├── constants.util.ts                # Application constants
+│   ├── env.util.ts                      # Environment validation
+│   ├── language-detector.util.ts        # Language detection utility
+│   ├── parse-command-args.util.ts       # Command line argument parser
+│   ├── setup-signal-handlers.util.ts    # Process signal handlers
+│   └── translation-file.util.ts         # Translation file utility
+├── index.ts                             # Main entry point
+├── types.d.ts                           # Type definitions
+│
+logs/                                    # Error logs directory
+snapshots.sqlite                         # SQLite database for state persistence
 ```
 
 ## Architecture
 
 ### Core Services
 
-1. **GitHub Service** (`services/github/`)
+1. **Runner Service** (`services/runner/`)
 
-   - Modular architecture with specialized services:
-     - **Base Service**: Common GitHub functionality and error handling
-     - **Branch Service**: Branch lifecycle and cleanup management
-     - **Content Service**: File operations and PR management
-     - **Repository Service**: Repository and fork synchronization
-   - Inheritance-based design for code reuse
-   - Protected access modifiers for internal operations
-   - Unified error handling through base service
+- Orchestrates the entire translation workflow
+- Manages batch processing and progress tracking
+- Handles state persistence through snapshots
+- Implements error recovery and reporting
 
-2. **Translator Service** (`services/translator.service.ts`)
+2. **GitHub Service** (`services/github/`)
 
-   - Interfaces with OpenAI's GPT models
-   - Maintains translation glossary and rules
-   - Tracks translation metrics and performance
+- Modular architecture with specialized services:
+  - **Base Service**: Common GitHub functionality and error handling
+  - **Branch Service**: Branch lifecycle and cleanup management
+  - **Content Service**: File operations and PR management
+  - **Repository Service**: Repository and fork synchronization
+- Inheritance-based design for code reuse
+- Protected access modifiers for internal operations
+- Unified error handling through base service
 
-3. **Language Detector** (`services/language-detector.service.ts`)
+3. **Translator Service** (`services/translator.service.ts`)
 
-   - Uses `franc` for language detection
-   - Determines if content needs translation
-   - Calculates language confidence scores
+- Interfaces with OpenAI's language models
+- Handles content parsing and block management
+- Maintains translation glossary and rules
+- Implements chunking and retry mechanisms for large files
 
-4. **Database Service** (`services/database.service.ts`)
-   - Manages persistent storage of workflow state
-   - Handles snapshots for interruption recovery
-   - Maintains translation history and results
+4. **Language Detector** (`utils/language-detector.util.ts`)
 
-### Workflow Management
+- Uses `franc` for language detection
+- Determines if content needs translation
+- Calculates language confidence scores
 
-1. **Runner** (`runner.ts`)
+5. **Database Service** (`services/database.service.ts`)
 
-   - Orchestrates the entire translation process
-   - Manages service interactions
-   - Handles error recovery and reporting
+- Manages persistent storage of workflow state
+- Handles snapshots for interruption recovery
+- Maintains translation history and results
 
-2. **Branch Manager** (`services/github/branch.service.ts`)
+### Error Handling System
 
-   - Manages Git branches for translations
-   - Ensures proper cleanup of temporary branches
-   - Tracks active translation branches
+1. **Error Handler** (`errors/error.handler.ts`)
 
-3. **Content Parser** (`utils/content-parser.util.ts`)
-   - Parses markdown content
-   - Handles code blocks and special formatting
-   - Maintains document structure during translation
+- Centralized error management
+- Severity-based filtering
+- File logging capabilities
+- Custom error reporting
+
+2. **Error Proxy** (`errors/proxy.handler.ts`)
+
+- Automatic error wrapping for services
+- Context enrichment for debugging
+- Method-specific error handling
+- Error transformation and mapping
 
 ## Features
 
