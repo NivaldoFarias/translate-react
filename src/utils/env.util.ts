@@ -21,6 +21,7 @@ const envSchema = z.object({
 	REPO_FORK_OWNER: z.string().min(1, "Repository owner is required"),
 	REPO_FORK_NAME: z.string().min(1, "Repository name is required"),
 	REPO_UPSTREAM_OWNER: z.string().min(1, "Original repository owner is required"),
+	REPO_UPSTREAM_NAME: z.string().min(1, "Original repository name is required"),
 
 	LLM_MODEL: z.string().min(1, "LLM model is required"),
 	OPENAI_API_KEY: z.string().min(1, "LLM API key is required"),

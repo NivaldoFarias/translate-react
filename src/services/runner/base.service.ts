@@ -579,7 +579,9 @@ export abstract class RunnerService {
 	abstract run(): Promise<void>;
 
 	protected get pullRequestDescription() {
-		return `This pull request contains a translation of the referenced page into Portuguese (pt-BR). The translation was generated using LLMs _(Open Router API :: model \`${import.meta.env.LLM_MODEL}\`)_.
+		const language = langs.where("1", this.options.targetLanguage);
+
+		return `This pull request contains a translation of the referenced page to ${language?.name || "Portuguese"}. The translation was generated using LLMs _(Open Router API :: model \`${import.meta.env.LLM_MODEL}\`)_.
 
 Refer to the [source repository](https://github.com/${import.meta.env.REPO_FORK_OWNER}/translate-react) workflow that generated this translation for more details.
 
