@@ -8,6 +8,7 @@ import { TranslatorService } from "@/services/translator.service";
 
 declare interface TranslationOutput {
 	input: string;
+	chunks: Array<string>;
 	output: string;
 }
 
@@ -38,9 +39,10 @@ if (import.meta.main) {
 				try {
 					console.info(`${prefix}	Parsing ${file.filename} (step 1/2)`);
 
-					const translation = await services.translator.chunkAndRetryTranslation(file.content);
+					const chunks = services.translator.splitIntoSections(file.content);
+					const translation = await services.translator.translateChunks(chunks);
 
-					output.set(file.filename, { input: file.content, output: translation });
+					output.set(file.filename, { input: file.content, chunks, output: translation });
 
 					console.info(`${prefix} Translated ${file.filename} (step 2/2)`);
 				} catch (error) {
@@ -61,10 +63,7 @@ if (import.meta.main) {
 
 		const prettierResult = Bun.spawnSync(
 			["bunx", "prettier", "--write", `dist/${OUTPUT_FILENAME}`],
-			{
-				stdout: "inherit",
-				stderr: "inherit",
-			},
+			{ stdout: "inherit", stderr: "inherit" },
 		);
 
 		if (prettierResult.success) {
@@ -107,6 +106,8 @@ if (import.meta.main) {
 		}
 
 		for (const [filename, content] of translations.entries()) {
+			if (content.output.length === 0) continue;
+
 			const dirname = filename.replace(/[^a-z0-9]/gi, "_").toLowerCase();
 			const fileDir = `${previewDir}/${dirname}`;
 
