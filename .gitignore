@@ -4,6 +4,7 @@
 .snapshots/
 .vscode/
 .cursor
+scripts/
 
 # Logs
 

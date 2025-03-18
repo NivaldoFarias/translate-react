@@ -9,15 +9,14 @@
         "checkJs": true,
 
         /* Emit Rules */
-
         "noEmit": true,
-        /* Type Checking Rules */
 
+        /* Type Checking Rules */
         "strict": true,
         "noPropertyAccessFromIndexSignature": true,
         "noUncheckedIndexedAccess": true,
-        /* Other Options */
 
+        /* Other Options */
         "skipLibCheck": true,
         "esModuleInterop": true,
         "forceConsistentCasingInFileNames": true,
@@ -27,6 +26,6 @@
             "@/*": ["src/*"]
         }
     },
-    "include": ["src/**/*", "tests/**/*"],
+    "include": ["src/**/*", "tests/**/*", "scripts/**/*"],
     "exclude": ["node_modules", "dist"]
 }
