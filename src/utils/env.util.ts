@@ -49,7 +49,7 @@ const envSchema = z.object({
 		}),
 
 	HEADER_APP_URL: z.string().url().default(homepage),
-	HEADER_APP_NAME: z.string().default(`${name} v${version}`),
+	HEADER_APP_TITLE: z.string().default(`${name} v${version}`),
 });
 
 /**

@@ -30,7 +30,7 @@ export class GitHubService {
 	};
 
 	private readonly services = {
-		branch: new BranchService(this.repos.fork.owner, this.repos.fork.repo),
+		branch: new BranchService(this.repos.upstream, this.repos.fork),
 		repository: new RepositoryService(this.repos.upstream, this.repos.fork),
 		content: new ContentService(this.repos.upstream, this.repos.fork),
 	};
@@ -61,6 +61,44 @@ export class GitHubService {
 	 */
 	public async getRepositoryTree(baseBranch = "main", filterIgnored = true) {
 		return this.services.repository.getRepositoryTree(baseBranch, filterIgnored);
+	}
+
+	/**
+	 * Lists all files that need to be filtered out from the translation.
+	 *
+	 * @returns A list of files that need to be filtered out from the translation
+	 *
+	 * @example
+	 * ```typescript
+	 * const files = await github.listFilesToFilter();
+	 * ```
+	 */
+	public async listFilesToFilter() {
+		const prs = await this.services.content.listOpenPullRequests();
+
+		const userPRs = prs.data.filter(({ user }) => user?.login === import.meta.env.REPO_FORK_OWNER);
+
+		const fullPRData = await Promise.all(
+			userPRs.map(async ({ number }) => {
+				const { data } = await this.services.content.findPullRequestByNumber(number);
+
+				return data;
+			}),
+		);
+
+		const mergeablePRs = fullPRData.filter(({ mergeable }) => mergeable);
+		const nonMergeablePRs = fullPRData.filter(({ mergeable }) => !mergeable);
+
+		for (const pr of nonMergeablePRs) {
+			await this.services.content.createCommentOnPullRequest(
+				pr.number,
+				"PR closed due to merge conflicts.",
+			);
+
+			await this.services.content.closePullRequest(pr.number);
+		}
+
+		return mergeablePRs.map(({ head }) => head.ref.split("/").pop()).filter(Boolean);
 	}
 
 	/**
@@ -108,7 +146,7 @@ export class GitHubService {
 	 * ```
 	 */
 	public async createOrGetTranslationBranch(file: TranslationFile, baseBranch = "main") {
-		const branchName = `translate/${file.path.split("/").slice(1).join("/")}`;
+		const branchName = `translate/${file.path.split("/").slice(2).join("/")}`;
 		const existingBranch = await this.services.branch.getBranch(branchName);
 
 		if (existingBranch) {
@@ -133,10 +171,11 @@ export class GitHubService {
 	/**
 	 * Commits translated content to a branch.
 	 *
-	 * @param branch Target branch reference
-	 * @param file File being translated
-	 * @param content Translated content
-	 * @param message Commit message
+	 * @param options Commit options
+	 * @param options.branch Target branch reference
+	 * @param options.file File being translated
+	 * @param options.content Translated content
+	 * @param options.message Commit message
 	 *
 	 * @example
 	 * ```typescript
@@ -148,22 +187,28 @@ export class GitHubService {
 	 * );
 	 * ```
 	 */
-	public async commitTranslation(
-		branch: RestEndpointMethodTypes["git"]["getRef"]["response"]["data"],
-		file: TranslationFile,
-		content: string,
-		message: string,
-	) {
-		await this.services.content.commitTranslation(branch, file, content, message);
+	public async commitTranslation({
+		branch,
+		file,
+		content,
+		message,
+	}: {
+		branch: RestEndpointMethodTypes["git"]["getRef"]["response"]["data"];
+		file: TranslationFile;
+		content: string;
+		message: string;
+	}) {
+		await this.services.content.commitTranslation({ branch, file, content, message });
 	}
 
 	/**
 	 * Creates a pull request for translated content.
 	 *
-	 * @param branch Source branch name
-	 * @param title Pull request title
-	 * @param body Pull request description
-	 * @param baseBranch Target branch for PR
+	 * @param options Pull request options
+	 * @param options.branch Source branch name
+	 * @param options.title Pull request title
+	 * @param options.body Pull request description
+	 * @param options.baseBranch Target branch for PR
 	 *
 	 * @example
 	 * ```typescript
@@ -174,8 +219,18 @@ export class GitHubService {
 	 * );
 	 * ```
 	 */
-	public async createPullRequest(branch: string, title: string, body: string, baseBranch = "main") {
-		return this.services.content.createPullRequest(branch, title, body, baseBranch);
+	public async createPullRequest({
+		branch,
+		title,
+		body,
+		baseBranch = "main",
+	}: {
+		branch: string;
+		title: string;
+		body: string;
+		baseBranch?: string;
+	}) {
+		return this.services.content.createPullRequest({ branch, title, body, baseBranch });
 	}
 
 	/**
