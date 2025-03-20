@@ -158,7 +158,14 @@ export class GitHubService {
 			}
 
 			const upstreamPR = await this.services.content.findPullRequestByBranch(branchName);
-			if (upstreamPR) await this.services.content.closePullRequest(upstreamPR.number);
+			if (upstreamPR) {
+				await this.services.content.createCommentOnPullRequest(
+					upstreamPR.number,
+					"PR closed due to upstream changes.",
+				);
+
+				await this.services.content.closePullRequest(upstreamPR.number);
+			}
 
 			await this.services.branch.deleteBranch(branchName);
 		}
