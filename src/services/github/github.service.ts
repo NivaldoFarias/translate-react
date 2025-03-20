@@ -64,44 +64,6 @@ export class GitHubService {
 	}
 
 	/**
-	 * Lists all files that need to be filtered out from the translation.
-	 *
-	 * @returns A list of files that need to be filtered out from the translation
-	 *
-	 * @example
-	 * ```typescript
-	 * const files = await github.listFilesToFilter();
-	 * ```
-	 */
-	public async listFilesToFilter() {
-		const prs = await this.services.content.listOpenPullRequests();
-
-		const userPRs = prs.data.filter(({ user }) => user?.login === import.meta.env.REPO_FORK_OWNER);
-
-		const fullPRData = await Promise.all(
-			userPRs.map(async ({ number }) => {
-				const { data } = await this.services.content.findPullRequestByNumber(number);
-
-				return data;
-			}),
-		);
-
-		const mergeablePRs = fullPRData.filter(({ mergeable }) => mergeable);
-		const nonMergeablePRs = fullPRData.filter(({ mergeable }) => !mergeable);
-
-		for (const pr of nonMergeablePRs) {
-			await this.services.content.createCommentOnPullRequest(
-				pr.number,
-				"PR closed due to merge conflicts.",
-			);
-
-			await this.services.content.closePullRequest(pr.number);
-		}
-
-		return mergeablePRs.map(({ head }) => head.ref.split("/").pop()).filter(Boolean);
-	}
-
-	/**
 	 * Fetches raw content of a file from GitHub.
 	 *
 	 * @param file File reference to fetch
