@@ -2,6 +2,29 @@
 
 A CLI tool to automate the translation of React documentation from English to any other language using Large Language Models (LLMs).
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Prerequisites](#prerequisites)
+- [Setup](#setup)
+- [Usage](#usage)
+  - [Development](#development)
+  - [Production](#production)
+  - [Command Line Arguments](#command-line-arguments)
+- [Project Structure](#project-structure)
+- [Architecture](#architecture)
+  - [Core Services](#core-services)
+  - [Error Handling System](#error-handling-system)
+- [Features](#features)
+  - [Translation Quality](#translation-quality)
+  - [State Management](#state-management)
+  - [Process Management](#process-management)
+  - [GitHub Integration](#github-integration)
+  - [Error Handling](#error-handling)
+- [Contributing](#contributing)
+  - [Development Guidelines](#development-guidelines)
+- [License](#license)
+
 ## Overview
 
 This project automates the translation process of React's documentation to any language. It uses the following workflow:
@@ -38,19 +61,30 @@ cd translate-react
 bun install
 ```
 
-3. Create a `.env` file with the following variables:
+3. Create a `.env.local` file with the following variables:
 
 ```env
-GITHUB_TOKEN=your_github_token                 # required
+NODE_ENV=development|production|test           # required
+BUN_ENV=development|production|test            # required
+
+LLM_MODEL=gpt-4                                # required
 OPENAI_API_KEY=your_openai_api_key             # required
 OPENAI_BASE_URL=https://api.openai.com/v1      # optional, defaults to OpenAI API
-LLM_MODEL=gpt-4                                # required
+OPENAI_PROJECT_ID=your_openai_project_id       # optional
+
+GITHUB_TOKEN=your_github_token                 # required
+
 REPO_FORK_OWNER=target_fork_owner              # required
 REPO_FORK_NAME=target_fork_name                # required
 REPO_UPSTREAM_OWNER=upstream_owner             # required
-NODE_ENV=development|production|test           # optional, defaults to development
-BUN_ENV=development|production|test            # optional, defaults to development
+REPO_UPSTREAM_NAME=upstream_name               # required
+
 PROGRESS_ISSUE_NUMBER=123                      # optional, only used for tracking progress
+
+FORCE_SNAPSHOT_CLEAR=true|false                # optional, defaults to false
+
+HEADER_APP_URL=https://example.com             # optional, defaults to project homepage
+HEADER_APP_TITLE=My App                        # optional, defaults to package.json name and version
 ```
 
 > [!NOTE]
@@ -82,13 +116,13 @@ bun run src/index.ts
 
 The tool supports the following command line arguments:
 
-```bash
-bun run start --target pt --source en --batch-size 10
-```
-
 - `--target`: Target language code (default: "pt")
 - `--source`: Source language code (default: "en")
 - `--batch-size`: Number of files to process in each batch (default: 10)
+
+```bash
+bun run start --target=pt --source=en --batch-size=10
+```
 
 ## Project Structure
 

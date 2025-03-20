@@ -88,13 +88,28 @@ export abstract class RunnerService {
 	 * Sets up process event listeners for graceful termination
 	 */
 	constructor(protected readonly options: RunnerOptions) {
-		this.env = validateEnv();
+		try {
+			this.env = validateEnv();
+		} catch (error) {
+			console.error(extractErrorMessage(error));
+
+			throw error;
+		}
 
 		this.services = {
-			github: createErrorHandlingProxy(new GitHubService(), {
-				serviceName: "GitHubService",
-				excludeMethods: ["getSpinner"],
-			}),
+			github: createErrorHandlingProxy(
+				new GitHubService({
+					upstream: {
+						owner: this.env.REPO_UPSTREAM_OWNER,
+						repo: this.env.REPO_UPSTREAM_NAME,
+					},
+					fork: {
+						owner: this.env.REPO_FORK_OWNER,
+						repo: this.env.REPO_FORK_NAME,
+					},
+				}),
+				{ serviceName: "GitHubService", excludeMethods: ["getSpinner"] },
+			),
 			translator: createErrorHandlingProxy(
 				new TranslatorService({
 					source: this.options.sourceLanguage,
@@ -270,15 +285,23 @@ export abstract class RunnerService {
 			);
 		}
 
-		this.state.filesToTranslate = uncheckedFiles.filter(
-			(file) => !this.services.translator.isFileTranslated(file),
-		);
+		let numFilesFiltered = 0;
+
+		this.state.filesToTranslate = uncheckedFiles.filter((file) => {
+			const isTranslated = this.services.translator.isFileTranslated(file);
+
+			if (isTranslated) numFilesFiltered++;
+
+			return !isTranslated;
+		});
 
 		if (this.env.NODE_ENV === "development") {
 			await this.services.snapshot.append("filesToTranslate", this.state.filesToTranslate);
 		}
 
-		this.spinner.succeed(`Found ${this.state.filesToTranslate.length} files to translate`);
+		this.spinner.succeed(
+			`Found ${this.state.filesToTranslate.length} files to translate (${numFilesFiltered} already translated)`,
+		);
 
 		this.spinner.start();
 	}
