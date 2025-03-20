@@ -18,6 +18,44 @@ export class ContentService extends BaseGitHubService {
 	private readonly issueNumber = Number(import.meta.env.PROGRESS_ISSUE_NUMBER);
 
 	/**
+	 * Creates a comment on a pull request.
+	 *
+	 * @param prNumber Pull request number
+	 * @param comment Comment to create
+	 *
+	 * @returns The response from the GitHub API
+	 */
+	public createCommentOnPullRequest(prNumber: number, comment: string) {
+		return this.octokit.issues.createComment({
+			...this.upstream,
+			issue_number: prNumber,
+			body: comment,
+		});
+	}
+
+	/**
+	 * Lists all open pull requests.
+	 *
+	 * @returns A list of open pull requests
+	 */
+	public async listOpenPullRequests() {
+		return await this.octokit.pulls.list({
+			...this.upstream,
+			state: "open",
+		});
+	}
+
+	/**
+	 * Retrieves a pull request by number.
+	 *
+	 * @param prNumber Pull request number
+	 * @returns The pull request data
+	 */
+	public async findPullRequestByNumber(prNumber: number) {
+		return this.octokit.pulls.get({ ...this.upstream, pull_number: prNumber });
+	}
+
+	/**
 	 * Retrieves markdown files that need translation.
 	 * Filters and processes files based on content type.
 	 *
@@ -74,28 +112,42 @@ export class ContentService extends BaseGitHubService {
 	 * Commits translated content to a branch.
 	 * Updates existing file or creates new one.
 	 *
-	 * @param branch Target branch reference
-	 * @param file File being translated
-	 * @param content Translated content
-	 * @param message Commit message
+	 * @param options Commit options
+	 * @param options.branch Target branch reference
+	 * @param options.file File being translated
+	 * @param options.content Translated content
+	 * @param options.message Commit message
+	 *
 	 * @throws {Error} If commit operation fails
 	 *
 	 * @example
 	 * ```typescript
-	 * await contentService.commitTranslation(
-	 *   branch,
-	 *   file,
-	 *   translatedContent,
-	 *   'feat(i18n): translate homepage'
-	 * );
+	 * const options = {
+	 *   branch: branchRef,
+	 *   file: {
+	 *     path: 'src/content/homepage.md',
+	 *     content: translatedContent,
+	 *     sha: '1234567890',
+	 *     filename: 'homepage.md',
+	 *   },
+	 *   content: translatedContent,
+	 *   message: 'feat(i18n): translate homepage'
+	 * };
+	 *
+	 * await contentService.commitTranslation(options);
 	 * ```
 	 */
-	public async commitTranslation(
-		branch: RestEndpointMethodTypes["git"]["getRef"]["response"]["data"],
-		file: TranslationFile,
-		content: string,
-		message: string,
-	) {
+	public async commitTranslation({
+		branch,
+		file,
+		content,
+		message,
+	}: {
+		branch: RestEndpointMethodTypes["git"]["getRef"]["response"]["data"];
+		file: TranslationFile;
+		content: string;
+		message: string;
+	}) {
 		const currentFile = await this.octokit.repos.getContent({
 			...this.fork,
 			path: file.path,
@@ -117,22 +169,37 @@ export class ContentService extends BaseGitHubService {
 	/**
 	 * Creates or finds an existing pull request.
 	 *
-	 * @param branch Source branch name
-	 * @param title Pull request title
-	 * @param body Pull request description
-	 * @param baseBranch Target branch for PR
+	 * @param options Pull request options
+	 * @param options.branch Source branch name
+	 * @param options.title Pull request title
+	 * @param options.body Pull request description
+	 * @param options.baseBranch Target branch for PR
+	 *
 	 * @throws {Error} If pull request creation fails
 	 *
 	 * @example
 	 * ```typescript
-	 * const pr = await contentService.createPullRequest(
-	 *   'translate/homepage',
-	 *   'feat(i18n): translate homepage',
-	 *   'Translates homepage content to Portuguese'
-	 * );
+	 * const options = {
+	 *   branch: 'translate/homepage',
+	 *   title: 'feat(i18n): translate homepage',
+	 *   body: 'Translates homepage content to Portuguese',
+	 *   baseBranch: 'main',
+	 * };
+	 *
+	 * const pr = await contentService.createPullRequest(options);
 	 * ```
 	 */
-	public async createPullRequest(branch: string, title: string, body: string, baseBranch = "main") {
+	public async createPullRequest({
+		branch,
+		title,
+		body,
+		baseBranch,
+	}: {
+		branch: string;
+		title: string;
+		body: string;
+		baseBranch: string;
+	}) {
 		const listPullsResponse = await this.octokit.pulls.list({
 			...this.upstream,
 			head: `${this.fork.owner}:${branch}`,

@@ -2,6 +2,7 @@ import langs from "langs";
 import ora from "ora";
 
 import type { FileProcessingProgress, ProcessedFileResult, Snapshot } from "@/types";
+import type { Environment } from "@/utils/";
 import type { SetNonNullable } from "type-fest";
 
 import {
@@ -24,13 +25,14 @@ export interface RunnerOptions {
 }
 
 export abstract class RunnerService {
+	protected readonly env: Environment;
 	private readonly errorHandler = ErrorHandler.getInstance();
 
 	/**
 	 * Tracks progress for the current batch of files being processed
 	 * Used to update the spinner and generate statistics
 	 */
-	private readonly batchProgress = {
+	protected batchProgress = {
 		completed: 0,
 		successful: 0,
 		failed: 0,
@@ -86,12 +88,7 @@ export abstract class RunnerService {
 	 * Sets up process event listeners for graceful termination
 	 */
 	constructor(protected readonly options: RunnerOptions) {
-		try {
-			validateEnv();
-		} catch (error) {
-			console.error(extractErrorMessage(error));
-			process.exit(1);
-		}
+		this.env = validateEnv();
 
 		this.services = {
 			github: createErrorHandlingProxy(new GitHubService(), {
@@ -110,7 +107,7 @@ export abstract class RunnerService {
 			}),
 		};
 
-		if (import.meta.env.FORCE_SNAPSHOT_CLEAR) {
+		if (this.env.FORCE_SNAPSHOT_CLEAR) {
 			this.services.snapshot.clear();
 		}
 
@@ -147,7 +144,7 @@ export abstract class RunnerService {
 		if (!isForkSynced) {
 			this.spinner.text = "Fork is out of sync. Updating fork...";
 
-			if (import.meta.env.NODE_ENV === "development") {
+			if (this.env.NODE_ENV === "development") {
 				await this.services.snapshot.clear();
 			}
 
@@ -196,19 +193,25 @@ export abstract class RunnerService {
 	protected async fetchRepositoryTree() {
 		if (!this.state.repositoryTree?.length) {
 			this.spinner.text = "Fetching repository content...";
-			this.state.repositoryTree = await this.services.github.getRepositoryTree("main");
+			const repositoryTree = await this.services.github.getRepositoryTree("main");
 
-			if (import.meta.env.NODE_ENV === "development") {
-				await this.services.snapshot.append("repositoryTree", this.state.repositoryTree);
+			this.spinner.text = "Filtering out files that already have a mergeable PR...";
+
+			const filesToFilter = await this.services.github.listFilesToFilter();
+
+			this.state.repositoryTree = repositoryTree.filter(
+				(file) => !filesToFilter.includes(file.path?.split("/").pop() || ""),
+			);
+
+			if (this.env.NODE_ENV === "development") {
+				await this.services.snapshot.append("repositoryTree", repositoryTree);
 			}
 
 			this.spinner.text = "Repository tree fetched. Fetching glossary...";
 			const glossary = await this.services.github.getGlossary();
 
 			if (!glossary) {
-				throw new ResourceLoadError("Failed to fetch glossary", {
-					operation: "fetchGlossary",
-				});
+				throw new ResourceLoadError("Failed to fetch glossary", { operation: "fetchGlossary" });
 			}
 
 			this.services.translator.glossary = glossary;
@@ -271,7 +274,7 @@ export abstract class RunnerService {
 			(file) => !this.services.translator.isFileTranslated(file),
 		);
 
-		if (import.meta.env.NODE_ENV === "development") {
+		if (this.env.NODE_ENV === "development") {
 			await this.services.snapshot.append("filesToTranslate", this.state.filesToTranslate);
 		}
 
@@ -325,8 +328,8 @@ export abstract class RunnerService {
 	 */
 	protected get shouldUpdateIssueComment() {
 		return !!(
-			import.meta.env.NODE_ENV === "production" &&
-			import.meta.env.PROGRESS_ISSUE_NUMBER &&
+			this.env.NODE_ENV === "production" &&
+			this.env.PROGRESS_ISSUE_NUMBER &&
 			this.metadata.results.size > 0
 		);
 	}
@@ -529,20 +532,21 @@ export abstract class RunnerService {
 		try {
 			metadata.branch = await this.services.github.createOrGetTranslationBranch(file);
 			metadata.translation = await this.services.translator.translateContent(file);
+
 			const language = langs.where("1", this.options.targetLanguage);
 
-			await this.services.github.commitTranslation(
-				metadata.branch,
+			await this.services.github.commitTranslation({
+				branch: metadata.branch,
 				file,
-				metadata.translation,
-				`Translate \`${file.filename}\` to ${language?.name || "Portuguese"}`,
-			);
+				content: metadata.translation,
+				message: `Translate \`${file.filename}\` to ${language?.name || "Portuguese"}`,
+			});
 
-			metadata.pullRequest = await this.services.github.createPullRequest(
-				metadata.branch.ref,
-				`Translate \`${file.filename}\` to ${language?.name || "Portuguese"}`,
-				this.pullRequestDescription,
-			);
+			metadata.pullRequest = await this.services.github.createPullRequest({
+				branch: metadata.branch.ref,
+				title: `Translate \`${file.filename}\` to ${language?.name || "Portuguese"}`,
+				body: this.pullRequestDescription,
+			});
 
 			this.updateBatchProgress("success");
 		} catch (error) {
@@ -581,9 +585,9 @@ export abstract class RunnerService {
 	protected get pullRequestDescription() {
 		const language = langs.where("1", this.options.targetLanguage);
 
-		return `This pull request contains a translation of the referenced page to ${language?.name || "Portuguese"}. The translation was generated using LLMs _(Open Router API :: model \`${import.meta.env.LLM_MODEL}\`)_.
+		return `This pull request contains a translation of the referenced page to ${language?.name || "Portuguese"}. The translation was generated using LLMs _(Open Router API :: model \`${this.env.LLM_MODEL}\`)_.
 
-Refer to the [source repository](https://github.com/${import.meta.env.REPO_FORK_OWNER}/translate-react) workflow that generated this translation for more details.
+Refer to the [source repository](https://github.com/${this.env.REPO_FORK_OWNER}/translate-react) workflow that generated this translation for more details.
 
 Feel free to review and suggest any improvements to the translation.`;
 	}

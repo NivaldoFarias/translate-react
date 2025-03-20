@@ -1,4 +1,3 @@
-import { extractErrorMessage } from "@/errors/error.handler";
 import { BaseGitHubService } from "@/services/github/base.service";
 
 /**
@@ -19,17 +18,17 @@ export class BranchService extends BaseGitHubService {
 	 * Creates a new branch service instance.
 	 * Initializes the GitHub client and sets up cleanup handlers.
 	 *
-	 * @param owner GitHub repository owner
-	 * @param repo GitHub repository name
+	 * @param upstream Original repository details
+	 * @param fork Forked repository details
 	 * @param githubToken GitHub personal access token
-	 *
-	 * @example
-	 * ```typescript
-	 * const branchService = new BranchService('owner', 'repo', 'token');
-	 * ```
 	 */
-	constructor(owner: string, repo: string, githubToken?: string) {
-		super({ owner, repo }, { owner, repo }, githubToken);
+	constructor(
+		protected readonly upstream: { owner: string; repo: string },
+		protected readonly fork: { owner: string; repo: string },
+		protected readonly githubToken = import.meta.env.GITHUB_TOKEN,
+	) {
+		super(upstream, fork, githubToken);
+
 		this.setupCleanupHandlers();
 	}
 
@@ -40,9 +39,7 @@ export class BranchService extends BaseGitHubService {
 	protected setupCleanupHandlers() {
 		process.on("SIGINT", async () => await this.cleanup());
 		process.on("SIGTERM", async () => await this.cleanup());
-		process.on("uncaughtException", async () => {
-			await this.cleanup();
-		});
+		process.on("uncaughtException", async () => await this.cleanup());
 	}
 
 	/**
@@ -113,14 +110,12 @@ export class BranchService extends BaseGitHubService {
 	 * ```
 	 */
 	public async deleteBranch(branchName: string) {
-		const response = await this.octokit.git.deleteRef({
+		await this.octokit.git.deleteRef({
 			...this.fork,
 			ref: `heads/${branchName}`,
 		});
 
 		this.activeBranches.delete(branchName);
-
-		return response.status === 204;
 	}
 
 	/**

@@ -48,7 +48,7 @@ export default class Runner extends RunnerService {
 			await this.verifyPermissions();
 			const isForkSynced = await this.syncFork();
 
-			if (import.meta.env.NODE_ENV === "development") {
+			if (this.env.NODE_ENV === "development") {
 				await this.loadSnapshot(isForkSynced);
 			}
 
@@ -60,7 +60,7 @@ export default class Runner extends RunnerService {
 
 			this.state.processedResults = Array.from(this.metadata.results.values());
 
-			if (import.meta.env.NODE_ENV === "development") {
+			if (this.env.NODE_ENV === "development") {
 				await this.services.snapshot.append("processedResults", this.state.processedResults);
 			}
 
@@ -70,7 +70,7 @@ export default class Runner extends RunnerService {
 				await this.updateIssueWithResults();
 			}
 
-			if (import.meta.env.NODE_ENV === "production") {
+			if (this.env.NODE_ENV === "production") {
 				await this.services.snapshot.clear();
 			}
 		} catch (error) {
