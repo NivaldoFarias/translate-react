@@ -132,9 +132,6 @@ export class TranslatorService {
 			throw new Error("No content returned");
 		}
 
-		if (translatedContent.startsWith("```")) translatedContent = translatedContent.slice(1);
-		if (translatedContent.endsWith("```")) translatedContent = translatedContent.slice(0, -1);
-
 		return translatedContent;
 	}
 
