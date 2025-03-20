@@ -160,15 +160,18 @@ export class TranslatorService {
 	 * For some reason, some LLMs return the content with fences prepended and appended.
 	 * This method removes them.
 	 */
-	private cleanupTranslatedContent(content: string, originalContent?: string) {
+	public cleanupTranslatedContent(content: string, originalContent?: string) {
 		const shouldStartWith = `---\ntitle:`;
+		const endTicks = "```";
 
 		if (!content.startsWith(shouldStartWith)) {
 			content = content.replace(/^[\s\S]*?(?=---\ntitle:)/, "");
 		}
 
-		if (content.endsWith("```") && !originalContent?.endsWith("```")) {
-			content = content.replace(/\n?```$/, "");
+		if (content.endsWith(endTicks) && !originalContent?.endsWith(endTicks)) {
+			const regex = new RegExp(`\n${endTicks}$`);
+
+			content = content.replace(regex, "");
 		}
 
 		return content;
