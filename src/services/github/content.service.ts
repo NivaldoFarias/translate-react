@@ -148,34 +148,24 @@ export class ContentService extends BaseGitHubService {
 		content: string;
 		message: string;
 	}) {
-		const currentFile = await this.octokit.repos.getContent({
-			...this.fork,
-			path: file.path,
-			ref: branch.object.sha,
-		});
-
-		const fileSha = "sha" in currentFile.data ? currentFile.data.sha : undefined;
-
 		await this.octokit.repos.createOrUpdateFileContents({
 			...this.fork,
 			path: file.path,
 			message,
 			content: Buffer.from(content).toString("base64"),
 			branch: branch.ref,
-			sha: fileSha,
+			sha: file.sha,
 		});
 	}
 
 	/**
-	 * Creates or finds an existing pull request.
+	 * Creates a pull request.
 	 *
 	 * @param options Pull request options
 	 * @param options.branch Source branch name
 	 * @param options.title Pull request title
 	 * @param options.body Pull request description
 	 * @param options.baseBranch Target branch for PR
-	 *
-	 * @throws {Error} If pull request creation fails
 	 *
 	 * @example
 	 * ```typescript
@@ -200,31 +190,6 @@ export class ContentService extends BaseGitHubService {
 		body: string;
 		baseBranch: string;
 	}) {
-		const listPullsResponse = await this.octokit.pulls.list({
-			...this.upstream,
-			head: `${this.fork.owner}:${branch}`,
-			state: "open",
-		});
-
-		const existingPullRequest = listPullsResponse.data.find(
-			(pr) => pr.head.ref === branch && pr.base.ref === baseBranch,
-		);
-
-		if (existingPullRequest) {
-			const prDetails = await this.octokit.pulls.get({
-				...this.upstream,
-				pull_number: existingPullRequest.number,
-			});
-
-			if (prDetails.data.mergeable) return existingPullRequest;
-
-			await this.octokit.pulls.update({
-				...this.upstream,
-				pull_number: existingPullRequest.number,
-				state: "closed",
-			});
-		}
-
 		const createPullRequestResponse = await this.octokit.pulls.create({
 			...this.upstream,
 			title,

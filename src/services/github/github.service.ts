@@ -17,22 +17,10 @@ import { TranslationFile } from "@/utils/translation-file.util";
  * - Error handling and recovery
  */
 export class GitHubService {
-	/** Repository configuration for upstream and fork */
-	protected readonly repos = {
-		upstream: {
-			owner: import.meta.env.REPO_UPSTREAM_OWNER,
-			repo: import.meta.env.REPO_UPSTREAM_NAME,
-		},
-		fork: {
-			owner: import.meta.env.REPO_FORK_OWNER,
-			repo: import.meta.env.REPO_FORK_NAME,
-		},
-	};
-
-	private readonly services = {
-		branch: new BranchService(this.repos.upstream, this.repos.fork),
-		repository: new RepositoryService(this.repos.upstream, this.repos.fork),
-		content: new ContentService(this.repos.upstream, this.repos.fork),
+	private readonly services: {
+		branch: BranchService;
+		repository: RepositoryService;
+		content: ContentService;
 	};
 
 	/**
@@ -45,7 +33,19 @@ export class GitHubService {
 	 * await github.verifyTokenPermissions();
 	 * ```
 	 */
-	constructor() {}
+	constructor(
+		/** Repository configuration for upstream and fork */
+		private readonly repos: {
+			upstream: { owner: string; repo: string };
+			fork: { owner: string; repo: string };
+		},
+	) {
+		this.services = {
+			branch: new BranchService(this.repos.upstream, this.repos.fork),
+			repository: new RepositoryService(this.repos.upstream, this.repos.fork),
+			content: new ContentService(this.repos.upstream, this.repos.fork),
+		};
+	}
 
 	/**
 	 * Retrieves the repository file tree.

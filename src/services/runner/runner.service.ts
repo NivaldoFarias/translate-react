@@ -24,6 +24,15 @@ import { RunnerService } from "@/services/runner/base.service";
  * ```
  */
 export default class Runner extends RunnerService {
+	private printForkInfo() {
+		this.spinner.info(
+			`Fork: ${this.env.REPO_FORK_OWNER}/${this.env.REPO_FORK_NAME} :: ` +
+				`Upstream: ${this.env.REPO_UPSTREAM_OWNER}/${this.env.REPO_UPSTREAM_NAME}`,
+		);
+
+		this.spinner.start();
+	}
+
 	/**
 	 * # Main Workflow Execution
 	 *
@@ -44,6 +53,8 @@ export default class Runner extends RunnerService {
 	public async run() {
 		try {
 			this.spinner.start();
+
+			this.printForkInfo();
 
 			await this.verifyPermissions();
 			const isForkSynced = await this.syncFork();

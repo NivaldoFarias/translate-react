@@ -6,8 +6,6 @@ import type { ErrorContext } from "./base.error";
 
 import { ErrorCode, ErrorSeverity, TranslationError } from "./base.error";
 
-/* eslint-disable no-console */
-
 /** Configuration options for the error handler */
 export interface ErrorHandlerConfig {
 	/** The minimum severity level to log */

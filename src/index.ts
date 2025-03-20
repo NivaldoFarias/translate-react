@@ -26,7 +26,7 @@ if (import.meta.main) {
 		metadata: {
 			version,
 			component: name,
-			environment: process.env.NODE_ENV,
+			environment: import.meta.env.NODE_ENV,
 		},
 	});
 

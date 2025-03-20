@@ -16,39 +16,46 @@ const envSchema = z.object({
 	NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
 	BUN_ENV: z.enum(["development", "production", "test"]).default("development"),
 
+	/** The GitHub Personal Access Token */
 	GITHUB_TOKEN: z.string().min(1, "GitHub token is required"),
 
+	/** The owner (user or organization) of the forked repository */
 	REPO_FORK_OWNER: z.string().min(1, "Repository owner is required"),
+
+	/** The name of the forked repository */
 	REPO_FORK_NAME: z.string().min(1, "Repository name is required"),
+
+	/** Original repository owner */
 	REPO_UPSTREAM_OWNER: z.string().min(1, "Original repository owner is required"),
+
+	/** Original repository name */
 	REPO_UPSTREAM_NAME: z.string().min(1, "Original repository name is required"),
 
+	/** The LLM model to use */
 	LLM_MODEL: z.string().min(1, "LLM model is required"),
-	OPENAI_API_KEY: z.string().min(1, "LLM API key is required"),
-	OPENAI_BASE_URL: z.string().url().default("https://openrouter.ai/api/v1"),
-	OPENAI_PROJECT_ID: z.string().min(1, "OpenAI project ID is required"),
 
+	/** The OpenAI API key */
+	OPENAI_API_KEY: z.string().min(1, "LLM API key is required"),
+
+	/** The OpenAI API base URL. Defaults to OpenAI API */
+	OPENAI_BASE_URL: z.string().url().default("https://openrouter.ai/api/v1"),
+
+	/** The OpenAI project ID. Used for activity tracking on OpenAI. */
+	OPENAI_PROJECT_ID: z.string().min(1, "OpenAI project ID is required").optional(),
+
+	/** The issue number of the progress tracking issue */
 	PROGRESS_ISSUE_NUMBER: z
 		.union([z.coerce.number().positive(), z.string().length(0), z.undefined()])
 		.optional()
 		.transform((value) => (value === "" ? undefined : value)),
 
-	FORCE_SNAPSHOT_CLEAR: z.coerce
-		.boolean()
-		.default(false)
-		.superRefine((value, context) => {
-			const isDevEnvironment =
-				import.meta.env.NODE_ENV === "development" && import.meta.env.BUN_ENV === "development";
+	/** Whether to clear the snapshot on startup. Used for development. */
+	FORCE_SNAPSHOT_CLEAR: z.coerce.boolean().default(false),
 
-			if (value === true && !isDevEnvironment) {
-				context.addIssue({
-					code: z.ZodIssueCode.custom,
-					message: "FORCE_SNAPSHOT_CLEAR can only be true in development environment",
-				});
-			}
-		}),
-
+	/** The URL of the application. Used for activity tracking on Open Router. */
 	HEADER_APP_URL: z.string().url().default(homepage),
+
+	/** The title of the application. Used for activity tracking on Open Router. */
 	HEADER_APP_TITLE: z.string().default(`${name} v${version}`),
 });
 

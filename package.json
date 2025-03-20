@@ -12,7 +12,7 @@
 	"description": "A tool to translate React docs to any language",
 	"type": "module",
 	"scripts": {
-		"start": "bun run src/index.ts",
+		"start": "bun src/index.ts",
 		"dev": "bun --watch --env-file=.env.development src/index.ts",
 		"lint": "eslint .",
 		"lint:fix": "eslint . --fix",
