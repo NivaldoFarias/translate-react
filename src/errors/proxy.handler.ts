@@ -1,6 +1,6 @@
 import type { ErrorContext } from "./base.error";
 
-import TranslationFile from "@/utils/translation-file.util";
+import { TranslationFile } from "@/utils/translation-file.util";
 
 import { ErrorCode, TranslationError } from "./base.error";
 import { ErrorHandler } from "./error.handler";

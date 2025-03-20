@@ -3,7 +3,7 @@ import "@total-typescript/ts-reset";
 import type { Environment } from "@/utils/env.util";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
-import TranslationFile from "@/utils/translation-file.util";
+import { TranslationFile } from "@/utils/translation-file.util";
 
 /** Represents the progress of file processing in batches */
 export interface FileProcessingProgress {

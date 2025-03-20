@@ -8,7 +8,7 @@ import type { LanguageConfig } from "@/utils/language-detector.util";
 import { ErrorCode } from "@/errors/base.error";
 import { createErrorHandlingProxy } from "@/errors/proxy.handler";
 import { LanguageDetector } from "@/utils/language-detector.util";
-import TranslationFile from "@/utils/translation-file.util";
+import { TranslationFile } from "@/utils/translation-file.util";
 
 /**
  * # Translation Service

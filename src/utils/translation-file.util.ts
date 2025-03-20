@@ -1,5 +1,5 @@
 /** Represents a file that needs to be translated */
-export default class TranslationFile {
+export class TranslationFile {
 	constructor(
 		/** The content of the file */
 		public readonly content: string,

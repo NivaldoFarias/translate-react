@@ -16,7 +16,7 @@ import { GitHubService } from "@/services/github/github.service";
 import { SnapshotService } from "@/services/snapshot.service";
 import { TranslatorService } from "@/services/translator.service";
 import { setupSignalHandlers, validateEnv } from "@/utils/";
-import TranslationFile from "@/utils/translation-file.util";
+import { TranslationFile } from "@/utils/translation-file.util";
 
 export interface RunnerOptions {
 	targetLanguage: string;
