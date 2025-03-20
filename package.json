@@ -12,8 +12,8 @@
 	"description": "A tool to translate React docs to any language",
 	"type": "module",
 	"scripts": {
-		"start": "bun src/index.ts",
-		"dev": "bun --watch --env-file=.env.development src/index.ts",
+		"start": "bun --env-file=.env src/index.ts",
+		"dev": "bun --watch --env-file=.env.dev src/index.ts",
 		"lint": "eslint .",
 		"lint:fix": "eslint . --fix",
 		"format": "prettier --write '**/*.{ts,js,cjs,mjs,json,md}'"

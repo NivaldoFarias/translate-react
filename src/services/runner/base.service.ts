@@ -208,18 +208,10 @@ export abstract class RunnerService {
 	protected async fetchRepositoryTree() {
 		if (!this.state.repositoryTree?.length) {
 			this.spinner.text = "Fetching repository content...";
-			const repositoryTree = await this.services.github.getRepositoryTree("main");
-
-			this.spinner.text = "Filtering out files that already have a mergeable PR...";
-
-			const filesToFilter = await this.services.github.listFilesToFilter();
-
-			this.state.repositoryTree = repositoryTree.filter(
-				(file) => !filesToFilter.includes(file.path?.split("/").pop() || ""),
-			);
+			this.state.repositoryTree = await this.services.github.getRepositoryTree("main");
 
 			if (this.env.NODE_ENV === "development") {
-				await this.services.snapshot.append("repositoryTree", repositoryTree);
+				await this.services.snapshot.append("repositoryTree", this.state.repositoryTree);
 			}
 
 			this.spinner.text = "Repository tree fetched. Fetching glossary...";

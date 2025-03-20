@@ -61,7 +61,7 @@ cd translate-react
 bun install
 ```
 
-3. Create a `.env.local` file with the following variables:
+3. Create a `.env` file with the following variables:
 
 ```env
 NODE_ENV=development|production|test           # required
