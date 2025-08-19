@@ -1,9 +1,9 @@
-import { existsSync, writeFileSync } from "fs";
+import { existsSync, writeFileSync } from "node:fs";
 
 import { Database } from "bun:sqlite";
 
 import type { ProcessedFileResult, Snapshot } from "@/types";
-import type TranslationFile from "@/utils/translation-file.util";
+import type { TranslationFile } from "@/utils/translation-file.util";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 /**
