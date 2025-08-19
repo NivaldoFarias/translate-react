@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
 import type { ProcessedFileResult } from "@/types";
 
-import { DatabaseService } from "../../src/services/database.service";
+import { DatabaseService } from "./database.service";
 
 /**
  * Test suite for Database Service

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, mock, test } from "bun:test";
 
 import { TranslationFile } from "@/utils/translation-file.util";
 
-import { ContentService } from "../../../src/services/github/content.service";
+import { ContentService } from "./content.service";
 
 /**
  * Test suite for GitHub Content Service
