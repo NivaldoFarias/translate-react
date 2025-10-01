@@ -116,7 +116,7 @@ MUST use underscore separators in large numeric literals for readability.
 
 ### Descriptive Variable Names [P1]
 
-MUST employ descriptive, unabbreviated variable names for enhanced AI comprehension and code readability.
+MUST employ descriptive, unabbreviated variable names for enhanced code readability.
 
 ### Named Conditional Logic [P1]
 
@@ -184,7 +184,7 @@ function handleResponse<T>(response: ApiResponse<T>): T | null {
 
 ### Explicit `enum` or `as const` usage [P1]
 
-MUST use `enum` or `as const` for fixed sets of related constants to enhance type safety and AI comprehension.
+MUST use `enum` or `as const` for fixed sets of related constants to enhance type safety.
 
 ```typescript
 export enum UserRole {

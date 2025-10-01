@@ -13,7 +13,6 @@ import { TranslationFile } from "@/utils/translation-file.util";
 /**
  * Core service for translating content using OpenAI's language models.
  *
- * @remarks
  * Handles the entire translation workflow. Including:
  * - Content parsing and block management
  * - Language model interaction
@@ -67,7 +66,6 @@ export class TranslatorService {
 	/**
 	 * Main translation method that processes files and manages the translation workflow
 	 *
-	 * @remarks
 	 * ## Workflow
 	 * 1. Validates input content
 	 * 2. Parses content (without modifying code blocks)
@@ -232,7 +230,6 @@ export class TranslatorService {
 	 * Handles content that exceeds the model's context window by splitting it into
 	 * smaller chunks and translating each chunk separately, then combining the results.
 	 *
-	 * @remarks
 	 * ## Workflow
 	 * 1. Splits content at natural break points (middle of paragraphs, end of code blocks)
 	 * 2. Recursively splits chunks that are still too large
@@ -254,7 +251,6 @@ export class TranslatorService {
 	/**
 	 * Translates the content of the chunks.
 	 *
-	 * @remarks
 	 * ## Workflow
 	 * 1. Adds context about chunking to help maintain consistency
 	 * 2. Translates each chunk
@@ -294,7 +290,6 @@ export class TranslatorService {
 	/**
 	 * Splits content at a natural break point closest to the middle.
 	 *
-	 * @remarks
 	 * Finds logical boundaries like paragraph breaks, code blocks, or headers
 	 * that are nearest to the middle of the content to maintain semantic integrity.
 	 *

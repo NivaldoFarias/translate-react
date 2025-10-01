@@ -25,6 +25,7 @@ export class GitHubService {
 
 	/**
 	 * Creates a new GitHub service instance.
+	 *
 	 * Initializes all specialized services with repository configuration.
 	 *
 	 * @example
@@ -50,7 +51,7 @@ export class GitHubService {
 	/**
 	 * Retrieves the repository file tree.
 	 *
-	 * @remarks Can optionally filter out ignored paths.
+	 * Can optionally filter out ignored paths.
 	 *
 	 * @param baseBranch Branch to get tree from
 	 * @param filterIgnored Whether to filter ignored paths

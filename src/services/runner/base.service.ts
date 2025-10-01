@@ -31,7 +31,7 @@ export abstract class RunnerService {
 	/**
 	 * Tracks progress for the current batch of files being processed
 	 *
-	 * @remarks Used to update the spinner and generate statistics
+	 * Used to update the spinner and generate statistics
 	 */
 	protected batchProgress = {
 		completed: 0,
@@ -42,7 +42,7 @@ export abstract class RunnerService {
 	/**
 	 * Maintains the current state of the translation workflow.
 	 *
-	 * @remarks In development mode, this state can be persisted between runs
+	 * In development mode, this state can be persisted between runs
 	 */
 	protected state: Omit<Snapshot, "id"> = {
 		repositoryTree: [],
@@ -78,7 +78,7 @@ export abstract class RunnerService {
 	/**
 	 * Cleanup handler for process termination.
 	 *
-	 * @remarks Ensures graceful shutdown and cleanup of resources
+	 * Ensures graceful shutdown and cleanup of resources
 	 */
 	protected cleanup = () => {
 		this.spinner?.stop();
@@ -89,7 +89,7 @@ export abstract class RunnerService {
 	/**
 	 * Initializes the runner with environment validation and signal handlers
 	 *
-	 * @remarks Sets up process event listeners for graceful termination
+	 * Sets up process event listeners for graceful termination
 	 */
 	constructor(protected readonly options: RunnerOptions) {
 		try {
@@ -358,8 +358,8 @@ export abstract class RunnerService {
 	/**
 	 * Generates and displays final statistics for the translation workflow
 	 *
-	 * @remarks
-	 * ## Statistics Reported
+	 * ### Statistics Reported
+	 *
 	 * - Total files processed
 	 * - Success/failure counts
 	 * - Detailed error information for failed files
@@ -432,8 +432,8 @@ export abstract class RunnerService {
 	/**
 	 * Processes files in batches to manage resources and provide progress feedback
 	 *
-	 * @remarks
-	 * ## Workflow
+	 * ### Workflow
+	 *
 	 * 1. Splits files into manageable batches
 	 * 2. Processes each batch concurrently
 	 * 3. Updates progress in real-time
@@ -527,14 +527,15 @@ export abstract class RunnerService {
 	/**
 	 * Processes a single file through the complete translation workflow
 	 *
-	 * @remarks
-	 * ## Workflow Steps
+	 * ### Workflow Steps
+	 *
 	 * 1. Creates or gets a translation branch
 	 * 2. Translates the file content
 	 * 3. Commits the translation
 	 * 4. Creates a pull request
 	 *
-	 * ## Error Handling
+	 * ### Error Handling
+	 *
 	 * - Captures and logs all errors
 	 * - Updates progress tracking
 	 * - Maintains file metadata even on failure
@@ -597,7 +598,7 @@ export abstract class RunnerService {
 	/**
 	 * Updates progress tracking for the current batch and adjusts success/failure counts.
 	 *
-	 * @remarks This information is used for both real-time feedback and final statistics
+	 * This information is used for both real-time feedback and final statistics
 	 *
 	 * @param status The processing outcome for the file
 	 */

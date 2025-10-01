@@ -47,7 +47,7 @@ export interface ErrorContext {
 /**
  * Base error class for all translation-related errors
  *
- * @remarks Extends the native Error class with additional context and tracking capabilities
+ * Extends the native Error class with additional context and tracking capabilities
  */
 export class TranslationError extends Error {
 	/** Standardized error code */
@@ -62,7 +62,7 @@ export class TranslationError extends Error {
 	/**
 	 * Initializes a new instance of the `TranslationError` class.
 	 *
-	 * @remarks Uses `Object.setPrototypeOf` to maintain proper prototype chain for custom errors.
+	 * Uses `Object.setPrototypeOf` to maintain proper prototype chain for custom errors.
 	 */
 	constructor(
 		message: string,
