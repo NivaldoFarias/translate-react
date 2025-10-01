@@ -8,6 +8,7 @@ A CLI tool to automate the translation of React documentation from English to an
   - [Table of Contents](#table-of-contents)
   - [Overview](#overview)
     - [Key Workflow](#key-workflow)
+    - [Project workflow diagram](#project-workflow-diagram)
     - [Target Use Cases](#target-use-cases)
   - [Prerequisites](#prerequisites)
     - [Required Software](#required-software)
@@ -15,6 +16,16 @@ A CLI tool to automate the translation of React documentation from English to an
     - [Repository Setup](#repository-setup)
     - [Supported Repositories](#supported-repositories)
   - [Setup](#setup)
+    - [1. Clone the repository](#1-clone-the-repository)
+    - [2. Install dependencies](#2-install-dependencies)
+    - [3. Create a `.env` file with the necessary variables](#3-create-a-env-file-with-the-necessary-variables)
+      - [Environment Configuration **(required)**](#environment-configuration-required)
+      - [Language Model Configuration **(required)**](#language-model-configuration-required)
+      - [GitHub Configuration **(required)**](#github-configuration-required)
+      - [Repository Configuration **(required)**](#repository-configuration-required)
+      - [Progress Tracking **(optional)**](#progress-tracking-optional)
+      - [Development Options **(optional)**](#development-options-optional)
+      - [API Headers **(optional)**](#api-headers-optional)
   - [Usage](#usage)
     - [Development](#development)
     - [Production](#production)
@@ -68,6 +79,46 @@ This project automates the translation process of React's documentation to any t
 8. **Progress Tracking**: Updates GitHub issues with translation results and links to created PRs
 9. **Error Recovery**: Comprehensive error handling with cleanup and recovery mechanisms
 
+### Project workflow diagram
+
+Below is a high-level Mermaid flowchart that visualizes the core pipeline used by the project.
+
+```mermaid
+graph TD
+  A["🔧 Repository Setup <br/> (fork & sync)"] --> B["💾 State Management <br/> (SQLite snapshots)"]
+  B --> C["🔍 Content Discovery <br/> (fetch tree & filter .md)"]
+  C --> D["🌐 Language Detection <br/> (franc + confidence)"]
+  D --> E{"❓ Needs Translation?"}
+  E -->|"✅ Yes"| F["📦 Batch Processing <br/> (configurable size)"]
+  F --> G["🤖 Translation Engine <br/> (LLM, chunking, glossary)"]
+  G --> H["✨ Quality Validation <br/> (format & glossary checks)"]
+  H --> I["🔄 GitHub Workflow <br/> (branch -> commit -> PR)"]
+  I --> J["📊 Progress Tracking <br/> (issue updates & logs)"]
+  E -->|"⏭️ No"| K["⏩ Skip File"]
+  G --> L["💽 Database <br/> (store results & snapshot)"]
+  H --> M["⚠️ Error Handling <br/> (severity & context)"]
+  M --> N["🔄 Retry / Cleanup"]
+  N --> B
+
+  %% Style definitions
+  classDef setup fill:#e1f5fe,stroke:#0277bd,stroke-width:2px,color:#000
+  classDef process fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#000
+  classDef storage fill:#e8f5e8,stroke:#388e3c,stroke-width:2px,color:#000
+  classDef github fill:#fff3e0,stroke:#f57c00,stroke-width:2px,color:#000
+  classDef decision fill:#fce4ec,stroke:#c2185b,stroke-width:2px,color:#000
+  classDef error fill:#ffebee,stroke:#d32f2f,stroke-width:2px,color:#000
+  classDef skip fill:#f5f5f5,stroke:#757575,stroke-width:2px,color:#000
+
+  %% Apply styles to nodes
+  class A setup
+  class B,L storage
+  class C,D,F,G,H process
+  class I,J github
+  class E decision
+  class M,N error
+  class K skip
+```
+
 ### Target Use Cases
 
 - **React Documentation Teams**: Automate translation of official React documentation
@@ -108,55 +159,81 @@ The tool is designed to work with React documentation repositories but can be ad
 
 ## Setup
 
-1. Clone the repository:
+### 1. Clone the repository
 
 ```bash
 git clone https://github.com/NivaldoFarias/translate-react.git
+```
+
+Then, navigate into it:
+
+```bash
 cd translate-react
 ```
 
-2. Install dependencies:
+### 2. Install dependencies
 
 ```bash
 bun install
 ```
 
-3. Create a `.env` file with the following variables:
+### 3. Create a `.env` file with the necessary variables
 
-```env
-# Environment Configuration (required)
-NODE_ENV=development|production|test           # Runtime environment
-BUN_ENV=development|production|test            # Bun-specific environment
+#### Environment Configuration **(required)**
 
-# Language Model Configuration (required)
-LLM_MODEL=gpt-4o                               # Model to use for translation
-OPENAI_API_KEY=your_openai_api_key             # API key for the language model
-OPENAI_BASE_URL=https://api.openai.com/v1      # API endpoint (supports OpenRouter, Azure, etc.)
-OPENAI_PROJECT_ID=your_openai_project_id       # Project ID for usage tracking (optional)
+| Variable   | Example Value                   | Description              |
+| ---------- | ------------------------------- | ------------------------ |
+| `NODE_ENV` | `development\|production\|test` | Runtime environment      |
+| `BUN_ENV`  | `development\|production\|test` | Bun-specific environment |
 
-# GitHub Configuration (required)
-GITHUB_TOKEN=your_github_token                 # Personal access token with repo permissions
+#### Language Model Configuration **(required)**
 
-# Repository Configuration (required)
-REPO_FORK_OWNER=your_username                  # Owner of your fork
-REPO_FORK_NAME=react.dev                       # Name of your forked repository
-REPO_UPSTREAM_OWNER=reactjs                    # Original repository owner
-REPO_UPSTREAM_NAME=react.dev                   # Original repository name
+| Variable            | Example Value               | Description                                     |
+| ------------------- | --------------------------- | ----------------------------------------------- |
+| `LLM_MODEL`         | `gpt-4o`                    | Model to use for translation                    |
+| `OPENAI_API_KEY`    | `your_openai_api_key`       | **Required** - API key for the language model   |
+| `OPENAI_BASE_URL`   | `https://api.openai.com/v1` | API endpoint (supports OpenRouter, Azure, etc.) |
+| `OPENAI_PROJECT_ID` | `your_openai_project_id`    | *Optional* - Project ID for usage tracking      |
 
-# Progress Tracking (optional)
-PROGRESS_ISSUE_NUMBER=123                      # Issue number for progress updates
+#### GitHub Configuration **(required)**
 
-# Development Options (optional)
-FORCE_SNAPSHOT_CLEAR=false                     # Clear snapshots on startup (dev only)
+| Variable       | Example Value       | Description                                                |
+| -------------- | ------------------- | ---------------------------------------------------------- |
+| `GITHUB_TOKEN` | `your_github_token` | **Required** - Personal access token with repo permissions |
 
-# API Headers (optional)
-HEADER_APP_URL=https://github.com/your-username/translate-react
-HEADER_APP_TITLE=translate-react v0.1.5
-```
+#### Repository Configuration **(required)**
 
-> [!IMPORTANT] > **Environment Validation**: All variables are validated at runtime using Zod schemas. Check `src/utils/env.util.ts` for detailed validation rules.
+| Variable              | Example Value   | Description                                   |
+| --------------------- | --------------- | --------------------------------------------- |
+| `REPO_FORK_OWNER`     | `your_username` | **Required** - Owner of your fork             |
+| `REPO_FORK_NAME`      | `react.dev`     | **Required** - Name of your forked repository |
+| `REPO_UPSTREAM_OWNER` | `reactjs`       | **Required** - Original repository owner      |
+| `REPO_UPSTREAM_NAME`  | `react.dev`     | **Required** - Original repository name       |
 
-> [!TIP] > **Development Setup**: Use `.env.dev` for development-specific configurations. The tool automatically loads the appropriate file based on the `NODE_ENV`.
+#### Progress Tracking **(optional)**
+
+| Variable                | Example Value | Description                                    |
+| ----------------------- | ------------- | ---------------------------------------------- |
+| `PROGRESS_ISSUE_NUMBER` | `123`         | *Optional* - Issue number for progress updates |
+
+#### Development Options **(optional)**
+
+| Variable               | Example Value | Description                                        |
+| ---------------------- | ------------- | -------------------------------------------------- |
+| `FORCE_SNAPSHOT_CLEAR` | `false`       | *Optional* - Clear snapshots on startup (dev only) |
+
+#### API Headers **(optional)**
+
+| Variable           | Example Value                                      | Description                                    |
+| ------------------ | -------------------------------------------------- | ---------------------------------------------- |
+| `HEADER_APP_URL`   | `https://github.com/your-username/translate-react` | *Optional* - Application URL for API headers   |
+| `HEADER_APP_TITLE` | `translate-react v0.1.5`                           | *Optional* - Application title for API headers |
+
+> [!IMPORTANT]
+> **Environment Validation**: All variables are validated at runtime using Zod schemas. Check `src/utils/env.util.ts` for detailed validation rules.
+
+> [!TIP] 
+> **Development Setup**: Use `.env.dev` for development-specific configurations. The tool automatically loads the appropriate file based on the `NODE_ENV`.
 
 ## Usage
 
@@ -208,7 +285,7 @@ bun run start --target=es --batch-size=5
 bun run start --source=pt --target=en
 ```
 
-> [!NOTE]
+> [!NOTE] 
 > **Language Detection**: The tool automatically detects the language of each file and skips files already in the target language, making it safe to run multiple times.
 
 ## How It Works
