@@ -179,36 +179,39 @@ bun install
 
 ### 3. Create a `.env` file with the necessary variables
 
+> [!TIP]
+> Reference [Environment Default Values](https://github.com/NivaldoFarias/translate-react/blob/main/src/utils/constants.util.ts) for default settings.
+
 #### Environment Configuration **(required)**
 
-| Variable   | Example Value                   | Description              |
-| ---------- | ------------------------------- | ------------------------ |
-| `NODE_ENV` | `development\|production\|test` | Runtime environment      |
-| `BUN_ENV`  | `development\|production\|test` | Bun-specific environment |
+| Variable   | Example Value   | Description              |
+| ---------- | --------------- | ------------------------ |
+| `NODE_ENV` | `"development"` | Runtime environment      |
+| `BUN_ENV`  | `"development"` | Bun-specific environment |
 
 #### Language Model Configuration **(required)**
 
-| Variable            | Example Value               | Description                                     |
-| ------------------- | --------------------------- | ----------------------------------------------- |
-| `LLM_MODEL`         | `gpt-4o`                    | Model to use for translation                    |
-| `OPENAI_API_KEY`    | `your_openai_api_key`       | **Required** - API key for the language model   |
-| `OPENAI_BASE_URL`   | `https://api.openai.com/v1` | API endpoint (supports OpenRouter, Azure, etc.) |
-| `OPENAI_PROJECT_ID` | `your_openai_project_id`    | *Optional* - Project ID for usage tracking      |
+| Variable            | Example Value                        | Description                                     |
+| ------------------- | ------------------------------------ | ----------------------------------------------- |
+| `LLM_MODEL`         | `"google/gemini-2.0-flash-exp:free"` | Model to use for translation                    |
+| `OPENAI_API_KEY`    | `"your_openai_api_key"`              | **Required** - API key for the language model   |
+| `OPENAI_BASE_URL`   | `"https://openrouter.ai/api/v1"`     | API endpoint (supports OpenRouter, Azure, etc.) |
+| `OPENAI_PROJECT_ID` | `"your_openai_project_id"`           | *Optional* - Project ID for usage tracking      |
 
 #### GitHub Configuration **(required)**
 
-| Variable       | Example Value       | Description                                                |
-| -------------- | ------------------- | ---------------------------------------------------------- |
-| `GITHUB_TOKEN` | `your_github_token` | **Required** - Personal access token with repo permissions |
+| Variable       | Example Value         | Description                                                |
+| -------------- | --------------------- | ---------------------------------------------------------- |
+| `GITHUB_TOKEN` | `"your_github_token"` | **Required** - Personal access token with repo permissions |
 
 #### Repository Configuration **(required)**
 
-| Variable              | Example Value   | Description                                   |
-| --------------------- | --------------- | --------------------------------------------- |
-| `REPO_FORK_OWNER`     | `your_username` | **Required** - Owner of your fork             |
-| `REPO_FORK_NAME`      | `react.dev`     | **Required** - Name of your forked repository |
-| `REPO_UPSTREAM_OWNER` | `reactjs`       | **Required** - Original repository owner      |
-| `REPO_UPSTREAM_NAME`  | `react.dev`     | **Required** - Original repository name       |
+| Variable              | Example Value       | Description                                   |
+| --------------------- | ------------------- | --------------------------------------------- |
+| `REPO_FORK_OWNER`     | `"your_username"`   | **Required** - Owner of your fork             |
+| `REPO_FORK_NAME`      | `"pt-br.react.dev"` | **Required** - Name of your forked repository |
+| `REPO_UPSTREAM_OWNER` | `"reactjs"`         | **Required** - Original repository owner      |
+| `REPO_UPSTREAM_NAME`  | `"pt-br.react.dev"` | **Required** - Original repository name       |
 
 #### Progress Tracking **(optional)**
 
@@ -224,10 +227,10 @@ bun install
 
 #### API Headers **(optional)**
 
-| Variable           | Example Value                                      | Description                                    |
-| ------------------ | -------------------------------------------------- | ---------------------------------------------- |
-| `HEADER_APP_URL`   | `https://github.com/your-username/translate-react` | *Optional* - Application URL for API headers   |
-| `HEADER_APP_TITLE` | `translate-react v0.1.5`                           | *Optional* - Application title for API headers |
+| Variable           | Example Value                                        | Description                                    |
+| ------------------ | ---------------------------------------------------- | ---------------------------------------------- |
+| `HEADER_APP_URL`   | `"https://github.com/your-username/translate-react"` | *Optional* - Application URL for API headers   |
+| `HEADER_APP_TITLE` | `"translate-react v0.1.5"`                           | *Optional* - Application title for API headers |
 
 > [!IMPORTANT]
 > **Environment Validation**: All variables are validated at runtime using Zod schemas. Check `src/utils/env.util.ts` for detailed validation rules.

@@ -1,3 +1,17 @@
+import { homepage, name, version } from "../../package.json";
+
+/**
+ * Available runtime environments for the application.
+ *
+ * @remarks Maps to `NODE_ENV` and `BUN_ENV` environment variables
+ */
+export enum RuntimeEnvironment {
+	DEVELOPMENT = "development",
+	TEST = "test",
+	STAGING = "staging",
+	PRODUCTION = "production",
+}
+
 /** Process signal constants used for event handling */
 export const PROCESS_SIGNALS = {
 	INTERRUPT: "SIGINT",
@@ -27,3 +41,18 @@ export const SNAPSHOT_KEYS = {
 
 /** Maximum number of tokens that can be translated in a single request */
 export const MAX_CHUNK_TOKENS = 4000;
+
+export const ENV_DEFAULTS = {
+	NODE_ENV: RuntimeEnvironment.DEVELOPMENT,
+	BUN_ENV: RuntimeEnvironment.DEVELOPMENT,
+	FORCE_SNAPSHOT_CLEAR: false,
+	OPENAI_BASE_URL: "https://openrouter.ai/api/v1",
+	HEADER_APP_TITLE: `${name} v${version}`,
+	HEADER_APP_URL: homepage,
+	REPO_FORK_OWNER: "nivaldofarias",
+	REPO_FORK_NAME: "pt-br.react.dev",
+	REPO_UPSTREAM_OWNER: "reactjs",
+	REPO_UPSTREAM_NAME: "pt-br.react.dev",
+	PROGRESS_ISSUE_NUMBER: 555, // https://github.com/reactjs/pt-br.react.dev/issues/555
+	LLM_MODEL: "google/gemini-2.0-flash-exp:free",
+};
