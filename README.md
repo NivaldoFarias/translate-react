@@ -1,50 +1,110 @@
 # translate-react
 
-A CLI tool to automate the translation of React documentation from English to any other language using Large Language Models (LLMs).
+A CLI tool to automate the translation of React documentation from English to any target language using Large Language Models (LLMs). The tool intelligently processes markdown files, preserves formatting and code blocks, and creates pull requests with high-quality translations.
 
 ## Table of Contents
 
-- [Overview](#overview)
-- [Prerequisites](#prerequisites)
-- [Setup](#setup)
-- [Usage](#usage)
-  - [Development](#development)
-  - [Production](#production)
-  - [Command Line Arguments](#command-line-arguments)
-- [Project Structure](#project-structure)
-- [Architecture](#architecture)
-  - [Core Services](#core-services)
-  - [Error Handling System](#error-handling-system)
-- [Features](#features)
-  - [Translation Quality](#translation-quality)
-  - [State Management](#state-management)
-  - [Process Management](#process-management)
-  - [GitHub Integration](#github-integration)
-  - [Error Handling](#error-handling)
-- [Contributing](#contributing)
-  - [Development Guidelines](#development-guidelines)
-- [License](#license)
+- [translate-react](#translate-react)
+  - [Table of Contents](#table-of-contents)
+  - [Overview](#overview)
+    - [Key Workflow](#key-workflow)
+    - [Target Use Cases](#target-use-cases)
+  - [Prerequisites](#prerequisites)
+    - [Required Software](#required-software)
+    - [Required API Access](#required-api-access)
+    - [Repository Setup](#repository-setup)
+    - [Supported Repositories](#supported-repositories)
+  - [Setup](#setup)
+  - [Usage](#usage)
+    - [Development](#development)
+    - [Production](#production)
+    - [Command Line Arguments](#command-line-arguments)
+      - [Translate to Portuguese (default)](#translate-to-portuguese-default)
+      - [Translate to Spanish with custom batch size](#translate-to-spanish-with-custom-batch-size)
+      - [Translate from Portuguese to English](#translate-from-portuguese-to-english)
+  - [How It Works](#how-it-works)
+    - [File Discovery \& Filtering](#file-discovery--filtering)
+    - [Translation Process](#translation-process)
+    - [GitHub Workflow](#github-workflow)
+  - [Project Structure](#project-structure)
+  - [Architecture](#architecture)
+    - [Core Services](#core-services)
+      - [1. **Runner Service** (`services/runner/`)](#1-runner-service-servicesrunner)
+      - [2. **GitHub Service** (`services/github/`)](#2-github-service-servicesgithub)
+      - [3. **Translator Service** (`services/translator.service.ts`)](#3-translator-service-servicestranslatorservicets)
+      - [4. **Language Detector** (`utils/language-detector.util.ts`)](#4-language-detector-utilslanguage-detectorutilts)
+      - [5. **Database Service** (`services/database.service.ts`)](#5-database-service-servicesdatabaseservicets)
+    - [Error Handling System](#error-handling-system)
+  - [Features](#features)
+    - [🎯 Translation Quality](#-translation-quality)
+    - [💾 State Management](#-state-management)
+    - [⚡ Process Management](#-process-management)
+    - [🔄 GitHub Integration](#-github-integration)
+    - [🛡️ Error Handling \& Recovery](#️-error-handling--recovery)
+  - [Contributing](#contributing)
+    - [Getting Started](#getting-started)
+    - [Development Guidelines](#development-guidelines)
+    - [Project-Specific Patterns](#project-specific-patterns)
+    - [Testing Translations](#testing-translations)
+  - [Troubleshooting](#troubleshooting)
+    - [Common Issues](#common-issues)
+      - [Environment Validation Errors](#environment-validation-errors)
+    - [Debug Mode](#debug-mode)
+    - [Getting Help](#getting-help)
 
 ## Overview
 
-This project automates the translation process of React's documentation to any language. It uses the following workflow:
+This project automates the translation process of React's documentation to any target language. It intelligently identifies files that need translation, processes them using language models, and seamlessly integrates with GitHub workflows.
 
-1. Verifying GitHub token permissions and synchronizing fork with upstream
-2. Managing translation state through SQLite snapshots for interruption recovery
-3. Fetching repository tree and identifying files for translation
-4. Processing files in batches with real-time progress tracking
-5. Translating content using OpenAI models with strict glossary rules
-6. Creating branches and pull requests with translations
-7. Tracking progress through GitHub issues
-8. Managing cleanup and error recovery
+### Key Workflow
+
+1. **Repository Setup**: Verifies GitHub token permissions and synchronizes fork with upstream
+2. **State Management**: Uses SQLite snapshots for interruption recovery and progress tracking
+3. **Content Discovery**: Fetches repository tree and identifies markdown files requiring translation
+4. **Language Detection**: Analyzes content to determine if translation is needed using language confidence scoring
+5. **Batch Processing**: Processes files in configurable batches with real-time progress tracking
+6. **Translation**: Uses OpenAI-compatible models with strict glossary rules and formatting preservation
+7. **GitHub Integration**: Creates individual branches and pull requests for each translated file
+8. **Progress Tracking**: Updates GitHub issues with translation results and links to created PRs
+9. **Error Recovery**: Comprehensive error handling with cleanup and recovery mechanisms
+
+### Target Use Cases
+
+- **React Documentation Teams**: Automate translation of official React documentation
+- **Open Source Projects**: Translate React-based project documentation for international audiences
+- **Educational Content**: Convert React tutorials and guides to multiple languages
+- **Technical Writers**: Batch process large documentation repositories
 
 ## Prerequisites
 
-- [Bun](https://bun.sh) runtime
-- GitHub Personal Access Token with repo permissions
-- OpenAI API Key
-- Node.js v20+
-- SQLite3
+### Required Software
+
+- **[Bun](https://bun.sh)** runtime (v1.0.0+) - Primary JavaScript runtime and package manager
+- **Node.js** (v20+) - Required for some dependencies
+- **SQLite3** - For state persistence and recovery (usually pre-installed on most systems)
+- **Git** - For repository operations
+
+### Required API Access
+
+- **GitHub Personal Access Token** - With `repo` permissions for the target repositories
+- **OpenAI API Key** - Or compatible API (OpenRouter, Azure OpenAI, etc.) for language model access
+
+### Repository Setup
+
+You'll need:
+
+- A **fork** of the target React documentation repository
+- **Write access** to your fork for creating branches and PRs
+- Optionally, a **tracking issue** in your fork for progress updates
+
+### Supported Repositories
+
+The tool is designed to work with React documentation repositories but can be adapted for any markdown-based documentation:
+
+- **React.dev** (official React documentation)
+- **React Native documentation**
+- **Next.js documentation**
+- **Any repository** with markdown files in a `src/` directory structure
 
 ## Setup
 
@@ -64,31 +124,39 @@ bun install
 3. Create a `.env` file with the following variables:
 
 ```env
-NODE_ENV=development|production|test           # required
-BUN_ENV=development|production|test            # required
+# Environment Configuration (required)
+NODE_ENV=development|production|test           # Runtime environment
+BUN_ENV=development|production|test            # Bun-specific environment
 
-LLM_MODEL=gpt-4                                # required
-OPENAI_API_KEY=your_openai_api_key             # required
-OPENAI_BASE_URL=https://api.openai.com/v1      # optional, defaults to OpenAI API
-OPENAI_PROJECT_ID=your_openai_project_id       # optional
+# Language Model Configuration (required)
+LLM_MODEL=gpt-4o                               # Model to use for translation
+OPENAI_API_KEY=your_openai_api_key             # API key for the language model
+OPENAI_BASE_URL=https://api.openai.com/v1      # API endpoint (supports OpenRouter, Azure, etc.)
+OPENAI_PROJECT_ID=your_openai_project_id       # Project ID for usage tracking (optional)
 
-GITHUB_TOKEN=your_github_token                 # required
+# GitHub Configuration (required)
+GITHUB_TOKEN=your_github_token                 # Personal access token with repo permissions
 
-REPO_FORK_OWNER=target_fork_owner              # required
-REPO_FORK_NAME=target_fork_name                # required
-REPO_UPSTREAM_OWNER=upstream_owner             # required
-REPO_UPSTREAM_NAME=upstream_name               # required
+# Repository Configuration (required)
+REPO_FORK_OWNER=your_username                  # Owner of your fork
+REPO_FORK_NAME=react.dev                       # Name of your forked repository
+REPO_UPSTREAM_OWNER=reactjs                    # Original repository owner
+REPO_UPSTREAM_NAME=react.dev                   # Original repository name
 
-PROGRESS_ISSUE_NUMBER=123                      # optional, only used for tracking progress
+# Progress Tracking (optional)
+PROGRESS_ISSUE_NUMBER=123                      # Issue number for progress updates
 
-FORCE_SNAPSHOT_CLEAR=true|false                # optional, defaults to false
+# Development Options (optional)
+FORCE_SNAPSHOT_CLEAR=false                     # Clear snapshots on startup (dev only)
 
-HEADER_APP_URL=https://example.com             # optional, defaults to project homepage
-HEADER_APP_TITLE=My App                        # optional, defaults to package.json name and version
+# API Headers (optional)
+HEADER_APP_URL=https://github.com/your-username/translate-react
+HEADER_APP_TITLE=translate-react v0.1.5
 ```
 
-> [!NOTE]
-> These variables are validated at runtime using Zod. Refer to the `src/utils/env.util.ts` file for the validation schema.
+> [!IMPORTANT] > **Environment Validation**: All variables are validated at runtime using Zod schemas. Check `src/utils/env.util.ts` for detailed validation rules.
+
+> [!TIP] > **Development Setup**: Use `.env.dev` for development-specific configurations. The tool automatically loads the appropriate file based on the `NODE_ENV`.
 
 ## Usage
 
@@ -116,13 +184,55 @@ bun run src/index.ts
 
 The tool supports the following command line arguments:
 
-- `--target`: Target language code (default: "pt")
-- `--source`: Source language code (default: "en")
-- `--batch-size`: Number of files to process in each batch (default: 10)
+| Argument       | Description                      | Default | Example Values                     |
+| -------------- | -------------------------------- | ------- | ---------------------------------- |
+| `--target`     | Target language code (ISO 639-1) | `"pt"`  | `pt`, `es`, `fr`, `de`, `ja`, `ko` |
+| `--source`     | Source language code (ISO 639-1) | `"en"`  | `en`, `pt`, `es`, `fr`             |
+| `--batch-size` | Files to process per batch       | `10`    | `5`, `15`, `20`                    |
+
+#### Translate to Portuguese (default)
 
 ```bash
-bun run start --target=pt --source=en --batch-size=10
+bun run start
 ```
+
+#### Translate to Spanish with custom batch size
+
+```bash
+bun run start --target=es --batch-size=5
+```
+
+#### Translate from Portuguese to English
+
+```bash
+bun run start --source=pt --target=en
+```
+
+> [!NOTE]
+> **Language Detection**: The tool automatically detects the language of each file and skips files already in the target language, making it safe to run multiple times.
+
+## How It Works
+
+### File Discovery & Filtering
+
+1. **Repository Scanning**: Fetches the complete repository tree from GitHub
+2. **Markdown Filtering**: Identifies all `.md` files within the `src/` directory structure
+3. **Language Analysis**: Uses statistical language detection to determine each file's current language
+4. **Translation Check**: Skips files that are already in the target language or have low confidence scores
+
+### Translation Process
+
+1. **Content Parsing**: Extracts translatable text while preserving code blocks, links, and formatting
+2. **LLM Processing**: Sends content to the configured language model with strict translation rules
+3. **Quality Validation**: Checks translated content for format preservation and completeness
+4. **Content Assembly**: Reconstructs the file with translated text and original formatting
+
+### GitHub Workflow
+
+1. **Branch Creation**: Creates a unique branch for each file (e.g., `translate/src/content/homepage.md`)
+2. **File Commit**: Commits the translated content with descriptive commit messages
+3. **Pull Request**: Creates PR with translated content and detailed description
+4. **Progress Tracking**: Updates the tracking issue with links to created PRs
 
 ## Project Structure
 
@@ -162,44 +272,57 @@ snapshots.sqlite                         # SQLite database for state persistence
 
 ## Architecture
 
+The tool follows a modular, service-oriented architecture with clear separation of concerns and comprehensive error handling.
+
 ### Core Services
 
-1. **Runner Service** (`services/runner/`)
+#### 1. **Runner Service** (`services/runner/`)
 
-- Orchestrates the entire translation workflow
-- Manages batch processing and progress tracking
-- Handles state persistence through snapshots
-- Implements error recovery and reporting
+The main orchestrator that manages the complete translation workflow:
 
-2. **GitHub Service** (`services/github/`)
+- **Workflow Management**: Coordinates all services and manages execution flow
+- **Batch Processing**: Processes files in configurable batches to optimize API usage
+- **Progress Tracking**: Real-time CLI feedback with spinners and progress indicators
+- **State Persistence**: Manages SQLite snapshots for interruption recovery
+- **Environment Handling**: Different behaviors for development vs production modes
 
-- Modular architecture with specialized services:
-  - **Base Service**: Common GitHub functionality and error handling
-  - **Branch Service**: Branch lifecycle and cleanup management
-  - **Content Service**: File operations and PR management
-  - **Repository Service**: Repository and fork synchronization
-- Inheritance-based design for code reuse
-- Protected access modifiers for internal operations
-- Unified error handling through base service
+#### 2. **GitHub Service** (`services/github/`)
 
-3. **Translator Service** (`services/translator.service.ts`)
+Modular GitHub integration with specialized sub-services:
 
-- Interfaces with OpenAI's language models
-- Handles content parsing and block management
-- Maintains translation glossary and rules
-- Implements chunking and retry mechanisms for large files
+- **Base Service**: Common GitHub functionality, authentication, and error handling
+- **Branch Service**: Branch lifecycle management and cleanup operations
+- **Content Service**: File operations, content filtering, and PR management
+- **Repository Service**: Fork synchronization and repository tree operations
+- **Design Pattern**: Inheritance-based architecture with protected access modifiers
 
-4. **Language Detector** (`utils/language-detector.util.ts`)
+#### 3. **Translator Service** (`services/translator.service.ts`)
 
-- Uses `franc` for language detection
-- Determines if content needs translation
-- Calculates language confidence scores
+Core translation engine with advanced content handling:
 
-5. **Database Service** (`services/database.service.ts`)
+- **LLM Integration**: Interfaces with OpenAI-compatible APIs (OpenAI, OpenRouter, Azure)
+- **Content Parsing**: Intelligent markdown parsing that preserves code blocks and formatting
+- **Glossary Management**: Maintains technical term consistency across translations
+- **Chunking Strategy**: Handles large files by breaking them into manageable segments
+- **Quality Assurance**: Validates translation output and ensures formatting integrity
 
-- Manages persistent storage of workflow state
-- Handles snapshots for interruption recovery
-- Maintains translation history and results
+#### 4. **Language Detector** (`utils/language-detector.util.ts`)
+
+Intelligent content analysis for translation decisions:
+
+- **Detection Engine**: Uses `franc` library for statistical language detection
+- **Confidence Scoring**: Calculates reliability scores for language predictions
+- **Translation Logic**: Determines if content requires translation based on confidence thresholds
+- **Language Mapping**: Converts between ISO 639-1 and ISO 639-3 codes for compatibility
+
+#### 5. **Database Service** (`services/database.service.ts`)
+
+Persistent state management with SQLite:
+
+- **Snapshot System**: Stores workflow state for interruption recovery
+- **Transaction Management**: Ensures data consistency across operations
+- **Progress Tracking**: Records processed files and translation results
+- **Development Support**: Provides snapshot clearing and debugging capabilities
 
 ### Error Handling System
 
@@ -219,53 +342,130 @@ snapshots.sqlite                         # SQLite database for state persistence
 
 ## Features
 
-### Translation Quality
+### 🎯 Translation Quality
 
-- Enforces strict glossary rules for technical terms
-- Preserves markdown formatting and structure
-- Maintains code blocks and technical references
-- Supports any language localization standards
+- **Glossary Enforcement**: Maintains consistent technical terminology across all translations
+- **Formatting Preservation**: Keeps all markdown structure, code blocks, and special syntax intact
+- **Content Intelligence**: Distinguishes between translatable text and code/technical references
+- **Language Standards**: Supports any target language with proper localization conventions
+- **Quality Validation**: Post-translation checks to ensure content integrity
 
-### State Management
+### 💾 State Management
 
-- SQLite-based snapshot system
-- Interruption recovery
-- Progress tracking
-- Error state persistence
+- **SQLite Persistence**: Robust database for storing workflow state and progress
+- **Interruption Recovery**: Resume translations from any point if the process is interrupted
+- **Progress Tracking**: Detailed logging of processed files and translation status
+- **Development Mode**: Snapshot management with clearing capabilities for testing
+- **Batch State**: Tracks individual file processing within batches
 
-### Process Management
+### ⚡ Process Management
 
-- Batch processing with configurable sizes
-- Progress tracking with CLI spinners
-- Detailed error reporting
-- Performance metrics tracking
+- **Configurable Batching**: Process multiple files simultaneously with customizable batch sizes
+- **Real-time Feedback**: CLI spinners with detailed progress indicators and percentage completion
+- **Performance Metrics**: Tracks processing time, API usage, and throughput statistics
+- **Memory Optimization**: Efficient handling of large documentation repositories
+- **Concurrent Processing**: Parallel file fetching and processing where possible
 
-### GitHub Integration
+### 🔄 GitHub Integration
 
-- Branch per file strategy
-- Automated PR creation
-- Issue progress tracking
-- Branch cleanup management
+- **Individual Branches**: Creates separate branches for each translated file for better review process
+- **Automated PRs**: Generates pull requests with descriptive titles and detailed descriptions
+- **Progress Issues**: Updates tracking issues with links to created PRs and translation status
+- **Branch Management**: Automatic cleanup of completed or failed translation branches
+- **Fork Synchronization**: Keeps fork updated with upstream changes before processing
 
-### Error Handling
+### 🛡️ Error Handling & Recovery
 
-- Custom error types for different scenarios
-- Graceful failure recovery
-- Detailed error context
-- Cleanup on failure
+- **Hierarchical Errors**: Custom error types for different failure scenarios (API, Git, Translation)
+- **Graceful Degradation**: Continues processing other files when individual translations fail
+- **Detailed Context**: Rich error messages with operation context and debugging information
+- **Automatic Cleanup**: Removes incomplete branches and files on critical failures
+- **Retry Mechanisms**: Smart retry logic for transient API and network failures
+- **Logging System**: Comprehensive error logs with timestamps and structured data
 
 ## Contributing
 
-This project is open for contributions. Feel free to open issues, fork the project and submit pull requests for improvements.
+We welcome contributions! Whether you're fixing bugs, adding features, or improving documentation, your help is appreciated.
+
+### Getting Started
+
+1. **Fork the repository** and create your feature branch
+2. **Set up your development environment** with the prerequisites
+3. **Create a `.env.dev` file** for development-specific configuration
+4. **Run tests** to ensure everything works: `bun test`
 
 ### Development Guidelines
 
-1. All code is written in TypeScript
-2. Use Bun as the runtime
-3. Follow the established error handling patterns
-4. Maintain comprehensive JSDoc documentation
-5. Use conventional commits for version control
+1. **TypeScript First**: All code must be written in TypeScript with proper type definitions
+2. **Bun Runtime**: Use Bun for development, testing, and package management
+3. **Error Handling**: Follow the established error handling patterns using the custom error system
+4. **Documentation**: Maintain comprehensive JSDoc comments following the project's documentation standards
+5. **Conventional Commits**: Use conventional commit messages for automated changelog generation
+6. **Testing**: Add tests for new features and ensure existing tests pass
+7. **Code Style**: Follow the ESLint and Prettier configurations defined in the project
 
-## License
+### Project-Specific Patterns
 
-MIT License - see LICENSE file for details
+- **Service Architecture**: New services should extend appropriate base classes
+- **Error Types**: Create specific error types for new failure scenarios
+- **Environment Variables**: Add new config to the Zod schema in `env.util.ts`
+- **Database Operations**: Use the existing database service for any persistence needs
+
+### Testing Translations
+
+When testing translation functionality:
+
+- Use development mode with `FORCE_SNAPSHOT_CLEAR=true`
+- Test with small batch sizes to avoid excessive API usage
+- Verify both the translation quality and GitHub integration
+
+## Troubleshooting
+
+### Common Issues
+
+#### Environment Validation Errors
+
+```bash
+❌ Invalid environment variables:
+- GITHUB_TOKEN: String must contain at least 1 character(s)
+```
+
+**Solution**: Ensure all required environment variables are set in your `.env` file.
+
+**GitHub API Rate Limiting**
+
+```bash
+API rate limit exceeded
+```
+
+**Solution**: The tool will automatically retry with exponential backoff. For heavy usage, consider using a GitHub App token instead of a personal token.
+
+**Translation API Errors**
+
+```bash
+OpenAI API error: insufficient_quota
+```
+
+**Solution**: Check your API key has sufficient credits. You can also switch to alternative providers by changing `OPENAI_BASE_URL`.
+
+**SQLite Database Lock**
+
+```bash
+Database is locked
+```
+
+**Solution**: Ensure no other instances are running. In development, use `FORCE_SNAPSHOT_CLEAR=true` to reset the database.
+
+### Debug Mode
+
+Enable verbose logging by setting the environment to development:
+
+```bash
+NODE_ENV=development bun run start
+```
+
+### Getting Help
+
+- **Issues**: Report bugs or request features on [GitHub Issues](https://github.com/NivaldoFarias/translate-react/issues)
+- **Discussions**: Ask questions in [GitHub Discussions](https://github.com/NivaldoFarias/translate-react/discussions)
+- **Documentation**: Check the inline code documentation for detailed API information

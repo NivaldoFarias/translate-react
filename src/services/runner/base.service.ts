@@ -30,7 +30,8 @@ export abstract class RunnerService {
 
 	/**
 	 * Tracks progress for the current batch of files being processed
-	 * Used to update the spinner and generate statistics
+	 *
+	 * @remarks Used to update the spinner and generate statistics
 	 */
 	protected batchProgress = {
 		completed: 0,
@@ -39,8 +40,9 @@ export abstract class RunnerService {
 	};
 
 	/**
-	 * Maintains the current state of the translation workflow
-	 * In development mode, this state can be persisted between runs
+	 * Maintains the current state of the translation workflow.
+	 *
+	 * @remarks In development mode, this state can be persisted between runs
 	 */
 	protected state: Omit<Snapshot, "id"> = {
 		repositoryTree: [],
@@ -75,7 +77,8 @@ export abstract class RunnerService {
 
 	/**
 	 * Cleanup handler for process termination.
-	 * Ensures graceful shutdown and cleanup of resources
+	 *
+	 * @remarks Ensures graceful shutdown and cleanup of resources
 	 */
 	protected cleanup = () => {
 		this.spinner?.stop();
@@ -85,7 +88,8 @@ export abstract class RunnerService {
 
 	/**
 	 * Initializes the runner with environment validation and signal handlers
-	 * Sets up process event listeners for graceful termination
+	 *
+	 * @remarks Sets up process event listeners for graceful termination
 	 */
 	constructor(protected readonly options: RunnerOptions) {
 		try {
@@ -339,6 +343,8 @@ export abstract class RunnerService {
 	}
 
 	/**
+	 * Determines if the issue comment should be updated based on environment and results
+	 *
 	 * @returns `true` if the issue comment should be updated, `false` otherwise
 	 */
 	protected get shouldUpdateIssueComment() {
@@ -352,6 +358,7 @@ export abstract class RunnerService {
 	/**
 	 * Generates and displays final statistics for the translation workflow
 	 *
+	 * @remarks
 	 * ## Statistics Reported
 	 * - Total files processed
 	 * - Success/failure counts
@@ -402,7 +409,7 @@ export abstract class RunnerService {
 
 	/**
 	 * Formats a time duration in milliseconds to a human-readable string
-	 * using the Intl.RelativeTimeFormat API for localization
+	 * using the {@link Intl.RelativeTimeFormat} API for localization
 	 *
 	 * @param elapsedTime The elapsed time in milliseconds
 	 *
@@ -425,6 +432,7 @@ export abstract class RunnerService {
 	/**
 	 * Processes files in batches to manage resources and provide progress feedback
 	 *
+	 * @remarks
 	 * ## Workflow
 	 * 1. Splits files into manageable batches
 	 * 2. Processes each batch concurrently
@@ -433,6 +441,7 @@ export abstract class RunnerService {
 	 *
 	 * @param files List of files to process
 	 * @param batchSize Number of files to process simultaneously
+	 *
 	 * @throws {ResourceLoadError} If file content cannot be loaded
 	 * @throws {APIError} If GitHub operations fail
 	 */
@@ -518,6 +527,7 @@ export abstract class RunnerService {
 	/**
 	 * Processes a single file through the complete translation workflow
 	 *
+	 * @remarks
 	 * ## Workflow Steps
 	 * 1. Creates or gets a translation branch
 	 * 2. Translates the file content
@@ -585,8 +595,9 @@ export abstract class RunnerService {
 	}
 
 	/**
-	 * Updates progress tracking for the current batch and adjusts success/failure counts
-	 * This information is used for both real-time feedback and final statistics
+	 * Updates progress tracking for the current batch and adjusts success/failure counts.
+	 *
+	 * @remarks This information is used for both real-time feedback and final statistics
 	 *
 	 * @param status The processing outcome for the file
 	 */

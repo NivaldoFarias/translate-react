@@ -1,3 +1,10 @@
+/**
+ * @fileoverview
+ * Test suite for Base GitHub Service
+ *
+ * Tests core GitHub API functionality
+ */
+
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 
 import { BaseGitHubService } from "@/services/github/base.service";
@@ -31,10 +38,6 @@ class TestGitHubService extends BaseGitHubService {
 	}
 }
 
-/**
- * Test suite for Base GitHub Service
- * Tests core GitHub API functionality
- */
 describe("Base GitHub Service", () => {
 	let service: TestGitHubService;
 	const mockConfig = {

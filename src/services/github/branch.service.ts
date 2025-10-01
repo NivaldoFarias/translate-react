@@ -4,6 +4,7 @@ import { BaseGitHubService } from "@/services/github/base.service";
  * Service responsible for Git branch operations and lifecycle management.
  * Handles branch creation, deletion, and cleanup tasks.
  *
+ * @remarks
  * ## Responsibilities
  * - Branch creation and deletion
  * - Branch state tracking
@@ -16,11 +17,8 @@ export class BranchService extends BaseGitHubService {
 
 	/**
 	 * Creates a new branch service instance.
-	 * Initializes the GitHub client and sets up cleanup handlers.
 	 *
-	 * @param upstream Original repository details
-	 * @param fork Forked repository details
-	 * @param githubToken GitHub personal access token
+	 * @remarks Initializes the GitHub client and sets up cleanup handlers.
 	 */
 	constructor(
 		protected readonly upstream: { owner: string; repo: string },
@@ -34,17 +32,20 @@ export class BranchService extends BaseGitHubService {
 
 	/**
 	 * Sets up process termination handlers for branch cleanup.
-	 * Ensures branches are cleaned up on process exit or errors.
+	 *
+	 * @remarks Ensures branches are cleaned up on process exit or errors.
 	 */
 	protected setupCleanupHandlers() {
-		process.on("SIGINT", async () => await this.cleanup());
-		process.on("SIGTERM", async () => await this.cleanup());
-		process.on("uncaughtException", async () => await this.cleanup());
+		process
+			.on("SIGINT", async () => await this.cleanup())
+			.on("SIGTERM", async () => await this.cleanup())
+			.on("uncaughtException", async () => await this.cleanup());
 	}
 
 	/**
 	 * Creates a new Git branch from a base branch.
-	 * Tracks the branch for cleanup if created successfully.
+	 *
+	 * @remarks Tracks the branch for cleanup if created successfully.
 	 *
 	 * @param branchName Name for the new branch
 	 * @param baseBranch Branch to create from
@@ -140,10 +141,17 @@ export class BranchService extends BaseGitHubService {
 	}
 
 	/**
-	 * # Fork Commit Check
-	 *
 	 * Verifies if commits exist on the fork from the current user.
-	 * Used to determine if translation work has already been done.
+	 *
+	 * @remarks Used to determine if translation work has already been done.
+	 *
+	 * @param branchName Branch to check for commits
+	 *
+	 * @example
+	 * ```typescript
+	 * const hasCommits = await branchService.checkIfCommitExistsOnFork('feature/translation');
+	 * if (hasCommits) console.log('Translation work already exists on fork');
+	 * ```
 	 */
 	public async checkIfCommitExistsOnFork(branchName: string) {
 		const forkRef = await this.getBranch(branchName);

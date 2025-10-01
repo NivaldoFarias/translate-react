@@ -1,4 +1,4 @@
-import { type BunFile } from "bun";
+import type { BunFile } from "bun";
 
 /** Represents the severity level of an error */
 export enum ErrorSeverity {
@@ -9,9 +9,7 @@ export enum ErrorSeverity {
 	FATAL = "FATAL",
 }
 
-/**
- * Standardized error codes for the translation workflow
- */
+/** Standardized error codes for the translation workflow */
 export enum ErrorCode {
 	// API Related
 	GITHUB_API_ERROR = "GITHUB_API_ERROR",
@@ -48,13 +46,24 @@ export interface ErrorContext {
 
 /**
  * Base error class for all translation-related errors
- * Extends the native Error class with additional context and tracking capabilities
+ *
+ * @remarks Extends the native Error class with additional context and tracking capabilities
  */
 export class TranslationError extends Error {
+	/** Standardized error code */
 	public readonly code: ErrorCode;
+
+	/** Timestamp when the error was created */
 	public readonly timestamp: Date;
+
+	/** Additional context about the error */
 	public readonly context: ErrorContext;
 
+	/**
+	 * Initializes a new instance of the `TranslationError` class.
+	 *
+	 * @remarks Uses `Object.setPrototypeOf` to maintain proper prototype chain for custom errors.
+	 */
 	constructor(
 		message: string,
 		code: ErrorCode = ErrorCode.UNKNOWN_ERROR,
@@ -73,13 +82,10 @@ export class TranslationError extends Error {
 			timestamp: this.timestamp,
 		};
 
-		// Ensure proper prototype chain for instanceof checks
 		Object.setPrototypeOf(this, new.target.prototype);
 	}
 
-	/**
-	 * Creates a formatted error message including context information
-	 */
+	/** Creates a formatted error message including context information */
 	public toJSON() {
 		return {
 			name: this.name,
@@ -98,11 +104,10 @@ export class TranslationError extends Error {
 			.map((line) => line.trim());
 	}
 
-	/**
-	 * Extracts a human-readable message from the error
-	 */
+	/** Extracts a human-readable message from the error */
 	public getDisplayMessage(): string {
 		const context = this.context.operation ? ` (in ${this.context.operation})` : "";
+
 		return `${this.message}${context}`;
 	}
 }

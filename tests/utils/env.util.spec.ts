@@ -1,11 +1,14 @@
+/**
+ * @fileoverview
+ * Test suite for Environment Utilities
+ *
+ * Tests environment variable validation and parsing
+ */
+
 import { beforeEach, describe, expect, test } from "bun:test";
 
 import { validateEnv } from "@/utils/env.util";
 
-/**
- * Test suite for Environment Utilities
- * Tests environment variable validation and parsing
- */
 describe("Environment Utilities", () => {
 	const originalEnv = process.env;
 

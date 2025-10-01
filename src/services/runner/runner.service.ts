@@ -2,11 +2,10 @@ import { extractErrorMessage } from "@/errors/error.handler";
 import { RunnerService } from "@/services/runner/base.service";
 
 /**
- * # Translation Workflow Runner
- *
  * Main orchestrator class that manages the entire translation process workflow.
  * Handles file processing, translation, GitHub operations, and progress tracking.
  *
+ * @remarks
  * The runner implements a batch processing system to efficiently handle multiple files
  * while providing real-time progress feedback through a CLI spinner.
  *
@@ -34,9 +33,10 @@ export default class Runner extends RunnerService {
 	}
 
 	/**
-	 * # Main Workflow Execution
+	 * Executes the main translation workflow.
 	 *
-	 * Executes the complete translation workflow:
+	 * @remarks
+	 * Workflow:
 	 * 1. Verifies GitHub token permissions
 	 * 2. Loads or creates workflow snapshot (development only)
 	 * 3. Fetches repository tree
@@ -44,7 +44,7 @@ export default class Runner extends RunnerService {
 	 * 5. Processes files in batches
 	 * 6. Reports results
 	 *
-	 * In production, also comments results on the specified issue
+	 * In production, also comments results on the specified issue.
 	 *
 	 * @throws {InitializationError} If token verification or fork sync fails
 	 * @throws {ResourceLoadError} If repository content or glossary fetch fails

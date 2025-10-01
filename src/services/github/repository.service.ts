@@ -4,7 +4,6 @@ import { BaseGitHubService } from "@/services/github/base.service";
 
 /**
  * Service responsible for repository operations and fork management.
- * Handles repository content, fork synchronization, and tree management.
  *
  * ## Responsibilities
  * - Repository tree management
@@ -15,7 +14,7 @@ import { BaseGitHubService } from "@/services/github/base.service";
 export class RepositoryService extends BaseGitHubService {
 	/**
 	 * Retrieves the repository file tree.
-	 * Can optionally filter out ignored paths.
+	 * @remarks Can optionally filter out ignored paths.
 	 *
 	 * @param baseBranch Branch to get tree from
 	 * @param filterIgnored Whether to filter ignored paths
@@ -37,7 +36,6 @@ export class RepositoryService extends BaseGitHubService {
 
 	/**
 	 * Verifies that the GitHub token has required permissions.
-	 * Checks access to both upstream and fork repositories.
 	 *
 	 * @example
 	 * ```typescript
@@ -62,7 +60,6 @@ export class RepositoryService extends BaseGitHubService {
 
 	/**
 	 * Checks if the fork is synchronized with upstream.
-	 * Compares latest commit SHAs of both repositories.
 	 *
 	 * @example
 	 * ```typescript
@@ -98,7 +95,8 @@ export class RepositoryService extends BaseGitHubService {
 
 	/**
 	 * Synchronizes the fork with the upstream repository.
-	 * Creates a merge commit to update the fork.
+	 *
+	 * @remarks Creates a merge commit to update the fork.
 	 *
 	 * @example
 	 * ```typescript
@@ -139,6 +137,7 @@ export class RepositoryService extends BaseGitHubService {
 	/**
 	 * Fetches the glossary.md file from the repository.
 	 *
+	 * @remarks
 	 * This method retrieves the content of the glossary file which contains
 	 * standardized terminology and translations for the project. The glossary
 	 * is essential for maintaining consistent translations across documentation.

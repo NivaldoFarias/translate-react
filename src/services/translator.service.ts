@@ -11,10 +11,10 @@ import { LanguageDetector } from "@/utils/language-detector.util";
 import { TranslationFile } from "@/utils/translation-file.util";
 
 /**
- * # Translation Service
- *
  * Core service for translating content using OpenAI's language models.
- * Handles the entire translation workflow including:
+ *
+ * @remarks
+ * Handles the entire translation workflow. Including:
  * - Content parsing and block management
  * - Language model interaction
  * - Response processing
@@ -67,6 +67,7 @@ export class TranslatorService {
 	/**
 	 * Main translation method that processes files and manages the translation workflow
 	 *
+	 * @remarks
 	 * ## Workflow
 	 * 1. Validates input content
 	 * 2. Parses content (without modifying code blocks)
@@ -155,7 +156,7 @@ export class TranslatorService {
 
 	/**
 	 * For some reason, some LLMs return the content with fences prepended and appended.
-	 * This method removes them.
+	 * This method removes them when present.
 	 */
 	public cleanupTranslatedContent(content: string, originalContent?: string) {
 		const shouldStartWith = `---\ntitle:`;
@@ -231,6 +232,7 @@ export class TranslatorService {
 	 * Handles content that exceeds the model's context window by splitting it into
 	 * smaller chunks and translating each chunk separately, then combining the results.
 	 *
+	 * @remarks
 	 * ## Workflow
 	 * 1. Splits content at natural break points (middle of paragraphs, end of code blocks)
 	 * 2. Recursively splits chunks that are still too large
@@ -252,6 +254,7 @@ export class TranslatorService {
 	/**
 	 * Translates the content of the chunks.
 	 *
+	 * @remarks
 	 * ## Workflow
 	 * 1. Adds context about chunking to help maintain consistency
 	 * 2. Translates each chunk
@@ -290,17 +293,28 @@ export class TranslatorService {
 
 	/**
 	 * Splits content at a natural break point closest to the middle.
+	 *
+	 * @remarks
 	 * Finds logical boundaries like paragraph breaks, code blocks, or headers
-	 * that are nearest to the middle of the content.
+	 * that are nearest to the middle of the content to maintain semantic integrity.
 	 *
-	 * ## Workflow
-	 * 1. Identifies natural break points (paragraph breaks, end of code blocks, headers)
-	 * 2. Finds the break point closest to the middle of the content
-	 * 3. Returns the content split at that point
+	 * ## Algorithm Steps
+	 * 1. Identifies natural break points using regex patterns for paragraphs, headers, and code blocks
+	 * 2. Selects the break point closest to the content midpoint to ensure balanced chunks
+	 * 3. Falls back to sentence breaks if no structural breaks are found near midpoint
+	 * 4. Uses nearest whitespace as final fallback to avoid breaking words
+	 * 5. Returns content split at the optimal break point
 	 *
-	 * @param content Content to split
+	 * @param content Content to split into manageable chunks
 	 *
-	 * @returns Array containing two parts of the content, split at a natural break
+	 * @returns Array containing two parts of the content, split at a natural break point
+	 *
+	 * @example
+	 * ```typescript
+	 * const longContent = "# Header\n\nParagraph one...\n\n## Another Header\n\nParagraph two...";
+	 * const chunks = this.splitIntoSections(longContent);
+	 * // Returns content split at paragraph or header boundaries
+	 * ```
 	 */
 	private splitIntoSections(content: string): Array<string> {
 		if (content.length < 1000) return [content];
@@ -320,8 +334,6 @@ export class TranslatorService {
 			const distance = Math.abs(breakPointPosition - midpoint);
 			const exceededSearchBoundary = breakPointPosition > midpoint * 1.5;
 
-			// If the distance is smaller than the minimum distance,
-			// update the minimum distance and the best break point
 			if (distance < minDistance) {
 				minDistance = distance;
 				bestBreakPoint = breakPointPosition;
@@ -330,13 +342,10 @@ export class TranslatorService {
 			if (exceededSearchBoundary) break;
 		}
 
-		// If no good break point was found, use the midpoint
 		if (bestBreakPoint === 0) {
-			// Try to find a sentence break near the midpoint
 			const sentenceBreakRegex = /[.!?]\s+/g;
 			sentenceBreakRegex.lastIndex = midpoint - 200 > 0 ? midpoint - 200 : 0;
 
-			// Try to find a sentence break near the midpoint
 			while ((match = sentenceBreakRegex.exec(content)) !== null) {
 				const breakPointPosition = match.index + match[0].length;
 				const distance = Math.abs(breakPointPosition - midpoint);
@@ -350,9 +359,7 @@ export class TranslatorService {
 				if (exceededSearchBoundary) break;
 			}
 
-			// If still no good break point, use the midpoint at a space
 			if (bestBreakPoint === 0) {
-				// Find the nearest space to the midpoint
 				let left = midpoint;
 				let right = midpoint;
 
@@ -376,12 +383,10 @@ export class TranslatorService {
 			}
 		}
 
-		// If we still couldn't find a break point, just use the midpoint
 		if (bestBreakPoint === 0) {
 			bestBreakPoint = midpoint;
 		}
 
-		// Split the content at the best break point
 		return [content.substring(0, bestBreakPoint), content.substring(bestBreakPoint)];
 	}
 }

@@ -1,11 +1,12 @@
+/**
+ * @fileoverview
+ * Test suite for Language Detector Utility
+ */
+
 import { describe, expect, test } from "bun:test";
 
 import { LanguageDetector } from "@/utils/language-detector.util";
 
-/**
- * Test suite for Language Detector Utility
- * Tests language detection and translation status functionality
- */
 describe("Language Detector Utility", () => {
 	const detector = new LanguageDetector({
 		source: "en",

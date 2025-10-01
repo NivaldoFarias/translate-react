@@ -1,13 +1,16 @@
+/**
+ * @fileoverview
+ * Test suite for GitHub Content Service
+ *
+ * Tests content retrieval and manipulation operations
+ */
+
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 
 import { TranslationFile } from "@/utils/translation-file.util";
 
-import { ContentService } from "./content.service";
+import { ContentService } from "../../../src/services/github/content.service";
 
-/**
- * Test suite for GitHub Content Service
- * Tests content retrieval and manipulation operations
- */
 describe("GitHub Content Service", () => {
 	let contentService: ContentService;
 	const mockConfig = {
