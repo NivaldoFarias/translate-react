@@ -7,8 +7,7 @@ import { TranslationFile } from "@/utils/translation-file.util";
 /**
  * Service responsible for managing repository content and translations.
  *
- * @remarks
- * ## Responsibilities
+ * ### Responsibilities
  * - File content retrieval and modification
  * - Translation content management
  * - Pull request creation and management
@@ -59,7 +58,7 @@ export class ContentService extends BaseGitHubService {
 	/**
 	 * Retrieves markdown files that need translation.
 	 *
-	 * @remarks Filters and processes files based on content type.
+	 * Filters and processes files based on content type.
 	 *
 	 * @param maxFiles Optional limit on number of files to retrieve
 	 * @throws {Error} If repository tree is empty or retrieval fails
@@ -113,7 +112,7 @@ export class ContentService extends BaseGitHubService {
 	/**
 	 * Commits translated content to a branch.
 	 *
-	 * @remarks Updates existing file or creates new one.
+	 * Updates existing file or creates new one.
 	 *
 	 * @param options Commit options
 	 * @param options.branch Target branch reference
@@ -245,8 +244,8 @@ export class ContentService extends BaseGitHubService {
 	/**
 	 * Posts translation results as comments on GitHub issues.
 	 *
-	 * @remarks
-	 * ## Workflow
+	 * ### Workflow
+	 *
 	 * 1. Checks if the issue exists
 	 * 2. Lists comments on the issue
 	 * 3. Finds the user's comment with the correct prefix
@@ -325,11 +324,11 @@ export class ContentService extends BaseGitHubService {
 	/**
 	 * Builds a hierarchical comment for GitHub issues based on translation results.
 	 *
-	 * @remarks
 	 * Processes translation results and file data to create a structured comment
 	 * that organizes translated files by their directory hierarchy for better readability.
 	 *
-	 * ## Processing Steps
+	 * ### Processing Steps
+	 *
 	 * 1. Maps translation results to file data with simplified path structures
 	 * 2. Extracts directory paths and filenames from translation file paths
 	 * 3. Creates hierarchical data structure with path parts and PR numbers
@@ -372,11 +371,11 @@ export class ContentService extends BaseGitHubService {
 	/**
 	 * Simplifies path parts by removing common prefixes and flattening complex structures.
 	 *
-	 * @remarks
 	 * Processes file path segments to create cleaner, more readable hierarchical structures
 	 * in comments by removing unnecessary nesting and standardizing path representation.
 	 *
-	 * ## Simplification Rules
+	 * ### Simplification Rules
+	 *
 	 * 1. Removes common "src/content" prefix from all paths for cleaner display
 	 * 2. Flattens blog post directories by ignoring date-based subdirectories
 	 * 3. Preserves meaningful directory structure while reducing visual clutter
@@ -411,11 +410,11 @@ export class ContentService extends BaseGitHubService {
 	/**
 	 * Builds a hierarchical comment structure from processed translation data.
 	 *
-	 * @remarks
 	 * Creates a nested directory structure representation for GitHub comment display,
 	 * organizing files by their path hierarchy with associated pull request numbers.
 	 *
-	 * ## Structure Building Process
+	 * ### Structure Building Process
+	 *
 	 * 1. Sorts data alphabetically by path and filename for consistent ordering
 	 * 2. Creates nested object structure mirroring directory hierarchy
 	 * 3. Groups files under their respective directory levels with __files arrays

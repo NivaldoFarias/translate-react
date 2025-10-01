@@ -4,8 +4,7 @@ import { Octokit } from "@octokit/rest";
  * Base service for GitHub operations.
  * Provides common functionality and configuration for all GitHub services.
  *
- * @remarks
- * ## Responsibilities
+ * ### Responsibilities
  * - GitHub client initialization
  * - Repository configuration management
  * - Common error handling

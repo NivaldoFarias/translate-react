@@ -3,13 +3,13 @@ import { RunnerService } from "@/services/runner/base.service";
 
 /**
  * Main orchestrator class that manages the entire translation process workflow.
- * Handles file processing, translation, GitHub operations, and progress tracking.
  *
- * @remarks
- * The runner implements a batch processing system to efficiently handle multiple files
+ * - Handles file processing, translation, GitHub operations, and progress tracking.
+ * - The runner implements a batch processing system to efficiently handle multiple files
  * while providing real-time progress feedback through a CLI spinner.
  *
- * ## Features
+ * ### Features
+ *
  * - Batch processing with configurable size
  * - Real-time progress tracking
  * - Development/Production mode support
@@ -35,8 +35,8 @@ export default class Runner extends RunnerService {
 	/**
 	 * Executes the main translation workflow.
 	 *
-	 * @remarks
-	 * Workflow:
+	 * ### Workflow:
+	 *
 	 * 1. Verifies GitHub token permissions
 	 * 2. Loads or creates workflow snapshot (development only)
 	 * 3. Fetches repository tree

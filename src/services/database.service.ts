@@ -8,10 +8,10 @@ import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 /**
  * Core service for managing persistent storage of translation workflow data.
+ *
  * Uses SQLite for storing snapshots, repository tree, files, and results.
  *
- * @remarks
- * ## Responsibilities
+ * ### Responsibilities:
  * - Manages persistent storage of translation workflow data
  * - Handles snapshots of repository state and files to translate
  * - Maintains translation history and results
@@ -36,7 +36,6 @@ export class DatabaseService {
 	/**
 	 * Initializes database tables.
 	 *
-	 * @remarks
 	 * Creates required database tables if they don't exist:
 	 * - snapshots: Workflow state snapshots
 	 * - repository_tree: Git repository structure
@@ -65,8 +64,7 @@ export class DatabaseService {
 	}
 
 	/**
-	 * Saves repository tree structure to database.
-	 * Uses transactions for data integrity.
+	 * Saves repository tree structure to database. Uses transactions for data integrity.
 	 *
 	 * @param snapshotId ID of associated snapshot
 	 * @param tree Repository tree structure from GitHub
@@ -128,7 +126,6 @@ export class DatabaseService {
 	/**
 	 * Saves translation results to database.
 	 *
-	 * @remarks
 	 * - Includes branch info, PR details, and any errors.
 	 * - Uses transactions for data integrity.
 	 *
@@ -167,7 +164,7 @@ export class DatabaseService {
 	/**
 	 * Fetches most recent workflow snapshot with all related data.
 	 *
-	 * @remarks
+	 * Includes:
 	 * - Repository tree
 	 * - Files to translate
 	 * - Processing results

@@ -26,7 +26,8 @@ MUST document ALL public functions, methods, classes, interfaces, types, and exp
   - `@param` for each parameter with detailed description
   - `@returns` for return values with type and description
   - `@example` with realistic usage showing actual project patterns
-  - Use proper spacing and formatting for optimal user and AI comprehension
+  - MUST Use proper spacing and formatting
+  - ALL jsdocs MUST start with a short one-line summary sentence on the element's purpose. If the element is complex, follow the summary with a more detailed description AFTER a line break.
 - **EXCEPT**: Simple methods/variables without parameters or side effects. See section `Single-Line Format for Trivial Functions` for details.
 
 #### Examples
@@ -37,12 +38,12 @@ MUST document ALL public functions, methods, classes, interfaces, types, and exp
 /**
  * Creates a travel itinerary based on user preferences and generates a PDF.
  *
- * @remarks Processes user travel data, applies rate limiting, generates AI-powered
+ * Processes user travel data, applies rate limiting, generates AI-powered
  * itinerary content, and stores the result in the database with PDF path.
  *
  * @param request The incoming NextJS request containing travel planning data
  *
- * @returns Promise resolving to NextResponse with itinerary generation status and ID
+ * @returns A `Promise` resolving to NextResponse with itinerary generation status and ID
  *
  * @example
  * ```typescript
@@ -62,7 +63,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
 ````javascript
 /**
- * Calculates the total budget breakdown for a travel itinerary
+ * Calculates the total budget breakdown for a travel itinerary.
  *
  * Takes travel preferences and duration to estimate costs across
  * accommodation, meals, activities, and transportation categories.
@@ -118,11 +119,28 @@ MUST exclude TypeScript type annotations from JSDoc in `.ts` files to avoid redu
 
 ### Structured Markdown Formatting [P2]
 
-MUST use structured markdown formatting for enhanced readability and AI parsing. Employ consistent markdown syntax with proper hierarchy, lists, and emphasis.
+MUST use structured markdown formatting for enhanced readability. Employ consistent markdown syntax with proper hierarchy, lists, and emphasis.
+
+### Inline code formatting [P1]
+
+MUST use inline code formatting for all code elements within descriptions, including function names, parameters, types, and code snippets.
+
+```typescript
+/**
+ * Fetches user data from the database using the provided `userId`.
+ *
+ * @param {string} userId The unique identifier for the user
+ *
+ * @returns {Promise<User>} A promise that resolves to the user object
+ */
+async function getUser(userId: string): Promise<User> {
+	// ...
+}
+```
 
 ### Language Identifiers in Code Blocks [P1]
 
-MUST specify language identifiers for all code blocks to enable proper syntax highlighting and optimal AI understanding.
+MUST specify language identifiers for all code blocks to enable proper syntax highlighting.
 
 ### Cross-References and Links [P1]
 
@@ -155,7 +173,7 @@ function validateAuthToken(token) {
 /**
  * Creates a new authentication token for the user.
  *
- * @remarks Uses {@link validateAuthToken} to verify the generated token.
+ * Uses {@link validateAuthToken} to verify the generated token.
  *
  * @param {UserData} userData User information to encode
  * @returns {string} JWT authentication token
@@ -203,7 +221,7 @@ SHOULD provide detailed examples with realistic data and error scenarios. Includ
 
 ### Consistency with Established Patterns [P1]
 
-MUST maintain consistency with established patterns. Follow established documentation patterns within the codebase to ensure uniform AI comprehension.
+MUST maintain consistency with established patterns. Follow established documentation patterns within the codebase.
 
 ### Documentation Updates with Code Changes [P0]
 
@@ -229,7 +247,7 @@ MUST validate JSDoc completeness through automated tooling for required tag pres
 
 ### Pattern Consistency [P1]
 
-MUST maintain consistency with established documentation patterns within the codebase to ensure uniform AI comprehension and developer experience.
+MUST maintain consistency with established documentation patterns within the codebase to ensure uniform AI and developer experience.
 
 ### Documentation Currency [P0]
 

@@ -9,7 +9,7 @@ applyTo: "**"
 
 ## Instruction Files Structure Standard
 
-Instruction files in this project follow a hybrid rule structure format optimized for AI comprehension and automated processing:
+Instruction files in this project follow a hybrid rule structure format optimized.
 
 ### Rule Format Types
 
@@ -26,11 +26,12 @@ Instruction files in this project follow a hybrid rule structure format optimize
 ```markdown
 ### <Rule Title> [P0/P1/P2]
 
-**WHEN**: [Context/Conditions when this rule applies]
-**WHAT**: [Specific requirement/action to take]
-**WHY**: [Rationale/reasoning behind the rule]
-**HOW**: [Implementation examples/templates]
-**EXCEPT**: [Optional exceptions]
+- **WHEN**: [Context/Conditions when this rule applies]
+- **WHAT**: [Specific requirement/action to take]
+- **WHY**: [Rationale/reasoning behind the rule]
+- **HOW**: [Implementation examples/templates]
+  - [Optional sub-points for clarity]
+- **EXCEPT**: [Optional exceptions]
 ```
 
 ### Priority Levels for AI Processing

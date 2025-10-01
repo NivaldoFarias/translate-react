@@ -14,7 +14,8 @@ import { BaseGitHubService } from "@/services/github/base.service";
 export class RepositoryService extends BaseGitHubService {
 	/**
 	 * Retrieves the repository file tree.
-	 * @remarks Can optionally filter out ignored paths.
+	 *
+	 * Can optionally filter out ignored paths.
 	 *
 	 * @param baseBranch Branch to get tree from
 	 * @param filterIgnored Whether to filter ignored paths
@@ -96,7 +97,7 @@ export class RepositoryService extends BaseGitHubService {
 	/**
 	 * Synchronizes the fork with the upstream repository.
 	 *
-	 * @remarks Creates a merge commit to update the fork.
+	 * Creates a merge commit to update the fork.
 	 *
 	 * @example
 	 * ```typescript
@@ -137,7 +138,6 @@ export class RepositoryService extends BaseGitHubService {
 	/**
 	 * Fetches the glossary.md file from the repository.
 	 *
-	 * @remarks
 	 * This method retrieves the content of the glossary file which contains
 	 * standardized terminology and translations for the project. The glossary
 	 * is essential for maintaining consistent translations across documentation.

@@ -4,8 +4,7 @@ import { BaseGitHubService } from "@/services/github/base.service";
  * Service responsible for Git branch operations and lifecycle management.
  * Handles branch creation, deletion, and cleanup tasks.
  *
- * @remarks
- * ## Responsibilities
+ * ### Responsibilities
  * - Branch creation and deletion
  * - Branch state tracking
  * - Automatic cleanup on process termination
@@ -18,7 +17,7 @@ export class BranchService extends BaseGitHubService {
 	/**
 	 * Creates a new branch service instance.
 	 *
-	 * @remarks Initializes the GitHub client and sets up cleanup handlers.
+	 * Initializes the GitHub client and sets up cleanup handlers.
 	 */
 	constructor(
 		protected readonly upstream: { owner: string; repo: string },
@@ -33,7 +32,7 @@ export class BranchService extends BaseGitHubService {
 	/**
 	 * Sets up process termination handlers for branch cleanup.
 	 *
-	 * @remarks Ensures branches are cleaned up on process exit or errors.
+	 * Ensures branches are cleaned up on process exit or errors.
 	 */
 	protected setupCleanupHandlers() {
 		process
@@ -45,7 +44,7 @@ export class BranchService extends BaseGitHubService {
 	/**
 	 * Creates a new Git branch from a base branch.
 	 *
-	 * @remarks Tracks the branch for cleanup if created successfully.
+	 * Tracks the branch for cleanup if created successfully.
 	 *
 	 * @param branchName Name for the new branch
 	 * @param baseBranch Branch to create from
@@ -143,7 +142,7 @@ export class BranchService extends BaseGitHubService {
 	/**
 	 * Verifies if commits exist on the fork from the current user.
 	 *
-	 * @remarks Used to determine if translation work has already been done.
+	 * Used to determine if translation work has already been done.
 	 *
 	 * @param branchName Branch to check for commits
 	 *
