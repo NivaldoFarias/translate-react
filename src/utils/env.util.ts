@@ -2,16 +2,7 @@ import { z } from "zod";
 
 import { homepage, name, version } from "../../package.json";
 
-/**
- * Environment configuration schema for runtime validation.
- * Uses Zod for type checking and validation of environment variables.
- *
- * ## Required Variables
- * - GitHub authentication and repository settings
- * - OpenAI API configuration
- * - Language settings
- * - Environment mode settings
- */
+/** Environment configuration schema for runtime validation */
 const envSchema = z.object({
 	NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
 	BUN_ENV: z.enum(["development", "production", "test"]).default("development"),

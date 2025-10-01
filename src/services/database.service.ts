@@ -7,11 +7,10 @@ import type { TranslationFile } from "@/utils/translation-file.util";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 /**
- * # Database Service
- *
  * Core service for managing persistent storage of translation workflow data.
  * Uses SQLite for storing snapshots, repository tree, files, and results.
  *
+ * @remarks
  * ## Responsibilities
  * - Manages persistent storage of translation workflow data
  * - Handles snapshots of repository state and files to translate
@@ -35,6 +34,9 @@ export class DatabaseService {
 	}
 
 	/**
+	 * Initializes database tables.
+	 *
+	 * @remarks
 	 * Creates required database tables if they don't exist:
 	 * - snapshots: Workflow state snapshots
 	 * - repository_tree: Git repository structure
@@ -125,8 +127,10 @@ export class DatabaseService {
 
 	/**
 	 * Saves translation results to database.
-	 * Includes branch info, PR details, and any errors.
-	 * Uses transactions for data integrity.
+	 *
+	 * @remarks
+	 * - Includes branch info, PR details, and any errors.
+	 * - Uses transactions for data integrity.
 	 *
 	 * @param snapshotId ID of associated snapshot
 	 * @param results Translation processing results
@@ -161,12 +165,14 @@ export class DatabaseService {
 	}
 
 	/**
-	 * Fetches most recent workflow snapshot with all related data:
+	 * Fetches most recent workflow snapshot with all related data.
+	 *
+	 * @remarks
 	 * - Repository tree
 	 * - Files to translate
 	 * - Processing results
 	 *
-	 * Returns null if no snapshots exist.
+	 * @returns `null` if no snapshots exist.
 	 */
 	public getLatestSnapshot(): Snapshot | null {
 		const snapshot = this.db

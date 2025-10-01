@@ -7,9 +7,12 @@ import type { Type as LangsType } from "langs";
  * Configuration interface for language detection settings.
  * Uses ISO 639-1 language codes for source and target languages.
  *
- * ## Example
- * ```typescript
- * { sourceLanguage: 'en', targetLanguage: 'pt' }
+ * @example
+ * ```json
+ * {
+ * 	"sourceLanguage": "en",
+ * 	"targetLanguage": "pt"
+ * }
  * ```
  */
 export interface LanguageConfig {
@@ -17,22 +20,21 @@ export interface LanguageConfig {
 	target: string;
 }
 
-/**
- * Detailed analysis of content language detection results.
- *
- * ## Analysis Components
- * - Confidence scores for source and target languages
- * - Ratio of target language presence
- * - Translation status determination
- * - Primary detected language identification
- */
+/** Detailed analysis of content language detection results. */
 export interface LanguageAnalysis {
+	/** Confidence scores for source and target languages */
 	languageScore: {
 		target: number;
 		source: number;
 	};
+
+	/** Ratio of target language presence in content */
 	ratio: number;
+
+	/** Indicates if content is considered translated */
 	isTranslated: boolean;
+
+	/** Primary detected language details */
 	detectedLanguage: ReturnType<typeof langs.where>;
 }
 
@@ -163,6 +165,18 @@ export class LanguageDetector {
 		);
 	}
 
+	/**
+	 * Converts a language code to its full language details using the `langs` library.
+	 *
+	 * @param language Language code to convert
+	 * @param type Type of language code (default is "3" for ISO 639-3)
+	 * @returns Full language details or `undefined` if not found
+	 *
+	 * @example
+	 * ```typescript
+	 * const langDetails = detector.detectLanguage('en', '1');
+	 * ```
+	 */
 	public detectLanguage(language: string, type: LangsType = "3") {
 		return langs.where(type, language);
 	}

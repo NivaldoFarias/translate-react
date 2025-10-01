@@ -6,8 +6,8 @@ import { TranslationFile } from "@/utils/translation-file.util";
 
 /**
  * Service responsible for managing repository content and translations.
- * Handles file content operations, commits, and pull requests.
  *
+ * @remarks
  * ## Responsibilities
  * - File content retrieval and modification
  * - Translation content management
@@ -49,6 +49,7 @@ export class ContentService extends BaseGitHubService {
 	 * Retrieves a pull request by number.
 	 *
 	 * @param prNumber Pull request number
+	 *
 	 * @returns The pull request data
 	 */
 	public async findPullRequestByNumber(prNumber: number) {
@@ -57,7 +58,8 @@ export class ContentService extends BaseGitHubService {
 
 	/**
 	 * Retrieves markdown files that need translation.
-	 * Filters and processes files based on content type.
+	 *
+	 * @remarks Filters and processes files based on content type.
 	 *
 	 * @param maxFiles Optional limit on number of files to retrieve
 	 * @throws {Error} If repository tree is empty or retrieval fails
@@ -110,7 +112,8 @@ export class ContentService extends BaseGitHubService {
 
 	/**
 	 * Commits translated content to a branch.
-	 * Updates existing file or creates new one.
+	 *
+	 * @remarks Updates existing file or creates new one.
 	 *
 	 * @param options Commit options
 	 * @param options.branch Target branch reference
@@ -242,6 +245,7 @@ export class ContentService extends BaseGitHubService {
 	/**
 	 * Posts translation results as comments on GitHub issues.
 	 *
+	 * @remarks
 	 * ## Workflow
 	 * 1. Checks if the issue exists
 	 * 2. Lists comments on the issue
@@ -319,12 +323,30 @@ export class ContentService extends BaseGitHubService {
 	}
 
 	/**
-	 * Builds a comment for the issue based on the translation results and files that were translated.
+	 * Builds a hierarchical comment for GitHub issues based on translation results.
 	 *
-	 * @param results Translation results
-	 * @param filesToTranslate Files that were translated
+	 * @remarks
+	 * Processes translation results and file data to create a structured comment
+	 * that organizes translated files by their directory hierarchy for better readability.
 	 *
-	 * @returns The comment to be posted on the issue
+	 * ## Processing Steps
+	 * 1. Maps translation results to file data with simplified path structures
+	 * 2. Extracts directory paths and filenames from translation file paths
+	 * 3. Creates hierarchical data structure with path parts and PR numbers
+	 * 4. Filters out invalid results and builds organized comment structure
+	 *
+	 * @param results Translation processing results containing PR information
+	 * @param filesToTranslate Original files that were processed for translation
+	 *
+	 * @returns Formatted hierarchical comment string for GitHub issue posting
+	 *
+	 * @example
+	 * ```typescript
+	 * const results = [{ filename: 'intro.md', pullRequest: { number: 123 } }];
+	 * const files = [{ filename: 'intro.md', path: 'src/content/docs/intro.md' }];
+	 * const comment = service.buildComment(results, files);
+	 * // Returns formatted hierarchical comment with file organization
+	 * ```
 	 */
 	public buildComment(results: ProcessedFileResult[], filesToTranslate: TranslationFile[]) {
 		const concattedData = results
@@ -333,11 +355,9 @@ export class ContentService extends BaseGitHubService {
 
 				if (!translationFile) return null;
 
-				// Extract the directory path and clean it
 				const pathParts = translationFile.path.split("/");
 				const filename = pathParts.pop() || "";
 
-				// Create an object with the proper levels for hierarchy
 				return {
 					pathParts: this.simplifyPathParts(pathParts),
 					filename,
@@ -346,26 +366,42 @@ export class ContentService extends BaseGitHubService {
 			})
 			.filter(Boolean);
 
-		// Build a hierarchical structure instead of a flat map
 		return this.buildHierarchicalComment(concattedData);
 	}
 
 	/**
-	 * Simplifies path parts by removing date-based segments and other unnecessary elements.
+	 * Simplifies path parts by removing common prefixes and flattening complex structures.
 	 *
-	 * @param pathParts Array of path segments
-	 * @returns Simplified path parts
+	 * @remarks
+	 * Processes file path segments to create cleaner, more readable hierarchical structures
+	 * in comments by removing unnecessary nesting and standardizing path representation.
+	 *
+	 * ## Simplification Rules
+	 * 1. Removes common "src/content" prefix from all paths for cleaner display
+	 * 2. Flattens blog post directories by ignoring date-based subdirectories
+	 * 3. Preserves meaningful directory structure while reducing visual clutter
+	 *
+	 * @param pathParts Array of path segments to be simplified
+	 *
+	 * @returns Simplified array of path segments for hierarchical display
+	 *
+	 * @example
+	 * ```typescript
+	 * const pathParts = ['src', 'content', 'docs', 'getting-started'];
+	 * const simplified = this.simplifyPathParts(pathParts);
+	 * // Returns: ['docs', 'getting-started']
+	 *
+	 * const blogPath = ['src', 'content', 'blog', '2024', '01', 'post'];
+	 * const simplifiedBlog = this.simplifyPathParts(blogPath);
+	 * // Returns: ['blog']
+	 * ```
 	 */
 	private simplifyPathParts(pathParts: string[]): string[] {
-		// Remove the common prefix "src/content"
 		if (pathParts[0] === "src" && pathParts[1] === "content") {
 			pathParts = pathParts.slice(2);
 		}
 
-		// Special handling for blog posts
 		if (pathParts[0] === "blog") {
-			// For blog posts, we want to flatten the structure
-			// Keep only the files directly under "blog" regardless of date directories
 			return ["blog"];
 		}
 
@@ -373,10 +409,32 @@ export class ContentService extends BaseGitHubService {
 	}
 
 	/**
-	 * Builds a hierarchical comment from the processed data.
+	 * Builds a hierarchical comment structure from processed translation data.
 	 *
-	 * @param data Processed file data with path parts
-	 * @returns Formatted hierarchical comment
+	 * @remarks
+	 * Creates a nested directory structure representation for GitHub comment display,
+	 * organizing files by their path hierarchy with associated pull request numbers.
+	 *
+	 * ## Structure Building Process
+	 * 1. Sorts data alphabetically by path and filename for consistent ordering
+	 * 2. Creates nested object structure mirroring directory hierarchy
+	 * 3. Groups files under their respective directory levels with __files arrays
+	 * 4. Associates each file with its corresponding pull request number
+	 * 5. Converts the nested structure to formatted Markdown string
+	 *
+	 * @param data Processed file data containing path parts, filenames, and PR numbers
+	 *
+	 * @returns Formatted hierarchical Markdown comment string
+	 *
+	 * @example
+	 * ```typescript
+	 * const data = [
+	 *   { pathParts: ['docs'], filename: 'intro.md', pr_number: 123 },
+	 *   { pathParts: ['docs', 'api'], filename: 'reference.md', pr_number: 124 }
+	 * ];
+	 * const comment = this.buildHierarchicalComment(data);
+	 * // Returns: "- docs\n  - `intro.md`: #123\n  - api\n    - `reference.md`: #124"
+	 * ```
 	 */
 	private buildHierarchicalComment(
 		data: Array<{
@@ -385,7 +443,6 @@ export class ContentService extends BaseGitHubService {
 			pr_number: number;
 		}>,
 	): string {
-		// Sort data by path and filename
 		data.sort((a, b) => {
 			const pathA = a.pathParts.join("/");
 			const pathB = b.pathParts.join("/");
@@ -393,13 +450,11 @@ export class ContentService extends BaseGitHubService {
 			return pathA === pathB ? a.filename.localeCompare(b.filename) : pathA.localeCompare(pathB);
 		});
 
-		// Build a nested structure
 		const structure: any = {};
 
 		for (const item of data) {
 			let currentLevel = structure;
 
-			// Build the nested structure based on path parts
 			for (const part of item.pathParts) {
 				if (!currentLevel[part]) {
 					currentLevel[part] = {
@@ -409,29 +464,51 @@ export class ContentService extends BaseGitHubService {
 				currentLevel = currentLevel[part];
 			}
 
-			// Add file to the current level
 			currentLevel.__files.push({
 				filename: item.filename,
 				pr_number: item.pr_number,
 			});
 		}
 
-		// Convert the structure to a formatted string
 		return this.formatStructure(structure, 0);
 	}
 
 	/**
 	 * Recursively formats the hierarchical structure into a Markdown comment.
 	 *
-	 * @param structure The hierarchical structure to format
-	 * @param level Current indentation level
-	 * @returns Formatted Markdown string
+	 * Converts the nested directory structure into properly indented Markdown format
+	 * suitable for GitHub issue comments, with directories and files organized hierarchically.
+	 *
+	 * ## Formatting Rules
+	 * 1. Processes directories in alphabetical order for consistent presentation
+	 * 2. Indents each level with two spaces for clear visual hierarchy
+	 * 3. Lists files under their respective directories with backticks and PR links
+	 * 4. Recursively processes subdirectories maintaining proper indentation
+	 * 5. Sorts files alphabetically within each directory level
+	 *
+	 * @param structure The nested directory structure to format
+	 * @param level Current indentation level for recursive processing
+	 *
+	 * @returns Formatted Markdown string with proper hierarchy and indentation
+	 *
+	 * @example
+	 * ```typescript
+	 * const structure = {
+	 *   docs: {
+	 *     __files: [{ filename: 'intro.md', pr_number: 123 }],
+	 *     api: {
+	 *       __files: [{ filename: 'reference.md', pr_number: 124 }]
+	 *     }
+	 *   }
+	 * };
+	 * const formatted = this.formatStructure(structure, 0);
+	 * // Returns formatted Markdown with proper indentation
+	 * ```
 	 */
 	private formatStructure(structure: any, level: number): string {
 		const lines: string[] = [];
 		const indent = "  ".repeat(level);
 
-		// Process each directory in alphabetical order
 		const dirs = Object.keys(structure)
 			.filter((key) => key !== "__files")
 			.sort();
@@ -439,13 +516,11 @@ export class ContentService extends BaseGitHubService {
 		for (const dir of dirs) {
 			lines.push(`${indent}- ${dir}`);
 
-			// Add files at this level
 			const files = structure[dir].__files || [];
 			for (const file of files.sort((a: any, b: any) => a.filename.localeCompare(b.filename))) {
 				lines.push(`${indent}  - \`${file.filename}\`: #${file.pr_number}`);
 			}
 
-			// Process subdirectories recursively
 			const subDirs = Object.keys(structure[dir]).filter((key) => key !== "__files");
 			if (subDirs.length > 0) {
 				lines.push(this.formatStructure(structure[dir], level + 1));
@@ -473,6 +548,7 @@ export class ContentService extends BaseGitHubService {
 	 * Closes a pull request by number.
 	 *
 	 * @param prNumber Pull request number
+	 *
 	 * @throws {Error} If pull request closure fails
 	 */
 	public async closePullRequest(prNumber: number) {

@@ -1,3 +1,10 @@
+/**
+ * @fileoverview
+ * Test suite for Database Service
+ *
+ * Tests database operations and data persistence
+ */
+
 import { existsSync } from "fs";
 import { unlink } from "fs/promises";
 
@@ -5,12 +12,8 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
 import type { ProcessedFileResult } from "@/types";
 
-import { DatabaseService } from "./database.service";
+import { DatabaseService } from "../../src/services/database.service";
 
-/**
- * Test suite for Database Service
- * Tests database operations and data persistence
- */
 describe("Database Service", () => {
 	let dbService: DatabaseService;
 	const TEST_DB_PATH = "test-snapshots.sqlite";

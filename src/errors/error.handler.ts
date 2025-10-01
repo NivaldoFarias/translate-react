@@ -29,7 +29,7 @@ export interface ErrorHandlerConfig {
  * - Error: Uses the native error message
  * - Other types: Converts to string
  *
- * @param error  The error to extract a message from
+ * @param error The error to extract a message from
  */
 export function extractErrorMessage(error: unknown): string {
 	if (error instanceof TranslationError) return error.getDisplayMessage();
@@ -176,6 +176,7 @@ export class ErrorHandler {
 	 */
 	private logError(error: TranslationError) {
 		const severity = error.context.sanity ?? ErrorSeverity.ERROR;
+
 		if (this.shouldLog(severity)) {
 			// const method = this.getSeverityMethod(severity);
 
@@ -198,6 +199,7 @@ export class ErrorHandler {
 		const severityLevels = Object.values(ErrorSeverity);
 		const minIndex = severityLevels.indexOf(this.config.minSeverity!);
 		const currentIndex = severityLevels.indexOf(severity);
+
 		return currentIndex >= minIndex;
 	}
 
@@ -216,6 +218,7 @@ export class ErrorHandler {
 			[ErrorSeverity.ERROR]: "error",
 			[ErrorSeverity.FATAL]: "error",
 		};
+
 		return methodMap[severity];
 	}
 }

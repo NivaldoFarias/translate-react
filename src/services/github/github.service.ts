@@ -49,7 +49,8 @@ export class GitHubService {
 
 	/**
 	 * Retrieves the repository file tree.
-	 * Can optionally filter out ignored paths.
+	 *
+	 * @remarks Can optionally filter out ignored paths.
 	 *
 	 * @param baseBranch Branch to get tree from
 	 * @param filterIgnored Whether to filter ignored paths
@@ -67,6 +68,7 @@ export class GitHubService {
 	 * Fetches raw content of a file from GitHub.
 	 *
 	 * @param file File reference to fetch
+	 *
 	 * @returns The raw content of the file
 	 *
 	 * @example
@@ -302,7 +304,7 @@ export class GitHubService {
 	/**
 	 * Fetches the glossary.md file from the repository.
 	 *
-	 * @returns The content of the glossary file as a string, or null if the file doesn't exist or cannot be retrieved
+	 * @returns The content of the glossary file as a `string`, or `null` if the file doesn't exist or cannot be retrieved
 	 *
 	 * @example
 	 * ```typescript

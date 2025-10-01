@@ -32,6 +32,7 @@ export interface ProxyHandlerOptions {
 /**
  * Creates a proxy that automatically wraps all methods of a service with error handling
  *
+ * @remarks
  * This utility reduces boilerplate by applying error handling to all methods
  * of a service without requiring explicit wrapping of each method.
  *

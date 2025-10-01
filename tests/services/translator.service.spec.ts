@@ -1,12 +1,15 @@
+/**
+ * @fileoverview
+ * Test suite for Translator Service
+ *
+ * Tests translation operations and content handling
+ */
+
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 
 import { TranslatorService } from "@/services/translator.service";
 import { TranslationFile } from "@/utils/translation-file.util";
 
-/**
- * Test suite for Translator Service
- * Tests translation operations and content handling
- */
 describe("Translator Service", () => {
 	let translatorService: TranslatorService;
 

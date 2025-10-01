@@ -1,5 +1,5 @@
 import type { ProcessedFileResult, Snapshot } from "@/types";
-import type TranslationFile from "@/utils/translation-file.util";
+import type { TranslationFile } from "@/utils/translation-file.util";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 import { extractErrorMessage } from "@/errors/error.handler";
