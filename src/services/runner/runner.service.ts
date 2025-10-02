@@ -1,5 +1,6 @@
-import { extractErrorMessage } from "@/errors/error.handler";
+import { extractErrorMessage } from "@/errors/";
 import { RunnerService } from "@/services/runner/base.service";
+import { env } from "@/utils";
 
 /**
  * Main orchestrator class that manages the entire translation process workflow.
@@ -25,8 +26,8 @@ import { RunnerService } from "@/services/runner/base.service";
 export default class Runner extends RunnerService {
 	private printForkInfo() {
 		this.spinner.info(
-			`Fork: ${this.env.REPO_FORK_OWNER}/${this.env.REPO_FORK_NAME} :: ` +
-				`Upstream: ${this.env.REPO_UPSTREAM_OWNER}/${this.env.REPO_UPSTREAM_NAME}`,
+			`Fork: ${env.REPO_FORK_OWNER}/${env.REPO_FORK_NAME} :: ` +
+				`Upstream: ${env.REPO_UPSTREAM_OWNER}/${env.REPO_UPSTREAM_NAME}`,
 		);
 
 		this.spinner.start();
@@ -59,7 +60,7 @@ export default class Runner extends RunnerService {
 			await this.verifyPermissions();
 			const isForkSynced = await this.syncFork();
 
-			if (this.env.NODE_ENV === "development") {
+			if (env.NODE_ENV === "development") {
 				await this.loadSnapshot(isForkSynced);
 			}
 
@@ -71,7 +72,7 @@ export default class Runner extends RunnerService {
 
 			this.state.processedResults = Array.from(this.metadata.results.values());
 
-			if (this.env.NODE_ENV === "development") {
+			if (env.NODE_ENV === "development") {
 				await this.services.snapshot.append("processedResults", this.state.processedResults);
 			}
 
@@ -81,7 +82,7 @@ export default class Runner extends RunnerService {
 				await this.updateIssueWithResults();
 			}
 
-			if (this.env.NODE_ENV === "production") {
+			if (env.NODE_ENV === "production") {
 				await this.services.snapshot.clear();
 			}
 		} catch (error) {

@@ -1,5 +1,7 @@
 import { Octokit } from "@octokit/rest";
 
+import { env } from "@/utils/";
+
 /**
  * Base service for GitHub operations.
  * Provides common functionality and configuration for all GitHub services.
@@ -23,7 +25,7 @@ export abstract class BaseGitHubService {
 	constructor(
 		protected readonly upstream: { owner: string; repo: string },
 		protected readonly fork: { owner: string; repo: string },
-		protected readonly githubToken = import.meta.env.GITHUB_TOKEN,
+		protected readonly githubToken = env.GITHUB_TOKEN,
 	) {
 		this.octokit = new Octokit({
 			auth: this.githubToken,

@@ -2,13 +2,14 @@ import { franc } from "franc";
 import OpenAI from "openai";
 import { APIError } from "openai/error";
 
-import type { ProxyHandlerOptions } from "@/errors/proxy.handler";
-import type { LanguageConfig } from "@/utils/language-detector.util";
+import type { ProxyHandlerOptions } from "@/errors/";
 
-import { ErrorCode } from "@/errors/base.error";
-import { createErrorHandlingProxy } from "@/errors/proxy.handler";
-import { LanguageDetector } from "@/utils/language-detector.util";
-import { TranslationFile } from "@/utils/translation-file.util";
+import type { LanguageConfig } from "./language-detector.service";
+
+import { createErrorHandlingProxy, ErrorCode } from "@/errors/";
+import { env, TranslationFile } from "@/utils/";
+
+import { LanguageDetector } from "./language-detector.service";
 
 /**
  * Core service for translating content using OpenAI's language models.
@@ -22,12 +23,12 @@ import { TranslationFile } from "@/utils/translation-file.util";
 export class TranslatorService {
 	/** Language model instance for translation */
 	private readonly llm = new OpenAI({
-		baseURL: import.meta.env.OPENAI_BASE_URL,
-		apiKey: import.meta.env.OPENAI_API_KEY,
-		project: import.meta.env.OPENAI_PROJECT_ID,
+		baseURL: env.OPENAI_BASE_URL,
+		apiKey: env.OPENAI_API_KEY,
+		project: env.OPENAI_PROJECT_ID,
 		defaultHeaders: {
-			"X-Title": import.meta.env.HEADER_APP_TITLE,
-			"HTTP-Referer": import.meta.env.HEADER_APP_URL,
+			"X-Title": env.HEADER_APP_TITLE,
+			"HTTP-Referer": env.HEADER_APP_URL,
 		},
 	});
 
@@ -41,10 +42,7 @@ export class TranslatorService {
 	 * @param options Language configuration for translation
 	 */
 	public constructor(private readonly options: LanguageConfig) {
-		this.languageDetector = new LanguageDetector({
-			source: this.options.source,
-			target: this.options.target,
-		});
+		this.languageDetector = new LanguageDetector(this.options);
 
 		const errorMap: ProxyHandlerOptions["errorMap"] = new Map();
 
@@ -114,7 +112,7 @@ export class TranslatorService {
 	 */
 	private async callLanguageModel(content: string): Promise<string> {
 		const response = (await this.llm.chat.completions.create({
-			model: import.meta.env.LLM_MODEL,
+			model: env.LLM_MODEL,
 			messages: this.createPrompt(content),
 		})) as OpenAI.Chat.Completions.ChatCompletion | { error: { message: string } };
 

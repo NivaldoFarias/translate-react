@@ -114,6 +114,27 @@ const envSchema = z.object({
 	 * @default `"${pkgJson.name} v${pkgJson.version}"`
 	 */
 	HEADER_APP_TITLE: z.string().default(ENV_DEFAULTS.HEADER_APP_TITLE),
+
+	/**
+	 * The number of items to process in each batch.
+	 *
+	 * @default 10
+	 */
+	BATCH_SIZE: z.coerce.number().positive().default(ENV_DEFAULTS.BATCH_SIZE),
+
+	/**
+	 * The target language for translation.
+	 *
+	 * @default "pt"
+	 */
+	TARGET_LANGUAGE: z.string().min(2).max(5).default(ENV_DEFAULTS.TARGET_LANGUAGE),
+
+	/**
+	 * The source language for translation.
+	 *
+	 * @default "en"
+	 */
+	SOURCE_LANGUAGE: z.string().min(2).max(5).default(ENV_DEFAULTS.SOURCE_LANGUAGE),
 });
 
 /** Type definition for the environment configuration */
@@ -131,7 +152,7 @@ export type Environment = z.infer<typeof envSchema>;
  *
  * @throws {Error} Detailed validation errors if environment variables are invalid
  */
-export function validateEnv() {
+function validateEnv() {
 	try {
 		const env = envSchema.parse(import.meta.env);
 
@@ -149,3 +170,5 @@ export function validateEnv() {
 		throw error;
 	}
 }
+
+export const env = validateEnv();

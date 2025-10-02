@@ -1,9 +1,9 @@
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 import type { ProcessedFileResult, Snapshot } from "@/types";
-import type { TranslationFile } from "@/utils/translation-file.util";
+import type { TranslationFile } from "@/utils/";
 
-import { extractErrorMessage } from "@/errors/error.handler";
+import { extractErrorMessage } from "@/errors/";
 import { DatabaseService } from "@/services/database.service";
 
 /** Manages the creation, saving, and loading of translation workflow snapshots */

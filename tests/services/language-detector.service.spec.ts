@@ -5,7 +5,7 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { LanguageDetector } from "@/utils/language-detector.util";
+import { LanguageDetector } from "@/services/language-detector.service";
 
 describe("Language Detector Utility", () => {
 	const detector = new LanguageDetector({
