@@ -44,7 +44,7 @@ export interface LanguageAnalysis {
  * Service for analyzing and detecting the language of content.
  * Helps determine if content needs translation based on language analysis.
  *
- * ## Responsibilities
+ * ### Responsibilities
  * - Language detection and analysis
  * - Translation status determination
  * - Language code conversion

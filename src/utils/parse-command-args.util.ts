@@ -11,7 +11,7 @@ import { ValidationError } from "@/errors";
  */
 export function parseCommandLineArgs(
 	expectedArgs: string[],
-	argsSchema: z.ZodSchema,
+	argsSchema: z.ZodSchema<RunnerOptions>,
 ): RunnerOptions {
 	const commandLineArgs = process.argv.slice(2);
 
@@ -21,12 +21,12 @@ export function parseCommandLineArgs(
 		return argsSchema.parse(argValuesToOptions(expectedArgs, argValues));
 	} catch (error) {
 		if (error instanceof z.ZodError) {
-			const messages = error.errors.map(({ message }) => message).join(", ");
+			const messages = error.issues.map(({ message }) => message).join(", ");
 
 			throw new ValidationError(`Invalid arguments: ${messages}`, {
-				operation: "parseCommandLineArgs",
+				operation: parseCommandLineArgs.name,
 				metadata: {
-					zodErrors: error.errors,
+					zodErrors: error.issues,
 					args: commandLineArgs,
 				},
 			});
@@ -35,7 +35,7 @@ export function parseCommandLineArgs(
 		if (error instanceof ValidationError) throw error;
 
 		throw new ValidationError("Failed to parse command line arguments", {
-			operation: "parseCommandLineArgs",
+			operation: parseCommandLineArgs.name,
 			metadata: { originalError: error, args: commandLineArgs },
 		});
 	}
@@ -67,6 +67,14 @@ export function parseCommandLineArgs(
 	 * @param argValues The values of the command line arguments
 	 *
 	 * @returns The values of the command line arguments
+	 *
+	 * @example
+	 * ```typescript
+	 * const expectedArgs = ["--target", "--source", "--batch-size"];
+	 * const argValues = ["fr", "en", "10"];
+	 * const options = argValuesToOptions(expectedArgs, argValues);
+	 * // ^? { target: "fr", source: "en", batchSize: "10" }
+	 * ```
 	 */
 	function argValuesToOptions(expectedArgs: string[], argValues: (string | undefined)[]) {
 		return Object.fromEntries(

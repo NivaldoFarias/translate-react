@@ -33,7 +33,7 @@ export default {
 		"",
 		"<TYPES>",
 		"",
-		"<TYPES>^[./]",
+		"<TYPES>^@/",
 		"",
 		"^@/",
 		"",
