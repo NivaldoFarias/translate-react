@@ -1,10 +1,41 @@
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
-import type { ProcessedFileResult } from "@/types";
-
 import { BaseGitHubService } from "@/services/github/base.service";
+import { ProcessedFileResult } from "@/types";
 import { env } from "@/utils";
 import { TranslationFile } from "@/utils/translation-file.util";
+
+import { CommentBuilderService } from "../comment-builder.service";
+
+/** Pull request options */
+export interface PullRequestOptions {
+	/** Source branch name */
+	branch: string;
+
+	/** Pull request title */
+	title: string;
+
+	/** Pull request description */
+	body: string;
+
+	/** Target branch for PR */
+	baseBranch?: string;
+}
+
+/** Options for committing translation changes */
+export interface CommitTranslationOptions {
+	/** Target branch reference */
+	branch: RestEndpointMethodTypes["git"]["getRef"]["response"]["data"];
+
+	/** File being translated */
+	file: TranslationFile;
+
+	/** Translated content */
+	content: string;
+
+	/** Commit message */
+	message: string;
+}
 
 /**
  * Service responsible for managing repository content and translations.
@@ -17,6 +48,9 @@ import { TranslationFile } from "@/utils/translation-file.util";
  */
 export class ContentService extends BaseGitHubService {
 	private readonly issueNumber = Number(env.PROGRESS_ISSUE_NUMBER);
+	private readonly services = {
+		commentBuilder: new CommentBuilderService(),
+	};
 
 	/**
 	 * Creates a comment on a pull request.
@@ -26,7 +60,10 @@ export class ContentService extends BaseGitHubService {
 	 *
 	 * @returns The response from the GitHub API
 	 */
-	public createCommentOnPullRequest(prNumber: number, comment: string) {
+	public createCommentOnPullRequest(
+		prNumber: number,
+		comment: string,
+	): Promise<RestEndpointMethodTypes["issues"]["createComment"]["response"]> {
 		return this.octokit.issues.createComment({
 			...this.upstream,
 			issue_number: prNumber,
@@ -39,7 +76,9 @@ export class ContentService extends BaseGitHubService {
 	 *
 	 * @returns A list of open pull requests
 	 */
-	public async listOpenPullRequests() {
+	public async listOpenPullRequests(): Promise<
+		RestEndpointMethodTypes["pulls"]["list"]["response"]
+	> {
 		return await this.octokit.pulls.list({
 			...this.upstream,
 			state: "open",
@@ -53,7 +92,9 @@ export class ContentService extends BaseGitHubService {
 	 *
 	 * @returns The pull request data
 	 */
-	public async findPullRequestByNumber(prNumber: number) {
+	public async findPullRequestByNumber(
+		prNumber: number,
+	): Promise<RestEndpointMethodTypes["pulls"]["get"]["response"]> {
 		return this.octokit.pulls.get({ ...this.upstream, pull_number: prNumber });
 	}
 
@@ -70,7 +111,7 @@ export class ContentService extends BaseGitHubService {
 	 * const files = await contentService.getUntranslatedFiles(5);
 	 * ```
 	 */
-	public async getUntranslatedFiles(maxFiles?: number) {
+	public async getUntranslatedFiles(maxFiles?: number): Promise<TranslationFile[]> {
 		const repoTreeResponse = await this.octokit.git.getTree({
 			...this.fork,
 			tree_sha: "main",
@@ -117,10 +158,6 @@ export class ContentService extends BaseGitHubService {
 	 * Updates existing file or creates new one.
 	 *
 	 * @param options Commit options
-	 * @param options.branch Target branch reference
-	 * @param options.file File being translated
-	 * @param options.content Translated content
-	 * @param options.message Commit message
 	 *
 	 * @throws {Error} If commit operation fails
 	 *
@@ -146,13 +183,10 @@ export class ContentService extends BaseGitHubService {
 		file,
 		content,
 		message,
-	}: {
-		branch: RestEndpointMethodTypes["git"]["getRef"]["response"]["data"];
-		file: TranslationFile;
-		content: string;
-		message: string;
-	}) {
-		await this.octokit.repos.createOrUpdateFileContents({
+	}: CommitTranslationOptions): Promise<
+		RestEndpointMethodTypes["repos"]["createOrUpdateFileContents"]["response"]
+	> {
+		return await this.octokit.repos.createOrUpdateFileContents({
 			...this.fork,
 			path: file.path,
 			message,
@@ -166,10 +200,6 @@ export class ContentService extends BaseGitHubService {
 	 * Creates a pull request.
 	 *
 	 * @param options Pull request options
-	 * @param options.branch Source branch name
-	 * @param options.title Pull request title
-	 * @param options.body Pull request description
-	 * @param options.baseBranch Target branch for PR
 	 *
 	 * @example
 	 * ```typescript
@@ -187,13 +217,8 @@ export class ContentService extends BaseGitHubService {
 		branch,
 		title,
 		body,
-		baseBranch,
-	}: {
-		branch: string;
-		title: string;
-		body: string;
-		baseBranch: string;
-	}) {
+		baseBranch = "main",
+	}: PullRequestOptions): Promise<RestEndpointMethodTypes["pulls"]["create"]["response"]["data"]> {
 		const createPullRequestResponse = await this.octokit.pulls.create({
 			...this.upstream,
 			title,
@@ -213,7 +238,7 @@ export class ContentService extends BaseGitHubService {
 	 */
 	protected filterMarkdownFiles(
 		tree: RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"],
-	) {
+	): RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"] {
 		return tree.filter((item) => {
 			if (!item.path?.endsWith(".md")) return false;
 			if (!item.path.includes("src/")) return false;
@@ -230,7 +255,7 @@ export class ContentService extends BaseGitHubService {
 		file:
 			| TranslationFile
 			| RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"][number],
-	) {
+	): Promise<string> {
 		const blobSha = file.sha;
 
 		if (!blobSha) throw new Error("Invalid blob URL");
@@ -269,7 +294,7 @@ export class ContentService extends BaseGitHubService {
 	public async commentCompiledResultsOnIssue(
 		results: ProcessedFileResult[],
 		filesToTranslate: TranslationFile[],
-	) {
+	): Promise<RestEndpointMethodTypes["issues"]["createComment"]["response"]["data"]> {
 		const issueExistsResponse = await this.octokit.issues.get({
 			...this.upstream,
 			issue_number: this.issueNumber,
@@ -287,7 +312,8 @@ export class ContentService extends BaseGitHubService {
 
 		const userComment = listCommentsResponse.data.find((comment) => {
 			return (
-				comment.user?.login === env.REPO_FORK_OWNER && comment.body?.includes(this.comment.suffix)
+				comment.user?.login === env.REPO_FORK_OWNER &&
+				comment.body?.includes(this.services.commentBuilder.comment.suffix)
 			);
 		});
 
@@ -295,7 +321,9 @@ export class ContentService extends BaseGitHubService {
 			const updateCommentResponse = await this.octokit.issues.updateComment({
 				...this.upstream,
 				issue_number: this.issueNumber,
-				body: this.concatComment(this.buildComment(results, filesToTranslate)),
+				body: this.services.commentBuilder.concatComment(
+					this.services.commentBuilder.buildComment(results, filesToTranslate),
+				),
 				comment_id: userComment.id,
 			});
 
@@ -305,237 +333,24 @@ export class ContentService extends BaseGitHubService {
 		const createCommentResponse = await this.octokit.issues.createComment({
 			...this.upstream,
 			issue_number: this.issueNumber,
-			body: this.concatComment(this.buildComment(results, filesToTranslate)),
+			body: this.services.commentBuilder.concatComment(
+				this.services.commentBuilder.buildComment(results, filesToTranslate),
+			),
 		});
 
 		return createCommentResponse.data;
 	}
 
 	/**
-	 * Concatenates the comment prefix and suffix to the main content.
-	 *
-	 * @param content The content to concatenate
-	 *
-	 * @returns The concatenated comment
-	 */
-	private concatComment(content: string) {
-		return `${this.comment.prefix}\n\n${content}\n\n${this.comment.suffix}`;
-	}
-
-	/**
-	 * Builds a hierarchical comment for GitHub issues based on translation results.
-	 *
-	 * Processes translation results and file data to create a structured comment
-	 * that organizes translated files by their directory hierarchy for better readability.
-	 *
-	 * ### Processing Steps
-	 *
-	 * 1. Maps translation results to file data with simplified path structures
-	 * 2. Extracts directory paths and filenames from translation file paths
-	 * 3. Creates hierarchical data structure with path parts and PR numbers
-	 * 4. Filters out invalid results and builds organized comment structure
-	 *
-	 * @param results Translation processing results containing PR information
-	 * @param filesToTranslate Original files that were processed for translation
-	 *
-	 * @returns Formatted hierarchical comment string for GitHub issue posting
-	 *
-	 * @example
-	 * ```typescript
-	 * const results = [{ filename: 'intro.md', pullRequest: { number: 123 } }];
-	 * const files = [{ filename: 'intro.md', path: 'src/content/docs/intro.md' }];
-	 * const comment = service.buildComment(results, files);
-	 * // Returns formatted hierarchical comment with file organization
-	 * ```
-	 */
-	public buildComment(results: ProcessedFileResult[], filesToTranslate: TranslationFile[]) {
-		const concattedData = results
-			.map((result) => {
-				const translationFile = filesToTranslate.find((file) => file.filename === result.filename);
-
-				if (!translationFile) return null;
-
-				const pathParts = translationFile.path.split("/");
-				const filename = pathParts.pop() || "";
-
-				return {
-					pathParts: this.simplifyPathParts(pathParts),
-					filename,
-					pr_number: result.pullRequest?.number || 0,
-				};
-			})
-			.filter(Boolean);
-
-		return this.buildHierarchicalComment(concattedData);
-	}
-
-	/**
-	 * Simplifies path parts by removing common prefixes and flattening complex structures.
-	 *
-	 * Processes file path segments to create cleaner, more readable hierarchical structures
-	 * in comments by removing unnecessary nesting and standardizing path representation.
-	 *
-	 * ### Simplification Rules
-	 *
-	 * 1. Removes common "src/content" prefix from all paths for cleaner display
-	 * 2. Flattens blog post directories by ignoring date-based subdirectories
-	 * 3. Preserves meaningful directory structure while reducing visual clutter
-	 *
-	 * @param pathParts Array of path segments to be simplified
-	 *
-	 * @returns Simplified array of path segments for hierarchical display
-	 *
-	 * @example
-	 * ```typescript
-	 * const pathParts = ['src', 'content', 'docs', 'getting-started'];
-	 * const simplified = this.simplifyPathParts(pathParts);
-	 * // Returns: ['docs', 'getting-started']
-	 *
-	 * const blogPath = ['src', 'content', 'blog', '2024', '01', 'post'];
-	 * const simplifiedBlog = this.simplifyPathParts(blogPath);
-	 * // Returns: ['blog']
-	 * ```
-	 */
-	private simplifyPathParts(pathParts: string[]): string[] {
-		if (pathParts[0] === "src" && pathParts[1] === "content") {
-			pathParts = pathParts.slice(2);
-		}
-
-		if (pathParts[0] === "blog") {
-			return ["blog"];
-		}
-
-		return pathParts;
-	}
-
-	/**
-	 * Builds a hierarchical comment structure from processed translation data.
-	 *
-	 * Creates a nested directory structure representation for GitHub comment display,
-	 * organizing files by their path hierarchy with associated pull request numbers.
-	 *
-	 * ### Structure Building Process
-	 *
-	 * 1. Sorts data alphabetically by path and filename for consistent ordering
-	 * 2. Creates nested object structure mirroring directory hierarchy
-	 * 3. Groups files under their respective directory levels with __files arrays
-	 * 4. Associates each file with its corresponding pull request number
-	 * 5. Converts the nested structure to formatted Markdown string
-	 *
-	 * @param data Processed file data containing path parts, filenames, and PR numbers
-	 *
-	 * @returns Formatted hierarchical Markdown comment string
-	 *
-	 * @example
-	 * ```typescript
-	 * const data = [
-	 *   { pathParts: ['docs'], filename: 'intro.md', pr_number: 123 },
-	 *   { pathParts: ['docs', 'api'], filename: 'reference.md', pr_number: 124 }
-	 * ];
-	 * const comment = this.buildHierarchicalComment(data);
-	 * // Returns: "- docs\n  - `intro.md`: #123\n  - api\n    - `reference.md`: #124"
-	 * ```
-	 */
-	private buildHierarchicalComment(
-		data: Array<{
-			pathParts: string[];
-			filename: string;
-			pr_number: number;
-		}>,
-	): string {
-		data.sort((a, b) => {
-			const pathA = a.pathParts.join("/");
-			const pathB = b.pathParts.join("/");
-
-			return pathA === pathB ? a.filename.localeCompare(b.filename) : pathA.localeCompare(pathB);
-		});
-
-		const structure: any = {};
-
-		for (const item of data) {
-			let currentLevel = structure;
-
-			for (const part of item.pathParts) {
-				if (!currentLevel[part]) {
-					currentLevel[part] = {
-						__files: [],
-					};
-				}
-				currentLevel = currentLevel[part];
-			}
-
-			currentLevel.__files.push({
-				filename: item.filename,
-				pr_number: item.pr_number,
-			});
-		}
-
-		return this.formatStructure(structure, 0);
-	}
-
-	/**
-	 * Recursively formats the hierarchical structure into a Markdown comment.
-	 *
-	 * Converts the nested directory structure into properly indented Markdown format
-	 * suitable for GitHub issue comments, with directories and files organized hierarchically.
-	 *
-	 * ### Formatting Rules
-	 * 1. Processes directories in alphabetical order for consistent presentation
-	 * 2. Indents each level with two spaces for clear visual hierarchy
-	 * 3. Lists files under their respective directories with backticks and PR links
-	 * 4. Recursively processes subdirectories maintaining proper indentation
-	 * 5. Sorts files alphabetically within each directory level
-	 *
-	 * @param structure The nested directory structure to format
-	 * @param level Current indentation level for recursive processing
-	 *
-	 * @returns Formatted Markdown string with proper hierarchy and indentation
-	 *
-	 * @example
-	 * ```typescript
-	 * const structure = {
-	 *   docs: {
-	 *     __files: [{ filename: 'intro.md', pr_number: 123 }],
-	 *     api: {
-	 *       __files: [{ filename: 'reference.md', pr_number: 124 }]
-	 *     }
-	 *   }
-	 * };
-	 * const formatted = this.formatStructure(structure, 0);
-	 * // Returns formatted Markdown with proper indentation
-	 * ```
-	 */
-	private formatStructure(structure: any, level: number): string {
-		const lines: string[] = [];
-		const indent = "  ".repeat(level);
-
-		const dirs = Object.keys(structure)
-			.filter((key) => key !== "__files")
-			.sort();
-
-		for (const dir of dirs) {
-			lines.push(`${indent}- ${dir}`);
-
-			const files = structure[dir].__files || [];
-			for (const file of files.sort((a: any, b: any) => a.filename.localeCompare(b.filename))) {
-				lines.push(`${indent}  - \`${file.filename}\`: #${file.pr_number}`);
-			}
-
-			const subDirs = Object.keys(structure[dir]).filter((key) => key !== "__files");
-			if (subDirs.length > 0) {
-				lines.push(this.formatStructure(structure[dir], level + 1));
-			}
-		}
-
-		return lines.join("\n");
-	}
-
-	/**
 	 * Retrieves a pull request by branch name.
 	 *
 	 * @param branchName Source branch name
+	 *
+	 * @returns The first matching pull request or undefined if none found
 	 */
-	public async findPullRequestByBranch(branchName: string) {
+	public async findPullRequestByBranch(
+		branchName: string,
+	): Promise<RestEndpointMethodTypes["pulls"]["list"]["response"]["data"][number] | undefined> {
 		const response = await this.octokit.pulls.list({
 			...this.upstream,
 			head: `${this.fork.owner}:${branchName}`,
@@ -545,13 +360,56 @@ export class ContentService extends BaseGitHubService {
 	}
 
 	/**
+	 * Checks if a pull request is outdated or has merge conflicts.
+	 *
+	 * Determines if a PR needs to be updated by examining its mergeable status
+	 * and checking for conflicts that prevent clean merging.
+	 *
+	 * @param prNumber Pull request number to check
+	 *
+	 * @returns A Promise resolving to an object with conflict status and mergeability info
+	 *
+	 * @example
+	 * ```typescript
+	 * const status = await contentService.checkPullRequestStatus(123);
+	 * if (status.hasConflicts) {
+	 *   console.log('PR has conflicts and needs updating');
+	 * }
+	 * ```
+	 */
+	public async checkPullRequestStatus(prNumber: number): Promise<{
+		hasConflicts: boolean;
+		mergeable: boolean | null;
+		mergeableState: string;
+		needsUpdate: boolean;
+	}> {
+		const prResponse = await this.octokit.pulls.get({
+			...this.upstream,
+			pull_number: prNumber,
+		});
+
+		const pr = prResponse.data;
+		const hasConflicts = pr.mergeable === false && pr.mergeable_state === "dirty";
+		const needsUpdate = hasConflicts || pr.mergeable_state === "behind";
+
+		return {
+			hasConflicts,
+			mergeable: pr.mergeable,
+			mergeableState: pr.mergeable_state,
+			needsUpdate,
+		};
+	}
+
+	/**
 	 * Closes a pull request by number.
 	 *
 	 * @param prNumber Pull request number
 	 *
 	 * @throws {Error} If pull request closure fails
 	 */
-	public async closePullRequest(prNumber: number) {
+	public async closePullRequest(
+		prNumber: number,
+	): Promise<RestEndpointMethodTypes["pulls"]["update"]["response"]["data"]> {
 		const response = await this.octokit.pulls.update({
 			...this.upstream,
 			pull_number: prNumber,
@@ -559,18 +417,7 @@ export class ContentService extends BaseGitHubService {
 		});
 
 		if (response.status !== 200) throw new Error(`Failed to close pull request ${prNumber}`);
-	}
 
-	/** Comment template for issue comments */
-	private get comment() {
-		return {
-			prefix: `As seguintes páginas foram traduzidas e PRs foram criados:`,
-			suffix: `###### Observações
-	
-	- As traduções foram geradas por uma LLM e requerem revisão humana para garantir precisão técnica e fluência.
-	- Alguns arquivos podem ter PRs de tradução existentes em análise. Verifiquei duplicações, mas recomendo conferir.
-	- O fluxo de trabalho de automação completo está disponível no repositório [\`translate-react\`](https://github.com/${env.REPO_FORK_OWNER}/translate-react) para referência e contribuições.
-	- Esta implementação é um trabalho em progresso e pode apresentar inconsistências em conteúdos técnicos complexos ou formatação específica.`,
-		};
+		return response.data;
 	}
 }

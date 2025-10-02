@@ -24,7 +24,7 @@ import { env } from "@/utils";
  * ```
  */
 export default class Runner extends RunnerService {
-	private printForkInfo() {
+	private printForkInfo(): void {
 		this.spinner.info(
 			`Fork: ${env.REPO_FORK_OWNER}/${env.REPO_FORK_NAME} :: ` +
 				`Upstream: ${env.REPO_UPSTREAM_OWNER}/${env.REPO_UPSTREAM_NAME}`,
@@ -51,7 +51,7 @@ export default class Runner extends RunnerService {
 	 * @throws {ResourceLoadError} If repository content or glossary fetch fails
 	 * @throws {APIError} If GitHub API operations fail
 	 */
-	public async run() {
+	public async run(): Promise<void> {
 		try {
 			this.spinner.start();
 

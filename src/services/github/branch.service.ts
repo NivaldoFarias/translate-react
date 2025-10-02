@@ -1,5 +1,7 @@
+import { RestEndpointMethodTypes } from "@octokit/rest";
+
 import { BaseGitHubService } from "@/services/github/base.service";
-import { env } from "@/utils";
+import { env } from "@/utils/";
 
 /**
  * Service responsible for Git branch operations and lifecycle management.
@@ -35,7 +37,7 @@ export class BranchService extends BaseGitHubService {
 	 *
 	 * Ensures branches are cleaned up on process exit or errors.
 	 */
-	protected setupCleanupHandlers() {
+	protected setupCleanupHandlers(): void {
 		process
 			.on("SIGINT", async () => await this.cleanup())
 			.on("SIGTERM", async () => await this.cleanup())
@@ -55,7 +57,10 @@ export class BranchService extends BaseGitHubService {
 	 * const branch = await branchService.createBranch('feature/new-branch');
 	 * ```
 	 */
-	public async createBranch(branchName: string, baseBranch = "main") {
+	public async createBranch(
+		branchName: string,
+		baseBranch = "main",
+	): Promise<RestEndpointMethodTypes["git"]["createRef"]["response"]> {
 		try {
 			const mainBranchRef = await this.octokit.git.getRef({
 				...this.fork,
@@ -88,15 +93,13 @@ export class BranchService extends BaseGitHubService {
 	 * if (branch) console.log('Branch exists');
 	 * ```
 	 */
-	public async getBranch(branchName: string) {
-		try {
-			return await this.octokit.git.getRef({
-				...this.fork,
-				ref: `heads/${branchName}`,
-			});
-		} catch {
-			return null;
-		}
+	public async getBranch(
+		branchName: string,
+	): Promise<RestEndpointMethodTypes["git"]["getRef"]["response"]> {
+		return await this.octokit.git.getRef({
+			...this.fork,
+			ref: `heads/${branchName}`,
+		});
 	}
 
 	/**
@@ -110,13 +113,17 @@ export class BranchService extends BaseGitHubService {
 	 * await branchService.deleteBranch('feature/old-branch');
 	 * ```
 	 */
-	public async deleteBranch(branchName: string) {
-		await this.octokit.git.deleteRef({
+	public async deleteBranch(
+		branchName: string,
+	): Promise<RestEndpointMethodTypes["git"]["deleteRef"]["response"]> {
+		const response = await this.octokit.git.deleteRef({
 			...this.fork,
 			ref: `heads/${branchName}`,
 		});
 
 		this.activeBranches.delete(branchName);
+
+		return response;
 	}
 
 	/**
@@ -128,7 +135,7 @@ export class BranchService extends BaseGitHubService {
 	 * console.log(`Active branches: ${branches.join(', ')}`);
 	 * ```
 	 */
-	public getActiveBranches() {
+	public getActiveBranches(): string[] {
 		return Array.from(this.activeBranches);
 	}
 
@@ -136,7 +143,7 @@ export class BranchService extends BaseGitHubService {
 	 * Removes all tracked branches.
 	 * Called automatically on process termination.
 	 */
-	protected async cleanup() {
+	protected async cleanup(): Promise<void> {
 		await Promise.all(Array.from(this.activeBranches).map((branch) => this.deleteBranch(branch)));
 	}
 
@@ -153,7 +160,7 @@ export class BranchService extends BaseGitHubService {
 	 * if (hasCommits) console.log('Translation work already exists on fork');
 	 * ```
 	 */
-	public async checkIfCommitExistsOnFork(branchName: string) {
+	public async checkIfCommitExistsOnFork(branchName: string): Promise<boolean> {
 		const forkRef = await this.getBranch(branchName);
 
 		const listCommitsResponse = await this.octokit.repos.listCommits({

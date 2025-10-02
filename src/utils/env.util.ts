@@ -152,13 +152,9 @@ export type Environment = z.infer<typeof envSchema>;
  *
  * @throws {Error} Detailed validation errors if environment variables are invalid
  */
-function validateEnv() {
+export function validateEnv() {
 	try {
-		const env = envSchema.parse(import.meta.env);
-
-		Object.assign(import.meta.env, env);
-
-		return env;
+		return envSchema.parse(import.meta.env);
 	} catch (error) {
 		if (error instanceof z.ZodError) {
 			const issues = error.issues

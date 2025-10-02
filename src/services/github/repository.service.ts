@@ -25,7 +25,10 @@ export class RepositoryService extends BaseGitHubService {
 	 * const tree = await repoService.getRepositoryTree('main', true);
 	 * ```
 	 */
-	public async getRepositoryTree(baseBranch = "main", filterIgnored = true) {
+	public async getRepositoryTree(
+		baseBranch = "main",
+		filterIgnored = true,
+	): Promise<RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"]> {
 		const response = await this.octokit.git.getTree({
 			...this.fork,
 			tree_sha: baseBranch,
@@ -44,7 +47,7 @@ export class RepositoryService extends BaseGitHubService {
 	 * if (!hasPermissions) console.error('Invalid token permissions');
 	 * ```
 	 */
-	public async verifyTokenPermissions() {
+	public async verifyTokenPermissions(): Promise<boolean> {
 		try {
 			const response = await this.octokit.rest.users.getAuthenticated();
 
@@ -68,7 +71,7 @@ export class RepositoryService extends BaseGitHubService {
 	 * if (!isSynced) await repoService.syncFork();
 	 * ```
 	 */
-	public async isForkSynced() {
+	public async isForkSynced(): Promise<boolean> {
 		try {
 			const [upstreamRepo, forkedRepo] = await Promise.all([
 				this.octokit.repos.get(this.upstream),
@@ -105,7 +108,7 @@ export class RepositoryService extends BaseGitHubService {
 	 * if (!synced) console.error('Failed to sync fork');
 	 * ```
 	 */
-	public async syncFork() {
+	public async syncFork(): Promise<boolean> {
 		try {
 			const mergeResponse = await this.octokit.repos.mergeUpstream({
 				...this.fork,
@@ -125,7 +128,7 @@ export class RepositoryService extends BaseGitHubService {
 	 */
 	protected filterRepositoryTree(
 		tree: RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"],
-	) {
+	): RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"] {
 		return tree.filter((item) => {
 			if (!item.path) return false;
 			else if (!item.path.endsWith(".md")) return false;
@@ -154,7 +157,7 @@ export class RepositoryService extends BaseGitHubService {
 	 * }
 	 * ```
 	 */
-	public async fetchGlossary() {
+	public async fetchGlossary(): Promise<string | null> {
 		try {
 			const response = await this.octokit.repos.getContent({
 				...this.upstream,
