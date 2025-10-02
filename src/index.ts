@@ -1,20 +1,13 @@
 import Bun from "bun";
-import { z } from "zod";
 
 import type { BunFile } from "bun";
 
 import { ErrorHandler, ErrorSeverity } from "@/errors";
 import Runner from "@/services/runner/runner.service";
-import { parseCommandLineArgs } from "@/utils/parse-command-args.util";
 
 import { name, version } from "../package.json";
 
-/** Defines the expected structure and types for the runner options */
-const runnerOptionsSchema = z.object({
-	targetLanguage: z.string().min(2).max(5).default("pt"),
-	sourceLanguage: z.string().min(2).max(5).default("en"),
-	batchSize: z.coerce.number().positive().default(10),
-});
+import { env } from "./utils";
 
 if (import.meta.main) {
 	const errorHandler = initializeErrorHandler(
@@ -23,11 +16,7 @@ if (import.meta.main) {
 
 	const runTranslation = errorHandler.wrapAsync(workflow, {
 		operation: "main",
-		metadata: {
-			version,
-			component: name,
-			environment: import.meta.env.NODE_ENV,
-		},
+		metadata: { version, component: name, environment: env.NODE_ENV },
 	});
 
 	try {
@@ -40,9 +29,7 @@ if (import.meta.main) {
 }
 
 async function workflow() {
-	const args = parseCommandLineArgs(["--target", "--source", "--batch-size"], runnerOptionsSchema);
-
-	const runner = new Runner(args);
+	const runner = new Runner();
 
 	await runner.run();
 }

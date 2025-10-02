@@ -19,20 +19,10 @@ A CLI tool to automate the translation of React documentation from English to an
     - [1. Clone the repository](#1-clone-the-repository)
     - [2. Install dependencies](#2-install-dependencies)
     - [3. Create a `.env` file with the necessary variables](#3-create-a-env-file-with-the-necessary-variables)
-      - [Environment Configuration **(required)**](#environment-configuration-required)
-      - [Language Model Configuration **(required)**](#language-model-configuration-required)
-      - [GitHub Configuration **(required)**](#github-configuration-required)
-      - [Repository Configuration **(required)**](#repository-configuration-required)
-      - [Progress Tracking **(optional)**](#progress-tracking-optional)
-      - [Development Options **(optional)**](#development-options-optional)
-      - [API Headers **(optional)**](#api-headers-optional)
+      - [Environment Configuration](#environment-configuration)
   - [Usage](#usage)
     - [Development](#development)
     - [Production](#production)
-    - [Command Line Arguments](#command-line-arguments)
-      - [Translate to Portuguese (default)](#translate-to-portuguese-default)
-      - [Translate to Spanish with custom batch size](#translate-to-spanish-with-custom-batch-size)
-      - [Translate from Portuguese to English](#translate-from-portuguese-to-english)
   - [How It Works](#how-it-works)
     - [File Discovery \& Filtering](#file-discovery--filtering)
     - [Translation Process](#translation-process)
@@ -180,63 +170,34 @@ bun install
 ### 3. Create a `.env` file with the necessary variables
 
 > [!TIP]
-> Reference [Environment Default Values](https://github.com/NivaldoFarias/translate-react/blob/main/src/utils/constants.util.ts) for default settings.
+> Reference [Environment Default Values Definitions](https://github.com/NivaldoFarias/translate-react/blob/main/src/utils/constants.util.ts) for default settings.
 
-#### Environment Configuration **(required)**
+#### Environment Configuration 
 
-| Variable   | Example Value   | Description              |
-| ---------- | --------------- | ------------------------ |
-| `NODE_ENV` | `"development"` | Runtime environment      |
-| `BUN_ENV`  | `"development"` | Bun-specific environment |
-
-#### Language Model Configuration **(required)**
-
-| Variable            | Example Value                        | Description                                     |
-| ------------------- | ------------------------------------ | ----------------------------------------------- |
-| `LLM_MODEL`         | `"google/gemini-2.0-flash-exp:free"` | Model to use for translation                    |
-| `OPENAI_API_KEY`    | `"your_openai_api_key"`              | **Required** - API key for the language model   |
-| `OPENAI_BASE_URL`   | `"https://openrouter.ai/api/v1"`     | API endpoint (supports OpenRouter, Azure, etc.) |
-| `OPENAI_PROJECT_ID` | `"your_openai_project_id"`           | *Optional* - Project ID for usage tracking      |
-
-#### GitHub Configuration **(required)**
-
-| Variable       | Example Value         | Description                                                |
-| -------------- | --------------------- | ---------------------------------------------------------- |
-| `GITHUB_TOKEN` | `"your_github_token"` | **Required** - Personal access token with repo permissions |
-
-#### Repository Configuration **(required)**
-
-| Variable              | Example Value       | Description                                   |
-| --------------------- | ------------------- | --------------------------------------------- |
-| `REPO_FORK_OWNER`     | `"your_username"`   | **Required** - Owner of your fork             |
-| `REPO_FORK_NAME`      | `"pt-br.react.dev"` | **Required** - Name of your forked repository |
-| `REPO_UPSTREAM_OWNER` | `"reactjs"`         | **Required** - Original repository owner      |
-| `REPO_UPSTREAM_NAME`  | `"pt-br.react.dev"` | **Required** - Original repository name       |
-
-#### Progress Tracking **(optional)**
-
-| Variable                | Example Value | Description                                    |
-| ----------------------- | ------------- | ---------------------------------------------- |
-| `PROGRESS_ISSUE_NUMBER` | `123`         | *Optional* - Issue number for progress updates |
-
-#### Development Options **(optional)**
-
-| Variable               | Example Value | Description                                        |
-| ---------------------- | ------------- | -------------------------------------------------- |
-| `FORCE_SNAPSHOT_CLEAR` | `false`       | *Optional* - Clear snapshots on startup (dev only) |
-
-#### API Headers **(optional)**
-
-| Variable           | Example Value                                        | Description                                    |
-| ------------------ | ---------------------------------------------------- | ---------------------------------------------- |
-| `HEADER_APP_URL`   | `"https://github.com/your-username/translate-react"` | *Optional* - Application URL for API headers   |
-| `HEADER_APP_TITLE` | `"translate-react v0.1.5"`                           | *Optional* - Application title for API headers |
+| Variable                | Required? | Default                                            | Description                                        |
+| ----------------------- | --------- | -------------------------------------------------- | -------------------------------------------------- |
+| `NODE_ENV`              | no        | `development`                                      | Runtime environment                                |
+| `BUN_ENV`               | no        | `development`                                      | Bun-specific environment                           |
+| `LLM_MODEL`             | no        | `google/gemini-2.0-flash-exp:free`                 | Model to use for translation                       |
+| `OPENAI_API_KEY`        | yes       | —                                                  | API key for the language model                     |
+| `OPENAI_BASE_URL`       | no        | `https://openrouter.ai/api/v1`                     | API endpoint (supports OpenRouter, Azure, etc.)    |
+| `OPENAI_PROJECT_ID`     | no        | —                                                  | Project ID for usage tracking                      |
+| `GITHUB_TOKEN`          | yes       | —                                                  | Personal access token with repo permissions        |
+| `REPO_FORK_OWNER`       | no        | `nivaldofarias`                                    | Owner of your fork                                 |
+| `REPO_FORK_NAME`        | no        | `pt-br.react.dev`                                  | Name of your forked repository                     |
+| `REPO_UPSTREAM_OWNER`   | no        | `reactjs`                                          | Original repository owner                          |
+| `REPO_UPSTREAM_NAME`    | no        | `pt-br.react.dev`                                  | Original repository name                           |
+| `PROGRESS_ISSUE_NUMBER` | no        | `555`                                              | Issue number for progress updates                  |
+| `FORCE_SNAPSHOT_CLEAR`  | no        | `false`                                            | Clear snapshots on startup (dev only)              |
+| `HEADER_APP_URL`        | no        | `https://github.com/NivaldoFarias/translate-react` | Application URL for OpenRouter Activity Tracking   |
+| `HEADER_APP_TITLE`      | no        | `translate-react v0.1.5`                           | Application title for OpenRouter Activity Tracking |
+| `BATCH_SIZE`            | no        | `10`                                               | Number of files to process concurrently            |
+| `TARGET_LANGUAGE`       | no        | `pt`                                               | Target language (ISO 639-1 code)                   |
+| `SOURCE_LANGUAGE`       | no        | `en`                                               | Source language (ISO 639-1 code)                   |
 
 > [!IMPORTANT]
-> **Environment Validation**: All variables are validated at runtime using Zod schemas. Check `src/utils/env.util.ts` for detailed validation rules.
-
-> [!TIP] 
-> **Development Setup**: Use `.env.dev` for development-specific configurations. The tool automatically loads the appropriate file based on the `NODE_ENV`.
+> **Environment Validation**: All variables are validated at runtime using Zod schemas. 
+> See [Environment Schema Definitions](https://github.com/NivaldoFarias/translate-react/blob/main/src/utils/env.util.ts) for detailed validation rules.
 
 ## Usage
 
@@ -259,37 +220,6 @@ Or run the script directly:
 ```bash
 bun run src/index.ts
 ```
-
-### Command Line Arguments
-
-The tool supports the following command line arguments:
-
-| Argument       | Description                      | Default | Example Values                     |
-| -------------- | -------------------------------- | ------- | ---------------------------------- |
-| `--target`     | Target language code (ISO 639-1) | `"pt"`  | `pt`, `es`, `fr`, `de`, `ja`, `ko` |
-| `--source`     | Source language code (ISO 639-1) | `"en"`  | `en`, `pt`, `es`, `fr`             |
-| `--batch-size` | Files to process per batch       | `10`    | `5`, `15`, `20`                    |
-
-#### Translate to Portuguese (default)
-
-```bash
-bun run start
-```
-
-#### Translate to Spanish with custom batch size
-
-```bash
-bun run start --target=es --batch-size=5
-```
-
-#### Translate from Portuguese to English
-
-```bash
-bun run start --source=pt --target=en
-```
-
-> [!NOTE] 
-> **Language Detection**: The tool automatically detects the language of each file and skips files already in the target language, making it safe to run multiple times.
 
 ## How It Works
 

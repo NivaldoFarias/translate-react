@@ -1,23 +1,19 @@
 import langs from "langs";
 import ora from "ora";
 
-import type { SetNonNullable } from "type-fest";
-
 import type { FileProcessingProgress, ProcessedFileResult, Snapshot } from "@/types";
-import type { Environment } from "@/utils/";
+import type { SetNonNullable } from "type-fest";
 
 import {
 	createErrorHandlingProxy,
 	ErrorHandler,
-	extractErrorMessage,
 	InitializationError,
 	ResourceLoadError,
 } from "@/errors/";
 import { GitHubService } from "@/services/github/github.service";
 import { SnapshotService } from "@/services/snapshot.service";
 import { TranslatorService } from "@/services/translator.service";
-import { setupSignalHandlers, validateEnv } from "@/utils/";
-import { TranslationFile } from "@/utils/translation-file.util";
+import { env, setupSignalHandlers, TranslationFile } from "@/utils/";
 
 export interface RunnerOptions {
 	targetLanguage: string;
@@ -26,7 +22,6 @@ export interface RunnerOptions {
 }
 
 export abstract class RunnerService {
-	protected readonly env: Environment;
 	private readonly errorHandler = ErrorHandler.getInstance();
 
 	/**
@@ -92,25 +87,23 @@ export abstract class RunnerService {
 	 *
 	 * Sets up process event listeners for graceful termination
 	 */
-	constructor(protected readonly options: RunnerOptions) {
-		try {
-			this.env = validateEnv();
-		} catch (error) {
-			console.error(extractErrorMessage(error));
-
-			throw error;
-		}
-
+	constructor(
+		protected readonly options: RunnerOptions = {
+			targetLanguage: env.TARGET_LANGUAGE,
+			sourceLanguage: "en",
+			batchSize: env.BATCH_SIZE,
+		},
+	) {
 		this.services = {
 			github: createErrorHandlingProxy(
 				new GitHubService({
 					upstream: {
-						owner: this.env.REPO_UPSTREAM_OWNER,
-						repo: this.env.REPO_UPSTREAM_NAME,
+						owner: env.REPO_UPSTREAM_OWNER,
+						repo: env.REPO_UPSTREAM_NAME,
 					},
 					fork: {
-						owner: this.env.REPO_FORK_OWNER,
-						repo: this.env.REPO_FORK_NAME,
+						owner: env.REPO_FORK_OWNER,
+						repo: env.REPO_FORK_NAME,
 					},
 				}),
 				{ serviceName: "GitHubService", excludeMethods: ["getSpinner"] },
@@ -127,7 +120,7 @@ export abstract class RunnerService {
 			}),
 		};
 
-		if (this.env.FORCE_SNAPSHOT_CLEAR) {
+		if (env.FORCE_SNAPSHOT_CLEAR) {
 			this.services.snapshot.clear();
 		}
 
@@ -164,7 +157,7 @@ export abstract class RunnerService {
 		if (!isForkSynced) {
 			this.spinner.text = "Fork is out of sync. Updating fork...";
 
-			if (this.env.NODE_ENV === "development") {
+			if (env.NODE_ENV === "development") {
 				await this.services.snapshot.clear();
 			}
 
@@ -215,7 +208,7 @@ export abstract class RunnerService {
 			this.spinner.text = "Fetching repository content...";
 			this.state.repositoryTree = await this.services.github.getRepositoryTree("main");
 
-			if (this.env.NODE_ENV === "development") {
+			if (env.NODE_ENV === "development") {
 				await this.services.snapshot.append("repositoryTree", this.state.repositoryTree);
 			}
 
@@ -292,7 +285,7 @@ export abstract class RunnerService {
 			return !isTranslated;
 		});
 
-		if (this.env.NODE_ENV === "development") {
+		if (env.NODE_ENV === "development") {
 			await this.services.snapshot.append("filesToTranslate", this.state.filesToTranslate);
 		}
 
@@ -350,8 +343,8 @@ export abstract class RunnerService {
 	 */
 	protected get shouldUpdateIssueComment() {
 		return !!(
-			this.env.NODE_ENV === "production" &&
-			this.env.PROGRESS_ISSUE_NUMBER &&
+			env.NODE_ENV === "production" &&
+			env.PROGRESS_ISSUE_NUMBER &&
 			this.metadata.results.size > 0
 		);
 	}
@@ -613,9 +606,9 @@ export abstract class RunnerService {
 	protected get pullRequestDescription() {
 		const language = langs.where("1", this.options.targetLanguage);
 
-		return `This pull request contains a translation of the referenced page to ${language?.name || "Portuguese"}. The translation was generated using LLMs _(Open Router API :: model \`${this.env.LLM_MODEL}\`)_.
+		return `This pull request contains a translation of the referenced page to ${language?.name || "Portuguese"}. The translation was generated using LLMs _(Open Router API :: model \`${env.LLM_MODEL}\`)_.
 
-Refer to the [source repository](https://github.com/${this.env.REPO_FORK_OWNER}/translate-react) workflow that generated this translation for more details.
+Refer to the [source repository](https://github.com/${env.REPO_FORK_OWNER}/translate-react) workflow that generated this translation for more details.
 
 Feel free to review and suggest any improvements to the translation.`;
 	}

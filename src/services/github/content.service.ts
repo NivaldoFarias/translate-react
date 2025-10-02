@@ -3,6 +3,7 @@ import type { RestEndpointMethodTypes } from "@octokit/rest";
 import type { ProcessedFileResult } from "@/types";
 
 import { BaseGitHubService } from "@/services/github/base.service";
+import { env } from "@/utils";
 import { TranslationFile } from "@/utils/translation-file.util";
 
 /**
@@ -15,7 +16,7 @@ import { TranslationFile } from "@/utils/translation-file.util";
  * - Content filtering and validation
  */
 export class ContentService extends BaseGitHubService {
-	private readonly issueNumber = Number(import.meta.env.PROGRESS_ISSUE_NUMBER);
+	private readonly issueNumber = Number(env.PROGRESS_ISSUE_NUMBER);
 
 	/**
 	 * Creates a comment on a pull request.
@@ -286,8 +287,7 @@ export class ContentService extends BaseGitHubService {
 
 		const userComment = listCommentsResponse.data.find((comment) => {
 			return (
-				comment.user?.login === import.meta.env.REPO_FORK_OWNER &&
-				comment.body?.includes(this.comment.suffix)
+				comment.user?.login === env.REPO_FORK_OWNER && comment.body?.includes(this.comment.suffix)
 			);
 		});
 
@@ -569,7 +569,7 @@ export class ContentService extends BaseGitHubService {
 	
 	- As traduções foram geradas por uma LLM e requerem revisão humana para garantir precisão técnica e fluência.
 	- Alguns arquivos podem ter PRs de tradução existentes em análise. Verifiquei duplicações, mas recomendo conferir.
-	- O fluxo de trabalho de automação completo está disponível no repositório [\`translate-react\`](https://github.com/${import.meta.env.REPO_FORK_OWNER}/translate-react) para referência e contribuições.
+	- O fluxo de trabalho de automação completo está disponível no repositório [\`translate-react\`](https://github.com/${env.REPO_FORK_OWNER}/translate-react) para referência e contribuições.
 	- Esta implementação é um trabalho em progresso e pode apresentar inconsistências em conteúdos técnicos complexos ou formatação específica.`,
 		};
 	}

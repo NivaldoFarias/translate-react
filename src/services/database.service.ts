@@ -5,7 +5,7 @@ import { Database } from "bun:sqlite";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 import type { ProcessedFileResult, Snapshot } from "@/types";
-import type { TranslationFile } from "@/utils/translation-file.util";
+import type { TranslationFile } from "@/utils/";
 
 /**
  * Core service for managing persistent storage of translation workflow data.

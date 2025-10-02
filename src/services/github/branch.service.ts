@@ -1,4 +1,5 @@
 import { BaseGitHubService } from "@/services/github/base.service";
+import { env } from "@/utils";
 
 /**
  * Service responsible for Git branch operations and lifecycle management.
@@ -22,7 +23,7 @@ export class BranchService extends BaseGitHubService {
 	constructor(
 		protected readonly upstream: { owner: string; repo: string },
 		protected readonly fork: { owner: string; repo: string },
-		protected readonly githubToken = import.meta.env.GITHUB_TOKEN,
+		protected readonly githubToken = env.GITHUB_TOKEN,
 	) {
 		super(upstream, fork, githubToken);
 
@@ -161,7 +162,7 @@ export class BranchService extends BaseGitHubService {
 		});
 
 		return listCommitsResponse.data.some(
-			(commit) => commit?.author?.login === import.meta.env.REPO_FORK_OWNER!,
+			(commit) => commit?.author?.login === env.REPO_FORK_OWNER!,
 		);
 	}
 }
