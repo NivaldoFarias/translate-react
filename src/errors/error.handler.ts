@@ -1,8 +1,7 @@
 import Bun from "bun";
 
-import type { BunFile } from "bun";
-
 import type { ErrorContext } from "./base.error";
+import type { BunFile } from "bun";
 
 import { ErrorCode, ErrorSeverity, TranslationError } from "./base.error";
 
@@ -24,7 +23,7 @@ export interface ErrorHandlerConfig {
 /**
  * Extracts a human-readable error message from various error types
  *
- * ## Handling
+ * ### Handling
  * - TranslateError: Uses the formatted message with context
  * - Error: Uses the native error message
  * - Other types: Converts to string

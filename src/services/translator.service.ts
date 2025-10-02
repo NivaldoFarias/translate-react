@@ -66,7 +66,7 @@ export class TranslatorService {
 	/**
 	 * Main translation method that processes files and manages the translation workflow
 	 *
-	 * ## Workflow
+	 * ### Workflow
 	 * 1. Validates input content
 	 * 2. Parses content (without modifying code blocks)
 	 * 3. Calls language model for translation
@@ -230,7 +230,7 @@ export class TranslatorService {
 	 * Handles content that exceeds the model's context window by splitting it into
 	 * smaller chunks and translating each chunk separately, then combining the results.
 	 *
-	 * ## Workflow
+	 * ### Workflow
 	 * 1. Splits content at natural break points (middle of paragraphs, end of code blocks)
 	 * 2. Recursively splits chunks that are still too large
 	 * 3. Translates each chunk while maintaining context
@@ -251,7 +251,7 @@ export class TranslatorService {
 	/**
 	 * Translates the content of the chunks.
 	 *
-	 * ## Workflow
+	 * ### Workflow
 	 * 1. Adds context about chunking to help maintain consistency
 	 * 2. Translates each chunk
 	 * 3. Removes the part prefix if it exists in the response
@@ -293,7 +293,7 @@ export class TranslatorService {
 	 * Finds logical boundaries like paragraph breaks, code blocks, or headers
 	 * that are nearest to the middle of the content to maintain semantic integrity.
 	 *
-	 * ## Algorithm Steps
+	 * ### Algorithm Steps
 	 * 1. Identifies natural break points using regex patterns for paragraphs, headers, and code blocks
 	 * 2. Selects the break point closest to the content midpoint to ensure balanced chunks
 	 * 3. Falls back to sentence breaks if no structural breaks are found near midpoint

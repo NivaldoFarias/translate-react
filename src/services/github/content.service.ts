@@ -1,5 +1,6 @@
-import type { ProcessedFileResult } from "@/types";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
+
+import type { ProcessedFileResult } from "@/types";
 
 import { BaseGitHubService } from "@/services/github/base.service";
 import { TranslationFile } from "@/utils/translation-file.util";
@@ -478,7 +479,7 @@ export class ContentService extends BaseGitHubService {
 	 * Converts the nested directory structure into properly indented Markdown format
 	 * suitable for GitHub issue comments, with directories and files organized hierarchically.
 	 *
-	 * ## Formatting Rules
+	 * ### Formatting Rules
 	 * 1. Processes directories in alphabetical order for consistent presentation
 	 * 2. Indents each level with two spaces for clear visual hierarchy
 	 * 3. Lists files under their respective directories with backticks and PR links

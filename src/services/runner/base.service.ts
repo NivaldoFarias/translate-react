@@ -1,9 +1,10 @@
 import langs from "langs";
 import ora from "ora";
 
+import type { SetNonNullable } from "type-fest";
+
 import type { FileProcessingProgress, ProcessedFileResult, Snapshot } from "@/types";
 import type { Environment } from "@/utils/";
-import type { SetNonNullable } from "type-fest";
 
 import {
 	createErrorHandlingProxy,

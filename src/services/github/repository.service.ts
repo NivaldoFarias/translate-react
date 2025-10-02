@@ -5,7 +5,7 @@ import { BaseGitHubService } from "@/services/github/base.service";
 /**
  * Service responsible for repository operations and fork management.
  *
- * ## Responsibilities
+ * ### Responsibilities
  * - Repository tree management
  * - Fork synchronization
  * - Token permission verification
