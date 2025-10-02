@@ -97,14 +97,8 @@ export abstract class RunnerService {
 		this.services = {
 			github: createErrorHandlingProxy(
 				new GitHubService({
-					upstream: {
-						owner: env.REPO_UPSTREAM_OWNER,
-						repo: env.REPO_UPSTREAM_NAME,
-					},
-					fork: {
-						owner: env.REPO_FORK_OWNER,
-						repo: env.REPO_FORK_NAME,
-					},
+					upstream: { owner: env.REPO_UPSTREAM_OWNER, repo: env.REPO_UPSTREAM_NAME },
+					fork: { owner: env.REPO_FORK_OWNER, repo: env.REPO_FORK_NAME },
 				}),
 				{ serviceName: "GitHubService", excludeMethods: ["getSpinner"] },
 			),
@@ -132,7 +126,7 @@ export abstract class RunnerService {
 	 *
 	 * @throws {InitializationError} If token permissions verification fails
 	 */
-	protected async verifyPermissions() {
+	protected async verifyPermissions(): Promise<void> {
 		const hasPermissions = await this.services.github.verifyTokenPermissions();
 
 		if (!hasPermissions) {
@@ -149,7 +143,7 @@ export abstract class RunnerService {
 	 *
 	 * @returns `true` if the fork is up to date, `false` otherwise
 	 */
-	protected async syncFork() {
+	protected async syncFork(): Promise<boolean> {
 		this.spinner.text = "Checking fork status...";
 
 		const isForkSynced = await this.services.github.isForkSynced();
@@ -183,7 +177,7 @@ export abstract class RunnerService {
 	 *
 	 * @param isForkSynced Whether the fork is up to date
 	 */
-	protected async loadSnapshot(isForkSynced: boolean) {
+	protected async loadSnapshot(isForkSynced: boolean): Promise<void> {
 		const latestSnapshot = await this.services.snapshot.loadLatest();
 
 		if (latestSnapshot && !isForkSynced) {
@@ -203,7 +197,7 @@ export abstract class RunnerService {
 	 *
 	 * @throws {ResourceLoadError} If the repository tree or glossary fetch fails
 	 */
-	protected async fetchRepositoryTree() {
+	protected async fetchRepositoryTree(): Promise<void> {
 		if (!this.state.repositoryTree?.length) {
 			this.spinner.text = "Fetching repository content...";
 			this.state.repositoryTree = await this.services.github.getRepositoryTree("main");
@@ -236,7 +230,7 @@ export abstract class RunnerService {
 	 *
 	 * @throws {ResourceLoadError} If file content fetch fails
 	 */
-	protected async fetchFilesToTranslate() {
+	protected async fetchFilesToTranslate(): Promise<void> {
 		if (this.state.filesToTranslate.length) {
 			this.spinner.stopAndPersist({
 				symbol: "📦",
@@ -304,7 +298,10 @@ export abstract class RunnerService {
 	 *
 	 * @returns The batch of files
 	 */
-	protected async fetchBatch(batch: typeof this.state.repositoryTree, updateSpinnerFn: () => void) {
+	protected async fetchBatch(
+		batch: typeof this.state.repositoryTree,
+		updateSpinnerFn: () => void,
+	): Promise<(TranslationFile | null)[]> {
 		return await Promise.all(
 			batch.map(async (file) => {
 				const filename = file.path?.split("/").pop();
@@ -325,7 +322,7 @@ export abstract class RunnerService {
 	 *
 	 * @throws {APIError} If commenting on the issue fails
 	 */
-	protected async updateIssueWithResults() {
+	protected async updateIssueWithResults(): Promise<void> {
 		this.spinner.text = "Commenting on issue...";
 
 		const comment = await this.services.github.commentCompiledResultsOnIssue(
@@ -341,7 +338,7 @@ export abstract class RunnerService {
 	 *
 	 * @returns `true` if the issue comment should be updated, `false` otherwise
 	 */
-	protected get shouldUpdateIssueComment() {
+	protected get shouldUpdateIssueComment(): boolean {
 		return !!(
 			env.NODE_ENV === "production" &&
 			env.PROGRESS_ISSUE_NUMBER &&
@@ -364,7 +361,7 @@ export abstract class RunnerService {
 	 * - Itemized lists for failures
 	 * - Timing information
 	 */
-	protected async printFinalStatistics() {
+	protected async printFinalStatistics(): Promise<void> {
 		const elapsedTime = Math.ceil(Date.now() - this.metadata.timestamp);
 		const results = Array.from(this.metadata.results.values());
 
@@ -409,7 +406,7 @@ export abstract class RunnerService {
 	 *
 	 * @returns A formatted duration string
 	 */
-	private formatElapsedTime(elapsedTime: number) {
+	private formatElapsedTime(elapsedTime: number): string {
 		const formatter = new Intl.RelativeTimeFormat("en", { numeric: "always", style: "long" });
 
 		const seconds = Math.floor(elapsedTime / 1000);
@@ -439,7 +436,7 @@ export abstract class RunnerService {
 	 * @throws {ResourceLoadError} If file content cannot be loaded
 	 * @throws {APIError} If GitHub operations fail
 	 */
-	protected async processInBatches(files: TranslationFile[], batchSize = 10) {
+	protected async processInBatches(files: TranslationFile[], batchSize = 10): Promise<void> {
 		this.spinner.text = "Processing files";
 
 		const batches = this.createBatches(files, batchSize);
@@ -478,7 +475,7 @@ export abstract class RunnerService {
 	private async processBatch(
 		batch: TranslationFile[],
 		batchInfo: { currentBatch: number; totalBatches: number; batchSize: number },
-	) {
+	): Promise<void> {
 		this.batchProgress.completed = 0;
 		this.batchProgress.successful = 0;
 		this.batchProgress.failed = 0;
@@ -540,7 +537,10 @@ export abstract class RunnerService {
 	 * @throws {APIError} If GitHub operations fail
 	 * @throws {ResourceLoadError} If translation resources cannot be loaded
 	 */
-	private async processFile(file: TranslationFile, progress: FileProcessingProgress) {
+	private async processFile(
+		file: TranslationFile,
+		progress: FileProcessingProgress,
+	): Promise<void> {
 		const metadata = this.metadata.results.get(file.filename) || {
 			branch: null,
 			filename: file.filename,
@@ -562,8 +562,7 @@ export abstract class RunnerService {
 				message: `Translate \`${file.filename}\` to ${language?.name || "Portuguese"}`,
 			});
 
-			metadata.pullRequest = await this.services.github.createPullRequest({
-				branch: metadata.branch.ref,
+			metadata.pullRequest = await this.services.github.createOrUpdatePullRequest(file, {
 				title: `Translate \`${file.filename}\` to ${language?.name || "Portuguese"}`,
 				body: this.pullRequestDescription,
 			});
@@ -583,7 +582,7 @@ export abstract class RunnerService {
 	 *
 	 * @param progress Current progress information
 	 */
-	private updateProgressSpinner(progress: FileProcessingProgress) {
+	private updateProgressSpinner(progress: FileProcessingProgress): void {
 		const percentComplete = Math.round((this.batchProgress.completed / progress.batchSize) * 100);
 
 		this.spinner.suffixText = `[${this.batchProgress.completed}/${progress.batchSize}] files completed (${percentComplete}% done)`;
@@ -596,14 +595,14 @@ export abstract class RunnerService {
 	 *
 	 * @param status The processing outcome for the file
 	 */
-	private updateBatchProgress(status: "success" | "error") {
+	private updateBatchProgress(status: "success" | "error"): void {
 		this.batchProgress.completed++;
 		status === "success" ? this.batchProgress.successful++ : this.batchProgress.failed++;
 	}
 
 	abstract run(): Promise<void>;
 
-	protected get pullRequestDescription() {
+	protected get pullRequestDescription(): string {
 		const language = langs.where("1", this.options.targetLanguage);
 
 		return `This pull request contains a translation of the referenced page to ${language?.name || "Portuguese"}. The translation was generated using LLMs _(Open Router API :: model \`${env.LLM_MODEL}\`)_.

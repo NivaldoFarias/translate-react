@@ -1,9 +1,12 @@
+import type { ProcessedFileResult } from "@/types";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
-import type { ProcessedFileResult } from "@/types";
-
 import { BranchService } from "@/services/github/branch.service";
-import { ContentService } from "@/services/github/content.service";
+import {
+	CommitTranslationOptions,
+	ContentService,
+	PullRequestOptions,
+} from "@/services/github/content.service";
 import { RepositoryService } from "@/services/github/repository.service";
 import { TranslationFile } from "@/utils/";
 
@@ -145,65 +148,84 @@ export class GitHubService {
 	 * Commits translated content to a branch.
 	 *
 	 * @param options Commit options
-	 * @param options.branch Target branch reference
-	 * @param options.file File being translated
-	 * @param options.content Translated content
-	 * @param options.message Commit message
-	 *
-	 * @example
-	 * ```typescript
-	 * await github.commitTranslation(
-	 *   branch,
-	 *   file,
-	 *   translatedContent,
-	 *   'feat(i18n): translate homepage'
-	 * );
-	 * ```
 	 */
-	public async commitTranslation({
-		branch,
-		file,
-		content,
-		message,
-	}: {
-		branch: RestEndpointMethodTypes["git"]["getRef"]["response"]["data"];
-		file: TranslationFile;
-		content: string;
-		message: string;
-	}) {
-		await this.services.content.commitTranslation({ branch, file, content, message });
+	public async commitTranslation(
+		options: CommitTranslationOptions,
+	): Promise<RestEndpointMethodTypes["repos"]["createOrUpdateFileContents"]["response"]> {
+		return await this.services.content.commitTranslation(options);
 	}
 
 	/**
 	 * Creates a pull request for translated content.
 	 *
 	 * @param options Pull request options
-	 * @param options.branch Source branch name
-	 * @param options.title Pull request title
-	 * @param options.body Pull request description
-	 * @param options.baseBranch Target branch for PR
+	 */
+	public async createPullRequest(
+		options: PullRequestOptions,
+	): Promise<RestEndpointMethodTypes["pulls"]["create"]["response"]["data"]> {
+		return this.services.content.createPullRequest(options);
+	}
+
+	/**
+	 * Handles pull request creation or update for a translation file.
+	 *
+	 * Checks if a PR already exists for the file's branch, and if so, evaluates
+	 * whether it needs updating due to conflicts or being outdated. Handles the
+	 * complete PR lifecycle including closing outdated PRs and creating new ones.
+	 *
+	 * @param file Translation file being processed
+	 * @param prOptions Pull request creation options
+	 *
+	 * @returns The created or existing pull request data
 	 *
 	 * @example
 	 * ```typescript
-	 * const pr = await github.createPullRequest(
-	 *   'translate/homepage',
-	 *   'feat(i18n): translate homepage',
-	 *   'Translates homepage content to Portuguese'
-	 * );
+	 * const pr = await github.createOrUpdatePullRequest(file, {
+	 *   title: 'Translate homepage',
+	 *   body: 'Translation to Portuguese',
+	 *   baseBranch: 'main'
+	 * });
 	 * ```
 	 */
-	public async createPullRequest({
-		branch,
-		title,
-		body,
-		baseBranch = "main",
-	}: {
-		branch: string;
-		title: string;
-		body: string;
-		baseBranch?: string;
-	}) {
-		return this.services.content.createPullRequest({ branch, title, body, baseBranch });
+	public async createOrUpdatePullRequest(
+		file: TranslationFile,
+		prOptions: Omit<PullRequestOptions, "branch">,
+	): Promise<
+		| RestEndpointMethodTypes["pulls"]["create"]["response"]["data"]
+		| RestEndpointMethodTypes["pulls"]["list"]["response"]["data"][number]
+	> {
+		const branchName = `translate/${file.path.split("/").slice(2).join("/")}`;
+		const existingPR = await this.services.content.findPullRequestByBranch(branchName);
+
+		if (existingPR) {
+			const prStatus = await this.services.content.checkPullRequestStatus(existingPR.number);
+
+			if (prStatus.needsUpdate) {
+				await this.services.content.createCommentOnPullRequest(
+					existingPR.number,
+					"This PR is being closed and recreated due to conflicts or outdated content. A new PR with updated translation will be created.",
+				);
+
+				await this.services.content.closePullRequest(existingPR.number);
+
+				// Create new PR since the old one was outdated
+				return await this.services.content.createPullRequest({
+					branch: branchName,
+					...prOptions,
+					baseBranch: prOptions.baseBranch || "main",
+				});
+			}
+
+			// PR exists and is up to date, return existing PR
+			return existingPR;
+		}
+
+		// No existing PR, create new one
+		return await this.services.content.createPullRequest({
+			branch: branchName,
+			...prOptions,
+			baseBranch: prOptions.baseBranch || "main",
+		});
 	}
 
 	/**
@@ -216,7 +238,7 @@ export class GitHubService {
 	 * await github.cleanupBranch('translate/homepage');
 	 * ```
 	 */
-	public async cleanupBranch(branch: string) {
+	public async cleanupBranch(branch: string): Promise<void> {
 		await this.services.branch.deleteBranch(branch);
 	}
 
@@ -228,7 +250,7 @@ export class GitHubService {
 	 * const branches = github.getActiveBranches();
 	 * ```
 	 */
-	public getActiveBranches() {
+	public getActiveBranches(): string[] {
 		return this.services.branch.getActiveBranches();
 	}
 
@@ -240,7 +262,7 @@ export class GitHubService {
 	 * const hasPermissions = await github.verifyTokenPermissions();
 	 * ```
 	 */
-	public async verifyTokenPermissions() {
+	public async verifyTokenPermissions(): Promise<boolean> {
 		return this.services.repository.verifyTokenPermissions();
 	}
 
@@ -252,7 +274,7 @@ export class GitHubService {
 	 * const needsSync = !(await github.isForkSynced());
 	 * ```
 	 */
-	public async isForkSynced() {
+	public async isForkSynced(): Promise<boolean> {
 		return this.services.repository.isForkSynced();
 	}
 
@@ -266,7 +288,7 @@ export class GitHubService {
 	 * }
 	 * ```
 	 */
-	public async syncFork() {
+	public async syncFork(): Promise<boolean> {
 		return this.services.repository.syncFork();
 	}
 
@@ -284,7 +306,7 @@ export class GitHubService {
 	public async commentCompiledResultsOnIssue(
 		results: ProcessedFileResult[],
 		filesToTranslate: TranslationFile[],
-	) {
+	): Promise<RestEndpointMethodTypes["issues"]["createComment"]["response"]["data"]> {
 		return this.services.content.commentCompiledResultsOnIssue(results, filesToTranslate);
 	}
 
@@ -299,7 +321,7 @@ export class GitHubService {
 	 * const exists = await github.checkIfCommitExistsOnFork('main', '1234567890');
 	 * ```
 	 */
-	public async checkIfCommitExistsOnFork(branchName: string) {
+	public async checkIfCommitExistsOnFork(branchName: string): Promise<boolean> {
 		return this.services.branch.checkIfCommitExistsOnFork(branchName);
 	}
 
@@ -313,7 +335,7 @@ export class GitHubService {
 	 * const glossary = await github.fetchGlossary();
 	 * ```
 	 */
-	public async getGlossary() {
+	public async getGlossary(): Promise<string | null> {
 		return this.services.repository.fetchGlossary();
 	}
 }

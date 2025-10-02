@@ -29,10 +29,6 @@ class TestGitHubService extends BaseGitHubService {
 		return this.githubToken;
 	}
 
-	public testFormatError(error: unknown, context: string) {
-		return this.formatError(error, context);
-	}
-
 	public getRateLimit() {
 		return this.octokit.rateLimit.get();
 	}

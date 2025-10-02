@@ -73,7 +73,7 @@ export class TranslatorService {
 	 *
 	 * @param file File containing content to translate
 	 */
-	public async translateContent(file: TranslationFile) {
+	public async translateContent(file: TranslationFile): Promise<string> {
 		if (!file.content?.length) {
 			throw new Error(`File content is empty: ${file.filename}`);
 		}
@@ -96,7 +96,7 @@ export class TranslatorService {
 	 * const isTranslated = detector.isFileTranslated('Olá mundo');
 	 * ```
 	 */
-	public isFileTranslated(file: TranslationFile) {
+	public isFileTranslated(file: TranslationFile): boolean {
 		const analysis = this.languageDetector.analyzeLanguage(file.filename, file.content);
 
 		return analysis.isTranslated;
@@ -137,7 +137,7 @@ export class TranslatorService {
 	 *
 	 * @param content Main content to translate
 	 */
-	private createPrompt(content: string) {
+	private createPrompt(content: string): OpenAI.Chat.Completions.ChatCompletionMessageParam[] {
 		return [
 			{
 				role: "system" as const,
@@ -154,7 +154,7 @@ export class TranslatorService {
 	 * For some reason, some LLMs return the content with fences prepended and appended.
 	 * This method removes them when present.
 	 */
-	public cleanupTranslatedContent(content: string, originalContent?: string) {
+	public cleanupTranslatedContent(content: string, originalContent?: string): string {
 		const shouldStartWith = `---\ntitle:`;
 		const endTicks = "```";
 
@@ -177,7 +177,7 @@ export class TranslatorService {
 	 *
 	 * @param content Content to be translated
 	 */
-	private getUserPrompt(content: string) {
+	private getUserPrompt(content: string): string {
 		return `CONTENT TO TRANSLATE:\n${content}\n\n`;
 	}
 
@@ -187,7 +187,7 @@ export class TranslatorService {
 	 *
 	 * @param content Content to determine source language
 	 */
-	private getSystemPrompt(content: string) {
+	private getSystemPrompt(content: string): string {
 		const languages = {
 			target: this.languageDetector.detectLanguage(this.options.target)?.["1"] || "Portuguese",
 			source: this.languageDetector.detectLanguage(franc(content))?.["1"] || "English",
@@ -240,7 +240,7 @@ export class TranslatorService {
 	 *
 	 * @throws {Error} If chunking fails or if all chunk translation attempts fail
 	 */
-	public async chunkAndRetryTranslation(content: string) {
+	public async chunkAndRetryTranslation(content: string): Promise<string> {
 		const chunks = this.splitIntoSections(content);
 
 		return this.cleanupTranslatedContent(await this.translateChunks(chunks));
@@ -259,7 +259,7 @@ export class TranslatorService {
 	 *
 	 * @returns The translated content
 	 */
-	private async translateChunks(chunks: Array<string>) {
+	private async translateChunks(chunks: Array<string>): Promise<string> {
 		const chunkContext = (index: number, total: number) => `PART ${index + 1} OF ${total}:\n\n`;
 
 		const translatedChunks: Array<string> = [];

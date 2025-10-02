@@ -2,10 +2,9 @@ import { existsSync, writeFileSync } from "node:fs";
 
 import { Database } from "bun:sqlite";
 
-import type { RestEndpointMethodTypes } from "@octokit/rest";
-
-import type { ProcessedFileResult, Snapshot } from "@/types";
+import type { ProcessedFileResult, Snapshot, SnapshotRecord } from "@/types";
 import type { TranslationFile } from "@/utils/";
+import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 /**
  * Core service for managing persistent storage of translation workflow data.
@@ -44,7 +43,7 @@ export class DatabaseService {
 	 * - processed_results: Translation results and status
 	 * - failed_translations: Detailed error tracking for failed translations
 	 */
-	private initializeTables() {
+	private initializeTables(): void {
 		for (const script of Object.values(this.scripts.create)) {
 			const sanitizedScript = script.replace(/\s+/g, " ");
 
@@ -73,7 +72,7 @@ export class DatabaseService {
 	public saveRepositoryTree(
 		snapshotId: number,
 		tree: RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"],
-	) {
+	): void {
 		const statement = this.db.prepare(`
 			INSERT INTO repository_tree (snapshot_id, path, mode, type, sha, size, url)
 			VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -107,7 +106,7 @@ export class DatabaseService {
 	 * @param snapshotId ID of associated snapshot
 	 * @param files Files to be translated
 	 */
-	public saveFilesToTranslate(snapshotId: number, files: TranslationFile[]) {
+	public saveFilesToTranslate(snapshotId: number, files: TranslationFile[]): void {
 		const statement = this.db.prepare(`
 			INSERT INTO files_to_translate (snapshot_id, content, sha, filename, path)
 			VALUES (?, ?, ?, ?, ?)
@@ -133,7 +132,7 @@ export class DatabaseService {
 	 * @param snapshotId ID of associated snapshot
 	 * @param results Translation processing results
 	 */
-	public saveProcessedResults(snapshotId: number, results: ProcessedFileResult[]) {
+	public saveProcessedResults(snapshotId: number, results: ProcessedFileResult[]): void {
 		const statement = this.db.prepare(`
 			INSERT INTO processed_results (
 				snapshot_id, filename, branch_ref, branch_object_sha,
@@ -204,7 +203,7 @@ export class DatabaseService {
 	 * Removes all data from database tables.
 	 * Uses transaction to ensure all-or-nothing deletion.
 	 */
-	public async clearSnapshots() {
+	public async clearSnapshots(): Promise<void> {
 		this.db.transaction(() => {
 			this.db.prepare("DELETE FROM processed_results").run();
 			this.db.prepare("DELETE FROM files_to_translate").run();
@@ -218,11 +217,8 @@ export class DatabaseService {
 	 *
 	 * @returns Array of snapshot objects
 	 */
-	public getSnapshots() {
-		return this.db.prepare(this.scripts.select.allSnapshots).all() as {
-			id: number;
-			timestamp: number;
-		}[];
+	public getSnapshots(): SnapshotRecord[] {
+		return this.db.prepare(this.scripts.select.allSnapshots).all() as SnapshotRecord[];
 	}
 
 	/**
@@ -232,7 +228,7 @@ export class DatabaseService {
 	 *
 	 * @returns Files to translate or null if not found
 	 */
-	public getFilesToTranslateByFilename(filenames: string[]) {
+	public getFilesToTranslateByFilename(filenames: string[]): TranslationFile[] {
 		return this.db
 			.prepare(this.scripts.select.filesToTranslateByFilename)
 			.all(filenames.join(",")) as TranslationFile[];
@@ -243,7 +239,7 @@ export class DatabaseService {
 	 *
 	 * @param id ID of snapshot to delete
 	 */
-	public deleteSnapshot(id: number) {
+	public deleteSnapshot(id: number): void {
 		this.db.run(this.scripts.delete.snapshotById, [id]);
 	}
 

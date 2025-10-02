@@ -1,6 +1,6 @@
 {
 	"name": "translate-react",
-	"version": "0.1.5",
+	"version": "0.1.6",
 	"contributors": [
 		{
 			"name": "Nivaldo Farias",
@@ -16,7 +16,8 @@
 		"dev": "bun --watch --env-file=.env.dev src/index.ts",
 		"lint": "eslint .",
 		"lint:fix": "eslint . --fix",
-		"format": "prettier --write '**/*.{ts,js,cjs,mjs,json}'"
+		"format": "prettier --write '**/*.{ts,js,cjs,mjs,json}'",
+		"type-check": "tsc"
 	},
 	"dependencies": {
 		"@octokit/rest": "^21.1.0",
