@@ -64,12 +64,10 @@ export function createErrorHandlingProxy<T extends object>(
 		get(obj, prop) {
 			const value = Reflect.get(obj, prop);
 
-			// Only proxy methods, not properties
 			if (typeof value !== "function" || excludeMethods.includes(prop.toString())) {
 				return value;
 			}
 
-			// Return a wrapped version of the method
 			return function (...args: unknown[]) {
 				const methodName = prop.toString();
 				const context: Partial<ErrorContext> = {
@@ -78,14 +76,12 @@ export function createErrorHandlingProxy<T extends object>(
 					metadata: {
 						...baseContext.metadata,
 						arguments: args.map((arg) =>
-							// Don't include file contents in metadata to avoid bloat
 							arg && arg instanceof TranslationFile ? `TranslationFile(${arg.filename})` : arg,
 						),
 					},
 				};
 
 				const handleError = (error: unknown) => {
-					// If it's already our error type, just add the context
 					if (error instanceof TranslationError) {
 						error.context.operation = context.operation;
 						error.context.metadata = {
@@ -95,7 +91,6 @@ export function createErrorHandlingProxy<T extends object>(
 						throw error;
 					}
 
-					// Check if we have a specific error mapping
 					if (error instanceof Error) {
 						const errorType = error.constructor.name;
 						const mapping = errorMap.get(errorType);
@@ -110,7 +105,6 @@ export function createErrorHandlingProxy<T extends object>(
 						}
 					}
 
-					// Default error handling
 					throw new TranslationError(
 						error instanceof Error ? error.message : String(error),
 						ErrorCode.UNKNOWN_ERROR,
@@ -119,7 +113,6 @@ export function createErrorHandlingProxy<T extends object>(
 				};
 
 				try {
-					// Handle async methods
 					if (value.constructor.name === "AsyncFunction") {
 						return errorHandler.wrapAsync(async () => {
 							try {
@@ -130,7 +123,6 @@ export function createErrorHandlingProxy<T extends object>(
 						}, context)();
 					}
 
-					// Handle synchronous methods
 					return errorHandler.wrapSync(() => {
 						try {
 							return value.apply(obj, args);

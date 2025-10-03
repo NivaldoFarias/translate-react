@@ -1,8 +1,8 @@
 /**
- * @fileoverview
- * Test suite for Base GitHub Service
+ * @fileoverview Tests for the {@link BaseGitHubService}.
  *
- * Tests core GitHub API functionality
+ * This suite covers GitHub API client initialization, configuration management,
+ * and core functionality for all GitHub-based services.
  */
 
 import { beforeEach, describe, expect, mock, test } from "bun:test";
@@ -53,15 +53,17 @@ describe("Base GitHub Service", () => {
 		expect(service.getToken()).toBe(mockConfig.token);
 	});
 
-	test("should format errors correctly", () => {
-		const testError = new Error("Test error");
-		const formattedError = service.testFormatError(testError, "Test context");
-		expect(formattedError).toBe("Test context: Test error");
+	test("should have valid Octokit instance", () => {
+		const octokit = service.getOctokit();
+		expect(octokit).toBeDefined();
+		expect(octokit.rest).toBeDefined();
+		expect(typeof octokit.request).toBe("function");
 	});
 
-	test("should format unknown errors", () => {
-		const formattedError = service.testFormatError(null, "Test context");
-		expect(formattedError).toBe("Test context: Unknown error");
+	test("should store configuration correctly", () => {
+		expect(service.getUpstream()).toEqual({ owner: "test-owner", repo: "test-repo" });
+		expect(service.getFork()).toEqual({ owner: "fork-owner", repo: "fork-repo" });
+		expect(service.getToken()).toBe("test-token");
 	});
 
 	test("should handle API rate limits", async () => {
@@ -91,7 +93,7 @@ describe("Base GitHub Service", () => {
 	});
 
 	test("should handle API errors", async () => {
-		// @ts-ignore - Mocking private property
+		// @ts-expect-error - Mocking private property
 		service.octokit = {
 			rateLimit: {
 				get: mock(() => Promise.reject(new Error("API Error"))),
@@ -115,7 +117,7 @@ describe("Base GitHub Service", () => {
 			},
 		};
 
-		// @ts-ignore - Mocking private property
+		// @ts-expect-error - Mocking private property
 		service.octokit = {
 			rateLimit: {
 				get: mock(() => Promise.resolve(mockRateLimit)),

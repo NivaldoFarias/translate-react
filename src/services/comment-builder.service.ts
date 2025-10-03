@@ -158,11 +158,11 @@ export class CommentBuilderService {
 			let currentLevel = structure;
 
 			for (const part of item.pathParts) {
-				let extractedPart = structure[part];
+				if (!currentLevel[part]) {
+					currentLevel[part] = { files: [] };
+				}
 
-				if (!extractedPart) extractedPart = { files: [] };
-
-				currentLevel = { ...currentLevel, [part]: extractedPart };
+				currentLevel = currentLevel[part] as HierarchicalStructure;
 			}
 
 			currentLevel.files?.push({ filename: item.filename, prNumber: item.prNumber });

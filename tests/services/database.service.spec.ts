@@ -1,25 +1,24 @@
 /**
- * @fileoverview
- * Test suite for Database Service
+ * @fileoverview Tests for the {@link DatabaseService}.
  *
- * Tests database operations and data persistence
+ * This suite covers database operations, data persistence, snapshot management,
+ * and all CRUD operations for the translation workflow storage system.
  */
 
-import { existsSync } from "fs";
-import { unlink } from "fs/promises";
+import { existsSync } from "node:fs";
+import { unlink } from "node:fs/promises";
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
 import type { ProcessedFileResult } from "@/types";
 
-import { DatabaseService } from "../../src/services/database.service";
+import { DatabaseService } from "@/services/database.service";
 
-describe("Database Service", () => {
+describe("DatabaseService", () => {
 	let dbService: DatabaseService;
 	const TEST_DB_PATH = "test-snapshots.sqlite";
 
 	beforeEach(async () => {
-		// Clean up any existing test database
 		if (existsSync(TEST_DB_PATH)) {
 			await unlink(TEST_DB_PATH);
 		}
@@ -27,7 +26,6 @@ describe("Database Service", () => {
 	});
 
 	afterEach(async () => {
-		// Clean up test database after each test
 		if (existsSync(TEST_DB_PATH)) {
 			await unlink(TEST_DB_PATH);
 		}
@@ -116,12 +114,10 @@ describe("Database Service", () => {
 	});
 
 	test("should handle empty database state", async () => {
-		// Create a new instance with a fresh database
 		const emptyDbService = new DatabaseService(`empty-${TEST_DB_PATH}`);
 		const latestSnapshot = emptyDbService.getLatestSnapshot();
 		expect(latestSnapshot).toBeNull();
 
-		// Clean up the empty database
 		if (existsSync(`empty-${TEST_DB_PATH}`)) {
 			await unlink(`empty-${TEST_DB_PATH}`);
 		}
@@ -167,28 +163,19 @@ describe("Database Service", () => {
 	});
 
 	test("should retrieve all snapshots", () => {
-		// Create multiple snapshots with different timestamps
-		const timestamps = [
-			1000000000000, // Older timestamp
-			2000000000000, // Middle timestamp
-			3000000000000, // Newer timestamp
-		];
+		const timestamps = [1000000000000, 2000000000000, 3000000000000];
 
-		// Create snapshots and store their IDs
 		const snapshotIds = timestamps.map((timestamp) => dbService.createSnapshot(timestamp));
 
-		// Retrieve all snapshots
 		const snapshots = dbService.getSnapshots();
 
-		// Verify snapshots were retrieved correctly
 		expect(snapshots).toHaveLength(3);
 
-		// Verify each snapshot has correct structure and data
 		snapshots.forEach((snapshot, index) => {
 			const expectedSnapshot = {
 				id: snapshotIds[index] ?? 0,
 				timestamp: timestamps[index] ?? 0,
-				created_at: expect.any(String), // SQLite adds this automatically
+				created_at: expect.any(String),
 			};
 
 			expect(snapshot).toEqual(expectedSnapshot);

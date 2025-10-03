@@ -88,7 +88,6 @@ export class ErrorHandler {
 	public handle(error: Error, context?: Partial<ErrorContext>): TranslationError {
 		const translatedError = this.wrapError(error, context);
 
-		// Log asynchronously to avoid blocking error handling
 		this.logError(translatedError).catch((logError) => {
 			console.error("Failed to log error:", logError);
 		});

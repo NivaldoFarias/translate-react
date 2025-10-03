@@ -7,6 +7,7 @@
 
 import { beforeEach, describe, expect, test } from "bun:test";
 
+import { RuntimeEnvironment } from "@/utils/constants.util";
 import { validateEnv } from "@/utils/env.util";
 
 describe("Environment Utilities", () => {
@@ -14,10 +15,9 @@ describe("Environment Utilities", () => {
 
 	beforeEach(() => {
 		process.env = { ...originalEnv };
-		// Reset import.meta.env for each test
 		Object.assign(import.meta.env, {
-			GITHUB_TOKEN: "test-token",
-			OPENAI_API_KEY: "test-key",
+			GITHUB_TOKEN: "ghp_1234567890abcdefghijklmnopqrstuvwxyzABCD",
+			OPENAI_API_KEY: "sk-1234567890abcdefghijklmnopqrstuvwxyzABCDEF1234567890",
 			LLM_MODEL: "test-model",
 			REPO_FORK_OWNER: "test-owner",
 			REPO_FORK_NAME: "test-repo",
@@ -29,9 +29,9 @@ describe("Environment Utilities", () => {
 
 	test("should validate correct environment variables", () => {
 		const env = validateEnv();
-		expect(env.GITHUB_TOKEN).toBe("test-token");
-		expect(env.OPENAI_API_KEY).toBe("test-key");
-		expect(env.NODE_ENV).toBe("test");
+		expect(env.GITHUB_TOKEN).toBe("ghp_1234567890abcdefghijklmnopqrstuvwxyzABCD");
+		expect(env.OPENAI_API_KEY).toBe("sk-1234567890abcdefghijklmnopqrstuvwxyzABCDEF1234567890");
+		expect(env.NODE_ENV).toBe(RuntimeEnvironment.TEST);
 	});
 
 	test("should throw error for missing required variables", () => {
