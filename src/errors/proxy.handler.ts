@@ -101,7 +101,9 @@ export function createErrorHandlingProxy<T extends object>(
 						const mapping = errorMap.get(errorType);
 						if (mapping) {
 							const additionalContext = mapping.transform?.(error) ?? {};
-							throw new TranslationError(error.message, mapping.code, {
+							const errorCodeToUse = additionalContext.code ?? mapping.code;
+
+							throw new TranslationError(error.message, errorCodeToUse, {
 								...context,
 								...additionalContext,
 							});

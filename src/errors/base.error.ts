@@ -7,6 +7,7 @@ export enum ErrorSeverity {
 	WARN = "WARN",
 	ERROR = "ERROR",
 	FATAL = "FATAL",
+	LOG = "LOG",
 }
 
 /** Standardized error codes for the translation workflow */
@@ -42,6 +43,15 @@ export interface ErrorContext {
 	file?: BunFile | string;
 	metadata?: Record<string, unknown>;
 	timestamp?: Date;
+}
+
+export interface FormattedError {
+	name: string;
+	message: string;
+	code: ErrorCode;
+	timestamp: string;
+	context: ErrorContext;
+	stack: string[];
 }
 
 /**
@@ -86,7 +96,7 @@ export class TranslationError extends Error {
 	}
 
 	/** Creates a formatted error message including context information */
-	public toJSON() {
+	public toJSON(): FormattedError {
 		return {
 			name: this.name,
 			message: this.message,
@@ -97,7 +107,8 @@ export class TranslationError extends Error {
 		};
 	}
 
-	private stackList(stack = "") {
+	/** Converts the stack trace string into a list of lines for easier reading */
+	private stackList(stack = ""): Array<string> {
 		return stack
 			.split("\n")
 			.slice(1)

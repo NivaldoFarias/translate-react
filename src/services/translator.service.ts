@@ -2,9 +2,9 @@ import { franc } from "franc";
 import OpenAI from "openai";
 import { APIError } from "openai/error";
 
-import type { ProxyHandlerOptions } from "@/errors/";
-
 import type { LanguageConfig } from "./language-detector.service";
+
+import type { ProxyHandlerOptions } from "@/errors/";
 
 import { createErrorHandlingProxy, ErrorCode } from "@/errors/";
 import { env, TranslationFile } from "@/utils/";
@@ -50,6 +50,16 @@ export class TranslatorService {
 			code: ErrorCode.LLM_API_ERROR,
 			transform: (error: Error) => {
 				if (error instanceof APIError) {
+					if (error.status === 429 || error.message.toLowerCase().includes("rate limit")) {
+						return {
+							code: ErrorCode.RATE_LIMIT_EXCEEDED,
+							metadata: {
+								statusCode: error.status,
+								type: error.type,
+								originalMessage: error.message,
+							},
+						};
+					}
 					return { metadata: { statusCode: error.status, type: error.type } };
 				}
 

@@ -1,8 +1,9 @@
 import langs from "langs";
 import ora from "ora";
 
-import type { FileProcessingProgress, ProcessedFileResult, Snapshot } from "@/types";
 import type { SetNonNullable } from "type-fest";
+
+import type { FileProcessingProgress, ProcessedFileResult, Snapshot } from "@/types";
 
 import {
 	createErrorHandlingProxy,
@@ -349,17 +350,17 @@ export abstract class RunnerService {
 	/**
 	 * Generates and displays final statistics for the translation workflow
 	 *
+	 * The statistics are displayed using a combination of:
+	 * - Console tables for summary data
+	 * - Itemized lists for failures
+	 * - Timing information
+	 *
 	 * ### Statistics Reported
 	 *
 	 * - Total files processed
 	 * - Success/failure counts
 	 * - Detailed error information for failed files
 	 * - Total execution time
-	 *
-	 * The statistics are displayed using a combination of:
-	 * - Console tables for summary data
-	 * - Itemized lists for failures
-	 * - Timing information
 	 */
 	protected async printFinalStatistics(): Promise<void> {
 		const elapsedTime = Math.ceil(Date.now() - this.metadata.timestamp);
