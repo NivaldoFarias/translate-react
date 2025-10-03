@@ -1,7 +1,6 @@
 import Bun from "bun";
 
 import type { ErrorContext } from "./base.error";
-import type { BunFile } from "bun";
 
 import { ErrorCode, ErrorSeverity, TranslationError } from "./base.error";
 
@@ -45,8 +44,8 @@ export class ErrorHandler {
 	/** The configuration for the error handler */
 	private readonly config: ErrorHandlerConfig;
 
-	/** The stream to write errors to */
-	private logStream?: BunFile;
+	/** The path to the log file */
+	private logFilePath?: string;
 
 	/**
 	 * Creates a new ErrorHandler instance
@@ -61,7 +60,7 @@ export class ErrorHandler {
 		};
 
 		if (this.config.logToFile && this.config.logFilePath) {
-			this.logStream = Bun.file(this.config.logFilePath);
+			this.logFilePath = this.config.logFilePath;
 		}
 	}
 
@@ -86,9 +85,13 @@ export class ErrorHandler {
 	 *
 	 * @returns The translated error
 	 */
-	public handle(error: Error, context?: Partial<ErrorContext>) {
+	public handle(error: Error, context?: Partial<ErrorContext>): TranslationError {
 		const translatedError = this.wrapError(error, context);
-		this.logError(translatedError);
+
+		// Log asynchronously to avoid blocking error handling
+		this.logError(translatedError).catch((logError) => {
+			console.error("Failed to log error:", logError);
+		});
 
 		if (this.config.customReporter) {
 			this.config.customReporter(translatedError);
@@ -173,16 +176,20 @@ export class ErrorHandler {
 	 *
 	 * @param error The error to log
 	 */
-	private logError(error: TranslationError) {
+	private async logError(error: TranslationError): Promise<void> {
 		const severity = error.context.sanity ?? ErrorSeverity.ERROR;
 
 		if (this.shouldLog(severity)) {
-			// const method = this.getSeverityMethod(severity);
+			if (this.logFilePath) {
+				try {
+					const logEntry = JSON.stringify(error.toJSON(), null, 2) + "\n";
+					const file = Bun.file(this.logFilePath);
+					const existingContent = (await file.exists()) ? await file.text() : "";
 
-			// (console[method] as (...args: any[]) => void)(error.message);
-
-			if (this.logStream) {
-				this.logStream.write(JSON.stringify(error.toJSON(), null, 2) + "\n");
+					await Bun.write(this.logFilePath, existingContent + logEntry, { createPath: true });
+				} catch (writeError) {
+					console.error("Failed to write error to log file:", writeError);
+				}
 			}
 		}
 	}
@@ -216,6 +223,7 @@ export class ErrorHandler {
 			[ErrorSeverity.WARN]: "warn",
 			[ErrorSeverity.ERROR]: "error",
 			[ErrorSeverity.FATAL]: "error",
+			[ErrorSeverity.LOG]: "log",
 		};
 
 		return methodMap[severity];
