@@ -110,7 +110,7 @@ MUST use GFM task lists for actionable items in issues, pull requests, and docum
 
 ```markdown
 - [x] Design the database schema
-- [ ] Implement the `Alutrip Responde` endpoint
+- [ ] Implement the API endpoint
 ```
 
 ###### [GitHub Docs: About task lists](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/about-task-lists)
@@ -248,7 +248,7 @@ SHOULD keep line length under 100 characters to improve readability in raw Markd
   - Verify all links are functional and use proper relative paths
   - Check that code blocks have correct language identifiers
   - Ensure heading hierarchy is logical and follows document structure
-  - Validate that examples are relevant to AluTrip project context
+  - Validate that examples are relevant to project context
   - Review table formatting and alignment
 
 ### Documentation Maintenance [P1]

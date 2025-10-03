@@ -211,12 +211,12 @@ export class TranslatorService {
 			You are a precise translator specializing in technical documentation. 
 			Your task is to translate React documentation from ${languages.source} to ${languages.target} in a single, high-quality pass.
 
-			TRANSLATION AND VERIFICATION REQUIREMENTS - YOU MUST FOLLOW THESE EXACTLY:
+			TRANSLATION AND VERIFICATION REQUIREMENTS — YOU MUST FOLLOW THESE EXACTLY:
 			1. MUST maintain ALL original markdown formatting, including code blocks, links, and special syntax
-			2. MUST preserve ALL original code examples exactly as they are
+			2. MUST preserve ALL original code examples EXACTLY as they are
 			3. MUST keep ALL original HTML tags intact and unchanged
-			4. MUST follow the glossary rules below STRICTLY - these are non-negotiable terms
-			5. MUST maintain ALL original frontmatter exactly as in original
+			4. MUST follow the glossary rules below STRICTLY — these are non-negotiable terms
+			5. MUST maintain ALL original frontmatter EXACTLY as in original
 			6. MUST preserve ALL original line breaks and paragraph structure
 			7. MUST NOT translate code variables, function names, or technical terms not in the glossary
 			8. MUST NOT add any content
@@ -227,6 +227,7 @@ export class TranslatorService {
 			13. MUST ensure the translation reads naturally in ${languages.target} while preserving technical accuracy
 			14. When translating code blocks, MUST only translate comments and string literals that don't refer to code
 			15. MUST respond only with the translated content.
+			16. MUST make sure the output text content is not preppended or appended with any extra characters or text (sometimes LLMs add "\`\`\`" at the start or end)
 			
 			GLOSSARY RULES:
 			You must translate the following terms according to the glossary:
@@ -239,6 +240,7 @@ export class TranslatorService {
 	 * smaller chunks and translating each chunk separately, then combining the results.
 	 *
 	 * ### Workflow
+	 *
 	 * 1. Splits content at natural break points (middle of paragraphs, end of code blocks)
 	 * 2. Recursively splits chunks that are still too large
 	 * 3. Translates each chunk while maintaining context
@@ -260,6 +262,7 @@ export class TranslatorService {
 	 * Translates the content of the chunks.
 	 *
 	 * ### Workflow
+	 *
 	 * 1. Adds context about chunking to help maintain consistency
 	 * 2. Translates each chunk
 	 * 3. Removes the part prefix if it exists in the response
