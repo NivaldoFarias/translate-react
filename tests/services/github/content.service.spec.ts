@@ -1,17 +1,16 @@
 /**
- * @fileoverview
- * Test suite for GitHub Content Service
+ * @fileoverview Tests for the {@link ContentService}.
  *
- * Tests content retrieval and manipulation operations
+ * This suite covers content retrieval, file operations, commit creation,
+ * and pull request management for GitHub-based translation workflow.
  */
 
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 
+import { ContentService } from "@/services/github/content.service";
 import { TranslationFile } from "@/utils/translation-file.util";
 
-import { ContentService } from "../../../src/services/github/content.service";
-
-describe("GitHub Content Service", () => {
+describe("ContentService", () => {
 	let contentService: ContentService;
 	const mockConfig = {
 		upstream: { owner: "test-owner", repo: "test-repo" },
@@ -46,7 +45,7 @@ describe("GitHub Content Service", () => {
 			},
 		};
 
-		// @ts-ignore - Mocking private property
+		// @ts-expect-error - Mocking private property
 		contentService.octokit = {
 			git: {
 				getTree: mock(() => Promise.resolve(mockTree)),
@@ -81,36 +80,32 @@ describe("GitHub Content Service", () => {
 			filename: "file.md",
 		};
 
-		const mockGetContent = {
-			data: {
-				sha: "current-sha",
-			},
-		};
-
-		const mockCreateOrUpdate = {
+		const mockCreateOrUpdateResponse = {
 			data: {
 				content: {
 					sha: "new-sha",
 				},
+				commit: {
+					sha: "commit-sha",
+				},
 			},
 		};
 
-		// @ts-ignore - Mocking private property
+		// @ts-expect-error - Mocking private property for testing
 		contentService.octokit = {
 			repos: {
-				getContent: mock(() => Promise.resolve(mockGetContent)),
-				createOrUpdateFileContents: mock(() => Promise.resolve(mockCreateOrUpdate)),
+				createOrUpdateFileContents: mock(() => Promise.resolve(mockCreateOrUpdateResponse)),
 			},
 		};
 
 		expect(
-			contentService.commitTranslation(
-				mockBranch,
-				mockFile,
-				"# Translated Content",
-				"test: translate content",
-			),
-		).resolves.not.toThrow();
+			await contentService.commitTranslation({
+				branch: mockBranch,
+				file: mockFile,
+				content: "# Translated Content",
+				message: "test: translate content",
+			}),
+		).resolves.toBeDefined();
 	});
 
 	test("should create pull request", async () => {
@@ -120,7 +115,7 @@ describe("GitHub Content Service", () => {
 			html_url: "https://github.com/test/test/pull/1",
 		};
 
-		// @ts-ignore - Mocking private property
+		// @ts-expect-error - Mocking private property
 		contentService.octokit = {
 			pulls: {
 				list: mock(() => Promise.resolve({ data: [] })),
@@ -128,11 +123,11 @@ describe("GitHub Content Service", () => {
 			},
 		};
 
-		const pr = await contentService.createPullRequest(
-			"translate/test",
-			"test: new translation",
-			"Adds test translation",
-		);
+		const pr = await contentService.createPullRequest({
+			branch: "translate/test",
+			title: "test: new translation",
+			body: "Adds test translation",
+		});
 
 		expect(pr.number).toBe(1);
 		expect(pr.html_url).toBe("https://github.com/test/test/pull/1");
@@ -146,7 +141,7 @@ describe("GitHub Content Service", () => {
 			},
 		};
 
-		// @ts-ignore - Mocking private property
+		// @ts-expect-error - Mocking private property
 		contentService.octokit = {
 			git: {
 				getBlob: mock(() => Promise.resolve(mockBlob)),
@@ -165,7 +160,7 @@ describe("GitHub Content Service", () => {
 	});
 
 	test("should handle file content errors", async () => {
-		// @ts-ignore - Mocking private property
+		// @ts-expect-error - Mocking private property
 		contentService.octokit = {
 			git: {
 				getBlob: mock(() => Promise.reject(new Error("Not Found"))),

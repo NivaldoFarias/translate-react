@@ -1,5 +1,6 @@
-import type { ProcessedFileResult } from "@/types";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
+
+import type { ProcessedFileResult } from "@/types";
 
 import { BranchService } from "@/services/github/branch.service";
 import {
@@ -208,7 +209,6 @@ export class GitHubService {
 
 				await this.services.content.closePullRequest(existingPR.number);
 
-				// Create new PR since the old one was outdated
 				return await this.services.content.createPullRequest({
 					branch: branchName,
 					...prOptions,
@@ -216,11 +216,9 @@ export class GitHubService {
 				});
 			}
 
-			// PR exists and is up to date, return existing PR
 			return existingPR;
 		}
 
-		// No existing PR, create new one
 		return await this.services.content.createPullRequest({
 			branch: branchName,
 			...prOptions,

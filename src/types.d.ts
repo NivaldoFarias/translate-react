@@ -25,10 +25,7 @@ export interface ProcessedFileResult {
     branch: RestEndpointMethodTypes["git"]["getRef"]["response"]["data"] | null;
     filename: string;
     translation: string | null;
-    pullRequest:
-        | RestEndpointMethodTypes["pulls"]["create"]["response"]["data"]
-        | RestEndpointMethodTypes["pulls"]["list"]["response"]["data"][number]
-        | null;
+    pullRequest: RestEndpointMethodTypes["pulls"]["create"]["response"]["data"] | null;
     error: Error | null;
 }
 
