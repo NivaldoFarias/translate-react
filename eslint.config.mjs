@@ -31,6 +31,7 @@ export default defineConfig(
 
 			/* ESLint */
 			"no-unused-vars": "off",
+			"no-console": "error",
 
 			/* TypeScript */
 			"@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],

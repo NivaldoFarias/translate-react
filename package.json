@@ -20,10 +20,12 @@
 		"type-check": "tsc"
 	},
 	"dependencies": {
+		"@langchain/textsplitters": "^0.1.0",
 		"@octokit/request-error": "^7.0.1",
 		"@octokit/rest": "^21.1.0",
 		"cld": "^2.10.1",
 		"http-status-codes": "^2.3.0",
+		"js-tiktoken": "^1.0.21",
 		"openai": "^4.78.1",
 		"ora": "^8.1.1",
 		"zod": "^4.1.9"

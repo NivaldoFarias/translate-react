@@ -115,3 +115,30 @@ Larger, more comprehensive changes should only be suggested in specific scenario
 - When user explicitly requests comprehensive refactoring
 - For initial project setup or major architectural decisions
 - When addressing critical bugs that span multiple components
+
+### Library-First Implementation Strategy [P0]
+
+- **WHEN**: Implementing any non-trivial functionality (text processing, data manipulation, algorithms, parsing, formatting, etc.)
+- **WHAT**: MUST research and prioritize existing, battle-tested libraries over custom implementations
+- **WHY**: Custom implementations often contain bugs, performance issues, edge cases, and maintenance overhead that established libraries have already solved
+- **HOW**:
+  - ALWAYS search npm/package registries BEFORE writing custom logic
+  - Prefer libraries with active maintenance, good documentation, and wide adoption
+  - Consider specialized libraries (e.g., LangChain for text processing, date-fns for dates, lodash for utilities)
+  - Evaluate library bundle size vs. implementation complexity trade-offs
+  - When custom implementation seems necessary, explicitly justify why existing solutions are inadequate
+- **EXCEPT**: Simple utilities (2-5 lines), project-specific business logic, or when library dependencies would create significant bloat
+
+### Custom Implementation Red Flags [P0]
+
+NEVER implement custom solutions for these common patterns without thorough library research:
+
+- Text chunking, splitting, or processing algorithms
+- Date/time manipulation and formatting
+- Data structure operations (sorting, filtering, grouping)
+- File parsing (JSON, CSV, XML, Markdown)
+- Validation and schema enforcement
+- Cryptographic operations
+- HTTP request handling and retry logic
+- Caching mechanisms
+- Token counting or text analysis
