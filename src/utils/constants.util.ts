@@ -110,8 +110,8 @@ export const environmentDefaults = {
 
 	/** @see {@link https://github.com/reactjs/pt-br.react.dev/issues/555|Docs Progress Issue (pt-BR)} */
 	PROGRESS_ISSUE_NUMBER: 555,
-	LLM_MODEL: "google/gemini-2.0-flash-exp:free",
-	BATCH_SIZE: 10,
+	LLM_MODEL: "google/gemini-2.5-flash-lite",
+	BATCH_SIZE: 1,
 	TARGET_LANGUAGE: "pt-br",
 	SOURCE_LANGUAGE: "en",
 } as const;

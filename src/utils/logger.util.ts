@@ -36,7 +36,12 @@ export interface LoggerConfig {
 	/** Whether to log to file */
 	logToFile?: boolean;
 
-	/** Path to the log file */
+	/**
+	 * Path to the log file (recommend using .json extension for JSON array format)
+	 *
+	 * The Logger uses JSON array format where all log entries are stored in a
+	 * single JSON array. This format enables easy parsing as valid JSON.
+	 */
 	logFilePath?: string;
 
 	/** Minimum severity to log to console */
@@ -54,6 +59,10 @@ export interface LoggerConfig {
  * other services in the app can simply call the convenience methods
  * (`info`, `error`, etc.). It uses the {@link ErrorSeverity} enum to control
  * filtering behavior.
+ *
+ * Uses JSON array format for log files where all entries are stored in a single
+ * JSON array structure. This format provides valid JSON that can be easily parsed.
+ * Recommended file extension: `.json`
  *
  * @example
  * ```typescript

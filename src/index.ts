@@ -11,7 +11,7 @@ import { env } from "./utils";
 
 if (import.meta.main) {
 	const errorHandler = initializeErrorHandler(
-		Bun.file(`logs/${new Date().toISOString()}.log.json`),
+		Bun.file(`logs/${new Date().toISOString()}.log.jsonl`),
 	);
 
 	const runTranslation = errorHandler.wrapAsync(workflow, {

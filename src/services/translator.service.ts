@@ -5,6 +5,8 @@
  * model interaction, response processing, and metrics tracking.
  */
 
+import { MarkdownTextSplitter } from "@langchain/textsplitters";
+import { encodingForModel } from "js-tiktoken";
 import OpenAI from "openai";
 import { APIError } from "openai/error";
 
@@ -13,7 +15,7 @@ import type { LanguageConfig } from "./language-detector.service.ts";
 import type { ProxyHandlerOptions } from "@/errors/";
 
 import { createErrorHandlingProxy, ErrorCode, ErrorHandler, TranslationError } from "@/errors/";
-import { detectRateLimit, env } from "@/utils/";
+import { detectRateLimit, env, MAX_CHUNK_TOKENS } from "@/utils/";
 
 import { LanguageDetector } from "./language-detector.service";
 
@@ -153,26 +155,45 @@ export class TranslatorService {
 	}
 
 	/**
-	 * Main translation method that processes files and manages the translation workflow
+	 * Main translation method that processes files and manages the translation workflow.
+	 *
+	 * Automatically handles large files through intelligent chunking while preserving
+	 * markdown structure and code blocks. Uses token estimation to determine if
+	 * content needs to be split into manageable pieces.
 	 *
 	 * ### Workflow
 	 *
 	 * 1. Validates input content
-	 * 2. Parses content (without modifying code blocks)
-	 * 3. Calls language model for translation
-	 * 4. Returns translated content
+	 * 2. Determines if chunking is needed based on token estimates
+	 * 3. Translates content (with chunking if necessary)
+	 * 4. Cleans up and returns translated content
 	 * 5. Updates metrics
 	 *
 	 * @param file File containing content to translate
+	 *
+	 * @returns Promise resolving to translated content
+	 *
+	 * @example
+	 * ```typescript
+	 * const translator = new TranslatorService({ source: 'en', target: 'pt-br' });
+	 * const file = new TranslationFile(
+	 *   '# Hello\n\nWelcome to React!',
+	 *   'hello.md',
+	 *   'docs/hello.md',
+	 *   'abc123'
+	 * );
+	 * const translated = await translator.translateContent(file);
+	 * console.log(translated); // '# Olá\n\nBem-vindo ao React!'
+	 * ```
 	 */
 	public async translateContent(file: TranslationFile): Promise<string> {
 		if (!file.content?.length) {
 			throw new Error(`File content is empty: ${file.filename}`);
 		}
 
-		const content = await this.callLanguageModel(file.content);
+		const translatedContent = await this.translateWithChunking(file.content);
 
-		return this.cleanupTranslatedContent(content, file.content);
+		return this.cleanupTranslatedContent(translatedContent, file.content);
 	}
 
 	/**
@@ -218,6 +239,154 @@ export class TranslatorService {
 	}
 
 	/**
+	 * Estimates token count for content using tiktoken encoding.
+	 *
+	 * Uses the actual tokenization model to provide accurate token counts
+	 * for the specific LLM being used. This is crucial for proper chunking
+	 * and avoiding API limits.
+	 *
+	 * @param content Content to estimate tokens for
+	 *
+	 * @returns Accurate token count using model-specific encoding
+	 *
+	 * @example
+	 * ```typescript
+	 * const translator = new TranslatorService({ source: 'en', target: 'pt-br' });
+	 * const tokenCount = translator.estimateTokenCount('# Hello World\n\nWelcome!');
+	 * console.log(tokenCount); // ~8 tokens
+	 * ```
+	 */
+	private estimateTokenCount(content: string): number {
+		try {
+			const encoding = encodingForModel("gpt-4o-mini");
+			const tokens = encoding.encode(content);
+			return tokens.length;
+		} catch {
+			return Math.ceil(content.length / 3.5);
+		}
+	}
+
+	/**
+	 * Determines if content needs chunking based on token estimates.
+	 *
+	 * Checks if the estimated token count exceeds safe limits, leaving buffer
+	 * space for system prompt (approximately 1000 tokens) and output tokens
+	 * (approximately 8000 tokens).
+	 *
+	 * @param content Content to check for chunking requirements
+	 *
+	 * @returns True if content exceeds safe token limits and needs chunking
+	 *
+	 * @example
+	 * ```typescript
+	 * const translator = new TranslatorService({ source: 'en', target: 'pt-br' });
+	 * const needsChunking = translator.needsChunking(largeContent);
+	 * if (needsChunking) {
+	 *   console.log('Content will be split into chunks');
+	 * }
+	 * ```
+	 */
+	private needsChunking(content: string): boolean {
+		const estimatedTokens = this.estimateTokenCount(content);
+		const maxInputTokens = MAX_CHUNK_TOKENS - 1000;
+		return estimatedTokens > maxInputTokens;
+	}
+
+	/**
+	 * Splits content into chunks while preserving markdown structure.
+	 *
+	 * Uses LangChain's MarkdownTextSplitter for intelligent chunking that respects
+	 * markdown structure and code blocks, ensuring chunks don't exceed the maximum
+	 * token limit while maintaining content coherence and readability.
+	 *
+	 * @param content Content to split into manageable chunks
+	 * @param maxTokens Maximum tokens per chunk (defaults to safe limit)
+	 *
+	 * @returns Promise resolving to array of content chunks with preserved markdown structure
+	 *
+	 * @example
+	 * ```typescript
+	 * const translator = new TranslatorService({ source: 'en', target: 'pt-br' });
+	 * const largeContent = '# Title\n\n```js\ncode here\n```\n\nMore content...';
+	 * const chunks = await translator.chunkContent(largeContent, 1000);
+	 * console.log(chunks.length); // Number of chunks created
+	 * ```
+	 */
+	private async chunkContent(
+		content: string,
+		maxTokens = MAX_CHUNK_TOKENS - 500,
+	): Promise<string[]> {
+		if (!this.needsChunking(content)) {
+			return [content];
+		}
+
+		const splitter = new MarkdownTextSplitter({
+			chunkSize: maxTokens,
+			chunkOverlap: 200,
+			lengthFunction: (text: string) => this.estimateTokenCount(text),
+		});
+
+		const chunks = await splitter.splitText(content);
+		return chunks.filter((chunk) => chunk.trim().length > 0);
+	}
+
+	/**
+	 * Translates content using chunking if necessary.
+	 *
+	 * Handles large files by breaking them into manageable pieces and processing
+	 * each chunk separately. Automatically reassembles the translated chunks while
+	 * maintaining proper spacing and structure.
+	 *
+	 * @param content Content to translate (may be chunked if large)
+	 *
+	 * @returns Promise resolving to translated content reassembled from chunks
+	 *
+	 * @example
+	 * ```typescript
+	 * const translator = new TranslatorService({ source: 'en', target: 'pt-br' });
+	 * const largeContent = 'Very long documentation content...';
+	 * const translated = await translator.translateWithChunking(largeContent);
+	 * console.log('Translation completed successfully');
+	 * ```
+	 */
+	private async translateWithChunking(content: string): Promise<string> {
+		const contentNeedsChunking = this.needsChunking(content);
+
+		if (!contentNeedsChunking) {
+			return await this.callLanguageModel(content);
+		}
+
+		const chunks = await this.chunkContent(content);
+		const translatedChunks: string[] = [];
+
+		for (let i = 0; i < chunks.length; i++) {
+			const chunk = chunks[i]!;
+
+			try {
+				const translatedChunk = await this.callLanguageModel(chunk);
+				translatedChunks.push(translatedChunk);
+			} catch (error) {
+				throw new TranslationError(
+					`Failed to translate content chunk ${i + 1}/${chunks.length}`,
+					ErrorCode.LLM_API_ERROR,
+					{
+						operation: "translateWithChunking",
+						metadata: {
+							chunkIndex: i,
+							totalChunks: chunks.length,
+							chunkSize: chunk.length,
+							estimatedTokens: this.estimateTokenCount(chunk),
+							originalError: error instanceof Error ? error.message : String(error),
+						},
+					},
+				);
+			}
+		}
+
+		return translatedChunks.join("\n\n");
+	}
+
+	/**
 	 * Sends content to the language model for translation.
 	 * Constructs system and user prompts based on detected language.
 	 *
@@ -233,7 +402,7 @@ export class TranslatorService {
 			const completion = await this.llm.chat.completions.create({
 				model: env.LLM_MODEL,
 				temperature: 0.1,
-				max_tokens: 4096,
+				max_tokens: 8192,
 				messages: [
 					{ role: "system", content: systemPrompt },
 					{ role: "user", content: userPrompt },
@@ -241,6 +410,7 @@ export class TranslatorService {
 			});
 
 			const translatedContent = completion.choices[0]?.message?.content;
+
 			if (!translatedContent) {
 				throw new Error("No content returned from language model");
 			}
@@ -388,6 +558,8 @@ export class TranslatorService {
 			- MUST NOT add whitespace to lists or between list items and their bullets/numbers (e.g. "- item", "1. item"; NOT "-item", "1.item" or "-  item", "1.  item")
 			- MUST NOT wrap the translated content in a code block (sometimes LLMs do this even when instructed not to)
 			- MUST NOT remove the original frontmatter at the start of the document (the section between "---" lines)
+			- MUST keep the same number of blank lines as the original content
+			- MUST keep the blank line at the end of a file if it is present in the original content
 			${languages.target === "Português (Brasil)" ? "- MUST translate 'deprecated' and derived terms to 'descontinuado(a)' or 'obsoleto(a)'" : ""}
 
 			${glossarySection}

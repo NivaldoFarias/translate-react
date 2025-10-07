@@ -12,7 +12,12 @@ export interface ErrorHandlerConfig {
 	/** Whether to log errors to a file */
 	logToFile?: boolean;
 
-	/** The path to the log file */
+	/**
+	 * The path to the log file (recommend using .jsonl extension for JSONL format)
+	 *
+	 * The ErrorHandler uses JSONL (JSON Lines) format where each line is a separate
+	 * JSON object. This format is optimal for streaming logs and append-only operations.
+	 */
 	logFilePath?: string;
 
 	/** A custom reporter function */
@@ -36,7 +41,13 @@ export function extractErrorMessage(error: unknown): string {
 	return String(error);
 }
 
-/** Centralized error handling service implementing the singleton pattern */
+/**
+ * Centralized error handling service implementing the singleton pattern.
+ *
+ * Uses JSONL (JSON Lines) format for log files where each line contains a complete
+ * JSON object. This format is optimal for streaming logs and append-only operations.
+ * Recommended file extension: `.jsonl`
+ */
 export class ErrorHandler {
 	/** The singleton instance of ErrorHandler */
 	private static instance: ErrorHandler;
