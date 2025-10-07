@@ -11,10 +11,9 @@ import { unlink } from "node:fs/promises";
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-import type { ProcessedFileResult, Snapshot } from "@/types";
-import type { TranslationFile } from "@/utils/";
-
-import { SnapshotService } from "@/services/snapshot.service";
+import { ProcessedFileResult } from "@/services/runner/base.service";
+import { Snapshot, SnapshotService } from "@/services/snapshot.service";
+import { TranslationFile } from "@/services/translator.service";
 
 describe("SnapshotService", () => {
 	let snapshotService: SnapshotService;

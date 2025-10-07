@@ -1,24 +1,58 @@
-import { franc } from "franc";
+/**
+ * @fileoverview Core service for translating content using OpenAI's language models.
+ *
+ * Handles the entire translation workflow including content parsing, language detection,
+ * model interaction, response processing, and metrics tracking.
+ */
+
 import OpenAI from "openai";
 import { APIError } from "openai/error";
 
-import type { LanguageConfig } from "./language-detector.service";
+import type { LanguageConfig } from "./language-detector.service.ts";
 
 import type { ProxyHandlerOptions } from "@/errors/";
 
 import { createErrorHandlingProxy, ErrorCode } from "@/errors/";
-import { env, TranslationFile } from "@/utils/";
+import { env } from "@/utils/";
 
 import { LanguageDetector } from "./language-detector.service";
+
+/** Represents a file that needs to be translated */
+export class TranslationFile {
+	constructor(
+		/** The content of the file */
+		public readonly content: string,
+
+		/** The filename of the file */
+		public readonly filename: string,
+
+		/** The path of the file */
+		public readonly path: string,
+
+		/** The SHA of the file */
+		public readonly sha: string,
+	) {}
+}
+
 
 /**
  * Core service for translating content using OpenAI's language models.
  *
- * Handles the entire translation workflow. Including:
+ * Handles the entire translation workflow including:
  * - Content parsing and block management
- * - Language model interaction
- * - Response processing
- * - Metrics tracking
+ * - Language model interaction with async language detection
+ * - Response processing and cleanup
+ * - Translation metrics tracking
+ * - Language analysis and detection
+ *
+ * @example
+ * ```typescript
+ * const translator = new TranslatorService({ source: 'en', target: 'pt' });
+ * translator.setGlossary('React -> React\ncomponent -> componente');
+ *
+ * const result = await translator.translateContent(file);
+ * console.log(result); // Translated content
+ * ```
  */
 export class TranslatorService {
 	/** Language model instance for translation */
@@ -32,14 +66,23 @@ export class TranslatorService {
 		},
 	});
 
-	private readonly languageDetector: LanguageDetector;
+	public readonly languageDetector: LanguageDetector;
 
 	public glossary: string | null = null;
 
 	/**
-	 * Initializes the translator service with the given language configuration
+	 * Initializes the translator service with language configuration and error handling.
 	 *
-	 * @param options Language configuration for translation
+	 * Sets up the OpenAI client, language detector, and comprehensive error handling
+	 * with automatic retry logic for rate limits and API errors.
+	 *
+	 * @param options Language configuration for translation workflow
+	 *
+	 * @example
+	 * ```typescript
+	 * const translator = new TranslatorService({ source: 'en', target: 'pt' });
+	 * translator.setGlossary('React -> React\ncomponent -> componente');
+	 * ```
 	 */
 	public constructor(private readonly options: LanguageConfig) {
 		this.languageDetector = new LanguageDetector(this.options);
@@ -75,6 +118,7 @@ export class TranslatorService {
 	 * Main translation method that processes files and manages the translation workflow
 	 *
 	 * ### Workflow
+	 *
 	 * 1. Validates input content
 	 * 2. Parses content (without modifying code blocks)
 	 * 3. Calls language model for translation
@@ -95,97 +139,111 @@ export class TranslatorService {
 
 	/**
 	 * Determines if content is already translated by analyzing its language composition.
-	 * Uses language detection and scoring to make the determination.
+	 * Uses async language detection and scoring to make the determination.
 	 *
 	 * @param file File containing content to analyze
 	 *
-	 * @returns `true` if content is in target language, `false` otherwise
-	 *
-	 * @example
-	 * ```typescript
-	 * const isTranslated = detector.isFileTranslated('Olá mundo');
-	 * ```
+	 * @returns Resolves to `true` if content is already translated
 	 */
-	public isFileTranslated(file: TranslationFile): boolean {
-		const analysis = this.languageDetector.analyzeLanguage(file.filename, file.content);
+	public async isContentTranslated(file: TranslationFile): Promise<boolean> {
+		if (!file.content?.length) return false;
 
-		return analysis.isTranslated;
+		try {
+			const analysis = await this.languageDetector.analyzeLanguage(file.filename, file.content);
+
+			return analysis.isTranslated;
+		} catch (error) {
+			console.warn(`Language detection failed for ${file.filename}:`, error);
+			return false;
+		}
 	}
 
 	/**
-	 * Makes API calls to OpenAI for content translation.
-	 * Constructs appropriate prompts and handles response processing.
+	 * Gets detailed language analysis for debugging and metrics.
 	 *
-	 * @param content Main content to translate
+	 * @param file File to analyze
 	 *
-	 * @returns Translated content from the language model
+	 * @returns Resolves to the detailed language analysis
+	 */
+	public async getLanguageAnalysis(file: TranslationFile) {
+		if (!file.content?.length) {
+			throw new Error(`File content is empty: ${file.filename}`);
+		}
+
+		return await this.languageDetector.analyzeLanguage(file.filename, file.content);
+	}
+
+	/**
+	 * Sends content to the language model for translation.
+	 * Constructs system and user prompts based on detected language.
+	 *
+	 * @param content Content to translate
+	 *
+	 * @returns Resolves to the translated content
 	 */
 	private async callLanguageModel(content: string): Promise<string> {
-		const response = (await this.llm.chat.completions.create({
+		const systemPrompt = await this.getSystemPrompt(content);
+		const userPrompt = this.getUserPrompt(content);
+
+		const completion = await this.llm.chat.completions.create({
 			model: env.LLM_MODEL,
-			messages: this.createPrompt(content),
-		})) as OpenAI.Chat.Completions.ChatCompletion | { error: { message: string } };
+			temperature: 0.1,
+			max_tokens: 4096,
+			messages: [
+				{ role: "system", content: systemPrompt },
+				{ role: "user", content: userPrompt },
+			],
+		});
 
-		if ("error" in response) {
-			throw new Error(response.error.message);
-		}
-
-		if (response.choices[0]?.finish_reason === "length") {
-			return this.chunkAndRetryTranslation(content);
-		}
-
-		let translatedContent = response.choices[0]?.message.content;
+		const translatedContent = completion.choices[0]?.message?.content;
 		if (!translatedContent) {
-			throw new Error("No content returned");
+			throw new Error("No content returned from language model");
 		}
 
 		return translatedContent;
 	}
 
 	/**
-	 * Creates the messages array for the language model
+	 * Removes common artifacts from translation output.
 	 *
-	 * @param content Main content to translate
+	 * @param translatedContent Content returned from the language model
+	 * @param originalContent Original content before translation
+	 *
+	 * @returns Cleaned translated content
 	 */
-	private createPrompt(content: string): OpenAI.Chat.Completions.ChatCompletionMessageParam[] {
-		return [
-			{
-				role: "system" as const,
-				content: this.getSystemPrompt(content),
-			},
-			{
-				role: "user" as const,
-				content: this.getUserPrompt(content),
-			},
+	private cleanupTranslatedContent(translatedContent: string, originalContent: string): string {
+		let cleaned = translatedContent;
+
+		const prefixes = [
+			"Here is the translation:",
+			"Here's the translation:",
+			"Translation:",
+			"Translated content:",
+			"Here is the translated content:",
+			"Here's the translated content:",
 		];
+
+		for (const prefix of prefixes) {
+			if (cleaned.trim().toLowerCase().startsWith(prefix.toLowerCase())) {
+				cleaned = cleaned.substring(prefix.length).trim();
+			}
+		}
+
+		cleaned = cleaned.trim();
+
+		if (originalContent.includes("\r\n")) {
+			cleaned = cleaned.replace(/\n/g, "\r\n");
+		}
+
+		return cleaned;
 	}
 
 	/**
-	 * For some reason, some LLMs return the content with fences prepended and appended.
-	 * This method removes them when present.
-	 */
-	public cleanupTranslatedContent(content: string, originalContent?: string): string {
-		const shouldStartWith = `---\ntitle:`;
-		const endTicks = "```";
-
-		if (!content.startsWith(shouldStartWith)) {
-			content = content.replace(/^[\s\S]*?(?=---\ntitle:)/, "");
-		}
-
-		if (content.endsWith(endTicks) && !originalContent?.endsWith(endTicks)) {
-			const regex = new RegExp(`\n${endTicks}$`);
-
-			content = content.replace(regex, "");
-		}
-
-		return content;
-	}
-
-	/**
-	 * Creates the user prompt for the language model.
-	 * Includes instructions for content translation and block handling.
+	 * Creates user prompt with the content to translate.
 	 *
-	 * @param content Content to be translated
+	 * @param content Content to translate
+	 *
+	 * @returns User prompt string
 	 */
 	private getUserPrompt(content: string): string {
 		return `CONTENT TO TRANSLATE:\n${content}\n\n`;
@@ -193,206 +251,57 @@ export class TranslatorService {
 
 	/**
 	 * Creates the system prompt that defines translation rules and requirements.
-	 * Includes language specifications, formatting rules, and glossary.
+	 * Uses async language detection to determine source language.
 	 *
 	 * @param content Content to determine source language
+	 *
+	 * @returns Resolves to the system prompt string
 	 */
-	private getSystemPrompt(content: string): string {
+	private async getSystemPrompt(content: string): Promise<string> {
+		const detectedSourceCode = await this.languageDetector.detectPrimaryLanguage(content);
+
 		const languages = {
-			target: this.languageDetector.detectLanguage(this.options.target)?.["1"] || "Portuguese",
-			source: this.languageDetector.detectLanguage(franc(content))?.["1"] || "English",
+			target: this.languageDetector.getLanguageName(this.options.target) || "Portuguese",
+			source:
+				detectedSourceCode ?
+					this.languageDetector.getLanguageName(detectedSourceCode) || "English"
+				:	"English",
 		};
 
 		if (languages.target === "Portuguese") {
-			languages.target = "Brazilian Portuguese";
+			languages.target = "Portuguese (Brazil)";
 		}
+
+		const glossarySection = `
+			GLOSSARY RULES:
+			You must translate the following terms according to the glossary:
+			${this.glossary}`;
 
 		return `
 			You are a precise translator specializing in technical documentation. 
 			Your task is to translate React documentation from ${languages.source} to ${languages.target} in a single, high-quality pass.
 
 			TRANSLATION AND VERIFICATION REQUIREMENTS — YOU MUST FOLLOW THESE EXACTLY:
-			1. MUST maintain ALL original markdown formatting, including code blocks, links, and special syntax
-			2. MUST preserve ALL original code examples EXACTLY as they are
-			3. MUST keep ALL original HTML tags intact and unchanged
-			4. MUST follow the glossary rules below STRICTLY — these are non-negotiable terms
-			5. MUST maintain ALL original frontmatter EXACTLY as in original
-			6. MUST preserve ALL original line breaks and paragraph structure
-			7. MUST NOT translate code variables, function names, or technical terms not in the glossary
-			8. MUST NOT add any content
-			9. MUST NOT remove any content. This is very important, DO NOT DO IT!
-			10. MUST NOT change any URLs or links
-			11. MUST translate comments within code blocks according to the glossary
-			12. MUST maintain consistent technical terminology throughout the translation
-			13. MUST ensure the translation reads naturally in ${languages.target} while preserving technical accuracy
-			14. When translating code blocks, MUST only translate comments and string literals that don't refer to code
-			15. MUST respond only with the translated content.
-			16. MUST make sure the output text content is not preppended or appended with any extra characters or text (sometimes LLMs add "\`\`\`" at the start or end)
-			
-			GLOSSARY RULES:
-			You must translate the following terms according to the glossary:
-			${this.glossary}
+			- MUST maintain ALL original markdown formatting, including code blocks, links, and special syntax
+			- MUST preserve ALL original code examples EXACTLY as they are
+			- MUST keep ALL original HTML tags intact and unchanged
+			- MUST follow the glossary rules below STRICTLY — these are non-negotiable terms
+			- MUST maintain ALL original frontmatter EXACTLY as in original
+			- MUST preserve ALL original line breaks and paragraph structure
+			- MUST NOT translate code variables, function names, or technical terms not in the glossary
+			- MUST NOT add any content
+			- MUST NOT remove any content. This is very important, DO NOT DO IT!
+			- MUST NOT change any URLs or links
+			- MUST translate comments within code blocks according to the glossary
+			- MUST maintain consistent technical terminology throughout the translation
+			- MUST ensure the translation reads naturally in ${languages.target} while preserving technical accuracy
+			- When translating code blocks, MUST only translate comments and string literals that don't refer to code
+			- MUST respond only with the translated content.
+			- MUST make sure the output text content is not preppended or appended with any extra characters or text (sometimes LLMs add "\`\`\`" at the start or end)
+			- MUST NOT add whitespace to lists or between list items and their bullets/numbers (e.g. "- item", "1. item"; NOT "-item", "1.item" or "-  item", "1.  item")
+			${languages.target === "Portuguese (Brazil)" ? "- MUST translate 'deprecated' and derived terms to 'descontinuado(a)' or 'obsoleto(a)'" : ""}
+
+			${glossarySection}
 		`;
-	}
-
-	/**
-	 * Handles content that exceeds the model's context window by splitting it into
-	 * smaller chunks and translating each chunk separately, then combining the results.
-	 *
-	 * ### Workflow
-	 *
-	 * 1. Splits content at natural break points (middle of paragraphs, end of code blocks)
-	 * 2. Recursively splits chunks that are still too large
-	 * 3. Translates each chunk while maintaining context
-	 * 4. Combines translated chunks preserving original structure
-	 *
-	 * @param content Content that exceeded the model's context window
-	 *
-	 * @returns Combined translated content from all chunks
-	 *
-	 * @throws {Error} If chunking fails or if all chunk translation attempts fail
-	 */
-	public async chunkAndRetryTranslation(content: string): Promise<string> {
-		const chunks = this.splitIntoSections(content);
-
-		return this.cleanupTranslatedContent(await this.translateChunks(chunks));
-	}
-
-	/**
-	 * Translates the content of the chunks.
-	 *
-	 * ### Workflow
-	 *
-	 * 1. Adds context about chunking to help maintain consistency
-	 * 2. Translates each chunk
-	 * 3. Removes the part prefix if it exists in the response
-	 * 4. Combines the translated chunks
-	 *
-	 * @param chunks The chunks to translate
-	 *
-	 * @returns The translated content
-	 */
-	private async translateChunks(chunks: Array<string>): Promise<string> {
-		const chunkContext = (index: number, total: number) => `PART ${index + 1} OF ${total}:\n\n`;
-
-		const translatedChunks: Array<string> = [];
-
-		for (const [index, chunk] of chunks.entries()) {
-			try {
-				const translatedChunk = await this.callLanguageModel(
-					chunkContext(index + 1, chunks.length) + chunk,
-				);
-
-				translatedChunks.push(this.cleanupTranslatedContent(translatedChunk, chunk));
-			} catch (error) {
-				if (error instanceof Error && error.message === "Content is too long") {
-					const furtherChunkedTranslation = await this.chunkAndRetryTranslation(chunk);
-
-					translatedChunks.push(furtherChunkedTranslation);
-				} else {
-					throw error;
-				}
-			}
-		}
-
-		return translatedChunks.join("");
-	}
-
-	/**
-	 * Splits content at a natural break point closest to the middle.
-	 *
-	 * Finds logical boundaries like paragraph breaks, code blocks, or headers
-	 * that are nearest to the middle of the content to maintain semantic integrity.
-	 *
-	 * ### Algorithm Steps
-	 * 1. Identifies natural break points using regex patterns for paragraphs, headers, and code blocks
-	 * 2. Selects the break point closest to the content midpoint to ensure balanced chunks
-	 * 3. Falls back to sentence breaks if no structural breaks are found near midpoint
-	 * 4. Uses nearest whitespace as final fallback to avoid breaking words
-	 * 5. Returns content split at the optimal break point
-	 *
-	 * @param content Content to split into manageable chunks
-	 *
-	 * @returns Array containing two parts of the content, split at a natural break point
-	 *
-	 * @example
-	 * ```typescript
-	 * const longContent = "# Header\n\nParagraph one...\n\n## Another Header\n\nParagraph two...";
-	 * const chunks = this.splitIntoSections(longContent);
-	 * // Returns content split at paragraph or header boundaries
-	 * ```
-	 */
-	private splitIntoSections(content: string): Array<string> {
-		if (content.length < 1000) return [content];
-
-		const midpoint = Math.floor(content.length / 2);
-
-		const breakPointRegex = /(\n\n)|(\n#{1,6} )|(\n```\n)|(```\n)/g;
-
-		let bestBreakPoint = 0;
-		let minDistance = content.length;
-		let match;
-
-		breakPointRegex.lastIndex = 0;
-
-		while ((match = breakPointRegex.exec(content)) !== null) {
-			const breakPointPosition = match.index + match[0].length;
-			const distance = Math.abs(breakPointPosition - midpoint);
-			const exceededSearchBoundary = breakPointPosition > midpoint * 1.5;
-
-			if (distance < minDistance) {
-				minDistance = distance;
-				bestBreakPoint = breakPointPosition;
-			}
-
-			if (exceededSearchBoundary) break;
-		}
-
-		if (bestBreakPoint === 0) {
-			const sentenceBreakRegex = /[.!?]\s+/g;
-			sentenceBreakRegex.lastIndex = midpoint - 200 > 0 ? midpoint - 200 : 0;
-
-			while ((match = sentenceBreakRegex.exec(content)) !== null) {
-				const breakPointPosition = match.index + match[0].length;
-				const distance = Math.abs(breakPointPosition - midpoint);
-				const exceededSearchBoundary = breakPointPosition > midpoint + 200;
-
-				if (distance < minDistance) {
-					minDistance = distance;
-					bestBreakPoint = breakPointPosition;
-				}
-
-				if (exceededSearchBoundary) break;
-			}
-
-			if (bestBreakPoint === 0) {
-				let left = midpoint;
-				let right = midpoint;
-
-				while (left > 0 || right < content.length) {
-					if (left > 0) {
-						left--;
-						if (content[left] === " " || content[left] === "\n") {
-							bestBreakPoint = left + 1;
-							break;
-						}
-					}
-
-					if (right < content.length) {
-						if (content[right] === " " || content[right] === "\n") {
-							bestBreakPoint = right + 1;
-							break;
-						}
-						right++;
-					}
-				}
-			}
-		}
-
-		if (bestBreakPoint === 0) {
-			bestBreakPoint = midpoint;
-		}
-
-		return [content.substring(0, bestBreakPoint), content.substring(bestBreakPoint)];
 	}
 }

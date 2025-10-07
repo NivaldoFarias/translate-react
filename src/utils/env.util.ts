@@ -1,6 +1,11 @@
 import { z } from "zod";
 
-import { ENV_DEFAULTS, MIN_API_TOKEN_LENGTH, RuntimeEnvironment } from "./constants.util";
+import {
+	environmentDefaults,
+	MIN_API_TOKEN_LENGTH,
+	REACT_TRANSLATION_LANGUAGES,
+	RuntimeEnvironment,
+} from "./constants.util";
 
 /**
  * Creates a secure token validation schema with common security checks.
@@ -28,14 +33,14 @@ const envSchema = z.object({
 	 *
 	 * @default "development"
 	 */
-	NODE_ENV: z.enum(Object.values(RuntimeEnvironment)).default(ENV_DEFAULTS.NODE_ENV),
+	NODE_ENV: z.enum(Object.values(RuntimeEnvironment)).default(environmentDefaults.NODE_ENV),
 
 	/**
 	 * Bun's runtime environment.
 	 *
 	 * @default "development"
 	 */
-	BUN_ENV: z.enum(Object.values(RuntimeEnvironment)).default(ENV_DEFAULTS.BUN_ENV),
+	BUN_ENV: z.enum(Object.values(RuntimeEnvironment)).default(environmentDefaults.BUN_ENV),
 
 	/** The GitHub Personal Access Token */
 	GITHUB_TOKEN: createTokenSchema("GITHUB_TOKEN"),
@@ -48,42 +53,42 @@ const envSchema = z.object({
 	 *
 	 * @default "nivaldofarias"
 	 */
-	REPO_FORK_OWNER: z.string().default(ENV_DEFAULTS.REPO_FORK_OWNER),
+	REPO_FORK_OWNER: z.string().default(environmentDefaults.REPO_FORK_OWNER),
 
 	/**
 	 * The name of the forked repository.
 	 *
 	 * @default "pt-br.react.dev"
 	 */
-	REPO_FORK_NAME: z.string().default(ENV_DEFAULTS.REPO_FORK_NAME),
+	REPO_FORK_NAME: z.string().default(environmentDefaults.REPO_FORK_NAME),
 
 	/**
 	 * Original repository owner.
 	 *
 	 * @default "reactjs"
 	 */
-	REPO_UPSTREAM_OWNER: z.string().default(ENV_DEFAULTS.REPO_UPSTREAM_OWNER),
+	REPO_UPSTREAM_OWNER: z.string().default(environmentDefaults.REPO_UPSTREAM_OWNER),
 
 	/**
 	 * Original repository name.
 	 *
 	 * @default "pt-br.react.dev"
 	 */
-	REPO_UPSTREAM_NAME: z.string().default(ENV_DEFAULTS.REPO_UPSTREAM_NAME),
+	REPO_UPSTREAM_NAME: z.string().default(environmentDefaults.REPO_UPSTREAM_NAME),
 
 	/**
 	 * The LLM model to use.
 	 *
 	 * @default "google/gemini-2.0-flash-exp:free"
 	 */
-	LLM_MODEL: z.string().default(ENV_DEFAULTS.LLM_MODEL),
+	LLM_MODEL: z.string().default(environmentDefaults.LLM_MODEL),
 
 	/**
 	 * The OpenAI/OpenRouter/etc API base URL.
 	 *
 	 * @default "https://api.openrouter.com/v1"
 	 */
-	OPENAI_BASE_URL: z.url().default(ENV_DEFAULTS.OPENAI_BASE_URL),
+	OPENAI_BASE_URL: z.url().default(environmentDefaults.OPENAI_BASE_URL),
 
 	/** The OpenAI project's ID. Used for activity tracking on OpenAI. */
 	OPENAI_PROJECT_ID: z.string().optional(),
@@ -92,12 +97,15 @@ const envSchema = z.object({
 	 * The issue number of the progress tracking issue.
 	 *
 	 * @default 555
-	 * @see {@link ENV_DEFAULTS.PROGRESS_ISSUE_NUMBER}
+	 * @see {@link environmentDefaults.PROGRESS_ISSUE_NUMBER}
 	 */
-	PROGRESS_ISSUE_NUMBER: z.coerce.number().positive().default(ENV_DEFAULTS.PROGRESS_ISSUE_NUMBER),
+	PROGRESS_ISSUE_NUMBER: z.coerce
+		.number()
+		.positive()
+		.default(environmentDefaults.PROGRESS_ISSUE_NUMBER),
 
 	/** Whether to clear the snapshot on startup. Used for development. */
-	FORCE_SNAPSHOT_CLEAR: z.coerce.boolean().default(ENV_DEFAULTS.FORCE_SNAPSHOT_CLEAR),
+	FORCE_SNAPSHOT_CLEAR: z.coerce.boolean().default(environmentDefaults.FORCE_SNAPSHOT_CLEAR),
 
 	/**
 	 * The URL of the application to override the default URL.
@@ -105,7 +113,7 @@ const envSchema = z.object({
 	 *
 	 * @default `"${pkgJson.homepage}"`
 	 */
-	HEADER_APP_URL: z.url().default(ENV_DEFAULTS.HEADER_APP_URL),
+	HEADER_APP_URL: z.url().default(environmentDefaults.HEADER_APP_URL),
 
 	/**
 	 * The title of the application to override the default title.
@@ -113,28 +121,32 @@ const envSchema = z.object({
 	 *
 	 * @default `"${pkgJson.name} v${pkgJson.version}"`
 	 */
-	HEADER_APP_TITLE: z.string().default(ENV_DEFAULTS.HEADER_APP_TITLE),
+	HEADER_APP_TITLE: z.string().default(environmentDefaults.HEADER_APP_TITLE),
 
 	/**
 	 * The number of items to process in each batch.
 	 *
 	 * @default 10
 	 */
-	BATCH_SIZE: z.coerce.number().positive().default(ENV_DEFAULTS.BATCH_SIZE),
+	BATCH_SIZE: z.coerce.number().positive().default(environmentDefaults.BATCH_SIZE),
 
 	/**
 	 * The target language for translation.
+	 * Must be one of the 38 supported React translation languages.
 	 *
-	 * @default "pt"
+	 * @default "pt-br"
+	 * @see {@link REACT_TRANSLATION_LANGUAGES}
 	 */
-	TARGET_LANGUAGE: z.string().min(2).max(5).default(ENV_DEFAULTS.TARGET_LANGUAGE),
+	TARGET_LANGUAGE: z.enum(REACT_TRANSLATION_LANGUAGES).default(environmentDefaults.TARGET_LANGUAGE),
 
 	/**
 	 * The source language for translation.
+	 * Must be one of the 38 supported React translation languages.
 	 *
 	 * @default "en"
+	 * @see {@link REACT_TRANSLATION_LANGUAGES}
 	 */
-	SOURCE_LANGUAGE: z.string().min(2).max(5).default(ENV_DEFAULTS.SOURCE_LANGUAGE),
+	SOURCE_LANGUAGE: z.enum(REACT_TRANSLATION_LANGUAGES).default(environmentDefaults.SOURCE_LANGUAGE),
 });
 
 /** Type definition for the environment configuration */

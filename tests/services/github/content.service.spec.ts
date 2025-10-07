@@ -8,7 +8,7 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 
 import { ContentService } from "@/services/github/content.service";
-import { TranslationFile } from "@/utils/translation-file.util";
+import { TranslationFile } from "@/services/translator.service";
 
 describe("ContentService", () => {
 	let contentService: ContentService;

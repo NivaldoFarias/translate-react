@@ -31,7 +31,7 @@ describe("Environment Utilities", () => {
 		const env = validateEnv();
 		expect(env.GITHUB_TOKEN).toBe("ghp_1234567890abcdefghijklmnopqrstuvwxyzABCD");
 		expect(env.OPENAI_API_KEY).toBe("sk-1234567890abcdefghijklmnopqrstuvwxyzABCDEF1234567890");
-		expect(env.NODE_ENV).toBe(RuntimeEnvironment.TEST);
+		expect(env.NODE_ENV).toBe(RuntimeEnvironment.Test);
 	});
 
 	test("should throw error for missing required variables", () => {

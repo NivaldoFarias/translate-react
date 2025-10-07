@@ -186,17 +186,33 @@ function handleResponse<T>(response: ApiResponse<T>): T | null {
 
 MUST use `enum` or `as const` for fixed sets of related constants to enhance type safety.
 
+#### `enum` usage [P1]
+
+Use when you need a set of named constants with distinct values. Use PascalCase for enum names and enum members.
+
 ```typescript
 export enum UserRole {
 	Admin = "admin",
 	Editor = "editor",
 	Viewer = "viewer",
 }
+```
 
+#### `as const` usage [P1]
+
+Use for object maps or when you want to create a union of literal types. use camelCase for object names and constant values.
+
+```typescript
 export const userConfigMap = {
 	[UserRole.Admin]: { canEdit: true, canDelete: true },
 	[UserRole.Editor]: { canEdit: true, canDelete: false },
 	[UserRole.Viewer]: { canEdit: false, canDelete: false },
+} as const;
+
+export const statusCodes = {
+	success: 200,
+	notFound: 404,
+	serverError: 500,
 } as const;
 ```
 

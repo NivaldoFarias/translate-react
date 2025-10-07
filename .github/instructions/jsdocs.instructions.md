@@ -131,7 +131,7 @@ MUST use inline code formatting for all code elements within descriptions, inclu
  *
  * @param {string} userId The unique identifier for the user
  *
- * @returns {Promise<User>} A promise that resolves to the user object
+ * @returns {Promise<User>} Resolves to the user object
  */
 async function getUser(userId: string): Promise<User> {
 	// ...

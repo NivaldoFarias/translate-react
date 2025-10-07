@@ -1,9 +1,28 @@
-import type { ProcessedFileResult, Snapshot } from "@/types";
-import type { TranslationFile } from "@/utils/";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 import { extractErrorMessage } from "@/errors/";
 import { DatabaseService } from "@/services/database.service";
+
+import { ProcessedFileResult } from "./runner/base.service";
+import { TranslationFile } from "./translator.service";
+
+/** Represents a snapshot of the translation workflow state */
+export interface Snapshot {
+	/** The ID of the snapshot */
+	id: number;
+
+	/** The timestamp of the snapshot */
+	timestamp: number;
+
+	/** The repository tree */
+	repositoryTree: RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"];
+
+	/** The files to translate */
+	filesToTranslate: TranslationFile[];
+
+	/** The processed results */
+	processedResults: ProcessedFileResult[];
+}
 
 /** Manages the creation, saving, and loading of translation workflow snapshots */
 export class SnapshotService {

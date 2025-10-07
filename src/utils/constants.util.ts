@@ -6,37 +6,37 @@ import { homepage, name, version } from "../../package.json";
  * Maps to `NODE_ENV` and `BUN_ENV` environment variables
  */
 export enum RuntimeEnvironment {
-	DEVELOPMENT = "development",
-	TEST = "test",
-	STAGING = "staging",
-	PRODUCTION = "production",
+	Development = "development",
+	Test = "test",
+	Staging = "staging",
+	Production = "production",
 }
 
 /** Process signal constants used for event handling */
-export const PROCESS_SIGNALS = {
-	INTERRUPT: "SIGINT",
-	TERMINATE: "SIGTERM",
-	UNCAUGHT_EXCEPTION: "uncaughtException",
-	UNHANDLED_REJECTION: "unhandledRejection",
+export const processSignals = {
+	interrupt: "SIGINT",
+	terminate: "SIGTERM",
+	uncaughtException: "uncaughtException",
+	unhandledRejection: "unhandledRejection",
 } satisfies Record<string, NodeJS.Signals | NodeJS.UncaughtExceptionOrigin>;
 
 /** Standard error messages used throughout the application */
-export const ERROR_MESSAGE = {
-	INVALID_KEY: (key: string) => `Invalid key: ${key}`,
-	SNAPSHOT_SAVE_FAILED: "Failed to save snapshot",
-	SNAPSHOT_APPEND_FAILED: (key: string) => `Failed to append ${key}`,
-	SNAPSHOT_LOAD_FAILED: "Failed to load snapshot",
-	SNAPSHOT_CLEAR_FAILED: "Failed to clear snapshots",
-	SNAPSHOT_CLEANUP_FAILED: "Failed to cleanup snapshots",
-	SNAPSHOT_FORCE_CLEAR: "Forcefully cleared all snapshots as requested by FORCE_SNAPSHOT_CLEAR",
+export const errorMessages = {
+	invalidKey: (key: string) => `Invalid key: ${key}`,
+	snapshotSaveFailed: "Failed to save snapshot",
+	snapshotAppendFailed: (key: string) => `Failed to append ${key}`,
+	snapshotLoadFailed: "Failed to load snapshot",
+	snapshotClearFailed: "Failed to clear snapshots",
+	snapshotCleanupFailed: "Failed to cleanup snapshots",
+	snapshotForceClear: "Forcefully cleared all snapshots as requested by FORCE_SNAPSHOT_CLEAR",
 } as const;
 
 /** Keys used in snapshot data structure */
-export const SNAPSHOT_KEYS = {
-	REPOSITORY_TREE: "repositoryTree",
-	FILES_TO_TRANSLATE: "filesToTranslate",
-	PROCESSED_RESULTS: "processedResults",
-	TIMESTAMP: "timestamp",
+export const snapshotKeys = {
+	repositoryTree: "repositoryTree",
+	filesToTranslate: "filesToTranslate",
+	processedResults: "processedResults",
+	timestamp: "timestamp",
 } as const;
 
 /** Maximum number of tokens that can be translated in a single request */
@@ -45,9 +45,60 @@ export const MAX_CHUNK_TOKENS = 4000;
 /** Minimum length required for a valid API token */
 export const MIN_API_TOKEN_LENGTH = 20;
 
-export const ENV_DEFAULTS = {
-	NODE_ENV: RuntimeEnvironment.DEVELOPMENT,
-	BUN_ENV: RuntimeEnvironment.DEVELOPMENT,
+/**
+ * Official React documentation translation language codes.
+ *
+ * These are the 38 languages supported by the React community translation effort.
+ *
+ * @see {@link https://translations.react.dev/|`react.dev` Translation Repositories Homepage}
+ */
+export const REACT_TRANSLATION_LANGUAGES = [
+	"ar",
+	"az",
+	"be",
+	"bn",
+	"cs",
+	"de",
+	"fa",
+	"fi",
+	"fr",
+	"gu",
+	"he",
+	"hi",
+	"hu",
+	"id",
+	"is",
+	"it",
+	"ja",
+	"kk",
+	"ko",
+	"lo",
+	"mk",
+	"ml",
+	"mn",
+	"pl",
+	"pt-br",
+	"ru",
+	"si",
+	"sr",
+	"sw",
+	"ta",
+	"te",
+	"tr",
+	"uk",
+	"ur",
+	"vi",
+	"zh-hans",
+	"zh-hant",
+	"en",
+] as const;
+
+/** Type for React translation language codes */
+export type ReactLanguageCode = (typeof REACT_TRANSLATION_LANGUAGES)[number];
+
+export const environmentDefaults = {
+	NODE_ENV: RuntimeEnvironment.Development,
+	BUN_ENV: RuntimeEnvironment.Development,
 	FORCE_SNAPSHOT_CLEAR: false,
 	OPENAI_BASE_URL: "https://openrouter.ai/api/v1",
 	HEADER_APP_TITLE: `${name} v${version}`,
@@ -61,6 +112,6 @@ export const ENV_DEFAULTS = {
 	PROGRESS_ISSUE_NUMBER: 555,
 	LLM_MODEL: "google/gemini-2.0-flash-exp:free",
 	BATCH_SIZE: 10,
-	TARGET_LANGUAGE: "pt",
+	TARGET_LANGUAGE: "pt-br",
 	SOURCE_LANGUAGE: "en",
 } as const;

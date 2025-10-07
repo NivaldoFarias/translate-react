@@ -98,6 +98,10 @@ MUST organize test files in a structure that mirrors the `src` directory. For ex
 - **WHAT**: MUST structure tests using the **Arrange-Act-Assert** pattern with clear separation.
 - **WHY**: Provides a consistent, readable test structure that is easily understood by AI and developers.
 
+### `@ts-expect-error` usage [P1]
+
+When a private property override is needed, for example, `service["privateProp"] = mockValue;`, MUST use `@ts-expect-error` to suppress TypeScript errors, ensuring the intention is clear and avoiding unintended type issues (instead of using `as any` or `@ts-ignore`).
+
 ## Error Handling Testing [P0]
 
 ### Exception Testing Patterns [P0]

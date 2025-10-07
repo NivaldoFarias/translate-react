@@ -2,9 +2,13 @@ import { existsSync, writeFileSync } from "node:fs";
 
 import { Database } from "bun:sqlite";
 
-import type { ProcessedFileResult, Snapshot, SnapshotRecord } from "@/types";
-import type { TranslationFile } from "@/utils/";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
+
+import { SnapshotRecord } from "@/interfaces/snapshot";
+
+import { ProcessedFileResult } from "./runner/base.service";
+import { Snapshot } from "./snapshot.service";
+import { TranslationFile } from "./translator.service";
 
 /**
  * Core service for managing persistent storage of translation workflow data.

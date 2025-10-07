@@ -1,7 +1,5 @@
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
-import type { ProcessedFileResult } from "@/types";
-
 import { BranchService } from "@/services/github/branch.service";
 import {
 	CommitTranslationOptions,
@@ -9,7 +7,9 @@ import {
 	PullRequestOptions,
 } from "@/services/github/content.service";
 import { RepositoryService } from "@/services/github/repository.service";
-import { TranslationFile } from "@/utils/";
+
+import { ProcessedFileResult } from "../runner/base.service";
+import { TranslationFile } from "../translator.service";
 
 /**
  * Main GitHub service that integrates specialized services for repository operations.

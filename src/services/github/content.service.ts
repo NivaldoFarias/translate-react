@@ -1,11 +1,11 @@
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 import { BaseGitHubService } from "@/services/github/base.service";
-import { ProcessedFileResult } from "@/types";
 import { env } from "@/utils";
-import { TranslationFile } from "@/utils/translation-file.util";
 
 import { CommentBuilderService } from "../comment-builder.service";
+import { ProcessedFileResult } from "../runner/base.service";
+import { TranslationFile } from "../translator.service";
 
 /** Pull request options */
 export interface PullRequestOptions {

@@ -10,9 +10,8 @@ import { unlink } from "node:fs/promises";
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-import type { ProcessedFileResult } from "@/types";
-
 import { DatabaseService } from "@/services/database.service";
+import { ProcessedFileResult } from "@/services/runner/base.service";
 
 describe("DatabaseService", () => {
 	let dbService: DatabaseService;

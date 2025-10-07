@@ -1,8 +1,7 @@
-import type { ProcessedFileResult } from "@/types";
-
-import { TranslationFile } from "@/utils/translation-file.util";
-
 import { env } from "../utils/env.util";
+
+import { ProcessedFileResult } from "./runner/base.service";
+import { TranslationFile } from "./translator.service";
 
 export interface FileEntry {
 	filename: string;

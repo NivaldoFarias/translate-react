@@ -1,9 +1,9 @@
-import langs from "langs";
 import ora from "ora";
 
+import type { RestEndpointMethodTypes } from "@octokit/rest";
 import type { SetNonNullable } from "type-fest";
 
-import type { FileProcessingProgress, ProcessedFileResult, Snapshot } from "@/types";
+import type { ReactLanguageCode } from "@/utils/constants.util";
 
 import {
 	createErrorHandlingProxy,
@@ -12,14 +12,40 @@ import {
 	ResourceLoadError,
 } from "@/errors/";
 import { GitHubService } from "@/services/github/github.service";
-import { SnapshotService } from "@/services/snapshot.service";
-import { TranslatorService } from "@/services/translator.service";
-import { env, setupSignalHandlers, TranslationFile } from "@/utils/";
+import { Snapshot, SnapshotService } from "@/services/snapshot.service";
+import { TranslationFile, TranslatorService } from "@/services/translator.service";
+import { env, RuntimeEnvironment, setupSignalHandlers } from "@/utils/";
 
 export interface RunnerOptions {
-	targetLanguage: string;
-	sourceLanguage: string;
+	targetLanguage: ReactLanguageCode;
+	sourceLanguage: ReactLanguageCode;
 	batchSize: number;
+}
+
+/** Represents the progress of file processing in batches */
+export interface FileProcessingProgress {
+	/** The index of the current batch */
+	batchIndex: number;
+
+	/** The index of the current file in the batch */
+	fileIndex: number;
+
+	/** The total number of batches */
+	totalBatches: number;
+
+	/** The number of files to process in each batch */
+	batchSize: number;
+}
+
+export interface ProcessedFileResult {
+	branch: RestEndpointMethodTypes["git"]["getRef"]["response"]["data"] | null;
+	filename: string;
+	translation: string | null;
+	pullRequest:
+		| RestEndpointMethodTypes["pulls"]["create"]["response"]["data"]
+		| RestEndpointMethodTypes["pulls"]["list"]["response"]["data"][number]
+		| null;
+	error: Error | null;
 }
 
 export abstract class RunnerService {
@@ -272,15 +298,18 @@ export abstract class RunnerService {
 
 		let numFilesFiltered = 0;
 
-		this.state.filesToTranslate = uncheckedFiles.filter((file) => {
-			const isTranslated = this.services.translator.isFileTranslated(file);
+		this.state.filesToTranslate = [];
+		for (const file of uncheckedFiles) {
+			const analysis = await this.services.translator.languageDetector.analyzeLanguage(
+				file.filename,
+				file.content,
+			);
 
-			if (isTranslated) numFilesFiltered++;
+			if (analysis.isTranslated) numFilesFiltered++;
+			else this.state.filesToTranslate.push(file);
+		}
 
-			return !isTranslated;
-		});
-
-		if (env.NODE_ENV === "development") {
+		if (env.NODE_ENV === RuntimeEnvironment.Development) {
 			await this.services.snapshot.append("filesToTranslate", this.state.filesToTranslate);
 		}
 
@@ -554,17 +583,19 @@ export abstract class RunnerService {
 			metadata.branch = await this.services.github.createOrGetTranslationBranch(file);
 			metadata.translation = await this.services.translator.translateContent(file);
 
-			const language = langs.where("1", this.options.targetLanguage);
+			const languageName =
+				this.services.translator.languageDetector.getLanguageName(this.options.targetLanguage) ||
+				"Portuguese";
 
 			await this.services.github.commitTranslation({
 				branch: metadata.branch,
 				file,
 				content: metadata.translation,
-				message: `Translate \`${file.filename}\` to ${language?.name || "Portuguese"}`,
+				message: `Translate \`${file.filename}\` to ${languageName}`,
 			});
 
 			metadata.pullRequest = await this.services.github.createOrUpdatePullRequest(file, {
-				title: `Translate \`${file.filename}\` to ${language?.name || "Portuguese"}`,
+				title: `Translate \`${file.filename}\` to ${languageName}`,
 				body: this.pullRequestDescription,
 			});
 
@@ -604,9 +635,11 @@ export abstract class RunnerService {
 	abstract run(): Promise<void>;
 
 	protected get pullRequestDescription(): string {
-		const language = langs.where("1", this.options.targetLanguage);
+		const languageName =
+			this.services.translator.languageDetector.getLanguageName(this.options.targetLanguage) ||
+			"Portuguese";
 
-		return `This pull request contains a translation of the referenced page to ${language?.name || "Portuguese"}. The translation was generated using LLMs _(Open Router API :: model \`${env.LLM_MODEL}\`)_.
+		return `This pull request contains a translation of the referenced page to ${languageName}. The translation was generated using LLMs _(Open Router API :: model \`${env.LLM_MODEL}\`)_.
 
 Refer to the [source repository](https://github.com/${env.REPO_FORK_OWNER}/translate-react) workflow that generated this translation for more details.
 
