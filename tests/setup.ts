@@ -36,6 +36,7 @@ globalThis.mockEnv = {
 	HEADER_APP_TITLE: "Test App",
 	HEADER_APP_URL: "https://testapp.com",
 	PROGRESS_ISSUE_NUMBER: 1,
+	DEV_MODE_FORK_PR: false,
 	OPENAI_PROJECT_ID: "test-project-id",
 };
 

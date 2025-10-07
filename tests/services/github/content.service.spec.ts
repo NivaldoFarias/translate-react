@@ -19,7 +19,7 @@ describe("ContentService", () => {
 	};
 
 	beforeEach(() => {
-		contentService = new ContentService(mockConfig.upstream, mockConfig.fork, mockConfig.token);
+		contentService = new ContentService(mockConfig.upstream, mockConfig.fork);
 	});
 
 	test("should get untranslated files", async () => {

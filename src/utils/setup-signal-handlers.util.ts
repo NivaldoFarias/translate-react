@@ -1,8 +1,8 @@
 import { processSignals } from "./constants.util";
 
-export function setupSignalHandlers(cleanUpFn: (...args: any[]) => void | Promise<void>): void {
+export function setupSignalHandlers(cleanUpFn: (...args: unknown[]) => void | Promise<void>): void {
 	for (const signal of Object.values(processSignals)) {
-		process.on(signal, (...args: any[]) => {
+		process.on(signal, (...args: unknown[]) => {
 			(async () => {
 				try {
 					await cleanUpFn(...args);

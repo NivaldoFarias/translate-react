@@ -213,6 +213,7 @@ describe("SnapshotService", () => {
 				processedResults: [],
 			};
 
+			// eslint-disable-next-line @typescript-eslint/no-unused-vars
 			const snapshot2: Omit<Snapshot, "id"> = {
 				timestamp: Date.now() + 1000,
 				repositoryTree: [],

@@ -21,6 +21,9 @@ A CLI tool to automate the translation of React documentation from English to an
     - [3. Create a `.env` file with the necessary variables](#3-create-a-env-file-with-the-necessary-variables)
       - [Environment Configuration](#environment-configuration)
   - [Usage](#usage)
+    - [Development vs Production Modes](#development-vs-production-modes)
+      - [Development Mode](#development-mode)
+      - [Production Mode](#production-mode)
     - [Development](#development)
     - [Production](#production)
   - [How It Works](#how-it-works)
@@ -50,7 +53,10 @@ A CLI tool to automate the translation of React documentation from English to an
   - [Troubleshooting](#troubleshooting)
     - [Common Issues](#common-issues)
       - [Environment Validation Errors](#environment-validation-errors)
+      - [GitHub "Not Found" Errors During Development](#github-not-found-errors-during-development)
+      - [Default Branch Detection Issues](#default-branch-detection-issues)
     - [Debug Mode](#debug-mode)
+      - [Enhanced Error Logs](#enhanced-error-logs)
     - [Getting Help](#getting-help)
 
 ## Overview
@@ -189,8 +195,9 @@ bun install
 | `REPO_UPSTREAM_NAME`    | no        | `pt-br.react.dev`                                  | Original repository name                           |
 | `PROGRESS_ISSUE_NUMBER` | no        | `555`                                              | Issue number for progress updates                  |
 | `FORCE_SNAPSHOT_CLEAR`  | no        | `false`                                            | Clear snapshots on startup (dev only)              |
+| `DEV_MODE_FORK_PR`      | no        | `false`                                            | Create PRs in fork (dev) vs upstream (production)  |
 | `HEADER_APP_URL`        | no        | `https://github.com/NivaldoFarias/translate-react` | Application URL for OpenRouter Activity Tracking   |
-| `HEADER_APP_TITLE`      | no        | `translate-react v0.1.6`                           | Application title for OpenRouter Activity Tracking |
+| `HEADER_APP_TITLE`      | no        | `translate-react v0.1.7`                           | Application title for OpenRouter Activity Tracking |
 | `BATCH_SIZE`            | no        | `10`                                               | Number of files to process concurrently            |
 | `TARGET_LANGUAGE`       | no        | `pt`                                               | Target language (ISO 639-1 code)                   |
 | `SOURCE_LANGUAGE`       | no        | `en`                                               | Source language (ISO 639-1 code)                   |
@@ -201,6 +208,22 @@ bun install
 
 ## Usage
 
+### Development vs Production Modes
+
+The tool supports two distinct modes of operation:
+
+#### Development Mode
+- **Configuration**: Set `DEV_MODE_FORK_PR=true` in your `.env.dev` file
+- **Behavior**: Creates pull requests against your fork repository
+- **Use Case**: Testing, development, and personal workflows
+- **Benefits**: Avoids permission issues and keeps experimental work isolated
+
+#### Production Mode  
+- **Configuration**: Set `DEV_MODE_FORK_PR=false` or omit the variable (default)
+- **Behavior**: Creates pull requests against the upstream repository
+- **Use Case**: Official translation contributions to the main project
+- **Benefits**: Direct contribution to the upstream project
+
 ### Development
 
 Development mode with watch:
@@ -208,6 +231,9 @@ Development mode with watch:
 ```bash
 bun run dev
 ```
+
+> [!TIP]
+> **Development Mode Configuration**: For development, create a `.env.dev` file and set `DEV_MODE_FORK_PR=true` to create pull requests against your fork instead of the upstream repository. This prevents permission issues during development and testing.
 
 ### Production
 
@@ -239,10 +265,13 @@ bun run src/index.ts
 
 ### GitHub Workflow
 
-1. **Branch Creation**: Creates a unique branch for each file (e.g., `translate/src/content/homepage.md`)
-2. **File Commit**: Commits the translated content with descriptive commit messages
-3. **Pull Request**: Creates PR with translated content and detailed description
-4. **Progress Tracking**: Updates the tracking issue with links to created PRs
+1. **Dynamic Branch Detection**: Automatically detects the repository's default branch (main/master/etc.) instead of hardcoding assumptions
+2. **Branch Creation**: Creates a unique branch for each file (e.g., `translate/src/content/homepage.md`)
+3. **File Commit**: Commits the translated content with descriptive commit messages
+4. **Pull Request**: Creates PR with translated content and detailed description
+   - **Development Mode**: PRs created against your fork when `DEV_MODE_FORK_PR=true`
+   - **Production Mode**: PRs created against upstream repository when `DEV_MODE_FORK_PR=false`
+5. **Progress Tracking**: Updates the tracking issue with links to created PRs
 
 ## Project Structure
 
@@ -338,10 +367,10 @@ Persistent state management with SQLite:
 
 1. **Error Handler** (`errors/error.handler.ts`)
 
-- Centralized error management
-- Severity-based filtering
-- File logging capabilities
-- Custom error reporting
+- Centralized error management with structured logging
+- Severity-based filtering and console output
+- JSONL (JSON Lines) format for parseable error logs
+- Custom error reporting with enhanced context
 
 2. **Error Proxy** (`errors/proxy.handler.ts`)
 
@@ -349,6 +378,13 @@ Persistent state management with SQLite:
 - Context enrichment for debugging
 - Method-specific error handling
 - Error transformation and mapping
+
+3. **Enhanced GitHub API Error Mapping**
+
+- **Specific Error Codes**: `GITHUB_NOT_FOUND`, `GITHUB_UNAUTHORIZED`, `GITHUB_FORBIDDEN`, `GITHUB_RATE_LIMITED`, `GITHUB_SERVER_ERROR`
+- **HTTP Status Translation**: Automatically maps HTTP status codes to meaningful error types
+- **Improved Debugging**: Detailed error context for faster issue resolution
+- **Clean Stack Traces**: Filters out error handler wrapper frames to show only relevant application code
 
 ## Features
 
@@ -378,6 +414,10 @@ Persistent state management with SQLite:
 
 ### 🔄 GitHub Integration
 
+- **Flexible PR Strategy**: 
+  - **Development Mode**: Creates PRs against your fork (`DEV_MODE_FORK_PR=true`)
+  - **Production Mode**: Creates PRs against upstream repository (`DEV_MODE_FORK_PR=false`)
+- **Dynamic Branch Detection**: Automatically detects repository default branch (main/master/etc.)
 - **Individual Branches**: Creates separate branches for each translated file for better review process
 - **Automated PRs**: Generates pull requests with descriptive titles and detailed descriptions
 - **Progress Issues**: Updates tracking issues with links to created PRs and translation status
@@ -386,12 +426,17 @@ Persistent state management with SQLite:
 
 ### 🛡️ Error Handling & Recovery
 
-- **Hierarchical Errors**: Custom error types for different failure scenarios (API, Git, Translation)
+- **Enhanced Error Classification**: 
+  - Specific GitHub API error codes (`GITHUB_NOT_FOUND`, `GITHUB_UNAUTHORIZED`, etc.)
+  - Intelligent HTTP status code mapping for better debugging
+  - Context-aware error transformation based on failure scenarios
+- **Clean Stack Traces**: Automatically filters error handler wrapper frames to show relevant code
+- **Structured Logging**: JSONL format error logs for easy parsing and analysis
 - **Graceful Degradation**: Continues processing other files when individual translations fail
 - **Detailed Context**: Rich error messages with operation context and debugging information
 - **Automatic Cleanup**: Removes incomplete branches and files on critical failures
 - **Retry Mechanisms**: Smart retry logic for transient API and network failures
-- **Logging System**: Comprehensive error logs with timestamps and structured data
+- **Development-Friendly**: Separate error handling for development vs production environments
 
 ## Contributing
 
@@ -401,7 +446,15 @@ We welcome contributions! Whether you're fixing bugs, adding features, or improv
 
 1. **Fork the repository** and create your feature branch
 2. **Set up your development environment** with the prerequisites
-3. **Create a `.env.dev` file** for development-specific configuration
+3. **Create a `.env.dev` file** for development-specific configuration:
+   ```bash
+   # Essential for development - creates PRs in your fork
+   DEV_MODE_FORK_PR=true
+   
+   # Other development settings
+   FORCE_SNAPSHOT_CLEAR=true
+   NODE_ENV=development
+   ```
 4. **Run tests** to ensure everything works: `bun test`
 
 ### Development Guidelines
@@ -442,13 +495,29 @@ When testing translation functionality:
 
 **Solution**: Ensure all required environment variables are set in your `.env` file.
 
+#### GitHub "Not Found" Errors During Development
+
+```bash
+GITHUB_NOT_FOUND - https://docs.github.com/rest/git/refs#get-a-reference
+```
+
+**Solution**: This typically occurs when trying to create PRs against a repository you don't have write access to. Set `DEV_MODE_FORK_PR=true` in your `.env.dev` file to create PRs against your fork instead of the upstream repository.
+
+#### Default Branch Detection Issues
+
+```bash
+GITHUB_NOT_FOUND - Base branch main not found
+```
+
+**Solution**: The tool now automatically detects the repository's default branch. This error should no longer occur, but if it does, ensure your fork is properly synchronized with the upstream repository.
+
 **GitHub API Rate Limiting**
 
 ```bash
-API rate limit exceeded
+GITHUB_RATE_LIMITED - API rate limit exceeded
 ```
 
-**Solution**: The tool will automatically retry with exponential backoff. For heavy usage, consider using a GitHub App token instead of a personal token.
+**Solution**: The tool will automatically retry with exponential backoff. The enhanced error handling now provides specific error codes for better debugging. For heavy usage, consider using a GitHub App token instead of a personal token.
 
 **Translation API Errors**
 
@@ -472,6 +541,21 @@ Enable verbose logging by setting the environment to development:
 
 ```bash
 NODE_ENV=development bun run start
+```
+
+#### Enhanced Error Logs
+
+The tool now uses JSONL (JSON Lines) format for error logging, making logs easier to parse and analyze:
+
+```bash
+# View recent errors with proper JSON formatting
+tail -f logs/$(ls -t logs/ | head -1) | jq '.'
+
+# Filter errors by type
+grep "GITHUB_NOT_FOUND" logs/*.log.json | jq '.'
+
+# Analyze error patterns
+cat logs/*.log.json | jq '.code' | sort | uniq -c
 ```
 
 ### Getting Help

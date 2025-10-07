@@ -13,6 +13,24 @@ import { BaseGitHubService } from "@/services/github/base.service";
  */
 export class RepositoryService extends BaseGitHubService {
 	/**
+	 * Gets the default branch name for a repository.
+	 *
+	 * @param target Which repository to check ('fork' or 'upstream')
+	 *
+	 * @returns The default branch name
+	 *
+	 * @example
+	 * ```typescript
+	 * const defaultBranch = await repoService.getDefaultBranch('fork');
+	 * ```
+	 */
+	public async getDefaultBranch(target: "fork" | "upstream" = "fork"): Promise<string> {
+		const repoConfig = target === "fork" ? this.fork : this.upstream;
+		const response = await this.octokit.repos.get(repoConfig);
+		return response.data.default_branch;
+	}
+
+	/**
 	 * Retrieves the repository file tree.
 	 *
 	 * Can optionally filter out ignored paths.
@@ -26,12 +44,13 @@ export class RepositoryService extends BaseGitHubService {
 	 * ```
 	 */
 	public async getRepositoryTree(
-		baseBranch = "main",
+		baseBranch?: string,
 		filterIgnored = true,
 	): Promise<RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"]> {
+		const branchName = baseBranch || (await this.getDefaultBranch("fork"));
 		const response = await this.octokit.git.getTree({
 			...this.fork,
-			tree_sha: baseBranch,
+			tree_sha: branchName,
 			recursive: "true",
 		});
 

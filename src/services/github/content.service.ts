@@ -219,11 +219,18 @@ export class ContentService extends BaseGitHubService {
 		body,
 		baseBranch = "main",
 	}: PullRequestOptions): Promise<RestEndpointMethodTypes["pulls"]["create"]["response"]["data"]> {
+		// Import env inside method to avoid circular dependencies
+		const { env } = await import("@/utils/");
+
+		// In dev mode, create PRs against the fork; in production, against upstream
+		const targetRepo = env.DEV_MODE_FORK_PR ? this.fork : this.upstream;
+		const headRef = env.DEV_MODE_FORK_PR ? branch : `${this.fork.owner}:${branch}`;
+
 		const createPullRequestResponse = await this.octokit.pulls.create({
-			...this.upstream,
+			...targetRepo,
 			title,
 			body,
-			head: `${this.fork.owner}:${branch}`,
+			head: headRef,
 			base: baseBranch,
 			maintainer_can_modify: true,
 		});
