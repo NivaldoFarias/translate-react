@@ -1,5 +1,3 @@
-import Bun from "bun";
-
 import type { ErrorContext } from "./base.error";
 
 import { ErrorCode, ErrorSeverity, TranslationError } from "./base.error";
@@ -187,18 +185,22 @@ export class ErrorHandler {
 		if (this.shouldLog(severity)) {
 			if (this.logFilePath) {
 				try {
-					// Use JSONL format (one JSON object per line) for proper parsing
-					const logEntry = JSON.stringify(error.toJSON()) + "\n";
-					const file = Bun.file(this.logFilePath);
-					const existingContent = (await file.exists()) ? await file.text() : "";
+					const { Logger } = await import("@/utils/logger.util");
+					const logger = Logger.getInstance({
+						logToFile: true,
+						logFilePath: this.logFilePath,
+						minFileLevel: ErrorSeverity.ERROR,
+					});
 
-					await Bun.write(this.logFilePath, existingContent + logEntry, { createPath: true });
+					await logger.log(severity, error.message, error.toJSON());
 				} catch (writeError) {
 					console.error("Failed to write error to log file:", writeError);
 				}
 			}
 		}
-	} /**
+	}
+
+	/**
 	 * Determines if an error should be logged based on minimum severity
 	 *
 	 * @param severity The severity of the error
@@ -211,25 +213,5 @@ export class ErrorHandler {
 		const currentIndex = severityLevels.indexOf(severity);
 
 		return currentIndex >= minIndex;
-	}
-
-	/**
-	 * Maps severity levels to console methods
-	 *
-	 * @param severity The severity of the error
-	 *
-	 * @returns The console method to use
-	 */
-	private getSeverityMethod(severity: ErrorSeverity): keyof Console {
-		const methodMap: Record<ErrorSeverity, keyof Console> = {
-			[ErrorSeverity.DEBUG]: "debug",
-			[ErrorSeverity.INFO]: "info",
-			[ErrorSeverity.WARN]: "warn",
-			[ErrorSeverity.ERROR]: "error",
-			[ErrorSeverity.FATAL]: "error",
-			[ErrorSeverity.LOG]: "log",
-		};
-
-		return methodMap[severity];
 	}
 }

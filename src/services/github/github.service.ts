@@ -1,7 +1,6 @@
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 import { createErrorHandlingProxy } from "@/errors/proxy.handler";
-import { BaseGitHubService } from "@/services/github/base.service";
 import { BranchService } from "@/services/github/branch.service";
 import {
 	CommitTranslationOptions,

@@ -315,18 +315,38 @@ export class Logger {
 	/**
 	 * Logs to file in JSON format.
 	 *
-	 * This method reads existing content (if any) and appends a JSON line.
-	 * It intentionally swallows file errors and logs them to console to avoid
-	 * crashing the host process.
+	 * This method maintains a proper JSON array structure by reading existing
+	 * content, parsing it as an array, appending the new entry, and writing
+	 * back the complete array. It intentionally swallows file errors and logs
+	 * them to console to avoid crashing the host process.
 	 *
 	 * @param entry The structured log entry to persist
 	 */
 	private async logToFile(entry: LogEntry): Promise<void> {
 		try {
-			const logLine = JSON.stringify(entry) + "\n";
 			const file = Bun.file(this.config.logFilePath!);
-			const existingContent = (await file.exists()) ? await file.text() : "";
-			await Bun.write(this.config.logFilePath!, existingContent + logLine, { createPath: true });
+			const fileExists = await file.exists();
+
+			let existingLogs: LogEntry[] = [];
+			if (fileExists) {
+				try {
+					const existingContent = await file.text();
+					if (existingContent.trim()) {
+						const parsed = JSON.parse(existingContent) as unknown;
+						if (Array.isArray(parsed)) {
+							existingLogs = parsed as LogEntry[];
+						} else {
+							existingLogs = [];
+						}
+					}
+				} catch {
+					existingLogs = [];
+				}
+			}
+
+			existingLogs.push(entry);
+			const jsonContent = JSON.stringify(existingLogs, null, 2);
+			await Bun.write(this.config.logFilePath!, jsonContent, { createPath: true });
 		} catch (error) {
 			console.error("Failed to write log entry to file:", error);
 		}
