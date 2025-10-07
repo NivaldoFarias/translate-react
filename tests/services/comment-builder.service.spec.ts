@@ -6,11 +6,12 @@
  * for the translation workflow result presentation.
  */
 
+import { RestEndpointMethodTypes } from "@octokit/rest";
 import { beforeEach, describe, expect, test } from "bun:test";
 
 import { CommentBuilderService } from "@/services/comment-builder.service";
-import { ProcessedFileResult } from "@/types";
-import { TranslationFile } from "@/utils/translation-file.util";
+import { ProcessedFileResult } from "@/services/runner/base.service";
+import { TranslationFile } from "@/services/translator.service";
 
 describe("CommentBuilderService", () => {
 	let commentBuilderService: CommentBuilderService;
@@ -19,251 +20,36 @@ describe("CommentBuilderService", () => {
 		commentBuilderService = new CommentBuilderService();
 	});
 
+	const createMockPrData = (
+		prNumber: number,
+	): RestEndpointMethodTypes["pulls"]["list"]["response"]["data"][number] => {
+		return {
+			number: prNumber,
+			id: prNumber,
+			node_id: `PR_${prNumber}`,
+			url: `https://api.github.com/repos/test/test/pulls/${prNumber}`,
+			html_url: `https://github.com/test/test/pull/${prNumber}`,
+			diff_url: `https://github.com/test/test/pull/${prNumber}.diff`,
+			patch_url: `https://github.com/test/test/pull/${prNumber}.patch`,
+			issue_url: `https://github.com/test/test/issues/${prNumber}`,
+			commits_url: `https://api.github.com/repos/test/test/pulls/${prNumber}/commits`,
+			review_comments_url: `https://api.github.com/repos/test/test/pulls/${prNumber}/comments`,
+		} as unknown as RestEndpointMethodTypes["pulls"]["list"]["response"]["data"][number];
+	};
+
 	/** Helper function to create mock ProcessedFileResult */
 	const createMockResult = (
 		filename: string,
 		prNumber: number | null = null,
-	): ProcessedFileResult => ({
-		branch: null,
-		filename,
-		translation: `Translated content of ${filename}`,
-		pullRequest:
-			prNumber ?
-				{
-					number: prNumber,
-					id: prNumber,
-					node_id: `PR_${prNumber}`,
-					url: `https://api.github.com/repos/test/test/pulls/${prNumber}`,
-					html_url: `https://github.com/test/test/pull/${prNumber}`,
-					diff_url: `https://github.com/test/test/pull/${prNumber}.diff`,
-					patch_url: `https://github.com/test/test/pull/${prNumber}.patch`,
-					issue_url: `https://api.github.com/repos/test/test/issues/${prNumber}`,
-					commits_url: `https://api.github.com/repos/test/test/pulls/${prNumber}/commits`,
-					review_comments_url: `https://api.github.com/repos/test/test/pulls/${prNumber}/comments`,
-					review_comment_url: `https://api.github.com/repos/test/test/pulls/comments{/number}`,
-					comments_url: `https://api.github.com/repos/test/test/issues/${prNumber}/comments`,
-					statuses_url: `https://api.github.com/repos/test/test/statuses/abc123`,
-					state: "open" as const,
-					locked: false,
-					title: `Translation for ${filename}`,
-					user: {
-						login: "test-user",
-						id: 1,
-						node_id: "U_1",
-						avatar_url: "https://github.com/images/error/test-user_happy.gif",
-						gravatar_id: "",
-						url: "https://api.github.com/users/test-user",
-						html_url: "https://github.com/test-user",
-						followers_url: "https://api.github.com/users/test-user/followers",
-						following_url: "https://api.github.com/users/test-user/following{/other_user}",
-						gists_url: "https://api.github.com/users/test-user/gists{/gist_id}",
-						starred_url: "https://api.github.com/users/test-user/starred{/owner}{/repo}",
-						subscriptions_url: "https://api.github.com/users/test-user/subscriptions",
-						organizations_url: "https://api.github.com/users/test-user/orgs",
-						repos_url: "https://api.github.com/users/test-user/repos",
-						events_url: "https://api.github.com/users/test-user/events{/privacy}",
-						received_events_url: "https://api.github.com/users/test-user/received_events",
-						type: "User",
-						site_admin: false,
-					},
-					body: `Automated translation for ${filename}`,
-					created_at: "2025-10-03T00:00:00Z",
-					updated_at: "2025-10-03T00:00:00Z",
-					closed_at: null,
-					merged_at: null,
-					merge_commit_sha: null,
-					assignee: null,
-					assignees: [],
-					requested_reviewers: [],
-					requested_teams: [],
-					labels: [],
-					milestone: null,
-					draft: false,
-					head: {
-						label: "test:feature-branch",
-						ref: "feature-branch",
-						sha: "abc123",
-						user: {
-							login: "test-user",
-							id: 1,
-							node_id: "U_1",
-							avatar_url: "https://github.com/images/error/test-user_happy.gif",
-							gravatar_id: "",
-							url: "https://api.github.com/users/test-user",
-							html_url: "https://github.com/test-user",
-							followers_url: "https://api.github.com/users/test-user/followers",
-							following_url: "https://api.github.com/users/test-user/following{/other_user}",
-							gists_url: "https://api.github.com/users/test-user/gists{/gist_id}",
-							starred_url: "https://api.github.com/users/test-user/starred{/owner}{/repo}",
-							subscriptions_url: "https://api.github.com/users/test-user/subscriptions",
-							organizations_url: "https://api.github.com/users/test-user/orgs",
-							repos_url: "https://api.github.com/users/test-user/repos",
-							events_url: "https://api.github.com/users/test-user/events{/privacy}",
-							received_events_url: "https://api.github.com/users/test-user/received_events",
-							type: "User",
-							site_admin: false,
-						},
-						repo: {
-							id: 1,
-							node_id: "R_1",
-							name: "test",
-							full_name: "test/test",
-							private: false,
-							owner: {
-								login: "test-user",
-								id: 1,
-								node_id: "U_1",
-								avatar_url: "https://github.com/images/error/test-user_happy.gif",
-								gravatar_id: "",
-								url: "https://api.github.com/users/test-user",
-								html_url: "https://github.com/test-user",
-								followers_url: "https://api.github.com/users/test-user/followers",
-								following_url: "https://api.github.com/users/test-user/following{/other_user}",
-								gists_url: "https://api.github.com/users/test-user/gists{/gist_id}",
-								starred_url: "https://api.github.com/users/test-user/starred{/owner}{/repo}",
-								subscriptions_url: "https://api.github.com/users/test-user/subscriptions",
-								organizations_url: "https://api.github.com/users/test-user/orgs",
-								repos_url: "https://api.github.com/users/test-user/repos",
-								events_url: "https://api.github.com/users/test-user/events{/privacy}",
-								received_events_url: "https://api.github.com/users/test-user/received_events",
-								type: "User",
-								site_admin: false,
-							},
-							html_url: "https://github.com/test/test",
-							description: "Test repository",
-							fork: false,
-							url: "https://api.github.com/repos/test/test",
-							created_at: "2025-01-01T00:00:00Z",
-							updated_at: "2025-10-03T00:00:00Z",
-							pushed_at: "2025-10-03T00:00:00Z",
-							git_url: "git://github.com/test/test.git",
-							ssh_url: "git@github.com:test/test.git",
-							clone_url: "https://github.com/test/test.git",
-							svn_url: "https://github.com/test/test",
-							homepage: null,
-							size: 100,
-							stargazers_count: 0,
-							watchers_count: 0,
-							language: "TypeScript",
-							has_issues: true,
-							has_projects: true,
-							has_wiki: true,
-							has_pages: false,
-							has_downloads: true,
-							archived: false,
-							disabled: false,
-							open_issues_count: 0,
-							license: null,
-							forks: 0,
-							open_issues: 0,
-							watchers: 0,
-							default_branch: "main",
-						},
-					},
-					base: {
-						label: "test:main",
-						ref: "main",
-						sha: "def456",
-						user: {
-							login: "test-user",
-							id: 1,
-							node_id: "U_1",
-							avatar_url: "https://github.com/images/error/test-user_happy.gif",
-							gravatar_id: "",
-							url: "https://api.github.com/users/test-user",
-							html_url: "https://github.com/test-user",
-							followers_url: "https://api.github.com/users/test-user/followers",
-							following_url: "https://api.github.com/users/test-user/following{/other_user}",
-							gists_url: "https://api.github.com/users/test-user/gists{/gist_id}",
-							starred_url: "https://api.github.com/users/test-user/starred{/owner}{/repo}",
-							subscriptions_url: "https://api.github.com/users/test-user/subscriptions",
-							organizations_url: "https://api.github.com/users/test-user/orgs",
-							repos_url: "https://api.github.com/users/test-user/repos",
-							events_url: "https://api.github.com/users/test-user/events{/privacy}",
-							received_events_url: "https://api.github.com/users/test-user/received_events",
-							type: "User",
-							site_admin: false,
-						},
-						repo: {
-							id: 1,
-							node_id: "R_1",
-							name: "test",
-							full_name: "test/test",
-							private: false,
-							owner: {
-								login: "test-user",
-								id: 1,
-								node_id: "U_1",
-								avatar_url: "https://github.com/images/error/test-user_happy.gif",
-								gravatar_id: "",
-								url: "https://api.github.com/users/test-user",
-								html_url: "https://github.com/test-user",
-								followers_url: "https://api.github.com/users/test-user/followers",
-								following_url: "https://api.github.com/users/test-user/following{/other_user}",
-								gists_url: "https://api.github.com/users/test-user/gists{/gist_id}",
-								starred_url: "https://api.github.com/users/test-user/starred{/owner}{/repo}",
-								subscriptions_url: "https://api.github.com/users/test-user/subscriptions",
-								organizations_url: "https://api.github.com/users/test-user/orgs",
-								repos_url: "https://api.github.com/users/test-user/repos",
-								events_url: "https://api.github.com/users/test-user/events{/privacy}",
-								received_events_url: "https://api.github.com/users/test-user/received_events",
-								type: "User",
-								site_admin: false,
-							},
-							html_url: "https://github.com/test/test",
-							description: "Test repository",
-							fork: false,
-							url: "https://api.github.com/repos/test/test",
-							created_at: "2025-01-01T00:00:00Z",
-							updated_at: "2025-10-03T00:00:00Z",
-							pushed_at: "2025-10-03T00:00:00Z",
-							git_url: "git://github.com/test/test.git",
-							ssh_url: "git@github.com:test/test.git",
-							clone_url: "https://github.com/test/test.git",
-							svn_url: "https://github.com/test/test",
-							homepage: null,
-							size: 100,
-							stargazers_count: 0,
-							watchers_count: 0,
-							language: "TypeScript",
-							has_issues: true,
-							has_projects: true,
-							has_wiki: true,
-							has_pages: false,
-							has_downloads: true,
-							archived: false,
-							disabled: false,
-							open_issues_count: 0,
-							license: null,
-							forks: 0,
-							open_issues: 0,
-							watchers: 0,
-							default_branch: "main",
-						},
-					},
-					_links: {
-						self: { href: `https://api.github.com/repos/test/test/pulls/${prNumber}` },
-						html: { href: `https://github.com/test/test/pull/${prNumber}` },
-						issue: { href: `https://api.github.com/repos/test/test/issues/${prNumber}` },
-						comments: {
-							href: `https://api.github.com/repos/test/test/issues/${prNumber}/comments`,
-						},
-						review_comments: {
-							href: `https://api.github.com/repos/test/test/pulls/${prNumber}/comments`,
-						},
-						review_comment: {
-							href: `https://api.github.com/repos/test/test/pulls/comments{/number}`,
-						},
-						commits: { href: `https://api.github.com/repos/test/test/pulls/${prNumber}/commits` },
-						statuses: { href: `https://api.github.com/repos/test/test/statuses/abc123` },
-					},
-					author_association: "OWNER",
-					auto_merge: null,
-					active_lock_reason: null,
-				}
-			:	null,
-		error: null,
-	});
+	): ProcessedFileResult => {
+		return {
+			branch: null,
+			filename,
+			translation: `Translated content of ${filename}`,
+			pullRequest: prNumber ? createMockPrData(prNumber) : null,
+			error: null,
+		};
+	};
 
 	/** Helper function to create mock TranslationFile */
 	const createMockTranslationFile = (filename: string, path: string): TranslationFile =>
@@ -334,18 +120,15 @@ describe("CommentBuilderService", () => {
 			const results: ProcessedFileResult[] = [
 				{
 					filename: "post.md",
-					content: "# Blog Post",
-					pullRequest: { number: 126 },
+					translation: "# Blog Post",
+					branch: null,
+					pullRequest: createMockPrData(126),
 					error: null,
 				},
 			];
 
 			const filesToTranslate: TranslationFile[] = [
-				{
-					filename: "post.md",
-					path: "src/content/blog/2024/01/15/post.md",
-					content: "# Blog Post",
-				},
+				createMockTranslationFile("post.md", "src/content/blog/2024/01/15/post.md"),
 			];
 
 			const result = commentBuilderService.buildComment(results, filesToTranslate);
@@ -416,8 +199,9 @@ describe("CommentBuilderService", () => {
 			const results: ProcessedFileResult[] = [
 				{
 					filename: "test.md",
-					content: "# Test",
-					pullRequest: { number: 127 },
+					translation: "# Test",
+					branch: null,
+					pullRequest: createMockPrData(127),
 					error: null,
 				},
 			];
@@ -427,6 +211,7 @@ describe("CommentBuilderService", () => {
 					filename: "test.md",
 					path: "src/content/docs/advanced/test.md",
 					content: "# Test",
+					sha: "sha_test",
 				},
 			];
 
@@ -441,8 +226,9 @@ describe("CommentBuilderService", () => {
 			const results: ProcessedFileResult[] = [
 				{
 					filename: "article.md",
-					content: "# Article",
-					pullRequest: { number: 128 },
+					translation: "# Article",
+					branch: null,
+					pullRequest: createMockPrData(128),
 					error: null,
 				},
 			];
@@ -452,6 +238,7 @@ describe("CommentBuilderService", () => {
 					filename: "article.md",
 					path: "src/content/blog/2024/03/15/some-folder/article.md",
 					content: "# Article",
+					sha: "sha_article",
 				},
 			];
 
@@ -470,20 +257,23 @@ describe("CommentBuilderService", () => {
 			const results: ProcessedFileResult[] = [
 				{
 					filename: "intro.md",
-					content: "# Introduction",
-					pullRequest: { number: 129 },
+					translation: "# Introduction",
+					branch: null,
+					pullRequest: createMockPrData(129),
 					error: null,
 				},
 				{
 					filename: "advanced.md",
-					content: "# Advanced",
-					pullRequest: { number: 130 },
+					translation: "# Advanced",
+					branch: null,
+					pullRequest: createMockPrData(130),
 					error: null,
 				},
 				{
 					filename: "api.md",
-					content: "# API",
-					pullRequest: { number: 131 },
+					translation: "# API",
+					branch: null,
+					pullRequest: createMockPrData(131),
 					error: null,
 				},
 			];
@@ -493,16 +283,19 @@ describe("CommentBuilderService", () => {
 					filename: "intro.md",
 					path: "src/content/docs/intro.md",
 					content: "# Introduction",
+					sha: "sha_file_1",
 				},
 				{
 					filename: "advanced.md",
 					path: "src/content/docs/guides/advanced.md",
 					content: "# Advanced",
+					sha: "sha_file_2",
 				},
 				{
 					filename: "api.md",
 					path: "src/content/docs/reference/api.md",
 					content: "# API",
+					sha: "sha_file_3",
 				},
 			];
 
@@ -520,14 +313,16 @@ describe("CommentBuilderService", () => {
 			const results: ProcessedFileResult[] = [
 				{
 					filename: "zebra.md",
-					content: "# Zebra",
-					pullRequest: { number: 132 },
+					translation: "# Zebra",
+					branch: null,
+					pullRequest: createMockPrData(132),
 					error: null,
 				},
 				{
 					filename: "alpha.md",
-					content: "# Alpha",
-					pullRequest: { number: 133 },
+					translation: "# Alpha",
+					branch: null,
+					pullRequest: createMockPrData(133),
 					error: null,
 				},
 			];
@@ -537,11 +332,13 @@ describe("CommentBuilderService", () => {
 					filename: "zebra.md",
 					path: "src/content/docs/zebra.md",
 					content: "# Zebra",
+					sha: "sha_file_zebra",
 				},
 				{
 					filename: "alpha.md",
 					path: "src/content/docs/alpha.md",
 					content: "# Alpha",
+					sha: "sha_file_alpha",
 				},
 			];
 
@@ -556,8 +353,9 @@ describe("CommentBuilderService", () => {
 			const results: ProcessedFileResult[] = [
 				{
 					filename: "deep.md",
-					content: "# Deep",
-					pullRequest: { number: 134 },
+					translation: "# Deep",
+					branch: null,
+					pullRequest: createMockPrData(134),
 					error: null,
 				},
 			];
@@ -567,6 +365,7 @@ describe("CommentBuilderService", () => {
 					filename: "deep.md",
 					path: "src/content/docs/level1/level2/level3/deep.md",
 					content: "# Deep",
+					sha: "sha_file_deep",
 				},
 			];
 
@@ -585,8 +384,9 @@ describe("CommentBuilderService", () => {
 			const results: ProcessedFileResult[] = [
 				{
 					filename: "",
-					content: "# Empty",
-					pullRequest: { number: 135 },
+					translation: "# Empty",
+					branch: null,
+					pullRequest: createMockPrData(135),
 					error: null,
 				},
 			];
@@ -596,6 +396,7 @@ describe("CommentBuilderService", () => {
 					filename: "",
 					path: "src/content/docs/",
 					content: "# Empty",
+					sha: "sha_empty_file",
 				},
 			];
 
@@ -608,8 +409,9 @@ describe("CommentBuilderService", () => {
 			const results: ProcessedFileResult[] = [
 				{
 					filename: "special-file_name.with.dots.md",
-					content: "# Special",
-					pullRequest: { number: 136 },
+					translation: "# Special",
+					branch: null,
+					pullRequest: createMockPrData(136),
 					error: null,
 				},
 			];
@@ -619,6 +421,7 @@ describe("CommentBuilderService", () => {
 					filename: "special-file_name.with.dots.md",
 					path: "src/content/docs/special-file_name.with.dots.md",
 					content: "# Special",
+					sha: "sha_special_file",
 				},
 			];
 
@@ -634,8 +437,9 @@ describe("CommentBuilderService", () => {
 			for (let i = 1; i <= 50; i++) {
 				results.push({
 					filename: `file-${i.toString().padStart(2, "0")}.md`,
-					content: `# File ${i}`,
-					pullRequest: { number: 100 + i },
+					branch: null,
+					translation: `# File ${i}`,
+					pullRequest: createMockPrData(100 + i),
 					error: null,
 				});
 
@@ -643,6 +447,7 @@ describe("CommentBuilderService", () => {
 					filename: `file-${i.toString().padStart(2, "0")}.md`,
 					path: `src/content/docs/batch/file-${i.toString().padStart(2, "0")}.md`,
 					content: `# File ${i}`,
+					sha: `sha_file_${i}`,
 				});
 			}
 

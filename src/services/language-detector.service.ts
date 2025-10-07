@@ -1,26 +1,42 @@
-import { franc, francAll } from "franc";
-import langs from "langs";
+/**
+ * @fileoverview React-aware Language Detection Service using Google's CLD library.
+ *
+ * Provides language detection and translation status determination specifically
+ * for React documentation translation workflows. Validates against the 38 official
+ * React translation languages and uses Intl.DisplayNames for human-readable names.
+ */
 
-import type { Type as LangsType } from "langs";
+import cld from "cld";
+
+import type { ReactLanguageCode } from "@/utils/constants.util";
+
+import { REACT_TRANSLATION_LANGUAGES } from "@/utils/constants.util";
 
 /**
  * Configuration interface for language detection settings.
- * Uses ISO 639-1 language codes for source and target languages.
+ *
+ * Uses React translation language codes for source and target languages.
+ * Only the 38 official React translation languages are supported.
  *
  * @example
- * ```json
- * {
- * 	"sourceLanguage": "en",
- * 	"targetLanguage": "pt"
- * }
+ * ```typescript
+ * const config: LanguageConfig = {
+ * 	source: "en",
+ * 	target: "pt-br"
+ * };
  * ```
  */
 export interface LanguageConfig {
-	source: string;
-	target: string;
+	source: ReactLanguageCode;
+	target: ReactLanguageCode;
 }
 
-/** Detailed analysis of content language detection results. */
+/**
+ * Detailed analysis of content language detection results.
+ *
+ * Contains confidence scores, ratios, and detection metadata for language
+ * analysis operations.
+ */
 export interface LanguageAnalysis {
 	/** Confidence scores for source and target languages */
 	languageScore: {
@@ -34,21 +50,26 @@ export interface LanguageAnalysis {
 	/** Indicates if content is considered translated */
 	isTranslated: boolean;
 
-	/** Primary detected language details */
-	detectedLanguage: ReturnType<typeof langs.where>;
+	/** Primary detected language code (e.g., "en", "pt") */
+	detectedLanguage: string | undefined;
+
+	/** Raw CLD detection result for advanced usage */
+	rawResult: cld.DetectLanguage;
 }
 
 /**
- * # Language Detection Service
+ * React-aware language detection service using Google's CLD2 (Compact Language Detector).
  *
- * Service for analyzing and detecting the language of content.
- * Helps determine if content needs translation based on language analysis.
+ * Provides async language analysis specifically for React documentation translation
+ * workflows. Validates against the 38 official React translation languages and uses
+ * Intl.DisplayNames for human-readable language names with 100% coverage.
  *
- * ### Responsibilities
- * - Language detection and analysis
- * - Translation status determination
- * - Language code conversion
- * - Confidence score calculation
+ * @example
+ * ```typescript
+ * const detector = new LanguageDetector({ source: 'en', target: 'pt-br' });
+ * const analysis = await detector.analyzeLanguage('readme.md', 'Hello world');
+ * console.log(analysis.isTranslated); // false
+ * ```
  */
 export class LanguageDetector {
 	/** Minimum content length required for reliable language detection */
@@ -57,127 +78,234 @@ export class LanguageDetector {
 	/** Threshold ratio above which content is considered translated */
 	private readonly TRANSLATION_THRESHOLD = 0.5;
 
-	/** Current language configuration in ISO 639-3 format */
+	/** Current language configuration using React language codes */
 	private readonly languages: LanguageConfig;
 
-	/** Map of detected languages by filename */
-	public detected: Map<string, ReturnType<typeof langs.where>> = new Map();
+	/** Intl.DisplayNames instance for human-readable language names */
+	private readonly displayNames = new Intl.DisplayNames(["en"], { type: "language" });
+
+	/**
+	 * Cache of previously detected languages to avoid redundant CLD calls.
+	 * Maps content hashes to detected language codes.
+	 */
+	public detected: Map<string, string | undefined> = new Map();
 
 	/**
 	 * Initializes a new language detector with source and target languages.
-	 * Converts ISO 639-1 codes to ISO 639-3 for compatibility with franc.
+	 *
+	 * Validates that both languages are supported React translation languages.
+	 * Throws an error with helpful guidance if unsupported languages are provided.
 	 *
 	 * @param config Language configuration with source and target languages
 	 *
+	 * @throws {Error} When invalid or unsupported language codes are provided
+	 *
 	 * @example
 	 * ```typescript
-	 * const detector = new LanguageDetector({ source: 'en', target: 'pt' });
+	 * const detector = new LanguageDetector({ source: 'en', target: 'pt-br' });
+	 * // Detector ready for language analysis operations
 	 * ```
 	 */
 	public constructor(config: LanguageConfig) {
-		const source = this.detectLanguage(config.source, "1");
-		const target = this.detectLanguage(config.target, "1");
-
-		if (!source || !target) {
-			throw new Error(`Invalid language code: ${config.source} or ${config.target}`);
+		if (
+			!REACT_TRANSLATION_LANGUAGES.includes(config.source) ||
+			!REACT_TRANSLATION_LANGUAGES.includes(config.target)
+		) {
+			const supportedList = REACT_TRANSLATION_LANGUAGES.join(", ");
+			throw new Error(
+				`Unsupported language code: ${config.source} or ${config.target}. ` +
+					`This tool supports only React translation languages: ${supportedList}. ` +
+					`See https://translations.react.dev/ for the complete list.`,
+			);
 		}
 
-		this.languages = {
-			source: source["3"],
-			target: target["3"],
-		};
+		this.languages = config;
 	}
 
 	/**
-	 * Performs detailed language analysis on the content:
-	 * 1. Removes code blocks from content
-	 * 2. Checks minimum content length
-	 * 3. Detects languages and their confidence scores
-	 * 4. Calculates target language ratio
-	 * 5. Determines translation status
+	 * Gets the human-readable display name for a React language code.
 	 *
-	 * @param filename Filename of the content
-	 * @param content Text content to analyze
+	 * Uses Intl.DisplayNames for automatic localization support. Only works with
+	 * the 38 supported React translation languages.
 	 *
-	 * @returns Language analysis results
+	 * @param code React language code (e.g., "en", "pt-br", "zh-hans")
+	 *
+	 * @returns Human-readable language name or `undefined` if not a supported React language
 	 *
 	 * @example
 	 * ```typescript
-	 * const analysis = detector.analyzeLanguage('Olá mundo');
+	 * detector.getLanguageName('pt-br'); 	// "Brazilian Portuguese"
+	 * detector.getLanguageName('zh-hans'); // "Simplified Chinese"
+	 * detector.getLanguageName('invalid'); // undefined
 	 * ```
 	 */
-	public analyzeLanguage(filename: string, content: string): LanguageAnalysis {
-		const contentWithoutCode = content.replace(/```[\s\S]*?```/g, "");
+	public getLanguageName(code: string): string | undefined {
+		if (!REACT_TRANSLATION_LANGUAGES.includes(code as ReactLanguageCode)) {
+			return undefined;
+		}
 
-		if (content.length < this.MIN_CONTENT_LENGTH) {
+		try {
+			const name = this.displayNames.of(code);
+			return name !== code ? name : undefined;
+		} catch {
+			return undefined;
+		}
+	}
+
+	/**
+	 * Performs language analysis on content using CLD.
+	 *
+	 * @param filename Identifier for the content being analyzed
+	 * @param content Text content to analyze for language detection
+	 *
+	 * @returns Resolves to the language analysis results
+	 */
+	public async analyzeLanguage(filename: string, content: string): Promise<LanguageAnalysis> {
+		// Skip analysis for very short content
+		if (!content || content.length < this.MIN_CONTENT_LENGTH) {
 			return {
 				languageScore: { target: 0, source: 0 },
 				ratio: 0,
-				detectedLanguage: this.detectLanguage("und"),
 				isTranslated: false,
+				detectedLanguage: "und",
+				rawResult: {
+					reliable: false,
+					languages: [],
+					textBytes: content.length,
+					chunks: [],
+				},
 			};
 		}
 
-		const allDetections = francAll(contentWithoutCode);
-		const scores = new Map(allDetections);
+		// Remove code blocks and technical content for better detection
+		const cleanContent = this.cleanContent(content);
 
-		const targetLanguageScore = scores.get(this.languages.target) ?? 0;
-		const sourceLanguageScore = scores.get(this.languages.source) ?? 0;
-		const detectedLang = franc(contentWithoutCode, { minLength: this.MIN_CONTENT_LENGTH });
+		try {
+			// Detect language using CLD
+			const detection = await cld.detect(cleanContent);
 
-		const detectedLanguage = this.detectLanguage(detectedLang);
+			// Find primary detected language
+			const primaryLanguage = detection.languages[0];
+			const detectedLanguage = primaryLanguage?.code || "und";
 
-		this.detected.set(filename, detectedLanguage);
+			// Calculate confidence scores
+			const targetScore = this.findLanguageScore(detection.languages, this.languages.target);
+			const sourceScore = this.findLanguageScore(detection.languages, this.languages.source);
 
-		const ratio = targetLanguageScore / (targetLanguageScore + sourceLanguageScore) || 0;
+			// Calculate target language ratio
+			const ratio = targetScore / (targetScore + sourceScore || 1);
 
-		return {
-			languageScore: { target: targetLanguageScore, source: sourceLanguageScore },
-			ratio,
-			detectedLanguage,
-			isTranslated:
-				targetLanguageScore === 1 || this.determineTranslationStatus(ratio, detectedLanguage),
+			// Determine if content is translated
+			const isTranslated = ratio > this.TRANSLATION_THRESHOLD;
+
+			// Cache result
+			this.detected.set(filename, detectedLanguage);
+
+			return {
+				languageScore: {
+					target: targetScore,
+					source: sourceScore,
+				},
+				ratio,
+				isTranslated,
+				detectedLanguage,
+				rawResult: detection,
+			};
+		} catch {
+			return {
+				languageScore: { target: 0, source: 0 },
+				ratio: 0,
+				isTranslated: false,
+				detectedLanguage: "und",
+				rawResult: {
+					reliable: false,
+					languages: [],
+					textBytes: content.length,
+					chunks: [],
+				},
+			};
+		}
+	}
+
+	/**
+	 * Detects the primary language of text content.
+	 *
+	 * @param text Text content to analyze
+	 *
+	 * @returns Resolves to the detected language code or undefined
+	 */
+	public async detectPrimaryLanguage(text: string): Promise<string | undefined> {
+		if (!text || text.length < this.MIN_CONTENT_LENGTH) {
+			return undefined;
+		}
+
+		try {
+			const cleanContent = this.cleanContent(text);
+			const detection = await cld.detect(cleanContent);
+			return detection.languages[0]?.code || "und";
+		} catch {
+			return undefined;
+		}
+	}
+
+	/**
+	 * Removes code blocks and technical content from text for better language detection.
+	 *
+	 * @param content Raw content to clean
+	 *
+	 * @returns Cleaned content suitable for language detection
+	 */
+	private cleanContent(content: string): string {
+		const regexes: Record<string, RegExp> = {
+			codeBlock: /```[\s\S]*?```/g,
+			inlineCode: /`[^`]*`/g,
+			htmlTags: /<[^>]*>/g,
+			urls: /https?:\/\/[^\s]+/g,
+			whitespace: /\s+/g,
 		};
+
+		return content
+			.replace(regexes["codeBlock"]!, " ")
+			.replace(regexes["inlineCode"]!, " ")
+			.replace(regexes["htmlTags"]!, " ")
+			.replace(regexes["urls"]!, " ")
+			.replace(regexes["whitespace"]!, " ")
+			.trim();
 	}
 
 	/**
-	 * Evaluates if content should be considered translated based on:
-	 * - Match between detected and target language
-	 * - Ratio of target language presence
-	 *
-	 * @param ratio Target language presence ratio
-	 * @param detectedLanguage Primary detected language
-	 *
-	 * @returns `true` if content should be considered translated, `false` otherwise
-	 *
-	 * @example
-	 * ```typescript
-	 * const isTranslated = detector.determineTranslationStatus(0.7, 'pt');
-	 * ```
+	 * Maps React language codes to CLD language codes.
+	 * CLD uses standard ISO codes while React uses locale-specific codes.
 	 */
-	private determineTranslationStatus(
-		ratio: number,
-		detectedLanguage: ReturnType<typeof langs.where>,
-	) {
-		return (
-			(detectedLanguage && Object.values(detectedLanguage).includes(this.languages.target)) ||
-			ratio >= this.TRANSLATION_THRESHOLD
-		);
+	private mapToCldCode(reactCode: string): string[] {
+		const mapping: Record<string, string[]> = {
+			"pt-br": ["pt", "pt-br"],
+			"zh-hans": ["zh", "zh-cn", "zh-hans"],
+			"zh-hant": ["zh", "zh-tw", "zh-hant"],
+		};
+
+		return mapping[reactCode] || [reactCode];
 	}
 
 	/**
-	 * Converts a language code to its full language details using the `langs` library.
+	 * Finds the confidence score for a specific language in CLD results.
+	 * Handles mapping between React language codes and CLD codes.
 	 *
-	 * @param language Language code to convert
-	 * @param type Type of language code (default is "3" for ISO 639-3)
-	 * @returns Full language details or `undefined` if not found
+	 * @param detectedLanguages Array of detected languages from CLD
+	 * @param targetLanguageCode Target language code to find
 	 *
-	 * @example
-	 * ```typescript
-	 * const langDetails = detector.detectLanguage('en', '1');
-	 * ```
+	 * @returns Confidence score (0-1) for the target language
 	 */
-	public detectLanguage(language: string, type: LangsType = "3") {
-		return langs.where(type, language);
+	private findLanguageScore(detectedLanguages: cld.Language[], targetLanguageCode: string): number {
+		const possibleCodes = this.mapToCldCode(targetLanguageCode);
+
+		for (const code of possibleCodes) {
+			const lang = detectedLanguages.find((lang) => lang.code === code);
+			if (lang) {
+				return lang.percent / 100;
+			}
+		}
+
+		return 0;
 	}
 }

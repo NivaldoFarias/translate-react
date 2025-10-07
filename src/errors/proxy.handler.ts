@@ -1,16 +1,13 @@
 import type { ErrorContext } from "./base.error";
 
-import { TranslationFile } from "@/utils/translation-file.util";
+import { TranslationFile } from "@/services/translator.service";
 
 import { ErrorCode, TranslationError } from "./base.error";
 import { ErrorHandler } from "./error.handler";
 
 /** Configuration options for creating an error-handling proxy */
 export interface ProxyHandlerOptions {
-	/**
-	 * The name of the service or class being proxied.
-	 * Used for error context and logging
-	 */
+	/** The name of the service or class being proxied */
 	serviceName: string;
 
 	/** Optional additional context to include with all errors */

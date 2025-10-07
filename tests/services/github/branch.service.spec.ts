@@ -18,7 +18,6 @@ import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 
 import { BranchService } from "@/services/github/branch.service";
 
-// Mock the env module to control REPO_FORK_OWNER
 mock.module("@/utils/env.util", () => ({
 	env: {
 		REPO_FORK_OWNER: "test-fork-owner",

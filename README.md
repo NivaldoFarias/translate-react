@@ -77,7 +77,7 @@ Below is a high-level Mermaid flowchart that visualizes the core pipeline used b
 graph TD
   A["🔧 Repository Setup <br/> (fork & sync)"] --> B["💾 State Management <br/> (SQLite snapshots)"]
   B --> C["🔍 Content Discovery <br/> (fetch tree & filter .md)"]
-  C --> D["🌐 Language Detection <br/> (franc + confidence)"]
+  C --> D["🌐 Language Detection <br/> (CLD + confidence)"]
   D --> E{"❓ Needs Translation?"}
   E -->|"✅ Yes"| F["📦 Batch Processing <br/> (configurable size)"]
   F --> G["🤖 Translation Engine <br/> (LLM, chunking, glossary)"]
@@ -320,7 +320,7 @@ Core translation engine with advanced content handling:
 
 Intelligent content analysis for translation decisions:
 
-- **Detection Engine**: Uses `franc` library for statistical language detection
+- **Detection Engine**: Uses `cld` (Compact Language Detector) library for statistical language detection
 - **Confidence Scoring**: Calculates reliability scores for language predictions
 - **Translation Logic**: Determines if content requires translation based on confidence thresholds
 - **Language Mapping**: Converts between ISO 639-1 and ISO 639-3 codes for compatibility

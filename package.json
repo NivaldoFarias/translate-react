@@ -21,8 +21,7 @@
 	},
 	"dependencies": {
 		"@octokit/rest": "^21.1.0",
-		"franc": "^6.2.0",
-		"langs": "^2.0.0",
+		"cld": "^2.10.1",
 		"openai": "^4.78.1",
 		"ora": "^8.1.1",
 		"zod": "^4.1.9"
@@ -32,7 +31,6 @@
 		"@total-typescript/ts-reset": "^0.6.1",
 		"@types/bun": "^1.2.2",
 		"@types/eslint": "^9.6.1",
-		"@types/langs": "^2.0.5",
 		"@types/node": "^22.13.9",
 		"@typescript-eslint/eslint-plugin": "^8.20.0",
 		"@typescript-eslint/parser": "^8.20.0",
