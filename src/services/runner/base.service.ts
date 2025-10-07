@@ -147,7 +147,12 @@ export abstract class RunnerService {
 			this.services.snapshot.clear();
 		}
 
-		setupSignalHandlers(this.cleanup);
+		setupSignalHandlers(this.cleanup, (message, error) => {
+			this.errorHandler.handle(error as Error, {
+				operation: "signalCleanup",
+				metadata: { message },
+			});
+		});
 	}
 
 	/**
@@ -659,7 +664,13 @@ export abstract class RunnerService {
 				const branchName = metadata.branch.ref.replace("refs/heads/", "");
 				await this.services.github.cleanupBranch(branchName);
 			} catch (cleanupError) {
-				console.warn(`Failed to cleanup branch for ${metadata.filename}:`, cleanupError);
+				this.errorHandler.handle(cleanupError as Error, {
+					operation: "cleanupFailedTranslation",
+					metadata: {
+						filename: metadata.filename,
+						branchRef: metadata.branch.ref,
+					},
+				});
 			}
 		}
 	}
@@ -682,7 +693,7 @@ export abstract class RunnerService {
 		return `This pull request contains an automated translation of the referenced page to **${languageName}**.
 
 > [!IMPORTANT]
-> This translation was generated using AI/LLM technology and requires human review for accuracy, cultural context, and technical terminology.
+> This translation was generated using AI/LLM and requires human review for accuracy, cultural context, and technical terminology.
 
 ## Review Guidelines
 

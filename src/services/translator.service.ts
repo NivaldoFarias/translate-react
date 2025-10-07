@@ -5,7 +5,6 @@
  * model interaction, response processing, and metrics tracking.
  */
 
-import { StatusCodes } from "http-status-codes";
 import OpenAI from "openai";
 import { APIError } from "openai/error";
 
@@ -13,8 +12,8 @@ import type { LanguageConfig } from "./language-detector.service.ts";
 
 import type { ProxyHandlerOptions } from "@/errors/";
 
-import { createErrorHandlingProxy, ErrorCode } from "@/errors/";
-import { env } from "@/utils/";
+import { createErrorHandlingProxy, ErrorCode, ErrorHandler, TranslationError } from "@/errors/";
+import { detectRateLimit, env } from "@/utils/";
 
 import { LanguageDetector } from "./language-detector.service";
 
@@ -70,6 +69,9 @@ export class TranslatorService {
 
 	public glossary: string | null = null;
 
+	/** Error handler for logging and managing translation errors */
+	private readonly errorHandler = ErrorHandler.getInstance();
+
 	/**
 	 * Initializes the translator service with language configuration and error handling.
 	 *
@@ -93,14 +95,7 @@ export class TranslatorService {
 		 * Generic error transform that checks for rate limit patterns in any error
 		 */
 		const genericErrorTransform = (error: Error) => {
-			const isRateLimit =
-				error.message.toLowerCase().includes("rate limit") ||
-				error.message.includes("429") ||
-				error.message.toLowerCase().includes("free-models-per-") ||
-				error.message.toLowerCase().includes("provider returned error") ||
-				error.message.toLowerCase().includes("no endpoints found matching");
-
-			if (isRateLimit) {
+			if (detectRateLimit(error.message)) {
 				return {
 					code: ErrorCode.RATE_LIMIT_EXCEEDED,
 					metadata: {
@@ -122,15 +117,7 @@ export class TranslatorService {
 			code: ErrorCode.LLM_API_ERROR,
 			transform: (error: Error) => {
 				if (error instanceof APIError) {
-					const isRateLimit =
-						error.status === StatusCodes.TOO_MANY_REQUESTS ||
-						error.message.toLowerCase().includes("rate limit") ||
-						error.message.includes("429") ||
-						error.message.toLowerCase().includes("free-models-per-") ||
-						error.message.toLowerCase().includes("provider returned error") ||
-						error.message.toLowerCase().includes("no endpoints found matching");
-
-					if (isRateLimit) {
+					if (detectRateLimit(error.message, error.status)) {
 						return {
 							code: ErrorCode.RATE_LIMIT_EXCEEDED,
 							metadata: {
@@ -204,7 +191,13 @@ export class TranslatorService {
 
 			return analysis.isTranslated;
 		} catch (error) {
-			console.warn(`Language detection failed for ${file.filename}:`, error);
+			this.errorHandler.handle(error as Error, {
+				operation: "isTranslationComplete",
+				metadata: {
+					filename: file.filename,
+					contentLength: file.content?.length || 0,
+				},
+			});
 			return false;
 		}
 	}
@@ -236,22 +229,69 @@ export class TranslatorService {
 		const systemPrompt = await this.getSystemPrompt(content);
 		const userPrompt = this.getUserPrompt(content);
 
-		const completion = await this.llm.chat.completions.create({
-			model: env.LLM_MODEL,
-			temperature: 0.1,
-			max_tokens: 4096,
-			messages: [
-				{ role: "system", content: systemPrompt },
-				{ role: "user", content: userPrompt },
-			],
-		});
+		try {
+			const completion = await this.llm.chat.completions.create({
+				model: env.LLM_MODEL,
+				temperature: 0.1,
+				max_tokens: 4096,
+				messages: [
+					{ role: "system", content: systemPrompt },
+					{ role: "user", content: userPrompt },
+				],
+			});
 
-		const translatedContent = completion.choices[0]?.message?.content;
-		if (!translatedContent) {
-			throw new Error("No content returned from language model");
+			const translatedContent = completion.choices[0]?.message?.content;
+			if (!translatedContent) {
+				throw new Error("No content returned from language model");
+			}
+
+			return translatedContent;
+		} catch (error) {
+			/**
+			 * Handle OpenAI-specific errors that may not be caught by the proxy
+			 * due to nested method calls (this.llm.chat.completions.create)
+			 */
+			if (error instanceof Error) {
+				const errorType = error.constructor.name;
+
+				/**
+				 * Direct mapping for known OpenAI error types
+				 */
+				if (
+					errorType === "RateLimitError" ||
+					errorType === "QuotaExceededError" ||
+					errorType === "TooManyRequestsError"
+				) {
+					throw new TranslationError(error.message, ErrorCode.RATE_LIMIT_EXCEEDED, {
+						operation: "callLanguageModel",
+						metadata: {
+							model: env.LLM_MODEL,
+							errorType,
+							originalMessage: error.message,
+						},
+					});
+				}
+
+				/**
+				 * Fallback pattern matching for rate limit errors
+				 */
+				if (detectRateLimit(error.message)) {
+					throw new TranslationError(error.message, ErrorCode.RATE_LIMIT_EXCEEDED, {
+						operation: "callLanguageModel",
+						metadata: {
+							model: env.LLM_MODEL,
+							errorType,
+							originalMessage: error.message,
+						},
+					});
+				}
+			}
+
+			/**
+			 * Re-throw the error for upper-level error handling
+			 */
+			throw error;
 		}
-
-		return translatedContent;
 	}
 
 	/**

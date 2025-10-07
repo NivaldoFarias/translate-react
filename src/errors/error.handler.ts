@@ -1,3 +1,5 @@
+import Bun from "bun";
+
 import type { ErrorContext } from "./base.error";
 
 import { ErrorCode, ErrorSeverity, TranslationError } from "./base.error";
@@ -59,6 +61,42 @@ export class ErrorHandler {
 
 		if (this.config.logToFile && this.config.logFilePath) {
 			this.logFilePath = this.config.logFilePath;
+			this.initializeLogFile();
+		}
+	}
+
+	/**
+	 * Initializes the log file with a startup entry
+	 *
+	 * Creates the log file immediately when ErrorHandler is instantiated to ensure
+	 * proper observability from the beginning of the workflow execution.
+	 */
+	private initializeLogFile(): void {
+		if (!this.logFilePath) return;
+
+		const startupEntry = {
+			timestamp: new Date().toISOString(),
+			level: ErrorSeverity.INFO,
+			message: "ErrorHandler initialized - logging started",
+			metadata: {
+				logFilePath: this.logFilePath,
+				minSeverity: this.config.minSeverity,
+				process: {
+					pid: process.pid,
+					version: process.version,
+				},
+			},
+		};
+
+		const logLine = JSON.stringify(startupEntry) + "\n";
+
+		/**
+		 * Synchronous initialization to ensure log file exists before any errors occur
+		 */
+		try {
+			Bun.write(this.logFilePath, logLine);
+		} catch (initError) {
+			console.error("Failed to initialize log file:", initError);
 		}
 	}
 
@@ -182,20 +220,27 @@ export class ErrorHandler {
 			this.config.customReporter(error);
 		}
 
-		if (this.shouldLog(severity)) {
-			if (this.logFilePath) {
-				try {
-					const { Logger } = await import("@/utils/logger.util");
-					const logger = Logger.getInstance({
-						logToFile: true,
-						logFilePath: this.logFilePath,
-						minFileLevel: ErrorSeverity.ERROR,
-					});
+		if (this.shouldLog(severity) && this.logFilePath) {
+			try {
+				const logEntry = {
+					timestamp: new Date().toISOString(),
+					level: severity,
+					message: error.message,
+					metadata: error.toJSON(),
+				};
 
-					await logger.log(severity, error.message, error.toJSON());
-				} catch (writeError) {
-					console.error("Failed to write error to log file:", writeError);
-				}
+				const logLine = JSON.stringify(logEntry) + "\n";
+
+				/**
+				 * Write log entry using direct file system operations to avoid
+				 * circular dependency with Logger service
+				 */
+				const existingContent = await Bun.file(this.logFilePath)
+					.text()
+					.catch(() => "");
+				await Bun.write(this.logFilePath, existingContent + logLine);
+			} catch (writeError) {
+				console.error("Failed to write error to log file:", writeError);
 			}
 		}
 	}
