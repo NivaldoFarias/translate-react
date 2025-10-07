@@ -16,6 +16,8 @@ import { Snapshot, SnapshotService } from "@/services/snapshot.service";
 import { TranslationFile, TranslatorService } from "@/services/translator.service";
 import { env, RuntimeEnvironment, setupSignalHandlers } from "@/utils/";
 
+import { homepage, name, version } from "../../../package.json";
+
 export interface RunnerOptions {
 	targetLanguage: ReactLanguageCode;
 	sourceLanguage: ReactLanguageCode;
@@ -429,6 +431,23 @@ export abstract class RunnerService {
 	}
 
 	/**
+	 * Formats a byte count to a human-readable string with appropriate units
+	 *
+	 * @param bytes The number of bytes to format
+	 *
+	 * @returns A formatted string with units (B, KB, MB, etc.)
+	 */
+	private formatBytes(bytes: number): string {
+		if (bytes === 0) return "0 B";
+
+		const k = 1024;
+		const sizes = ["B", "KB", "MB", "GB"];
+		const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+		return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
+	}
+
+	/**
 	 * Formats a time duration in milliseconds to a human-readable string
 	 * using the {@link Intl.RelativeTimeFormat} API for localization
 	 *
@@ -596,7 +615,7 @@ export abstract class RunnerService {
 
 			metadata.pullRequest = await this.services.github.createOrUpdatePullRequest(file, {
 				title: `Translate \`${file.filename}\` to ${languageName}`,
-				body: this.pullRequestDescription,
+				body: this.createPullRequestDescription(file, metadata),
 			});
 
 			this.updateBatchProgress("success");
@@ -634,15 +653,69 @@ export abstract class RunnerService {
 
 	abstract run(): Promise<void>;
 
-	protected get pullRequestDescription(): string {
+	protected createPullRequestDescription(
+		file: TranslationFile,
+		processingResult: ProcessedFileResult,
+	): string {
 		const languageName =
 			this.services.translator.languageDetector.getLanguageName(this.options.targetLanguage) ||
 			"Portuguese";
 
-		return `This pull request contains a translation of the referenced page to ${languageName}. The translation was generated using LLMs _(Open Router API :: model \`${env.LLM_MODEL}\`)_.
+		const processingTime = Date.now() - this.metadata.timestamp;
+		const sourceLength = file.content.length;
+		const translationLength = processingResult.translation?.length || 0;
+		const compressionRatio = sourceLength > 0 ? (translationLength / sourceLength).toFixed(2) : "0";
 
-Refer to the [source repository](https://github.com/${env.REPO_FORK_OWNER}/translate-react) workflow that generated this translation for more details.
+		return `# Translation to ${languageName}
 
-Feel free to review and suggest any improvements to the translation.`;
+This pull request contains an automated translation of the referenced page to **${languageName}**.
+
+> [!IMPORTANT]
+> This translation was generated using AI/LLM technology and requires human review for accuracy, cultural context, and technical terminology.
+
+## Review Guidelines
+
+Please review this translation for:
+
+- [ ] **Accuracy**: Content meaning preserved from source
+- [ ] **Technical Terms**: Proper translation of React/development terminology
+- [ ] **Cultural Context**: Appropriate localization for target audience
+- [ ] **Formatting**: Markdown syntax and code blocks maintained
+- [ ] **Links**: Internal references and external links work correctly
+
+<details>
+<summary>Translation Details</summary>
+
+### Processing Statistics
+
+| Metric | Value |
+|--------|-------|
+| **Source File Size** | ${this.formatBytes(sourceLength)} |
+| **Translation Size** | ${this.formatBytes(translationLength)} |
+| **Content Ratio** | ${compressionRatio}x |
+| **File Path** | \`${file.path}\` |
+| **Processing Time** | ~${Math.ceil(processingTime / 1000)}s |
+
+### Technical Information
+
+- **Target Language**: ${languageName} (\`${this.options.targetLanguage}\`)
+- **AI Model**: \`${env.LLM_MODEL}\` via Open Router API
+- **Generated**: ${new Date().toISOString().split("T")[0]}
+- **Branch**: \`${processingResult.branch?.ref || "unknown"}\`
+- **Translation Tool Version**: \`${name} v${version}\`
+
+> [!NOTE]
+> The content ratio indicates how the translation length compares to the source (1.0x = same length, >1.0x = translation is longer). Different languages naturally have varying verbosity levels.
+
+</details>
+
+## Additional Resources
+
+- [Source Repository](${homepage}): Workflow and tooling details
+- [Translation Workflow Documentation](${homepage}#readme): Process overview and guidelines
+
+---
+
+**Questions or suggestions?** Feel free to leave comments or request changes to improve the translation quality.`;
 	}
 }
