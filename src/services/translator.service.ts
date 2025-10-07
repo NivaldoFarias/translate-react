@@ -5,6 +5,7 @@
  * model interaction, response processing, and metrics tracking.
  */
 
+import { StatusCodes } from "http-status-codes";
 import OpenAI from "openai";
 import { APIError } from "openai/error";
 
@@ -33,7 +34,6 @@ export class TranslationFile {
 		public readonly sha: string,
 	) {}
 }
-
 
 /**
  * Core service for translating content using OpenAI's language models.
@@ -89,11 +89,48 @@ export class TranslatorService {
 
 		const errorMap: ProxyHandlerOptions["errorMap"] = new Map();
 
+		/**
+		 * Generic error transform that checks for rate limit patterns in any error
+		 */
+		const genericErrorTransform = (error: Error) => {
+			const isRateLimit =
+				error.message.toLowerCase().includes("rate limit") ||
+				error.message.includes("429") ||
+				error.message.toLowerCase().includes("free-models-per-") ||
+				error.message.toLowerCase().includes("provider returned error") ||
+				error.message.toLowerCase().includes("no endpoints found matching");
+
+			if (isRateLimit) {
+				return {
+					code: ErrorCode.RATE_LIMIT_EXCEEDED,
+					metadata: {
+						originalMessage: error.message,
+						errorType: error.constructor.name,
+					},
+				};
+			}
+
+			return {
+				metadata: {
+					originalMessage: error.message,
+					errorType: error.constructor.name,
+				},
+			};
+		};
+
 		errorMap.set("APIError", {
 			code: ErrorCode.LLM_API_ERROR,
 			transform: (error: Error) => {
 				if (error instanceof APIError) {
-					if (error.status === 429 || error.message.toLowerCase().includes("rate limit")) {
+					const isRateLimit =
+						error.status === StatusCodes.TOO_MANY_REQUESTS ||
+						error.message.toLowerCase().includes("rate limit") ||
+						error.message.includes("429") ||
+						error.message.toLowerCase().includes("free-models-per-") ||
+						error.message.toLowerCase().includes("provider returned error") ||
+						error.message.toLowerCase().includes("no endpoints found matching");
+
+					if (isRateLimit) {
 						return {
 							code: ErrorCode.RATE_LIMIT_EXCEEDED,
 							metadata: {
@@ -103,13 +140,27 @@ export class TranslatorService {
 							},
 						};
 					}
-					return { metadata: { statusCode: error.status, type: error.type } };
+					return {
+						metadata: {
+							statusCode: error.status,
+							type: error.type,
+							originalMessage: error.message,
+						},
+					};
 				}
 
-				return { metadata: { statusCode: 500, type: "UnknownError" } };
+				return genericErrorTransform(error);
 			},
 		});
+
+		errorMap.set("Error", {
+			code: ErrorCode.UNKNOWN_ERROR,
+			transform: genericErrorTransform,
+		});
+
 		errorMap.set("RateLimitError", { code: ErrorCode.RATE_LIMIT_EXCEEDED });
+		errorMap.set("QuotaExceededError", { code: ErrorCode.RATE_LIMIT_EXCEEDED });
+		errorMap.set("TooManyRequestsError", { code: ErrorCode.RATE_LIMIT_EXCEEDED });
 
 		this.llm = createErrorHandlingProxy(this.llm, { serviceName: "OpenAI", errorMap });
 	}
@@ -268,10 +319,6 @@ export class TranslatorService {
 				:	"English",
 		};
 
-		if (languages.target === "Portuguese") {
-			languages.target = "Portuguese (Brazil)";
-		}
-
 		const glossarySection = `
 			GLOSSARY RULES:
 			You must translate the following terms according to the glossary:
@@ -299,7 +346,9 @@ export class TranslatorService {
 			- MUST respond only with the translated content.
 			- MUST make sure the output text content is not preppended or appended with any extra characters or text (sometimes LLMs add "\`\`\`" at the start or end)
 			- MUST NOT add whitespace to lists or between list items and their bullets/numbers (e.g. "- item", "1. item"; NOT "-item", "1.item" or "-  item", "1.  item")
-			${languages.target === "Portuguese (Brazil)" ? "- MUST translate 'deprecated' and derived terms to 'descontinuado(a)' or 'obsoleto(a)'" : ""}
+			- MUST NOT wrap the translated content in a code block (sometimes LLMs do this even when instructed not to)
+			- MUST NOT remove the original frontmatter at the start of the document (the section between "---" lines)
+			${languages.target === "Português (Brasil)" ? "- MUST translate 'deprecated' and derived terms to 'descontinuado(a)' or 'obsoleto(a)'" : ""}
 
 			${glossarySection}
 		`;

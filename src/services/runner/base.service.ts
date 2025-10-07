@@ -616,6 +616,8 @@ export abstract class RunnerService {
 		} catch (error) {
 			metadata.error = error instanceof Error ? error : new Error(String(error));
 			this.updateBatchProgress("error");
+
+			await this.cleanupFailedTranslation(metadata);
 		} finally {
 			this.metadata.results.set(file.filename, metadata);
 			this.updateProgressSpinner(progress);
@@ -641,6 +643,25 @@ export abstract class RunnerService {
 	private updateBatchProgress(status: "success" | "error"): void {
 		this.batchProgress.completed++;
 		status === "success" ? this.batchProgress.successful++ : this.batchProgress.failed++;
+	}
+
+	/**
+	 * Cleans up resources for failed translation attempts.
+	 *
+	 * Removes translation branches that were created but failed during processing
+	 * to prevent accumulation of stale branches in the repository.
+	 *
+	 * @param metadata The processing result metadata containing branch information
+	 */
+	private async cleanupFailedTranslation(metadata: ProcessedFileResult): Promise<void> {
+		if (metadata.branch?.ref) {
+			try {
+				const branchName = metadata.branch.ref.replace("refs/heads/", "");
+				await this.services.github.cleanupBranch(branchName);
+			} catch (cleanupError) {
+				console.warn(`Failed to cleanup branch for ${metadata.filename}:`, cleanupError);
+			}
+		}
 	}
 
 	abstract run(): Promise<void>;

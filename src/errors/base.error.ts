@@ -50,7 +50,7 @@ export interface ErrorContext {
 	timestamp?: Date;
 }
 
-export interface FormattedError {
+export interface FormattedError extends Record<string, unknown> {
 	name: string;
 	message: string;
 	code: ErrorCode;
