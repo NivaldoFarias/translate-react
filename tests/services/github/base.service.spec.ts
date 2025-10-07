@@ -25,10 +25,6 @@ class TestGitHubService extends BaseGitHubService {
 		return this.fork;
 	}
 
-	public getToken() {
-		return this.githubToken;
-	}
-
 	public getRateLimit() {
 		return this.octokit.rateLimit.get();
 	}
@@ -39,18 +35,16 @@ describe("Base GitHub Service", () => {
 	const mockConfig = {
 		upstream: { owner: "test-owner", repo: "test-repo" },
 		fork: { owner: "fork-owner", repo: "fork-repo" },
-		token: "test-token",
 	};
 
 	beforeEach(() => {
-		service = new TestGitHubService(mockConfig.upstream, mockConfig.fork, mockConfig.token);
+		service = new TestGitHubService(mockConfig.upstream, mockConfig.fork);
 	});
 
 	test("should initialize with correct configuration", () => {
 		expect(service.getOctokit()).toBeDefined();
 		expect(service.getUpstream()).toEqual(mockConfig.upstream);
 		expect(service.getFork()).toEqual(mockConfig.fork);
-		expect(service.getToken()).toBe(mockConfig.token);
 	});
 
 	test("should have valid Octokit instance", () => {
@@ -63,7 +57,6 @@ describe("Base GitHub Service", () => {
 	test("should store configuration correctly", () => {
 		expect(service.getUpstream()).toEqual({ owner: "test-owner", repo: "test-repo" });
 		expect(service.getFork()).toEqual({ owner: "fork-owner", repo: "fork-repo" });
-		expect(service.getToken()).toBe("test-token");
 	});
 
 	test("should handle API rate limits", async () => {

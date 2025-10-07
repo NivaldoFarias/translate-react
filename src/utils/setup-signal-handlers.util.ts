@@ -1,7 +1,15 @@
 import { processSignals } from "./constants.util";
 
-export function setupSignalHandlers(cleanUpFn: (...args: any[]) => void): void {
+export function setupSignalHandlers(cleanUpFn: (...args: any[]) => void | Promise<void>): void {
 	for (const signal of Object.values(processSignals)) {
-		process.on(signal, cleanUpFn);
+		process.on(signal, (...args: any[]) => {
+			(async () => {
+				try {
+					await cleanUpFn(...args);
+				} catch (error) {
+					console.error(`Cleanup failed for signal ${signal}:`, error);
+				}
+			})();
+		});
 	}
 }
