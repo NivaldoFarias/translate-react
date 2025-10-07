@@ -1,6 +1,7 @@
 import type { ErrorContext } from "./base.error";
 
 import { TranslationFile } from "@/services/translator.service";
+import { detectRateLimit } from "@/utils/";
 
 import { ErrorCode, TranslationError } from "./base.error";
 import { ErrorHandler } from "./error.handler";
@@ -105,15 +106,7 @@ export function createErrorHandlingProxy<T extends object>(
 						 * Fallback: Check for rate limit patterns in any error message
 						 * This ensures rate limits are caught regardless of error type
 						 */
-						const isRateLimit =
-							error.message.toLowerCase().includes("rate limit") ||
-							error.message.includes("429") ||
-							error.message.toLowerCase().includes("free-models-per-") ||
-							error.message.toLowerCase().includes("provider returned error") ||
-							error.message.toLowerCase().includes("no endpoints found matching") ||
-							error.message.toLowerCase().includes("quota");
-
-						if (isRateLimit) {
+						if (detectRateLimit(error.message)) {
 							throw new TranslationError(error.message, ErrorCode.RATE_LIMIT_EXCEEDED, {
 								...context,
 								metadata: {
