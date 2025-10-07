@@ -108,6 +108,14 @@ const envSchema = z.object({
 	FORCE_SNAPSHOT_CLEAR: z.coerce.boolean().default(environmentDefaults.FORCE_SNAPSHOT_CLEAR),
 
 	/**
+	 * Whether to create PRs in the fork (development mode) or upstream (production mode).
+	 * When true, PRs are created against the fork for development purposes.
+	 *
+	 * @default false
+	 */
+	DEV_MODE_FORK_PR: z.coerce.boolean().default(false),
+
+	/**
 	 * The URL of the application to override the default URL.
 	 * Used for activity tracking on {@link https://openrouter.ai/|OpenRouter}.
 	 *

@@ -44,7 +44,7 @@ export interface ProxyHandlerOptions {
  * const safeGithubService = createErrorHandlingProxy(githubService, {
  *   serviceName: 'GitHubService',
  *   errorMap: new Map([
- *     ['HttpError', { code: ErrorCode.GITHUB_API_ERROR }],
+ *     ['RequestError', { code: ErrorCode.GITHUB_API_ERROR }],
  *     ['RateLimitError', { code: ErrorCode.RATE_LIMIT_EXCEEDED }]
  *   ])
  * });

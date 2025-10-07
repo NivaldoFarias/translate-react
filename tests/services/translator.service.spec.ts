@@ -13,7 +13,7 @@ import { TranslationFile, TranslatorService } from "@/services/translator.servic
 
 describe("TranslatorService", () => {
 	let translatorService: TranslatorService;
-	let mockOpenAI: any;
+	let mockOpenAI: unknown;
 	const config: LanguageConfig = {
 		source: "en",
 		target: "pt-br",

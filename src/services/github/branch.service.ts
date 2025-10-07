@@ -1,4 +1,5 @@
 import { RestEndpointMethodTypes } from "@octokit/rest";
+import { StatusCodes } from "http-status-codes";
 
 import { BaseGitHubService } from "@/services/github/base.service";
 import { env, setupSignalHandlers } from "@/utils/";
@@ -32,6 +33,37 @@ export class BranchService extends BaseGitHubService {
 	}
 
 	/**
+	 * Gets the default branch name for the fork repository.
+	 *
+	 * @returns The default branch name
+	 *
+	 * @example
+	 * ```typescript
+	 * const defaultBranch = await branchService.getDefaultBranch();
+	 * ```
+	 */
+	private async getDefaultBranch(): Promise<string> {
+		const response = await this.octokit.repos.get(this.fork);
+		return response.data.default_branch;
+	}
+
+	/**
+	 * Type guard to check if an error is a GitHub API 404 Not Found error.
+	 *
+	 * @param error The error to check
+	 *
+	 * @returns True if the error is a 404 Not Found error
+	 */
+	private isNotFoundError(error: unknown): boolean {
+		return (
+			typeof error === "object" &&
+			error !== null &&
+			"status" in error &&
+			error.status === StatusCodes.NOT_FOUND
+		);
+	}
+
+	/**
 	 * Creates a new Git branch from a base branch.
 	 *
 	 * Tracks the branch for cleanup if created successfully.
@@ -46,12 +78,14 @@ export class BranchService extends BaseGitHubService {
 	 */
 	public async createBranch(
 		branchName: string,
-		baseBranch = "main",
+		baseBranch?: string,
 	): Promise<RestEndpointMethodTypes["git"]["createRef"]["response"]> {
 		try {
+			const actualBaseBranch = baseBranch || (await this.getDefaultBranch());
+
 			const mainBranchRef = await this.octokit.git.getRef({
 				...this.fork,
-				ref: `heads/${baseBranch}`,
+				ref: `heads/${actualBaseBranch}`,
 			});
 
 			const branchRef = await this.octokit.git.createRef({
@@ -82,11 +116,19 @@ export class BranchService extends BaseGitHubService {
 	 */
 	public async getBranch(
 		branchName: string,
-	): Promise<RestEndpointMethodTypes["git"]["getRef"]["response"]> {
-		return await this.octokit.git.getRef({
-			...this.fork,
-			ref: `heads/${branchName}`,
-		});
+	): Promise<RestEndpointMethodTypes["git"]["getRef"]["response"] | null> {
+		try {
+			return await this.octokit.git.getRef({
+				...this.fork,
+				ref: `heads/${branchName}`,
+			});
+		} catch (error) {
+			if (this.isNotFoundError(error)) {
+				return null;
+			}
+
+			throw error;
+		}
 	}
 
 	/**

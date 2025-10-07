@@ -229,7 +229,7 @@ export abstract class RunnerService {
 	protected async fetchRepositoryTree(): Promise<void> {
 		if (!this.state.repositoryTree?.length) {
 			this.spinner.text = "Fetching repository content...";
-			this.state.repositoryTree = await this.services.github.getRepositoryTree("main");
+			this.state.repositoryTree = await this.services.github.getRepositoryTree();
 
 			if (env.NODE_ENV === "development") {
 				await this.services.snapshot.append("repositoryTree", this.state.repositoryTree);
@@ -397,12 +397,12 @@ export abstract class RunnerService {
 		const elapsedTime = Math.ceil(Date.now() - this.metadata.timestamp);
 		const results = Array.from(this.metadata.results.values());
 
-		this.spinner.stopAndPersist({ symbol: "📊", text: "Final Statistics" });
+		const successCount = results.filter(({ error }) => !error).length;
+		const failureCount = results.filter(({ error }) => !!error).length;
 
-		console.table({
-			"Files processed successfully": results.filter(({ error }) => !error).length,
-			"Failed translations": results.filter(({ error }) => !!error).length,
-			"Total elapsed time": this.formatElapsedTime(elapsedTime),
+		this.spinner.stopAndPersist({
+			symbol: "📊",
+			text: `Final: ${successCount} successful, ${failureCount} failed (${this.formatElapsedTime(elapsedTime)})`,
 		});
 
 		const failedFiles = results.filter(({ error }) => !!error) as SetNonNullable<
@@ -413,7 +413,7 @@ export abstract class RunnerService {
 		if (failedFiles.length > 0) {
 			this.spinner.stopAndPersist({
 				symbol: "❌",
-				text: `Failed translations (${failedFiles.length} total):`,
+				text: `Failed files (${failedFiles.length}):`,
 			});
 
 			for (const [index, { filename, error }] of failedFiles.entries()) {
@@ -423,11 +423,6 @@ export abstract class RunnerService {
 				});
 			}
 		}
-
-		this.spinner.stopAndPersist({
-			symbol: "⏱️",
-			text: ` Workflow completed in ${elapsedTime}ms (${Math.ceil(elapsedTime / 1000)}s)`,
-		});
 	}
 
 	/**
@@ -530,7 +525,7 @@ export abstract class RunnerService {
 		this.batchProgress.failed = 0;
 
 		this.spinner.text = `Processing batch ${batchInfo.currentBatch}/${batchInfo.totalBatches}`;
-		this.spinner.suffixText = `:: 0 out of ${batch.length} files completed (0% done)`;
+		this.spinner.suffixText = `(0/${batch.length})`;
 
 		const processBatchFiles = this.errorHandler.wrapAsync(
 			async () => {
@@ -555,8 +550,7 @@ export abstract class RunnerService {
 		const successRate = Math.round((this.batchProgress.successful / batch.length) * 100);
 
 		this.spinner.succeed(
-			`Completed batch ${batchInfo.currentBatch}/${batchInfo.totalBatches} :: ` +
-				`${this.batchProgress.successful}/${batch.length} successful (${successRate}% success rate)`,
+			`Batch ${batchInfo.currentBatch}/${batchInfo.totalBatches} completed: ${this.batchProgress.successful}/${batch.length} successful (${successRate}%)`,
 		);
 
 		if (batchInfo.currentBatch < batchInfo.totalBatches) {
@@ -634,9 +628,7 @@ export abstract class RunnerService {
 	 * @param progress Current progress information
 	 */
 	private updateProgressSpinner(progress: FileProcessingProgress): void {
-		const percentComplete = Math.round((this.batchProgress.completed / progress.batchSize) * 100);
-
-		this.spinner.suffixText = `[${this.batchProgress.completed}/${progress.batchSize}] files completed (${percentComplete}% done)`;
+		this.spinner.suffixText = `(${this.batchProgress.completed}/${progress.batchSize})`;
 	}
 
 	/**
@@ -666,9 +658,7 @@ export abstract class RunnerService {
 		const translationLength = processingResult.translation?.length || 0;
 		const compressionRatio = sourceLength > 0 ? (translationLength / sourceLength).toFixed(2) : "0";
 
-		return `# Translation to ${languageName}
-
-This pull request contains an automated translation of the referenced page to **${languageName}**.
+		return `This pull request contains an automated translation of the referenced page to **${languageName}**.
 
 > [!IMPORTANT]
 > This translation was generated using AI/LLM technology and requires human review for accuracy, cultural context, and technical terminology.
@@ -696,6 +686,8 @@ Please review this translation for:
 | **File Path** | \`${file.path}\` |
 | **Processing Time** | ~${Math.ceil(processingTime / 1000)}s |
 
+###### ps.: The content ratio indicates how the translation length compares to the source (1.0x = same length, >1.0x = translation is longer). Different languages naturally have varying verbosity levels.
+
 ### Technical Information
 
 - **Target Language**: ${languageName} (\`${this.options.targetLanguage}\`)
@@ -704,8 +696,6 @@ Please review this translation for:
 - **Branch**: \`${processingResult.branch?.ref || "unknown"}\`
 - **Translation Tool Version**: \`${name} v${version}\`
 
-> [!NOTE]
-> The content ratio indicates how the translation length compares to the source (1.0x = same length, >1.0x = translation is longer). Different languages naturally have varying verbosity levels.
 
 </details>
 

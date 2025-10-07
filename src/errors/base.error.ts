@@ -14,6 +14,11 @@ export enum ErrorSeverity {
 export enum ErrorCode {
 	// API Related
 	GITHUB_API_ERROR = "GITHUB_API_ERROR",
+	GITHUB_NOT_FOUND = "GITHUB_NOT_FOUND",
+	GITHUB_UNAUTHORIZED = "GITHUB_UNAUTHORIZED",
+	GITHUB_FORBIDDEN = "GITHUB_FORBIDDEN",
+	GITHUB_RATE_LIMITED = "GITHUB_RATE_LIMITED",
+	GITHUB_SERVER_ERROR = "GITHUB_SERVER_ERROR",
 	LLM_API_ERROR = "LLM_API_ERROR",
 	RATE_LIMIT_EXCEEDED = "RATE_LIMIT_EXCEEDED",
 	API_ERROR = "API_ERROR",
@@ -107,12 +112,36 @@ export class TranslationError extends Error {
 		};
 	}
 
-	/** Converts the stack trace string into a list of lines for easier reading */
+	/**
+	 * Converts the stack trace string into a list of lines for easier reading.
+	 * Filters out error handler wrapper frames to show only relevant application code.
+	 */
 	private stackList(stack = ""): Array<string> {
-		return stack
+		const stackLines = stack
 			.split("\n")
-			.slice(1)
-			.map((line) => line.trim());
+			.slice(1) // Remove the error message line
+			.map((line) => line.trim())
+			.filter(Boolean); // Remove empty lines
+
+		// Filter out error handling infrastructure frames
+		const errorHandlerPatterns = [
+			/proxy\.handler\.ts/,
+			/error\.handler\.ts/,
+			/wrapAsync/,
+			/wrapSync/,
+			/handleError/,
+		];
+
+		let filteredStack = stackLines.filter(
+			(line) => !errorHandlerPatterns.some((pattern) => pattern.test(line)),
+		);
+
+		// Keep at least the first 3 lines if filtering removed everything
+		if (filteredStack.length === 0) {
+			filteredStack = stackLines.slice(0, 3);
+		}
+
+		return filteredStack;
 	}
 
 	/** Extracts a human-readable message from the error */

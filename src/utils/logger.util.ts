@@ -304,8 +304,10 @@ export class Logger {
 		const logMessage = `[${entry.timestamp}] ${entry.level}: ${entry.message}`;
 
 		if (entry.metadata) {
+			// eslint-disable-next-line no-console
 			(console[method] as (...args: unknown[]) => void)(logMessage, entry.metadata);
 		} else {
+			// eslint-disable-next-line no-console
 			(console[method] as (...args: unknown[]) => void)(logMessage);
 		}
 	}

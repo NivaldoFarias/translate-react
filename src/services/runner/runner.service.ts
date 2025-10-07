@@ -76,7 +76,7 @@ export default class Runner extends RunnerService {
 				await this.services.snapshot.append("processedResults", this.state.processedResults);
 			}
 
-			this.spinner.succeed("Translation completed");
+			this.spinner.succeed("Translation workflow completed");
 
 			if (this.shouldUpdateIssueComment) {
 				await this.updateIssueWithResults();

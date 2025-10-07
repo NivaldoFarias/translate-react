@@ -1,5 +1,7 @@
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
+import { createErrorHandlingProxy } from "@/errors/proxy.handler";
+import { BaseGitHubService } from "@/services/github/base.service";
 import { BranchService } from "@/services/github/branch.service";
 import {
 	CommitTranslationOptions,
@@ -7,6 +9,7 @@ import {
 	PullRequestOptions,
 } from "@/services/github/content.service";
 import { RepositoryService } from "@/services/github/repository.service";
+import { createGitHubErrorMap } from "@/utils";
 
 import { ProcessedFileResult } from "../runner/base.service";
 import { TranslationFile } from "../translator.service";
@@ -46,10 +49,21 @@ export class GitHubService {
 			fork: { owner: string; repo: string };
 		},
 	) {
+		const gitHubErrorMap = createGitHubErrorMap();
+
 		this.services = {
-			branch: new BranchService(this.repos.upstream, this.repos.fork),
-			repository: new RepositoryService(this.repos.upstream, this.repos.fork),
-			content: new ContentService(this.repos.upstream, this.repos.fork),
+			branch: createErrorHandlingProxy(new BranchService(this.repos.upstream, this.repos.fork), {
+				serviceName: "BranchService",
+				errorMap: gitHubErrorMap,
+			}),
+			repository: createErrorHandlingProxy(
+				new RepositoryService(this.repos.upstream, this.repos.fork),
+				{ serviceName: "RepositoryService", errorMap: gitHubErrorMap },
+			),
+			content: createErrorHandlingProxy(new ContentService(this.repos.upstream, this.repos.fork), {
+				serviceName: "ContentService",
+				errorMap: gitHubErrorMap,
+			}),
 		};
 	}
 
@@ -66,7 +80,7 @@ export class GitHubService {
 	 * const tree = await repoService.getRepositoryTree('main', true);
 	 * ```
 	 */
-	public async getRepositoryTree(baseBranch = "main", filterIgnored = true) {
+	public async getRepositoryTree(baseBranch?: string, filterIgnored = true) {
 		return this.services.repository.getRepositoryTree(baseBranch, filterIgnored);
 	}
 
@@ -115,13 +129,16 @@ export class GitHubService {
 	 * const branch = await github.createOrGetTranslationBranch(file);
 	 * ```
 	 */
-	public async createOrGetTranslationBranch(file: TranslationFile, baseBranch = "main") {
+	public async createOrGetTranslationBranch(file: TranslationFile, baseBranch?: string) {
+		// Get the actual default branch if not specified
+		const actualBaseBranch =
+			baseBranch || (await this.services.repository.getDefaultBranch("fork"));
 		const branchName = `translate/${file.path.split("/").slice(2).join("/")}`;
 		const existingBranch = await this.services.branch.getBranch(branchName);
 
 		if (existingBranch) {
-			const mainBranchRef = await this.services.branch.getBranch(baseBranch);
-			if (!mainBranchRef) throw new Error(`Base branch ${baseBranch} not found`);
+			const mainBranchRef = await this.services.branch.getBranch(actualBaseBranch);
+			if (!mainBranchRef) throw new Error(`Base branch ${actualBaseBranch} not found`);
 
 			if (existingBranch.data.object.sha === mainBranchRef.data.object.sha) {
 				return existingBranch.data;
@@ -140,7 +157,7 @@ export class GitHubService {
 			await this.services.branch.deleteBranch(branchName);
 		}
 
-		const newBranch = await this.services.branch.createBranch(branchName, baseBranch);
+		const newBranch = await this.services.branch.createBranch(branchName, actualBaseBranch);
 
 		return newBranch.data;
 	}

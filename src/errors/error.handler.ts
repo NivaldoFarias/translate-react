@@ -88,7 +88,7 @@ export class ErrorHandler {
 	public handle(error: Error, context?: Partial<ErrorContext>): TranslationError {
 		const translatedError = this.wrapError(error, context);
 
-		this.logError(translatedError).catch((logError) => {
+		this.logError(translatedError, translatedError.context.sanity).catch((logError) => {
 			console.error("Failed to log error:", logError);
 		});
 
@@ -171,17 +171,24 @@ export class ErrorHandler {
 	}
 
 	/**
-	 * Logs an error based on configuration
+	 * Logs an error to file if configured
+	 *
+	 * Uses JSONL (JSON Lines) format for proper append-only logging.
+	 * Each line is a valid JSON object, making the file easily parseable.
 	 *
 	 * @param error The error to log
+	 * @param severity The severity level
 	 */
-	private async logError(error: TranslationError): Promise<void> {
-		const severity = error.context.sanity ?? ErrorSeverity.ERROR;
+	private async logError(error: TranslationError, severity: ErrorSeverity): Promise<void> {
+		if (this.config.customReporter) {
+			this.config.customReporter(error);
+		}
 
 		if (this.shouldLog(severity)) {
 			if (this.logFilePath) {
 				try {
-					const logEntry = JSON.stringify(error.toJSON(), null, 2) + "\n";
+					// Use JSONL format (one JSON object per line) for proper parsing
+					const logEntry = JSON.stringify(error.toJSON()) + "\n";
 					const file = Bun.file(this.logFilePath);
 					const existingContent = (await file.exists()) ? await file.text() : "";
 
@@ -191,9 +198,7 @@ export class ErrorHandler {
 				}
 			}
 		}
-	}
-
-	/**
+	} /**
 	 * Determines if an error should be logged based on minimum severity
 	 *
 	 * @param severity The severity of the error
