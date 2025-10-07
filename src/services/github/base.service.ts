@@ -20,15 +20,13 @@ export abstract class BaseGitHubService {
 	 *
 	 * @param upstream Original repository details
 	 * @param fork Forked repository details
-	 * @param githubToken GitHub personal access token
 	 */
 	constructor(
 		protected readonly upstream: { owner: string; repo: string },
 		protected readonly fork: { owner: string; repo: string },
-		protected readonly githubToken = env.GITHUB_TOKEN,
 	) {
 		this.octokit = new Octokit({
-			auth: this.githubToken,
+			auth: env.GITHUB_TOKEN,
 			log: {
 				debug: () => {},
 				info: () => {},

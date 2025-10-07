@@ -1,7 +1,7 @@
 import { RestEndpointMethodTypes } from "@octokit/rest";
 
 import { BaseGitHubService } from "@/services/github/base.service";
-import { env } from "@/utils/";
+import { env, setupSignalHandlers } from "@/utils/";
 
 /**
  * Service responsible for Git branch operations and lifecycle management.
@@ -25,23 +25,10 @@ export class BranchService extends BaseGitHubService {
 	constructor(
 		protected readonly upstream: { owner: string; repo: string },
 		protected readonly fork: { owner: string; repo: string },
-		protected readonly githubToken = env.GITHUB_TOKEN,
 	) {
-		super(upstream, fork, githubToken);
+		super(upstream, fork);
 
-		this.setupCleanupHandlers();
-	}
-
-	/**
-	 * Sets up process termination handlers for branch cleanup.
-	 *
-	 * Ensures branches are cleaned up on process exit or errors.
-	 */
-	protected setupCleanupHandlers(): void {
-		process
-			.on("SIGINT", async () => await this.cleanup())
-			.on("SIGTERM", async () => await this.cleanup())
-			.on("uncaughtException", async () => await this.cleanup());
+		setupSignalHandlers(async () => await this.cleanup());
 	}
 
 	/**
