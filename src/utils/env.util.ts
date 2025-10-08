@@ -155,6 +155,13 @@ const envSchema = z.object({
 	 * @see {@link REACT_TRANSLATION_LANGUAGES}
 	 */
 	SOURCE_LANGUAGE: z.enum(REACT_TRANSLATION_LANGUAGES).default(environmentDefaults.SOURCE_LANGUAGE),
+
+	/**
+	 * Maximum tokens to generate in a single LLM response.
+	 *
+	 * @default 8192
+	 */
+	MAX_TOKENS: z.coerce.number().positive().default(environmentDefaults.MAX_TOKENS),
 });
 
 /** Type definition for the environment configuration */
