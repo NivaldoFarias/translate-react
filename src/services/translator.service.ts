@@ -402,7 +402,7 @@ export class TranslatorService {
 			const completion = await this.llm.chat.completions.create({
 				model: env.LLM_MODEL,
 				temperature: 0.1,
-				max_tokens: 8192,
+				max_tokens: env.MAX_TOKENS,
 				messages: [
 					{ role: "system", content: systemPrompt },
 					{ role: "user", content: userPrompt },

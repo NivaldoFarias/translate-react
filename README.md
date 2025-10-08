@@ -180,27 +180,28 @@ bun install
 
 #### Environment Configuration 
 
-| Variable                | Required? | Default                                            | Description                                        |
-| ----------------------- | --------- | -------------------------------------------------- | -------------------------------------------------- |
-| `NODE_ENV`              | no        | `development`                                      | Runtime environment                                |
-| `BUN_ENV`               | no        | `development`                                      | Bun-specific environment                           |
-| `LLM_MODEL`             | no        | `google/gemini-2.0-flash-exp:free`                 | Model to use for translation                       |
-| `OPENAI_API_KEY`        | yes       | —                                                  | API key for the language model                     |
-| `OPENAI_BASE_URL`       | no        | `https://openrouter.ai/api/v1`                     | API endpoint (supports OpenRouter, Azure, etc.)    |
-| `OPENAI_PROJECT_ID`     | no        | —                                                  | Project ID for usage tracking                      |
-| `GITHUB_TOKEN`          | yes       | —                                                  | Personal access token with repo permissions        |
-| `REPO_FORK_OWNER`       | no        | `nivaldofarias`                                    | Owner of your fork                                 |
-| `REPO_FORK_NAME`        | no        | `pt-br.react.dev`                                  | Name of your forked repository                     |
-| `REPO_UPSTREAM_OWNER`   | no        | `reactjs`                                          | Original repository owner                          |
-| `REPO_UPSTREAM_NAME`    | no        | `pt-br.react.dev`                                  | Original repository name                           |
-| `PROGRESS_ISSUE_NUMBER` | no        | `555`                                              | Issue number for progress updates                  |
-| `FORCE_SNAPSHOT_CLEAR`  | no        | `false`                                            | Clear snapshots on startup (dev only)              |
-| `DEV_MODE_FORK_PR`      | no        | `false`                                            | Create PRs in fork (dev) vs upstream (production)  |
-| `HEADER_APP_URL`        | no        | `https://github.com/NivaldoFarias/translate-react` | Application URL for OpenRouter Activity Tracking   |
-| `HEADER_APP_TITLE`      | no        | `translate-react v0.1.8`                           | Application title for OpenRouter Activity Tracking |
-| `BATCH_SIZE`            | no        | `10`                                               | Number of files to process concurrently            |
-| `TARGET_LANGUAGE`       | no        | `pt`                                               | Target language (ISO 639-1 code)                   |
-| `SOURCE_LANGUAGE`       | no        | `en`                                               | Source language (ISO 639-1 code)                   |
+| Variable                | Required? | Default                                            | Description                                         |
+| ----------------------- | --------- | -------------------------------------------------- | --------------------------------------------------- |
+| `NODE_ENV`              | no        | `development`                                      | Runtime environment                                 |
+| `BUN_ENV`               | no        | `development`                                      | Bun-specific environment                            |
+| `LLM_MODEL`             | no        | `google/gemini-2.5-flash-lite`                     | Model to use for translation                        |
+| `OPENAI_API_KEY`        | yes       | —                                                  | API key for the language model                      |
+| `OPENAI_BASE_URL`       | no        | `https://openrouter.ai/api/v1`                     | API endpoint (supports OpenRouter, Azure, etc.)     |
+| `OPENAI_PROJECT_ID`     | no        | —                                                  | Project ID for usage tracking                       |
+| `GITHUB_TOKEN`          | yes       | —                                                  | Personal access token with repo permissions         |
+| `REPO_FORK_OWNER`       | no        | `nivaldofarias`                                    | Owner of your fork                                  |
+| `REPO_FORK_NAME`        | no        | `pt-br.react.dev`                                  | Name of your forked repository                      |
+| `REPO_UPSTREAM_OWNER`   | no        | `reactjs`                                          | Original repository owner                           |
+| `REPO_UPSTREAM_NAME`    | no        | `pt-br.react.dev`                                  | Original repository name                            |
+| `PROGRESS_ISSUE_NUMBER` | no        | `555`                                              | Issue number for progress updates                   |
+| `FORCE_SNAPSHOT_CLEAR`  | no        | `false`                                            | Clear snapshots on startup (dev only)               |
+| `DEV_MODE_FORK_PR`      | no        | `false`                                            | Create PRs in fork (dev) vs upstream (production)   |
+| `HEADER_APP_URL`        | no        | `https://github.com/NivaldoFarias/translate-react` | Application URL for OpenRouter Activity Tracking    |
+| `HEADER_APP_TITLE`      | no        | `translate-react v0.1.8`                           | Application title for OpenRouter Activity Tracking  |
+| `BATCH_SIZE`            | no        | `10`                                               | Number of files to process concurrently             |
+| `TARGET_LANGUAGE`       | no        | `pt`                                               | Target language (ISO 639-1 code)                    |
+| `SOURCE_LANGUAGE`       | no        | `en`                                               | Source language (ISO 639-1 code)                    |
+| `MAX_TOKENS`            | no        | `8192`                                             | Maximum tokens to generate in a single LLM response |
 
 > [!IMPORTANT]
 > **Environment Validation**: All variables are validated at runtime using Zod schemas. 

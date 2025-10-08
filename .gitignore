@@ -177,3 +177,7 @@ dist
 # SQLite database files
 *.sqlite
 *.sqlite-journal
+
+# Github Copilot
+.github/instructions/
+.github/copilot-instructions.md

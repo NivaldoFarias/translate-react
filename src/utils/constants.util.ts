@@ -114,4 +114,6 @@ export const environmentDefaults = {
 	BATCH_SIZE: 1,
 	TARGET_LANGUAGE: "pt-br",
 	SOURCE_LANGUAGE: "en",
+	/** Maximum tokens to generate in a single LLM response */
+	MAX_TOKENS: 8192,
 } as const;
