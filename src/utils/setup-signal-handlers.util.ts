@@ -18,6 +18,7 @@ export function setupSignalHandlers(
 			 * error reporter is provided. This is acceptable for process shutdown scenarios
 			 * where the logging system may not be available.
 			 */
+			// eslint-disable-next-line no-console
 			console.error(message, error);
 		});
 
