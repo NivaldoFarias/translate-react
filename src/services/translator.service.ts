@@ -396,7 +396,6 @@ export class TranslatorService {
 	 */
 	private async callLanguageModel(content: string): Promise<string> {
 		const systemPrompt = await this.getSystemPrompt(content);
-		const userPrompt = this.getUserPrompt(content);
 
 		try {
 			const completion = await this.llm.chat.completions.create({
@@ -405,7 +404,7 @@ export class TranslatorService {
 				max_tokens: env.MAX_TOKENS,
 				messages: [
 					{ role: "system", content: systemPrompt },
-					{ role: "user", content: userPrompt },
+					{ role: "user", content },
 				],
 			});
 
@@ -500,19 +499,9 @@ export class TranslatorService {
 	}
 
 	/**
-	 * Creates user prompt with the content to translate.
-	 *
-	 * @param content Content to translate
-	 *
-	 * @returns User prompt string
-	 */
-	private getUserPrompt(content: string): string {
-		return `CONTENT TO TRANSLATE:\n${content}\n\n`;
-	}
-
-	/**
 	 * Creates the system prompt that defines translation rules and requirements.
-	 * Uses async language detection to determine source language.
+	 * Uses async language detection to determine source language and constructs
+	 * a structured prompt following prompt engineering best practices.
 	 *
 	 * @param content Content to determine source language
 	 *
@@ -522,47 +511,72 @@ export class TranslatorService {
 		const detectedSourceCode = await this.languageDetector.detectPrimaryLanguage(content);
 
 		const languages = {
-			target: this.languageDetector.getLanguageName(this.options.target) || "Portuguese",
+			target: this.languageDetector.getLanguageName(this.options.target) || "Brazilian Portuguese",
 			source:
 				detectedSourceCode ?
 					this.languageDetector.getLanguageName(detectedSourceCode) || "English"
 				:	"English",
 		};
 
-		const glossarySection = `
-			GLOSSARY RULES:
-			You must translate the following terms according to the glossary:
-			${this.glossary}`;
+		const glossarySection =
+			this.glossary ?
+				`\n## TERMINOLOGY GLOSSARY\nApply these exact translations for the specified terms:\n${this.glossary}\n`
+			:	"";
 
-		return `
-			You are a precise translator specializing in technical documentation. 
-			Your task is to translate React documentation from ${languages.source} to ${languages.target} in a single, high-quality pass.
+		const langSpecificRules = this.getLanguageSpecificRules(languages.target);
 
-			TRANSLATION AND VERIFICATION REQUIREMENTS — YOU MUST FOLLOW THESE EXACTLY:
-			- MUST maintain ALL original markdown formatting, including code blocks, links, and special syntax
-			- MUST preserve ALL original code examples EXACTLY as they are
-			- MUST keep ALL original HTML tags intact and unchanged
-			- MUST follow the glossary rules below STRICTLY — these are non-negotiable terms
-			- MUST maintain ALL original frontmatter EXACTLY as in original
-			- MUST preserve ALL original line breaks and paragraph structure
-			- MUST NOT translate code variables, function names, or technical terms not in the glossary
-			- MUST NOT add any content
-			- MUST NOT remove any content. This is very important, DO NOT DO IT!
-			- MUST NOT change any URLs or links
-			- MUST translate comments within code blocks according to the glossary
-			- MUST maintain consistent technical terminology throughout the translation
-			- MUST ensure the translation reads naturally in ${languages.target} while preserving technical accuracy
-			- When translating code blocks, MUST only translate comments and string literals that don't refer to code
-			- MUST respond only with the translated content.
-			- MUST make sure the output text content is not preppended or appended with any extra characters or text (sometimes LLMs add "\`\`\`" at the start or end)
-			- MUST NOT add whitespace to lists or between list items and their bullets/numbers (e.g. "- item", "1. item"; NOT "-item", "1.item" or "-  item", "1.  item")
-			- MUST NOT wrap the translated content in a code block (sometimes LLMs do this even when instructed not to)
-			- MUST NOT remove the original frontmatter at the start of the document (the section between "---" lines)
-			- MUST keep the same number of blank lines as the original content
-			- MUST keep the blank line at the end of a file if it is present in the original content
-			${languages.target === "Português (Brasil)" ? "- MUST translate 'deprecated' and derived terms to 'descontinuado(a)' or 'obsoleto(a)'" : ""}
+		return `# ROLE
+You are an expert technical translator specializing in React documentation.
 
-			${glossarySection}
-		`;
+# TASK
+Translate the provided content from ${languages.source} to ${languages.target} with absolute precision and technical accuracy.
+
+# CRITICAL PRESERVATION RULES
+1. **Structure & Formatting**: Preserve ALL markdown syntax, HTML tags, code blocks, frontmatter, and line breaks exactly as written
+2. **Code Integrity**: Keep ALL code examples, variable names, function names, and URLs COMPLETELY unchanged
+3. **Content Completeness**: Translate EVERY piece of text content WITHOUT adding, removing, or omitting anything
+
+# TRANSLATION GUIDELINES
+## What to Translate
+- Natural language text and documentation content
+- Code comments and string literals (when they contain user-facing text)
+- Alt text, titles, and descriptive content
+
+## What NOT to Translate
+- Code syntax, variable names, function names, API endpoints
+- Technical terms not specified in the glossary
+- URLs, file paths, or configuration values
+- Frontmatter keys (only translate values if they're user-facing)
+
+## Quality Standards
+- Use natural, fluent ${languages.target} while maintaining technical precision
+- Apply consistent terminology throughout the document
+- Ensure technical accuracy and clarity for developers
+
+# OUTPUT REQUIREMENTS
+- Return ONLY the translated content
+- Do NOT add explanatory text, code block wrappers, or prefixes
+- Maintain exact whitespace patterns, including list formatting and blank lines
+- Preserve any trailing newlines from the original content
+
+${langSpecificRules}
+
+${glossarySection}`;
+	}
+
+	/**
+	 * Gets language-specific translation rules based on the target language.
+	 *
+	 * @param targetLanguage The target language name
+	 *
+	 * @returns Language-specific rules or empty string
+	 */
+	private getLanguageSpecificRules(targetLanguage: string): string {
+		if (targetLanguage === "Português (Brasil)") {
+			return `\n# PORTUGUESE (BRAZIL) SPECIFIC RULES
+- Translate 'deprecated' and related terms to 'descontinuado(a)' or 'obsoleto(a)'
+- Use Brazilian Portuguese conventions and terminology`;
+		}
+		return "";
 	}
 }

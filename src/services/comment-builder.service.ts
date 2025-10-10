@@ -13,6 +13,7 @@ export interface HierarchicalStructure {
 	[key: string]: HierarchicalStructure | FileEntry[] | undefined;
 }
 
+/** Service for building comments based on translation results */
 export class CommentBuilderService {
 	/**
 	 * Builds a hierarchical comment for GitHub issues based on translation results.

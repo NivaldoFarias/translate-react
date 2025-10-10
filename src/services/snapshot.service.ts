@@ -2,8 +2,9 @@ import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 import { extractErrorMessage } from "@/errors/";
 import { DatabaseService } from "@/services/database.service";
+import { ProcessedFileResult } from "@/services/runner/base.service";
+import { setupSignalHandlers } from "@/utils";
 
-import { ProcessedFileResult } from "./runner/base.service";
 import { TranslationFile } from "./translator.service";
 
 /** Represents a snapshot of the translation workflow state */
@@ -26,19 +27,11 @@ export interface Snapshot {
 
 /** Manages the creation, saving, and loading of translation workflow snapshots */
 export class SnapshotService {
-	private readonly service: DatabaseService;
+	private readonly service = new DatabaseService();
 	private currentSnapshotId: number | null = null;
 
 	constructor() {
-		this.service = new DatabaseService();
-
-		process.on("SIGINT", async () => {
-			await this.cleanup();
-		});
-
-		process.on("SIGTERM", async () => {
-			await this.cleanup();
-		});
+		setupSignalHandlers(async () => await this.cleanup());
 	}
 
 	/**
