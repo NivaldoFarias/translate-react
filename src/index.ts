@@ -1,5 +1,5 @@
 import { TranslationError } from "@/errors";
-import Runner from "@/services/runner/runner.service";
+import RunnerService from "@/services/runner/runner.service";
 import { env, logger } from "@/utils";
 
 import { name, version } from "../package.json";
@@ -42,7 +42,7 @@ if (import.meta.main) {
  * @throws {TranslationError} If any critical error occurs during translation
  */
 async function workflow(): Promise<void> {
-	const runner = new Runner();
+	const runner = new RunnerService();
 
 	await runner.run();
 }
