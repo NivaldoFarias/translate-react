@@ -1,11 +1,13 @@
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 import { BaseGitHubService } from "@/services/github/base.service";
+import { logger } from "@/utils";
 
 /**
  * Service responsible for repository operations and fork management.
  *
  * ### Responsibilities
+ *
  * - Repository tree management
  * - Fork synchronization
  * - Token permission verification
@@ -25,9 +27,19 @@ export class RepositoryService extends BaseGitHubService {
 	 * ```
 	 */
 	public async getDefaultBranch(target: "fork" | "upstream" = "fork"): Promise<string> {
-		const repoConfig = target === "fork" ? this.fork : this.upstream;
-		const response = await this.octokit.repos.get(repoConfig);
-		return response.data.default_branch;
+		try {
+			const repoConfig = target === "fork" ? this.fork : this.upstream;
+			const response = await this.octokit.repos.get(repoConfig);
+
+			logger.debug({ target, branch: response.data.default_branch }, "Retrieved default branch");
+
+			return response.data.default_branch;
+		} catch (error) {
+			throw this.helpers.github.mapError(error, {
+				operation: "RepositoryService.getDefaultBranch",
+				metadata: { target, repoConfig: target === "fork" ? this.fork : this.upstream },
+			});
+		}
 	}
 
 	/**
@@ -47,14 +59,34 @@ export class RepositoryService extends BaseGitHubService {
 		baseBranch?: string,
 		filterIgnored = true,
 	): Promise<RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"]> {
-		const branchName = baseBranch || (await this.getDefaultBranch("fork"));
-		const response = await this.octokit.git.getTree({
-			...this.fork,
-			tree_sha: branchName,
-			recursive: "true",
-		});
+		try {
+			const branchName = baseBranch || (await this.getDefaultBranch("fork"));
+			const response = await this.octokit.git.getTree({
+				...this.fork,
+				tree_sha: branchName,
+				recursive: "true",
+			});
 
-		return filterIgnored ? this.filterRepositoryTree(response.data.tree) : response.data.tree;
+			const tree =
+				filterIgnored ? this.filterRepositoryTree(response.data.tree) : response.data.tree;
+
+			logger.info(
+				{
+					branch: branchName,
+					totalItems: response.data.tree.length,
+					filteredItems: tree.length,
+					filterIgnored,
+				},
+				"Retrieved repository tree",
+			);
+
+			return tree;
+		} catch (error) {
+			throw this.helpers.github.mapError(error, {
+				operation: "RepositoryService.getRepositoryTree",
+				metadata: { baseBranch, filterIgnored, fork: this.fork },
+			});
+		}
 	}
 
 	/**
@@ -71,12 +103,16 @@ export class RepositoryService extends BaseGitHubService {
 			const response = await this.octokit.rest.users.getAuthenticated();
 
 			if (response.status !== 200) {
+				logger.warn({ status: response.status }, "Authentication status check failed");
 				return false;
 			}
 
 			await this.octokit.rest.repos.get(this.upstream);
+
+			logger.info({ user: response.data.login }, "Token permissions verified successfully");
 			return true;
-		} catch {
+		} catch (error) {
+			logger.error({ err: error }, "Token permission verification failed");
 			return false;
 		}
 	}
@@ -110,8 +146,20 @@ export class RepositoryService extends BaseGitHubService {
 				}),
 			]);
 
-			return upstreamCommits.data[0]?.sha === forkedCommits.data[0]?.sha;
-		} catch {
+			const isSynced = upstreamCommits.data[0]?.sha === forkedCommits.data[0]?.sha;
+
+			logger.debug(
+				{
+					isSynced,
+					upstreamSha: upstreamCommits.data[0]?.sha,
+					forkSha: forkedCommits.data[0]?.sha,
+				},
+				"Checked fork synchronization status",
+			);
+
+			return isSynced;
+		} catch (error) {
+			logger.error({ err: error }, "Failed to check fork synchronization");
 			return false;
 		}
 	}
@@ -134,8 +182,27 @@ export class RepositoryService extends BaseGitHubService {
 				branch: "main",
 			});
 
-			return mergeResponse.status === 200;
-		} catch {
+			const success = mergeResponse.status === 200;
+
+			if (success) {
+				logger.info(
+					{
+						fork: this.fork,
+						message: mergeResponse.data.message,
+						mergeType: mergeResponse.data.merge_type,
+					},
+					"Fork synchronized successfully",
+				);
+			} else {
+				logger.warn(
+					{ fork: this.fork, status: mergeResponse.status },
+					"Fork synchronization returned unexpected status",
+				);
+			}
+
+			return success;
+		} catch (error) {
+			logger.error({ err: error, fork: this.fork }, "Failed to synchronize fork");
 			return false;
 		}
 	}
@@ -185,11 +252,14 @@ export class RepositoryService extends BaseGitHubService {
 
 			if ("content" in response.data) {
 				const content = Buffer.from(response.data.content, "base64").toString();
+				logger.info({ contentLength: content.length }, "Glossary fetched successfully");
 				return content;
 			}
 
+			logger.warn("Glossary file exists but has no content");
 			return null;
-		} catch {
+		} catch (error) {
+			logger.debug({ err: error }, "Glossary file not found or inaccessible");
 			return null;
 		}
 	}

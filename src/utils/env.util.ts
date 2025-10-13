@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import {
 	environmentDefaults,
+	LogLevel,
 	MIN_API_TOKEN_LENGTH,
 	REACT_TRANSLATION_LANGUAGES,
 	RuntimeEnvironment,
@@ -33,14 +34,21 @@ const envSchema = z.object({
 	 *
 	 * @default "development"
 	 */
-	NODE_ENV: z.enum(Object.values(RuntimeEnvironment)).default(environmentDefaults.NODE_ENV),
+	NODE_ENV: z.enum(RuntimeEnvironment).default(environmentDefaults.NODE_ENV),
 
 	/**
 	 * Bun's runtime environment.
 	 *
 	 * @default "development"
 	 */
-	BUN_ENV: z.enum(Object.values(RuntimeEnvironment)).default(environmentDefaults.BUN_ENV),
+	BUN_ENV: z.enum(RuntimeEnvironment).default(environmentDefaults.BUN_ENV),
+
+	/**
+	 * Logging level for the application.
+	 *
+	 * @default "info"
+	 */
+	LOG_LEVEL: z.enum(LogLevel).default(environmentDefaults.LOG_LEVEL),
 
 	/** The GitHub Personal Access Token */
 	GITHUB_TOKEN: createTokenSchema("GITHUB_TOKEN"),

@@ -1,11 +1,11 @@
-import type { ErrorContext } from "./base.error";
+import type { ErrorContext } from "./base-error";
 
-import { ErrorCode, TranslationError } from "./base.error";
+import { ErrorCode, TranslationError } from "./base-error";
 
 /** Thrown when the translation service fails to initialize */
 export class InitializationError extends TranslationError {
 	/**
-	 * Creates a new InitializationError instance
+	 * Creates a new `InitializationError` instance
 	 *
 	 * @param message The error message
 	 * @param context The error context
@@ -18,7 +18,7 @@ export class InitializationError extends TranslationError {
 /** Thrown when a required translation key is missing */
 export class MissingKeyError extends TranslationError {
 	/**
-	 * Creates a new MissingKeyError instance
+	 * Creates a new `MissingKeyError` instance
 	 *
 	 * @param key The missing translation key
 	 * @param context The error context
@@ -31,7 +31,7 @@ export class MissingKeyError extends TranslationError {
 /** Thrown when an unsupported language is requested */
 export class UnsupportedLanguageError extends TranslationError {
 	/**
-	 * Creates a new UnsupportedLanguageError instance
+	 * Creates a new `UnsupportedLanguageError` instance
 	 *
 	 * @param language The unsupported language
 	 * @param context The error context
@@ -44,7 +44,7 @@ export class UnsupportedLanguageError extends TranslationError {
 /** Thrown when loading translation resources fails */
 export class ResourceLoadError extends TranslationError {
 	/**
-	 * Creates a new ResourceLoadError instance
+	 * Creates a new `ResourceLoadError` instance
 	 *
 	 * @param resource The failed resource
 	 * @param context The error context
@@ -61,7 +61,7 @@ export class ResourceLoadError extends TranslationError {
 /** Thrown when API requests fail */
 export class APIError extends TranslationError {
 	/**
-	 * Creates a new APIError instance
+	 * Creates a new `APIError` instance
 	 *
 	 * @param endpoint The failed API endpoint
 	 * @param statusCode The HTTP status code
@@ -79,7 +79,7 @@ export class APIError extends TranslationError {
 /** Thrown when validation fails */
 export class ValidationError extends TranslationError {
 	/**
-	 * Creates a new ValidationError instance
+	 * Creates a new `ValidationError` instance
 	 *
 	 * @param message The error message
 	 * @param context The error context

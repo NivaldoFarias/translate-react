@@ -7,7 +7,7 @@
 
 import type { Environment } from "@/utils/env.util";
 
-import { RuntimeEnvironment } from "@/utils";
+import { LogLevel, RuntimeEnvironment } from "@/utils";
 
 /** Global test configuration and setup utilities */
 declare global {
@@ -38,6 +38,8 @@ globalThis.mockEnv = {
 	PROGRESS_ISSUE_NUMBER: 1,
 	DEV_MODE_FORK_PR: false,
 	OPENAI_PROJECT_ID: "test-project-id",
+	LOG_LEVEL: LogLevel.Info,
+	MAX_TOKENS: 4096,
 };
 
 /** Reset environment variables to test defaults before each test */

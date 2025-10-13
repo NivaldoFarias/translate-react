@@ -4,7 +4,7 @@ import { Database } from "bun:sqlite";
 
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
-import { SnapshotRecord } from "@/interfaces/snapshot";
+import { SnapshotRecord } from "@/types";
 
 import { ProcessedFileResult } from "./runner/base.service";
 import { Snapshot } from "./snapshot.service";
@@ -13,13 +13,16 @@ import { TranslationFile } from "./translator.service";
 /**
  * Core service for managing persistent storage of translation workflow data.
  *
- * Uses SQLite for storing snapshots, repository tree, files, and results.
+ * Uses Bun's SQLite API for storing snapshots, repository tree, files, and results.
  *
- * ### Responsibilities:
+ * ### Responsibilities
+ *
  * - Manages persistent storage of translation workflow data
  * - Handles snapshots of repository state and files to translate
  * - Maintains translation history and results
  * - Provides data recovery and cleanup capabilities
+ *
+ * @see {@link https://bun.com/docs/api/sqlite|Bun's SQLite API Docs}
  */
 export class DatabaseService {
 	/** SQLite database connection instance */

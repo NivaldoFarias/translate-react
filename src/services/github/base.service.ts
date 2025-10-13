@@ -1,5 +1,6 @@
 import { Octokit } from "@octokit/rest";
 
+import { GithubErrorHelper, LLMErrorHelper } from "@/errors/";
 import { env } from "@/utils/";
 
 /**
@@ -7,6 +8,7 @@ import { env } from "@/utils/";
  * Provides common functionality and configuration for all GitHub services.
  *
  * ### Responsibilities
+ *
  * - GitHub client initialization
  * - Repository configuration management
  * - Common error handling
@@ -14,6 +16,11 @@ import { env } from "@/utils/";
 export abstract class BaseGitHubService {
 	/** GitHub API client instance */
 	protected readonly octokit: Octokit;
+
+	protected readonly helpers = {
+		llm: new LLMErrorHelper(),
+		github: new GithubErrorHelper(),
+	};
 
 	/**
 	 * Creates a new base GitHub service instance

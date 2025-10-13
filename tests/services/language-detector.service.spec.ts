@@ -1,5 +1,5 @@
 /**
- * @fileoverview Tests for the {@link LanguageDetector		test("should analyze Portuguese content as translated", async () => {
+ * @fileoverview Tests for the {@link LanguageDetectorService		test("should analyze Portuguese content as translated", async () => {
 			const filename = "test.md";
 			const portugueseText =
 				"Este é um texto abrangente em português brasileiro para fins de teste de detecção de idioma. " +
@@ -23,36 +23,36 @@ import { beforeEach, describe, expect, test } from "bun:test";
 
 import type { LanguageConfig } from "@/services/language-detector.service";
 
-import { LanguageDetector } from "@/services/language-detector.service";
+import { LanguageDetectorService } from "@/services/language-detector.service";
 
 describe("LanguageDetector", () => {
-	let detector: LanguageDetector;
+	let detector: LanguageDetectorService;
 	const config: LanguageConfig = {
 		source: "en",
 		target: "pt-br",
 	};
 
 	beforeEach(() => {
-		detector = new LanguageDetector(config);
+		detector = new LanguageDetectorService(config);
 	});
 
 	describe("Constructor", () => {
 		test("should initialize with valid language configuration", () => {
-			expect(detector).toBeInstanceOf(LanguageDetector);
+			expect(detector).toBeInstanceOf(LanguageDetectorService);
 			expect(detector.detected).toBeInstanceOf(Map);
 		});
 
 		test("should throw error for invalid source language code", () => {
 			expect(() => {
 				// @ts-expect-error - Testing invalid type for runtime validation
-				new LanguageDetector({ source: "invalid", target: "pt-br" });
+				new LanguageDetectorService({ source: "invalid", target: "pt-br" });
 			}).toThrow("Unsupported language code: invalid or pt-br");
 		});
 
 		test("should throw error for invalid target language code", () => {
 			expect(() => {
 				// @ts-expect-error - Testing invalid type for runtime validation
-				new LanguageDetector({ source: "en", target: "invalid" });
+				new LanguageDetectorService({ source: "en", target: "invalid" });
 			}).toThrow("Unsupported language code: en or invalid");
 		});
 	});

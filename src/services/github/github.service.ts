@@ -1,6 +1,5 @@
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
-import { createErrorHandlingProxy } from "@/errors/proxy.handler";
 import { BranchService } from "@/services/github/branch.service";
 import {
 	CommitTranslationOptions,
@@ -8,7 +7,6 @@ import {
 	PullRequestOptions,
 } from "@/services/github/content.service";
 import { RepositoryService } from "@/services/github/repository.service";
-import { createGitHubErrorMap } from "@/utils";
 
 import { ProcessedFileResult } from "../runner/base.service";
 import { TranslationFile } from "../translator.service";
@@ -18,6 +16,7 @@ import { TranslationFile } from "../translator.service";
  * Provides a unified interface for GitHub operations while maintaining separation of concerns.
  *
  * ### Responsibilities
+ *
  * - Service orchestration and integration
  * - Repository configuration management
  * - Unified interface for GitHub operations
@@ -48,21 +47,10 @@ export class GitHubService {
 			fork: { owner: string; repo: string };
 		},
 	) {
-		const gitHubErrorMap = createGitHubErrorMap();
-
 		this.services = {
-			branch: createErrorHandlingProxy(new BranchService(this.repos.upstream, this.repos.fork), {
-				serviceName: "BranchService",
-				errorMap: gitHubErrorMap,
-			}),
-			repository: createErrorHandlingProxy(
-				new RepositoryService(this.repos.upstream, this.repos.fork),
-				{ serviceName: "RepositoryService", errorMap: gitHubErrorMap },
-			),
-			content: createErrorHandlingProxy(new ContentService(this.repos.upstream, this.repos.fork), {
-				serviceName: "ContentService",
-				errorMap: gitHubErrorMap,
-			}),
+			branch: new BranchService(this.repos.upstream, this.repos.fork),
+			repository: new RepositoryService(this.repos.upstream, this.repos.fork),
+			content: new ContentService(this.repos.upstream, this.repos.fork),
 		};
 	}
 
@@ -129,7 +117,6 @@ export class GitHubService {
 	 * ```
 	 */
 	public async createOrGetTranslationBranch(file: TranslationFile, baseBranch?: string) {
-		// Get the actual default branch if not specified
 		const actualBaseBranch =
 			baseBranch || (await this.services.repository.getDefaultBranch("fork"));
 		const branchName = `translate/${file.path.split("/").slice(2).join("/")}`;
