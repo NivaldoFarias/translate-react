@@ -2,13 +2,14 @@ import { RestEndpointMethodTypes } from "@octokit/rest";
 import { StatusCodes } from "http-status-codes";
 
 import { BaseGitHubService } from "@/services/github/base.service";
-import { env, setupSignalHandlers } from "@/utils/";
+import { env, logger, setupSignalHandlers } from "@/utils/";
 
 /**
  * Service responsible for Git branch operations and lifecycle management.
  * Handles branch creation, deletion, and cleanup tasks.
  *
  * ### Responsibilities
+ *
  * - Branch creation and deletion
  * - Branch state tracking
  * - Automatic cleanup on process termination
@@ -43,8 +44,16 @@ export class BranchService extends BaseGitHubService {
 	 * ```
 	 */
 	private async getDefaultBranch(): Promise<string> {
-		const response = await this.octokit.repos.get(this.fork);
-		return response.data.default_branch;
+		try {
+			const response = await this.octokit.repos.get(this.fork);
+			logger.debug({ branch: response.data.default_branch }, "Retrieved default branch");
+			return response.data.default_branch;
+		} catch (error) {
+			throw this.helpers.github.mapError(error, {
+				operation: "BranchService.getDefaultBranch",
+				metadata: { fork: this.fork },
+			});
+		}
 	}
 
 	/**
@@ -96,10 +105,18 @@ export class BranchService extends BaseGitHubService {
 
 			this.activeBranches.add(branchName);
 
+			logger.info(
+				{ branchName, baseBranch: actualBaseBranch, sha: mainBranchRef.data.object.sha },
+				"Branch created successfully",
+			);
+
 			return branchRef;
 		} catch (error) {
 			this.activeBranches.delete(branchName);
-			throw error;
+			throw this.helpers.github.mapError(error, {
+				operation: "BranchService.createBranch",
+				metadata: { branchName, baseBranch, fork: this.fork },
+			});
 		}
 	}
 
@@ -118,16 +135,24 @@ export class BranchService extends BaseGitHubService {
 		branchName: string,
 	): Promise<RestEndpointMethodTypes["git"]["getRef"]["response"] | null> {
 		try {
-			return await this.octokit.git.getRef({
+			const response = await this.octokit.git.getRef({
 				...this.fork,
 				ref: `heads/${branchName}`,
 			});
+
+			logger.debug({ branchName, sha: response.data.object.sha }, "Branch retrieved");
+
+			return response;
 		} catch (error) {
 			if (this.isNotFoundError(error)) {
+				logger.debug({ branchName }, "Branch not found (404)");
 				return null;
 			}
 
-			throw error;
+			throw this.helpers.github.mapError(error, {
+				operation: "BranchService.getBranch",
+				metadata: { branchName, fork: this.fork },
+			});
 		}
 	}
 
@@ -145,14 +170,25 @@ export class BranchService extends BaseGitHubService {
 	public async deleteBranch(
 		branchName: string,
 	): Promise<RestEndpointMethodTypes["git"]["deleteRef"]["response"]> {
-		const response = await this.octokit.git.deleteRef({
-			...this.fork,
-			ref: `heads/${branchName}`,
-		});
+		try {
+			const response = await this.octokit.git.deleteRef({
+				...this.fork,
+				ref: `heads/${branchName}`,
+			});
 
-		this.activeBranches.delete(branchName);
+			this.activeBranches.delete(branchName);
 
-		return response;
+			logger.info({ branchName }, "Branch deleted successfully");
+
+			return response;
+		} catch (error) {
+			this.activeBranches.delete(branchName);
+
+			throw this.helpers.github.mapError(error, {
+				operation: "BranchService.deleteBranch",
+				metadata: { branchName, fork: this.fork },
+			});
+		}
 	}
 
 	/**
@@ -190,15 +226,34 @@ export class BranchService extends BaseGitHubService {
 	 * ```
 	 */
 	public async checkIfCommitExistsOnFork(branchName: string): Promise<boolean> {
-		const forkRef = await this.getBranch(branchName);
+		try {
+			const forkRef = await this.getBranch(branchName);
 
-		const listCommitsResponse = await this.octokit.repos.listCommits({
-			...this.fork,
-			sha: forkRef?.data.object.sha,
-		});
+			if (!forkRef) {
+				logger.debug({ branchName }, "Branch not found, no commits exist");
+				return false;
+			}
 
-		return listCommitsResponse.data.some(
-			(commit) => commit?.author?.login === env.REPO_FORK_OWNER!,
-		);
+			const listCommitsResponse = await this.octokit.repos.listCommits({
+				...this.fork,
+				sha: forkRef.data.object.sha,
+			});
+
+			const hasCommits = listCommitsResponse.data.some(
+				(commit) => commit?.author?.login === env.REPO_FORK_OWNER!,
+			);
+
+			logger.debug(
+				{ branchName, hasCommits, commitCount: listCommitsResponse.data.length },
+				"Checked for fork commits",
+			);
+
+			return hasCommits;
+		} catch (error) {
+			throw this.helpers.github.mapError(error, {
+				operation: "BranchService.checkIfCommitExistsOnFork",
+				metadata: { branchName, fork: this.fork, expectedAuthor: env.REPO_FORK_OWNER },
+			});
+		}
 	}
 }

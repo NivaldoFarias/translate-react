@@ -9,7 +9,7 @@ export default defineConfig(
 		ignores: ["node_modules/**", "dist/**", "out/**", "prettier.config.mjs"],
 	},
 	{
-		files: ["**/*.{js,ts,mts,cts}"],
+		files: ["**/*.{js,cjs,mjs,ts,mts,cts}"],
 		plugins: {
 			"@typescript-eslint": tseslint.plugin,
 		},
@@ -35,6 +35,12 @@ export default defineConfig(
 
 			/* TypeScript */
 			"@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
+		},
+	},
+	{
+		files: ["scripts/**/*.{js,ts}"],
+		rules: {
+			"no-console": "off",
 		},
 	},
 	{

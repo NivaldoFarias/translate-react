@@ -12,16 +12,23 @@ export enum ErrorSeverity {
 
 /** Standardized error codes for the translation workflow */
 export enum ErrorCode {
-	// API Related
+	// Github API Related
 	GithubApiError = "GITHUB_API_ERROR",
 	GithubNotFound = "GITHUB_NOT_FOUND",
 	GithubUnauthorized = "GITHUB_UNAUTHORIZED",
 	GithubForbidden = "GITHUB_FORBIDDEN",
 	GithubRateLimited = "GITHUB_RATE_LIMITED",
 	GithubServerError = "GITHUB_SERVER_ERROR",
+
+	// LLM API Related
 	LLMApiError = "LLM_API_ERROR",
+
+	// Generic HTTP Related
 	RateLimitExceeded = "RATE_LIMIT_EXCEEDED",
-	ApiError = "API_ERROR",
+	Unauthorized = "UNAUTHORIZED",
+	Forbidden = "FORBIDDEN",
+	NotFound = "NOT_FOUND",
+	ServerError = "SERVER_ERROR",
 
 	// Content Related
 	InvalidContent = "INVALID_CONTENT",
@@ -30,6 +37,7 @@ export enum ErrorCode {
 	FormatValidationFailed = "FORMAT_VALIDATION_FAILED",
 
 	// Process Related
+	ApiError = "API_ERROR",
 	TranslationFailed = "TRANSLATION_FAILED",
 	NoFilesFound = "NO_FILES_FOUND",
 	InitializationError = "INITIALIZATION_ERROR",
@@ -77,7 +85,7 @@ export class TranslationError extends Error {
 	/**
 	 * Initializes a new instance of the `TranslationError` class.
 	 *
-	 * Uses `Object.setPrototypeOf` to maintain proper prototype chain for custom errors.
+	 * Uses {@link Object.setPrototypeOf} to maintain proper prototype chain for custom errors.
 	 */
 	constructor(
 		message: string,
@@ -150,4 +158,22 @@ export class TranslationError extends Error {
 
 		return `${this.message}${context}`;
 	}
+}
+
+/**
+ * Extracts a human-readable error message from various error types
+ *
+ * ### Handling
+ *
+ * - {@link TranslateError}: Uses the formatted message with context
+ * - {@link Error}: Uses the native error message
+ * - Other types: Converts to string
+ *
+ * @param error The error to extract a message from
+ */
+export function extractErrorMessage(error: unknown): string {
+	if (error instanceof TranslationError) return error.getDisplayMessage();
+	else if (error instanceof Error) return error.message;
+
+	return String(error);
 }

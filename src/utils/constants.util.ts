@@ -12,6 +12,16 @@ export enum RuntimeEnvironment {
 	Production = "production",
 }
 
+/** Logging levels used throughout the application */
+export enum LogLevel {
+	Trace = "trace",
+	Debug = "debug",
+	Info = "info",
+	Warn = "warn",
+	Error = "error",
+	Fatal = "fatal",
+}
+
 /** Process signal constants used for event handling */
 export const processSignals = {
 	interrupt: "SIGINT",
@@ -99,6 +109,7 @@ export type ReactLanguageCode = (typeof REACT_TRANSLATION_LANGUAGES)[number];
 export const environmentDefaults = {
 	NODE_ENV: RuntimeEnvironment.Development,
 	BUN_ENV: RuntimeEnvironment.Development,
+	LOG_LEVEL: LogLevel.Info,
 	FORCE_SNAPSHOT_CLEAR: false,
 	OPENAI_BASE_URL: "https://openrouter.ai/api/v1",
 	HEADER_APP_TITLE: `${name} v${version}`,

@@ -1,5 +1,7 @@
 /**
- * @fileoverview React-aware Language Detection Service using Google's CLD library.
+ * @fileoverview
+ *
+ * React-aware Language Detection Service using Google's CLD library.
  *
  * Provides language detection and translation status determination specifically
  * for React documentation translation workflows. Validates against the 38 official
@@ -71,7 +73,7 @@ export interface LanguageAnalysis {
  * console.log(analysis.isTranslated); // false
  * ```
  */
-export class LanguageDetector {
+export class LanguageDetectorService {
 	/** Minimum content length required for reliable language detection */
 	private readonly MIN_CONTENT_LENGTH = 10;
 

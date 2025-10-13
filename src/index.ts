@@ -1,58 +1,48 @@
-import Bun from "bun";
-
-import type { BunFile } from "bun";
-
-import { ErrorHandler, ErrorSeverity } from "@/errors";
+import { TranslationError } from "@/errors";
 import Runner from "@/services/runner/runner.service";
-import { logger } from "@/utils/logger.util";
+import { env, logger } from "@/utils";
 
 import { name, version } from "../package.json";
 
-import { env } from "./utils";
-
 if (import.meta.main) {
 	try {
-		const logFile = Bun.file(`logs/${new Date().toISOString()}.log.jsonl`);
-		if (!logFile) throw new Error("Failed to create log file");
+		logger.info(
+			{ version, component: name, environment: env.NODE_ENV, targetLanguage: env.TARGET_LANGUAGE },
+			"Starting translation workflow",
+		);
 
-		const errorHandler = initializeErrorHandler(logFile);
-		logger.updateLogFilePath(logFile.name!);
+		await workflow();
 
-		const runTranslation = errorHandler.wrapAsync(workflow, {
-			operation: "main",
-			metadata: { version, component: name, environment: env.NODE_ENV },
-		});
-
-		await runTranslation();
-
+		logger.info("Translation workflow completed successfully");
 		process.exit(0);
-	} catch {
+	} catch (error) {
+		if (error instanceof TranslationError) {
+			logger.fatal(
+				{
+					error,
+					errorCode: error.code,
+					operation: error.context.operation,
+					metadata: error.context.metadata,
+				},
+				"Translation workflow failed with TranslationError",
+			);
+		} else {
+			logger.fatal({ error }, "Translation workflow failed with unexpected error");
+		}
+
 		process.exit(1);
 	}
 }
 
-async function workflow() {
+/**
+ * Main translation workflow execution.
+ *
+ * Creates and runs the Runner service which orchestrates the entire translation process.
+ *
+ * @throws {TranslationError} If any critical error occurs during translation
+ */
+async function workflow(): Promise<void> {
 	const runner = new Runner();
 
 	await runner.run();
-}
-
-/**
- * Initializes the error handler with the default configuration.
- *
- * @param logFile Optional log file to write errors to
- *
- * @returns The configured ErrorHandler singleton instance
- */
-function initializeErrorHandler(logFile?: BunFile): ErrorHandler {
-	return ErrorHandler.getInstance({
-		minSeverity: ErrorSeverity.Info,
-		logToFile: !!logFile,
-		logFilePath: logFile?.name,
-		customReporter: (error) => {
-			if (error.context.sanity === ErrorSeverity.Fatal) {
-				process.exit(1);
-			}
-		},
-	});
 }

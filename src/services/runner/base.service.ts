@@ -5,16 +5,11 @@ import type { SetNonNullable } from "type-fest";
 
 import type { ReactLanguageCode } from "@/utils/constants.util";
 
-import {
-	createErrorHandlingProxy,
-	ErrorHandler,
-	InitializationError,
-	ResourceLoadError,
-} from "@/errors/";
+import { InitializationError, ResourceLoadError } from "@/errors/";
 import { GitHubService } from "@/services/github/github.service";
 import { Snapshot, SnapshotService } from "@/services/snapshot.service";
 import { TranslationFile, TranslatorService } from "@/services/translator.service";
-import { env, RuntimeEnvironment, setupSignalHandlers } from "@/utils/";
+import { env, logger, RuntimeEnvironment, setupSignalHandlers } from "@/utils/";
 
 import { homepage, name, version } from "../../../package.json";
 
@@ -51,8 +46,6 @@ export interface ProcessedFileResult {
 }
 
 export abstract class RunnerService {
-	private readonly errorHandler = ErrorHandler.getInstance();
-
 	/**
 	 * Tracks progress for the current batch of files being processed
 	 *
@@ -124,23 +117,15 @@ export abstract class RunnerService {
 		},
 	) {
 		this.services = {
-			github: createErrorHandlingProxy(
-				new GitHubService({
-					upstream: { owner: env.REPO_UPSTREAM_OWNER, repo: env.REPO_UPSTREAM_NAME },
-					fork: { owner: env.REPO_FORK_OWNER, repo: env.REPO_FORK_NAME },
-				}),
-				{ serviceName: "GitHubService", excludeMethods: ["getSpinner"] },
-			),
-			translator: createErrorHandlingProxy(
-				new TranslatorService({
-					source: this.options.sourceLanguage,
-					target: this.options.targetLanguage,
-				}),
-				{ serviceName: "TranslatorService" },
-			),
-			snapshot: createErrorHandlingProxy(new SnapshotService(), {
-				serviceName: "SnapshotService",
+			github: new GitHubService({
+				upstream: { owner: env.REPO_UPSTREAM_OWNER, repo: env.REPO_UPSTREAM_NAME },
+				fork: { owner: env.REPO_FORK_OWNER, repo: env.REPO_FORK_NAME },
 			}),
+			translator: new TranslatorService({
+				source: this.options.sourceLanguage,
+				target: this.options.targetLanguage,
+			}),
+			snapshot: new SnapshotService(),
 		};
 
 		if (env.FORCE_SNAPSHOT_CLEAR) {
@@ -148,10 +133,7 @@ export abstract class RunnerService {
 		}
 
 		setupSignalHandlers(this.cleanup, (message, error) => {
-			this.errorHandler.handle(error as Error, {
-				operation: "signalCleanup",
-				metadata: { message },
-			});
+			logger.error({ error, message }, "Signal handler triggered during cleanup");
 		});
 	}
 
@@ -532,25 +514,41 @@ export abstract class RunnerService {
 		this.spinner.text = `Processing batch ${batchInfo.currentBatch}/${batchInfo.totalBatches}`;
 		this.spinner.suffixText = `(0/${batch.length})`;
 
-		const processBatchFiles = this.errorHandler.wrapAsync(
-			async () => {
-				await Promise.all(
-					batch.map((file) => {
-						const progress = {
-							batchIndex: batchInfo.currentBatch,
-							fileIndex: this.batchProgress.completed,
-							totalBatches: batchInfo.totalBatches,
-							batchSize: batchInfo.batchSize,
-						};
+		try {
+			logger.info(
+				{
+					currentBatch: batchInfo.currentBatch,
+					totalBatches: batchInfo.totalBatches,
+					batchSize: batch.length,
+				},
+				"Processing batch",
+			);
 
-						return this.processFile(file, progress);
-					}),
-				);
-			},
-			{ operation: "processBatch", metadata: batchInfo },
-		);
+			await Promise.all(
+				batch.map((file) => {
+					const progress = {
+						batchIndex: batchInfo.currentBatch,
+						fileIndex: this.batchProgress.completed,
+						totalBatches: batchInfo.totalBatches,
+						batchSize: batchInfo.batchSize,
+					};
 
-		await processBatchFiles();
+					return this.processFile(file, progress);
+				}),
+			);
+
+			logger.info(
+				{
+					batchIndex: batchInfo.currentBatch,
+					successful: this.batchProgress.successful,
+					failed: this.batchProgress.failed,
+				},
+				"Batch processing completed",
+			);
+		} catch (error) {
+			logger.error({ error, batchInfo }, "Error processing batch");
+			throw error;
+		}
 
 		const successRate = Math.round((this.batchProgress.successful / batch.length) * 100);
 
@@ -663,14 +661,19 @@ export abstract class RunnerService {
 			try {
 				const branchName = metadata.branch.ref.replace("refs/heads/", "");
 				await this.services.github.cleanupBranch(branchName);
+				logger.info(
+					{ branchName, filename: metadata.filename },
+					"Cleaned up branch after failed translation",
+				);
 			} catch (cleanupError) {
-				this.errorHandler.handle(cleanupError as Error, {
-					operation: "cleanupFailedTranslation",
-					metadata: {
+				logger.error(
+					{
+						error: cleanupError,
 						filename: metadata.filename,
 						branchRef: metadata.branch.ref,
 					},
-				});
+					"Failed to cleanup branch after translation failure - non-critical",
+				);
 			}
 		}
 	}

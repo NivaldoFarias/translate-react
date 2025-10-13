@@ -8,16 +8,13 @@
 import { MarkdownTextSplitter } from "@langchain/textsplitters";
 import { encodingForModel } from "js-tiktoken";
 import OpenAI from "openai";
-import { APIError } from "openai/error";
 
 import type { LanguageConfig } from "./language-detector.service.ts";
 
-import type { ProxyHandlerOptions } from "@/errors/";
+import { GithubErrorHelper, LLMErrorHelper } from "@/errors/";
+import { env, logger, MAX_CHUNK_TOKENS } from "@/utils/";
 
-import { createErrorHandlingProxy, ErrorCode, ErrorHandler, TranslationError } from "@/errors/";
-import { detectRateLimit, env, MAX_CHUNK_TOKENS } from "@/utils/";
-
-import { LanguageDetector } from "./language-detector.service";
+import { LanguageDetectorService } from "./language-detector.service";
 
 /** Represents a file that needs to be translated */
 export class TranslationFile {
@@ -67,18 +64,19 @@ export class TranslatorService {
 		},
 	});
 
-	public readonly languageDetector: LanguageDetector;
+	private readonly helpers = {
+		llm: new LLMErrorHelper(),
+		github: new GithubErrorHelper(),
+	};
+
+	public readonly languageDetector: LanguageDetectorService;
 
 	public glossary: string | null = null;
 
-	/** Error handler for logging and managing translation errors */
-	private readonly errorHandler = ErrorHandler.getInstance();
-
 	/**
-	 * Initializes the translator service with language configuration and error handling.
+	 * Initializes the translator service with language configuration.
 	 *
-	 * Sets up the OpenAI client, language detector, and comprehensive error handling
-	 * with automatic retry logic for rate limits and API errors.
+	 * Sets up the OpenAI client and language detector for translation workflow.
 	 *
 	 * @param options Language configuration for translation workflow
 	 *
@@ -89,69 +87,7 @@ export class TranslatorService {
 	 * ```
 	 */
 	public constructor(private readonly options: LanguageConfig) {
-		this.languageDetector = new LanguageDetector(this.options);
-
-		const errorMap: ProxyHandlerOptions["errorMap"] = new Map();
-
-		/**
-		 * Generic error transform that checks for rate limit patterns in any error
-		 */
-		const genericErrorTransform = (error: Error) => {
-			if (detectRateLimit(error.message)) {
-				return {
-					code: ErrorCode.RateLimitExceeded,
-					metadata: {
-						originalMessage: error.message,
-						errorType: error.constructor.name,
-					},
-				};
-			}
-
-			return {
-				metadata: {
-					originalMessage: error.message,
-					errorType: error.constructor.name,
-				},
-			};
-		};
-
-		errorMap.set("APIError", {
-			code: ErrorCode.LLMApiError,
-			transform: (error: Error) => {
-				if (error instanceof APIError) {
-					if (detectRateLimit(error.message, error.status)) {
-						return {
-							code: ErrorCode.RateLimitExceeded,
-							metadata: {
-								statusCode: error.status,
-								type: error.type,
-								originalMessage: error.message,
-							},
-						};
-					}
-					return {
-						metadata: {
-							statusCode: error.status,
-							type: error.type,
-							originalMessage: error.message,
-						},
-					};
-				}
-
-				return genericErrorTransform(error);
-			},
-		});
-
-		errorMap.set("Error", {
-			code: ErrorCode.UnknownError,
-			transform: genericErrorTransform,
-		});
-
-		errorMap.set("RateLimitError", { code: ErrorCode.RateLimitExceeded });
-		errorMap.set("QuotaExceededError", { code: ErrorCode.RateLimitExceeded });
-		errorMap.set("TooManyRequestsError", { code: ErrorCode.RateLimitExceeded });
-
-		this.llm = createErrorHandlingProxy(this.llm, { serviceName: "OpenAI", errorMap });
+		this.languageDetector = new LanguageDetectorService(this.options);
 	}
 
 	/**
@@ -210,15 +146,26 @@ export class TranslatorService {
 		try {
 			const analysis = await this.languageDetector.analyzeLanguage(file.filename, file.content);
 
+			logger.debug(
+				{
+					filename: file.filename,
+					isTranslated: analysis.isTranslated,
+					detectedLanguage: analysis.detectedLanguage,
+				},
+				"Checked translation status",
+			);
+
 			return analysis.isTranslated;
 		} catch (error) {
-			this.errorHandler.handle(error as Error, {
-				operation: "isTranslationComplete",
-				metadata: {
+			logger.error(
+				{
+					error,
 					filename: file.filename,
 					contentLength: file.content?.length || 0,
 				},
-			});
+				"Error checking if content is translated - assuming not translated",
+			);
+
 			return false;
 		}
 	}
@@ -295,7 +242,7 @@ export class TranslatorService {
 	/**
 	 * Splits content into chunks while preserving markdown structure.
 	 *
-	 * Uses LangChain's MarkdownTextSplitter for intelligent chunking that respects
+	 * Uses LangChain's {@link MarkdownTextSplitter} for intelligent chunking that respects
 	 * markdown structure and code blocks, ensuring chunks don't exceed the maximum
 	 * token limit while maintaining content coherence and readability.
 	 *
@@ -363,23 +310,45 @@ export class TranslatorService {
 			const chunk = chunks[i]!;
 
 			try {
+				logger.debug(
+					{
+						chunkIndex: i + 1,
+						totalChunks: chunks.length,
+						chunkSize: chunk.length,
+					},
+					"Translating content chunk",
+				);
+
 				const translatedChunk = await this.callLanguageModel(chunk);
 				translatedChunks.push(translatedChunk);
-			} catch (error) {
-				throw new TranslationError(
-					`Failed to translate content chunk ${i + 1}/${chunks.length}`,
-					ErrorCode.LLMApiError,
+
+				logger.info(
 					{
-						operation: "translateWithChunking",
-						metadata: {
-							chunkIndex: i,
-							totalChunks: chunks.length,
-							chunkSize: chunk.length,
-							estimatedTokens: this.estimateTokenCount(chunk),
-							originalError: error instanceof Error ? error.message : String(error),
-						},
+						chunkIndex: i + 1,
+						totalChunks: chunks.length,
+						translatedSize: translatedChunk.length,
 					},
+					"Chunk translated successfully",
 				);
+			} catch (error) {
+				logger.error(
+					{
+						error,
+						chunkIndex: i + 1,
+						totalChunks: chunks.length,
+					},
+					"Failed to translate content chunk",
+				);
+
+				throw this.helpers.llm.mapError(error, {
+					operation: "TranslatorService.translateWithChunking",
+					metadata: {
+						chunkIndex: i,
+						totalChunks: chunks.length,
+						chunkSize: chunk.length,
+						estimatedTokens: this.estimateTokenCount(chunk),
+					},
+				});
 			}
 		}
 
@@ -398,6 +367,15 @@ export class TranslatorService {
 		const systemPrompt = await this.getSystemPrompt(content);
 
 		try {
+			logger.debug(
+				{
+					model: env.LLM_MODEL,
+					contentLength: content.length,
+					temperature: 0.1,
+				},
+				"Calling language model for translation",
+			);
+
 			const completion = await this.llm.chat.completions.create({
 				model: env.LLM_MODEL,
 				temperature: 0.1,
@@ -411,55 +389,34 @@ export class TranslatorService {
 			const translatedContent = completion.choices[0]?.message?.content;
 
 			if (!translatedContent) {
-				throw new Error("No content returned from language model");
+				logger.error({ model: env.LLM_MODEL }, "No content returned from language model");
+				throw new LLMErrorHelper().mapError(new Error("No content returned from language model"), {
+					operation: "TranslatorService.callLanguageModel",
+					metadata: {
+						model: env.LLM_MODEL,
+						contentLength: content.length,
+					},
+				});
 			}
+
+			logger.info(
+				{
+					model: env.LLM_MODEL,
+					translatedLength: translatedContent.length,
+					tokensUsed: completion.usage?.total_tokens,
+				},
+				"Translation completed successfully",
+			);
 
 			return translatedContent;
 		} catch (error) {
-			/**
-			 * Handle OpenAI-specific errors that may not be caught by the proxy
-			 * due to nested method calls (this.llm.chat.completions.create)
-			 */
-			if (error instanceof Error) {
-				const errorType = error.constructor.name;
-
-				/**
-				 * Direct mapping for known OpenAI error types
-				 */
-				if (
-					errorType === "RateLimitError" ||
-					errorType === "QuotaExceededError" ||
-					errorType === "TooManyRequestsError"
-				) {
-					throw new TranslationError(error.message, ErrorCode.RateLimitExceeded, {
-						operation: "callLanguageModel",
-						metadata: {
-							model: env.LLM_MODEL,
-							errorType,
-							originalMessage: error.message,
-						},
-					});
-				}
-
-				/**
-				 * Fallback pattern matching for rate limit errors
-				 */
-				if (detectRateLimit(error.message)) {
-					throw new TranslationError(error.message, ErrorCode.RateLimitExceeded, {
-						operation: "callLanguageModel",
-						metadata: {
-							model: env.LLM_MODEL,
-							errorType,
-							originalMessage: error.message,
-						},
-					});
-				}
-			}
-
-			/**
-			 * Re-throw the error for upper-level error handling
-			 */
-			throw error;
+			throw this.helpers.llm.mapError(error, {
+				operation: "TranslatorService.callLanguageModel",
+				metadata: {
+					model: env.LLM_MODEL,
+					contentLength: content.length,
+				},
+			});
 		}
 	}
 
