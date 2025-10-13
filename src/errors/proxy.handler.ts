@@ -45,8 +45,8 @@ export interface ProxyHandlerOptions {
  * const safeGithubService = createErrorHandlingProxy(githubService, {
  *   serviceName: 'GitHubService',
  *   errorMap: new Map([
- *     ['RequestError', { code: ErrorCode.GITHUB_API_ERROR }],
- *     ['RateLimitError', { code: ErrorCode.RATE_LIMIT_EXCEEDED }]
+ *     ['RequestError', { code: ErrorCode.GithubApiError }],
+ *     ['RateLimitError', { code: ErrorCode.RateLimitExceeded }]
  *   ])
  * });
  * ```
@@ -107,7 +107,7 @@ export function createErrorHandlingProxy<T extends object>(
 						 * This ensures rate limits are caught regardless of error type
 						 */
 						if (detectRateLimit(error.message)) {
-							throw new TranslationError(error.message, ErrorCode.RATE_LIMIT_EXCEEDED, {
+							throw new TranslationError(error.message, ErrorCode.RateLimitExceeded, {
 								...context,
 								metadata: {
 									...context.metadata,
@@ -120,7 +120,7 @@ export function createErrorHandlingProxy<T extends object>(
 
 					throw new TranslationError(
 						error instanceof Error ? error.message : String(error),
-						ErrorCode.UNKNOWN_ERROR,
+						ErrorCode.UnknownError,
 						context,
 					);
 				};

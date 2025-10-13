@@ -2,42 +2,42 @@ import type { BunFile } from "bun";
 
 /** Represents the severity level of an error */
 export enum ErrorSeverity {
-	DEBUG = "DEBUG",
-	INFO = "INFO",
-	WARN = "WARN",
-	ERROR = "ERROR",
-	FATAL = "FATAL",
-	LOG = "LOG",
+	Debug = "DEBUG",
+	Info = "INFO",
+	Warn = "WARN",
+	Error = "ERROR",
+	Fatal = "FATAL",
+	Log = "LOG",
 }
 
 /** Standardized error codes for the translation workflow */
 export enum ErrorCode {
 	// API Related
-	GITHUB_API_ERROR = "GITHUB_API_ERROR",
-	GITHUB_NOT_FOUND = "GITHUB_NOT_FOUND",
-	GITHUB_UNAUTHORIZED = "GITHUB_UNAUTHORIZED",
-	GITHUB_FORBIDDEN = "GITHUB_FORBIDDEN",
-	GITHUB_RATE_LIMITED = "GITHUB_RATE_LIMITED",
-	GITHUB_SERVER_ERROR = "GITHUB_SERVER_ERROR",
-	LLM_API_ERROR = "LLM_API_ERROR",
-	RATE_LIMIT_EXCEEDED = "RATE_LIMIT_EXCEEDED",
-	API_ERROR = "API_ERROR",
+	GithubApiError = "GITHUB_API_ERROR",
+	GithubNotFound = "GITHUB_NOT_FOUND",
+	GithubUnauthorized = "GITHUB_UNAUTHORIZED",
+	GithubForbidden = "GITHUB_FORBIDDEN",
+	GithubRateLimited = "GITHUB_RATE_LIMITED",
+	GithubServerError = "GITHUB_SERVER_ERROR",
+	LLMApiError = "LLM_API_ERROR",
+	RateLimitExceeded = "RATE_LIMIT_EXCEEDED",
+	ApiError = "API_ERROR",
 
 	// Content Related
-	INVALID_CONTENT = "INVALID_CONTENT",
-	CONTENT_TOO_LONG = "CONTENT_TOO_LONG",
-	NO_CONTENT = "NO_CONTENT",
-	FORMAT_VALIDATION_FAILED = "FORMAT_VALIDATION_FAILED",
+	InvalidContent = "INVALID_CONTENT",
+	ContentTooLong = "CONTENT_TOO_LONG",
+	NoContent = "NO_CONTENT",
+	FormatValidationFailed = "FORMAT_VALIDATION_FAILED",
 
 	// Process Related
-	TRANSLATION_FAILED = "TRANSLATION_FAILED",
-	NO_FILES_FOUND = "NO_FILES_FOUND",
-	INITIALIZATION_ERROR = "INITIALIZATION_ERROR",
-	RESOURCE_LOAD_ERROR = "RESOURCE_LOAD_ERROR",
-	VALIDATION_ERROR = "VALIDATION_ERROR",
-	UNKNOWN_ERROR = "UNKNOWN_ERROR",
-	MISSING_KEY = "MISSING_KEY",
-	UNSUPPORTED_LANG = "UNSUPPORTED_LANG",
+	TranslationFailed = "TRANSLATION_FAILED",
+	NoFilesFound = "NO_FILES_FOUND",
+	InitializationError = "INITIALIZATION_ERROR",
+	ResourceLoadError = "RESOURCE_LOAD_ERROR",
+	ValidationError = "VALIDATION_ERROR",
+	UnknownError = "UNKNOWN_ERROR",
+	MissingKey = "MISSING_KEY",
+	UnsupportedLang = "UNSUPPORTED_LANG",
 }
 
 /** Base context interface for all translation errors */
@@ -81,7 +81,7 @@ export class TranslationError extends Error {
 	 */
 	constructor(
 		message: string,
-		code: ErrorCode = ErrorCode.UNKNOWN_ERROR,
+		code: ErrorCode = ErrorCode.UnknownError,
 		context: Partial<ErrorContext> = {},
 	) {
 		super(message);
@@ -89,7 +89,7 @@ export class TranslationError extends Error {
 		this.code = code;
 		this.timestamp = context.timestamp ?? new Date();
 		this.context = {
-			sanity: context.sanity ?? ErrorSeverity.ERROR,
+			sanity: context.sanity ?? ErrorSeverity.Error,
 			code: this.code,
 			operation: context.operation,
 			file: context.file,
