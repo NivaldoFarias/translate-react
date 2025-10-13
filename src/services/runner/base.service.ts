@@ -1,5 +1,3 @@
-import ora from "ora";
-
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 import type { SetNonNullable } from "type-fest";
 
@@ -45,7 +43,7 @@ export interface ProcessedFileResult {
 	error: Error | null;
 }
 
-export abstract class RunnerService {
+export abstract class BaseRunnerService {
 	/**
 	 * Tracks progress for the current batch of files being processed
 	 *
@@ -86,20 +84,13 @@ export abstract class RunnerService {
 		timestamp: Date.now(),
 	};
 
-	/** Progress spinner for CLI feedback */
-	protected spinner = ora({
-		text: "Starting translation workflow",
-		color: "cyan",
-		spinner: "dots",
-	});
-
 	/**
 	 * Cleanup handler for process termination.
 	 *
 	 * Ensures graceful shutdown and cleanup of resources
 	 */
 	protected cleanup = () => {
-		this.spinner?.stop();
+		logger.info("Shutting down gracefully...");
 
 		setTimeout(() => void process.exit(0), 1000);
 	};
@@ -160,12 +151,12 @@ export abstract class RunnerService {
 	 * @returns `true` if the fork is up to date, `false` otherwise
 	 */
 	protected async syncFork(): Promise<boolean> {
-		this.spinner.text = "Checking fork status...";
+		logger.info("Checking fork status...");
 
 		const isForkSynced = await this.services.github.isForkSynced();
 
 		if (!isForkSynced) {
-			this.spinner.text = "Fork is out of sync. Updating fork...";
+			logger.info("Fork is out of sync, updating fork...");
 
 			if (env.NODE_ENV === "development") {
 				await this.services.snapshot.clear();
@@ -178,12 +169,10 @@ export abstract class RunnerService {
 				});
 			}
 
-			this.spinner.succeed("Fork synchronized with upstream repository");
+			logger.info("Fork synchronized with upstream repository");
 		} else {
-			this.spinner.succeed("Fork is up to date");
+			logger.info("Fork is up to date");
 		}
-
-		this.spinner.start();
 
 		return isForkSynced;
 	}
@@ -197,14 +186,9 @@ export abstract class RunnerService {
 		const latestSnapshot = await this.services.snapshot.loadLatest();
 
 		if (latestSnapshot && !isForkSynced) {
-			this.spinner.stopAndPersist({
-				symbol: "📦",
-				text: "Snapshot loaded",
-			});
+			logger.info("Snapshot loaded from previous session");
 
 			this.state = latestSnapshot;
-
-			this.spinner.start();
 		}
 	}
 
@@ -215,14 +199,14 @@ export abstract class RunnerService {
 	 */
 	protected async fetchRepositoryTree(): Promise<void> {
 		if (!this.state.repositoryTree?.length) {
-			this.spinner.text = "Fetching repository content...";
+			logger.info("Fetching repository content...");
 			this.state.repositoryTree = await this.services.github.getRepositoryTree();
 
 			if (env.NODE_ENV === "development") {
 				await this.services.snapshot.append("repositoryTree", this.state.repositoryTree);
 			}
 
-			this.spinner.text = "Repository tree fetched. Fetching glossary...";
+			logger.info("Repository tree fetched, fetching glossary...");
 			const glossary = await this.services.github.getGlossary();
 
 			if (!glossary) {
@@ -230,15 +214,10 @@ export abstract class RunnerService {
 			}
 
 			this.services.translator.glossary = glossary;
-			this.spinner.succeed("Repository content fetched");
+			logger.info("Repository content fetched successfully");
 		} else {
-			this.spinner.stopAndPersist({
-				symbol: "📦",
-				text: "Repository tree already fetched",
-			});
+			logger.info("Repository tree already fetched (from snapshot)");
 		}
-
-		this.spinner.start();
 	}
 
 	/**
@@ -248,26 +227,23 @@ export abstract class RunnerService {
 	 */
 	protected async fetchFilesToTranslate(): Promise<void> {
 		if (this.state.filesToTranslate.length) {
-			this.spinner.stopAndPersist({
-				symbol: "📦",
-				text: `Found ${this.state.filesToTranslate.length} files to translate`,
-			});
-
-			this.spinner.start();
+			logger.info(`Found ${this.state.filesToTranslate.length} files to translate (from snapshot)`);
 
 			return;
 		}
 
-		this.spinner.text = "Fetching files...";
+		logger.info("Fetching files...");
 
 		const uncheckedFiles: TranslationFile[] = [];
 		const totalFiles = this.state.repositoryTree.length;
 		let completedFiles = 0;
 
-		const updateSpinner = () => {
+		const updateProgress = () => {
 			completedFiles++;
 			const percentage = Math.floor((completedFiles / totalFiles) * 100);
-			this.spinner.text = `Fetching files: ${completedFiles}/${totalFiles} (${percentage}%)`;
+			if (completedFiles % 10 === 0 || completedFiles === totalFiles) {
+				logger.info(`Fetching files: ${completedFiles}/${totalFiles} (${percentage}%)`);
+			}
 		};
 
 		const uniqueFiles = this.state.repositoryTree.filter(
@@ -278,7 +254,7 @@ export abstract class RunnerService {
 
 		for (let i = 0; i < uniqueFiles.length; i += batchSize) {
 			const batch = uniqueFiles.slice(i, i + batchSize);
-			const batchResults = await this.fetchBatch(batch, updateSpinner);
+			const batchResults = await this.fetchBatch(batch, updateProgress);
 
 			uncheckedFiles.push(
 				...batchResults.filter((file): file is NonNullable<typeof file> => !!file),
@@ -302,11 +278,9 @@ export abstract class RunnerService {
 			await this.services.snapshot.append("filesToTranslate", this.state.filesToTranslate);
 		}
 
-		this.spinner.succeed(
+		logger.info(
 			`Found ${this.state.filesToTranslate.length} files to translate (${numFilesFiltered} already translated)`,
 		);
-
-		this.spinner.start();
 	}
 
 	/**
@@ -337,19 +311,19 @@ export abstract class RunnerService {
 	}
 
 	/**
-	 * Updates the issue with translation results
+	 * Updates the progress issue with the translation results
 	 *
 	 * @throws {APIError} If commenting on the issue fails
 	 */
 	protected async updateIssueWithResults(): Promise<void> {
-		this.spinner.text = "Commenting on issue...";
+		logger.info("Commenting on issue...");
 
 		const comment = await this.services.github.commentCompiledResultsOnIssue(
 			this.state.processedResults,
 			this.state.filesToTranslate,
 		);
 
-		this.spinner.succeed(`Commented on translation issue. Comment URL: ${comment.html_url}`);
+		logger.info({ commentUrl: comment.html_url }, "Commented on translation issue");
 	}
 
 	/**
@@ -387,10 +361,14 @@ export abstract class RunnerService {
 		const successCount = results.filter(({ error }) => !error).length;
 		const failureCount = results.filter(({ error }) => !!error).length;
 
-		this.spinner.stopAndPersist({
-			symbol: "📊",
-			text: `Final: ${successCount} successful, ${failureCount} failed (${this.formatElapsedTime(elapsedTime)})`,
-		});
+		logger.info(
+			{
+				successCount,
+				failureCount,
+				elapsedTime: this.formatElapsedTime(elapsedTime),
+			},
+			"Final statistics",
+		);
 
 		const failedFiles = results.filter(({ error }) => !!error) as SetNonNullable<
 			ProcessedFileResult,
@@ -398,17 +376,15 @@ export abstract class RunnerService {
 		>[];
 
 		if (failedFiles.length > 0) {
-			this.spinner.stopAndPersist({
-				symbol: "❌",
-				text: `Failed files (${failedFiles.length}):`,
-			});
-
-			for (const [index, { filename, error }] of failedFiles.entries()) {
-				this.spinner.stopAndPersist({
-					symbol: "  •",
-					text: `${index + 1}. ${filename}: ${error.message}`,
-				});
-			}
+			logger.warn(
+				{
+					failures: failedFiles.map(({ filename, error }) => ({
+						filename,
+						error: error.message,
+					})),
+				},
+				`Failed files (${failedFiles.length})`,
+			);
 		}
 	}
 
@@ -468,7 +444,7 @@ export abstract class RunnerService {
 	 * @throws {APIError} If GitHub operations fail
 	 */
 	protected async processInBatches(files: TranslationFile[], batchSize = 10): Promise<void> {
-		this.spinner.text = "Processing files";
+		logger.info("Processing files in batches...");
 
 		const batches = this.createBatches(files, batchSize);
 
@@ -511,18 +487,8 @@ export abstract class RunnerService {
 		this.batchProgress.successful = 0;
 		this.batchProgress.failed = 0;
 
-		this.spinner.text = `Processing batch ${batchInfo.currentBatch}/${batchInfo.totalBatches}`;
-		this.spinner.suffixText = `(0/${batch.length})`;
-
 		try {
-			logger.info(
-				{
-					currentBatch: batchInfo.currentBatch,
-					totalBatches: batchInfo.totalBatches,
-					batchSize: batch.length,
-				},
-				"Processing batch",
-			);
+			logger.info(batchInfo, "Processing batch");
 
 			await Promise.all(
 				batch.map((file) => {
@@ -538,11 +504,7 @@ export abstract class RunnerService {
 			);
 
 			logger.info(
-				{
-					batchIndex: batchInfo.currentBatch,
-					successful: this.batchProgress.successful,
-					failed: this.batchProgress.failed,
-				},
+				{ batchIndex: batchInfo.currentBatch, ...this.batchProgress },
 				"Batch processing completed",
 			);
 		} catch (error) {
@@ -552,13 +514,16 @@ export abstract class RunnerService {
 
 		const successRate = Math.round((this.batchProgress.successful / batch.length) * 100);
 
-		this.spinner.succeed(
+		logger.info(
+			{
+				batchIndex: batchInfo.currentBatch,
+				totalBatches: batchInfo.totalBatches,
+				successful: this.batchProgress.successful,
+				total: batch.length,
+				successRate,
+			},
 			`Batch ${batchInfo.currentBatch}/${batchInfo.totalBatches} completed: ${this.batchProgress.successful}/${batch.length} successful (${successRate}%)`,
 		);
-
-		if (batchInfo.currentBatch < batchInfo.totalBatches) {
-			this.spinner.start();
-		}
 	}
 
 	/**
@@ -578,14 +543,14 @@ export abstract class RunnerService {
 	 * - Maintains file metadata even on failure
 	 *
 	 * @param file File to process
-	 * @param progress Progress tracking information
+	 * @param _progress Progress tracking information
 	 *
 	 * @throws {APIError} If GitHub operations fail
 	 * @throws {ResourceLoadError} If translation resources cannot be loaded
 	 */
 	private async processFile(
 		file: TranslationFile,
-		progress: FileProcessingProgress,
+		_progress: FileProcessingProgress,
 	): Promise<void> {
 		const metadata = this.metadata.results.get(file.filename) || {
 			branch: null,
@@ -623,17 +588,7 @@ export abstract class RunnerService {
 			await this.cleanupFailedTranslation(metadata);
 		} finally {
 			this.metadata.results.set(file.filename, metadata);
-			this.updateProgressSpinner(progress);
 		}
-	}
-
-	/**
-	 * Updates the spinner with current progress information
-	 *
-	 * @param progress Current progress information
-	 */
-	private updateProgressSpinner(progress: FileProcessingProgress): void {
-		this.spinner.suffixText = `(${this.batchProgress.completed}/${progress.batchSize})`;
 	}
 
 	/**

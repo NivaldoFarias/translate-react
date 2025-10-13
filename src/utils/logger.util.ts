@@ -16,7 +16,7 @@
 
 import pino from "pino";
 
-import { RuntimeEnvironment } from "./constants.util";
+import { LogLevel, RuntimeEnvironment } from "./constants.util";
 import { env } from "./env.util";
 
 /**
@@ -27,10 +27,11 @@ import { env } from "./env.util";
  * - Can be overridden with LOG_LEVEL env var
  */
 const logLevel =
-	env.LOG_LEVEL ?? (env.NODE_ENV === RuntimeEnvironment.Production ? "info" : "debug");
+	env.LOG_LEVEL ??
+	(env.NODE_ENV === RuntimeEnvironment.Production ? LogLevel.Info : LogLevel.Debug);
 
 /**
- * Main Pino logger instance
+ * Main logger instance
  *
  * Configured with dual transports:
  * 1. File transport: Writes structured JSON to log files
@@ -38,20 +39,20 @@ const logLevel =
  *
  * @example
  * ```typescript
- * import { pinoLogger } from '@/utils/pino-logger.util';
+ * import { logger } from '@/utils/logger.util';
  *
  * // Simple logging
- * pinoLogger.info('Application started');
- * pinoLogger.error('Something went wrong');
+ * logger.info('Application started');
+ * logger.error('Something went wrong');
  *
  * // With context
- * pinoLogger.info({ file: 'test.md', size: 1024 }, 'Processing file');
+ * logger.info({ file: 'test.md', size: 1024 }, 'Processing file');
  *
  * // With error object
- * pinoLogger.error({ err: error, operation: 'translate' }, 'Translation failed');
+ * logger.error({ err: error, operation: 'translate' }, 'Translation failed');
  *
  * // Create child logger with context
- * const fileLogger = pinoLogger.child({ component: 'translator' });
+ * const fileLogger = logger.child({ component: 'translator' });
  * fileLogger.debug('Starting translation');
  * ```
  */

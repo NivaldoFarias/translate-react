@@ -1,18 +1,18 @@
 import { extractErrorMessage } from "@/errors/";
-import { RunnerService } from "@/services/runner/base.service";
-import { env } from "@/utils";
+import { BaseRunnerService } from "@/services/runner/base.service";
+import { env, logger } from "@/utils";
 
 /**
  * Main orchestrator class that manages the entire translation process workflow.
  *
  * - Handles file processing, translation, GitHub operations, and progress tracking.
  * - The runner implements a batch processing system to efficiently handle multiple files
- * while providing real-time progress feedback through a CLI spinner.
+ * while providing real-time progress feedback through structured logging.
  *
  * ### Features
  *
  * - Batch processing with configurable size
- * - Real-time progress tracking
+ * - Real-time progress tracking via Pino logger
  * - Development/Production mode support
  * - Snapshot-based state persistence
  * - Structured error handling
@@ -23,14 +23,12 @@ import { env } from "@/utils";
  * await runner.run();
  * ```
  */
-export default class Runner extends RunnerService {
+export default class RunnerService extends BaseRunnerService {
 	private printForkInfo(): void {
-		this.spinner.info(
+		logger.info(
 			`Fork: ${env.REPO_FORK_OWNER}/${env.REPO_FORK_NAME} :: ` +
 				`Upstream: ${env.REPO_UPSTREAM_OWNER}/${env.REPO_UPSTREAM_NAME}`,
 		);
-
-		this.spinner.start();
 	}
 
 	/**
@@ -53,7 +51,7 @@ export default class Runner extends RunnerService {
 	 */
 	public async run(): Promise<void> {
 		try {
-			this.spinner.start();
+			logger.info("Starting translation workflow");
 
 			this.printForkInfo();
 
@@ -76,7 +74,7 @@ export default class Runner extends RunnerService {
 				await this.services.snapshot.append("processedResults", this.state.processedResults);
 			}
 
-			this.spinner.succeed("Translation workflow completed");
+			logger.info("Translation workflow completed successfully");
 
 			if (this.shouldUpdateIssueComment) {
 				await this.updateIssueWithResults();
@@ -86,13 +84,11 @@ export default class Runner extends RunnerService {
 				await this.services.snapshot.clear();
 			}
 		} catch (error) {
-			this.spinner.fail(extractErrorMessage(error));
+			logger.error({ error: extractErrorMessage(error) }, "Translation workflow failed");
 
 			throw error;
 		} finally {
 			await this.printFinalStatistics();
-
-			this.spinner.stop();
 		}
 	}
 }
