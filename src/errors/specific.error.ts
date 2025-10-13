@@ -11,7 +11,7 @@ export class InitializationError extends TranslationError {
 	 * @param context The error context
 	 */
 	constructor(message: string, context?: Partial<ErrorContext>) {
-		super(message, ErrorCode.INITIALIZATION_ERROR, context);
+		super(message, ErrorCode.InitializationError, context);
 	}
 }
 
@@ -24,7 +24,7 @@ export class MissingKeyError extends TranslationError {
 	 * @param context The error context
 	 */
 	constructor(key: string, context?: Partial<ErrorContext>) {
-		super(`Translation key "${key}" not found`, ErrorCode.MISSING_KEY, context);
+		super(`Translation key "${key}" not found`, ErrorCode.MissingKey, context);
 	}
 }
 
@@ -37,7 +37,7 @@ export class UnsupportedLanguageError extends TranslationError {
 	 * @param context The error context
 	 */
 	constructor(language: string, context?: Partial<ErrorContext>) {
-		super(`Language "${language}" is not supported`, ErrorCode.UNSUPPORTED_LANG, context);
+		super(`Language "${language}" is not supported`, ErrorCode.UnsupportedLang, context);
 	}
 }
 
@@ -52,7 +52,7 @@ export class ResourceLoadError extends TranslationError {
 	constructor(resource: string, context?: Partial<ErrorContext>) {
 		super(
 			`Failed to load translation resource "${resource}"`,
-			ErrorCode.RESOURCE_LOAD_ERROR,
+			ErrorCode.ResourceLoadError,
 			context,
 		);
 	}
@@ -70,7 +70,7 @@ export class APIError extends TranslationError {
 	constructor(endpoint: string, statusCode: number, context?: Partial<ErrorContext>) {
 		super(
 			`API request to "${endpoint}" failed with status ${statusCode}`,
-			ErrorCode.API_ERROR,
+			ErrorCode.ApiError,
 			context,
 		);
 	}
@@ -85,6 +85,6 @@ export class ValidationError extends TranslationError {
 	 * @param context The error context
 	 */
 	constructor(message: string, context?: Partial<ErrorContext>) {
-		super(message, ErrorCode.VALIDATION_ERROR, context);
+		super(message, ErrorCode.ValidationError, context);
 	}
 }

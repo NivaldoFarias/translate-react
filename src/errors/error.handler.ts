@@ -1,6 +1,9 @@
+/* eslint-disable no-console */
 import Bun from "bun";
 
 import type { ErrorContext } from "./base.error";
+
+import type { LogEntry } from "@/utils";
 
 import { ErrorCode, ErrorSeverity, TranslationError } from "./base.error";
 
@@ -65,7 +68,7 @@ export class ErrorHandler {
 	 */
 	private constructor(config: ErrorHandlerConfig = {}) {
 		this.config = {
-			minSeverity: ErrorSeverity.DEBUG,
+			minSeverity: ErrorSeverity.Debug,
 			logToFile: false,
 			...config,
 		};
@@ -87,7 +90,7 @@ export class ErrorHandler {
 
 		const startupEntry = {
 			timestamp: new Date().toISOString(),
-			level: ErrorSeverity.INFO,
+			level: ErrorSeverity.Info,
 			message: "ErrorHandler initialized - logging started",
 			metadata: {
 				logFilePath: this.logFilePath,
@@ -97,7 +100,7 @@ export class ErrorHandler {
 					version: process.version,
 				},
 			},
-		};
+		} satisfies LogEntry;
 
 		const logLine = JSON.stringify(startupEntry) + "\n";
 
@@ -207,8 +210,8 @@ export class ErrorHandler {
 
 		const originalError = error instanceof Error ? error : new Error(String(error));
 
-		return new TranslationError(originalError.message, ErrorCode.UNKNOWN_ERROR, {
-			sanity: ErrorSeverity.ERROR,
+		return new TranslationError(originalError.message, ErrorCode.UnknownError, {
+			sanity: ErrorSeverity.Error,
 			...context,
 			metadata: {
 				originalError,
@@ -238,7 +241,7 @@ export class ErrorHandler {
 					level: severity,
 					message: error.message,
 					metadata: error.toJSON(),
-				};
+				} satisfies LogEntry;
 
 				const logLine = JSON.stringify(logEntry) + "\n";
 

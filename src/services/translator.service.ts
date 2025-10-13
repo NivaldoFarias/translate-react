@@ -99,7 +99,7 @@ export class TranslatorService {
 		const genericErrorTransform = (error: Error) => {
 			if (detectRateLimit(error.message)) {
 				return {
-					code: ErrorCode.RATE_LIMIT_EXCEEDED,
+					code: ErrorCode.RateLimitExceeded,
 					metadata: {
 						originalMessage: error.message,
 						errorType: error.constructor.name,
@@ -116,12 +116,12 @@ export class TranslatorService {
 		};
 
 		errorMap.set("APIError", {
-			code: ErrorCode.LLM_API_ERROR,
+			code: ErrorCode.LLMApiError,
 			transform: (error: Error) => {
 				if (error instanceof APIError) {
 					if (detectRateLimit(error.message, error.status)) {
 						return {
-							code: ErrorCode.RATE_LIMIT_EXCEEDED,
+							code: ErrorCode.RateLimitExceeded,
 							metadata: {
 								statusCode: error.status,
 								type: error.type,
@@ -143,13 +143,13 @@ export class TranslatorService {
 		});
 
 		errorMap.set("Error", {
-			code: ErrorCode.UNKNOWN_ERROR,
+			code: ErrorCode.UnknownError,
 			transform: genericErrorTransform,
 		});
 
-		errorMap.set("RateLimitError", { code: ErrorCode.RATE_LIMIT_EXCEEDED });
-		errorMap.set("QuotaExceededError", { code: ErrorCode.RATE_LIMIT_EXCEEDED });
-		errorMap.set("TooManyRequestsError", { code: ErrorCode.RATE_LIMIT_EXCEEDED });
+		errorMap.set("RateLimitError", { code: ErrorCode.RateLimitExceeded });
+		errorMap.set("QuotaExceededError", { code: ErrorCode.RateLimitExceeded });
+		errorMap.set("TooManyRequestsError", { code: ErrorCode.RateLimitExceeded });
 
 		this.llm = createErrorHandlingProxy(this.llm, { serviceName: "OpenAI", errorMap });
 	}
@@ -368,7 +368,7 @@ export class TranslatorService {
 			} catch (error) {
 				throw new TranslationError(
 					`Failed to translate content chunk ${i + 1}/${chunks.length}`,
-					ErrorCode.LLM_API_ERROR,
+					ErrorCode.LLMApiError,
 					{
 						operation: "translateWithChunking",
 						metadata: {
@@ -431,7 +431,7 @@ export class TranslatorService {
 					errorType === "QuotaExceededError" ||
 					errorType === "TooManyRequestsError"
 				) {
-					throw new TranslationError(error.message, ErrorCode.RATE_LIMIT_EXCEEDED, {
+					throw new TranslationError(error.message, ErrorCode.RateLimitExceeded, {
 						operation: "callLanguageModel",
 						metadata: {
 							model: env.LLM_MODEL,
@@ -445,7 +445,7 @@ export class TranslatorService {
 				 * Fallback pattern matching for rate limit errors
 				 */
 				if (detectRateLimit(error.message)) {
-					throw new TranslationError(error.message, ErrorCode.RATE_LIMIT_EXCEEDED, {
+					throw new TranslationError(error.message, ErrorCode.RateLimitExceeded, {
 						operation: "callLanguageModel",
 						metadata: {
 							model: env.LLM_MODEL,

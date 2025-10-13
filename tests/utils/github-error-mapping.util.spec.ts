@@ -28,7 +28,7 @@ describe("createGitHubErrorMap", () => {
 		expect(errorMap.has("RequestError")).toBe(true);
 	});
 
-	test("should transform UNAUTHORIZED status to GITHUB_UNAUTHORIZED", () => {
+	test(`should transform UNAUTHORIZED status to ${ErrorCode.GithubUnauthorized}`, () => {
 		const requestError = new RequestError("Unauthorized", StatusCodes.UNAUTHORIZED, {
 			request: { method: "GET", url: "/test", headers: {} },
 		});
@@ -36,10 +36,10 @@ describe("createGitHubErrorMap", () => {
 		const mapping = errorMap.get("RequestError");
 		const result = mapping?.transform?.(requestError);
 
-		expect(result?.code).toBe(ErrorCode.GITHUB_UNAUTHORIZED);
+		expect(result?.code).toBe(ErrorCode.GithubUnauthorized);
 	});
 
-	test("should transform NOT_FOUND status to GITHUB_NOT_FOUND", () => {
+	test(`should transform NOT_FOUND status to ${ErrorCode.GithubNotFound}`, () => {
 		const requestError = new RequestError("Not Found", StatusCodes.NOT_FOUND, {
 			request: { method: "GET", url: "/test", headers: {} },
 		});
@@ -47,10 +47,10 @@ describe("createGitHubErrorMap", () => {
 		const mapping = errorMap.get("RequestError");
 		const result = mapping?.transform?.(requestError);
 
-		expect(result?.code).toBe(ErrorCode.GITHUB_NOT_FOUND);
+		expect(result?.code).toBe(ErrorCode.GithubNotFound);
 	});
 
-	test("should transform FORBIDDEN with rate limit message to GITHUB_RATE_LIMITED", () => {
+	test(`should transform FORBIDDEN with rate limit message to ${ErrorCode.RateLimitExceeded}`, () => {
 		const requestError = new RequestError("API rate limit exceeded", StatusCodes.FORBIDDEN, {
 			request: { method: "GET", url: "/test", headers: {} },
 		});
@@ -58,10 +58,10 @@ describe("createGitHubErrorMap", () => {
 		const mapping = errorMap.get("RequestError");
 		const result = mapping?.transform?.(requestError);
 
-		expect(result?.code).toBe(ErrorCode.GITHUB_RATE_LIMITED);
+		expect(result?.code).toBe(ErrorCode.RateLimitExceeded);
 	});
 
-	test("should transform FORBIDDEN without rate limit message to GITHUB_FORBIDDEN", () => {
+	test(`should transform FORBIDDEN without rate limit message to ${ErrorCode.GithubForbidden}`, () => {
 		const requestError = new RequestError("Forbidden", StatusCodes.FORBIDDEN, {
 			request: { method: "GET", url: "/test", headers: {} },
 		});
@@ -69,10 +69,10 @@ describe("createGitHubErrorMap", () => {
 		const mapping = errorMap.get("RequestError");
 		const result = mapping?.transform?.(requestError);
 
-		expect(result?.code).toBe(ErrorCode.GITHUB_FORBIDDEN);
+		expect(result?.code).toBe(ErrorCode.GithubForbidden);
 	});
 
-	test("should transform server errors to GITHUB_SERVER_ERROR", () => {
+	test(`should transform server errors to ${ErrorCode.GithubServerError}`, () => {
 		const statuses = [
 			StatusCodes.INTERNAL_SERVER_ERROR,
 			StatusCodes.BAD_GATEWAY,
@@ -88,11 +88,11 @@ describe("createGitHubErrorMap", () => {
 			const mapping = errorMap.get("RequestError");
 			const result = mapping?.transform?.(requestError);
 
-			expect(result?.code).toBe(ErrorCode.GITHUB_SERVER_ERROR);
+			expect(result?.code).toBe(ErrorCode.GithubServerError);
 		}
 	});
 
-	test("should transform unknown status to GITHUB_API_ERROR with metadata", () => {
+	test(`should transform unknown status to ${ErrorCode.GithubApiError} with metadata`, () => {
 		const requestError = new RequestError("Unknown Error", StatusCodes.IM_A_TEAPOT, {
 			request: { method: "GET", url: "/test", headers: {} },
 		});
@@ -100,7 +100,7 @@ describe("createGitHubErrorMap", () => {
 		const mapping = errorMap.get("RequestError");
 		const result = mapping?.transform?.(requestError);
 
-		expect(result?.code).toBe(ErrorCode.GITHUB_API_ERROR);
+		expect(result?.code).toBe(ErrorCode.GithubApiError);
 		expect(result?.metadata?.["networkError"]).toBe(false);
 		expect(result?.metadata?.["originalError"]).toBe("Unknown Error");
 	});

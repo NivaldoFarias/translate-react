@@ -28,30 +28,30 @@ export function createGitHubErrorMap(): ProxyHandlerOptions["errorMap"] {
 	const errorMap: ProxyHandlerOptions["errorMap"] = new Map();
 
 	errorMap.set("RequestError", {
-		code: ErrorCode.GITHUB_API_ERROR,
+		code: ErrorCode.GithubApiError,
 		transform: (error: Error) => {
 			const requestError = error as RequestError;
 
 			switch (requestError.status) {
 				case StatusCodes.UNAUTHORIZED:
-					return { code: ErrorCode.GITHUB_UNAUTHORIZED };
+					return { code: ErrorCode.GithubUnauthorized };
 				case StatusCodes.FORBIDDEN:
 					if (requestError.message.toLowerCase().includes("rate limit")) {
-						return { code: ErrorCode.GITHUB_RATE_LIMITED };
+						return { code: ErrorCode.RateLimitExceeded };
 					}
-					return { code: ErrorCode.GITHUB_FORBIDDEN };
+					return { code: ErrorCode.GithubForbidden };
 				case StatusCodes.NOT_FOUND:
-					return { code: ErrorCode.GITHUB_NOT_FOUND };
+					return { code: ErrorCode.GithubNotFound };
 				case StatusCodes.UNPROCESSABLE_ENTITY:
-					return { code: ErrorCode.VALIDATION_ERROR };
+					return { code: ErrorCode.ValidationError };
 				case StatusCodes.INTERNAL_SERVER_ERROR:
 				case StatusCodes.BAD_GATEWAY:
 				case StatusCodes.SERVICE_UNAVAILABLE:
 				case StatusCodes.GATEWAY_TIMEOUT:
-					return { code: ErrorCode.GITHUB_SERVER_ERROR };
+					return { code: ErrorCode.GithubServerError };
 				default:
 					return {
-						code: ErrorCode.GITHUB_API_ERROR,
+						code: ErrorCode.GithubApiError,
 						metadata: {
 							networkError: !requestError.status,
 							originalError: requestError.message,

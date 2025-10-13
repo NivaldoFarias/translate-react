@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import Bun from "bun";
 
 import { ErrorSeverity } from "@/errors/base.error";
@@ -37,10 +38,10 @@ export interface LoggerConfig {
 	logToFile?: boolean;
 
 	/**
-	 * Path to the log file (recommend using .json extension for JSON array format)
+	 * Path to the log file (recommend using .jsonl extension for JSONL format)
 	 *
-	 * The Logger uses JSON array format where all log entries are stored in a
-	 * single JSON array. This format enables easy parsing as valid JSON.
+	 * The Logger uses JSONL (JSON Lines) format where each line is a separate
+	 * JSON object. This format is optimal for streaming logs and append-only operations.
 	 */
 	logFilePath?: string;
 
@@ -60,71 +61,102 @@ export interface LoggerConfig {
  * (`info`, `error`, etc.). It uses the {@link ErrorSeverity} enum to control
  * filtering behavior.
  *
- * Uses JSON array format for log files where all entries are stored in a single
- * JSON array structure. This format provides valid JSON that can be easily parsed.
- * Recommended file extension: `.json`
+ * Uses JSONL (JSON Lines) format for log files where each line contains a complete
+ * JSON object. This format is optimal for streaming logs and append-only operations.
+ * Recommended file extension: `.jsonl`
  *
  * @example
  * ```typescript
  * import { logger } from "@/utils/logger.util";
  *
- * await logger.info("Translator service started", { service: "translator" });
+ * await logger().info("Translator service started", { service: "translator" });
  * ```
  */
 export class Logger {
-	private static instance: Logger;
-
 	/** The configuration for the logger */
 	private readonly config: LoggerConfig;
 
+	/** The path to the log file */
+	public logFilePath?: string;
+
 	/** Severity levels in order of importance */
 	private readonly severityOrder: ErrorSeverity[] = [
-		ErrorSeverity.DEBUG,
-		ErrorSeverity.LOG,
-		ErrorSeverity.INFO,
-		ErrorSeverity.WARN,
-		ErrorSeverity.ERROR,
-		ErrorSeverity.FATAL,
+		ErrorSeverity.Debug,
+		ErrorSeverity.Log,
+		ErrorSeverity.Info,
+		ErrorSeverity.Warn,
+		ErrorSeverity.Error,
+		ErrorSeverity.Fatal,
 	];
 
 	/**
 	 * Creates a new Logger instance.
 	 *
 	 * @param config The configuration for the logger
-	 */
-	private constructor(config: LoggerConfig = {}) {
-		this.config = {
-			logToConsole: true,
-			logToFile: false,
-			minConsoleLevel: ErrorSeverity.LOG,
-			minFileLevel: ErrorSeverity.INFO,
-			...config,
-		};
-	}
-
-	/**
-	 * Returns the singleton Logger instance.
-	 *
-	 * The `config` parameter is only applied the first time the singleton is
-	 * created. Subsequent calls return the same instance.
-	 *
-	 * @param config Optional configuration to use when creating the instance
-	 *
-	 * @returns The singleton instance of Logger
 	 *
 	 * @example
 	 * ```typescript
+	 * // In services or other modules (after Logger is initialized in index.ts):
 	 * import { Logger } from "@/utils/logger.util";
 	 *
-	 * const instance = Logger.getInstance({ logToFile: true, logFilePath: ".logs/app.log" });
+	 * const log = new Logger();
+	 * await log.info("Service started");
 	 * ```
 	 */
-	public static getInstance(config?: LoggerConfig): Logger {
-		if (!Logger.instance) {
-			Logger.instance = new Logger(config);
-		}
+	constructor(config: LoggerConfig = {}) {
+		this.config = {
+			logToConsole: true,
+			logToFile: false,
+			minConsoleLevel: ErrorSeverity.Log,
+			minFileLevel: ErrorSeverity.Info,
+			...config,
+		};
 
-		return Logger.instance;
+		if (this.config.logToFile && this.config.logFilePath) {
+			this.updateLogFilePath(this.config.logFilePath);
+		}
+	}
+
+	public updateLogFilePath(newPath: string): void {
+		this.logFilePath = newPath;
+		this.config.logToFile = true;
+		this.initializeLogFile();
+	}
+
+	/**
+	 * Initializes the log file with a startup entry.
+	 *
+	 * Creates the log file immediately when Logger is instantiated to ensure
+	 * proper observability from the beginning of the workflow execution.
+	 */
+	private initializeLogFile(): void {
+		if (!this.logFilePath) return;
+
+		const startupEntry = {
+			timestamp: new Date().toISOString(),
+			level: ErrorSeverity.Info,
+			message: "Logger initialized - logging started",
+			metadata: {
+				logFilePath: this.logFilePath,
+				minConsoleLevel: this.config.minConsoleLevel,
+				minFileLevel: this.config.minFileLevel,
+				process: {
+					pid: process.pid,
+					version: process.version,
+				},
+			},
+		} satisfies LogEntry;
+
+		const logLine = JSON.stringify(startupEntry) + "\n";
+
+		/**
+		 * Synchronous initialization to ensure log file exists before any logs occur
+		 */
+		try {
+			Bun.write(this.logFilePath, logLine);
+		} catch (initError) {
+			console.error("Failed to initialize log file:", initError);
+		}
 	}
 
 	/**
@@ -187,7 +219,7 @@ export class Logger {
 	 * ```
 	 */
 	public async debug(message: string, metadata?: Record<string, unknown>): Promise<void> {
-		return this.log(ErrorSeverity.DEBUG, message, metadata);
+		return this.log(ErrorSeverity.Debug, message, metadata);
 	}
 
 	/**
@@ -204,7 +236,7 @@ export class Logger {
 	 * ```
 	 */
 	public async info(message: string, metadata?: Record<string, unknown>): Promise<void> {
-		return this.log(ErrorSeverity.INFO, message, metadata);
+		return this.log(ErrorSeverity.Info, message, metadata);
 	}
 
 	/**
@@ -221,7 +253,7 @@ export class Logger {
 	 * ```
 	 */
 	public async message(message: string, metadata?: Record<string, unknown>): Promise<void> {
-		return this.log(ErrorSeverity.LOG, message, metadata);
+		return this.log(ErrorSeverity.Log, message, metadata);
 	}
 
 	/**
@@ -238,7 +270,7 @@ export class Logger {
 	 * ```
 	 */
 	public async warn(message: string, metadata?: Record<string, unknown>): Promise<void> {
-		return this.log(ErrorSeverity.WARN, message, metadata);
+		return this.log(ErrorSeverity.Warn, message, metadata);
 	}
 
 	/**
@@ -255,7 +287,7 @@ export class Logger {
 	 * ```
 	 */
 	public async error(message: string, metadata?: Record<string, unknown>): Promise<void> {
-		return this.log(ErrorSeverity.ERROR, message, metadata);
+		return this.log(ErrorSeverity.Error, message, metadata);
 	}
 
 	/**
@@ -272,7 +304,7 @@ export class Logger {
 	 * ```
 	 */
 	public async fatal(message: string, metadata?: Record<string, unknown>): Promise<void> {
-		return this.log(ErrorSeverity.FATAL, message, metadata);
+		return this.log(ErrorSeverity.Fatal, message, metadata);
 	}
 
 	/**
@@ -313,49 +345,35 @@ export class Logger {
 		const logMessage = `[${entry.timestamp}] ${entry.level}: ${entry.message}`;
 
 		if (entry.metadata) {
-			// eslint-disable-next-line no-console
 			(console[method] as (...args: unknown[]) => void)(logMessage, entry.metadata);
 		} else {
-			// eslint-disable-next-line no-console
 			(console[method] as (...args: unknown[]) => void)(logMessage);
 		}
 	}
 
 	/**
-	 * Logs to file in JSON format.
+	 * Logs to file in JSONL format.
 	 *
-	 * This method maintains a proper JSON array structure by reading existing
-	 * content, parsing it as an array, appending the new entry, and writing
-	 * back the complete array. It intentionally swallows file errors and logs
-	 * them to console to avoid crashing the host process.
+	 * Uses JSONL (JSON Lines) format for proper append-only logging.
+	 * Each line is a valid JSON object, making the file easily parseable.
+	 * This method intentionally swallows file errors and logs them to console
+	 * to avoid crashing the host process.
 	 *
 	 * @param entry The structured log entry to persist
 	 */
 	private async logToFile(entry: LogEntry): Promise<void> {
+		if (!this.logFilePath) return;
+
 		try {
-			const file = Bun.file(this.config.logFilePath!);
-			const fileExists = await file.exists();
+			const logLine = JSON.stringify(entry) + "\n";
 
-			let existingLogs: LogEntry[] = [];
-			if (fileExists) {
-				try {
-					const existingContent = await file.text();
-					if (existingContent.trim()) {
-						const parsed = JSON.parse(existingContent) as unknown;
-						if (Array.isArray(parsed)) {
-							existingLogs = parsed as LogEntry[];
-						} else {
-							existingLogs = [];
-						}
-					}
-				} catch {
-					existingLogs = [];
-				}
-			}
-
-			existingLogs.push(entry);
-			const jsonContent = JSON.stringify(existingLogs, null, 2);
-			await Bun.write(this.config.logFilePath!, jsonContent, { createPath: true });
+			/**
+			 * Append-only write for efficient JSONL logging
+			 */
+			const existingContent = await Bun.file(this.logFilePath)
+				.text()
+				.catch(() => "");
+			await Bun.write(this.logFilePath, existingContent + logLine);
 		} catch (error) {
 			console.error("Failed to write log entry to file:", error);
 		}
@@ -370,28 +388,20 @@ export class Logger {
 	 */
 	private getConsoleMethod(level: ErrorSeverity): keyof Console {
 		const methodMap: Record<ErrorSeverity, keyof Console> = {
-			[ErrorSeverity.DEBUG]: "table",
-			[ErrorSeverity.LOG]: "table",
-			[ErrorSeverity.INFO]: "table",
-			[ErrorSeverity.WARN]: "warn",
-			[ErrorSeverity.ERROR]: "error",
-			[ErrorSeverity.FATAL]: "error",
+			[ErrorSeverity.Debug]: "table",
+			[ErrorSeverity.Log]: "table",
+			[ErrorSeverity.Info]: "table",
+			[ErrorSeverity.Warn]: "warn",
+			[ErrorSeverity.Error]: "error",
+			[ErrorSeverity.Fatal]: "error",
 		};
 
 		return methodMap[level];
 	}
 }
 
-/**
- * Default shared logger instance for convenience.
- *
- * Import this from other modules for a single application-wide logger.
- *
- * @example
- * ```typescript
- * import { logger } from "@/utils/logger.util";
- *
- * await logger.info("Service started");
- * ```
- */
-export const logger = Logger.getInstance();
+export const logger = new Logger({
+	logToConsole: true,
+	minConsoleLevel: ErrorSeverity.Info,
+	minFileLevel: ErrorSeverity.Info,
+});
