@@ -393,23 +393,40 @@ export class TranslatorService {
 	}
 
 	/**
-	 * Splits content into chunks while preserving markdown structure.
+	 * Splits content into chunks while preserving markdown structure and formatting.
 	 *
 	 * Uses LangChain's {@link MarkdownTextSplitter} for intelligent chunking that respects
 	 * markdown structure and code blocks, ensuring chunks don't exceed the maximum
 	 * token limit while maintaining content coherence and readability.
 	 *
+	 * ### Whitespace Preservation Strategy
+	 *
+	 * The MarkdownTextSplitter automatically strips trailing whitespace from all chunks,
+	 * which can cause improper spacing during reassembly. This method implements a
+	 * comprehensive preservation strategy:
+	 *
+	 * - **Non-final chunks**: Always end with a newline to ensure proper spacing when joined
+	 * - **Final chunk**: Preserves the original file's ending exactly - if the source content
+	 *   ends with a newline, the last chunk will too; if not, it won't
+	 *
+	 * This approach ensures that reassembled content maintains identical structure and
+	 * whitespace patterns to the original, preventing both missing newlines and extra
+	 * blank lines.
+	 *
 	 * @param content Content to split into manageable chunks
 	 * @param maxTokens Maximum tokens per chunk (defaults to safe limit)
 	 *
-	 * @returns Promise resolving to array of content chunks with preserved markdown structure
+	 * @returns Promise resolving to array of content chunks with preserved markdown structure.
+	 *   Non-final chunks are guaranteed to end with `\n`. The final chunk matches the original
+	 *   file's ending whitespace pattern exactly.
 	 *
 	 * @example
 	 * ```typescript
 	 * const translator = new TranslatorService({ source: 'en', target: 'pt-br' });
-	 * const largeContent = '# Title\n\n```js\ncode here\n```\n\nMore content...';
-	 * const chunks = await translator.chunkContent(largeContent, 1000);
-	 * console.log(chunks.length); // Number of chunks created
+	 * const content = '# Title\n\n```js\ncode here\n```\n\nMore content...\n';
+	 * const chunks = await translator.chunkContent(content, 1000);
+	 * console.log(chunks[0].endsWith('\n')); // true (non-final chunk)
+	 * console.log(chunks[chunks.length - 1].endsWith('\n')); // true (matches original)
 	 * ```
 	 */
 	private async chunkContent(
@@ -427,7 +444,24 @@ export class TranslatorService {
 		});
 
 		const chunks = await splitter.splitText(content);
-		return chunks.filter((chunk) => chunk.trim().length > 0);
+		const filteredChunks = chunks.filter((chunk) => chunk.trim().length > 0);
+		const originalEndsWithNewline = content.endsWith("\n");
+
+		return filteredChunks.map((chunk, index) => {
+			const isLastChunk = index === filteredChunks.length - 1;
+
+			if (isLastChunk) {
+				if (originalEndsWithNewline && !chunk.endsWith("\n")) {
+					return chunk + "\n";
+				}
+
+				return chunk;
+			}
+
+			if (!chunk.endsWith("\n")) return chunk + "\n";
+
+			return chunk;
+		});
 	}
 
 	/**
@@ -444,7 +478,14 @@ export class TranslatorService {
 	 * 2. **Sequential Translation**: Processes each chunk in order, maintaining state
 	 * 3. **Progress Tracking**: Logs detailed metrics for each chunk translation
 	 * 4. **Validation Gate**: Ensures translated chunk count matches source chunk count
-	 * 5. **Reassembly**: Joins translated chunks with double newlines to maintain structure
+	 * 5. **Reassembly**: Joins translated chunks with single newlines to maintain structure
+	 *
+	 * ### Reassembly Strategy
+	 *
+	 * Chunks are joined with a single newline character (`\n`) rather than double newlines.
+	 * This is because the chunking process already ensures that each chunk (except the last)
+	 * ends with a trailing newline. Using a single newline as the separator preserves the
+	 * original spacing and prevents the introduction of extra blank lines between sections.
 	 *
 	 * ### Performance Characteristics
 	 *
@@ -602,7 +643,7 @@ export class TranslatorService {
 			"All chunks translated successfully - beginning reassembly",
 		);
 
-		const reassembledContent = translatedChunks.join("\n\n");
+		const reassembledContent = translatedChunks.join("\n");
 
 		logger.debug(
 			{
