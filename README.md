@@ -197,7 +197,7 @@ bun install
 | `FORCE_SNAPSHOT_CLEAR`  | no        | `false`                                            | Clear snapshots on startup (dev only)               |
 | `DEV_MODE_FORK_PR`      | no        | `false`                                            | Create PRs in fork (dev) vs upstream (production)   |
 | `HEADER_APP_URL`        | no        | `https://github.com/NivaldoFarias/translate-react` | Application URL for OpenRouter Activity Tracking    |
-| `HEADER_APP_TITLE`      | no        | `translate-react v0.1.9`                           | Application title for OpenRouter Activity Tracking  |
+| `HEADER_APP_TITLE`      | no        | `translate-react v0.1.10`                          | Application title for OpenRouter Activity Tracking  |
 | `BATCH_SIZE`            | no        | `10`                                               | Number of files to process concurrently             |
 | `TARGET_LANGUAGE`       | no        | `pt`                                               | Target language (ISO 639-1 code)                    |
 | `SOURCE_LANGUAGE`       | no        | `en`                                               | Source language (ISO 639-1 code)                    |

@@ -79,7 +79,7 @@ export const logger = pino({
 
 			/**
 			 * Console transport - pretty-printed for development
-			 * Only active when LOG_TO_CONSOLE is enabled and not in production
+			 * Only active when `LOG_TO_CONSOLE` is enabled and not in production
 			 */
 			...(env.LOG_TO_CONSOLE && env.NODE_ENV !== RuntimeEnvironment.Production ?
 				[

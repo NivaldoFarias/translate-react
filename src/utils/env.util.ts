@@ -113,7 +113,7 @@ const envSchema = z.object({
 		.default(environmentDefaults.PROGRESS_ISSUE_NUMBER),
 
 	/** Whether to clear the snapshot on startup. Used for development. */
-	FORCE_SNAPSHOT_CLEAR: z.coerce.boolean().default(environmentDefaults.FORCE_SNAPSHOT_CLEAR),
+	FORCE_SNAPSHOT_CLEAR: z.stringbool().default(environmentDefaults.FORCE_SNAPSHOT_CLEAR),
 
 	/**
 	 * Whether to create PRs in the fork (development mode) or upstream (production mode).
@@ -121,7 +121,7 @@ const envSchema = z.object({
 	 *
 	 * @default false
 	 */
-	DEV_MODE_FORK_PR: z.coerce.boolean().default(false),
+	DEV_MODE_FORK_PR: z.stringbool().default(false),
 
 	/**
 	 * The URL of the application to override the default URL.
@@ -179,7 +179,7 @@ const envSchema = z.object({
 	 *
 	 * @default true
 	 */
-	LOG_TO_CONSOLE: z.coerce.boolean().default(environmentDefaults.LOG_TO_CONSOLE),
+	LOG_TO_CONSOLE: z.stringbool().default(environmentDefaults.LOG_TO_CONSOLE),
 
 	/**
 	 * Timeout for GitHub API requests in **milliseconds**.
