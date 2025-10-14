@@ -35,6 +35,7 @@ export enum ErrorCode {
 	ContentTooLong = "CONTENT_TOO_LONG",
 	NoContent = "NO_CONTENT",
 	FormatValidationFailed = "FORMAT_VALIDATION_FAILED",
+	ChunkProcessingFailed = "CHUNK_PROCESSING_FAILED",
 
 	// Process Related
 	ApiError = "API_ERROR",
@@ -50,21 +51,23 @@ export enum ErrorCode {
 
 /** Base context interface for all translation errors */
 export interface ErrorContext {
+	/** The severity level of the error */
 	sanity: ErrorSeverity;
-	code: ErrorCode;
-	operation?: string;
-	file?: BunFile | string;
-	metadata?: Record<string, unknown>;
-	timestamp?: Date;
-}
 
-export interface FormattedError extends Record<string, unknown> {
-	name: string;
-	message: string;
+	/** The standardized error code */
 	code: ErrorCode;
-	timestamp: string;
-	context: ErrorContext;
-	stack: string[];
+
+	/** The operation that failed */
+	operation?: string;
+
+	/** The file related to the error, if applicable */
+	file?: BunFile | string;
+
+	/** Additional metadata about the error */
+	metadata?: Record<string, unknown>;
+
+	/** The timestamp when the error occurred */
+	timestamp?: Date;
 }
 
 /**
@@ -106,50 +109,6 @@ export class TranslationError extends Error {
 		};
 
 		Object.setPrototypeOf(this, new.target.prototype);
-	}
-
-	/** Creates a formatted error message including context information */
-	public toJSON(): FormattedError {
-		return {
-			name: this.name,
-			message: this.message,
-			code: this.code,
-			timestamp: this.timestamp.toISOString(),
-			context: this.context,
-			stack: this.stackList(this.stack),
-		};
-	}
-
-	/**
-	 * Converts the stack trace string into a list of lines for easier reading.
-	 * Filters out error handler wrapper frames to show only relevant application code.
-	 */
-	private stackList(stack = ""): Array<string> {
-		const stackLines = stack
-			.split("\n")
-			.slice(1) // Remove the error message line
-			.map((line) => line.trim())
-			.filter(Boolean); // Remove empty lines
-
-		// Filter out error handling infrastructure frames
-		const errorHandlerPatterns = [
-			/proxy\.handler\.ts/,
-			/error\.handler\.ts/,
-			/wrapAsync/,
-			/wrapSync/,
-			/handleError/,
-		];
-
-		let filteredStack = stackLines.filter(
-			(line) => !errorHandlerPatterns.some((pattern) => pattern.test(line)),
-		);
-
-		// Keep at least the first 3 lines if filtering removed everything
-		if (filteredStack.length === 0) {
-			filteredStack = stackLines.slice(0, 3);
-		}
-
-		return filteredStack;
 	}
 
 	/** Extracts a human-readable message from the error */

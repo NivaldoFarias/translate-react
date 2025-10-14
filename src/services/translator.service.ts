@@ -1,5 +1,7 @@
 /**
- * @fileoverview Core service for translating content using OpenAI's language models.
+ * @fileoverview
+ *
+ * Core service for translating content using OpenAI's language models.
  *
  * Handles the entire translation workflow including content parsing, language detection,
  * model interaction, response processing, and metrics tracking.
@@ -11,7 +13,13 @@ import OpenAI from "openai";
 
 import type { LanguageConfig } from "./language-detector.service.ts";
 
-import { GithubErrorHelper, LLMErrorHelper } from "@/errors/";
+import {
+	ChunkProcessingError,
+	EmptyContentError,
+	GithubErrorHelper,
+	LLMErrorHelper,
+	TranslationValidationError,
+} from "@/errors/";
 import { env, logger, MAX_CHUNK_TOKENS } from "@/utils/";
 
 import { LanguageDetectorService } from "./language-detector.service";
@@ -95,19 +103,23 @@ export class TranslatorService {
 	 *
 	 * Automatically handles large files through intelligent chunking while preserving
 	 * markdown structure and code blocks. Uses token estimation to determine if
-	 * content needs to be split into manageable pieces.
+	 * content needs to be split into manageable pieces. Includes post-translation
+	 * validation to ensure content integrity.
 	 *
 	 * ### Workflow
 	 *
 	 * 1. Validates input content
 	 * 2. Determines if chunking is needed based on token estimates
 	 * 3. Translates content (with chunking if necessary)
-	 * 4. Cleans up and returns translated content
-	 * 5. Updates metrics
+	 * 4. Validates translation completeness
+	 * 5. Cleans up and returns translated content
+	 * 6. Updates metrics
 	 *
 	 * @param file File containing content to translate
 	 *
 	 * @returns Promise resolving to translated content
+	 *
+	 * @throws When translation validation fails or content is empty
 	 *
 	 * @example
 	 * ```typescript
@@ -124,12 +136,149 @@ export class TranslatorService {
 	 */
 	public async translateContent(file: TranslationFile): Promise<string> {
 		if (!file.content?.length) {
-			throw new Error(`File content is empty: ${file.filename}`);
+			throw new EmptyContentError(file.filename, {
+				operation: "TranslatorService.translateContent",
+				file: file.path,
+				metadata: { filename: file.filename, path: file.path },
+			});
 		}
 
+		logger.debug(
+			{
+				filename: file.filename,
+				contentLength: file.content.length,
+				estimatedTokens: this.estimateTokenCount(file.content),
+			},
+			"Starting translation workflow for file",
+		);
+
+		const translationStartTime = Date.now();
 		const translatedContent = await this.translateWithChunking(file.content);
+		const translationDuration = Date.now() - translationStartTime;
+
+		this.validateTranslation(file, translatedContent);
+
+		logger.debug(
+			{
+				filename: file.filename,
+				originalLength: file.content.length,
+				translatedLength: translatedContent.length,
+				durationMs: translationDuration,
+				sizeRatio: (translatedContent.length / file.content.length).toFixed(2),
+			},
+			"Translation completed successfully",
+		);
 
 		return this.cleanupTranslatedContent(translatedContent, file.content);
+	}
+
+	/**
+	 * Validates translated content to ensure completeness and quality.
+	 *
+	 * Performs a comprehensive set of validation checks to catch potential translation
+	 * issues before committing to the repository. This multi-layered validation approach
+	 * helps prevent incomplete translations, structural corruption, and content loss.
+	 *
+	 * ### Validation Checks Performed
+	 *
+	 * 1. **Empty Content Detection**: Ensures the translation produced actual content
+	 *    and is not empty or whitespace-only, which would indicate a critical failure
+	 * 2. **Size Ratio Validation**: Compares translated content length to original,
+	 *    expecting ratio between 0.5-2.0x as translations typically expand or contract
+	 *    within this range depending on language characteristics
+	 * 3. **Markdown Structure Preservation**: Validates that markdown headings are
+	 *    preserved in the translation, as their complete loss indicates severe
+	 *    structural corruption during translation
+	 * 4. **Heading Count Consistency**: Ensures heading count remains similar (within
+	 *    20% variance) to catch partial content loss while allowing for legitimate
+	 *    structural adjustments during translation
+	 *
+	 * @param file Original file containing source content for comparison
+	 * @param translatedContent Translated content to validate against source
+	 *
+	 * @throws {Error} When critical validation checks fail (empty content, complete heading loss)
+	 *
+	 * @example
+	 * ```typescript
+	 * const file = new TranslationFile('# Title\nContent', 'doc.md', 'path', 'sha');
+	 * const translated = '# Título\nConteúdo';
+	 * validateTranslation(file, translated); // Passes all checks
+	 * ```
+	 */
+	private validateTranslation(file: TranslationFile, translatedContent: string): void {
+		if (!translatedContent || translatedContent.trim().length === 0) {
+			throw new TranslationValidationError("Translation produced empty content", file.filename, {
+				operation: "TranslatorService.validateTranslation",
+				file: file.path,
+				metadata: {
+					filename: file.filename,
+					originalLength: file.content.length,
+					translatedLength: translatedContent.length,
+				},
+			});
+		}
+
+		const sizeRatio = translatedContent.length / file.content.length;
+		if (sizeRatio < 0.5 || sizeRatio > 2.0) {
+			logger.warn(
+				{
+					filename: file.filename,
+					sizeRatio: sizeRatio.toFixed(2),
+					originalLength: file.content.length,
+					translatedLength: translatedContent.length,
+				},
+				"Translation size ratio outside expected range (0.5-2.0)",
+			);
+		}
+
+		const originalHeadings = (file.content.match(/^#{1,6}\s/gm) || []).length;
+		const translatedHeadings = (translatedContent.match(/^#{1,6}\s/gm) || []).length;
+
+		if (originalHeadings > 0 && translatedHeadings === 0) {
+			logger.error(
+				{ filename: file.filename, originalHeadings, translatedHeadings },
+				"Translation lost all markdown headings",
+			);
+			throw new TranslationValidationError(
+				"All markdown headings lost during translation",
+				file.filename,
+				{
+					operation: "TranslatorService.validateTranslation",
+					file: file.path,
+					metadata: {
+						originalHeadings,
+						translatedHeadings,
+						originalLength: file.content.length,
+						translatedLength: translatedContent.length,
+					},
+				},
+			);
+		}
+
+		if (originalHeadings > 0) {
+			const headingRatio = translatedHeadings / originalHeadings;
+			if (headingRatio < 0.8 || headingRatio > 1.2) {
+				logger.warn(
+					{
+						filename: file.filename,
+						originalHeadings,
+						translatedHeadings,
+						headingRatio: headingRatio.toFixed(2),
+					},
+					"Significant heading count mismatch detected",
+				);
+			}
+		}
+
+		logger.debug(
+			{
+				filename: file.filename,
+				sizeRatio: sizeRatio.toFixed(2),
+				originalHeadings,
+				translatedHeadings,
+			},
+			"Translation validation passed",
+		);
 	}
 
 	/**
@@ -179,7 +328,11 @@ export class TranslatorService {
 	 */
 	public async getLanguageAnalysis(file: TranslationFile) {
 		if (!file.content?.length) {
-			throw new Error(`File content is empty: ${file.filename}`);
+			throw new EmptyContentError(file.filename, {
+				operation: "TranslatorService.getLanguageAnalysis",
+				file: file.path,
+				metadata: { filename: file.filename, path: file.path },
+			});
 		}
 
 		return await this.languageDetector.analyzeLanguage(file.filename, file.content);
@@ -278,36 +431,73 @@ export class TranslatorService {
 	}
 
 	/**
-	 * Translates content using chunking if necessary.
+	 * Translates content using intelligent chunking for large files.
 	 *
 	 * Handles large files by breaking them into manageable pieces and processing
 	 * each chunk separately. Automatically reassembles the translated chunks while
-	 * maintaining proper spacing and structure.
+	 * maintaining proper spacing and structure. Includes comprehensive validation
+	 * to ensure all chunks are successfully translated before reassembly.
 	 *
-	 * @param content Content to translate (may be chunked if large)
+	 * ### Processing Workflow
 	 *
-	 * @returns Promise resolving to translated content reassembled from chunks
+	 * 1. **Chunking Decision**: Determines if content needs chunking based on token count
+	 * 2. **Sequential Translation**: Processes each chunk in order, maintaining state
+	 * 3. **Progress Tracking**: Logs detailed metrics for each chunk translation
+	 * 4. **Validation Gate**: Ensures translated chunk count matches source chunk count
+	 * 5. **Reassembly**: Joins translated chunks with double newlines to maintain structure
+	 *
+	 * ### Performance Characteristics
+	 *
+	 * - Each chunk is processed sequentially to maintain translation context
+	 * - Chunk timing is logged for performance analysis and debugging
+	 * - Translation metrics (size ratios, token counts) are tracked per chunk
+	 *
+	 * ### Error Handling
+	 *
+	 * - Individual chunk failures are caught and logged with context
+	 * - Chunk count mismatches trigger immediate failure before commit
+	 * - All errors include detailed metadata for debugging (chunk index, sizes, tokens)
+	 *
+	 * @param content Content to translate (automatically chunked if exceeds token limit)
+	 *
+	 * @returns Promise resolving to translated content reassembled from all chunks
+	 *
+	 * @throws When chunk translation fails or chunk count validation fails
+	 *
+	 * @see {@link chunkContent} for chunking strategy details
+	 * @see {@link callLanguageModel} for individual chunk translation
 	 *
 	 * @example
 	 * ```typescript
 	 * const translator = new TranslatorService({ source: 'en', target: 'pt-br' });
-	 * const largeContent = 'Very long documentation content...';
+	 * const largeContent = '# Very long documentation...\n'.repeat(1000);
 	 * const translated = await translator.translateWithChunking(largeContent);
-	 * console.log('Translation completed successfully');
+	 * console.log('Translation completed:', translated.length);
 	 * ```
 	 */
 	private async translateWithChunking(content: string): Promise<string> {
 		const contentNeedsChunking = this.needsChunking(content);
 
 		if (!contentNeedsChunking) {
+			logger.debug({ contentLength: content.length }, "Content does not require chunking");
 			return await this.callLanguageModel(content);
 		}
 
 		const chunks = await this.chunkContent(content);
 		const translatedChunks: string[] = [];
 
+		logger.debug(
+			{
+				totalChunks: chunks.length,
+				originalContentLength: content.length,
+				chunkSizes: chunks.map((c) => c.length),
+			},
+			"Starting chunked translation workflow",
+		);
+
 		for (let i = 0; i < chunks.length; i++) {
 			const chunk = chunks[i]!;
+			const chunkStartTime = Date.now();
 
 			try {
 				logger.debug(
@@ -315,20 +505,34 @@ export class TranslatorService {
 						chunkIndex: i + 1,
 						totalChunks: chunks.length,
 						chunkSize: chunk.length,
+						estimatedTokens: this.estimateTokenCount(chunk),
 					},
-					"Translating content chunk",
+					"Starting translation of chunk",
 				);
 
 				const translatedChunk = await this.callLanguageModel(chunk);
 				translatedChunks.push(translatedChunk);
+
+				const chunkDuration = Date.now() - chunkStartTime;
 
 				logger.info(
 					{
 						chunkIndex: i + 1,
 						totalChunks: chunks.length,
 						translatedSize: translatedChunk.length,
+						durationMs: chunkDuration,
 					},
 					"Chunk translated successfully",
+				);
+
+				logger.debug(
+					{
+						chunkIndex: i + 1,
+						originalLength: chunk.length,
+						translatedLength: translatedChunk.length,
+						sizeRatio: (translatedChunk.length / chunk.length).toFixed(2),
+					},
+					"Chunk translation metrics",
 				);
 			} catch (error) {
 				logger.error(
@@ -336,6 +540,7 @@ export class TranslatorService {
 						error,
 						chunkIndex: i + 1,
 						totalChunks: chunks.length,
+						translatedSoFar: translatedChunks.length,
 					},
 					"Failed to translate content chunk",
 				);
@@ -347,12 +552,68 @@ export class TranslatorService {
 						totalChunks: chunks.length,
 						chunkSize: chunk.length,
 						estimatedTokens: this.estimateTokenCount(chunk),
+						translatedChunks: translatedChunks.length,
 					},
 				});
 			}
 		}
 
-		return translatedChunks.join("\n\n");
+		/**
+		 * Validates that all chunks were successfully translated before reassembly.
+		 *
+		 * This critical check prevents incomplete translations from being committed
+		 * to the repository. A mismatch indicates a serious issue where one or more
+		 * chunks failed to translate but the error was not caught properly, or where
+		 * the translation array was corrupted during processing.
+		 */
+		if (translatedChunks.length !== chunks.length) {
+			logger.error(
+				{
+					expectedChunks: chunks.length,
+					actualChunks: translatedChunks.length,
+					missingChunks: chunks.length - translatedChunks.length,
+				},
+				"Critical: Chunk count mismatch detected",
+			);
+
+			throw new ChunkProcessingError(
+				`Chunk count mismatch: expected ${chunks.length} chunks, but only ${translatedChunks.length} were translated`,
+				{
+					operation: "TranslatorService.translateWithChunking",
+					metadata: {
+						expectedChunks: chunks.length,
+						actualChunks: translatedChunks.length,
+						missingChunks: chunks.length - translatedChunks.length,
+						contentLength: content.length,
+						chunkSizes: chunks.map((c) => c.length),
+					},
+				},
+			);
+		}
+
+		logger.debug(
+			{
+				totalChunks: translatedChunks.length,
+				totalTranslatedLength: translatedChunks.reduce((sum, c) => sum + c.length, 0),
+				averageChunkSize: Math.round(
+					translatedChunks.reduce((sum, c) => sum + c.length, 0) / translatedChunks.length,
+				),
+			},
+			"All chunks translated successfully - beginning reassembly",
+		);
+
+		const reassembledContent = translatedChunks.join("\n\n");
+
+		logger.debug(
+			{
+				reassembledLength: reassembledContent.length,
+				originalLength: content.length,
+				compressionRatio: (reassembledContent.length / content.length).toFixed(2),
+			},
+			"Content reassembly completed",
+		);
+
+		return reassembledContent;
 	}
 
 	/**
@@ -529,9 +790,11 @@ ${glossarySection}`;
 	 * @returns Language-specific rules or empty string
 	 */
 	private getLanguageSpecificRules(targetLanguage: string): string {
-		if (targetLanguage === "Português (Brasil)") {
+		if (targetLanguage === "Brazilian Portuguese") {
 			return `\n# PORTUGUESE (BRAZIL) SPECIFIC RULES
-- Translate 'deprecated' and related terms to 'descontinuado(a)' or 'obsoleto(a)'
+- ALWAYS translate 'deprecated' and related terms (deprecation, deprecating, deprecates) to 'descontinuado(a)', 'descontinuada', 'obsoleto(a)' or 'obsoleta' in ALL contexts (documentation text, comments, headings, lists, etc.)
+- Exception: Do NOT translate 'deprecated' in HTML comment IDs like {/*deprecated-something*/} - keep these exactly as-is
+- Exception: Do NOT translate 'deprecated' in URLs, anchor links, or code variable names
 - Use Brazilian Portuguese conventions and terminology`;
 		}
 		return "";

@@ -7,13 +7,25 @@ import { InitializationError, ResourceLoadError } from "@/errors/";
 import { GitHubService } from "@/services/github/github.service";
 import { Snapshot, SnapshotService } from "@/services/snapshot.service";
 import { TranslationFile, TranslatorService } from "@/services/translator.service";
-import { env, logger, RuntimeEnvironment, setupSignalHandlers } from "@/utils/";
+import {
+	env,
+	FILE_FETCH_BATCH_SIZE,
+	logger,
+	MAX_FILE_SIZE,
+	RuntimeEnvironment,
+	setupSignalHandlers,
+} from "@/utils/";
 
 import { homepage, name, version } from "../../../package.json";
 
 export interface RunnerOptions {
+	/** The target language code for translation */
 	targetLanguage: ReactLanguageCode;
+
+	/** The source language code for translation */
 	sourceLanguage: ReactLanguageCode;
+
+	/** The number of files to process in each batch */
 	batchSize: number;
 }
 
@@ -43,6 +55,8 @@ export interface ProcessedFileResult {
 	error: Error | null;
 }
 
+export type RunnerState = Omit<Snapshot, "id">;
+
 export abstract class BaseRunnerService {
 	/**
 	 * Tracks progress for the current batch of files being processed
@@ -60,7 +74,7 @@ export abstract class BaseRunnerService {
 	 *
 	 * In development mode, this state can be persisted between runs
 	 */
-	protected state: Omit<Snapshot, "id"> = {
+	protected state: RunnerState = {
 		repositoryTree: [],
 		filesToTranslate: [],
 		processedResults: [],
@@ -108,10 +122,7 @@ export abstract class BaseRunnerService {
 		},
 	) {
 		this.services = {
-			github: new GitHubService({
-				upstream: { owner: env.REPO_UPSTREAM_OWNER, repo: env.REPO_UPSTREAM_NAME },
-				fork: { owner: env.REPO_FORK_OWNER, repo: env.REPO_FORK_NAME },
-			}),
+			github: new GitHubService(),
 			translator: new TranslatorService({
 				source: this.options.sourceLanguage,
 				target: this.options.targetLanguage,
@@ -158,7 +169,7 @@ export abstract class BaseRunnerService {
 		if (!isForkSynced) {
 			logger.info("Fork is out of sync, updating fork...");
 
-			if (env.NODE_ENV === "development") {
+			if (env.NODE_ENV === RuntimeEnvironment.Development) {
 				await this.services.snapshot.clear();
 			}
 
@@ -202,7 +213,7 @@ export abstract class BaseRunnerService {
 			logger.info("Fetching repository content...");
 			this.state.repositoryTree = await this.services.github.getRepositoryTree();
 
-			if (env.NODE_ENV === "development") {
+			if (env.NODE_ENV === RuntimeEnvironment.Development) {
 				await this.services.snapshot.append("repositoryTree", this.state.repositoryTree);
 			}
 
@@ -221,7 +232,13 @@ export abstract class BaseRunnerService {
 	}
 
 	/**
-	 * Fetches and filters files that need translation
+	 * Fetches and filters files that need translation.
+	 *
+	 * Performs a multi-stage filtering process:
+	 * 1. Fetches file content from repository in batches
+	 * 2. Filters files with existing open pull requests
+	 * 3. Filters files exceeding size limits
+	 * 4. Filters files already translated via language detection
 	 *
 	 * @throws {ResourceLoadError} If file content fetch fails
 	 */
@@ -250,10 +267,8 @@ export abstract class BaseRunnerService {
 			(file, index, self) => index === self.findIndex((f) => f.path === file.path),
 		);
 
-		const batchSize = 10;
-
-		for (let i = 0; i < uniqueFiles.length; i += batchSize) {
-			const batch = uniqueFiles.slice(i, i + batchSize);
+		for (let i = 0; i < uniqueFiles.length; i += FILE_FETCH_BATCH_SIZE) {
+			const batch = uniqueFiles.slice(i, i + FILE_FETCH_BATCH_SIZE);
 			const batchResults = await this.fetchBatch(batch, updateProgress);
 
 			uncheckedFiles.push(
@@ -262,16 +277,59 @@ export abstract class BaseRunnerService {
 		}
 
 		let numFilesFiltered = 0;
+		let numFilesWithPRs = 0;
+		let numFilesTooLarge = 0;
+
+		logger.info("Checking for existing open PRs...");
+		const openPRs = await this.services.github.listOpenPullRequests();
+		const prFileMap = new Map<string, number>();
+
+		for (const pr of openPRs) {
+			const match = pr.title?.match(/Translate `(.+?)` to/);
+			if (match && match[1]) {
+				prFileMap.set(match[1], pr.number);
+			}
+		}
+
+		logger.debug(
+			{ openPRCount: openPRs.length, mappedFiles: prFileMap.size },
+			"Open PRs mapped to filenames",
+		);
 
 		this.state.filesToTranslate = [];
 		for (const file of uncheckedFiles) {
+			if (prFileMap.has(file.filename)) {
+				numFilesWithPRs++;
+				logger.debug(
+					{ filename: file.filename, prNumber: prFileMap.get(file.filename) },
+					"Skipping file with existing PR",
+				);
+				continue;
+			}
+
+			if (file.content.length > MAX_FILE_SIZE) {
+				numFilesTooLarge++;
+				logger.warn(
+					{
+						filename: file.filename,
+						size: file.content.length,
+						maxSize: MAX_FILE_SIZE,
+					},
+					"Skipping file: exceeds maximum size limit",
+				);
+				continue;
+			}
+
 			const analysis = await this.services.translator.languageDetector.analyzeLanguage(
 				file.filename,
 				file.content,
 			);
 
-			if (analysis.isTranslated) numFilesFiltered++;
-			else this.state.filesToTranslate.push(file);
+			if (analysis.isTranslated) {
+				numFilesFiltered++;
+			} else {
+				this.state.filesToTranslate.push(file);
+			}
 		}
 
 		if (env.NODE_ENV === RuntimeEnvironment.Development) {
@@ -279,7 +337,14 @@ export abstract class BaseRunnerService {
 		}
 
 		logger.info(
-			`Found ${this.state.filesToTranslate.length} files to translate (${numFilesFiltered} already translated)`,
+			{
+				filesToTranslate: this.state.filesToTranslate.length,
+				alreadyTranslated: numFilesFiltered,
+				withExistingPRs: numFilesWithPRs,
+				tooLarge: numFilesTooLarge,
+				totalFiltered: numFilesFiltered + numFilesWithPRs + numFilesTooLarge,
+			},
+			`Found ${this.state.filesToTranslate.length} files to translate (${numFilesFiltered + numFilesWithPRs + numFilesTooLarge} filtered)`,
 		);
 	}
 
@@ -333,7 +398,7 @@ export abstract class BaseRunnerService {
 	 */
 	protected get shouldUpdateIssueComment(): boolean {
 		return !!(
-			env.NODE_ENV === "production" &&
+			env.NODE_ENV === RuntimeEnvironment.Production &&
 			env.PROGRESS_ISSUE_NUMBER &&
 			this.metadata.results.size > 0
 		);
@@ -362,11 +427,7 @@ export abstract class BaseRunnerService {
 		const failureCount = results.filter(({ error }) => !!error).length;
 
 		logger.info(
-			{
-				successCount,
-				failureCount,
-				elapsedTime: this.formatElapsedTime(elapsedTime),
-			},
+			{ successCount, failureCount, elapsedTime: this.formatElapsedTime(elapsedTime) },
 			"Final statistics",
 		);
 
@@ -378,10 +439,7 @@ export abstract class BaseRunnerService {
 		if (failedFiles.length > 0) {
 			logger.warn(
 				{
-					failures: failedFiles.map(({ filename, error }) => ({
-						filename,
-						error: error.message,
-					})),
+					failures: failedFiles.map(({ filename, error }) => ({ filename, error: error.message })),
 				},
 				`Failed files (${failedFiles.length})`,
 			);
@@ -441,7 +499,6 @@ export abstract class BaseRunnerService {
 	 * @param batchSize Number of files to process simultaneously
 	 *
 	 * @throws {ResourceLoadError} If file content cannot be loaded
-	 * @throws {APIError} If GitHub operations fail
 	 */
 	protected async processInBatches(files: TranslationFile[], batchSize = 10): Promise<void> {
 		logger.info("Processing files in batches...");
@@ -527,26 +584,39 @@ export abstract class BaseRunnerService {
 	}
 
 	/**
-	 * Processes a single file through the complete translation workflow
+	 * Processes a single file through the complete translation workflow.
+	 *
+	 * Handles the entire lifecycle of translating a file sequentially, from branch
+	 * creation through translation, commit, and pull request generation. Each step
+	 * is performed synchronously using `await` to ensure proper ordering and state
+	 * management. Includes comprehensive error handling and cleanup for failed translations.
 	 *
 	 * ### Workflow Steps
 	 *
-	 * 1. Creates or gets a translation branch
-	 * 2. Translates the file content
-	 * 3. Commits the translation
-	 * 4. Creates a pull request
+	 * 1. **Branch Creation**: Creates or retrieves translation branch for isolation
+	 * 2. **Content Translation**: Translates file content (may involve chunking for large files)
+	 * 3. **Commit Operation**: Commits translated content to branch with descriptive message
+	 * 4. **Pull Request**: Creates or updates PR with translation and detailed metadata
+	 *
+	 * ### Timing and Sequencing
+	 *
+	 * All operations are awaited sequentially to ensure proper workflow ordering:
+	 * - Translation must complete before commit
+	 * - Commit must complete before PR creation
+	 * - Detailed timing logs track each operation's duration for debugging
 	 *
 	 * ### Error Handling
 	 *
-	 * - Captures and logs all errors
-	 * - Updates progress tracking
-	 * - Maintains file metadata even on failure
+	 * - Captures and logs all errors with timing context
+	 * - Updates progress tracking for reporting
+	 * - Performs cleanup of created resources (branches) on failure
+	 * - Maintains file metadata even on failure for audit trail
 	 *
-	 * @param file File to process
-	 * @param _progress Progress tracking information
+	 * @param file File to process through translation workflow
+	 * @param _progress Progress tracking information for batch processing
 	 *
-	 * @throws {APIError} If GitHub operations fail
-	 * @throws {ResourceLoadError} If translation resources cannot be loaded
+	 * @throws {APIError} When GitHub operations fail
+	 * @throws {ResourceLoadError} When translation resources cannot be loaded
 	 */
 	private async processFile(
 		file: TranslationFile,
@@ -560,28 +630,87 @@ export abstract class BaseRunnerService {
 			error: null,
 		};
 
+		const fileStartTime = Date.now();
+
 		try {
+			logger.debug(
+				{ filename: file.filename, contentLength: file.content.length },
+				"Starting file processing workflow",
+			);
+
+			const branchStartTime = Date.now();
 			metadata.branch = await this.services.github.createOrGetTranslationBranch(file);
+			const branchDuration = Date.now() - branchStartTime;
+
+			logger.debug(
+				{ filename: file.filename, branchRef: metadata.branch.ref, durationMs: branchDuration },
+				"Branch creation completed",
+			);
+
+			const translationStartTime = Date.now();
 			metadata.translation = await this.services.translator.translateContent(file);
+			const translationDuration = Date.now() - translationStartTime;
+
+			logger.debug(
+				{
+					filename: file.filename,
+					translatedLength: metadata.translation.length,
+					durationMs: translationDuration,
+				},
+				"Translation completed - proceeding to commit",
+			);
 
 			const languageName =
 				this.services.translator.languageDetector.getLanguageName(this.options.targetLanguage) ||
 				"Portuguese";
 
+			const commitStartTime = Date.now();
 			await this.services.github.commitTranslation({
-				branch: metadata.branch,
 				file,
+				branch: metadata.branch,
 				content: metadata.translation,
 				message: `Translate \`${file.filename}\` to ${languageName}`,
 			});
+			const commitDuration = Date.now() - commitStartTime;
 
+			logger.debug(
+				{ filename: file.filename, durationMs: commitDuration },
+				"Commit completed - creating pull request",
+			);
+
+			const prStartTime = Date.now();
 			metadata.pullRequest = await this.services.github.createOrUpdatePullRequest(file, {
 				title: `Translate \`${file.filename}\` to ${languageName}`,
 				body: this.createPullRequestDescription(file, metadata),
 			});
 
+			const prDuration = Date.now() - prStartTime;
+			const totalDuration = Date.now() - fileStartTime;
+
+			logger.debug(
+				{
+					filename: file.filename,
+					prNumber: metadata.pullRequest.number,
+					timing: {
+						branchMs: branchDuration,
+						translationMs: translationDuration,
+						commitMs: commitDuration,
+						prMs: prDuration,
+						totalMs: totalDuration,
+					},
+				},
+				"File processing completed successfully",
+			);
+
 			this.updateBatchProgress("success");
 		} catch (error) {
+			const failureDuration = Date.now() - fileStartTime;
+
+			logger.error(
+				{ error, filename: file.filename, durationMs: failureDuration },
+				"File processing failed",
+			);
+
 			metadata.error = error instanceof Error ? error : new Error(String(error));
 			this.updateBatchProgress("error");
 
@@ -612,24 +741,20 @@ export abstract class BaseRunnerService {
 	 * @param metadata The processing result metadata containing branch information
 	 */
 	private async cleanupFailedTranslation(metadata: ProcessedFileResult): Promise<void> {
-		if (metadata.branch?.ref) {
-			try {
-				const branchName = metadata.branch.ref.replace("refs/heads/", "");
-				await this.services.github.cleanupBranch(branchName);
-				logger.info(
-					{ branchName, filename: metadata.filename },
-					"Cleaned up branch after failed translation",
-				);
-			} catch (cleanupError) {
-				logger.error(
-					{
-						error: cleanupError,
-						filename: metadata.filename,
-						branchRef: metadata.branch.ref,
-					},
-					"Failed to cleanup branch after translation failure - non-critical",
-				);
-			}
+		if (!metadata.branch?.ref) return;
+
+		try {
+			const branchName = metadata.branch.ref.replace("refs/heads/", "");
+			await this.services.github.cleanupBranch(branchName);
+			logger.info(
+				{ branchName, filename: metadata.filename },
+				"Cleaned up branch after failed translation",
+			);
+		} catch (error) {
+			logger.error(
+				{ error, filename: metadata.filename, branchRef: metadata.branch.ref },
+				"Failed to cleanup branch after translation failure - non-critical",
+			);
 		}
 	}
 

@@ -67,7 +67,7 @@ export class ContentService extends BaseGitHubService {
 	): Promise<RestEndpointMethodTypes["issues"]["createComment"]["response"]> {
 		try {
 			const response = await this.octokit.issues.createComment({
-				...this.upstream,
+				...this.repositories.upstream,
 				issue_number: prNumber,
 				body: comment,
 			});
@@ -78,7 +78,7 @@ export class ContentService extends BaseGitHubService {
 		} catch (error) {
 			throw this.helpers.github.mapError(error, {
 				operation: "ContentService.createCommentOnPullRequest",
-				metadata: { prNumber, upstream: this.upstream },
+				metadata: { prNumber, upstream: this.repositories.upstream },
 			});
 		}
 	}
@@ -89,21 +89,21 @@ export class ContentService extends BaseGitHubService {
 	 * @returns A list of open pull requests
 	 */
 	public async listOpenPullRequests(): Promise<
-		RestEndpointMethodTypes["pulls"]["list"]["response"]
+		RestEndpointMethodTypes["pulls"]["list"]["response"]["data"]
 	> {
 		try {
 			const response = await this.octokit.pulls.list({
-				...this.upstream,
+				...this.repositories.upstream,
 				state: "open",
 			});
 
 			logger.debug({ count: response.data.length }, "Listed open pull requests");
 
-			return response;
+			return response.data;
 		} catch (error) {
 			throw this.helpers.github.mapError(error, {
 				operation: "ContentService.listOpenPullRequests",
-				metadata: { upstream: this.upstream },
+				metadata: { upstream: this.repositories.upstream },
 			});
 		}
 	}
@@ -119,7 +119,10 @@ export class ContentService extends BaseGitHubService {
 		prNumber: number,
 	): Promise<RestEndpointMethodTypes["pulls"]["get"]["response"]> {
 		try {
-			const response = await this.octokit.pulls.get({ ...this.upstream, pull_number: prNumber });
+			const response = await this.octokit.pulls.get({
+				...this.repositories.upstream,
+				pull_number: prNumber,
+			});
 
 			logger.debug(
 				{ prNumber, title: response.data.title, state: response.data.state },
@@ -130,7 +133,7 @@ export class ContentService extends BaseGitHubService {
 		} catch (error) {
 			throw this.helpers.github.mapError(error, {
 				operation: "ContentService.findPullRequestByNumber",
-				metadata: { prNumber, upstream: this.upstream },
+				metadata: { prNumber, upstream: this.repositories.upstream },
 			});
 		}
 	}
@@ -151,16 +154,16 @@ export class ContentService extends BaseGitHubService {
 	public async getUntranslatedFiles(maxFiles?: number): Promise<TranslationFile[]> {
 		try {
 			const repoTreeResponse = await this.octokit.git.getTree({
-				...this.fork,
+				...this.repositories.fork,
 				tree_sha: "main",
 				recursive: "true",
 			});
 
 			if (!repoTreeResponse.data.tree) {
-				logger.warn({ fork: this.fork }, "Repository tree is empty");
+				logger.warn({ fork: this.repositories.fork }, "Repository tree is empty");
 				throw this.helpers.github.mapError(new Error("Repository tree is empty"), {
 					operation: "ContentService.getUntranslatedFiles",
-					metadata: { fork: this.fork },
+					metadata: { fork: this.repositories.fork },
 				});
 			}
 
@@ -183,7 +186,7 @@ export class ContentService extends BaseGitHubService {
 
 				try {
 					const response = await this.octokit.repos.getContent({
-						...this.fork,
+						...this.repositories.fork,
 						path: file.path,
 					});
 
@@ -210,7 +213,7 @@ export class ContentService extends BaseGitHubService {
 		} catch (error) {
 			throw this.helpers.github.mapError(error, {
 				operation: "ContentService.getUntranslatedFiles",
-				metadata: { maxFiles, fork: this.fork },
+				metadata: { maxFiles, fork: this.repositories.fork },
 			});
 		}
 	}
@@ -251,7 +254,7 @@ export class ContentService extends BaseGitHubService {
 	> {
 		try {
 			const response = await this.octokit.repos.createOrUpdateFileContents({
-				...this.fork,
+				...this.repositories.fork,
 				path: file.path,
 				message,
 				content: Buffer.from(content).toString("base64"),
@@ -328,8 +331,8 @@ export class ContentService extends BaseGitHubService {
 		try {
 			const { env } = await import("@/utils/");
 
-			const targetRepo = env.DEV_MODE_FORK_PR ? this.fork : this.upstream;
-			const headRef = env.DEV_MODE_FORK_PR ? branch : `${this.fork.owner}:${branch}`;
+			const targetRepo = env.DEV_MODE_FORK_PR ? this.repositories.fork : this.repositories.upstream;
+			const headRef = env.DEV_MODE_FORK_PR ? branch : `${this.repositories.fork.owner}:${branch}`;
 
 			const createPullRequestResponse = await this.octokit.pulls.create({
 				...targetRepo,
@@ -398,7 +401,7 @@ export class ContentService extends BaseGitHubService {
 			}
 
 			const response = await this.octokit.git.getBlob({
-				...this.fork,
+				...this.repositories.fork,
 				file_sha: blobSha,
 			});
 
@@ -451,7 +454,7 @@ export class ContentService extends BaseGitHubService {
 	): Promise<RestEndpointMethodTypes["issues"]["createComment"]["response"]["data"]> {
 		try {
 			const issueExistsResponse = await this.octokit.issues.get({
-				...this.upstream,
+				...this.repositories.upstream,
 				issue_number: this.issueNumber,
 			});
 
@@ -459,12 +462,12 @@ export class ContentService extends BaseGitHubService {
 				logger.warn({ issueNumber: this.issueNumber }, "Issue not found");
 				throw this.helpers.github.mapError(new Error(`Issue ${this.issueNumber} not found`), {
 					operation: "ContentService.commentCompiledResultsOnIssue",
-					metadata: { issueNumber: this.issueNumber, upstream: this.upstream },
+					metadata: { issueNumber: this.issueNumber, upstream: this.repositories.upstream },
 				});
 			}
 
 			const listCommentsResponse = await this.octokit.issues.listComments({
-				...this.upstream,
+				...this.repositories.upstream,
 				issue_number: this.issueNumber,
 				since: "2025-01-20",
 			});
@@ -480,7 +483,7 @@ export class ContentService extends BaseGitHubService {
 				logger.debug({ commentId: userComment.id }, "Updating existing comment on issue");
 
 				const updateCommentResponse = await this.octokit.issues.updateComment({
-					...this.upstream,
+					...this.repositories.upstream,
 					issue_number: this.issueNumber,
 					body: this.services.commentBuilder.concatComment(
 						this.services.commentBuilder.buildComment(results, filesToTranslate),
@@ -502,7 +505,7 @@ export class ContentService extends BaseGitHubService {
 			logger.debug("No existing comment found - creating new comment");
 
 			const createCommentResponse = await this.octokit.issues.createComment({
-				...this.upstream,
+				...this.repositories.upstream,
 				issue_number: this.issueNumber,
 				body: this.services.commentBuilder.concatComment(
 					this.services.commentBuilder.buildComment(results, filesToTranslate),
@@ -542,8 +545,8 @@ export class ContentService extends BaseGitHubService {
 	): Promise<RestEndpointMethodTypes["pulls"]["list"]["response"]["data"][number] | undefined> {
 		try {
 			const response = await this.octokit.pulls.list({
-				...this.upstream,
-				head: `${this.fork.owner}:${branchName}`,
+				...this.repositories.upstream,
+				head: `${this.repositories.fork.owner}:${branchName}`,
 			});
 
 			const pr = response.data[0];
@@ -561,7 +564,7 @@ export class ContentService extends BaseGitHubService {
 		} catch (error) {
 			throw this.helpers.github.mapError(error, {
 				operation: "ContentService.findPullRequestByBranch",
-				metadata: { branchName, forkOwner: this.fork.owner },
+				metadata: { branchName, forkOwner: this.repositories.fork.owner },
 			});
 		}
 	}
@@ -592,7 +595,7 @@ export class ContentService extends BaseGitHubService {
 	}> {
 		try {
 			const prResponse = await this.octokit.pulls.get({
-				...this.upstream,
+				...this.repositories.upstream,
 				pull_number: prNumber,
 			});
 
@@ -620,7 +623,7 @@ export class ContentService extends BaseGitHubService {
 		} catch (error) {
 			throw this.helpers.github.mapError(error, {
 				operation: "ContentService.checkPullRequestStatus",
-				metadata: { prNumber, upstream: this.upstream },
+				metadata: { prNumber, upstream: this.repositories.upstream },
 			});
 		}
 	}
@@ -637,7 +640,7 @@ export class ContentService extends BaseGitHubService {
 	): Promise<RestEndpointMethodTypes["pulls"]["update"]["response"]["data"]> {
 		try {
 			const response = await this.octokit.pulls.update({
-				...this.upstream,
+				...this.repositories.upstream,
 				pull_number: prNumber,
 				state: "closed",
 			});
@@ -656,7 +659,7 @@ export class ContentService extends BaseGitHubService {
 		} catch (error) {
 			throw this.helpers.github.mapError(error, {
 				operation: "ContentService.closePullRequest",
-				metadata: { prNumber, upstream: this.upstream },
+				metadata: { prNumber, upstream: this.repositories.upstream },
 			});
 		}
 	}

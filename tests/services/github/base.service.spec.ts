@@ -18,11 +18,11 @@ class TestGitHubService extends BaseGitHubService {
 	}
 
 	public getUpstream() {
-		return this.upstream;
+		return this.repositories.upstream;
 	}
 
 	public getFork() {
-		return this.fork;
+		return this.repositories.fork;
 	}
 
 	public getRateLimit() {

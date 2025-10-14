@@ -88,3 +88,47 @@ export class ValidationError extends TranslationError {
 		super(message, ErrorCode.ValidationError, context);
 	}
 }
+
+/** Thrown when content is empty or missing */
+export class EmptyContentError extends TranslationError {
+	/**
+	 * Creates a new `EmptyContentError` instance
+	 *
+	 * @param filename The filename with empty content
+	 * @param context The error context
+	 */
+	constructor(filename: string, context?: Partial<ErrorContext>) {
+		super(`File content is empty: ${filename}`, ErrorCode.NoContent, context);
+	}
+}
+
+/** Thrown when translation produces empty or invalid output */
+export class TranslationValidationError extends TranslationError {
+	/**
+	 * Creates a new `TranslationValidationError` instance
+	 *
+	 * @param message The validation error message
+	 * @param filename The filename that failed validation
+	 * @param context The error context
+	 */
+	constructor(message: string, filename: string, context?: Partial<ErrorContext>) {
+		super(
+			`Translation validation failed for ${filename}: ${message}`,
+			ErrorCode.FormatValidationFailed,
+			context,
+		);
+	}
+}
+
+/** Thrown when chunk processing fails during translation */
+export class ChunkProcessingError extends TranslationError {
+	/**
+	 * Creates a new `ChunkProcessingError` instance
+	 *
+	 * @param message The error message
+	 * @param context The error context
+	 */
+	constructor(message: string, context?: Partial<ErrorContext>) {
+		super(message, ErrorCode.ChunkProcessingFailed, context);
+	}
+}
