@@ -170,6 +170,29 @@ const envSchema = z.object({
 	 * @default 8192
 	 */
 	MAX_TOKENS: z.coerce.number().positive().default(environmentDefaults.MAX_TOKENS),
+
+	/**
+	 * Whether to enable console logging in addition to file logging.
+	 *
+	 * When false, logs are only written to files. Useful for reducing terminal clutter
+	 * in debug mode while preserving detailed file logs.
+	 *
+	 * @default true
+	 */
+	LOG_TO_CONSOLE: z.coerce.boolean().default(environmentDefaults.LOG_TO_CONSOLE),
+
+	/**
+	 * Timeout for GitHub API requests in **milliseconds**.
+	 *
+	 * Prevents indefinite hangs on slow or stuck API calls. If a request exceeds this
+	 * timeout, it will be aborted and throw an error.
+	 *
+	 * @default 30000
+	 */
+	GITHUB_REQUEST_TIMEOUT: z.coerce
+		.number()
+		.positive()
+		.default(environmentDefaults.GITHUB_REQUEST_TIMEOUT),
 });
 
 /** Type definition for the environment configuration */

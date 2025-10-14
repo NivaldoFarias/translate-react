@@ -7,6 +7,7 @@ import {
 	PullRequestOptions,
 } from "@/services/github/content.service";
 import { RepositoryService } from "@/services/github/repository.service";
+import { logger } from "@/utils/";
 
 import { ProcessedFileResult } from "../runner/base.service";
 import { TranslationFile } from "../translator.service";
@@ -114,18 +115,33 @@ export class GitHubService extends BaseGitHubService {
 		const actualBaseBranch =
 			baseBranch || (await this.services.repository.getDefaultBranch("fork"));
 		const branchName = `translate/${file.path.split("/").slice(2).join("/")}`;
+
+		logger.debug(
+			{ filename: file.filename, branchName },
+			"Checking for existing translation branch",
+		);
 		const existingBranch = await this.services.branch.getBranch(branchName);
 
 		if (existingBranch) {
+			logger.debug(
+				{ filename: file.filename, branchName },
+				"Existing branch found, checking if update needed",
+			);
 			const mainBranchRef = await this.services.branch.getBranch(actualBaseBranch);
 			if (!mainBranchRef) throw new Error(`Base branch ${actualBaseBranch} not found`);
 
 			if (existingBranch.data.object.sha === mainBranchRef.data.object.sha) {
+				logger.debug({ filename: file.filename, branchName }, "Branch is up to date, reusing");
 				return existingBranch.data;
 			}
 
 			const upstreamPR = await this.services.content.findPullRequestByBranch(branchName);
+
 			if (upstreamPR) {
+				logger.debug(
+					{ filename: file.filename, prNumber: upstreamPR.number },
+					"Closing outdated PR",
+				);
 				await this.services.content.createCommentOnPullRequest(
 					upstreamPR.number,
 					"PR closed due to upstream changes.",
@@ -134,9 +150,11 @@ export class GitHubService extends BaseGitHubService {
 				await this.services.content.closePullRequest(upstreamPR.number);
 			}
 
+			logger.debug({ filename: file.filename, branchName }, "Deleting outdated branch");
 			await this.services.branch.deleteBranch(branchName);
 		}
 
+		logger.debug({ filename: file.filename, branchName }, "Creating new translation branch");
 		const newBranch = await this.services.branch.createBranch(branchName, actualBaseBranch);
 
 		return newBranch.data;
