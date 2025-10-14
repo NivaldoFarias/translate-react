@@ -1,7 +1,21 @@
 import { Octokit } from "@octokit/rest";
 
+import type { components } from "@octokit/openapi-types";
+
 import { GithubErrorHelper, LLMErrorHelper } from "@/errors/";
-import { env } from "@/utils/";
+import { env, logger } from "@/utils/";
+
+/** GitHub repository metadata for fork and upstream repositories */
+export interface RepositoryMetadata {
+	owner: components["parameters"]["owner"];
+	repo: components["parameters"]["repo"];
+	[key: string]: unknown;
+}
+
+export interface BaseRepositories {
+	upstream: RepositoryMetadata;
+	fork: RepositoryMetadata;
+}
 
 /**
  * Base service for GitHub operations.
@@ -22,23 +36,35 @@ export abstract class BaseGitHubService {
 		github: new GithubErrorHelper(),
 	};
 
+	/** Repository metadata for upstream and fork repositories */
+	protected readonly repositories: BaseRepositories = {
+		upstream: {
+			owner: env.REPO_UPSTREAM_OWNER,
+			repo: env.REPO_UPSTREAM_NAME,
+		},
+		fork: {
+			owner: env.REPO_FORK_OWNER,
+			repo: env.REPO_FORK_NAME,
+		},
+	};
+
 	/**
-	 * Creates a new base GitHub service instance
+	 * Creates a new base GitHub service instance.
 	 *
-	 * @param upstream Original repository details
-	 * @param fork Forked repository details
+	 * Initializes Octokit client with authentication and logging integration.
+	 * Octokit operations are logged through a child logger that respects the
+	 * application's `LOG_LEVEL` configuration for consistent observability.
 	 */
-	constructor(
-		protected readonly upstream: { owner: string; repo: string },
-		protected readonly fork: { owner: string; repo: string },
-	) {
+	constructor() {
+		const octokitLogger = logger.child({ component: "octokit" });
+
 		this.octokit = new Octokit({
 			auth: env.GITHUB_TOKEN,
 			log: {
-				debug: () => {},
-				info: () => {},
-				warn: () => {},
-				error: () => {},
+				debug: (message: string) => octokitLogger.debug(message),
+				info: (message: string) => octokitLogger.info(message),
+				warn: (message: string) => octokitLogger.warn(message),
+				error: (message: string) => octokitLogger.error(message),
 			},
 		});
 	}

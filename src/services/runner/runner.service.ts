@@ -1,6 +1,6 @@
 import { extractErrorMessage } from "@/errors/";
 import { BaseRunnerService } from "@/services/runner/base.service";
-import { env, logger } from "@/utils";
+import { env, logger, RuntimeEnvironment } from "@/utils";
 
 /**
  * Main orchestrator class that manages the entire translation process workflow.
@@ -19,22 +19,15 @@ import { env, logger } from "@/utils";
  *
  * @example
  * ```typescript
- * const runner = new Runner(options);
+ * const runner = new RunnerService(options);
  * await runner.run();
  * ```
  */
 export default class RunnerService extends BaseRunnerService {
-	private printForkInfo(): void {
-		logger.info(
-			`Fork: ${env.REPO_FORK_OWNER}/${env.REPO_FORK_NAME} :: ` +
-				`Upstream: ${env.REPO_UPSTREAM_OWNER}/${env.REPO_UPSTREAM_NAME}`,
-		);
-	}
-
 	/**
 	 * Executes the main translation workflow.
 	 *
-	 * ### Workflow:
+	 * ### Workflow
 	 *
 	 * 1. Verifies GitHub token permissions
 	 * 2. Loads or creates workflow snapshot (development only)
@@ -44,21 +37,20 @@ export default class RunnerService extends BaseRunnerService {
 	 * 6. Reports results
 	 *
 	 * In production, also comments results on the specified issue.
-	 *
-	 * @throws {InitializationError} If token verification or fork sync fails
-	 * @throws {ResourceLoadError} If repository content or glossary fetch fails
-	 * @throws {APIError} If GitHub API operations fail
 	 */
 	public async run(): Promise<void> {
 		try {
 			logger.info("Starting translation workflow");
 
-			this.printForkInfo();
+			logger.info(
+				`Fork: ${env.REPO_FORK_OWNER}/${env.REPO_FORK_NAME} :: ` +
+					`Upstream: ${env.REPO_UPSTREAM_OWNER}/${env.REPO_UPSTREAM_NAME}`,
+			);
 
 			await this.verifyPermissions();
 			const isForkSynced = await this.syncFork();
 
-			if (env.NODE_ENV === "development") {
+			if (env.NODE_ENV === RuntimeEnvironment.Development) {
 				await this.loadSnapshot(isForkSynced);
 			}
 
@@ -70,7 +62,7 @@ export default class RunnerService extends BaseRunnerService {
 
 			this.state.processedResults = Array.from(this.metadata.results.values());
 
-			if (env.NODE_ENV === "development") {
+			if (env.NODE_ENV === RuntimeEnvironment.Development) {
 				await this.services.snapshot.append("processedResults", this.state.processedResults);
 			}
 
@@ -80,7 +72,7 @@ export default class RunnerService extends BaseRunnerService {
 				await this.updateIssueWithResults();
 			}
 
-			if (env.NODE_ENV === "production") {
+			if (env.NODE_ENV === RuntimeEnvironment.Production) {
 				await this.services.snapshot.clear();
 			}
 		} catch (error) {

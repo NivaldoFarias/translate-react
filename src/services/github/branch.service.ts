@@ -24,11 +24,8 @@ export class BranchService extends BaseGitHubService {
 	 *
 	 * Initializes the GitHub client and sets up cleanup handlers.
 	 */
-	constructor(
-		protected readonly upstream: { owner: string; repo: string },
-		protected readonly fork: { owner: string; repo: string },
-	) {
-		super(upstream, fork);
+	constructor() {
+		super();
 
 		setupSignalHandlers(async () => await this.cleanup());
 	}
@@ -45,13 +42,13 @@ export class BranchService extends BaseGitHubService {
 	 */
 	private async getDefaultBranch(): Promise<string> {
 		try {
-			const response = await this.octokit.repos.get(this.fork);
+			const response = await this.octokit.repos.get(this.repositories.fork);
 			logger.debug({ branch: response.data.default_branch }, "Retrieved default branch");
 			return response.data.default_branch;
 		} catch (error) {
 			throw this.helpers.github.mapError(error, {
 				operation: "BranchService.getDefaultBranch",
-				metadata: { fork: this.fork },
+				metadata: { fork: this.repositories.fork },
 			});
 		}
 	}
@@ -93,12 +90,12 @@ export class BranchService extends BaseGitHubService {
 			const actualBaseBranch = baseBranch || (await this.getDefaultBranch());
 
 			const mainBranchRef = await this.octokit.git.getRef({
-				...this.fork,
+				...this.repositories.fork,
 				ref: `heads/${actualBaseBranch}`,
 			});
 
 			const branchRef = await this.octokit.git.createRef({
-				...this.fork,
+				...this.repositories.fork,
 				ref: `refs/heads/${branchName}`,
 				sha: mainBranchRef.data.object.sha,
 			});
@@ -115,7 +112,7 @@ export class BranchService extends BaseGitHubService {
 			this.activeBranches.delete(branchName);
 			throw this.helpers.github.mapError(error, {
 				operation: "BranchService.createBranch",
-				metadata: { branchName, baseBranch, fork: this.fork },
+				metadata: { branchName, baseBranch, fork: this.repositories.fork },
 			});
 		}
 	}
@@ -136,7 +133,7 @@ export class BranchService extends BaseGitHubService {
 	): Promise<RestEndpointMethodTypes["git"]["getRef"]["response"] | null> {
 		try {
 			const response = await this.octokit.git.getRef({
-				...this.fork,
+				...this.repositories.fork,
 				ref: `heads/${branchName}`,
 			});
 
@@ -151,7 +148,7 @@ export class BranchService extends BaseGitHubService {
 
 			throw this.helpers.github.mapError(error, {
 				operation: "BranchService.getBranch",
-				metadata: { branchName, fork: this.fork },
+				metadata: { branchName, fork: this.repositories.fork },
 			});
 		}
 	}
@@ -172,7 +169,7 @@ export class BranchService extends BaseGitHubService {
 	): Promise<RestEndpointMethodTypes["git"]["deleteRef"]["response"]> {
 		try {
 			const response = await this.octokit.git.deleteRef({
-				...this.fork,
+				...this.repositories.fork,
 				ref: `heads/${branchName}`,
 			});
 
@@ -186,7 +183,7 @@ export class BranchService extends BaseGitHubService {
 
 			throw this.helpers.github.mapError(error, {
 				operation: "BranchService.deleteBranch",
-				metadata: { branchName, fork: this.fork },
+				metadata: { branchName, fork: this.repositories.fork },
 			});
 		}
 	}
@@ -235,7 +232,7 @@ export class BranchService extends BaseGitHubService {
 			}
 
 			const listCommitsResponse = await this.octokit.repos.listCommits({
-				...this.fork,
+				...this.repositories.fork,
 				sha: forkRef.data.object.sha,
 			});
 
@@ -252,7 +249,7 @@ export class BranchService extends BaseGitHubService {
 		} catch (error) {
 			throw this.helpers.github.mapError(error, {
 				operation: "BranchService.checkIfCommitExistsOnFork",
-				metadata: { branchName, fork: this.fork, expectedAuthor: env.REPO_FORK_OWNER },
+				metadata: { branchName, fork: this.repositories.fork, expectedAuthor: env.REPO_FORK_OWNER },
 			});
 		}
 	}

@@ -28,7 +28,7 @@ export class RepositoryService extends BaseGitHubService {
 	 */
 	public async getDefaultBranch(target: "fork" | "upstream" = "fork"): Promise<string> {
 		try {
-			const repoConfig = target === "fork" ? this.fork : this.upstream;
+			const repoConfig = target === "fork" ? this.repositories.fork : this.repositories.upstream;
 			const response = await this.octokit.repos.get(repoConfig);
 
 			logger.debug({ target, branch: response.data.default_branch }, "Retrieved default branch");
@@ -37,7 +37,10 @@ export class RepositoryService extends BaseGitHubService {
 		} catch (error) {
 			throw this.helpers.github.mapError(error, {
 				operation: "RepositoryService.getDefaultBranch",
-				metadata: { target, repoConfig: target === "fork" ? this.fork : this.upstream },
+				metadata: {
+					target,
+					repoConfig: target === "fork" ? this.repositories.fork : this.repositories.upstream,
+				},
 			});
 		}
 	}
@@ -62,7 +65,7 @@ export class RepositoryService extends BaseGitHubService {
 		try {
 			const branchName = baseBranch || (await this.getDefaultBranch("fork"));
 			const response = await this.octokit.git.getTree({
-				...this.fork,
+				...this.repositories.fork,
 				tree_sha: branchName,
 				recursive: "true",
 			});
@@ -84,7 +87,7 @@ export class RepositoryService extends BaseGitHubService {
 		} catch (error) {
 			throw this.helpers.github.mapError(error, {
 				operation: "RepositoryService.getRepositoryTree",
-				metadata: { baseBranch, filterIgnored, fork: this.fork },
+				metadata: { baseBranch, filterIgnored, fork: this.repositories.fork },
 			});
 		}
 	}
@@ -107,7 +110,7 @@ export class RepositoryService extends BaseGitHubService {
 				return false;
 			}
 
-			await this.octokit.rest.repos.get(this.upstream);
+			await this.octokit.rest.repos.get(this.repositories.upstream);
 
 			logger.info({ user: response.data.login }, "Token permissions verified successfully");
 			return true;
@@ -129,18 +132,18 @@ export class RepositoryService extends BaseGitHubService {
 	public async isForkSynced(): Promise<boolean> {
 		try {
 			const [upstreamRepo, forkedRepo] = await Promise.all([
-				this.octokit.repos.get(this.upstream),
-				this.octokit.repos.get(this.fork),
+				this.octokit.repos.get(this.repositories.upstream),
+				this.octokit.repos.get(this.repositories.fork),
 			]);
 
 			const [upstreamCommits, forkedCommits] = await Promise.all([
 				this.octokit.repos.listCommits({
-					...this.upstream,
+					...this.repositories.upstream,
 					per_page: 1,
 					sha: upstreamRepo.data.default_branch,
 				}),
 				this.octokit.repos.listCommits({
-					...this.fork,
+					...this.repositories.fork,
 					per_page: 1,
 					sha: forkedRepo.data.default_branch,
 				}),
@@ -178,7 +181,7 @@ export class RepositoryService extends BaseGitHubService {
 	public async syncFork(): Promise<boolean> {
 		try {
 			const mergeResponse = await this.octokit.repos.mergeUpstream({
-				...this.fork,
+				...this.repositories.fork,
 				branch: "main",
 			});
 
@@ -187,7 +190,7 @@ export class RepositoryService extends BaseGitHubService {
 			if (success) {
 				logger.info(
 					{
-						fork: this.fork,
+						fork: this.repositories.fork,
 						message: mergeResponse.data.message,
 						mergeType: mergeResponse.data.merge_type,
 					},
@@ -195,14 +198,14 @@ export class RepositoryService extends BaseGitHubService {
 				);
 			} else {
 				logger.warn(
-					{ fork: this.fork, status: mergeResponse.status },
+					{ fork: this.repositories.fork, status: mergeResponse.status },
 					"Fork synchronization returned unexpected status",
 				);
 			}
 
 			return success;
 		} catch (error) {
-			logger.error({ err: error, fork: this.fork }, "Failed to synchronize fork");
+			logger.error({ err: error, fork: this.repositories.fork }, "Failed to synchronize fork");
 			return false;
 		}
 	}
@@ -246,7 +249,7 @@ export class RepositoryService extends BaseGitHubService {
 	public async fetchGlossary(): Promise<string | null> {
 		try {
 			const response = await this.octokit.repos.getContent({
-				...this.upstream,
+				...this.repositories.upstream,
 				path: "GLOSSARY.md",
 			});
 

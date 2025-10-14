@@ -11,6 +11,8 @@ import { RepositoryService } from "@/services/github/repository.service";
 import { ProcessedFileResult } from "../runner/base.service";
 import { TranslationFile } from "../translator.service";
 
+import { BaseGitHubService } from "./base.service";
+
 /**
  * Main GitHub service that integrates specialized services for repository operations.
  * Provides a unified interface for GitHub operations while maintaining separation of concerns.
@@ -22,37 +24,12 @@ import { TranslationFile } from "../translator.service";
  * - Unified interface for GitHub operations
  * - Error handling and recovery
  */
-export class GitHubService {
-	private readonly services: {
-		branch: BranchService;
-		repository: RepositoryService;
-		content: ContentService;
+export class GitHubService extends BaseGitHubService {
+	private readonly services = {
+		branch: new BranchService(),
+		repository: new RepositoryService(),
+		content: new ContentService(),
 	};
-
-	/**
-	 * Creates a new GitHub service instance.
-	 *
-	 * Initializes all specialized services with repository configuration.
-	 *
-	 * @example
-	 * ```typescript
-	 * const github = new GitHubService();
-	 * await github.verifyTokenPermissions();
-	 * ```
-	 */
-	constructor(
-		/** Repository configuration for upstream and fork */
-		private readonly repos: {
-			upstream: { owner: string; repo: string };
-			fork: { owner: string; repo: string };
-		},
-	) {
-		this.services = {
-			branch: new BranchService(this.repos.upstream, this.repos.fork),
-			repository: new RepositoryService(this.repos.upstream, this.repos.fork),
-			content: new ContentService(this.repos.upstream, this.repos.fork),
-		};
-	}
 
 	/**
 	 * Retrieves the repository file tree.
@@ -103,6 +80,23 @@ export class GitHubService {
 	 */
 	public async getUntranslatedFiles(maxFiles?: number) {
 		return this.services.content.getUntranslatedFiles(maxFiles);
+	}
+
+	/**
+	 * Lists all open pull requests for the fork repository.
+	 *
+	 * Used to check for existing translation PRs to avoid duplicates
+	 * and skip files that already have pending translations.
+	 *
+	 * @returns Array of open pull request data
+	 *
+	 * @example
+	 * ```typescript
+	 * const openPRs = await github.listOpenPullRequests();
+	 * ```
+	 */
+	public async listOpenPullRequests() {
+		return this.services.content.listOpenPullRequests();
 	}
 
 	/**
