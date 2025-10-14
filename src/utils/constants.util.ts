@@ -133,13 +133,20 @@ export const environmentDefaults = {
 	REPO_FORK_NAME: "pt-br.react.dev",
 	REPO_UPSTREAM_OWNER: "reactjs",
 	REPO_UPSTREAM_NAME: "pt-br.react.dev",
-
-	/** @see {@link https://github.com/reactjs/pt-br.react.dev/issues/555|Docs Progress Issue (pt-BR)} */
-	PROGRESS_ISSUE_NUMBER: 555,
 	LLM_MODEL: "google/gemini-2.5-flash-lite",
 	BATCH_SIZE: 1,
 	TARGET_LANGUAGE: "pt-br",
 	SOURCE_LANGUAGE: "en",
+
+	/** @see {@link https://github.com/reactjs/pt-br.react.dev/issues/555|Docs Progress Issue (pt-BR)} */
+	PROGRESS_ISSUE_NUMBER: 555,
+
 	/** Maximum tokens to generate in a single LLM response */
 	MAX_TOKENS: 8192,
+
+	/** Whether to enable console logging in addition to file logging */
+	LOG_TO_CONSOLE: true,
+
+	/** Timeout for GitHub API requests in milliseconds */
+	GITHUB_REQUEST_TIMEOUT: 30_000,
 } as const;

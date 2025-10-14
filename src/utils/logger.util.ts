@@ -1,19 +1,3 @@
-/**
- * @fileoverview
- *
- * Pino-based logger configuration
- *
- * This logger will eventually replace the custom Logger class.
- * For now, it exists alongside the existing logging system for gradual migration.
- *
- * ### Features
- * - **Fast**: Asynchronous, optimized logging via Pino
- * - **Structured**: Native JSON output for machine parsing
- * - **Dual output**: Logs to both file (JSON) and console (pretty-printed)
- * - **Child loggers**: Easy context propagation
- * - **Error serialization**: Built-in error handling
- */
-
 import pino from "pino";
 
 import { LogLevel, RuntimeEnvironment } from "./constants.util";
@@ -24,7 +8,7 @@ import { env } from "./env.util";
  *
  * - Production: info and above
  * - Development: debug and above
- * - Can be overridden with LOG_LEVEL env var
+ * - Can be overridden with `LOG_LEVEL` env var
  */
 const logLevel =
 	env.LOG_LEVEL ??
@@ -95,9 +79,9 @@ export const logger = pino({
 
 			/**
 			 * Console transport - pretty-printed for development
-			 * Only active in non-production environments
+			 * Only active when LOG_TO_CONSOLE is enabled and not in production
 			 */
-			...(env.NODE_ENV !== RuntimeEnvironment.Production ?
+			...(env.LOG_TO_CONSOLE && env.NODE_ENV !== RuntimeEnvironment.Production ?
 				[
 					{
 						target: "pino-pretty",

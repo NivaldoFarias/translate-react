@@ -54,12 +54,17 @@ export abstract class BaseGitHubService {
 	 * Initializes Octokit client with authentication and logging integration.
 	 * Octokit operations are logged through a child logger that respects the
 	 * application's `LOG_LEVEL` configuration for consistent observability.
+	 *
+	 * Configures request timeouts to prevent indefinite hangs on API calls.
 	 */
 	constructor() {
 		const octokitLogger = logger.child({ component: "octokit" });
 
 		this.octokit = new Octokit({
 			auth: env.GITHUB_TOKEN,
+			request: {
+				timeout: env.GITHUB_REQUEST_TIMEOUT,
+			},
 			log: {
 				debug: (message: string) => octokitLogger.debug(message),
 				info: (message: string) => octokitLogger.info(message),
