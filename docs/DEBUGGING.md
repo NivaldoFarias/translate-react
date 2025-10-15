@@ -24,7 +24,7 @@ LOG_LEVEL="debug" bun run start
 
 Add to your `.env.dev` or `.env` file:
 
-```env
+```ini
 LOG_LEVEL="debug"
 ```
 
@@ -167,43 +167,44 @@ grep "Content reassembly completed" logs/*.log
 
 ### Issue: Incomplete Translation
 
-**Symptoms**:
+#### Symptoms:
 
 - Final PR contains truncated content
 - Chunk count mismatch errors
 - Size ratio significantly below 0.5
 
-**Debug Steps**:
+#### Debug Steps:
 
 1. Enable debug logging
 2. Run translation for single file
 3. Check logs for:
-   - Total chunks vs. translated chunks
-   - Individual chunk completion times
-   - Commit timestamp vs. last chunk completion
+  - Total chunks vs. translated chunks
+  - Individual chunk completion times
+  - Commit timestamp vs. last chunk completion
 
 ### Issue: Race Condition Suspected
 
-**Symptoms**:
+#### Symptoms:
 
 - Commit occurs before all chunks finish
 - Missing content in final translation
 - Inconsistent results between runs
 
-**Debug Steps**:
+#### Debug Steps:
 
-1. Review timing logs with millisecond precision:
+##### 1. Review timing logs with millisecond precision:
 
 ```bash
 LOG_LEVEL="debug" bun run dev 2>&1 | grep -E "(Chunk.*translated|Commit completed|reassembly)"
 ```
 
-2. Verify sequential processing:
-   - Each chunk should complete before next starts
-   - Reassembly should complete before commit
-   - All timings should be additive
+##### 2. Verify sequential processing:
 
-3. Check for concurrent file processing:
+- Each chunk should complete before next starts
+- Reassembly should complete before commit
+- All timings should be additive
+
+##### 3. Check for concurrent file processing:
 
 ```bash
 grep "Starting file processing" logs/*.log | sort
@@ -241,7 +242,7 @@ Checks that headings are preserved in translation
 
 Logs are stored in:
 
-```
+```plaintext
 logs/YYYY-MM-DDTHH:MM:SS.sssZ.pino.log
 ```
 

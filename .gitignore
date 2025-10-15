@@ -181,3 +181,6 @@ dist
 # Github Copilot
 .github/instructions/
 .github/copilot-instructions.md
+
+# SpecStory
+.specstory/
