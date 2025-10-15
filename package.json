@@ -14,6 +14,7 @@
 	"scripts": {
 		"start": "bun --env-file=.env src/index.ts",
 		"dev": "bun --watch --env-file=.env.dev src/index.ts",
+		"build": "bun src/build.ts",
 		"lint": "eslint .",
 		"lint:fix": "eslint . --fix",
 		"format": "prettier --write '**/*.{ts,js,cjs,mjs,json}'",

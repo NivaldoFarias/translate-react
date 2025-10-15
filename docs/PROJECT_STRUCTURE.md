@@ -31,6 +31,7 @@ translate-react/
 ├── Application Source
 │   └── src/                                  # Main application code
 │       ├── index.ts                          # Application entry point
+│       ├── build.ts                          # Bun bundler build configuration
 │       ├── types.d.ts                        # Global type definitions
 │       │
 │       ├── errors/                           # Error handling system
@@ -87,6 +88,9 @@ translate-react/
 │           └── env.util.spec.ts
 │
 └── Runtime Artifacts (Auto-generated)
+    ├── dist/                              # Build output directory (gitignored)
+    │   ├── index.js                       # Bundled application
+    │   ├── index.js.map                   # Source map for debugging
     ├── logs/                              # Structured error logs (JSONL)
     ├── snapshots.sqlite                   # SQLite state persistence database
     ├── node_modules/                      # Package dependencies
@@ -160,6 +164,7 @@ translate-react/
 
 - **Start development**: `bun run dev` (watch mode)
 - **Run production**: `bun start`
+- **Build bundle**: `bun run build` (creates `dist/` directory)
 - **Linting**: `bun run lint` / `bun run lint:fix`
 - **Formatting**: `bun run format`
 - **Type checking**: `bun run type-check`
