@@ -11,8 +11,6 @@ import { MarkdownTextSplitter } from "@langchain/textsplitters";
 import { encodingForModel } from "js-tiktoken";
 import OpenAI from "openai";
 
-import type { LanguageConfig } from "./language-detector.service.ts";
-
 import {
 	ChunkProcessingError,
 	EmptyContentError,
@@ -20,7 +18,7 @@ import {
 	LLMErrorHelper,
 	TranslationValidationError,
 } from "@/errors/";
-import { env, logger, MAX_CHUNK_TOKENS } from "@/utils/";
+import { env, LANGUAGE_SPECIFIC_RULES, logger, MAX_CHUNK_TOKENS } from "@/utils/";
 
 import { LanguageDetectorService } from "./language-detector.service";
 
@@ -77,26 +75,9 @@ export class TranslatorService {
 		github: new GithubErrorHelper(),
 	};
 
-	public readonly languageDetector: LanguageDetectorService;
+	public readonly languageDetector = new LanguageDetectorService();
 
 	public glossary: string | null = null;
-
-	/**
-	 * Initializes the translator service with language configuration.
-	 *
-	 * Sets up the OpenAI client and language detector for translation workflow.
-	 *
-	 * @param options Language configuration for translation workflow
-	 *
-	 * @example
-	 * ```typescript
-	 * const translator = new TranslatorService({ source: 'en', target: 'pt' });
-	 * translator.setGlossary('React -> React\ncomponent -> componente');
-	 * ```
-	 */
-	public constructor(private readonly options: LanguageConfig) {
-		this.languageDetector = new LanguageDetectorService(this.options);
-	}
 
 	/**
 	 * Main translation method that processes files and manages the translation workflow.
@@ -770,7 +751,9 @@ export class TranslatorService {
 		const detectedSourceCode = await this.languageDetector.detectPrimaryLanguage(content);
 
 		const languages = {
-			target: this.languageDetector.getLanguageName(this.options.target) || "Brazilian Portuguese",
+			target:
+				this.languageDetector.getLanguageName(this.languageDetector.languages.target) ||
+				"Brazilian Portuguese",
 			source:
 				detectedSourceCode ?
 					this.languageDetector.getLanguageName(detectedSourceCode) || "English"
@@ -782,7 +765,10 @@ export class TranslatorService {
 				`\n## TERMINOLOGY GLOSSARY\nApply these exact translations for the specified terms:\n${this.glossary}\n`
 			:	"";
 
-		const langSpecificRules = this.getLanguageSpecificRules(languages.target);
+		const langSpecificRules =
+			languages.target in LANGUAGE_SPECIFIC_RULES ?
+				LANGUAGE_SPECIFIC_RULES[languages.target as keyof typeof LANGUAGE_SPECIFIC_RULES]
+			:	"";
 
 		return `# ROLE
 You are an expert technical translator specializing in React documentation.
@@ -821,23 +807,5 @@ Translate the provided content from ${languages.source} to ${languages.target} w
 ${langSpecificRules}
 
 ${glossarySection}`;
-	}
-
-	/**
-	 * Gets language-specific translation rules based on the target language.
-	 *
-	 * @param targetLanguage The target language name
-	 *
-	 * @returns Language-specific rules or empty string
-	 */
-	private getLanguageSpecificRules(targetLanguage: string): string {
-		if (targetLanguage === "Brazilian Portuguese") {
-			return `\n# PORTUGUESE (BRAZIL) SPECIFIC RULES
-- ALWAYS translate 'deprecated' and related terms (deprecation, deprecating, deprecates) to 'descontinuado(a)', 'descontinuada', 'obsoleto(a)' or 'obsoleta' in ALL contexts (documentation text, comments, headings, lists, etc.)
-- Exception: Do NOT translate 'deprecated' in HTML comment IDs like {/*deprecated-something*/} - keep these exactly as-is
-- Exception: Do NOT translate 'deprecated' in URLs, anchor links, or code variable names
-- Use Brazilian Portuguese conventions and terminology`;
-		}
-		return "";
 	}
 }

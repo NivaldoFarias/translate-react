@@ -1,7 +1,7 @@
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 import { BaseGitHubService } from "@/services/github/base.service";
-import { logger } from "@/utils";
+import { logger } from "@/utils/";
 
 /**
  * Service responsible for repository operations and fork management.

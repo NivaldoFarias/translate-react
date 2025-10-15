@@ -67,6 +67,15 @@ export const MAX_FILE_SIZE = 200_000;
  */
 export const FILE_FETCH_BATCH_SIZE = 10;
 
+/**
+ * Minimum confidence threshold for language cache hits.
+ *
+ * Cache entries below this confidence level are treated as cache misses,
+ * triggering fresh language detection to ensure accuracy. Set to 0.8 (80%)
+ * based on observed language detection reliability.
+ */
+export const MIN_CACHE_CONFIDENCE = 0.8;
+
 /** Minimum length required for a valid API token */
 export const MIN_API_TOKEN_LENGTH = 20;
 
@@ -150,3 +159,12 @@ export const environmentDefaults = {
 	/** Timeout for GitHub API requests in milliseconds */
 	GITHUB_REQUEST_TIMEOUT: 30_000,
 } as const;
+
+/** Glossary of terms with exact translations to enforce */
+export const LANGUAGE_SPECIFIC_RULES = {
+	"Brazilian Portuguese": `\n# PORTUGUESE (BRAZIL) SPECIFIC RULES
+- ALWAYS translate 'deprecated' and related terms (deprecation, deprecating, deprecates) to 'descontinuado(a)', 'descontinuada', 'obsoleto(a)' or 'obsoleta' in ALL contexts (documentation text, comments, headings, lists, etc.)
+- Exception: Do NOT translate 'deprecated' in HTML comment IDs like {/*deprecated-something*/} - keep these exactly as-is
+- Exception: Do NOT translate 'deprecated' in URLs, anchor links, or code variable names
+- Use Brazilian Portuguese conventions and terminology`,
+};

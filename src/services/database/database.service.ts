@@ -1,14 +1,12 @@
-import { existsSync, writeFileSync } from "node:fs";
-
-import { Database } from "bun:sqlite";
-
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
-import { SnapshotRecord } from "@/types";
+import type { ProcessedFileResult } from "@/services/runner/";
+import type { SnapshotRecord } from "@/types";
 
-import { ProcessedFileResult } from "./runner/base.service";
-import { Snapshot } from "./snapshot.service";
-import { TranslationFile } from "./translator.service";
+import { Snapshot } from "../snapshot.service";
+import { TranslationFile } from "../translator.service";
+
+import { BaseDatabaseService } from "./base.service";
 
 /**
  * Core service for managing persistent storage of translation workflow data.
@@ -24,40 +22,7 @@ import { TranslationFile } from "./translator.service";
  *
  * @see {@link https://bun.com/docs/api/sqlite|Bun's SQLite API Docs}
  */
-export class DatabaseService {
-	/** SQLite database connection instance */
-	private readonly db: Database;
-
-	/**
-	 * Initializes database connection and creates required tables.
-	 *
-	 * @param dbPath Optional path to the database file. Defaults to 'snapshots.sqlite'
-	 */
-	constructor(dbPath = "snapshots.sqlite") {
-		if (!existsSync(dbPath)) writeFileSync(dbPath, "");
-
-		this.db = new Database(dbPath);
-		this.initializeTables();
-	}
-
-	/**
-	 * Initializes database tables.
-	 *
-	 * Creates required database tables if they don't exist:
-	 * - snapshots: Workflow state snapshots
-	 * - repository_tree: Git repository structure
-	 * - files_to_translate: Files pending translation
-	 * - processed_results: Translation results and status
-	 * - failed_translations: Detailed error tracking for failed translations
-	 */
-	private initializeTables(): void {
-		for (const script of Object.values(this.scripts.create)) {
-			const sanitizedScript = script.replace(/\s+/g, " ");
-
-			this.db.run(sanitizedScript);
-		}
-	}
-
+export class DatabaseService extends BaseDatabaseService {
 	/**
 	 * Creates a new workflow state snapshot.
 	 *
@@ -250,94 +215,77 @@ export class DatabaseService {
 		this.db.run(this.scripts.delete.snapshotById, [id]);
 	}
 
-	/** The SQL scripts for creating database tables */
-	private get scripts() {
+	/**
+	 * Retrieves cached language detection result for a file.
+	 *
+	 * Checks both filename and content hash (SHA) to ensure cache validity.
+	 * Returns null if not found or if SHA doesn't match (file changed).
+	 *
+	 * @param filename Name of the file to check
+	 * @param contentHash Git SHA of the file content
+	 *
+	 * @returns Cached language data or null if not found/invalid
+	 */
+	public getLanguageCache(
+		filename: string,
+		contentHash: string,
+	): { detectedLanguage: string; confidence: number; timestamp: number } | null {
+		const result = this.db.prepare(this.scripts.select.languageCache).get(filename, contentHash) as
+			| { detected_language: string; confidence: number; timestamp: number }
+			| undefined;
+
+		if (!result) return null;
+
 		return {
-			create: {
-				/** Creates the snapshots table */
-				snapshotsTable: `
-					CREATE TABLE IF NOT EXISTS snapshots (
-						id INTEGER PRIMARY KEY AUTOINCREMENT,
-						timestamp INTEGER NOT NULL,
-						created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-					)
-				`,
-				/** Creates the repository_tree table */
-				repositoryTreeTable: `
-					CREATE TABLE IF NOT EXISTS repository_tree (
-						id INTEGER PRIMARY KEY AUTOINCREMENT,
-						snapshot_id INTEGER NOT NULL,
-						path TEXT,
-						mode TEXT,
-						type TEXT,
-						sha TEXT,
-						size INTEGER,
-						url TEXT,
-						FOREIGN KEY (snapshot_id) REFERENCES snapshots(id)
-					)
-				`,
-				/** Creates the files_to_translate table */
-				filesToTranslateTable: `
-					CREATE TABLE IF NOT EXISTS files_to_translate (
-						id INTEGER PRIMARY KEY AUTOINCREMENT,
-						snapshot_id INTEGER NOT NULL,
-						content TEXT NOT NULL,
-						sha TEXT NOT NULL,
-						filename TEXT NOT NULL,
-						path TEXT NOT NULL,
-						FOREIGN KEY (snapshot_id) REFERENCES snapshots(id)
-					)
-				`,
-				/** Creates the processed_results table */
-				processedResultsTable: `
-					CREATE TABLE IF NOT EXISTS processed_results (
-						id INTEGER PRIMARY KEY AUTOINCREMENT,
-						snapshot_id INTEGER NOT NULL,
-						filename TEXT NOT NULL,
-						branch_ref TEXT,
-						branch_object_sha TEXT,
-						translation TEXT,
-						pull_request_number INTEGER,
-						pull_request_url TEXT,
-						error TEXT,
-						FOREIGN KEY (snapshot_id) REFERENCES snapshots(id)
-					)
-				`,
-				/** Creates the failed_translations table */
-				failedTranslationsTable: `
-					CREATE TABLE IF NOT EXISTS failed_translations (
-						id INTEGER PRIMARY KEY AUTOINCREMENT,
-						snapshot_id INTEGER NOT NULL,
-						filename TEXT NOT NULL,
-						error_message TEXT NOT NULL,
-						timestamp INTEGER NOT NULL,
-						created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-						FOREIGN KEY (snapshot_id) REFERENCES snapshots(id)
-					)
-				`,
-			},
-			select: {
-				filesToTranslateByFilename: `
-					SELECT * FROM files_to_translate WHERE filename IN (?)
-				`,
-				allSnapshots: `
-					SELECT * FROM snapshots
-				`,
-			},
-			drop: {
-				snapshotsTable: "DROP TABLE IF EXISTS snapshots",
-				repositoryTreeTable: "DROP TABLE IF EXISTS repository_tree",
-				filesToTranslateTable: "DROP TABLE IF EXISTS files_to_translate",
-				processedResultsTable: "DROP TABLE IF EXISTS processed_results",
-				failedTranslationsTable: "DROP TABLE IF EXISTS failed_translations",
-			},
-			delete: {
-				snapshotById: "DELETE FROM snapshots WHERE id = ?",
-				repositoryTreeById: "DELETE FROM repository_tree WHERE id = ?",
-				filesToTranslateById: "DELETE FROM files_to_translate WHERE id = ?",
-				processedResultsById: "DELETE FROM processed_results WHERE id = ?",
-				failedTranslationsById: "DELETE FROM failed_translations WHERE id = ?",
-			},
+			detectedLanguage: result.detected_language,
+			confidence: result.confidence,
+			timestamp: result.timestamp,
 		};
+	}
+
+	/**
+	 * Stores language detection result in cache.
+	 *
+	 * Uses REPLACE to update existing entries or insert new ones.
+	 *
+	 * @param filename Name of the file
+	 * @param contentHash Git SHA of the file content
+	 * @param detectedLanguage Detected language code (e.g., 'pt', 'en')
+	 * @param confidence Detection confidence score (0-1)
+	 */
+	public setLanguageCache(
+		filename: string,
+		contentHash: string,
+		detectedLanguage: string,
+		confidence: number,
+	): void {
+		this.db
+			.prepare(this.scripts.insert.languageCache)
+			.run(filename, contentHash, detectedLanguage, confidence, Date.now());
+	}
+
+	/**
+	 * Removes all language cache entries.
+	 *
+	 * Useful for forcing fresh detection or debugging cache issues.
+	 */
+	public clearLanguageCache(): void {
+		this.db.prepare(this.scripts.delete.allLanguageCache).run();
+	}
+
+	/**
+	 * Removes language cache entries for specific files.
+	 *
+	 * Used when files are known to have changed (e.g., after fork sync).
+	 *
+	 * @param filenames Array of filenames to invalidate
+	 */
+	public invalidateLanguageCache(filenames: string[]): void {
+		if (filenames.length === 0) return;
+
+		const placeholders = filenames.map(() => "?").join(",");
+		const query = `DELETE FROM language_cache WHERE filename IN (${placeholders})`;
+
+		this.db.prepare(query).run(...filenames);
 	}
 }

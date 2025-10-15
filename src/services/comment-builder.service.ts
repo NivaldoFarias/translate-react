@@ -1,6 +1,7 @@
-import { env } from "../utils/env.util";
+import type { ProcessedFileResult } from "@/services/runner/";
 
-import { ProcessedFileResult } from "./runner/base.service";
+import { env } from "@/utils/";
+
 import { TranslationFile } from "./translator.service";
 
 export interface FileEntry {

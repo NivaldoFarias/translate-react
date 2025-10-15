@@ -1,6 +1,6 @@
 import { extractErrorMessage } from "@/errors/";
 import { BaseRunnerService } from "@/services/runner/base.service";
-import { env, logger, RuntimeEnvironment } from "@/utils";
+import { env, logger, RuntimeEnvironment } from "@/utils/";
 
 /**
  * Main orchestrator class that manages the entire translation process workflow.

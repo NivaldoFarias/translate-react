@@ -1,9 +1,9 @@
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 import { extractErrorMessage } from "@/errors/";
-import { DatabaseService } from "@/services/database.service";
-import { ProcessedFileResult } from "@/services/runner/base.service";
-import { setupSignalHandlers } from "@/utils";
+import { DatabaseService } from "@/services/database/";
+import { ProcessedFileResult } from "@/services/runner/";
+import { setupSignalHandlers } from "@/utils/";
 
 import { TranslationFile } from "./translator.service";
 

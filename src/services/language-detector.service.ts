@@ -10,9 +10,9 @@
 
 import cld from "cld";
 
-import type { ReactLanguageCode } from "@/utils/constants.util";
+import type { ReactLanguageCode } from "@/utils/";
 
-import { REACT_TRANSLATION_LANGUAGES } from "@/utils/constants.util";
+import { env, REACT_TRANSLATION_LANGUAGES } from "@/utils/";
 
 /**
  * Configuration interface for language detection settings.
@@ -68,7 +68,7 @@ export interface LanguageAnalysis {
  *
  * @example
  * ```typescript
- * const detector = new LanguageDetector({ source: 'en', target: 'pt-br' });
+ * const detector = new LanguageDetector();
  * const analysis = await detector.analyzeLanguage('readme.md', 'Hello world');
  * console.log(analysis.isTranslated); // false
  * ```
@@ -81,7 +81,10 @@ export class LanguageDetectorService {
 	private readonly TRANSLATION_THRESHOLD = 0.5;
 
 	/** Current language configuration using React language codes */
-	private readonly languages: LanguageConfig;
+	public readonly languages: LanguageConfig = {
+		source: env.SOURCE_LANGUAGE,
+		target: env.TARGET_LANGUAGE,
+	};
 
 	/** {@link Intl.DisplayNames} instance for human-readable language names */
 	private readonly displayNames = new Intl.DisplayNames(["en"], { type: "language" });
@@ -91,38 +94,6 @@ export class LanguageDetectorService {
 	 * Maps content hashes to detected language codes.
 	 */
 	public detected: Map<string, string | undefined> = new Map();
-
-	/**
-	 * Initializes a new language detector with source and target languages.
-	 *
-	 * Validates that both languages are supported React translation languages.
-	 * Throws an error with helpful guidance if unsupported languages are provided.
-	 *
-	 * @param config Language configuration with source and target languages
-	 *
-	 * @throws {Error} When invalid or unsupported language codes are provided
-	 *
-	 * @example
-	 * ```typescript
-	 * const detector = new LanguageDetector({ source: 'en', target: 'pt-br' });
-	 * // Detector ready for language analysis operations
-	 * ```
-	 */
-	public constructor(config: LanguageConfig) {
-		if (
-			!REACT_TRANSLATION_LANGUAGES.includes(config.source) ||
-			!REACT_TRANSLATION_LANGUAGES.includes(config.target)
-		) {
-			const supportedList = REACT_TRANSLATION_LANGUAGES.join(", ");
-			throw new Error(
-				`Unsupported language code: ${config.source} or ${config.target}. ` +
-					`This tool supports only React translation languages: ${supportedList}. ` +
-					`See https://translations.react.dev/ for the complete list.`,
-			);
-		}
-
-		this.languages = config;
-	}
 
 	/**
 	 * Gets the human-readable display name for a React language code.
@@ -142,12 +113,13 @@ export class LanguageDetectorService {
 	 * ```
 	 */
 	public getLanguageName(code: string): string | undefined {
-		if (!REACT_TRANSLATION_LANGUAGES.includes(code as ReactLanguageCode)) {
+		if (!REACT_TRANSLATION_LANGUAGES.includes(code)) {
 			return undefined;
 		}
 
 		try {
 			const name = this.displayNames.of(code);
+
 			return name !== code ? name : undefined;
 		} catch {
 			return undefined;

@@ -1,6 +1,6 @@
 import { RequestError } from "@octokit/request-error";
 
-import { ErrorCode, ErrorSeverity, TranslationError } from "@/errors/base-error";
+import { ErrorCode, ErrorSeverity, TranslationError } from "@/errors/";
 
 export abstract class ErrorHelper {
 	/**

@@ -1,15 +1,16 @@
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
-import { BranchService } from "@/services/github/branch.service";
+import type { ProcessedFileResult } from "@/services/runner/";
+
 import {
+	BranchService,
 	CommitTranslationOptions,
 	ContentService,
 	PullRequestOptions,
-} from "@/services/github/content.service";
-import { RepositoryService } from "@/services/github/repository.service";
+	RepositoryService,
+} from "@/services/github/";
 import { logger } from "@/utils/";
 
-import { ProcessedFileResult } from "../runner/base.service";
 import { TranslationFile } from "../translator.service";
 
 import { BaseGitHubService } from "./base.service";

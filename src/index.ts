@@ -1,6 +1,6 @@
-import { TranslationError } from "@/errors";
+import { TranslationError } from "@/errors/";
 import RunnerService from "@/services/runner/runner.service";
-import { env, logger } from "@/utils";
+import { env, logger } from "@/utils/";
 
 import { name, version } from "../package.json";
 
