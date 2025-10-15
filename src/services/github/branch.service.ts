@@ -1,7 +1,7 @@
 import { RestEndpointMethodTypes } from "@octokit/rest";
 import { StatusCodes } from "http-status-codes";
 
-import { BaseGitHubService } from "@/services/github/base.service";
+import { BaseGitHubService } from "@/services/github/";
 import { env, logger, setupSignalHandlers } from "@/utils/";
 
 /**

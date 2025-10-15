@@ -7,7 +7,7 @@
 
 import type { Environment } from "@/utils/env.util";
 
-import { LogLevel, RuntimeEnvironment } from "@/utils";
+import { LogLevel, RuntimeEnvironment } from "@/utils/";
 
 /** Global test configuration and setup utilities */
 declare global {

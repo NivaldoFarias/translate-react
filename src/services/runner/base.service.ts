@@ -1,10 +1,16 @@
-import type { RestEndpointMethodTypes } from "@octokit/rest";
+import type {
+	CacheCheckResult,
+	FileProcessingProgress,
+	LanguageDetectionResult,
+	PrFilterResult,
+	ProcessedFileResult,
+	RepositoryTreeItems,
+	RunnerOptions,
+} from "./runner.types";
 import type { SetNonNullable } from "type-fest";
 
-import type { ReactLanguageCode } from "@/utils/constants.util";
-
 import { InitializationError, ResourceLoadError } from "@/errors/";
-import { GitHubService } from "@/services/github/github.service";
+import { GitHubService } from "@/services/github/";
 import { Snapshot, SnapshotService } from "@/services/snapshot.service";
 import { TranslationFile, TranslatorService } from "@/services/translator.service";
 import {
@@ -12,48 +18,13 @@ import {
 	FILE_FETCH_BATCH_SIZE,
 	logger,
 	MAX_FILE_SIZE,
+	MIN_CACHE_CONFIDENCE,
 	RuntimeEnvironment,
 	setupSignalHandlers,
 } from "@/utils/";
 
 import { homepage, name, version } from "../../../package.json";
-
-export interface RunnerOptions {
-	/** The target language code for translation */
-	targetLanguage: ReactLanguageCode;
-
-	/** The source language code for translation */
-	sourceLanguage: ReactLanguageCode;
-
-	/** The number of files to process in each batch */
-	batchSize: number;
-}
-
-/** Represents the progress of file processing in batches */
-export interface FileProcessingProgress {
-	/** The index of the current batch */
-	batchIndex: number;
-
-	/** The index of the current file in the batch */
-	fileIndex: number;
-
-	/** The total number of batches */
-	totalBatches: number;
-
-	/** The number of files to process in each batch */
-	batchSize: number;
-}
-
-export interface ProcessedFileResult {
-	branch: RestEndpointMethodTypes["git"]["getRef"]["response"]["data"] | null;
-	filename: string;
-	translation: string | null;
-	pullRequest:
-		| RestEndpointMethodTypes["pulls"]["create"]["response"]["data"]
-		| RestEndpointMethodTypes["pulls"]["list"]["response"]["data"][number]
-		| null;
-	error: Error | null;
-}
+import { DatabaseService } from "../database/database.service";
 
 export type RunnerState = Omit<Snapshot, "id">;
 
@@ -81,15 +52,18 @@ export abstract class BaseRunnerService {
 		timestamp: Date.now(),
 	};
 
-	protected readonly services: {
+	protected readonly services = {
 		/** GitHub service instance for repository operations */
-		github: GitHubService;
+		github: new GitHubService(),
 
 		/** Translation service for content translation operations */
-		translator: TranslatorService;
+		translator: new TranslatorService(),
 
 		/** Snapshot manager to persist and retrieve workflow state */
-		snapshot: SnapshotService;
+		snapshot: new SnapshotService(),
+
+		/** Database service for persistent storage */
+		database: new DatabaseService(),
 	};
 
 	/** Statistics tracking for the translation process */
@@ -116,20 +90,9 @@ export abstract class BaseRunnerService {
 	 */
 	constructor(
 		protected readonly options: RunnerOptions = {
-			targetLanguage: env.TARGET_LANGUAGE,
-			sourceLanguage: "en",
 			batchSize: env.BATCH_SIZE,
 		},
 	) {
-		this.services = {
-			github: new GitHubService(),
-			translator: new TranslatorService({
-				source: this.options.sourceLanguage,
-				target: this.options.targetLanguage,
-			}),
-			snapshot: new SnapshotService(),
-		};
-
 		if (env.FORCE_SNAPSHOT_CLEAR) {
 			this.services.snapshot.clear();
 		}
@@ -232,61 +195,146 @@ export abstract class BaseRunnerService {
 	}
 
 	/**
-	 * Fetches and filters files that need translation.
+	 * Fetches and filters files that need translation through a multi-stage pipeline.
 	 *
-	 * Performs a multi-stage filtering process:
-	 * 1. Fetches file content from repository in batches
-	 * 2. Filters files with existing open pull requests
-	 * 3. Filters files exceeding size limits
-	 * 4. Filters files already translated via language detection
+	 * Orchestrates the complete file discovery workflow by coordinating cache checks,
+	 * PR filtering, content fetching, and language detection. Each stage progressively
+	 * narrows the candidate set to minimize expensive operations.
+	 *
+	 * The pipeline stages are:
+	 * 1. Language cache lookup to skip known translated files
+	 * 2. PR existence check to skip files with pending translations
+	 * 3. Batched content fetching from repository
+	 * 4. Size validation and language detection with cache updates
 	 *
 	 * @throws {ResourceLoadError} If file content fetch fails
 	 */
 	protected async fetchFilesToTranslate(): Promise<void> {
 		if (this.state.filesToTranslate.length) {
 			logger.info(`Found ${this.state.filesToTranslate.length} files to translate (from snapshot)`);
-
 			return;
 		}
-
-		logger.info("Fetching files...");
-
-		const uncheckedFiles: TranslationFile[] = [];
-		const totalFiles = this.state.repositoryTree.length;
-		let completedFiles = 0;
-
-		const updateProgress = () => {
-			completedFiles++;
-			const percentage = Math.floor((completedFiles / totalFiles) * 100);
-			if (completedFiles % 10 === 0 || completedFiles === totalFiles) {
-				logger.info(`Fetching files: ${completedFiles}/${totalFiles} (${percentage}%)`);
-			}
-		};
 
 		const uniqueFiles = this.state.repositoryTree.filter(
 			(file, index, self) => index === self.findIndex((f) => f.path === file.path),
 		);
 
-		for (let i = 0; i < uniqueFiles.length; i += FILE_FETCH_BATCH_SIZE) {
-			const batch = uniqueFiles.slice(i, i + FILE_FETCH_BATCH_SIZE);
-			const batchResults = await this.fetchBatch(batch, updateProgress);
+		logger.info(`Processing ${uniqueFiles.length} files from repository tree...`);
 
-			uncheckedFiles.push(
-				...batchResults.filter((file): file is NonNullable<typeof file> => !!file),
-			);
+		const { candidateFiles, cacheHits } = await this.checkLanguageCache(uniqueFiles);
+		const { filesToFetch, numFilesWithPRs } = await this.filterFilesByExistingPRs(candidateFiles);
+		const uncheckedFiles = await this.fetchFileContents(filesToFetch);
+		const { numFilesFiltered, numFilesTooLarge } =
+			await this.detectAndCacheLanguages(uncheckedFiles);
+
+		if (env.NODE_ENV === RuntimeEnvironment.Development) {
+			await this.services.snapshot.append("filesToTranslate", this.state.filesToTranslate);
 		}
 
-		let numFilesFiltered = 0;
-		let numFilesWithPRs = 0;
-		let numFilesTooLarge = 0;
+		logger.info(
+			{
+				filesToTranslate: this.state.filesToTranslate.length,
+				cachedTranslated: cacheHits,
+				analyzedTranslated: numFilesFiltered,
+				withExistingPRs: numFilesWithPRs,
+				tooLarge: numFilesTooLarge,
+				totalFiltered: cacheHits + numFilesFiltered + numFilesWithPRs + numFilesTooLarge,
+			},
+			`Found ${this.state.filesToTranslate.length} files to translate (${cacheHits + numFilesFiltered + numFilesWithPRs + numFilesTooLarge} filtered)`,
+		);
+	}
 
+	/**
+	 * Checks language cache to identify files already known to be translated.
+	 *
+	 * Queries the SQLite cache for each file using its path and content hash (SHA).
+	 * Files with cached Portuguese detection results above the confidence threshold
+	 * are filtered out, avoiding expensive content fetching and re-analysis.
+	 *
+	 * @param files Repository tree files to check against cache
+	 *
+	 * @returns Cache statistics and remaining candidate files for further processing
+	 *
+	 * @example
+	 * ```typescript
+	 * const result = await this.checkLanguageCache(repositoryFiles);
+	 * console.log(result.cacheHits);
+	 * // ^? 135 (out of 192 files)
+	 * ```
+	 */
+	private async checkLanguageCache(files: RepositoryTreeItems): Promise<CacheCheckResult> {
+		logger.info("Checking language cache...");
+		const startTime = Date.now();
+
+		let cacheHits = 0;
+		let cacheMisses = 0;
+		const candidateFiles: typeof files = [];
+
+		for (const file of files) {
+			if (!file.sha || !file.path) {
+				candidateFiles.push(file);
+				continue;
+			}
+
+			const cached = this.services.database.getLanguageCache(file.path, file.sha);
+			const targetLanguage = this.services.translator.languageDetector.languages.target;
+
+			if (
+				cached &&
+				cached.detectedLanguage === targetLanguage &&
+				cached.confidence > MIN_CACHE_CONFIDENCE
+			) {
+				cacheHits++;
+				logger.debug(
+					{ filename: file.path, language: cached.detectedLanguage, confidence: cached.confidence },
+					`Skipping cached ${targetLanguage} file`,
+				);
+			} else {
+				cacheMisses++;
+				candidateFiles.push(file);
+			}
+		}
+
+		const elapsed = Date.now() - startTime;
+		const hitRate = `${((cacheHits / files.length) * 100).toFixed(1)}%`;
+
+		logger.info(
+			{ cacheHits, cacheMisses, hitRate, timeMs: elapsed },
+			`Cache check complete: ${cacheHits} hits, ${cacheMisses} candidates`,
+		);
+
+		return { candidateFiles, cacheHits, cacheMisses };
+	}
+
+	/**
+	 * Filters candidate files by checking for existing open pull requests.
+	 *
+	 * Fetches all open PRs and builds a mapping of filenames to PR numbers by parsing
+	 * PR titles. Files with existing translation PRs are excluded from further processing
+	 * to prevent duplicate translation efforts.
+	 *
+	 * @param candidateFiles Files remaining after cache check
+	 *
+	 * @returns Files requiring content fetch and count of files with existing PRs
+	 *
+	 * @example
+	 * ```typescript
+	 * const result = await this.filterFilesByExistingPRs(cachedCandidates);
+	 * console.log(result.numFilesWithPRs);
+	 * // ^? 12 (files already have open PRs)
+	 * ```
+	 */
+	private async filterFilesByExistingPRs(
+		candidateFiles: RepositoryTreeItems,
+	): Promise<PrFilterResult> {
 		logger.info("Checking for existing open PRs...");
+
 		const openPRs = await this.services.github.listOpenPullRequests();
 		const prFileMap = new Map<string, number>();
 
 		for (const pr of openPRs) {
 			const match = pr.title?.match(/Translate `(.+?)` to/);
-			if (match && match[1]) {
+			if (match?.[1]) {
 				prFileMap.set(match[1], pr.number);
 			}
 		}
@@ -296,25 +344,105 @@ export abstract class BaseRunnerService {
 			"Open PRs mapped to filenames",
 		);
 
-		this.state.filesToTranslate = [];
-		for (const file of uncheckedFiles) {
-			if (prFileMap.has(file.filename)) {
+		let numFilesWithPRs = 0;
+		const filesToFetch: typeof candidateFiles = [];
+
+		for (const file of candidateFiles) {
+			if (file.path && prFileMap.has(file.path)) {
 				numFilesWithPRs++;
 				logger.debug(
-					{ filename: file.filename, prNumber: prFileMap.get(file.filename) },
+					{ filename: file.path, prNumber: prFileMap.get(file.path) },
 					"Skipping file with existing PR",
 				);
-				continue;
+			} else {
+				filesToFetch.push(file);
 			}
+		}
 
+		logger.info(
+			{ withPRs: numFilesWithPRs, toFetch: filesToFetch.length },
+			`After PR filter: ${filesToFetch.length} files need content fetch`,
+		);
+
+		return { filesToFetch, numFilesWithPRs };
+	}
+
+	/**
+	 * Fetches file contents from repository in parallel batches.
+	 *
+	 * Processes files in batches using {@link FILE_FETCH_BATCH_SIZE} to manage concurrent
+	 * GitHub API requests. Provides progress logging at 10% intervals and filters out
+	 * files with missing metadata.
+	 *
+	 * @param filesToFetch Files requiring content download
+	 *
+	 * @returns Successfully fetched files with content ready for language detection
+	 *
+	 * @example
+	 * ```typescript
+	 * const files = await this.fetchFileContents(candidates);
+	 * console.log(files.length);
+	 * // ^? 45 (successfully fetched files)
+	 * ```
+	 */
+	private async fetchFileContents(filesToFetch: RepositoryTreeItems): Promise<TranslationFile[]> {
+		logger.info("Fetching file content...");
+
+		const uncheckedFiles: TranslationFile[] = [];
+		let completedFiles = 0;
+
+		const updateProgress = (): void => {
+			completedFiles++;
+			const percentage = Math.floor((completedFiles / filesToFetch.length) * 100);
+			if (completedFiles % 10 === 0 || completedFiles === filesToFetch.length) {
+				logger.info(`Fetching files: ${completedFiles}/${filesToFetch.length} (${percentage}%)`);
+			}
+		};
+
+		for (let i = 0; i < filesToFetch.length; i += FILE_FETCH_BATCH_SIZE) {
+			const batch = filesToFetch.slice(i, i + FILE_FETCH_BATCH_SIZE);
+			const batchResults = await this.fetchBatch(batch, updateProgress);
+
+			uncheckedFiles.push(
+				...batchResults.filter((file): file is NonNullable<typeof file> => !!file),
+			);
+		}
+
+		return uncheckedFiles;
+	}
+
+	/**
+	 * Performs language detection and updates cache with results.
+	 *
+	 * Filters files exceeding {@link MAX_FILE_SIZE}, then analyzes remaining files
+	 * to detect translation status. Updates the language cache with detection results
+	 * (language and confidence) for future runs. Files requiring translation are
+	 * added to {@link state.filesToTranslate}.
+	 *
+	 * @param uncheckedFiles Files with fetched content awaiting language analysis
+	 *
+	 * @returns Statistics about filtered and analyzed files
+	 *
+	 * @example
+	 * ```typescript
+	 * const result = await this.detectAndCacheLanguages(fetchedFiles);
+	 * console.log(result.numFilesFiltered);
+	 * // ^? 38 (files detected as already translated)
+	 * ```
+	 */
+	private async detectAndCacheLanguages(
+		uncheckedFiles: TranslationFile[],
+	): Promise<LanguageDetectionResult> {
+		let numFilesTooLarge = 0;
+		let numFilesFiltered = 0;
+
+		this.state.filesToTranslate = [];
+
+		for (const file of uncheckedFiles) {
 			if (file.content.length > MAX_FILE_SIZE) {
 				numFilesTooLarge++;
 				logger.warn(
-					{
-						filename: file.filename,
-						size: file.content.length,
-						maxSize: MAX_FILE_SIZE,
-					},
+					{ filename: file.filename, size: file.content.length, maxSize: MAX_FILE_SIZE },
 					"Skipping file: exceeds maximum size limit",
 				);
 				continue;
@@ -325,6 +453,16 @@ export abstract class BaseRunnerService {
 				file.content,
 			);
 
+			if (file.sha && analysis.detectedLanguage) {
+				const confidence = analysis.languageScore.target / 100;
+				this.services.database.setLanguageCache(
+					file.path,
+					file.sha,
+					analysis.detectedLanguage,
+					confidence,
+				);
+			}
+
 			if (analysis.isTranslated) {
 				numFilesFiltered++;
 			} else {
@@ -332,33 +470,20 @@ export abstract class BaseRunnerService {
 			}
 		}
 
-		if (env.NODE_ENV === RuntimeEnvironment.Development) {
-			await this.services.snapshot.append("filesToTranslate", this.state.filesToTranslate);
-		}
-
-		logger.info(
-			{
-				filesToTranslate: this.state.filesToTranslate.length,
-				alreadyTranslated: numFilesFiltered,
-				withExistingPRs: numFilesWithPRs,
-				tooLarge: numFilesTooLarge,
-				totalFiltered: numFilesFiltered + numFilesWithPRs + numFilesTooLarge,
-			},
-			`Found ${this.state.filesToTranslate.length} files to translate (${numFilesFiltered + numFilesWithPRs + numFilesTooLarge} filtered)`,
-		);
+		return { numFilesFiltered, numFilesTooLarge };
 	}
 
 	/**
 	 * Fetches a batch of files and updates the spinner
 	 *
 	 * @param batch The batch of files to fetch
-	 * @param updateSpinnerFn The function to update the spinner
+	 * @param updateLoggerFn The function to update the spinner
 	 *
 	 * @returns The batch of files
 	 */
 	protected async fetchBatch(
-		batch: typeof this.state.repositoryTree,
-		updateSpinnerFn: () => void,
+		batch: RepositoryTreeItems,
+		updateLoggerFn: () => void,
 	): Promise<(TranslationFile | null)[]> {
 		return await Promise.all(
 			batch.map(async (file) => {
@@ -368,7 +493,7 @@ export abstract class BaseRunnerService {
 
 				const content = await this.services.github.getFileContent(file);
 
-				updateSpinnerFn();
+				updateLoggerFn();
 
 				return new TranslationFile(content, filename, file.path, file.sha);
 			}),
@@ -661,8 +786,9 @@ export abstract class BaseRunnerService {
 			);
 
 			const languageName =
-				this.services.translator.languageDetector.getLanguageName(this.options.targetLanguage) ||
-				"Portuguese";
+				this.services.translator.languageDetector.getLanguageName(
+					this.services.translator.languageDetector.languages.target,
+				) || "Portuguese";
 
 			const commitStartTime = Date.now();
 			await this.services.github.commitTranslation({
@@ -765,8 +891,9 @@ export abstract class BaseRunnerService {
 		processingResult: ProcessedFileResult,
 	): string {
 		const languageName =
-			this.services.translator.languageDetector.getLanguageName(this.options.targetLanguage) ||
-			"Portuguese";
+			this.services.translator.languageDetector.getLanguageName(
+				this.services.translator.languageDetector.languages.target,
+			) || "Portuguese";
 
 		const processingTime = Date.now() - this.metadata.timestamp;
 		const sourceLength = file.content.length;
@@ -805,7 +932,7 @@ Please review this translation for:
 
 ### Technical Information
 
-- **Target Language**: ${languageName} (\`${this.options.targetLanguage}\`)
+- **Target Language**: ${languageName} (\`${this.services.translator.languageDetector.languages.target}\`)
 - **AI Model**: \`${env.LLM_MODEL}\` via Open Router API
 - **Generated**: ${new Date().toISOString().split("T")[0]}
 - **Branch**: \`${processingResult.branch?.ref || "unknown"}\`

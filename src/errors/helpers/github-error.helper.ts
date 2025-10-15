@@ -1,11 +1,8 @@
 import { RequestError } from "@octokit/request-error";
 import { StatusCodes } from "http-status-codes";
 
-import { ErrorCode, ErrorSeverity, TranslationError } from "@/errors/base-error";
-import { logger } from "@/utils/logger.util";
-import { detectRateLimit } from "@/utils/rate-limit-detector.util";
-
-import { ErrorHelper } from "./error.helper";
+import { ErrorCode, ErrorHelper, ErrorSeverity, TranslationError } from "@/errors/";
+import { detectRateLimit, logger } from "@/utils/";
 
 export class GithubErrorHelper implements ErrorHelper {
 	/**

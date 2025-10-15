@@ -289,7 +289,7 @@ throw new SpecificError(message, context);
 
 ```typescript
 import { expect, test } from "bun:test";
-import { EmptyContentError } from "@/errors";
+import { EmptyContentError } from "@/errors/";
 
 test("throws EmptyContentError for empty content", () => {
   const file = new TranslationFile("", "test.md", "path/test.md", "sha123");
