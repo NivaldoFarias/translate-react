@@ -1,59 +1,28 @@
 /**
- * @fileoverview Tests for the {@link LanguageDetectorService		test("should analyze Portuguese content as translated", async () => {
-			const filename = "test.md";
-			const portugueseText =
-				"Este é um texto abrangente em português brasileiro para fins de teste de detecção de idioma. " +
-				"Contém várias palavras e frases típicas da língua portuguesa que devem ser facilmente detectadas " +
-				"pelo sistema de detecção de idiomas CLD. A detecção deve funcionar corretamente com este conteúdo.";
-
-			const analysis = await detector.analyzeLanguage(filename, portugueseText);
-
-			// CLD may detect Portuguese as "pt" instead of exact target "pt-br", 
-			// but the ratio should still indicate translation
-			expect(analysis.detectedLanguage).toBeDefined();
-			expect(analysis.ratio).toBeGreaterThan(0);
-			// More flexible assertion - content should be detected as non-English
-			expect(analysis.detectedLanguage).not.toBe("en");
-		}); *
+ * @fileoverview Tests for the {@link LanguageDetectorService}.
+ *
  * This suite covers language detection, translation analysis, and edge cases
  * for content language processing in the translation workflow.
  */
 
 import { beforeEach, describe, expect, test } from "bun:test";
 
-import type { LanguageConfig } from "@/services/language-detector.service";
-
 import { LanguageDetectorService } from "@/services/language-detector.service";
 
 describe("LanguageDetector", () => {
 	let detector: LanguageDetectorService;
-	const config: LanguageConfig = {
-		source: "en",
-		target: "pt-br",
-	};
 
 	beforeEach(() => {
-		detector = new LanguageDetectorService(config);
+		detector = new LanguageDetectorService();
 	});
 
 	describe("Constructor", () => {
-		test("should initialize with valid language configuration", () => {
+		test("should initialize with valid language configuration from env", () => {
 			expect(detector).toBeInstanceOf(LanguageDetectorService);
 			expect(detector.detected).toBeInstanceOf(Map);
-		});
-
-		test("should throw error for invalid source language code", () => {
-			expect(() => {
-				// @ts-expect-error - Testing invalid type for runtime validation
-				new LanguageDetectorService({ source: "invalid", target: "pt-br" });
-			}).toThrow("Unsupported language code: invalid or pt-br");
-		});
-
-		test("should throw error for invalid target language code", () => {
-			expect(() => {
-				// @ts-expect-error - Testing invalid type for runtime validation
-				new LanguageDetectorService({ source: "en", target: "invalid" });
-			}).toThrow("Unsupported language code: en or invalid");
+			expect(detector.languages).toBeDefined();
+			expect(detector.languages.source).toBeDefined();
+			expect(detector.languages.target).toBeDefined();
 		});
 	});
 

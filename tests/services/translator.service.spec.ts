@@ -7,20 +7,24 @@
 
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 
-import type { LanguageConfig } from "@/services/language-detector.service";
+import type OpenAI from "openai";
 
 import { TranslationFile, TranslatorService } from "@/services/translator.service";
 
+type MockOpenAI = {
+	chat: {
+		completions: {
+			create: ReturnType<typeof mock>;
+		};
+	};
+};
+
 describe("TranslatorService", () => {
 	let translatorService: TranslatorService;
-	let mockOpenAI: unknown;
-	const config: LanguageConfig = {
-		source: "en",
-		target: "pt-br",
-	};
+	let mockOpenAI: MockOpenAI;
 
 	beforeEach(() => {
-		translatorService = new TranslatorService(config);
+		translatorService = new TranslatorService();
 
 		mockOpenAI = {
 			chat: {
@@ -42,7 +46,7 @@ describe("TranslatorService", () => {
 		});
 
 		test("should initialize language detector with provided config", () => {
-			const service = new TranslatorService({ source: "fr", target: "pt-br" });
+			const service = new TranslatorService();
 			expect(service).toBeInstanceOf(TranslatorService);
 		});
 	});
@@ -54,7 +58,7 @@ describe("TranslatorService", () => {
 			};
 			mockOpenAI.chat.completions.create = mock(() => Promise.resolve(mockResponse));
 			// @ts-expect-error - Mocking private property for testing
-			translatorService.llm = mockOpenAI;
+			translatorService.llm = mockOpenAI as unknown as OpenAI;
 
 			const file: TranslationFile = {
 				path: "test/file.md",
@@ -77,7 +81,7 @@ describe("TranslatorService", () => {
 				filename: "empty.md",
 			};
 
-			expect(await translatorService.translateContent(file)).rejects.toThrow(
+			await expect(translatorService.translateContent(file)).rejects.toThrow(
 				"File content is empty",
 			);
 		});
@@ -89,7 +93,7 @@ describe("TranslatorService", () => {
 				}),
 			);
 			// @ts-expect-error - Mocking private property for testing
-			translatorService.llm = mockOpenAI;
+			translatorService.llm = mockOpenAI as unknown as OpenAI;
 
 			const file: TranslationFile = {
 				path: "test/whitespace.md",
@@ -98,10 +102,9 @@ describe("TranslatorService", () => {
 				filename: "whitespace.md",
 			};
 
-			const result = await translatorService.translateContent(file);
-
-			expect(result).toBeDefined();
-			expect(typeof result).toBe("string");
+			await expect(translatorService.translateContent(file)).rejects.toThrow(
+				"Translation produced empty content",
+			);
 		});
 
 		test("should preserve code blocks in translated content", async () => {
@@ -116,7 +119,7 @@ describe("TranslatorService", () => {
 			};
 			mockOpenAI.chat.completions.create = mock(() => Promise.resolve(mockResponse));
 			// @ts-expect-error - Mocking private property for testing
-			translatorService.llm = mockOpenAI;
+			translatorService.llm = mockOpenAI as unknown as OpenAI;
 
 			const file: TranslationFile = {
 				path: "test/code.md",
@@ -136,7 +139,7 @@ describe("TranslatorService", () => {
 		test("should handle API errors gracefully", async () => {
 			mockOpenAI.chat.completions.create = mock(() => Promise.reject(new Error("API Error")));
 			// @ts-expect-error - Mocking private property for testing
-			translatorService.llm = mockOpenAI;
+			translatorService.llm = mockOpenAI as unknown as OpenAI;
 
 			const file: TranslationFile = {
 				path: "test/error.md",
@@ -145,7 +148,7 @@ describe("TranslatorService", () => {
 				filename: "error.md",
 			};
 
-			expect(await translatorService.translateContent(file)).rejects.toThrow("API Error");
+			await expect(translatorService.translateContent(file)).rejects.toThrow("API Error");
 		});
 
 		test("should handle large content with chunking", async () => {
@@ -156,7 +159,7 @@ describe("TranslatorService", () => {
 				}),
 			);
 			// @ts-expect-error - Mocking private property for testing
-			translatorService.llm = mockOpenAI;
+			translatorService.llm = mockOpenAI as unknown as OpenAI;
 
 			const file: TranslationFile = {
 				path: "test/large.md",
@@ -270,7 +273,7 @@ describe("TranslatorService", () => {
 				}),
 			);
 			// @ts-expect-error - Mocking private property for testing
-			translatorService.llm = mockOpenAI;
+			translatorService.llm = mockOpenAI as unknown as OpenAI;
 
 			const result = await translatorService.chunkAndRetryTranslation(content);
 
@@ -286,7 +289,7 @@ describe("TranslatorService", () => {
 				}),
 			);
 			// @ts-expect-error - Mocking private property for testing
-			translatorService.llm = mockOpenAI;
+			translatorService.llm = mockOpenAI as unknown as OpenAI;
 
 			expect(await translatorService.chunkAndRetryTranslation("test content")).rejects.toThrow(
 				"No content returned",
@@ -311,7 +314,7 @@ describe("TranslatorService", () => {
 				}),
 			);
 			// @ts-expect-error - Mocking private property for testing
-			translatorService.llm = mockOpenAI;
+			translatorService.llm = mockOpenAI as unknown as OpenAI;
 
 			const file: TranslationFile = {
 				path: "test/malformed.md",
@@ -336,7 +339,7 @@ describe("TranslatorService", () => {
 				}),
 			);
 			// @ts-expect-error - Mocking private property for testing
-			translatorService.llm = mockOpenAI;
+			translatorService.llm = mockOpenAI as unknown as OpenAI;
 
 			const file: TranslationFile = {
 				path: "test/special.md",

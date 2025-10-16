@@ -12,14 +12,9 @@ import { TranslationFile } from "@/services/translator.service";
 
 describe("ContentService", () => {
 	let contentService: ContentService;
-	const mockConfig = {
-		upstream: { owner: "test-owner", repo: "test-repo" },
-		fork: { owner: "fork-owner", repo: "fork-repo" },
-		token: "test-token",
-	};
 
 	beforeEach(() => {
-		contentService = new ContentService(mockConfig.upstream, mockConfig.fork);
+		contentService = new ContentService();
 	});
 
 	test("should get untranslated files", async () => {
@@ -99,7 +94,7 @@ describe("ContentService", () => {
 		};
 
 		expect(
-			await contentService.commitTranslation({
+			contentService.commitTranslation({
 				branch: mockBranch,
 				file: mockFile,
 				content: "# Translated Content",

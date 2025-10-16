@@ -24,6 +24,9 @@ describe("Environment Utilities", () => {
 			REPO_UPSTREAM_OWNER: "test-original-owner",
 			NODE_ENV: "test",
 			BUN_ENV: "test",
+			FORCE_SNAPSHOT_CLEAR: "false",
+			DEV_MODE_FORK_PR: "false",
+			LOG_TO_CONSOLE: "false",
 		});
 	});
 

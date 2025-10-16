@@ -1,12 +1,13 @@
 name: Sync and Translate
+
 on:
   # Manual trigger
   workflow_dispatch:
-  
+
   # Scheduled check for upstream changes (runs every 6 hours)
   schedule:
-    - cron: '0 */6 * * *'
-  
+    - cron: "0 */6 * * *"
+
   # Trigger when a webhook is received from upstream repo
   # Note: This requires setting up a GitHub webhook from the upstream repo
   repository_dispatch:
@@ -24,7 +25,7 @@ jobs:
     outputs:
       has-changes: ${{ steps.check.outputs.has-changes }}
       latest-commit: ${{ steps.check.outputs.latest-commit }}
-    
+
     steps:
       - name: Checkout fork
         uses: actions/checkout@v4
@@ -47,12 +48,12 @@ jobs:
         run: |
           # Get the latest commit from upstream main branch
           UPSTREAM_COMMIT=$(git rev-parse upstream/main)
-          
+
           # Get the commit that was last synced (stored in a sync marker file or compare with origin/main)
           CURRENT_COMMIT=$(git rev-parse origin/main)
-          
+
           echo "latest-commit=$UPSTREAM_COMMIT" >> $GITHUB_OUTPUT
-          
+
           if [ "$UPSTREAM_COMMIT" != "$CURRENT_COMMIT" ]; then
             echo "has-changes=true" >> $GITHUB_OUTPUT
             echo "✅ Upstream has new changes"
@@ -66,7 +67,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: check-upstream-changes
     if: needs.check-upstream-changes.outputs.has-changes == 'true'
-    
+
     steps:
       - name: Checkout fork
         uses: actions/checkout@v4
