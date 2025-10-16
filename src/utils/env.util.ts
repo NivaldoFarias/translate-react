@@ -27,6 +27,20 @@ function createTokenSchema(envName: string) {
 		);
 }
 
+/**
+ * Detects if running in test environment.
+ *
+ * Checks NODE_ENV, BUN_ENV, and Bun's built-in test detection.
+ */
+function isTestEnvironment(): boolean {
+	const env = import.meta.env;
+	return (
+		env["NODE_ENV"] === RuntimeEnvironment.Test ||
+		env["BUN_ENV"] === RuntimeEnvironment.Test ||
+		(typeof Bun !== "undefined" && Bun.isMainThread === false)
+	);
+}
+
 /** Environment configuration schema for runtime validation */
 const envSchema = z.object({
 	/**
@@ -50,11 +64,17 @@ const envSchema = z.object({
 	 */
 	LOG_LEVEL: z.enum(LogLevel).default(environmentDefaults.LOG_LEVEL),
 
-	/** The GitHub Personal Access Token */
-	GITHUB_TOKEN: createTokenSchema("GITHUB_TOKEN"),
+	/** The GitHub Personal Access Token (optional in test environment) */
+	GITHUB_TOKEN:
+		isTestEnvironment() ?
+			createTokenSchema("GITHUB_TOKEN").optional()
+		:	createTokenSchema("GITHUB_TOKEN"),
 
-	/** The OpenAI/OpenRouter/etc API key */
-	OPENAI_API_KEY: createTokenSchema("OPENAI_API_KEY"),
+	/** The OpenAI/OpenRouter/etc API key (optional in test environment) */
+	OPENAI_API_KEY:
+		isTestEnvironment() ?
+			createTokenSchema("OPENAI_API_KEY").optional()
+		:	createTokenSchema("OPENAI_API_KEY"),
 
 	/**
 	 * The owner _(user or organization)_ of the forked repository.
