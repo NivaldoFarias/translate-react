@@ -40,9 +40,20 @@ export interface LanguageConfig {
  * analysis operations.
  */
 export interface LanguageAnalysis {
-	/** Confidence scores for source and target languages */
+	/** Confidence scores for source and target languages, on a scale from 0 to 1 */
 	languageScore: {
+		/**
+		 * Confidence scores for target languages, on a scale from 0 to 1
+		 *
+		 * @example 0.98
+		 */
 		target: number;
+
+		/**
+		 * Confidence scores for source languages, on a scale from 0 to 1
+		 *
+		 * @example 0.02
+		 */
 		source: number;
 	};
 
