@@ -2,8 +2,8 @@ import type {
 	CacheCheckResult,
 	FileProcessingProgress,
 	LanguageDetectionResult,
-	PrFilterResult,
 	ProcessedFileResult,
+	PrFilterResult as PullRequestFilterResult,
 	RepositoryTreeItems,
 	RunnerOptions,
 } from "./runner.types";
@@ -326,7 +326,7 @@ export abstract class BaseRunnerService {
 	 */
 	private async filterFilesByExistingPRs(
 		candidateFiles: RepositoryTreeItems,
-	): Promise<PrFilterResult> {
+	): Promise<PullRequestFilterResult> {
 		logger.info("Checking for existing open PRs...");
 
 		const openPRs = await this.services.github.listOpenPullRequests();
@@ -348,10 +348,17 @@ export abstract class BaseRunnerService {
 		const filesToFetch: typeof candidateFiles = [];
 
 		for (const file of candidateFiles) {
-			if (file.path && prFileMap.has(file.path)) {
+			if (!file.path) {
+				filesToFetch.push(file);
+				continue;
+			}
+
+			const filename = file.path.split("/").pop() ?? file.path;
+
+			if (prFileMap.has(filename)) {
 				numFilesWithPRs++;
 				logger.debug(
-					{ filename: file.path, prNumber: prFileMap.get(file.path) },
+					{ fullPath: file.path, filename, prNumber: prFileMap.get(filename) },
 					"Skipping file with existing PR",
 				);
 			} else {

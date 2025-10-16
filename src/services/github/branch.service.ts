@@ -1,7 +1,7 @@
 import { RestEndpointMethodTypes } from "@octokit/rest";
 import { StatusCodes } from "http-status-codes";
 
-import { BaseGitHubService } from "@/services/github/";
+import { BaseGitHubService, ContentService } from "@/services/github/";
 import { env, logger, setupSignalHandlers } from "@/utils/";
 
 /**
@@ -17,7 +17,8 @@ import { env, logger, setupSignalHandlers } from "@/utils/";
  */
 export class BranchService extends BaseGitHubService {
 	/** Set of branch names currently being tracked for cleanup */
-	protected activeBranches: Set<string> = new Set();
+	public activeBranches: Set<string> = new Set();
+	private readonly contentService = new ContentService();
 
 	/**
 	 * Creates a new branch service instance.
@@ -189,24 +190,63 @@ export class BranchService extends BaseGitHubService {
 	}
 
 	/**
-	 * Retrieves list of currently tracked branches.
+	 * Removes all tracked branches, but only if they don't have valid PRs.
+	 *
+	 * Called automatically on process termination. Checks each branch for an associated
+	 * pull request before deletion. If a PR exists without conflicts, the branch is
+	 * preserved to avoid closing valid PRs. Only branches without PRs or branches with
+	 * conflicted PRs are deleted during cleanup.
+	 *
+	 * ### Safety Checks
+	 *
+	 * For each branch in `activeBranches`:
+	 * 1. Check if an open PR exists for the branch
+	 * 2. If PR exists, check for merge conflicts
+	 * 3. Only delete if: no PR exists OR PR has conflicts
+	 * 4. Skip deletion if: PR exists without conflicts
+	 *
+	 * This prevents accidentally closing valid PRs when the process is interrupted
+	 * via SIGINT (Ctrl+C) or other termination signals.
 	 *
 	 * @example
 	 * ```typescript
-	 * const branches = branchService.getActiveBranches();
-	 * console.log(`Active branches: ${branches.join(', ')}`);
+	 * // On SIGINT:
+	 * // - Branch "translate/file1.md" has PR #123 (clean) → preserved
+	 * // - Branch "translate/file2.md" has PR #124 (conflicts) → deleted
+	 * // - Branch "translate/file3.md" has no PR → deleted
 	 * ```
 	 */
-	public getActiveBranches(): string[] {
-		return Array.from(this.activeBranches);
-	}
-
-	/**
-	 * Removes all tracked branches.
-	 * Called automatically on process termination.
-	 */
 	protected async cleanup(): Promise<void> {
-		await Promise.all(Array.from(this.activeBranches).map((branch) => this.deleteBranch(branch)));
+		const branchesToCheck = Array.from(this.activeBranches);
+
+		for (const branch of branchesToCheck) {
+			try {
+				const pr = await this.contentService.findPullRequestByBranch(branch);
+
+				if (pr) {
+					const prStatus = await this.contentService.checkPullRequestStatus(pr.number);
+
+					if (prStatus.needsUpdate) {
+						logger.info(
+							{ branch, prNumber: pr.number, mergeableState: prStatus.mergeableState },
+							"Cleanup: Deleting branch with conflicted PR",
+						);
+
+						await this.deleteBranch(branch);
+					} else {
+						logger.info(
+							{ branch, prNumber: pr.number, mergeableState: prStatus.mergeableState },
+							"Cleanup: Preserving branch with valid PR",
+						);
+					}
+				} else {
+					logger.info({ branch }, "Cleanup: Deleting branch without PR");
+					await this.deleteBranch(branch);
+				}
+			} catch (error) {
+				logger.error({ branch, error }, "Cleanup: Error checking branch, skipping deletion");
+			}
+		}
 	}
 
 	/**

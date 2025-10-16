@@ -106,7 +106,7 @@ describe("BranchService", () => {
 		});
 
 		test("should initialize empty active branches set", () => {
-			const activeBranches = branchService.getActiveBranches();
+			const activeBranches = Array.from(branchService.activeBranches);
 			expect(activeBranches).toEqual([]);
 		});
 	});
@@ -142,7 +142,7 @@ describe("BranchService", () => {
 		test("should track created branch for cleanup", async () => {
 			await branchService.createBranch("feature/test");
 
-			const activeBranches = branchService.getActiveBranches();
+			const activeBranches = Array.from(branchService.activeBranches);
 			expect(activeBranches).toContain("feature/test");
 		});
 
@@ -153,7 +153,7 @@ describe("BranchService", () => {
 				"Branch creation failed",
 			);
 
-			const activeBranches = branchService.getActiveBranches();
+			const activeBranches = Array.from(branchService.activeBranches);
 			expect(activeBranches).not.toContain("feature/test");
 		});
 
@@ -210,7 +210,7 @@ describe("BranchService", () => {
 				ref: "heads/feature/test",
 			});
 
-			const activeBranches = branchService.getActiveBranches();
+			const activeBranches = Array.from(branchService.activeBranches);
 			expect(activeBranches).not.toContain("feature/test");
 			expect(result.status).toBe(204);
 		});
@@ -221,14 +221,14 @@ describe("BranchService", () => {
 
 			expect(await branchService.deleteBranch("feature/test")).rejects.toThrow("Deletion failed");
 
-			const activeBranches = branchService.getActiveBranches();
+			const activeBranches = Array.from(branchService.activeBranches);
 			expect(activeBranches).toContain("feature/test");
 		});
 	});
 
 	describe("getActiveBranches", () => {
 		test("should return empty array when no branches tracked", () => {
-			const activeBranches = branchService.getActiveBranches();
+			const activeBranches = Array.from(branchService.activeBranches);
 			expect(activeBranches).toEqual([]);
 		});
 
@@ -236,7 +236,7 @@ describe("BranchService", () => {
 			await branchService.createBranch("feature/branch1");
 			await branchService.createBranch("feature/branch2");
 
-			const activeBranches = branchService.getActiveBranches();
+			const activeBranches = Array.from(branchService.activeBranches);
 			expect(activeBranches).toContain("feature/branch1");
 			expect(activeBranches).toContain("feature/branch2");
 			expect(activeBranches).toHaveLength(2);
@@ -245,8 +245,8 @@ describe("BranchService", () => {
 		test("should return copy of internal set", async () => {
 			await branchService.createBranch("feature/test");
 
-			const activeBranches1 = branchService.getActiveBranches();
-			const activeBranches2 = branchService.getActiveBranches();
+			const activeBranches1 = Array.from(branchService.activeBranches);
+			const activeBranches2 = Array.from(branchService.activeBranches);
 
 			expect(activeBranches1).not.toBe(activeBranches2);
 			expect(activeBranches1).toEqual(activeBranches2);
@@ -326,7 +326,7 @@ describe("BranchService", () => {
 				ref: "heads/feature/branch2",
 			});
 
-			const activeBranches = branchService.getActiveBranches();
+			const activeBranches = Array.from(branchService.activeBranches);
 			expect(activeBranches).toEqual([]);
 		});
 
@@ -337,7 +337,7 @@ describe("BranchService", () => {
 			// @ts-expect-error
 			expect(await branchService.cleanup()).rejects.toThrow("Cleanup failed");
 
-			const activeBranches = branchService.getActiveBranches();
+			const activeBranches = Array.from(branchService.activeBranches);
 			expect(activeBranches).toContain("feature/test");
 		});
 
@@ -386,7 +386,7 @@ describe("BranchService", () => {
 
 			await Promise.all(promises);
 
-			const activeBranches = branchService.getActiveBranches();
+			const activeBranches = Array.from(branchService.activeBranches);
 			expect(activeBranches).toHaveLength(3);
 			expect(activeBranches).toContain("feature/concurrent1");
 			expect(activeBranches).toContain("feature/concurrent2");
@@ -404,7 +404,7 @@ describe("BranchService", () => {
 
 			await Promise.all(cleanupPromises);
 
-			const activeBranches = branchService.getActiveBranches();
+			const activeBranches = Array.from(branchService.activeBranches);
 			expect(activeBranches).toEqual([]);
 		});
 	});
