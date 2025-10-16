@@ -22,6 +22,28 @@ import { env, LANGUAGE_SPECIFIC_RULES, logger, MAX_CHUNK_TOKENS } from "@/utils/
 
 import { LanguageDetectorService } from "./language-detector.service";
 
+/**
+ * Result of content chunking operation containing chunks and their separators.
+ *
+ * The separators array contains the exact whitespace patterns that existed
+ * between each pair of chunks in the original content, enabling perfect
+ * reassembly that preserves the source formatting.
+ */
+interface ChunkingResult {
+	/** Array of content chunks split from the original text */
+	chunks: string[];
+
+	/**
+	 * Array of separator strings between chunks.
+	 *
+	 * Length is always `chunks.length - 1` since there's one separator
+	 * between each pair of adjacent chunks. Each separator is the exact
+	 * whitespace pattern (e.g., `\n`, `\n\n`, `\n\n\n`) extracted from
+	 * the original content at that boundary position.
+	 */
+	separators: string[];
+}
+
 /** Represents a file that needs to be translated */
 export class TranslationFile {
 	constructor(
@@ -374,48 +396,57 @@ export class TranslatorService {
 	}
 
 	/**
-	 * Splits content into chunks while preserving markdown structure and formatting.
+	 * Splits content into chunks while preserving exact separators between chunks.
 	 *
-	 * Uses LangChain's {@link MarkdownTextSplitter} for intelligent chunking that respects
-	 * markdown structure and code blocks, ensuring chunks don't exceed the maximum
-	 * token limit while maintaining content coherence and readability.
+	 * Uses LangChain's `MarkdownTextSplitter` for intelligent chunking that respects
+	 * markdown structure and code blocks. After splitting, this method analyzes the
+	 * original content to detect and preserve the exact whitespace pattern (separator)
+	 * that exists between each pair of chunks, enabling perfect reassembly that maintains
+	 * the source document's formatting.
 	 *
-	 * ### Whitespace Preservation Strategy
+	 * ### Separator Detection Strategy
 	 *
-	 * The MarkdownTextSplitter automatically strips trailing whitespace from all chunks,
-	 * which can cause improper spacing during reassembly. This method implements a
-	 * comprehensive preservation strategy:
+	 * 1. **Split Content**: Uses LangChain splitter to create manageable chunks
+	 * 2. **Locate Chunks**: Finds each chunk's position in the original content
+	 * 3. **Extract Separators**: Captures exact whitespace between chunk boundaries
+	 * 4. **Fallback Handling**: Uses `\n\n` if separator detection fails
 	 *
-	 * - **Non-final chunks**: Always end with a newline to ensure proper spacing when joined
-	 * - **Final chunk**: Preserves the original file's ending exactly - if the source content
-	 *   ends with a newline, the last chunk will too; if not, it won't
+	 * This approach ensures that boundaries with single newlines (`\n`), double newlines
+	 * (`\n\n`), or any other whitespace pattern are preserved exactly as they appear in
+	 * the source, preventing blank line loss or addition during translation reassembly.
 	 *
-	 * This approach ensures that reassembled content maintains identical structure and
-	 * whitespace patterns to the original, preventing both missing newlines and extra
-	 * blank lines.
+	 * ### Whitespace Preservation Guarantee
 	 *
-	 * @param content Content to split into manageable chunks
-	 * @param maxTokens Maximum tokens per chunk (defaults to safe limit)
+	 * - **Chunk boundaries**: Each separator is extracted from original content
+	 * - **Pattern variety**: Handles `\n`, `\n\n`, `\n\n\n`, and mixed patterns
+	 * - **Edge cases**: Works with code blocks, lists, and complex markdown
+	 * - **Fallback safety**: Defaults to `\n\n` if boundary detection fails
 	 *
-	 * @returns Promise resolving to array of content chunks with preserved markdown structure.
-	 *   Non-final chunks are guaranteed to end with `\n`. The final chunk matches the original
-	 *   file's ending whitespace pattern exactly.
+	 * @param content Content to split into manageable chunks for translation
+	 * @param maxTokens Maximum tokens per chunk, defaults to safe limit accounting for prompt overhead
+	 *
+	 * @returns Result object containing chunk array and separator array for reassembly
+	 *
+	 * @see {@link translateWithChunking} for usage in translation workflow
+	 * @see {@link MarkdownTextSplitter} from LangChain for splitting implementation
 	 *
 	 * @example
 	 * ```typescript
-	 * const translator = new TranslatorService({ source: 'en', target: 'pt-br' });
-	 * const content = '# Title\n\n```js\ncode here\n```\n\nMore content...\n';
-	 * const chunks = await translator.chunkContent(content, 1000);
-	 * console.log(chunks[0].endsWith('\n')); // true (non-final chunk)
-	 * console.log(chunks[chunks.length - 1].endsWith('\n')); // true (matches original)
+	 * const translator = new TranslatorService();
+	 * const content = '# Title\n\nContent\n\n## Section\n\nMore...';
+	 * const result = await translator.chunkContent(content);
+	 *
+	 * console.log(result.chunks.length);    // 3
+	 * console.log(result.separators.length); // 2
+	 * console.log(result.separators[0]);     // '\n\n'
 	 * ```
 	 */
 	private async chunkContent(
 		content: string,
 		maxTokens = MAX_CHUNK_TOKENS - 500,
-	): Promise<string[]> {
+	): Promise<ChunkingResult> {
 		if (!this.needsChunking(content)) {
-			return [content];
+			return { chunks: [content], separators: [] };
 		}
 
 		const splitter = new MarkdownTextSplitter({
@@ -424,25 +455,44 @@ export class TranslatorService {
 			lengthFunction: (text: string) => this.estimateTokenCount(text),
 		});
 
-		const chunks = await splitter.splitText(content);
-		const filteredChunks = chunks.filter((chunk) => chunk.trim().length > 0);
-		const originalEndsWithNewline = content.endsWith("\n");
+		const rawChunks = await splitter.splitText(content);
+		const chunks = rawChunks.filter((chunk) => chunk.trim().length > 0);
+		const separators: string[] = [];
 
-		return filteredChunks.map((chunk, index) => {
-			const isLastChunk = index === filteredChunks.length - 1;
+		/**
+		 * Detect the actual separator between each pair of chunks by finding
+		 * where each chunk appears in the original content and extracting the
+		 * whitespace between them.
+		 */
+		let searchStartIndex = 0;
 
-			if (isLastChunk) {
-				if (originalEndsWithNewline && !chunk.endsWith("\n")) {
-					return chunk + "\n";
-				}
+		for (let index = 0; index < chunks.length - 1; index++) {
+			const currentChunk = chunks[index]!;
+			const nextChunk = chunks[index + 1]!;
 
-				return chunk;
+			const currentChunkIndex = content.indexOf(currentChunk.trim(), searchStartIndex);
+
+			if (currentChunkIndex === -1) {
+				separators.push("\n\n");
+				continue;
 			}
 
-			if (!chunk.endsWith("\n")) return chunk + "\n";
+			const currentChunkEnd = currentChunkIndex + currentChunk.trim().length;
 
-			return chunk;
-		});
+			const nextChunkIndex = content.indexOf(nextChunk.trim(), currentChunkEnd);
+
+			if (nextChunkIndex === -1) {
+				separators.push("\n\n");
+				continue;
+			}
+
+			const separator = content.substring(currentChunkEnd, nextChunkIndex);
+			separators.push(separator);
+
+			searchStartIndex = nextChunkIndex;
+		}
+
+		return { chunks, separators };
 	}
 
 	/**
@@ -505,26 +555,25 @@ export class TranslatorService {
 			return await this.callLanguageModel(content);
 		}
 
-		const chunks = await this.chunkContent(content);
+		const { chunks, separators } = await this.chunkContent(content);
 		const translatedChunks: string[] = [];
 
 		logger.debug(
 			{
 				totalChunks: chunks.length,
 				originalContentLength: content.length,
-				chunkSizes: chunks.map((c) => c.length),
+				chunkSizes: chunks.map((chunk) => chunk.length),
 			},
 			"Starting chunked translation workflow",
 		);
 
-		for (let i = 0; i < chunks.length; i++) {
-			const chunk = chunks[i]!;
+		for (const [index, chunk] of chunks.entries()) {
 			const chunkStartTime = Date.now();
 
 			try {
 				logger.debug(
 					{
-						chunkIndex: i + 1,
+						chunkIndex: index + 1,
 						totalChunks: chunks.length,
 						chunkSize: chunk.length,
 						estimatedTokens: this.estimateTokenCount(chunk),
@@ -539,7 +588,7 @@ export class TranslatorService {
 
 				logger.info(
 					{
-						chunkIndex: i + 1,
+						chunkIndex: index + 1,
 						totalChunks: chunks.length,
 						translatedSize: translatedChunk.length,
 						durationMs: chunkDuration,
@@ -549,7 +598,7 @@ export class TranslatorService {
 
 				logger.debug(
 					{
-						chunkIndex: i + 1,
+						chunkIndex: index + 1,
 						originalLength: chunk.length,
 						translatedLength: translatedChunk.length,
 						sizeRatio: (translatedChunk.length / chunk.length).toFixed(2),
@@ -560,7 +609,7 @@ export class TranslatorService {
 				logger.error(
 					{
 						error,
-						chunkIndex: i + 1,
+						chunkIndex: index + 1,
 						totalChunks: chunks.length,
 						translatedSoFar: translatedChunks.length,
 					},
@@ -570,7 +619,7 @@ export class TranslatorService {
 				throw this.helpers.llm.mapError(error, {
 					operation: "TranslatorService.translateWithChunking",
 					metadata: {
-						chunkIndex: i,
+						chunkIndex: index,
 						totalChunks: chunks.length,
 						chunkSize: chunk.length,
 						estimatedTokens: this.estimateTokenCount(chunk),
@@ -616,15 +665,32 @@ export class TranslatorService {
 		logger.debug(
 			{
 				totalChunks: translatedChunks.length,
-				totalTranslatedLength: translatedChunks.reduce((sum, c) => sum + c.length, 0),
+				totalTranslatedLength: translatedChunks.reduce((sum, current) => sum + current.length, 0),
 				averageChunkSize: Math.round(
-					translatedChunks.reduce((sum, c) => sum + c.length, 0) / translatedChunks.length,
+					translatedChunks.reduce((sum, current) => sum + current.length, 0) /
+						translatedChunks.length,
 				),
 			},
 			"All chunks translated successfully - beginning reassembly",
 		);
 
-		const reassembledContent = translatedChunks.join("\n");
+		let reassembledContent = translatedChunks.reduce(
+			(accumulator, chunk, index) => accumulator + chunk + (separators[index] ?? ""),
+			"",
+		);
+
+		const originalEndsWithNewline = content.endsWith("\n");
+		const translatedEndsWithNewline = reassembledContent.endsWith("\n");
+
+		if (originalEndsWithNewline && !translatedEndsWithNewline) {
+			const originalTrailingNewlines = content.match(/\n+$/)?.[0] ?? "";
+			reassembledContent += originalTrailingNewlines;
+
+			logger.debug(
+				{ addedTrailingNewlines: originalTrailingNewlines.length },
+				"Restored trailing newlines from original content",
+			);
+		}
 
 		logger.debug(
 			{
