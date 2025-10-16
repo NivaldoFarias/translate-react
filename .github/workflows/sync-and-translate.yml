@@ -21,6 +21,7 @@ concurrency:
 jobs:
   check-upstream-changes:
     name: Check for Upstream Changes
+    if: ${{ vars.TRANSLATION_ENABLED == 'true' && vars.REPO_UPSTREAM_OWNER != '' && vars.REPO_UPSTREAM_NAME != '' }}
     runs-on: ubuntu-latest
     outputs:
       has-changes: ${{ steps.check.outputs.has-changes }}
@@ -64,9 +65,9 @@ jobs:
 
   sync-and-translate:
     name: Sync Fork and Run Translation
+    if: ${{ vars.TRANSLATION_ENABLED == 'true' && vars.REPO_UPSTREAM_OWNER != '' && vars.REPO_UPSTREAM_NAME != '' && vars.REPO_FORK_OWNER != '' && vars.REPO_FORK_NAME != '' && vars.TARGET_LANGUAGE != '' && needs.check-upstream-changes.outputs.has-changes == 'true' }}
     runs-on: ubuntu-latest
     needs: check-upstream-changes
-    if: needs.check-upstream-changes.outputs.has-changes == 'true'
 
     steps:
       - name: Checkout fork
