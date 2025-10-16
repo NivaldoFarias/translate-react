@@ -38,7 +38,7 @@ export default defineConfig(
 		},
 	},
 	{
-		files: ["scripts/**/*.{js,ts}", "src/build.ts"],
+		files: ["scripts/**/*.{js,ts}", "src/build.ts", "src/scripts/**/*.{js,ts}"],
 		rules: {
 			"no-console": "off",
 		},

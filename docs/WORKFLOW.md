@@ -2,6 +2,9 @@
 
 This document provides a detailed breakdown of the translation workflow execution, including timing analysis, data flow, and stage-specific operations.
 
+> [!NOTE]
+> **Automated Execution**: This workflow can run automatically via GitHub Actions. See [GitHub Actions Setup Guide](GITHUB_ACTIONS_SETUP.md) for configuration details.
+
 ## Table of Contents
 
 - [Workflow Execution Documentation](#workflow-execution-documentation)

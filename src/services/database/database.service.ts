@@ -1,4 +1,7 @@
+import { statSync } from "node:fs";
+
 import type { RestEndpointMethodTypes } from "@octokit/rest";
+import type { Stats } from "node:fs";
 
 import type { ProcessedFileResult } from "@/services/runner/";
 import type { SnapshotRecord } from "@/types";
@@ -46,16 +49,21 @@ export class DatabaseService extends BaseDatabaseService {
 	 * Creates a new workflow state snapshot.
 	 *
 	 * @param timestamp Optional timestamp for the snapshot
+	 *
+	 * @returns Snapshot ID of the newly created snapshot
 	 */
 	public createSnapshot(timestamp: number = Date.now()): number {
-		const statement = this.db.prepare("INSERT INTO snapshots (timestamp) VALUES (?)");
+		const statement = this.db.prepare(this.scripts.insert.snapshot);
 		const result = statement.run(timestamp);
 
 		return Number(result.lastInsertRowid);
 	}
 
 	/**
-	 * Saves repository tree structure to database. Uses transactions for data integrity.
+	 * Saves repository tree structure to database.
+	 *
+	 * Uses transactions for data integrity to ensure atomicity when inserting
+	 * multiple tree entries.
 	 *
 	 * @param snapshotId ID of associated snapshot
 	 * @param tree Repository tree structure from GitHub
@@ -64,10 +72,7 @@ export class DatabaseService extends BaseDatabaseService {
 		snapshotId: number,
 		tree: RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"],
 	): void {
-		const statement = this.db.prepare(`
-			INSERT INTO repository_tree (snapshot_id, path, mode, type, sha, size, url)
-			VALUES (?, ?, ?, ?, ?, ?, ?)
-		`);
+		const statement = this.db.prepare(this.scripts.insert.repositoryTree);
 
 		const transaction = this.db.transaction(
 			(items: RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"]) => {
@@ -92,16 +97,15 @@ export class DatabaseService extends BaseDatabaseService {
 
 	/**
 	 * Saves files pending translation to database.
-	 * Uses transactions for data integrity.
+	 *
+	 * Uses transactions for data integrity to ensure atomicity when inserting
+	 * multiple translation files.
 	 *
 	 * @param snapshotId ID of associated snapshot
 	 * @param files Files to be translated
 	 */
 	public saveFilesToTranslate(snapshotId: number, files: TranslationFile[]): void {
-		const statement = this.db.prepare(`
-			INSERT INTO files_to_translate (snapshot_id, content, sha, filename, path)
-			VALUES (?, ?, ?, ?, ?)
-		`);
+		const statement = this.db.prepare(this.scripts.insert.filesToTranslate);
 
 		const transaction = this.db.transaction((items: TranslationFile[]) => {
 			for (const item of items) {
@@ -117,20 +121,14 @@ export class DatabaseService extends BaseDatabaseService {
 	/**
 	 * Saves translation results to database.
 	 *
-	 * - Includes branch info, PR details, and any errors.
-	 * - Uses transactions for data integrity.
+	 * Includes branch info, PR details, and any errors. Uses transactions for
+	 * data integrity to ensure atomicity when inserting multiple results.
 	 *
 	 * @param snapshotId ID of associated snapshot
 	 * @param results Translation processing results
 	 */
 	public saveProcessedResults(snapshotId: number, results: ProcessedFileResult[]): void {
-		const statement = this.db.prepare(`
-			INSERT INTO processed_results (
-				snapshot_id, filename, branch_ref, branch_object_sha,
-				translation, pull_request_number, pull_request_url, error
-			)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-		`);
+		const statement = this.db.prepare(this.scripts.insert.processedResults);
 
 		const transaction = this.db.transaction((items: ProcessedFileResult[]) => {
 			for (const item of items) {
@@ -155,30 +153,28 @@ export class DatabaseService extends BaseDatabaseService {
 	/**
 	 * Fetches most recent workflow snapshot with all related data.
 	 *
-	 * Includes:
-	 * - Repository tree
-	 * - Files to translate
-	 * - Processing results
+	 * Includes repository tree, files to translate, and processing results.
 	 *
-	 * @returns `null` if no snapshots exist.
+	 * @returns Snapshot object with all related data, or `null` if no snapshots exist
 	 */
 	public getLatestSnapshot(): Snapshot | null {
-		const snapshot = this.db
-			.prepare("SELECT * FROM snapshots ORDER BY timestamp DESC LIMIT 1")
-			.get() as { id: number; timestamp: number } | null;
+		const snapshot = this.db.prepare(this.scripts.select.latestSnapshot).get() as {
+			id: number;
+			timestamp: number;
+		} | null;
 
 		if (!snapshot) return null;
 
 		const repositoryTree = this.db
-			.prepare("SELECT * FROM repository_tree WHERE snapshot_id = ?")
+			.prepare(this.scripts.select.repositoryTreeBySnapshotId)
 			.all(snapshot.id) as RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"];
 
 		const filesToTranslate = this.db
-			.prepare("SELECT * FROM files_to_translate WHERE snapshot_id = ?")
+			.prepare(this.scripts.select.filesToTranslateBySnapshotId)
 			.all(snapshot.id) as TranslationFile[];
 
 		const processedResults = this.db
-			.prepare("SELECT * FROM processed_results WHERE snapshot_id = ?")
+			.prepare(this.scripts.select.processedResultsBySnapshotId)
 			.all(snapshot.id) as ProcessedFileResult[];
 
 		return {
@@ -192,14 +188,16 @@ export class DatabaseService extends BaseDatabaseService {
 
 	/**
 	 * Removes all data from database tables.
-	 * Uses transaction to ensure all-or-nothing deletion.
+	 *
+	 * Uses transaction to ensure all-or-nothing deletion, maintaining referential
+	 * integrity by deleting in the correct order (child tables first).
 	 */
 	public async clearSnapshots(): Promise<void> {
 		this.db.transaction(() => {
-			this.db.prepare("DELETE FROM processed_results").run();
-			this.db.prepare("DELETE FROM files_to_translate").run();
-			this.db.prepare("DELETE FROM repository_tree").run();
-			this.db.prepare("DELETE FROM snapshots").run();
+			this.db.prepare(this.scripts.delete.allProcessedResults).run();
+			this.db.prepare(this.scripts.delete.allFilesToTranslate).run();
+			this.db.prepare(this.scripts.delete.allRepositoryTree).run();
+			this.db.prepare(this.scripts.delete.allSnapshots).run();
 		})();
 	}
 
@@ -238,12 +236,11 @@ export class DatabaseService extends BaseDatabaseService {
 	 * Retrieves cached language detection result for a file.
 	 *
 	 * Checks both filename and content hash (SHA) to ensure cache validity.
-	 * Returns null if not found or if SHA doesn't match (file changed).
 	 *
 	 * @param filename Name of the file to check
 	 * @param contentHash Git SHA of the file content
 	 *
-	 * @returns Cached language data or null if not found/invalid
+	 * @returns Cached language data or `null` if not found or if SHA doesn't match
 	 */
 	public getLanguageCache(filename: string, contentHash: string): LanguageCache | null {
 		const result = this.db.prepare(this.scripts.select.languageCache).get(filename, contentHash) as
@@ -262,13 +259,13 @@ export class DatabaseService extends BaseDatabaseService {
 	/**
 	 * Stores language detection result in cache.
 	 *
-	 * Uses REPLACE to update existing entries or insert new ones.
+	 * Uses REPLACE statement to update existing entries or insert new ones.
 	 *
-	 * @param languageCache
-	 * @param filename Name of the file
-	 * @param contentHash Git SHA of the file content
-	 * @param detectedLanguage Detected language code (e.g., 'pt', 'en')
-	 * @param confidence Detection confidence score (0-1)
+	 * @param params Language cache data to store
+	 * @param params.filename Name of the file
+	 * @param params.contentHash Git SHA of the file content
+	 * @param params.detectedLanguage Detected language code (e.g., 'pt', 'en')
+	 * @param params.confidence Detection confidence score (0-1)
 	 */
 	public setLanguageCache({
 		filename,
@@ -309,5 +306,110 @@ export class DatabaseService extends BaseDatabaseService {
 		const query = `DELETE FROM language_cache WHERE filename IN (${placeholders})`;
 
 		this.db.prepare(query).run(...filenames);
+	}
+
+	/**
+	 * Removes old snapshots, keeping only the most recent ones.
+	 *
+	 * Executes deletion in a transaction and then runs VACUUM to reclaim disk space.
+	 *
+	 * @param keepCount Number of recent snapshots to retain (default: 10)
+	 *
+	 * @returns Number of snapshots deleted
+	 */
+	public cleanOldSnapshots(keepCount = 10): number {
+		const result = this.db.transaction(() => {
+			const beforeCount = this.db.prepare(this.scripts.select.countSnapshots).get() as {
+				count: number;
+			};
+
+			this.db.prepare(this.scripts.delete.oldSnapshots).run(keepCount);
+
+			const afterCount = this.db.prepare(this.scripts.select.countSnapshots).get() as {
+				count: number;
+			};
+
+			return beforeCount.count - afterCount.count;
+		})();
+
+		this.db.run(this.scripts.other.vacuum);
+
+		return result;
+	}
+
+	/**
+	 * Generates comprehensive database statistics report.
+	 *
+	 * @returns Object containing table counts, recent snapshots, and recently processed files
+	 */
+	public getDatabaseStats() {
+		return {
+			snapshots: this.db.prepare(this.scripts.select.countSnapshots).get() as {
+				count: number;
+			},
+			repositoryTree: this.db.prepare(this.scripts.select.countRepositoryTree).get() as {
+				count: number;
+			},
+			filesToTranslate: this.db.prepare(this.scripts.select.countFilesToTranslate).get() as {
+				count: number;
+			},
+			processedResults: this.db.prepare(this.scripts.select.countProcessedResults).get() as {
+				count: number;
+			},
+			failedTranslations: this.db.prepare(this.scripts.select.countFailedTranslations).get() as {
+				count: number;
+			},
+			languageCache: this.db.prepare(this.scripts.select.countLanguageCache).get() as {
+				count: number;
+			},
+			recentSnapshots: this.db
+				.prepare(this.scripts.select.recentSnapshots)
+				.all() as SnapshotRecord[],
+			recentProcessed: this.db.prepare(this.scripts.select.recentProcessedFiles).all() as Array<{
+				filename: string;
+				branch_ref: string | null;
+				pull_request_number: number | null;
+			}>,
+		};
+	}
+
+	/**
+	 * Validates database integrity.
+	 *
+	 * Attempts to query each table to verify they exist and are accessible.
+	 *
+	 * @returns Object indicating if database is valid and any error message if validation fails
+	 */
+	public validateDatabase(): { valid: boolean; error?: string } {
+		try {
+			this.db.prepare(this.scripts.select.countSnapshots).get();
+			this.db.prepare(this.scripts.select.countRepositoryTree).get();
+			this.db.prepare(this.scripts.select.countFilesToTranslate).get();
+			this.db.prepare(this.scripts.select.countProcessedResults).get();
+			this.db.prepare(this.scripts.select.countFailedTranslations).get();
+			this.db.prepare(this.scripts.select.countLanguageCache).get();
+
+			return { valid: true };
+		} catch (error) {
+			return {
+				valid: false,
+				error: error instanceof Error ? error.message : "Unknown validation error",
+			};
+		}
+	}
+
+	/**
+	 * Gets the size of the database file in bytes.
+	 *
+	 * @param filename Database filename (default: "snapshots.sqlite")
+	 *
+	 * @returns File size in bytes or null if file doesn't exist
+	 */
+	public getDatabaseSize(filename = "snapshots.sqlite"): Stats | null {
+		try {
+			return statSync(filename);
+		} catch {
+			return null;
+		}
 	}
 }

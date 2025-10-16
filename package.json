@@ -18,8 +18,13 @@
 		"lint": "eslint .",
 		"lint:fix": "eslint . --fix",
 		"format": "prettier --write '**/*.{ts,js,cjs,mjs,json}'",
+		"format:check": "prettier --check '**/*.{ts,js,cjs,mjs,json}'",
 		"type-check": "tsc",
-		"test": "bun test"
+		"test": "bun test",
+		"db:validate": "bun src/scripts/database-management.ts validate",
+		"db:clean": "bun src/scripts/database-management.ts clean",
+		"db:inspect": "bun src/scripts/database-management.ts inspect",
+		"db:size": "bun src/scripts/database-management.ts size"
 	},
 	"dependencies": {
 		"@langchain/textsplitters": "^0.1.0",
