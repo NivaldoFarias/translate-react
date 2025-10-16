@@ -10,13 +10,11 @@ export default {
 	trailingComma: "all",
 	bracketSpacing: true,
 	proseWrap: "preserve",
-	jsxSingleQuote: false,
 	arrowParens: "always",
 	bracketSameLine: false,
 	quoteProps: "consistent",
 	experimentalTernaries: true,
 	embeddedLanguageFormatting: "auto",
-	htmlWhitespaceSensitivity: "ignore",
 	overrides: [
 		{
 			files: ["*.d.ts", "*.json"],
@@ -35,7 +33,7 @@ export default {
 		"",
 		"<TYPES>",
 		"",
-		"<TYPES>^[./]",
+		"<TYPES>^@/",
 		"",
 		"^@/",
 		"",

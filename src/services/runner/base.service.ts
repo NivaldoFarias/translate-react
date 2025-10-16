@@ -1,35 +1,37 @@
-import langs from "langs";
-import ora from "ora";
-
-import type { FileProcessingProgress, ProcessedFileResult, Snapshot } from "@/types";
-import type { Environment } from "@/utils/";
+import type {
+	CacheCheckResult,
+	FileProcessingProgress,
+	LanguageDetectionResult,
+	ProcessedFileResult,
+	PrFilterResult as PullRequestFilterResult,
+	RepositoryTreeItems,
+	RunnerOptions,
+} from "./runner.types";
 import type { SetNonNullable } from "type-fest";
 
+import { InitializationError, ResourceLoadError } from "@/errors/";
+import { GitHubService } from "@/services/github/";
+import { Snapshot, SnapshotService } from "@/services/snapshot.service";
+import { TranslationFile, TranslatorService } from "@/services/translator.service";
 import {
-	createErrorHandlingProxy,
-	ErrorHandler,
-	extractErrorMessage,
-	InitializationError,
-	ResourceLoadError,
-} from "@/errors/";
-import { GitHubService } from "@/services/github/github.service";
-import { SnapshotService } from "@/services/snapshot.service";
-import { TranslatorService } from "@/services/translator.service";
-import { setupSignalHandlers, validateEnv } from "@/utils/";
-import { TranslationFile } from "@/utils/translation-file.util";
+	env,
+	FILE_FETCH_BATCH_SIZE,
+	logger,
+	MAX_FILE_SIZE,
+	MIN_CACHE_CONFIDENCE,
+	RuntimeEnvironment,
+	setupSignalHandlers,
+} from "@/utils/";
 
-export interface RunnerOptions {
-	targetLanguage: string;
-	sourceLanguage: string;
-	batchSize: number;
-}
+import { homepage, name, version } from "../../../package.json";
+import { DatabaseService } from "../database/database.service";
 
-export abstract class RunnerService {
-	protected readonly env: Environment;
-	private readonly errorHandler = ErrorHandler.getInstance();
+export type RunnerState = Omit<Snapshot, "id">;
 
+export abstract class BaseRunnerService {
 	/**
 	 * Tracks progress for the current batch of files being processed
+	 *
 	 * Used to update the spinner and generate statistics
 	 */
 	protected batchProgress = {
@@ -39,25 +41,29 @@ export abstract class RunnerService {
 	};
 
 	/**
-	 * Maintains the current state of the translation workflow
+	 * Maintains the current state of the translation workflow.
+	 *
 	 * In development mode, this state can be persisted between runs
 	 */
-	protected state: Omit<Snapshot, "id"> = {
+	protected state: RunnerState = {
 		repositoryTree: [],
 		filesToTranslate: [],
 		processedResults: [],
 		timestamp: Date.now(),
 	};
 
-	protected readonly services: {
+	protected readonly services = {
 		/** GitHub service instance for repository operations */
-		github: GitHubService;
+		github: new GitHubService(),
 
 		/** Translation service for content translation operations */
-		translator: TranslatorService;
+		translator: new TranslatorService(),
 
 		/** Snapshot manager to persist and retrieve workflow state */
-		snapshot: SnapshotService;
+		snapshot: new SnapshotService(),
+
+		/** Database service for persistent storage */
+		database: new DatabaseService(),
 	};
 
 	/** Statistics tracking for the translation process */
@@ -66,67 +72,34 @@ export abstract class RunnerService {
 		timestamp: Date.now(),
 	};
 
-	/** Progress spinner for CLI feedback */
-	protected spinner = ora({
-		text: "Starting translation workflow",
-		color: "cyan",
-		spinner: "dots",
-	});
-
 	/**
 	 * Cleanup handler for process termination.
+	 *
 	 * Ensures graceful shutdown and cleanup of resources
 	 */
 	protected cleanup = () => {
-		this.spinner?.stop();
+		logger.info("Shutting down gracefully...");
 
 		setTimeout(() => void process.exit(0), 1000);
 	};
 
 	/**
 	 * Initializes the runner with environment validation and signal handlers
+	 *
 	 * Sets up process event listeners for graceful termination
 	 */
-	constructor(protected readonly options: RunnerOptions) {
-		try {
-			this.env = validateEnv();
-		} catch (error) {
-			console.error(extractErrorMessage(error));
-
-			throw error;
-		}
-
-		this.services = {
-			github: createErrorHandlingProxy(
-				new GitHubService({
-					upstream: {
-						owner: this.env.REPO_UPSTREAM_OWNER,
-						repo: this.env.REPO_UPSTREAM_NAME,
-					},
-					fork: {
-						owner: this.env.REPO_FORK_OWNER,
-						repo: this.env.REPO_FORK_NAME,
-					},
-				}),
-				{ serviceName: "GitHubService", excludeMethods: ["getSpinner"] },
-			),
-			translator: createErrorHandlingProxy(
-				new TranslatorService({
-					source: this.options.sourceLanguage,
-					target: this.options.targetLanguage,
-				}),
-				{ serviceName: "TranslatorService" },
-			),
-			snapshot: createErrorHandlingProxy(new SnapshotService(), {
-				serviceName: "SnapshotService",
-			}),
-		};
-
-		if (this.env.FORCE_SNAPSHOT_CLEAR) {
+	constructor(
+		protected readonly options: RunnerOptions = {
+			batchSize: env.BATCH_SIZE,
+		},
+	) {
+		if (env.FORCE_SNAPSHOT_CLEAR) {
 			this.services.snapshot.clear();
 		}
 
-		setupSignalHandlers(this.cleanup);
+		setupSignalHandlers(this.cleanup, (message, error) => {
+			logger.error({ error, message }, "Signal handler triggered during cleanup");
+		});
 	}
 
 	/**
@@ -134,7 +107,7 @@ export abstract class RunnerService {
 	 *
 	 * @throws {InitializationError} If token permissions verification fails
 	 */
-	protected async verifyPermissions() {
+	protected async verifyPermissions(): Promise<void> {
 		const hasPermissions = await this.services.github.verifyTokenPermissions();
 
 		if (!hasPermissions) {
@@ -151,15 +124,15 @@ export abstract class RunnerService {
 	 *
 	 * @returns `true` if the fork is up to date, `false` otherwise
 	 */
-	protected async syncFork() {
-		this.spinner.text = "Checking fork status...";
+	protected async syncFork(): Promise<boolean> {
+		logger.info("Checking fork status...");
 
 		const isForkSynced = await this.services.github.isForkSynced();
 
 		if (!isForkSynced) {
-			this.spinner.text = "Fork is out of sync. Updating fork...";
+			logger.info("Fork is out of sync, updating fork...");
 
-			if (this.env.NODE_ENV === "development") {
+			if (env.NODE_ENV === RuntimeEnvironment.Development) {
 				await this.services.snapshot.clear();
 			}
 
@@ -170,12 +143,10 @@ export abstract class RunnerService {
 				});
 			}
 
-			this.spinner.succeed("Fork synchronized with upstream repository");
+			logger.info("Fork synchronized with upstream repository");
 		} else {
-			this.spinner.succeed("Fork is up to date");
+			logger.info("Fork is up to date");
 		}
-
-		this.spinner.start();
 
 		return isForkSynced;
 	}
@@ -185,18 +156,13 @@ export abstract class RunnerService {
 	 *
 	 * @param isForkSynced Whether the fork is up to date
 	 */
-	protected async loadSnapshot(isForkSynced: boolean) {
+	protected async loadSnapshot(isForkSynced: boolean): Promise<void> {
 		const latestSnapshot = await this.services.snapshot.loadLatest();
 
 		if (latestSnapshot && !isForkSynced) {
-			this.spinner.stopAndPersist({
-				symbol: "📦",
-				text: "Snapshot loaded",
-			});
+			logger.info("Snapshot loaded from previous session");
 
 			this.state = latestSnapshot;
-
-			this.spinner.start();
 		}
 	}
 
@@ -205,16 +171,16 @@ export abstract class RunnerService {
 	 *
 	 * @throws {ResourceLoadError} If the repository tree or glossary fetch fails
 	 */
-	protected async fetchRepositoryTree() {
+	protected async fetchRepositoryTree(): Promise<void> {
 		if (!this.state.repositoryTree?.length) {
-			this.spinner.text = "Fetching repository content...";
-			this.state.repositoryTree = await this.services.github.getRepositoryTree("main");
+			logger.info("Fetching repository content...");
+			this.state.repositoryTree = await this.services.github.getRepositoryTree();
 
-			if (this.env.NODE_ENV === "development") {
+			if (env.NODE_ENV === RuntimeEnvironment.Development) {
 				await this.services.snapshot.append("repositoryTree", this.state.repositoryTree);
 			}
 
-			this.spinner.text = "Repository tree fetched. Fetching glossary...";
+			logger.info("Repository tree fetched, fetching glossary...");
 			const glossary = await this.services.github.getGlossary();
 
 			if (!glossary) {
@@ -222,91 +188,310 @@ export abstract class RunnerService {
 			}
 
 			this.services.translator.glossary = glossary;
-			this.spinner.succeed("Repository content fetched");
+			logger.info("Repository content fetched successfully");
 		} else {
-			this.spinner.stopAndPersist({
-				symbol: "📦",
-				text: "Repository tree already fetched",
-			});
+			logger.info("Repository tree already fetched (from snapshot)");
 		}
-
-		this.spinner.start();
 	}
 
 	/**
-	 * Fetches and filters files that need translation
+	 * Fetches and filters files that need translation through a multi-stage pipeline.
+	 *
+	 * Orchestrates the complete file discovery workflow by coordinating cache checks,
+	 * PR filtering, content fetching, and language detection. Each stage progressively
+	 * narrows the candidate set to minimize expensive operations.
+	 *
+	 * The pipeline stages are:
+	 * 1. Language cache lookup to skip known translated files
+	 * 2. PR existence check to skip files with pending translations
+	 * 3. Batched content fetching from repository
+	 * 4. Size validation and language detection with cache updates
 	 *
 	 * @throws {ResourceLoadError} If file content fetch fails
 	 */
-	protected async fetchFilesToTranslate() {
+	protected async fetchFilesToTranslate(): Promise<void> {
 		if (this.state.filesToTranslate.length) {
-			this.spinner.stopAndPersist({
-				symbol: "📦",
-				text: `Found ${this.state.filesToTranslate.length} files to translate`,
-			});
-
-			this.spinner.start();
-
+			logger.info(`Found ${this.state.filesToTranslate.length} files to translate (from snapshot)`);
 			return;
 		}
-
-		this.spinner.text = "Fetching files...";
-
-		const uncheckedFiles: TranslationFile[] = [];
-		const totalFiles = this.state.repositoryTree.length;
-		let completedFiles = 0;
-
-		const updateSpinner = () => {
-			completedFiles++;
-			const percentage = Math.floor((completedFiles / totalFiles) * 100);
-			this.spinner.text = `Fetching files: ${completedFiles}/${totalFiles} (${percentage}%)`;
-		};
 
 		const uniqueFiles = this.state.repositoryTree.filter(
 			(file, index, self) => index === self.findIndex((f) => f.path === file.path),
 		);
 
-		const batchSize = 10;
+		logger.info(`Processing ${uniqueFiles.length} files from repository tree...`);
 
-		for (let i = 0; i < uniqueFiles.length; i += batchSize) {
-			const batch = uniqueFiles.slice(i, i + batchSize);
-			const batchResults = await this.fetchBatch(batch, updateSpinner);
+		const { candidateFiles, cacheHits } = await this.checkLanguageCache(uniqueFiles);
+		const { filesToFetch, numFilesWithPRs } = await this.filterFilesByExistingPRs(candidateFiles);
+		const uncheckedFiles = await this.fetchFileContents(filesToFetch);
+		const { numFilesFiltered, numFilesTooLarge } =
+			await this.detectAndCacheLanguages(uncheckedFiles);
+
+		if (env.NODE_ENV === RuntimeEnvironment.Development) {
+			await this.services.snapshot.append("filesToTranslate", this.state.filesToTranslate);
+		}
+
+		logger.info(
+			{
+				filesToTranslate: this.state.filesToTranslate.length,
+				cachedTranslated: cacheHits,
+				analyzedTranslated: numFilesFiltered,
+				withExistingPRs: numFilesWithPRs,
+				tooLarge: numFilesTooLarge,
+				totalFiltered: cacheHits + numFilesFiltered + numFilesWithPRs + numFilesTooLarge,
+			},
+			`Found ${this.state.filesToTranslate.length} files to translate (${cacheHits + numFilesFiltered + numFilesWithPRs + numFilesTooLarge} filtered)`,
+		);
+	}
+
+	/**
+	 * Checks language cache to identify files already known to be translated.
+	 *
+	 * Queries the SQLite cache for each file using its path and content hash (SHA).
+	 * Files with cached Portuguese detection results above the confidence threshold
+	 * are filtered out, avoiding expensive content fetching and re-analysis.
+	 *
+	 * @param files Repository tree files to check against cache
+	 *
+	 * @returns Cache statistics and remaining candidate files for further processing
+	 *
+	 * @example
+	 * ```typescript
+	 * const result = await this.checkLanguageCache(repositoryFiles);
+	 * console.log(result.cacheHits);
+	 * // ^? 135 (out of 192 files)
+	 * ```
+	 */
+	private async checkLanguageCache(files: RepositoryTreeItems): Promise<CacheCheckResult> {
+		logger.info("Checking language cache...");
+		const startTime = Date.now();
+
+		let cacheHits = 0;
+		let cacheMisses = 0;
+		const candidateFiles: typeof files = [];
+
+		for (const file of files) {
+			if (!file.sha || !file.path) {
+				candidateFiles.push(file);
+				continue;
+			}
+
+			const cached = this.services.database.getLanguageCache(file.path, file.sha);
+			const targetLanguage = this.services.translator.languageDetector.languages.target;
+
+			if (
+				cached &&
+				cached.detectedLanguage === targetLanguage &&
+				cached.confidence > MIN_CACHE_CONFIDENCE
+			) {
+				cacheHits++;
+				logger.debug(
+					{ filename: file.path, language: cached.detectedLanguage, confidence: cached.confidence },
+					`Skipping cached ${targetLanguage} file`,
+				);
+			} else {
+				cacheMisses++;
+				candidateFiles.push(file);
+			}
+		}
+
+		const elapsed = Date.now() - startTime;
+		const hitRate = `${((cacheHits / files.length) * 100).toFixed(1)}%`;
+
+		logger.info(
+			{ cacheHits, cacheMisses, hitRate, timeMs: elapsed },
+			`Cache check complete: ${cacheHits} hits, ${cacheMisses} candidates`,
+		);
+
+		return { candidateFiles, cacheHits, cacheMisses };
+	}
+
+	/**
+	 * Filters candidate files by checking for existing open pull requests.
+	 *
+	 * Fetches all open PRs and builds a mapping of filenames to PR numbers by parsing
+	 * PR titles. Files with existing translation PRs are excluded from further processing
+	 * to prevent duplicate translation efforts.
+	 *
+	 * @param candidateFiles Files remaining after cache check
+	 *
+	 * @returns Files requiring content fetch and count of files with existing PRs
+	 *
+	 * @example
+	 * ```typescript
+	 * const result = await this.filterFilesByExistingPRs(cachedCandidates);
+	 * console.log(result.numFilesWithPRs);
+	 * // ^? 12 (files already have open PRs)
+	 * ```
+	 */
+	private async filterFilesByExistingPRs(
+		candidateFiles: RepositoryTreeItems,
+	): Promise<PullRequestFilterResult> {
+		logger.info("Checking for existing open PRs...");
+
+		const openPRs = await this.services.github.listOpenPullRequests();
+		const prFileMap = new Map<string, number>();
+
+		for (const pr of openPRs) {
+			const match = pr.title?.match(/Translate `(.+?)` to/);
+			if (match?.[1]) {
+				prFileMap.set(match[1], pr.number);
+			}
+		}
+
+		logger.debug(
+			{ openPRCount: openPRs.length, mappedFiles: prFileMap.size },
+			"Open PRs mapped to filenames",
+		);
+
+		let numFilesWithPRs = 0;
+		const filesToFetch: typeof candidateFiles = [];
+
+		for (const file of candidateFiles) {
+			if (!file.path) {
+				filesToFetch.push(file);
+				continue;
+			}
+
+			const filename = file.path.split("/").pop() ?? file.path;
+
+			if (prFileMap.has(filename)) {
+				numFilesWithPRs++;
+				logger.debug(
+					{ fullPath: file.path, filename, prNumber: prFileMap.get(filename) },
+					"Skipping file with existing PR",
+				);
+			} else {
+				filesToFetch.push(file);
+			}
+		}
+
+		logger.info(
+			{ withPRs: numFilesWithPRs, toFetch: filesToFetch.length },
+			`After PR filter: ${filesToFetch.length} files need content fetch`,
+		);
+
+		return { filesToFetch, numFilesWithPRs };
+	}
+
+	/**
+	 * Fetches file contents from repository in parallel batches.
+	 *
+	 * Processes files in batches using {@link FILE_FETCH_BATCH_SIZE} to manage concurrent
+	 * GitHub API requests. Provides progress logging at 10% intervals and filters out
+	 * files with missing metadata.
+	 *
+	 * @param filesToFetch Files requiring content download
+	 *
+	 * @returns Successfully fetched files with content ready for language detection
+	 *
+	 * @example
+	 * ```typescript
+	 * const files = await this.fetchFileContents(candidates);
+	 * console.log(files.length);
+	 * // ^? 45 (successfully fetched files)
+	 * ```
+	 */
+	private async fetchFileContents(filesToFetch: RepositoryTreeItems): Promise<TranslationFile[]> {
+		logger.info("Fetching file content...");
+
+		const uncheckedFiles: TranslationFile[] = [];
+		let completedFiles = 0;
+
+		const updateProgress = (): void => {
+			completedFiles++;
+			const percentage = Math.floor((completedFiles / filesToFetch.length) * 100);
+			if (completedFiles % 10 === 0 || completedFiles === filesToFetch.length) {
+				logger.info(`Fetching files: ${completedFiles}/${filesToFetch.length} (${percentage}%)`);
+			}
+		};
+
+		for (let i = 0; i < filesToFetch.length; i += FILE_FETCH_BATCH_SIZE) {
+			const batch = filesToFetch.slice(i, i + FILE_FETCH_BATCH_SIZE);
+			const batchResults = await this.fetchBatch(batch, updateProgress);
 
 			uncheckedFiles.push(
 				...batchResults.filter((file): file is NonNullable<typeof file> => !!file),
 			);
 		}
 
+		return uncheckedFiles;
+	}
+
+	/**
+	 * Performs language detection and updates cache with results.
+	 *
+	 * Filters files exceeding {@link MAX_FILE_SIZE}, then analyzes remaining files
+	 * to detect translation status. Updates the language cache with detection results
+	 * (language and confidence) for future runs. Files requiring translation are
+	 * added to {@link state.filesToTranslate}.
+	 *
+	 * @param uncheckedFiles Files with fetched content awaiting language analysis
+	 *
+	 * @returns Statistics about filtered and analyzed files
+	 *
+	 * @example
+	 * ```typescript
+	 * const result = await this.detectAndCacheLanguages(fetchedFiles);
+	 * console.log(result.numFilesFiltered);
+	 * // ^? 38 (files detected as already translated)
+	 * ```
+	 */
+	private async detectAndCacheLanguages(
+		uncheckedFiles: TranslationFile[],
+	): Promise<LanguageDetectionResult> {
+		let numFilesTooLarge = 0;
 		let numFilesFiltered = 0;
 
-		this.state.filesToTranslate = uncheckedFiles.filter((file) => {
-			const isTranslated = this.services.translator.isFileTranslated(file);
+		this.state.filesToTranslate = [];
 
-			if (isTranslated) numFilesFiltered++;
+		for (const file of uncheckedFiles) {
+			if (file.content.length > MAX_FILE_SIZE) {
+				numFilesTooLarge++;
 
-			return !isTranslated;
-		});
+				logger.warn(
+					{ filename: file.filename, size: file.content.length, maxSize: MAX_FILE_SIZE },
+					"Skipping file: exceeds maximum size limit",
+				);
+				continue;
+			}
 
-		if (this.env.NODE_ENV === "development") {
-			await this.services.snapshot.append("filesToTranslate", this.state.filesToTranslate);
+			const analysis = await this.services.translator.languageDetector.analyzeLanguage(
+				file.filename,
+				file.content,
+			);
+
+			if (file.sha && analysis.detectedLanguage) {
+				this.services.database.setLanguageCache({
+					filename: file.path,
+					contentHash: file.sha,
+					detectedLanguage: analysis.detectedLanguage,
+					confidence: analysis.languageScore.target,
+				});
+			}
+
+			if (analysis.isTranslated) {
+				numFilesFiltered++;
+			} else {
+				this.state.filesToTranslate.push(file);
+			}
 		}
 
-		this.spinner.succeed(
-			`Found ${this.state.filesToTranslate.length} files to translate (${numFilesFiltered} already translated)`,
-		);
-
-		this.spinner.start();
+		return { numFilesFiltered, numFilesTooLarge };
 	}
 
 	/**
 	 * Fetches a batch of files and updates the spinner
 	 *
 	 * @param batch The batch of files to fetch
-	 * @param updateSpinnerFn The function to update the spinner
+	 * @param updateLoggerFn The function to update the spinner
 	 *
 	 * @returns The batch of files
 	 */
-	protected async fetchBatch(batch: typeof this.state.repositoryTree, updateSpinnerFn: () => void) {
+	protected async fetchBatch(
+		batch: RepositoryTreeItems,
+		updateLoggerFn: () => void,
+	): Promise<(TranslationFile | null)[]> {
 		return await Promise.all(
 			batch.map(async (file) => {
 				const filename = file.path?.split("/").pop();
@@ -315,7 +500,7 @@ export abstract class RunnerService {
 
 				const content = await this.services.github.getFileContent(file);
 
-				updateSpinnerFn();
+				updateLoggerFn();
 
 				return new TranslationFile(content, filename, file.path, file.sha);
 			}),
@@ -323,28 +508,30 @@ export abstract class RunnerService {
 	}
 
 	/**
-	 * Updates the issue with translation results
+	 * Updates the progress issue with the translation results
 	 *
 	 * @throws {APIError} If commenting on the issue fails
 	 */
-	protected async updateIssueWithResults() {
-		this.spinner.text = "Commenting on issue...";
+	protected async updateIssueWithResults(): Promise<void> {
+		logger.info("Commenting on issue...");
 
 		const comment = await this.services.github.commentCompiledResultsOnIssue(
 			this.state.processedResults,
 			this.state.filesToTranslate,
 		);
 
-		this.spinner.succeed(`Commented on translation issue. Comment URL: ${comment.html_url}`);
+		logger.info({ commentUrl: comment.html_url }, "Commented on translation issue");
 	}
 
 	/**
+	 * Determines if the issue comment should be updated based on environment and results
+	 *
 	 * @returns `true` if the issue comment should be updated, `false` otherwise
 	 */
-	protected get shouldUpdateIssueComment() {
+	protected get shouldUpdateIssueComment(): boolean {
 		return !!(
-			this.env.NODE_ENV === "production" &&
-			this.env.PROGRESS_ISSUE_NUMBER &&
+			env.NODE_ENV === RuntimeEnvironment.Production &&
+			env.PROGRESS_ISSUE_NUMBER &&
 			this.metadata.results.size > 0
 		);
 	}
@@ -352,28 +539,29 @@ export abstract class RunnerService {
 	/**
 	 * Generates and displays final statistics for the translation workflow
 	 *
-	 * ## Statistics Reported
-	 * - Total files processed
-	 * - Success/failure counts
-	 * - Detailed error information for failed files
-	 * - Total execution time
-	 *
 	 * The statistics are displayed using a combination of:
 	 * - Console tables for summary data
 	 * - Itemized lists for failures
 	 * - Timing information
+	 *
+	 * ### Statistics Reported
+	 *
+	 * - Total files processed
+	 * - Success/failure counts
+	 * - Detailed error information for failed files
+	 * - Total execution time
 	 */
-	protected async printFinalStatistics() {
+	protected async printFinalStatistics(): Promise<void> {
 		const elapsedTime = Math.ceil(Date.now() - this.metadata.timestamp);
 		const results = Array.from(this.metadata.results.values());
 
-		this.spinner.stopAndPersist({ symbol: "📊", text: "Final Statistics" });
+		const successCount = results.filter(({ error }) => !error).length;
+		const failureCount = results.filter(({ error }) => !!error).length;
 
-		console.table({
-			"Files processed successfully": results.filter(({ error }) => !error).length,
-			"Failed translations": results.filter(({ error }) => !!error).length,
-			"Total elapsed time": this.formatElapsedTime(elapsedTime),
-		});
+		logger.info(
+			{ successCount, failureCount, elapsedTime: this.formatElapsedTime(elapsedTime) },
+			"Final statistics",
+		);
 
 		const failedFiles = results.filter(({ error }) => !!error) as SetNonNullable<
 			ProcessedFileResult,
@@ -381,34 +569,41 @@ export abstract class RunnerService {
 		>[];
 
 		if (failedFiles.length > 0) {
-			this.spinner.stopAndPersist({
-				symbol: "❌",
-				text: `Failed translations (${failedFiles.length} total):`,
-			});
-
-			for (const [index, { filename, error }] of failedFiles.entries()) {
-				this.spinner.stopAndPersist({
-					symbol: "  •",
-					text: `${index + 1}. ${filename}: ${error.message}`,
-				});
-			}
+			logger.warn(
+				{
+					failures: failedFiles.map(({ filename, error }) => ({ filename, error: error.message })),
+				},
+				`Failed files (${failedFiles.length})`,
+			);
 		}
+	}
 
-		this.spinner.stopAndPersist({
-			symbol: "⏱️",
-			text: ` Workflow completed in ${elapsedTime}ms (${Math.ceil(elapsedTime / 1000)}s)`,
-		});
+	/**
+	 * Formats a byte count to a human-readable string with appropriate units
+	 *
+	 * @param bytes The number of bytes to format
+	 *
+	 * @returns A formatted string with units (B, KB, MB, etc.)
+	 */
+	private formatBytes(bytes: number): string {
+		if (bytes === 0) return "0 B";
+
+		const k = 1024;
+		const sizes = ["B", "KB", "MB", "GB"];
+		const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+		return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
 	}
 
 	/**
 	 * Formats a time duration in milliseconds to a human-readable string
-	 * using the Intl.RelativeTimeFormat API for localization
+	 * using the {@link Intl.RelativeTimeFormat} API for localization
 	 *
 	 * @param elapsedTime The elapsed time in milliseconds
 	 *
 	 * @returns A formatted duration string
 	 */
-	private formatElapsedTime(elapsedTime: number) {
+	private formatElapsedTime(elapsedTime: number): string {
 		const formatter = new Intl.RelativeTimeFormat("en", { numeric: "always", style: "long" });
 
 		const seconds = Math.floor(elapsedTime / 1000);
@@ -425,7 +620,8 @@ export abstract class RunnerService {
 	/**
 	 * Processes files in batches to manage resources and provide progress feedback
 	 *
-	 * ## Workflow
+	 * ### Workflow
+	 *
 	 * 1. Splits files into manageable batches
 	 * 2. Processes each batch concurrently
 	 * 3. Updates progress in real-time
@@ -433,11 +629,11 @@ export abstract class RunnerService {
 	 *
 	 * @param files List of files to process
 	 * @param batchSize Number of files to process simultaneously
+	 *
 	 * @throws {ResourceLoadError} If file content cannot be loaded
-	 * @throws {APIError} If GitHub operations fail
 	 */
-	protected async processInBatches(files: TranslationFile[], batchSize = 10) {
-		this.spinner.text = "Processing files";
+	protected async processInBatches(files: TranslationFile[], batchSize = 10): Promise<void> {
+		logger.info("Processing files in batches...");
 
 		const batches = this.createBatches(files, batchSize);
 
@@ -475,67 +671,89 @@ export abstract class RunnerService {
 	private async processBatch(
 		batch: TranslationFile[],
 		batchInfo: { currentBatch: number; totalBatches: number; batchSize: number },
-	) {
+	): Promise<void> {
 		this.batchProgress.completed = 0;
 		this.batchProgress.successful = 0;
 		this.batchProgress.failed = 0;
 
-		this.spinner.text = `Processing batch ${batchInfo.currentBatch}/${batchInfo.totalBatches}`;
-		this.spinner.suffixText = `:: 0 out of ${batch.length} files completed (0% done)`;
+		try {
+			logger.info(batchInfo, "Processing batch");
 
-		const processBatchFiles = this.errorHandler.wrapAsync(
-			async () => {
-				await Promise.all(
-					batch.map((file) => {
-						const progress = {
-							batchIndex: batchInfo.currentBatch,
-							fileIndex: this.batchProgress.completed,
-							totalBatches: batchInfo.totalBatches,
-							batchSize: batchInfo.batchSize,
-						};
+			await Promise.all(
+				batch.map((file) => {
+					const progress = {
+						batchIndex: batchInfo.currentBatch,
+						fileIndex: this.batchProgress.completed,
+						totalBatches: batchInfo.totalBatches,
+						batchSize: batchInfo.batchSize,
+					};
 
-						return this.processFile(file, progress);
-					}),
-				);
-			},
-			{ operation: "processBatch", metadata: batchInfo },
-		);
+					return this.processFile(file, progress);
+				}),
+			);
 
-		await processBatchFiles();
+			logger.info(
+				{ batchIndex: batchInfo.currentBatch, ...this.batchProgress },
+				"Batch processing completed",
+			);
+		} catch (error) {
+			logger.error({ error, batchInfo }, "Error processing batch");
+			throw error;
+		}
 
 		const successRate = Math.round((this.batchProgress.successful / batch.length) * 100);
 
-		this.spinner.succeed(
-			`Completed batch ${batchInfo.currentBatch}/${batchInfo.totalBatches} :: ` +
-				`${this.batchProgress.successful}/${batch.length} successful (${successRate}% success rate)`,
+		logger.info(
+			{
+				batchIndex: batchInfo.currentBatch,
+				totalBatches: batchInfo.totalBatches,
+				successful: this.batchProgress.successful,
+				total: batch.length,
+				successRate,
+			},
+			`Batch ${batchInfo.currentBatch}/${batchInfo.totalBatches} completed: ${this.batchProgress.successful}/${batch.length} successful (${successRate}%)`,
 		);
-
-		if (batchInfo.currentBatch < batchInfo.totalBatches) {
-			this.spinner.start();
-		}
 	}
 
 	/**
-	 * Processes a single file through the complete translation workflow
+	 * Processes a single file through the complete translation workflow.
 	 *
-	 * ## Workflow Steps
-	 * 1. Creates or gets a translation branch
-	 * 2. Translates the file content
-	 * 3. Commits the translation
-	 * 4. Creates a pull request
+	 * Handles the entire lifecycle of translating a file sequentially, from branch
+	 * creation through translation, commit, and pull request generation. Each step
+	 * is performed synchronously using `await` to ensure proper ordering and state
+	 * management. Includes comprehensive error handling and cleanup for failed translations.
 	 *
-	 * ## Error Handling
-	 * - Captures and logs all errors
-	 * - Updates progress tracking
-	 * - Maintains file metadata even on failure
+	 * ### Workflow Steps
 	 *
-	 * @param file File to process
-	 * @param progress Progress tracking information
+	 * 1. **Branch Creation**: Creates or retrieves translation branch for isolation
+	 * 2. **Content Translation**: Translates file content (may involve chunking for large files)
+	 * 3. **Commit Operation**: Commits translated content to branch with descriptive message
+	 * 4. **Pull Request**: Creates or updates PR with translation and detailed metadata
 	 *
-	 * @throws {APIError} If GitHub operations fail
-	 * @throws {ResourceLoadError} If translation resources cannot be loaded
+	 * ### Timing and Sequencing
+	 *
+	 * All operations are awaited sequentially to ensure proper workflow ordering:
+	 * - Translation must complete before commit
+	 * - Commit must complete before PR creation
+	 * - Detailed timing logs track each operation's duration for debugging
+	 *
+	 * ### Error Handling
+	 *
+	 * - Captures and logs all errors with timing context
+	 * - Updates progress tracking for reporting
+	 * - Performs cleanup of created resources (branches) on failure
+	 * - Maintains file metadata even on failure for audit trail
+	 *
+	 * @param file File to process through translation workflow
+	 * @param _progress Progress tracking information for batch processing
+	 *
+	 * @throws {APIError} When GitHub operations fail
+	 * @throws {ResourceLoadError} When translation resources cannot be loaded
 	 */
-	private async processFile(file: TranslationFile, progress: FileProcessingProgress) {
+	private async processFile(
+		file: TranslationFile,
+		_progress: FileProcessingProgress,
+	): Promise<void> {
 		const metadata = this.metadata.results.get(file.filename) || {
 			branch: null,
 			filename: file.filename,
@@ -544,66 +762,199 @@ export abstract class RunnerService {
 			error: null,
 		};
 
+		const fileStartTime = Date.now();
+
 		try {
+			logger.debug(
+				{ filename: file.filename, contentLength: file.content.length },
+				"Starting file processing workflow",
+			);
+
+			const branchStartTime = Date.now();
 			metadata.branch = await this.services.github.createOrGetTranslationBranch(file);
+			const branchDuration = Date.now() - branchStartTime;
+
+			logger.debug(
+				{ filename: file.filename, branchRef: metadata.branch.ref, durationMs: branchDuration },
+				"Branch creation completed",
+			);
+
+			const translationStartTime = Date.now();
 			metadata.translation = await this.services.translator.translateContent(file);
+			const translationDuration = Date.now() - translationStartTime;
 
-			const language = langs.where("1", this.options.targetLanguage);
+			logger.debug(
+				{
+					filename: file.filename,
+					translatedLength: metadata.translation.length,
+					durationMs: translationDuration,
+				},
+				"Translation completed - proceeding to commit",
+			);
 
+			const languageName =
+				this.services.translator.languageDetector.getLanguageName(
+					this.services.translator.languageDetector.languages.target,
+				) || "Portuguese";
+
+			const commitStartTime = Date.now();
 			await this.services.github.commitTranslation({
-				branch: metadata.branch,
 				file,
+				branch: metadata.branch,
 				content: metadata.translation,
-				message: `Translate \`${file.filename}\` to ${language?.name || "Portuguese"}`,
+				message: `Translate \`${file.filename}\` to ${languageName}`,
+			});
+			const commitDuration = Date.now() - commitStartTime;
+
+			logger.debug(
+				{ filename: file.filename, durationMs: commitDuration },
+				"Commit completed - creating pull request",
+			);
+
+			const prStartTime = Date.now();
+			metadata.pullRequest = await this.services.github.createOrUpdatePullRequest(file, {
+				title: `Translate \`${file.filename}\` to ${languageName}`,
+				body: this.createPullRequestDescription(file, metadata),
 			});
 
-			metadata.pullRequest = await this.services.github.createPullRequest({
-				branch: metadata.branch.ref,
-				title: `Translate \`${file.filename}\` to ${language?.name || "Portuguese"}`,
-				body: this.pullRequestDescription,
-			});
+			const prDuration = Date.now() - prStartTime;
+			const totalDuration = Date.now() - fileStartTime;
+
+			logger.debug(
+				{
+					filename: file.filename,
+					prNumber: metadata.pullRequest.number,
+					timing: {
+						branchMs: branchDuration,
+						translationMs: translationDuration,
+						commitMs: commitDuration,
+						prMs: prDuration,
+						totalMs: totalDuration,
+					},
+				},
+				"File processing completed successfully",
+			);
 
 			this.updateBatchProgress("success");
 		} catch (error) {
+			const failureDuration = Date.now() - fileStartTime;
+
+			logger.error(
+				{ error, filename: file.filename, durationMs: failureDuration },
+				"File processing failed",
+			);
+
 			metadata.error = error instanceof Error ? error : new Error(String(error));
 			this.updateBatchProgress("error");
+
+			await this.cleanupFailedTranslation(metadata);
 		} finally {
 			this.metadata.results.set(file.filename, metadata);
-			this.updateProgressSpinner(progress);
 		}
 	}
 
 	/**
-	 * Updates the spinner with current progress information
+	 * Updates progress tracking for the current batch and adjusts success/failure counts.
 	 *
-	 * @param progress Current progress information
-	 */
-	private updateProgressSpinner(progress: FileProcessingProgress) {
-		const percentComplete = Math.round((this.batchProgress.completed / progress.batchSize) * 100);
-
-		this.spinner.suffixText = `[${this.batchProgress.completed}/${progress.batchSize}] files completed (${percentComplete}% done)`;
-	}
-
-	/**
-	 * Updates progress tracking for the current batch and adjusts success/failure counts
 	 * This information is used for both real-time feedback and final statistics
 	 *
 	 * @param status The processing outcome for the file
 	 */
-	private updateBatchProgress(status: "success" | "error") {
+	private updateBatchProgress(status: "success" | "error"): void {
 		this.batchProgress.completed++;
 		status === "success" ? this.batchProgress.successful++ : this.batchProgress.failed++;
 	}
 
+	/**
+	 * Cleans up resources for failed translation attempts.
+	 *
+	 * Removes translation branches that were created but failed during processing
+	 * to prevent accumulation of stale branches in the repository.
+	 *
+	 * @param metadata The processing result metadata containing branch information
+	 */
+	private async cleanupFailedTranslation(metadata: ProcessedFileResult): Promise<void> {
+		if (!metadata.branch?.ref) return;
+
+		try {
+			const branchName = metadata.branch.ref.replace("refs/heads/", "");
+			await this.services.github.cleanupBranch(branchName);
+			logger.info(
+				{ branchName, filename: metadata.filename },
+				"Cleaned up branch after failed translation",
+			);
+		} catch (error) {
+			logger.error(
+				{ error, filename: metadata.filename, branchRef: metadata.branch.ref },
+				"Failed to cleanup branch after translation failure - non-critical",
+			);
+		}
+	}
+
 	abstract run(): Promise<void>;
 
-	protected get pullRequestDescription() {
-		const language = langs.where("1", this.options.targetLanguage);
+	protected createPullRequestDescription(
+		file: TranslationFile,
+		processingResult: ProcessedFileResult,
+	): string {
+		const languageName =
+			this.services.translator.languageDetector.getLanguageName(
+				this.services.translator.languageDetector.languages.target,
+			) || "Portuguese";
 
-		return `This pull request contains a translation of the referenced page to ${language?.name || "Portuguese"}. The translation was generated using LLMs _(Open Router API :: model \`${this.env.LLM_MODEL}\`)_.
+		const processingTime = Date.now() - this.metadata.timestamp;
+		const sourceLength = file.content.length;
+		const translationLength = processingResult.translation?.length || 0;
+		const compressionRatio = sourceLength > 0 ? (translationLength / sourceLength).toFixed(2) : "0";
 
-Refer to the [source repository](https://github.com/${this.env.REPO_FORK_OWNER}/translate-react) workflow that generated this translation for more details.
+		return `This pull request contains an automated translation of the referenced page to **${languageName}**.
 
-Feel free to review and suggest any improvements to the translation.`;
+> [!IMPORTANT]
+> This translation was generated using AI/LLM and requires human review for accuracy, cultural context, and technical terminology.
+
+## Review Guidelines
+
+Please review this translation for:
+
+- [ ] **Accuracy**: Content meaning preserved from source
+- [ ] **Technical Terms**: Proper translation of React/development terminology
+- [ ] **Cultural Context**: Appropriate localization for target audience
+- [ ] **Formatting**: Markdown syntax and code blocks maintained
+- [ ] **Links**: Internal references and external links work correctly
+
+<details>
+<summary>Translation Details</summary>
+
+### Processing Statistics
+
+| Metric | Value |
+|--------|-------|
+| **Source File Size** | ${this.formatBytes(sourceLength)} |
+| **Translation Size** | ${this.formatBytes(translationLength)} |
+| **Content Ratio** | ${compressionRatio}x |
+| **File Path** | \`${file.path}\` |
+| **Processing Time** | ~${Math.ceil(processingTime / 1000)}s |
+
+###### ps.: The content ratio indicates how the translation length compares to the source (1.0x = same length, >1.0x = translation is longer). Different languages naturally have varying verbosity levels.
+
+### Technical Information
+
+- **Target Language**: ${languageName} (\`${this.services.translator.languageDetector.languages.target}\`)
+- **AI Model**: \`${env.LLM_MODEL}\` via Open Router API
+- **Generated**: ${new Date().toISOString().split("T")[0]}
+- **Branch**: \`${processingResult.branch?.ref || "unknown"}\`
+- **Translation Tool Version**: \`${name} v${version}\`
+
+
+</details>
+
+## Additional Resources
+
+- [Source Repository](${homepage}): Workflow and tooling details
+- [Translation Workflow Documentation](${homepage}#readme): Process overview and guidelines
+
+---
+
+**Questions or suggestions?** Feel free to leave comments or request changes to improve the translation quality.`;
 	}
 }

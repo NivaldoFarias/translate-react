@@ -1,271 +1,355 @@
 # translate-react
 
-A CLI tool to automate the translation of React documentation from English to any other language using Large Language Models (LLMs).
+<div align="center" style="flex: wrap; justify-content: center; align-items: center; margin-bottom: 20px; color: #999;">
+<p style="font-size: 1.5rem;"><b>Work In Progress</b></p>
+<div>This project is actively being developed and may have breaking changes.</div>
+</div>
+
+Automated translation tool for React documentation using Large Language Models (LLMs). Processes markdown files, preserves formatting, and creates pull requests with translated content.
 
 ## Table of Contents
 
-- [Overview](#overview)
-- [Prerequisites](#prerequisites)
-- [Setup](#setup)
-- [Usage](#usage)
-  - [Development](#development)
-  - [Production](#production)
-  - [Command Line Arguments](#command-line-arguments)
-- [Project Structure](#project-structure)
-- [Architecture](#architecture)
-  - [Core Services](#core-services)
-  - [Error Handling System](#error-handling-system)
-- [Features](#features)
-  - [Translation Quality](#translation-quality)
-  - [State Management](#state-management)
-  - [Process Management](#process-management)
-  - [GitHub Integration](#github-integration)
-  - [Error Handling](#error-handling)
-- [Contributing](#contributing)
-  - [Development Guidelines](#development-guidelines)
-- [License](#license)
+- [translate-react](#translate-react)
+  - [Table of Contents](#table-of-contents)
+  - [Overview](#overview)
+  - [Prerequisites](#prerequisites)
+    - [Runtime Requirements](#runtime-requirements)
+    - [API Access](#api-access)
+    - [Repository Setup](#repository-setup)
+    - [Supported Repositories](#supported-repositories)
+  - [Quick Start](#quick-start)
+    - [1. Clone the Repository](#1-clone-the-repository)
+    - [2. Install Dependencies](#2-install-dependencies)
+    - [3. Configure Environment](#3-configure-environment)
+    - [4. Run in Development Mode](#4-run-in-development-mode)
+  - [Configuration](#configuration)
+    - [Required Environment Variables](#required-environment-variables)
+    - [Optional Environment Variables](#optional-environment-variables)
+  - [Usage](#usage)
+    - [Development Mode](#development-mode)
+    - [Production Mode](#production-mode)
+  - [Project Structure](#project-structure)
+  - [Documentation](#documentation)
+  - [Contributing](#contributing)
+    - [Setup](#setup)
+    - [Development Standards](#development-standards)
+    - [Patterns](#patterns)
+  - [Troubleshooting](#troubleshooting)
+    - [Common Issues](#common-issues)
+    - [Debug Mode](#debug-mode)
+    - [Getting Help](#getting-help)
+  - [License](#license)
 
 ## Overview
 
-This project automates the translation process of React's documentation to any language. It uses the following workflow:
+Automation tool for translating React documentation repositories. Uses LLM APIs to translate markdown files while preserving code blocks, formatting, and technical terminology. Integrates with GitHub to create PRs for each translated file.
 
-1. Verifying GitHub token permissions and synchronizing fork with upstream
-2. Managing translation state through SQLite snapshots for interruption recovery
-3. Fetching repository tree and identifying files for translation
-4. Processing files in batches with real-time progress tracking
-5. Translating content using OpenAI models with strict glossary rules
-6. Creating branches and pull requests with translations
-7. Tracking progress through GitHub issues
-8. Managing cleanup and error recovery
+**Core Workflow**:
+
+1. Verifies GitHub token permissions and syncs fork with upstream
+2. Fetches repository tree and identifies markdown files requiring translation
+3. Uses language detection to determine translation necessity
+4. Processes files in configurable batches with LLM translation
+5. Creates individual branches and pull requests for each file
+6. Updates tracking issues with progress and links to PRs
+
+For detailed workflow analysis including timing breakdowns and bottlenecks, see [WORKFLOW.md](./docs/WORKFLOW.md).
 
 ## Prerequisites
 
-- [Bun](https://bun.sh) runtime
-- GitHub Personal Access Token with repo permissions
-- OpenAI API Key
-- Node.js v20+
-- SQLite3
+### Runtime Requirements
 
-## Setup
+- **Bun** v1.0.0+ (primary runtime and package manager)[^1]
+- **Node.js** v20+ (dependency compatibility)
+- **SQLite3** (state persistence, usually pre-installed)
+- **Git** (repository operations)
 
-1. Clone the repository:
+[^1]: This project uses Bun exclusively. Do not use npm/yarn/pnpm.
+
+### API Access
+
+- **GitHub Personal Access Token** with `repo` scope
+- **LLM API Key** (OpenAI, OpenRouter, Azure OpenAI, or compatible)
+
+### Repository Setup
+
+- Fork of target React documentation repository
+- Write access to fork for branch/PR creation
+- Optional: tracking issue in fork for progress updates
+
+### Supported Repositories
+
+Designed for React documentation repositories but can be adapted to any markdown-based documentation with `src/` directory structure *(with some tweaks)*.
+
+## Quick Start
+
+### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/NivaldoFarias/translate-react.git
-cd translate-react
+git clone https://github.com/NivaldoFarias/translate-react.git && cd translate-react
 ```
 
-2. Install dependencies:
+### 2. Install Dependencies
 
 ```bash
 bun install
 ```
 
-3. Create a `.env` file with the following variables:
+### 3. Configure Environment
 
-```env
-NODE_ENV=development|production|test           # required
-BUN_ENV=development|production|test            # required
-
-LLM_MODEL=gpt-4                                # required
-OPENAI_API_KEY=your_openai_api_key             # required
-OPENAI_BASE_URL=https://api.openai.com/v1      # optional, defaults to OpenAI API
-OPENAI_PROJECT_ID=your_openai_project_id       # optional
-
-GITHUB_TOKEN=your_github_token                 # required
-
-REPO_FORK_OWNER=target_fork_owner              # required
-REPO_FORK_NAME=target_fork_name                # required
-REPO_UPSTREAM_OWNER=upstream_owner             # required
-REPO_UPSTREAM_NAME=upstream_name               # required
-
-PROGRESS_ISSUE_NUMBER=123                      # optional, only used for tracking progress
-
-FORCE_SNAPSHOT_CLEAR=true|false                # optional, defaults to false
-
-HEADER_APP_URL=https://example.com             # optional, defaults to project homepage
-HEADER_APP_TITLE=My App                        # optional, defaults to package.json name and version
+```bash
+cp .env.example .env
 ```
 
-> [!NOTE]
-> These variables are validated at runtime using Zod. Refer to the `src/utils/env.util.ts` file for the validation schema.
+Then, Edit `.env` with your API keys (see [Configuration section](#configuration)).
 
-## Usage
+### 4. Run in Development Mode
 
-### Development
-
-Development mode with watch:
+> [!IMPORTANT]
+> Make sure to setup a `.env.dev` file with `DEV_MODE_FORK_PR=true` to create PRs against your fork instead of upstream. This prevents permission issues during development.
 
 ```bash
 bun run dev
 ```
 
-### Production
+## Configuration
+
+Environment variables are validated at runtime using Zod schemas. See [`src/utils/env.util.ts`](./src/utils/env.util.ts) for complete schema definitions and validation rules.
+
+### Required Environment Variables
+
+These must be set in your `.env` *(or `.env.dev`, for development)* file:
+
+| Variable         | Description                                                |
+| ---------------- | ---------------------------------------------------------- |
+| `GITHUB_TOKEN`   | GitHub Personal Access Token with `repo` scope             |
+| `OPENAI_API_KEY` | API key for LLM service (OpenAI, OpenRouter, Azure OpenAI) |
+
+### Optional Environment Variables
+
+> [!IMPORTANT]
+> All optional variables have defaults defined in [`src/utils/constants.util.ts`](./src/utils/constants.util.ts).
+
+<details>
+<summary><b>GitHub Configuration</b></summary>
+
+| Variable                 | Default           | Description                          |
+| ------------------------ | ----------------- | ------------------------------------ |
+| `REPO_FORK_OWNER`        | `nivaldofarias`   | Fork owner username/organization     |
+| `REPO_FORK_NAME`         | `pt-br.react.dev` | Fork repository name                 |
+| `REPO_UPSTREAM_OWNER`    | `reactjs`         | Upstream owner username/organization |
+| `REPO_UPSTREAM_NAME`     | `pt-br.react.dev` | Upstream repository name             |
+| `GITHUB_REQUEST_TIMEOUT` | `30000`           | GitHub API timeout (milliseconds)    |
+
+</details>
+
+<details>
+<summary><b>LLM Configuration</b></summary>
+
+| Variable            | Default                                            | Description                              |
+| ------------------- | -------------------------------------------------- | ---------------------------------------- |
+| `LLM_MODEL`         | `google/gemini-2.0-flash-exp:free`                 | Model ID for translation                 |
+| `OPENAI_BASE_URL`   | `https://api.openrouter.com/v1`                    | API endpoint                             |
+| `OPENAI_PROJECT_ID` | —                                                  | Optional: OpenAI project ID for tracking |
+| `MAX_TOKENS`        | `8192`                                             | Maximum tokens per LLM response          |
+| `HEADER_APP_URL`    | `https://github.com/NivaldoFarias/translate-react` | App URL for OpenRouter tracking          |
+| `HEADER_APP_TITLE`  | `translate-react v0.1.13`                          | App title for OpenRouter tracking        |
+
+</details>
+
+<details>
+<summary><b>Translation Settings</b></summary>
+
+| Variable          | Default | Description                             |
+| ----------------- | ------- | --------------------------------------- |
+| `TARGET_LANGUAGE` | `pt-br` | Target translation language (ISO 639-1) |
+| `SOURCE_LANGUAGE` | `en`    | Source language (ISO 639-1)             |
+| `BATCH_SIZE`      | `10`    | Files to process in parallel            |
+
+</details>
+
+<details>
+<summary><b>Development/Debug Settings</b></summary>
+
+| Variable                | Default       | Description                                                            |
+| ----------------------- | ------------- | ---------------------------------------------------------------------- |
+| `NODE_ENV`              | `development` | Runtime environment                                                    |
+| `BUN_ENV`               | `development` | Bun-specific environment                                               |
+| `LOG_LEVEL`             | `info`        | Logging verbosity (`trace`\|`debug`\|`info`\|`warn`\|`error`\|`fatal`) |
+| `LOG_TO_CONSOLE`        | `true`        | Enable console logging in addition to file logs                        |
+| `PROGRESS_ISSUE_NUMBER` | `555`         | GitHub issue number for progress reports                               |
+| `FORCE_SNAPSHOT_CLEAR`  | `false`       | Clear snapshot cache on startup                                        |
+| `DEV_MODE_FORK_PR`      | `false`       | Create PRs in fork (dev) vs upstream (production)                      |
+
+</details>
+
+## Usage
+
+### Development Mode
+
+Development mode with auto-reload on file changes:
+
+```bash
+bun run dev
+```
+
+**Development Configuration**: Create `.env.dev` and set `DEV_MODE_FORK_PR=true` to create PRs against your fork instead of upstream. This prevents permission issues during testing.
+
+### Production Mode
 
 ```bash
 bun start
 ```
 
-Or run the script directly:
-
-```bash
-bun run src/index.ts
-```
-
-### Command Line Arguments
-
-The tool supports the following command line arguments:
-
-- `--target`: Target language code (default: "pt")
-- `--source`: Source language code (default: "en")
-- `--batch-size`: Number of files to process in each batch (default: 10)
-
-```bash
-bun run start --target=pt --source=en --batch-size=10
-```
+**Production Behavior**: Creates PRs against upstream repository for official contributions.
 
 ## Project Structure
 
-```
-src/
-├── errors/                              # Error handling system
-│   ├── base.error.ts                    # Base error classes and types
-│   ├── error.handler.ts                 # Error handler implementation
-│   ├── proxy.handler.ts                 # Error handling proxy
-│   └── specific.error.ts                # Specific error implementations
-├── services/
-│   ├── github/                          # GitHub API services
-│   │   ├── base.service.ts              # Base GitHub service
-│   │   ├── branch.service.ts            # Branch management
-│   │   ├── content.service.ts           # Content and PR management
-│   │   ├── github.service.ts            # Main GitHub service
-│   │   └── repository.service.ts        # Repository operations
-│   ├── runner/                          # Workflow orchestration
-│   │   ├── base.service.ts              # Base runner implementation
-│   │   └── runner.service.ts            # Main workflow orchestrator
-│   ├── database.service.ts              # Database service
-│   ├── snapshot.service.ts              # Snapshot service
-│   └── translator.service.ts            # Translation service
-├── utils/
-│   ├── constants.util.ts                # Application constants
-│   ├── env.util.ts                      # Environment validation
-│   ├── language-detector.util.ts        # Language detection utility
-│   ├── parse-command-args.util.ts       # Command line argument parser
-│   ├── setup-signal-handlers.util.ts    # Process signal handlers
-│   └── translation-file.util.ts         # Translation file utility
-├── index.ts                             # Main entry point
-├── types.d.ts                           # Type definitions
+```plaintext
+translate-react/
+├─ src/
+│  ├── errors/                    # Error handling system
+│  ├── services/                  # Core services
+│  │   ├── github/                # GitHub API integration
+│  │   ├── runner/                # Workflow orchestration
+│  │   ├── database.service.ts    # SQLite state persistence
+│  │   ├── snapshot.service.ts    # Snapshot management
+│  │   └── translator.service.ts  # LLM translation engine
+│  ├── utils/                     # Utilities and constants
+│  └── index.ts                   # Entry point
 │
-logs/                                    # Error logs directory
-snapshots.sqlite                         # SQLite database for state persistence
+├── docs/                         # Documentation
+├── logs/                         # Structured error logs (JSONL)
+└── snapshots.sqlite              # State persistence database
 ```
 
-## Architecture
+## Documentation
 
-### Core Services
-
-1. **Runner Service** (`services/runner/`)
-
-- Orchestrates the entire translation workflow
-- Manages batch processing and progress tracking
-- Handles state persistence through snapshots
-- Implements error recovery and reporting
-
-2. **GitHub Service** (`services/github/`)
-
-- Modular architecture with specialized services:
-  - **Base Service**: Common GitHub functionality and error handling
-  - **Branch Service**: Branch lifecycle and cleanup management
-  - **Content Service**: File operations and PR management
-  - **Repository Service**: Repository and fork synchronization
-- Inheritance-based design for code reuse
-- Protected access modifiers for internal operations
-- Unified error handling through base service
-
-3. **Translator Service** (`services/translator.service.ts`)
-
-- Interfaces with OpenAI's language models
-- Handles content parsing and block management
-- Maintains translation glossary and rules
-- Implements chunking and retry mechanisms for large files
-
-4. **Language Detector** (`utils/language-detector.util.ts`)
-
-- Uses `franc` for language detection
-- Determines if content needs translation
-- Calculates language confidence scores
-
-5. **Database Service** (`services/database.service.ts`)
-
-- Manages persistent storage of workflow state
-- Handles snapshots for interruption recovery
-- Maintains translation history and results
-
-### Error Handling System
-
-1. **Error Handler** (`errors/error.handler.ts`)
-
-- Centralized error management
-- Severity-based filtering
-- File logging capabilities
-- Custom error reporting
-
-2. **Error Proxy** (`errors/proxy.handler.ts`)
-
-- Automatic error wrapping for services
-- Context enrichment for debugging
-- Method-specific error handling
-- Error transformation and mapping
-
-## Features
-
-### Translation Quality
-
-- Enforces strict glossary rules for technical terms
-- Preserves markdown formatting and structure
-- Maintains code blocks and technical references
-- Supports any language localization standards
-
-### State Management
-
-- SQLite-based snapshot system
-- Interruption recovery
-- Progress tracking
-- Error state persistence
-
-### Process Management
-
-- Batch processing with configurable sizes
-- Progress tracking with CLI spinners
-- Detailed error reporting
-- Performance metrics tracking
-
-### GitHub Integration
-
-- Branch per file strategy
-- Automated PR creation
-- Issue progress tracking
-- Branch cleanup management
-
-### Error Handling
-
-- Custom error types for different scenarios
-- Graceful failure recovery
-- Detailed error context
-- Cleanup on failure
+- [**ARCHITECTURE.md**](./docs/ARCHITECTURE.md) - System architecture, service design, error handling patterns, and design decisions
+- [**WORKFLOW.md**](./docs/WORKFLOW.md) - Detailed execution workflow with timing analysis, bottleneck identification, and performance data
+- [**ERROR_HANDLING.md**](./docs/ERROR_HANDLING.md) - Error taxonomy, recovery mechanisms, and debugging strategies
+- [**DEBUGGING.md**](./docs/DEBUGGING.md) - Troubleshooting guides and diagnostic procedures
+- [**PROJECT_STRUCTURE.md**](./docs/PROJECT_STRUCTURE.md) - Comprehensive project organization, directory structure, and navigation guide
 
 ## Contributing
 
-This project is open for contributions. Feel free to open issues, fork the project and submit pull requests for improvements.
+Contributions are welcome. Follow these guidelines:
 
-### Development Guidelines
+### Setup
 
-1. All code is written in TypeScript
-2. Use Bun as the runtime
-3. Follow the established error handling patterns
-4. Maintain comprehensive JSDoc documentation
-5. Use conventional commits for version control
+1. Fork repository and create feature branch
+2. Install dependencies: `bun install`
+3. Create `.env.dev` with development configuration:
+```bash
+DEV_MODE_FORK_PR=true
+FORCE_SNAPSHOT_CLEAR=true
+NODE_ENV=development
+```
+4. Run tests: `bun test`
+
+### Development Standards
+
+- **TypeScript**: All code must be properly typed
+- **Bun Runtime**: Use Bun exclusively (not npm/yarn/pnpm)
+- **Error Handling**: Follow established error patterns (see [ERROR_HANDLING.md](./docs/ERROR_HANDLING.md))
+- **Documentation**: Maintain comprehensive JSDoc comments (see [.github/instructions/jsdocs.instructions.md](./.github/instructions/jsdocs.instructions.md))
+- **Commits**: Use conventional commit format (see [.github/instructions/commit.instructions.md](./.github/instructions/commit.instructions.md))
+- **Testing**: Add tests for new features
+- **Code Style**: Follow ESLint/Prettier configuration
+
+### Patterns
+
+- **Services**: Extend appropriate base classes
+- **Errors**: Create specific error types for new failure scenarios
+- **Environment**: Add new variables to Zod schema in `env.util.ts`
+- **Database**: Use existing database service for persistence
+
+## Troubleshooting
+
+### Common Issues
+
+<details>
+<summary><b>Environment Validation Errors</b></summary>
+
+**Error**: `❌ Invalid environment variables: - GITHUB_TOKEN: String must contain at least 1 character(s)`
+
+**Solution**: Ensure required variables (`GITHUB_TOKEN`, `OPENAI_API_KEY`) are set in `.env` file.
+
+</details>
+
+<details>
+<summary><b>GitHub "Not Found" Errors</b></summary>
+
+**Error**: `GITHUB_NOT_FOUND - https://docs.github.com/rest/git/refs#get-a-reference`
+
+**Solution**: Set `DEV_MODE_FORK_PR=true` in `.env.dev` to create PRs against your fork instead of upstream (prevents permission issues during development).
+
+</details>
+
+<details>
+<summary><b>GitHub API Rate Limiting</b></summary>
+
+**Error**: `GITHUB_RATE_LIMITED - API rate limit exceeded`
+
+**Solution**: Tool automatically retries with exponential backoff. For heavy usage, consider GitHub App token instead of PAT.
+
+</details>
+
+<details>
+<summary><b>Translation API Errors</b></summary>
+
+**Error**: `OpenAI API error: insufficient_quota`
+
+**Solution**: Check API key has sufficient credits. Switch providers by changing `OPENAI_BASE_URL`.
+
+</details>
+
+<details>
+<summary><b>SQLite Database Lock</b></summary>
+
+**Error**: `Database is locked`
+
+**Solution**: Ensure no other instances are running. In development, use `FORCE_SNAPSHOT_CLEAR=true` to reset database.
+
+</details>
+
+### Debug Mode
+
+> [!TIP]
+> For a more detailed debugging guidance, see [`DEBUGGING.md`](./docs/DEBUGGING.md).
+
+#### Enable verbose logging:
+
+```bash
+LOG_LEVEL="debug" bun dev
+```
+
+#### Analyze error logs *(`.jsonl` format)*:
+
+##### View Recent Errors
+
+```bash
+tail -f logs/$(ls -t logs/ | head -1) | jq '.'
+```
+
+##### Filter by Error Type
+
+```bash
+grep "GITHUB_NOT_FOUND" logs/*.log | jq '.'
+```
+
+##### Error Pattern Analysis
+
+```bash
+cat logs/*.log | jq '.code' | sort | uniq -c
+```
+
+### Getting Help
+
+- [GitHub Issues](https://github.com/NivaldoFarias/translate-react/issues) - Bug reports and feature requests
+- [GitHub Discussions](https://github.com/NivaldoFarias/translate-react/discussions) - Questions and support
+- [Documentation](./docs/) - Detailed technical documentation
 
 ## License
 
-MIT License - see LICENSE file for details
+MIT License - see [LICENSE](./LICENSE) file for details.

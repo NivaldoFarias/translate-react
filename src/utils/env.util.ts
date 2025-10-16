@@ -1,75 +1,229 @@
 import { z } from "zod";
 
-import { homepage, name, version } from "../../package.json";
+import {
+	environmentDefaults,
+	LogLevel,
+	MIN_API_TOKEN_LENGTH,
+	REACT_TRANSLATION_LANGUAGES,
+	RuntimeEnvironment,
+} from "./constants.util";
 
 /**
- * Environment configuration schema for runtime validation.
- * Uses Zod for type checking and validation of environment variables.
+ * Creates a secure token validation schema with common security checks.
  *
- * ## Required Variables
- * - GitHub authentication and repository settings
- * - OpenAI API configuration
- * - Language settings
- * - Environment mode settings
+ * @param envName The name of the environment variable (for error messages)
+ *
+ * @returns A Zod schema that validates API tokens/keys
  */
+function createTokenSchema(envName: string) {
+	return z
+		.string()
+		.min(MIN_API_TOKEN_LENGTH, `${envName} looks too short; ensure your API key is set`)
+		.refine((value) => !/\s/.test(value), `${envName} must not contain whitespace`)
+		.refine(
+			(value) =>
+				!["CHANGE_ME", "dev-token", "dev-key", "your-token-here", "your-key-here"].includes(value),
+			`${envName} appears to be a placeholder. Set a real token`,
+		);
+}
+
+/**
+ * Detects if running in test environment.
+ *
+ * Checks NODE_ENV, BUN_ENV, and Bun's built-in test detection.
+ */
+function isTestEnvironment(): boolean {
+	const env = import.meta.env;
+	return (
+		env["NODE_ENV"] === RuntimeEnvironment.Test ||
+		env["BUN_ENV"] === RuntimeEnvironment.Test ||
+		(typeof Bun !== "undefined" && Bun.isMainThread === false)
+	);
+}
+
+/** Environment configuration schema for runtime validation */
 const envSchema = z.object({
-	NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
-	BUN_ENV: z.enum(["development", "production", "test"]).default("development"),
+	/**
+	 * Node.js's runtime environment.
+	 *
+	 * @default "development"
+	 */
+	NODE_ENV: z.enum(RuntimeEnvironment).default(environmentDefaults.NODE_ENV),
 
-	/** The GitHub Personal Access Token */
-	GITHUB_TOKEN: z.string().min(1, "GitHub token is required"),
+	/**
+	 * Bun's runtime environment.
+	 *
+	 * @default "development"
+	 */
+	BUN_ENV: z.enum(RuntimeEnvironment).default(environmentDefaults.BUN_ENV),
 
-	/** The owner (user or organization) of the forked repository */
-	REPO_FORK_OWNER: z.string().min(1, "Repository owner is required"),
+	/**
+	 * Logging level for the application.
+	 *
+	 * @default "info"
+	 */
+	LOG_LEVEL: z.enum(LogLevel).default(environmentDefaults.LOG_LEVEL),
 
-	/** The name of the forked repository */
-	REPO_FORK_NAME: z.string().min(1, "Repository name is required"),
+	/** The GitHub Personal Access Token (optional in test environment) */
+	GITHUB_TOKEN:
+		isTestEnvironment() ?
+			createTokenSchema("GITHUB_TOKEN").optional()
+		:	createTokenSchema("GITHUB_TOKEN"),
 
-	/** Original repository owner */
-	REPO_UPSTREAM_OWNER: z.string().min(1, "Original repository owner is required"),
+	/** The OpenAI/OpenRouter/etc API key (optional in test environment) */
+	OPENAI_API_KEY:
+		isTestEnvironment() ?
+			createTokenSchema("OPENAI_API_KEY").optional()
+		:	createTokenSchema("OPENAI_API_KEY"),
 
-	/** Original repository name */
-	REPO_UPSTREAM_NAME: z.string().min(1, "Original repository name is required"),
+	/**
+	 * The owner _(user or organization)_ of the forked repository.
+	 *
+	 * @default "nivaldofarias"
+	 */
+	REPO_FORK_OWNER: z.string().default(environmentDefaults.REPO_FORK_OWNER),
 
-	/** The LLM model to use */
-	LLM_MODEL: z.string().min(1, "LLM model is required"),
+	/**
+	 * The name of the forked repository.
+	 *
+	 * @default "pt-br.react.dev"
+	 */
+	REPO_FORK_NAME: z.string().default(environmentDefaults.REPO_FORK_NAME),
 
-	/** The OpenAI API key */
-	OPENAI_API_KEY: z.string().min(1, "LLM API key is required"),
+	/**
+	 * Original repository owner.
+	 *
+	 * @default "reactjs"
+	 */
+	REPO_UPSTREAM_OWNER: z.string().default(environmentDefaults.REPO_UPSTREAM_OWNER),
 
-	/** The OpenAI API base URL. Defaults to OpenAI API */
-	OPENAI_BASE_URL: z.string().url().default("https://openrouter.ai/api/v1"),
+	/**
+	 * Original repository name.
+	 *
+	 * @default "pt-br.react.dev"
+	 */
+	REPO_UPSTREAM_NAME: z.string().default(environmentDefaults.REPO_UPSTREAM_NAME),
 
-	/** The OpenAI project ID. Used for activity tracking on OpenAI. */
-	OPENAI_PROJECT_ID: z.string().min(1, "OpenAI project ID is required").optional(),
+	/**
+	 * The LLM model to use.
+	 *
+	 * @default "google/gemini-2.0-flash-exp:free"
+	 */
+	LLM_MODEL: z.string().default(environmentDefaults.LLM_MODEL),
 
-	/** The issue number of the progress tracking issue */
-	PROGRESS_ISSUE_NUMBER: z
-		.union([z.coerce.number().positive(), z.string().length(0), z.undefined()])
-		.optional()
-		.transform((value) => (value === "" ? undefined : value)),
+	/**
+	 * The OpenAI/OpenRouter/etc API base URL.
+	 *
+	 * @default "https://api.openrouter.com/v1"
+	 */
+	OPENAI_BASE_URL: z.url().default(environmentDefaults.OPENAI_BASE_URL),
+
+	/** The OpenAI project's ID. Used for activity tracking on OpenAI. */
+	OPENAI_PROJECT_ID: z.string().optional(),
+
+	/**
+	 * The issue number of the progress tracking issue.
+	 *
+	 * @default 555
+	 * @see {@link environmentDefaults.PROGRESS_ISSUE_NUMBER}
+	 */
+	PROGRESS_ISSUE_NUMBER: z.coerce
+		.number()
+		.positive()
+		.default(environmentDefaults.PROGRESS_ISSUE_NUMBER),
 
 	/** Whether to clear the snapshot on startup. Used for development. */
-	FORCE_SNAPSHOT_CLEAR: z.coerce.boolean().default(false),
+	FORCE_SNAPSHOT_CLEAR: z.stringbool().default(environmentDefaults.FORCE_SNAPSHOT_CLEAR),
 
-	/** The URL of the application. Used for activity tracking on Open Router. */
-	HEADER_APP_URL: z.string().url().default(homepage),
+	/**
+	 * Whether to create PRs in the fork (development mode) or upstream (production mode).
+	 * When true, PRs are created against the fork for development purposes.
+	 *
+	 * @default false
+	 */
+	DEV_MODE_FORK_PR: z.stringbool().default(false),
 
-	/** The title of the application. Used for activity tracking on Open Router. */
-	HEADER_APP_TITLE: z.string().default(`${name} v${version}`),
+	/**
+	 * The URL of the application to override the default URL.
+	 * Used for activity tracking on {@link https://openrouter.ai/|OpenRouter}.
+	 *
+	 * @default `"${pkgJson.homepage}"`
+	 */
+	HEADER_APP_URL: z.url().default(environmentDefaults.HEADER_APP_URL),
+
+	/**
+	 * The title of the application to override the default title.
+	 * Used for activity tracking on {@link https://openrouter.ai/|OpenRouter}.
+	 *
+	 * @default `"${pkgJson.name} v${pkgJson.version}"`
+	 */
+	HEADER_APP_TITLE: z.string().default(environmentDefaults.HEADER_APP_TITLE),
+
+	/**
+	 * The number of items to process in each batch.
+	 *
+	 * @default 10
+	 */
+	BATCH_SIZE: z.coerce.number().positive().default(environmentDefaults.BATCH_SIZE),
+
+	/**
+	 * The target language for translation.
+	 * Must be one of the 38 supported React translation languages.
+	 *
+	 * @default "pt-br"
+	 * @see {@link REACT_TRANSLATION_LANGUAGES}
+	 */
+	TARGET_LANGUAGE: z.enum(REACT_TRANSLATION_LANGUAGES).default(environmentDefaults.TARGET_LANGUAGE),
+
+	/**
+	 * The source language for translation.
+	 * Must be one of the 38 supported React translation languages.
+	 *
+	 * @default "en"
+	 * @see {@link REACT_TRANSLATION_LANGUAGES}
+	 */
+	SOURCE_LANGUAGE: z.enum(REACT_TRANSLATION_LANGUAGES).default(environmentDefaults.SOURCE_LANGUAGE),
+
+	/**
+	 * Maximum tokens to generate in a single LLM response.
+	 *
+	 * @default 8192
+	 */
+	MAX_TOKENS: z.coerce.number().positive().default(environmentDefaults.MAX_TOKENS),
+
+	/**
+	 * Whether to enable console logging in addition to file logging.
+	 *
+	 * When false, logs are only written to files. Useful for reducing terminal clutter
+	 * in debug mode while preserving detailed file logs.
+	 *
+	 * @default true
+	 */
+	LOG_TO_CONSOLE: z.stringbool().default(environmentDefaults.LOG_TO_CONSOLE),
+
+	/**
+	 * Timeout for GitHub API requests in **milliseconds**.
+	 *
+	 * Prevents indefinite hangs on slow or stuck API calls. If a request exceeds this
+	 * timeout, it will be aborted and throw an error.
+	 *
+	 * @default 30000
+	 */
+	GITHUB_REQUEST_TIMEOUT: z.coerce
+		.number()
+		.positive()
+		.default(environmentDefaults.GITHUB_REQUEST_TIMEOUT),
 });
 
-/**
- * Type definition for the environment configuration.
- * Inferred from the Zod schema to ensure type safety.
- */
+/** Type definition for the environment configuration */
 export type Environment = z.infer<typeof envSchema>;
 
 /**
  * Validates all environment variables against the defined schema.
+ *
  * Performs runtime checks to ensure all required variables are present and correctly typed.
  *
- * ## Workflow
+ * ### Workflow
  * 1. Parses environment variables using Zod schema
  * 2. Updates `import.meta.env` with validated values
  * 3. Throws detailed error messages for invalid configurations
@@ -78,11 +232,7 @@ export type Environment = z.infer<typeof envSchema>;
  */
 export function validateEnv() {
 	try {
-		const env = envSchema.parse(import.meta.env);
-
-		Object.assign(import.meta.env, env);
-
-		return env;
+		return envSchema.parse(import.meta.env);
 	} catch (error) {
 		if (error instanceof z.ZodError) {
 			const issues = error.issues
@@ -94,3 +244,5 @@ export function validateEnv() {
 		throw error;
 	}
 }
+
+export const env = validateEnv();

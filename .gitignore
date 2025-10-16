@@ -1,15 +1,13 @@
 # Based on https://raw.githubusercontent.com/github/gitignore/main/Node.gitignore
-.config
-.dotfiles
 .snapshots/
-.vscode/
-.cursor
 scripts/
+!src/scripts/
+*.backup
 
 # Logs
 
-logs
-_.log
+logs/
+*.log
 npm-debug.log_
 yarn-debug.log*
 yarn-error.log*
@@ -106,7 +104,7 @@ web_modules/
 
 # dotenv environment variable files
 
-.env*
+*.env*
 !.env.example
 
 # parcel-bundler cache (https://parceljs.org/)
@@ -180,3 +178,10 @@ dist
 # SQLite database files
 *.sqlite
 *.sqlite-journal
+
+# Github Copilot
+.github/instructions/
+.github/copilot-instructions.md
+
+# SpecStory
+.specstory/

@@ -1,21 +1,66 @@
-import type { ProcessedFileResult } from "@/types";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
-import { BaseGitHubService } from "@/services/github/base.service";
-import { TranslationFile } from "@/utils/translation-file.util";
+import type { ProcessedFileResult } from "@/services/runner/";
+
+import { BaseGitHubService } from "@/services/github/";
+import { env, logger } from "@/utils/";
+
+import { CommentBuilderService } from "../comment-builder.service";
+import { TranslationFile } from "../translator.service";
+
+/** Pull request options */
+export interface PullRequestOptions {
+	/** Source branch name */
+	branch: string;
+
+	/** Pull request title */
+	title: string;
+
+	/** Pull request description */
+	body: string;
+
+	/** Target branch for PR */
+	baseBranch?: string;
+}
+
+/** Options for committing translation changes */
+export interface CommitTranslationOptions {
+	/** Target branch reference */
+	branch: RestEndpointMethodTypes["git"]["getRef"]["response"]["data"];
+
+	/** File being translated */
+	file: TranslationFile;
+
+	/** Translated content */
+	content: string;
+
+	/** Commit message */
+	message: string;
+}
+
+/** Pull request mergeable status */
+export interface PullRequestStatus {
+	hasConflicts: boolean;
+	mergeable: boolean | null;
+	mergeableState: string;
+	needsUpdate: boolean;
+}
 
 /**
  * Service responsible for managing repository content and translations.
- * Handles file content operations, commits, and pull requests.
  *
- * ## Responsibilities
+ * ### Responsibilities
+ *
  * - File content retrieval and modification
  * - Translation content management
  * - Pull request creation and management
  * - Content filtering and validation
  */
 export class ContentService extends BaseGitHubService {
-	private readonly issueNumber = Number(import.meta.env.PROGRESS_ISSUE_NUMBER);
+	private readonly issueNumber = Number(env.PROGRESS_ISSUE_NUMBER);
+	private readonly services = {
+		commentBuilder: new CommentBuilderService(),
+	};
 
 	/**
 	 * Creates a comment on a pull request.
@@ -25,12 +70,26 @@ export class ContentService extends BaseGitHubService {
 	 *
 	 * @returns The response from the GitHub API
 	 */
-	public createCommentOnPullRequest(prNumber: number, comment: string) {
-		return this.octokit.issues.createComment({
-			...this.upstream,
-			issue_number: prNumber,
-			body: comment,
-		});
+	public async createCommentOnPullRequest(
+		prNumber: number,
+		comment: string,
+	): Promise<RestEndpointMethodTypes["issues"]["createComment"]["response"]> {
+		try {
+			const response = await this.octokit.issues.createComment({
+				...this.repositories.upstream,
+				issue_number: prNumber,
+				body: comment,
+			});
+
+			logger.info({ prNumber, commentId: response.data.id }, "Comment created on pull request");
+
+			return response;
+		} catch (error) {
+			throw this.helpers.github.mapError(error, {
+				operation: "ContentService.createCommentOnPullRequest",
+				metadata: { prNumber, upstream: this.repositories.upstream },
+			});
+		}
 	}
 
 	/**
@@ -38,25 +97,59 @@ export class ContentService extends BaseGitHubService {
 	 *
 	 * @returns A list of open pull requests
 	 */
-	public async listOpenPullRequests() {
-		return await this.octokit.pulls.list({
-			...this.upstream,
-			state: "open",
-		});
+	public async listOpenPullRequests(): Promise<
+		RestEndpointMethodTypes["pulls"]["list"]["response"]["data"]
+	> {
+		try {
+			const response = await this.octokit.pulls.list({
+				...this.repositories.upstream,
+				state: "open",
+			});
+
+			logger.debug({ count: response.data.length }, "Listed open pull requests");
+
+			return response.data;
+		} catch (error) {
+			throw this.helpers.github.mapError(error, {
+				operation: "ContentService.listOpenPullRequests",
+				metadata: { upstream: this.repositories.upstream },
+			});
+		}
 	}
 
 	/**
 	 * Retrieves a pull request by number.
 	 *
 	 * @param prNumber Pull request number
+	 *
 	 * @returns The pull request data
 	 */
-	public async findPullRequestByNumber(prNumber: number) {
-		return this.octokit.pulls.get({ ...this.upstream, pull_number: prNumber });
+	public async findPullRequestByNumber(
+		prNumber: number,
+	): Promise<RestEndpointMethodTypes["pulls"]["get"]["response"]> {
+		try {
+			const response = await this.octokit.pulls.get({
+				...this.repositories.upstream,
+				pull_number: prNumber,
+			});
+
+			logger.debug(
+				{ prNumber, title: response.data.title, state: response.data.state },
+				"Found pull request by number",
+			);
+
+			return response;
+		} catch (error) {
+			throw this.helpers.github.mapError(error, {
+				operation: "ContentService.findPullRequestByNumber",
+				metadata: { prNumber, upstream: this.repositories.upstream },
+			});
+		}
 	}
 
 	/**
 	 * Retrieves markdown files that need translation.
+	 *
 	 * Filters and processes files based on content type.
 	 *
 	 * @param maxFiles Optional limit on number of files to retrieve
@@ -67,56 +160,79 @@ export class ContentService extends BaseGitHubService {
 	 * const files = await contentService.getUntranslatedFiles(5);
 	 * ```
 	 */
-	public async getUntranslatedFiles(maxFiles?: number) {
-		const repoTreeResponse = await this.octokit.git.getTree({
-			...this.fork,
-			tree_sha: "main",
-			recursive: "true",
-		});
+	public async getUntranslatedFiles(maxFiles?: number): Promise<TranslationFile[]> {
+		try {
+			const repoTreeResponse = await this.octokit.git.getTree({
+				...this.repositories.fork,
+				tree_sha: "main",
+				recursive: "true",
+			});
 
-		if (!repoTreeResponse.data.tree) {
-			throw new Error("Repository tree is empty");
-		}
-
-		const markdownFiles = this.filterMarkdownFiles(repoTreeResponse.data.tree);
-		const filesToProcess = maxFiles ? markdownFiles.slice(0, maxFiles) : markdownFiles;
-
-		const files: TranslationFile[] = [];
-
-		for (const file of filesToProcess) {
-			if (!file.path) continue;
-
-			try {
-				const response = await this.octokit.repos.getContent({
-					...this.fork,
-					path: file.path,
+			if (!repoTreeResponse.data.tree) {
+				logger.warn({ fork: this.repositories.fork }, "Repository tree is empty");
+				throw this.helpers.github.mapError(new Error("Repository tree is empty"), {
+					operation: "ContentService.getUntranslatedFiles",
+					metadata: { fork: this.repositories.fork },
 				});
-
-				if (!("content" in response.data)) continue;
-
-				files.push({
-					path: file.path,
-					content: Buffer.from(response.data.content, "base64").toString(),
-					sha: response.data.sha,
-					filename: file.path.split("/").pop()!,
-				});
-			} catch {
-				continue;
 			}
-		}
 
-		return files;
+			const markdownFiles = this.filterMarkdownFiles(repoTreeResponse.data.tree);
+			const filesToProcess = maxFiles ? markdownFiles.slice(0, maxFiles) : markdownFiles;
+
+			logger.info(
+				{
+					totalMarkdownFiles: markdownFiles.length,
+					filesToProcess: filesToProcess.length,
+					maxFilesLimit: maxFiles,
+				},
+				"Processing markdown files for translation",
+			);
+
+			const files: TranslationFile[] = [];
+
+			for (const file of filesToProcess) {
+				if (!file.path) continue;
+
+				try {
+					const response = await this.octokit.repos.getContent({
+						...this.repositories.fork,
+						path: file.path,
+					});
+
+					if (!("content" in response.data)) continue;
+
+					files.push({
+						path: file.path,
+						content: Buffer.from(response.data.content, "base64").toString(),
+						sha: response.data.sha,
+						filename: file.path.split("/").pop()!,
+					});
+				} catch (error) {
+					logger.debug(
+						{ filePath: file.path, error },
+						"Skipping file - could not retrieve content",
+					);
+					continue;
+				}
+			}
+
+			logger.info({ filesRetrieved: files.length }, "Successfully retrieved untranslated files");
+
+			return files;
+		} catch (error) {
+			throw this.helpers.github.mapError(error, {
+				operation: "ContentService.getUntranslatedFiles",
+				metadata: { maxFiles, fork: this.repositories.fork },
+			});
+		}
 	}
 
 	/**
 	 * Commits translated content to a branch.
+	 *
 	 * Updates existing file or creates new one.
 	 *
 	 * @param options Commit options
-	 * @param options.branch Target branch reference
-	 * @param options.file File being translated
-	 * @param options.content Translated content
-	 * @param options.message Commit message
 	 *
 	 * @throws {Error} If commit operation fails
 	 *
@@ -142,30 +258,45 @@ export class ContentService extends BaseGitHubService {
 		file,
 		content,
 		message,
-	}: {
-		branch: RestEndpointMethodTypes["git"]["getRef"]["response"]["data"];
-		file: TranslationFile;
-		content: string;
-		message: string;
-	}) {
-		await this.octokit.repos.createOrUpdateFileContents({
-			...this.fork,
-			path: file.path,
-			message,
-			content: Buffer.from(content).toString("base64"),
-			branch: branch.ref,
-			sha: file.sha,
-		});
+	}: CommitTranslationOptions): Promise<
+		RestEndpointMethodTypes["repos"]["createOrUpdateFileContents"]["response"]
+	> {
+		try {
+			const response = await this.octokit.repos.createOrUpdateFileContents({
+				...this.repositories.fork,
+				path: file.path,
+				message,
+				content: Buffer.from(content).toString("base64"),
+				branch: branch.ref,
+				sha: file.sha,
+			});
+
+			logger.info(
+				{
+					filePath: file.path,
+					branch: branch.ref,
+					commitSha: response.data.commit.sha,
+				},
+				"Translation committed successfully",
+			);
+
+			return response;
+		} catch (error) {
+			throw this.helpers.github.mapError(error, {
+				operation: "ContentService.commitTranslation",
+				metadata: {
+					filePath: file.path,
+					branchRef: branch.ref,
+					commitMessage: message,
+				},
+			});
+		}
 	}
 
 	/**
 	 * Creates a pull request.
 	 *
 	 * @param options Pull request options
-	 * @param options.branch Source branch name
-	 * @param options.title Pull request title
-	 * @param options.body Pull request description
-	 * @param options.baseBranch Target branch for PR
 	 *
 	 * @example
 	 * ```typescript
@@ -183,23 +314,42 @@ export class ContentService extends BaseGitHubService {
 		branch,
 		title,
 		body,
-		baseBranch,
-	}: {
-		branch: string;
-		title: string;
-		body: string;
-		baseBranch: string;
-	}) {
-		const createPullRequestResponse = await this.octokit.pulls.create({
-			...this.upstream,
-			title,
-			body,
-			head: `${this.fork.owner}:${branch}`,
-			base: baseBranch,
-			maintainer_can_modify: true,
-		});
+		baseBranch = "main",
+	}: PullRequestOptions): Promise<RestEndpointMethodTypes["pulls"]["create"]["response"]["data"]> {
+		try {
+			const { env } = await import("@/utils/");
 
-		return createPullRequestResponse.data;
+			const targetRepo = env.DEV_MODE_FORK_PR ? this.repositories.fork : this.repositories.upstream;
+			const headRef = env.DEV_MODE_FORK_PR ? branch : `${this.repositories.fork.owner}:${branch}`;
+
+			const createPullRequestResponse = await this.octokit.pulls.create({
+				...targetRepo,
+				title,
+				body,
+				head: headRef,
+				base: baseBranch,
+				maintainer_can_modify: true,
+			});
+
+			logger.info(
+				{
+					prNumber: createPullRequestResponse.data.number,
+					title,
+					targetRepo: targetRepo.owner,
+					headRef,
+					baseBranch,
+					devMode: env.DEV_MODE_FORK_PR,
+				},
+				"Pull request created successfully",
+			);
+
+			return createPullRequestResponse.data;
+		} catch (error) {
+			throw this.helpers.github.mapError(error, {
+				operation: "ContentService.createPullRequest",
+				metadata: { branch, title, baseBranch },
+			});
+		}
 	}
 
 	/**
@@ -209,7 +359,7 @@ export class ContentService extends BaseGitHubService {
 	 */
 	protected filterMarkdownFiles(
 		tree: RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"],
-	) {
+	): RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"] {
 		return tree.filter((item) => {
 			if (!item.path?.endsWith(".md")) return false;
 			if (!item.path.includes("src/")) return false;
@@ -226,23 +376,48 @@ export class ContentService extends BaseGitHubService {
 		file:
 			| TranslationFile
 			| RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"][number],
-	) {
-		const blobSha = file.sha;
+	): Promise<string> {
+		try {
+			const blobSha = file.sha;
 
-		if (!blobSha) throw new Error("Invalid blob URL");
+			if (!blobSha) {
+				logger.warn({ file }, "Invalid blob SHA - file missing SHA property");
+				throw this.helpers.github.mapError(new Error("Invalid blob SHA"), {
+					operation: "ContentService.getFileContent",
+					metadata: { filePath: file.path },
+				});
+			}
 
-		const response = await this.octokit.git.getBlob({
-			...this.fork,
-			file_sha: blobSha,
-		});
+			const response = await this.octokit.git.getBlob({
+				...this.repositories.fork,
+				file_sha: blobSha,
+			});
 
-		return Buffer.from(response.data.content, "base64").toString();
+			const content = Buffer.from(response.data.content, "base64").toString();
+
+			logger.debug(
+				{
+					filePath: file.path,
+					blobSha,
+					contentLength: content.length,
+				},
+				"Retrieved file content",
+			);
+
+			return content;
+		} catch (error) {
+			throw this.helpers.github.mapError(error, {
+				operation: "ContentService.getFileContent",
+				metadata: { filePath: file.path, blobSha: file.sha },
+			});
+		}
 	}
 
 	/**
 	 * Posts translation results as comments on GitHub issues.
 	 *
-	 * ## Workflow
+	 * ### Workflow
+	 *
 	 * 1. Checks if the issue exists
 	 * 2. Lists comments on the issue
 	 * 3. Finds the user's comment with the correct prefix
@@ -264,237 +439,231 @@ export class ContentService extends BaseGitHubService {
 	public async commentCompiledResultsOnIssue(
 		results: ProcessedFileResult[],
 		filesToTranslate: TranslationFile[],
-	) {
-		const issueExistsResponse = await this.octokit.issues.get({
-			...this.upstream,
-			issue_number: this.issueNumber,
-		});
-
-		if (!issueExistsResponse.data) {
-			throw new Error(`Issue ${this.issueNumber} not found`);
-		}
-
-		const listCommentsResponse = await this.octokit.issues.listComments({
-			...this.upstream,
-			issue_number: this.issueNumber,
-			since: "2025-01-20",
-		});
-
-		const userComment = listCommentsResponse.data.find((comment) => {
-			return (
-				comment.user?.login === import.meta.env.REPO_FORK_OWNER &&
-				comment.body?.includes(this.comment.suffix)
-			);
-		});
-
-		if (userComment) {
-			const updateCommentResponse = await this.octokit.issues.updateComment({
-				...this.upstream,
+	): Promise<RestEndpointMethodTypes["issues"]["createComment"]["response"]["data"]> {
+		try {
+			const issueExistsResponse = await this.octokit.issues.get({
+				...this.repositories.upstream,
 				issue_number: this.issueNumber,
-				body: this.concatComment(this.buildComment(results, filesToTranslate)),
-				comment_id: userComment.id,
 			});
 
-			return updateCommentResponse.data;
-		}
-
-		const createCommentResponse = await this.octokit.issues.createComment({
-			...this.upstream,
-			issue_number: this.issueNumber,
-			body: this.concatComment(this.buildComment(results, filesToTranslate)),
-		});
-
-		return createCommentResponse.data;
-	}
-
-	/**
-	 * Concatenates the comment prefix and suffix to the main content.
-	 *
-	 * @param content The content to concatenate
-	 *
-	 * @returns The concatenated comment
-	 */
-	private concatComment(content: string) {
-		return `${this.comment.prefix}\n\n${content}\n\n${this.comment.suffix}`;
-	}
-
-	/**
-	 * Builds a comment for the issue based on the translation results and files that were translated.
-	 *
-	 * @param results Translation results
-	 * @param filesToTranslate Files that were translated
-	 *
-	 * @returns The comment to be posted on the issue
-	 */
-	public buildComment(results: ProcessedFileResult[], filesToTranslate: TranslationFile[]) {
-		const concattedData = results
-			.map((result) => {
-				const translationFile = filesToTranslate.find((file) => file.filename === result.filename);
-
-				if (!translationFile) return null;
-
-				// Extract the directory path and clean it
-				const pathParts = translationFile.path.split("/");
-				const filename = pathParts.pop() || "";
-
-				// Create an object with the proper levels for hierarchy
-				return {
-					pathParts: this.simplifyPathParts(pathParts),
-					filename,
-					pr_number: result.pullRequest?.number || 0,
-				};
-			})
-			.filter(Boolean);
-
-		// Build a hierarchical structure instead of a flat map
-		return this.buildHierarchicalComment(concattedData);
-	}
-
-	/**
-	 * Simplifies path parts by removing date-based segments and other unnecessary elements.
-	 *
-	 * @param pathParts Array of path segments
-	 * @returns Simplified path parts
-	 */
-	private simplifyPathParts(pathParts: string[]): string[] {
-		// Remove the common prefix "src/content"
-		if (pathParts[0] === "src" && pathParts[1] === "content") {
-			pathParts = pathParts.slice(2);
-		}
-
-		// Special handling for blog posts
-		if (pathParts[0] === "blog") {
-			// For blog posts, we want to flatten the structure
-			// Keep only the files directly under "blog" regardless of date directories
-			return ["blog"];
-		}
-
-		return pathParts;
-	}
-
-	/**
-	 * Builds a hierarchical comment from the processed data.
-	 *
-	 * @param data Processed file data with path parts
-	 * @returns Formatted hierarchical comment
-	 */
-	private buildHierarchicalComment(
-		data: Array<{
-			pathParts: string[];
-			filename: string;
-			pr_number: number;
-		}>,
-	): string {
-		// Sort data by path and filename
-		data.sort((a, b) => {
-			const pathA = a.pathParts.join("/");
-			const pathB = b.pathParts.join("/");
-
-			return pathA === pathB ? a.filename.localeCompare(b.filename) : pathA.localeCompare(pathB);
-		});
-
-		// Build a nested structure
-		const structure: any = {};
-
-		for (const item of data) {
-			let currentLevel = structure;
-
-			// Build the nested structure based on path parts
-			for (const part of item.pathParts) {
-				if (!currentLevel[part]) {
-					currentLevel[part] = {
-						__files: [],
-					};
-				}
-				currentLevel = currentLevel[part];
+			if (!issueExistsResponse.data) {
+				logger.warn({ issueNumber: this.issueNumber }, "Issue not found");
+				throw this.helpers.github.mapError(new Error(`Issue ${this.issueNumber} not found`), {
+					operation: "ContentService.commentCompiledResultsOnIssue",
+					metadata: { issueNumber: this.issueNumber, upstream: this.repositories.upstream },
+				});
 			}
 
-			// Add file to the current level
-			currentLevel.__files.push({
-				filename: item.filename,
-				pr_number: item.pr_number,
+			const listCommentsResponse = await this.octokit.issues.listComments({
+				...this.repositories.upstream,
+				issue_number: this.issueNumber,
+				since: "2025-01-20",
+			});
+
+			const userComment = listCommentsResponse.data.find((comment) => {
+				return (
+					comment.user?.login === env.REPO_FORK_OWNER &&
+					comment.body?.includes(this.services.commentBuilder.comment.suffix)
+				);
+			});
+
+			if (userComment) {
+				logger.debug({ commentId: userComment.id }, "Updating existing comment on issue");
+
+				const updateCommentResponse = await this.octokit.issues.updateComment({
+					...this.repositories.upstream,
+					issue_number: this.issueNumber,
+					body: this.services.commentBuilder.concatComment(
+						this.services.commentBuilder.buildComment(results, filesToTranslate),
+					),
+					comment_id: userComment.id,
+				});
+
+				logger.info(
+					{
+						issueNumber: this.issueNumber,
+						commentId: updateCommentResponse.data.id,
+					},
+					"Updated comment on issue with compiled results",
+				);
+
+				return updateCommentResponse.data;
+			}
+
+			logger.debug("No existing comment found - creating new comment");
+
+			const createCommentResponse = await this.octokit.issues.createComment({
+				...this.repositories.upstream,
+				issue_number: this.issueNumber,
+				body: this.services.commentBuilder.concatComment(
+					this.services.commentBuilder.buildComment(results, filesToTranslate),
+				),
+			});
+
+			logger.info(
+				{
+					issueNumber: this.issueNumber,
+					commentId: createCommentResponse.data.id,
+				},
+				"Created comment on issue with compiled results",
+			);
+
+			return createCommentResponse.data;
+		} catch (error) {
+			throw this.helpers.github.mapError(error, {
+				operation: "ContentService.commentCompiledResultsOnIssue",
+				metadata: {
+					issueNumber: this.issueNumber,
+					filesCount: filesToTranslate.length,
+					resultsCount: results.length,
+				},
 			});
 		}
-
-		// Convert the structure to a formatted string
-		return this.formatStructure(structure, 0);
-	}
-
-	/**
-	 * Recursively formats the hierarchical structure into a Markdown comment.
-	 *
-	 * @param structure The hierarchical structure to format
-	 * @param level Current indentation level
-	 * @returns Formatted Markdown string
-	 */
-	private formatStructure(structure: any, level: number): string {
-		const lines: string[] = [];
-		const indent = "  ".repeat(level);
-
-		// Process each directory in alphabetical order
-		const dirs = Object.keys(structure)
-			.filter((key) => key !== "__files")
-			.sort();
-
-		for (const dir of dirs) {
-			lines.push(`${indent}- ${dir}`);
-
-			// Add files at this level
-			const files = structure[dir].__files || [];
-			for (const file of files.sort((a: any, b: any) => a.filename.localeCompare(b.filename))) {
-				lines.push(`${indent}  - \`${file.filename}\`: #${file.pr_number}`);
-			}
-
-			// Process subdirectories recursively
-			const subDirs = Object.keys(structure[dir]).filter((key) => key !== "__files");
-			if (subDirs.length > 0) {
-				lines.push(this.formatStructure(structure[dir], level + 1));
-			}
-		}
-
-		return lines.join("\n");
 	}
 
 	/**
 	 * Retrieves a pull request by branch name.
 	 *
 	 * @param branchName Source branch name
+	 *
+	 * @returns The first matching pull request or undefined if none found
 	 */
-	public async findPullRequestByBranch(branchName: string) {
-		const response = await this.octokit.pulls.list({
-			...this.upstream,
-			head: `${this.fork.owner}:${branchName}`,
-		});
+	public async findPullRequestByBranch(
+		branchName: string,
+	): Promise<RestEndpointMethodTypes["pulls"]["list"]["response"]["data"][number] | undefined> {
+		try {
+			const response = await this.octokit.pulls.list({
+				...this.repositories.upstream,
+				head: `${this.repositories.fork.owner}:${branchName}`,
+			});
 
-		return response.data[0];
+			const pr = response.data[0];
+
+			logger.debug(
+				{ branchName, found: !!pr, prNumber: pr?.number },
+				"Searched for pull request by branch",
+			);
+
+			return pr;
+		} catch (error) {
+			throw this.helpers.github.mapError(error, {
+				operation: "ContentService.findPullRequestByBranch",
+				metadata: { branchName, forkOwner: this.repositories.fork.owner },
+			});
+		}
+	}
+
+	/**
+	 * Checks if a pull request has merge conflicts that require closing and recreating.
+	 *
+	 * Determines if a PR needs to be closed and recreated by examining its mergeable status.
+	 * The `needsUpdate` flag is only set to `true` when there are actual merge conflicts
+	 * (indicated by `mergeable === false` and `mergeable_state === "dirty"`). PRs that are
+	 * simply "behind" the base branch remain valid and can be updated via rebase without
+	 * requiring closure.
+	 *
+	 * ### GitHub PR Mergeable States
+	 *
+	 * - `clean`: PR can be merged cleanly (no action needed)
+	 * - `behind`: PR is behind base branch but has no conflicts (can be rebased safely)
+	 * - `dirty`: PR has merge conflicts (requires closure and recreation)
+	 * - `unstable`: PR has failing checks (not a merge conflict, no closure needed)
+	 * - `blocked`: PR is blocked by review requirements (not a merge conflict)
+	 *
+	 * ### Implementation Details
+	 *
+	 * The method sets `needsUpdate = hasConflicts` where `hasConflicts` is determined by
+	 * checking if `mergeable === false` AND `mergeable_state === "dirty"`. This ensures
+	 * that PRs are only flagged for recreation when they have true merge conflicts, not
+	 * when they're merely out of sync with the base branch.
+	 *
+	 * @param prNumber Pull request number to check
+	 *
+	 * @returns A Promise resolving to an object containing:
+	 * - `hasConflicts`: `true` only when PR has actual merge conflicts
+	 * - `mergeable`: GitHub's raw mergeable status (`true`/`false`/`null`)
+	 * - `mergeableState`: GitHub's mergeable state string (e.g., "clean", "dirty", "behind")
+	 * - `needsUpdate`: `true` only when PR has conflicts requiring closure
+	 *
+	 * @example
+	 * ```typescript
+	 * const status = await contentService.checkPullRequestStatus(123);
+	 * if (status.needsUpdate) {
+	 *   console.log('PR has conflicts and needs recreating');
+	 * } else if (status.mergeableState === 'behind') {
+	 *   console.log('PR is behind but can be rebased');
+	 * }
+	 * ```
+	 */
+	public async checkPullRequestStatus(prNumber: number): Promise<PullRequestStatus> {
+		try {
+			const prResponse = await this.octokit.pulls.get({
+				...this.repositories.upstream,
+				pull_number: prNumber,
+			});
+
+			const pr = prResponse.data;
+			const hasConflicts = pr.mergeable === false && pr.mergeable_state === "dirty";
+			const needsUpdate = hasConflicts;
+
+			logger.info(
+				{
+					prNumber,
+					hasConflicts,
+					mergeable: pr.mergeable,
+					mergeableState: pr.mergeable_state,
+					needsUpdate,
+				},
+				"Checked pull request status",
+			);
+
+			return {
+				hasConflicts,
+				mergeable: pr.mergeable,
+				mergeableState: pr.mergeable_state,
+				needsUpdate,
+			};
+		} catch (error) {
+			throw this.helpers.github.mapError(error, {
+				operation: "ContentService.checkPullRequestStatus",
+				metadata: { prNumber, upstream: this.repositories.upstream },
+			});
+		}
 	}
 
 	/**
 	 * Closes a pull request by number.
 	 *
 	 * @param prNumber Pull request number
+	 *
 	 * @throws {Error} If pull request closure fails
 	 */
-	public async closePullRequest(prNumber: number) {
-		const response = await this.octokit.pulls.update({
-			...this.upstream,
-			pull_number: prNumber,
-			state: "closed",
-		});
+	public async closePullRequest(
+		prNumber: number,
+	): Promise<RestEndpointMethodTypes["pulls"]["update"]["response"]["data"]> {
+		try {
+			const response = await this.octokit.pulls.update({
+				...this.repositories.upstream,
+				pull_number: prNumber,
+				state: "closed",
+			});
 
-		if (response.status !== 200) throw new Error(`Failed to close pull request ${prNumber}`);
-	}
+			if (response.status !== 200) {
+				logger.error({ prNumber, status: response.status }, "Failed to close pull request");
+				throw this.helpers.github.mapError(new Error(`Failed to close pull request ${prNumber}`), {
+					operation: "ContentService.closePullRequest",
+					metadata: { prNumber, status: response.status },
+				});
+			}
 
-	/** Comment template for issue comments */
-	private get comment() {
-		return {
-			prefix: `As seguintes páginas foram traduzidas e PRs foram criados:`,
-			suffix: `###### Observações
-	
-	- As traduções foram geradas por uma LLM e requerem revisão humana para garantir precisão técnica e fluência.
-	- Alguns arquivos podem ter PRs de tradução existentes em análise. Verifiquei duplicações, mas recomendo conferir.
-	- O fluxo de trabalho de automação completo está disponível no repositório [\`translate-react\`](https://github.com/${import.meta.env.REPO_FORK_OWNER}/translate-react) para referência e contribuições.
-	- Esta implementação é um trabalho em progresso e pode apresentar inconsistências em conteúdos técnicos complexos ou formatação específica.`,
-		};
+			logger.info({ prNumber }, "Pull request closed successfully");
+
+			return response.data;
+		} catch (error) {
+			throw this.helpers.github.mapError(error, {
+				operation: "ContentService.closePullRequest",
+				metadata: { prNumber, upstream: this.repositories.upstream },
+			});
+		}
 	}
 }

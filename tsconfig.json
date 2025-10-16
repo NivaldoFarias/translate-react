@@ -13,11 +13,11 @@
 
         /* Type Checking Rules */
         "strict": true,
-        "noPropertyAccessFromIndexSignature": true,
         "noUncheckedIndexedAccess": true,
+        "noPropertyAccessFromIndexSignature": true,
 
         /* Other Options */
-        "skipLibCheck": true,
+        "skipLibCheck": false,
         "esModuleInterop": true,
         "forceConsistentCasingInFileNames": true,
         "isolatedModules": true,
@@ -26,6 +26,6 @@
             "@/*": ["src/*"]
         }
     },
-    "include": ["src/**/*", "tests/**/*", "scripts/**/*"],
+    "include": ["src/**/*", "tests/**/*", "scripts/**/*", "./*.config.*"],
     "exclude": ["node_modules", "dist"]
 }
