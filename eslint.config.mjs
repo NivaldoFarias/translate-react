@@ -1,12 +1,15 @@
+import { defineConfig } from "@eslint/config-helpers";
 import eslint from "@eslint/js";
-import eslintPluginPrettier from "eslint-plugin-prettier/recommended";
+import eslintConfigPrettier from "eslint-config-prettier";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
-export default tseslint.config(
-	eslintPluginPrettier,
+export default defineConfig(
 	{
-		files: ["**/*.{js,ts}"],
+		ignores: ["node_modules/**", "dist/**", "out/**", "prettier.config.mjs"],
+	},
+	{
+		files: ["**/*.{js,cjs,mjs,ts,mts,cts}"],
 		plugins: {
 			"@typescript-eslint": tseslint.plugin,
 		},
@@ -19,25 +22,25 @@ export default tseslint.config(
 			parser: tseslint.parser,
 			parserOptions: {
 				project: ["./tsconfig.json"],
+				ecmaVersion: "latest",
+				sourceType: "module",
 			},
 		},
 		rules: {
 			...eslint.configs.recommended.rules,
+
+			/* ESLint */
 			"no-unused-vars": "off",
-			"no-console": ["error", { allow: ["warn", "error", "table"] }],
+			"no-console": "error",
 
-			"prettier/prettier": "off",
-
-			// typescript-eslint rules
+			/* TypeScript */
 			"@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
-			"@typescript-eslint/no-namespace": "off",
-			"@typescript-eslint/dot-notation": "off",
-			"@typescript-eslint/no-unsafe-argument": "off",
-			"@typescript-eslint/no-extraneous-class": "off",
-			"@typescript-eslint/no-unsafe-assignment": "off",
-			"@typescript-eslint/no-unsafe-call": "off",
-			"@typescript-eslint/no-unsafe-return": "off",
-			"@typescript-eslint/no-unsafe-member-access": "off",
+		},
+	},
+	{
+		files: ["scripts/**/*.{js,ts}", "src/build.ts", "src/scripts/**/*.{js,ts}"],
+		rules: {
+			"no-console": "off",
 		},
 	},
 	{
@@ -52,4 +55,5 @@ export default tseslint.config(
 			globals: globals.node,
 		},
 	},
+	eslintConfigPrettier,
 );

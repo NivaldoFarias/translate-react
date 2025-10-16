@@ -1,66 +1,48 @@
-import Bun from "bun";
-import { z } from "zod";
-
-import type { BunFile } from "bun";
-
-import { ErrorHandler, ErrorSeverity } from "@/errors";
-import Runner from "@/services/runner/runner.service";
-import { parseCommandLineArgs } from "@/utils/parse-command-args.util";
+import { TranslationError } from "@/errors/";
+import RunnerService from "@/services/runner/runner.service";
+import { env, logger } from "@/utils/";
 
 import { name, version } from "../package.json";
 
-/** Defines the expected structure and types for the runner options */
-const runnerOptionsSchema = z.object({
-	targetLanguage: z.string().min(2).max(5).default("pt"),
-	sourceLanguage: z.string().min(2).max(5).default("en"),
-	batchSize: z.coerce.number().positive().default(10),
-});
-
 if (import.meta.main) {
-	const errorHandler = initializeErrorHandler(
-		Bun.file(`logs/${new Date().toISOString()}.log.json`),
-	);
-
-	const runTranslation = errorHandler.wrapAsync(workflow, {
-		operation: "main",
-		metadata: {
-			version,
-			component: name,
-			environment: import.meta.env.NODE_ENV,
-		},
-	});
-
 	try {
-		await runTranslation();
+		logger.info(
+			{ version, component: name, environment: env.NODE_ENV, targetLanguage: env.TARGET_LANGUAGE },
+			"Starting translation workflow",
+		);
 
+		await workflow();
+
+		logger.info("Translation workflow completed successfully");
 		process.exit(0);
-	} catch {
+	} catch (error) {
+		if (error instanceof TranslationError) {
+			logger.fatal(
+				{
+					error,
+					errorCode: error.code,
+					operation: error.context.operation,
+					metadata: error.context.metadata,
+				},
+				"Translation workflow failed with TranslationError",
+			);
+		} else {
+			logger.fatal({ error }, "Translation workflow failed with unexpected error");
+		}
+
 		process.exit(1);
 	}
 }
 
-async function workflow() {
-	const args = parseCommandLineArgs(["--target", "--source", "--batch-size"], runnerOptionsSchema);
-
-	const runner = new Runner(args);
+/**
+ * Main translation workflow execution.
+ *
+ * Creates and runs the Runner service which orchestrates the entire translation process.
+ *
+ * @throws {TranslationError} If any critical error occurs during translation
+ */
+async function workflow(): Promise<void> {
+	const runner = new RunnerService();
 
 	await runner.run();
-}
-
-/**
- * Initializes the error handler with the default configuration
- *
- * @param logFile Optional log file to write errors to
- */
-function initializeErrorHandler(logFile?: BunFile) {
-	return ErrorHandler.getInstance({
-		minSeverity: ErrorSeverity.INFO,
-		logToFile: !!logFile,
-		logFilePath: logFile?.name,
-		customReporter: (error) => {
-			if (error.context.sanity === ErrorSeverity.FATAL) {
-				process.exit(1);
-			}
-		},
-	});
 }
