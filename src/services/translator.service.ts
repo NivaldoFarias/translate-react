@@ -651,11 +651,7 @@ export class TranslatorService {
 
 		try {
 			logger.debug(
-				{
-					model: env.LLM_MODEL,
-					contentLength: content.length,
-					temperature: 0.1,
-				},
+				{ model: env.LLM_MODEL, contentLength: content.length, temperature: 0.1 },
 				"Calling language model for translation",
 			);
 
@@ -704,12 +700,38 @@ export class TranslatorService {
 	}
 
 	/**
-	 * Removes common artifacts from translation output.
+	 * Removes common artifacts from translation output and fixes whitespace issues.
+	 *
+	 * Performs comprehensive cleanup of translated content to remove LLM-added prefixes
+	 * and restore proper markdown structure. Includes critical whitespace fixes to
+	 * address common issues where blank lines are incorrectly removed during translation.
+	 *
+	 * ### Cleanup Operations
+	 *
+	 * 1. **Prefix Removal**: Strips common LLM response prefixes like "Here is the translation:"
+	 * 2. **Blank Line Restoration**: Restores blank lines after horizontal rules (---) that
+	 *    are often incorrectly removed by LLMs, ensuring proper markdown section spacing
+	 * 3. **Line Ending Normalization**: Converts line endings to match original content format
+	 *
+	 * ### Whitespace Fix Pattern
+	 *
+	 * The method specifically targets and fixes the pattern where blank lines after horizontal
+	 * rules are removed. This is a common LLM translation artifact that breaks markdown
+	 * document structure:
+	 * - Detects: `---\n#` (horizontal rule immediately followed by heading)
+	 * - Fixes to: `---\n\n#` (horizontal rule with proper blank line before heading)
 	 *
 	 * @param translatedContent Content returned from the language model
-	 * @param originalContent Original content before translation
+	 * @param originalContent Original content before translation (used for line ending detection)
 	 *
-	 * @returns Cleaned translated content
+	 * @returns Cleaned translated content with proper structure and whitespace
+	 *
+	 * @example
+	 * ```typescript
+	 * const translated = '---\n## Section'; // Missing blank line
+	 * const cleaned = cleanupTranslatedContent(translated, original);
+	 * console.log(cleaned); // '---\n\n## Section' (blank line restored)
+	 * ```
 	 */
 	private cleanupTranslatedContent(translatedContent: string, originalContent: string): string {
 		let cleaned = translatedContent;
@@ -731,11 +753,50 @@ export class TranslatorService {
 
 		cleaned = cleaned.trim();
 
+		cleaned = this.restoreBlankLinesAfterSeparators(cleaned);
+
 		if (originalContent.includes("\r\n")) {
 			cleaned = cleaned.replace(/\n/g, "\r\n");
 		}
 
 		return cleaned;
+	}
+
+	/**
+	 * Restores blank lines after horizontal rule separators that were incorrectly removed.
+	 *
+	 * LLMs frequently remove blank lines that appear after markdown horizontal rules (---),
+	 * causing sections to be improperly compressed together. This creates invalid markdown
+	 * structure where headings appear immediately after separators without proper spacing.
+	 *
+	 * ### Pattern Detection and Correction
+	 *
+	 * The method uses a regex pattern to detect horizontal rules immediately followed by
+	 * markdown headings (any level from # to ######) and inserts the missing blank line.
+	 * This preserves the standard markdown convention of having blank lines between major
+	 * structural elements.
+	 *
+	 * ### Matched Patterns
+	 *
+	 * - `---\n#` → `---\n\n#` (h1 heading)
+	 * - `---\n##` → `---\n\n##` (h2 heading)
+	 * - `---\n###` → `---\n\n###` (h3 heading)
+	 * - And so on for all heading levels (up to h6)
+	 *
+	 * @param content Content to process for blank line restoration
+	 *
+	 * @returns Content with restored blank lines after horizontal rules
+	 *
+	 * @example
+	 * ```typescript
+	 * const content = '---\n## Usage\n\nSome text\n---\n### Details';
+	 * const fixed = restoreBlankLinesAfterSeparators(content);
+	 * console.log(fixed);
+	 * // '---\n\n## Usage\n\nSome text\n---\n\n### Details'
+	 * ```
+	 */
+	private restoreBlankLinesAfterSeparators(content: string): string {
+		return content.replace(/---\n(#{1,6}\s)/g, "---\n\n$1");
 	}
 
 	/**
@@ -780,6 +841,7 @@ Translate the provided content from ${languages.source} to ${languages.target} w
 1. **Structure & Formatting**: Preserve ALL markdown syntax, HTML tags, code blocks, frontmatter, and line breaks exactly as written
 2. **Code Integrity**: Keep ALL code examples, variable names, function names, and URLs COMPLETELY unchanged
 3. **Content Completeness**: Translate EVERY piece of text content WITHOUT adding, removing, or omitting anything
+4. **Whitespace Integrity**: ALWAYS preserve blank lines, especially after horizontal rules (---). The pattern '---\n\n##' must remain '---\n\n##' and never become '---\n##'
 
 # TRANSLATION GUIDELINES
 ## What to Translate
