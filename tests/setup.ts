@@ -40,6 +40,8 @@ globalThis.mockEnv = {
 	OPENAI_PROJECT_ID: "test-project-id",
 	LOG_LEVEL: LogLevel.Info,
 	MAX_TOKENS: 4096,
+	LOG_TO_CONSOLE: false,
+	GITHUB_REQUEST_TIMEOUT: 60000,
 };
 
 /** Reset environment variables to test defaults before each test */

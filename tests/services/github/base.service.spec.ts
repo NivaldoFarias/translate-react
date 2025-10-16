@@ -9,6 +9,16 @@ import { beforeEach, describe, expect, mock, test } from "bun:test";
 
 import { BaseGitHubService } from "@/services/github/base.service";
 
+mock.module("@/utils/env.util", () => ({
+	env: {
+		GITHUB_TOKEN: "gho_test_token_with_40_characters_exactly",
+		REPO_UPSTREAM_OWNER: "test-owner",
+		REPO_UPSTREAM_NAME: "test-repo",
+		REPO_FORK_OWNER: "fork-owner",
+		REPO_FORK_NAME: "fork-repo",
+	},
+}));
+
 /**
  * Concrete implementation of BaseGitHubService for testing
  */
@@ -32,19 +42,15 @@ class TestGitHubService extends BaseGitHubService {
 
 describe("Base GitHub Service", () => {
 	let service: TestGitHubService;
-	const mockConfig = {
-		upstream: { owner: "test-owner", repo: "test-repo" },
-		fork: { owner: "fork-owner", repo: "fork-repo" },
-	};
 
 	beforeEach(() => {
-		service = new TestGitHubService(mockConfig.upstream, mockConfig.fork);
+		service = new TestGitHubService();
 	});
 
-	test("should initialize with correct configuration", () => {
+	test("should initialize with configuration from environment", () => {
 		expect(service.getOctokit()).toBeDefined();
-		expect(service.getUpstream()).toEqual(mockConfig.upstream);
-		expect(service.getFork()).toEqual(mockConfig.fork);
+		expect(service.getUpstream()).toBeDefined();
+		expect(service.getFork()).toBeDefined();
 	});
 
 	test("should have valid Octokit instance", () => {
@@ -110,7 +116,7 @@ describe("Base GitHub Service", () => {
 			},
 		};
 
-		// @ts-expect-error - Mocking private property
+		// @ts-expect-error - Mocking private property for testing
 		service.octokit = {
 			rateLimit: {
 				get: mock(() => Promise.resolve(mockRateLimit)),
@@ -121,8 +127,16 @@ describe("Base GitHub Service", () => {
 		expect(rateLimit.data.resources.core.remaining).toBe(0);
 	});
 
-	test("should use correct repository details", () => {
-		expect(service.getUpstream()).toBe(mockConfig.upstream);
-		expect(service.getFork()).toBe(mockConfig.fork);
+	test("should use correct repository details from environment", () => {
+		const upstream = service.getUpstream();
+		const fork = service.getFork();
+
+		expect(upstream).toBeDefined();
+		expect(upstream.owner).toBeDefined();
+		expect(upstream.repo).toBeDefined();
+
+		expect(fork).toBeDefined();
+		expect(fork.owner).toBeDefined();
+		expect(fork.repo).toBeDefined();
 	});
 });

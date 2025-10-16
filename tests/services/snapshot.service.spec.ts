@@ -11,7 +11,7 @@ import { unlink } from "node:fs/promises";
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-import { ProcessedFileResult } from "@/services/runner/base.service";
+import { ProcessedFileResult } from "@/services/runner/";
 import { Snapshot, SnapshotService } from "@/services/snapshot.service";
 import { TranslationFile } from "@/services/translator.service";
 

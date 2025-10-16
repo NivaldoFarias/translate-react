@@ -10,7 +10,7 @@ import { RestEndpointMethodTypes } from "@octokit/rest";
 import { beforeEach, describe, expect, test } from "bun:test";
 
 import { CommentBuilderService } from "@/services/comment-builder.service";
-import { ProcessedFileResult } from "@/services/runner/base.service";
+import { ProcessedFileResult } from "@/services/runner/";
 import { TranslationFile } from "@/services/translator.service";
 
 describe("CommentBuilderService", () => {

@@ -176,7 +176,12 @@ describe("DatabaseService", () => {
 			});
 
 			test("should return cached result when SHA matches", () => {
-				dbService.setLanguageCache("test.md", "sha123", "pt", 0.95);
+				dbService.setLanguageCache({
+					filename: "test.md",
+					contentHash: "sha123",
+					detectedLanguage: "pt",
+					confidence: 0.95,
+				});
 
 				const result = dbService.getLanguageCache("test.md", "sha123");
 
@@ -187,20 +192,33 @@ describe("DatabaseService", () => {
 			});
 
 			test("should return null when SHA doesn't match (file changed)", () => {
-				dbService.setLanguageCache("test.md", "old-sha", "pt", 0.95);
+				dbService.setLanguageCache({
+					filename: "test.md",
+					contentHash: "old-sha",
+					detectedLanguage: "pt",
+					confidence: 0.95,
+				});
 
 				const result = dbService.getLanguageCache("test.md", "new-sha");
 
 				expect(result).toBeNull();
 			});
-
 			test("should handle multiple files independently", () => {
-				dbService.setLanguageCache("file1.md", "sha1", "pt", 0.95);
-				dbService.setLanguageCache("file2.md", "sha2", "en", 0.98);
+				dbService.setLanguageCache({
+					filename: "file1.md",
+					contentHash: "sha1",
+					detectedLanguage: "pt",
+					confidence: 0.95,
+				});
+				dbService.setLanguageCache({
+					filename: "file2.md",
+					contentHash: "sha2",
+					detectedLanguage: "en",
+					confidence: 0.98,
+				});
 
 				const result1 = dbService.getLanguageCache("file1.md", "sha1");
 				const result2 = dbService.getLanguageCache("file2.md", "sha2");
-
 				expect(result1?.detectedLanguage).toBe("pt");
 				expect(result2?.detectedLanguage).toBe("en");
 			});
@@ -208,7 +226,12 @@ describe("DatabaseService", () => {
 
 		describe("setLanguageCache", () => {
 			test("should store language detection result", () => {
-				dbService.setLanguageCache("test.md", "sha123", "pt", 0.95);
+				dbService.setLanguageCache({
+					filename: "test.md",
+					contentHash: "sha123",
+					detectedLanguage: "pt",
+					confidence: 0.95,
+				});
 
 				const result = dbService.getLanguageCache("test.md", "sha123");
 
@@ -218,138 +241,212 @@ describe("DatabaseService", () => {
 			});
 
 			test("should update existing cache entry (REPLACE behavior)", () => {
-				dbService.setLanguageCache("test.md", "sha123", "en", 0.85);
-				dbService.setLanguageCache("test.md", "sha456", "pt", 0.95);
+				dbService.setLanguageCache({
+					filename: "test.md",
+					contentHash: "sha123",
+					detectedLanguage: "en",
+					confidence: 0.85,
+				});
+				dbService.setLanguageCache({
+					filename: "test.md",
+					contentHash: "sha456",
+					detectedLanguage: "pt",
+					confidence: 0.95,
+				});
 
 				const oldResult = dbService.getLanguageCache("test.md", "sha123");
 				expect(oldResult).toBeNull();
-
 				const newResult = dbService.getLanguageCache("test.md", "sha456");
 				expect(newResult).not.toBeNull();
 				expect(newResult?.detectedLanguage).toBe("pt");
 				expect(newResult?.confidence).toBe(0.95);
 			});
-
-			test("should handle various confidence values", () => {
-				const confidenceValues = [0.0, 0.5, 0.9, 0.99, 1.0];
-
-				for (const confidence of confidenceValues) {
-					const filename = `test-${confidence}.md`;
-					dbService.setLanguageCache(filename, "sha123", "pt", confidence);
-
-					const result = dbService.getLanguageCache(filename, "sha123");
-					expect(result?.confidence).toBe(confidence);
-				}
-			});
 		});
 
-		describe("clearLanguageCache", () => {
-			test("should remove all cache entries", () => {
-				dbService.setLanguageCache("file1.md", "sha1", "pt", 0.95);
-				dbService.setLanguageCache("file2.md", "sha2", "en", 0.98);
-				dbService.setLanguageCache("file3.md", "sha3", "es", 0.92);
+		test("should handle various confidence values", () => {
+			const confidenceValues = [0.0, 0.5, 0.9, 0.99, 1.0];
 
-				dbService.clearLanguageCache();
+			for (const confidence of confidenceValues) {
+				const filename = `test-${confidence}.md`;
+				dbService.setLanguageCache({
+					filename,
+					contentHash: "sha123",
+					detectedLanguage: "pt",
+					confidence,
+				});
 
-				expect(dbService.getLanguageCache("file1.md", "sha1")).toBeNull();
-				expect(dbService.getLanguageCache("file2.md", "sha2")).toBeNull();
-				expect(dbService.getLanguageCache("file3.md", "sha3")).toBeNull();
+				const result = dbService.getLanguageCache(filename, "sha123");
+				expect(result?.confidence).toBe(confidence);
+			}
+		});
+	});
+
+	describe("clearLanguageCache", () => {
+		test("should remove all cache entries", () => {
+			dbService.setLanguageCache({
+				filename: "file1.md",
+				contentHash: "sha1",
+				detectedLanguage: "pt",
+				confidence: 0.95,
+			});
+			dbService.setLanguageCache({
+				filename: "file2.md",
+				contentHash: "sha2",
+				detectedLanguage: "en",
+				confidence: 0.98,
+			});
+			dbService.setLanguageCache({
+				filename: "file3.md",
+				contentHash: "sha3",
+				detectedLanguage: "es",
+				confidence: 0.92,
 			});
 
-			test("should handle clearing empty cache", () => {
-				expect(() => dbService.clearLanguageCache()).not.toThrow();
-			});
+			dbService.clearLanguageCache();
+
+			expect(dbService.getLanguageCache("file1.md", "sha1")).toBeNull();
+			expect(dbService.getLanguageCache("file2.md", "sha2")).toBeNull();
+			expect(dbService.getLanguageCache("file3.md", "sha3")).toBeNull();
 		});
 
-		describe("invalidateLanguageCache", () => {
-			test("should remove specific files from cache", () => {
-				dbService.setLanguageCache("file1.md", "sha1", "pt", 0.95);
-				dbService.setLanguageCache("file2.md", "sha2", "en", 0.98);
-				dbService.setLanguageCache("file3.md", "sha3", "es", 0.92);
+		test("should handle clearing empty cache", () => {
+			expect(() => dbService.clearLanguageCache()).not.toThrow();
+		});
+	});
 
-				dbService.invalidateLanguageCache(["file1.md", "file3.md"]);
-
-				expect(dbService.getLanguageCache("file1.md", "sha1")).toBeNull();
-				expect(dbService.getLanguageCache("file3.md", "sha3")).toBeNull();
-
-				const result = dbService.getLanguageCache("file2.md", "sha2");
-				expect(result).not.toBeNull();
-				expect(result?.detectedLanguage).toBe("en");
+	describe("invalidateLanguageCache", () => {
+		test("should remove specific files from cache", () => {
+			dbService.setLanguageCache({
+				filename: "file1.md",
+				contentHash: "sha1",
+				detectedLanguage: "pt",
+				confidence: 0.95,
+			});
+			dbService.setLanguageCache({
+				filename: "file2.md",
+				contentHash: "sha2",
+				detectedLanguage: "en",
+				confidence: 0.98,
+			});
+			dbService.setLanguageCache({
+				filename: "file3.md",
+				contentHash: "sha3",
+				detectedLanguage: "es",
+				confidence: 0.92,
 			});
 
-			test("should handle invalidating non-existent files", () => {
-				dbService.setLanguageCache("existing.md", "sha1", "pt", 0.95);
+			dbService.invalidateLanguageCache(["file1.md", "file3.md"]);
 
-				expect(() => {
-					dbService.invalidateLanguageCache(["existing.md", "non-existent.md"]);
-				}).not.toThrow();
+			expect(dbService.getLanguageCache("file1.md", "sha1")).toBeNull();
+			expect(dbService.getLanguageCache("file3.md", "sha3")).toBeNull();
 
-				expect(dbService.getLanguageCache("existing.md", "sha1")).toBeNull();
-			});
-
-			test("should handle empty array", () => {
-				dbService.setLanguageCache("file.md", "sha1", "pt", 0.95);
-
-				dbService.invalidateLanguageCache([]);
-
-				expect(dbService.getLanguageCache("file.md", "sha1")).not.toBeNull();
-			});
-
-			test("should handle large arrays of filenames", () => {
-				const filenames: string[] = [];
-				for (let i = 0; i < 100; i++) {
-					const filename = `file${i}.md`;
-					filenames.push(filename);
-					dbService.setLanguageCache(filename, `sha${i}`, "pt", 0.95);
-				}
-
-				dbService.invalidateLanguageCache(filenames);
-
-				for (let i = 0; i < 100; i++) {
-					expect(dbService.getLanguageCache(`file${i}.md`, `sha${i}`)).toBeNull();
-				}
-			});
+			const result = dbService.getLanguageCache("file2.md", "sha2");
+			expect(result).not.toBeNull();
+			expect(result?.detectedLanguage).toBe("en");
 		});
 
-		describe("Integration scenarios", () => {
-			test("should support typical workflow: check cache → analyze → update cache", () => {
-				const filename = "homepage.md";
-				const sha1 = "original-sha";
-				const sha2 = "updated-sha";
-
-				const firstCheck = dbService.getLanguageCache(filename, sha1);
-				expect(firstCheck).toBeNull();
-
-				dbService.setLanguageCache(filename, sha1, "pt", 0.95);
-
-				const secondCheck = dbService.getLanguageCache(filename, sha1);
-				expect(secondCheck).not.toBeNull();
-				expect(secondCheck?.detectedLanguage).toBe("pt");
-
-				const thirdCheck = dbService.getLanguageCache(filename, sha2);
-				expect(thirdCheck).toBeNull();
-
-				dbService.setLanguageCache(filename, sha2, "pt", 0.97);
-
-				const fourthCheck = dbService.getLanguageCache(filename, sha2);
-				expect(fourthCheck).not.toBeNull();
-				expect(fourthCheck?.detectedLanguage).toBe("pt");
+		test("should handle invalidating non-existent files", () => {
+			dbService.setLanguageCache({
+				filename: "existing.md",
+				contentHash: "sha1",
+				detectedLanguage: "pt",
+				confidence: 0.95,
 			});
 
-			test("should support fork sync workflow: detect changes → invalidate cache", () => {
-				const files = ["file1.md", "file2.md", "file3.md", "file4.md"];
-				for (const file of files) {
-					dbService.setLanguageCache(file, "old-sha", "pt", 0.95);
-				}
+			expect(() => {
+				dbService.invalidateLanguageCache(["existing.md", "non-existent.md"]);
+			}).not.toThrow();
 
-				const changedFiles = ["file1.md", "file3.md"];
-				dbService.invalidateLanguageCache(changedFiles);
+			expect(dbService.getLanguageCache("existing.md", "sha1")).toBeNull();
+		});
 
-				expect(dbService.getLanguageCache("file1.md", "old-sha")).toBeNull();
-				expect(dbService.getLanguageCache("file3.md", "old-sha")).toBeNull();
-				expect(dbService.getLanguageCache("file2.md", "old-sha")).not.toBeNull();
-				expect(dbService.getLanguageCache("file4.md", "old-sha")).not.toBeNull();
+		test("should handle empty array", () => {
+			dbService.setLanguageCache({
+				filename: "file.md",
+				contentHash: "sha1",
+				detectedLanguage: "pt",
+				confidence: 0.95,
 			});
+
+			dbService.invalidateLanguageCache([]);
+
+			expect(dbService.getLanguageCache("file.md", "sha1")).not.toBeNull();
+		});
+
+		test("should handle large arrays of filenames", () => {
+			const filenames: string[] = [];
+			for (let i = 0; i < 100; i++) {
+				const filename = `file${i}.md`;
+				filenames.push(filename);
+				dbService.setLanguageCache({
+					filename,
+					contentHash: `sha${i}`,
+					detectedLanguage: "pt",
+					confidence: 0.95,
+				});
+			}
+
+			dbService.invalidateLanguageCache(filenames);
+
+			for (let i = 0; i < 100; i++) {
+				expect(dbService.getLanguageCache(`file${i}.md`, `sha${i}`)).toBeNull();
+			}
+		});
+	});
+
+	describe("Integration scenarios", () => {
+		test("should support typical workflow: check cache → analyze → update cache", () => {
+			const filename = "homepage.md";
+			const sha1 = "original-sha";
+			const sha2 = "updated-sha";
+
+			const firstCheck = dbService.getLanguageCache(filename, sha1);
+			expect(firstCheck).toBeNull();
+
+			dbService.setLanguageCache({
+				filename,
+				contentHash: sha1,
+				detectedLanguage: "pt",
+				confidence: 0.95,
+			});
+
+			const secondCheck = dbService.getLanguageCache(filename, sha1);
+			expect(secondCheck).not.toBeNull();
+			expect(secondCheck?.detectedLanguage).toBe("pt");
+
+			const thirdCheck = dbService.getLanguageCache(filename, sha2);
+			expect(thirdCheck).toBeNull();
+
+			dbService.setLanguageCache({
+				filename,
+				contentHash: sha2,
+				detectedLanguage: "pt",
+				confidence: 0.97,
+			});
+
+			const fourthCheck = dbService.getLanguageCache(filename, sha2);
+			expect(fourthCheck).not.toBeNull();
+			expect(fourthCheck?.detectedLanguage).toBe("pt");
+		});
+
+		test("should support fork sync workflow: detect changes → invalidate cache", () => {
+			const files = ["file1.md", "file2.md", "file3.md", "file4.md"];
+			for (const file of files) {
+				dbService.setLanguageCache({
+					filename: file,
+					contentHash: "old-sha",
+					detectedLanguage: "pt",
+					confidence: 0.95,
+				});
+			}
+
+			const changedFiles = ["file1.md", "file3.md"];
+			dbService.invalidateLanguageCache(changedFiles);
+
+			expect(dbService.getLanguageCache("file1.md", "old-sha")).toBeNull();
+			expect(dbService.getLanguageCache("file3.md", "old-sha")).toBeNull();
+			expect(dbService.getLanguageCache("file2.md", "old-sha")).not.toBeNull();
+			expect(dbService.getLanguageCache("file4.md", "old-sha")).not.toBeNull();
 		});
 	});
 });

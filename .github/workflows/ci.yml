@@ -1,4 +1,5 @@
 name: CI
+
 on:
   push:
     branches:
@@ -18,7 +19,7 @@ jobs:
   lint-and-typecheck:
     name: Lint, Format, and Type Check
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -43,7 +44,7 @@ jobs:
   test:
     name: Run Tests
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
