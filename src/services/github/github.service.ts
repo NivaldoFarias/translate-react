@@ -102,15 +102,42 @@ export class GitHubService extends BaseGitHubService {
 	}
 
 	/**
-	 * Creates a new branch for translation work, or gets the existing branch if it exists.
+	 * Creates a new branch for translation work, or reuses an existing branch if appropriate.
 	 *
-	 * @param file File being translated
-	 * @param baseBranch Branch to create from
+	 * This method intelligently handles existing branches by evaluating their associated PRs
+	 * for merge conflicts. When a branch already exists, the method checks if there's an open
+	 * PR and evaluates its merge status using {@link ContentService.checkPullRequestStatus}.
+	 * Branches are only deleted and recreated when their associated PRs have actual merge
+	 * conflicts (not when they're simply behind the base branch).
+	 *
+	 * ### Branch Reuse Scenarios
+	 *
+	 * 1. **Branch exists with PR having no conflicts**: Reuses existing branch, preserving PR
+	 * 2. **Branch exists with PR having conflicts**: Closes PR, deletes branch, creates new branch
+	 * 3. **Branch exists without PR**: Reuses existing branch safely
+	 * 4. **No existing branch**: Creates new branch from base
+	 *
+	 * ### Conflict Detection Logic
+	 *
+	 * The method uses `checkPullRequestStatus()` which only flags PRs with `hasConflicts = true`
+	 * when GitHub indicates `mergeable === false` and `mergeable_state === "dirty"`. PRs that
+	 * are merely "behind" the base branch are considered safe to reuse and can be updated via
+	 * rebase without requiring closure.
+	 *
+	 * @param file Translation file being processed
+	 * @param baseBranch Optional base branch to create from (defaults to fork's default branch)
+	 *
+	 * @returns Branch reference data containing SHA and branch name for subsequent commit operations
 	 *
 	 * @example
 	 * ```typescript
-	 * const branch = await github.createOrGetTranslationBranch(file);
+	 * const branch = await github.createOrGetTranslationBranch(file, 'main');
+	 * console.log(branch.ref);
+	 * // ^? "refs/heads/translate/content/learn/homepage.md"
 	 * ```
+	 *
+	 * @see {@link ContentService.checkPullRequestStatus} for conflict detection logic
+	 * @see {@link BranchService.getBranch} for branch existence checking
 	 */
 	public async createOrGetTranslationBranch(file: TranslationFile, baseBranch?: string) {
 		const actualBaseBranch =
@@ -126,33 +153,45 @@ export class GitHubService extends BaseGitHubService {
 		if (existingBranch) {
 			logger.debug(
 				{ filename: file.filename, branchName },
-				"Existing branch found, checking if update needed",
+				"Existing branch found, checking associated PR status",
 			);
-			const mainBranchRef = await this.services.branch.getBranch(actualBaseBranch);
-			if (!mainBranchRef) throw new Error(`Base branch ${actualBaseBranch} not found`);
-
-			if (existingBranch.data.object.sha === mainBranchRef.data.object.sha) {
-				logger.debug({ filename: file.filename, branchName }, "Branch is up to date, reusing");
-				return existingBranch.data;
-			}
 
 			const upstreamPR = await this.services.content.findPullRequestByBranch(branchName);
 
 			if (upstreamPR) {
-				logger.debug(
-					{ filename: file.filename, prNumber: upstreamPR.number },
-					"Closing outdated PR",
-				);
-				await this.services.content.createCommentOnPullRequest(
-					upstreamPR.number,
-					"PR closed due to upstream changes.",
-				);
+				const prStatus = await this.services.content.checkPullRequestStatus(upstreamPR.number);
 
-				await this.services.content.closePullRequest(upstreamPR.number);
+				if (prStatus.hasConflicts) {
+					logger.info(
+						{
+							filename: file.filename,
+							prNumber: upstreamPR.number,
+							mergeableState: prStatus.mergeableState,
+						},
+						"PR has merge conflicts, closing and recreating",
+					);
+					await this.services.content.createCommentOnPullRequest(
+						upstreamPR.number,
+						"This PR has merge conflicts and is being closed. A new PR with the updated translation will be created.",
+					);
+
+					await this.services.content.closePullRequest(upstreamPR.number);
+					await this.services.branch.deleteBranch(branchName);
+				} else {
+					logger.debug(
+						{
+							filename: file.filename,
+							prNumber: upstreamPR.number,
+							mergeableState: prStatus.mergeableState,
+						},
+						"PR exists with no conflicts, reusing existing branch",
+					);
+					return existingBranch.data;
+				}
+			} else {
+				logger.debug({ filename: file.filename, branchName }, "Branch exists without PR, reusing");
+				return existingBranch.data;
 			}
-
-			logger.debug({ filename: file.filename, branchName }, "Deleting outdated branch");
-			await this.services.branch.deleteBranch(branchName);
 		}
 
 		logger.debug({ filename: file.filename, branchName }, "Creating new translation branch");
@@ -184,25 +223,46 @@ export class GitHubService extends BaseGitHubService {
 	}
 
 	/**
-	 * Handles pull request creation or update for a translation file.
+	 * Handles pull request creation or reuse for a translation file.
 	 *
-	 * Checks if a PR already exists for the file's branch, and if so, evaluates
-	 * whether it needs updating due to conflicts or being outdated. Handles the
-	 * complete PR lifecycle including closing outdated PRs and creating new ones.
+	 * Implements intelligent PR lifecycle management by checking if a PR already exists for
+	 * the translation branch and evaluating its merge status. The method uses
+	 * {@link ContentService.checkPullRequestStatus} to determine if an existing PR has actual
+	 * merge conflicts. PRs are only closed and recreated when they have true conflicts
+	 * (indicated by `needsUpdate = true`). PRs that are merely behind the base branch are
+	 * preserved since they can be safely rebased without closure.
+	 *
+	 * ### PR Handling Logic
+	 *
+	 * 1. **No existing PR**: Creates new PR with provided options
+	 * 2. **Existing PR without conflicts**: Returns existing PR (preserves PR number and discussion)
+	 * 3. **Existing PR with conflicts**: Closes conflicted PR, creates new PR with updated content
+	 *
+	 * ### Conflict Resolution
+	 *
+	 * When conflicts are detected (`needsUpdate = true`), the method:
+	 * - Adds an explanatory comment to the existing PR
+	 * - Closes the conflicted PR
+	 * - Creates a new PR with the same title/body but fresh translation content
 	 *
 	 * @param file Translation file being processed
-	 * @param prOptions Pull request creation options
+	 * @param prOptions Pull request creation options (excluding branch, which is auto-generated)
 	 *
-	 * @returns The created or existing pull request data
+	 * @returns Either the newly created PR data or the existing PR data if reused
 	 *
 	 * @example
 	 * ```typescript
 	 * const pr = await github.createOrUpdatePullRequest(file, {
-	 *   title: 'Translate homepage',
-	 *   body: 'Translation to Portuguese',
+	 *   title: 'Translate homepage to Portuguese',
+	 *   body: 'Translation of homepage.md',
 	 *   baseBranch: 'main'
 	 * });
+	 * console.log(pr.number);
+	 * // ^? Existing PR number if reused, new PR number if created
 	 * ```
+	 *
+	 * @see {@link ContentService.checkPullRequestStatus} for conflict detection logic
+	 * @see {@link ContentService.findPullRequestByBranch} for PR lookup
 	 */
 	public async createOrUpdatePullRequest(
 		file: TranslationFile,
@@ -218,9 +278,13 @@ export class GitHubService extends BaseGitHubService {
 			const prStatus = await this.services.content.checkPullRequestStatus(existingPR.number);
 
 			if (prStatus.needsUpdate) {
+				logger.info(
+					{ prNumber: existingPR.number, mergeableState: prStatus.mergeableState },
+					"Closing PR with merge conflicts and creating new one",
+				);
 				await this.services.content.createCommentOnPullRequest(
 					existingPR.number,
-					"This PR is being closed and recreated due to conflicts or outdated content. A new PR with updated translation will be created.",
+					"This PR has merge conflicts and is being closed. A new PR with the updated translation will be created.",
 				);
 
 				await this.services.content.closePullRequest(existingPR.number);
@@ -232,6 +296,10 @@ export class GitHubService extends BaseGitHubService {
 				});
 			}
 
+			logger.debug(
+				{ prNumber: existingPR.number, mergeableState: prStatus.mergeableState },
+				"PR exists with no conflicts, reusing",
+			);
 			return existingPR;
 		}
 

@@ -553,11 +553,7 @@ export class ContentService extends BaseGitHubService {
 			const pr = response.data[0];
 
 			logger.debug(
-				{
-					branchName,
-					found: !!pr,
-					prNumber: pr?.number,
-				},
+				{ branchName, found: !!pr, prNumber: pr?.number },
 				"Searched for pull request by branch",
 			);
 
@@ -571,20 +567,44 @@ export class ContentService extends BaseGitHubService {
 	}
 
 	/**
-	 * Checks if a pull request is outdated or has merge conflicts.
+	 * Checks if a pull request has merge conflicts that require closing and recreating.
 	 *
-	 * Determines if a PR needs to be updated by examining its mergeable status
-	 * and checking for conflicts that prevent clean merging.
+	 * Determines if a PR needs to be closed and recreated by examining its mergeable status.
+	 * The `needsUpdate` flag is only set to `true` when there are actual merge conflicts
+	 * (indicated by `mergeable === false` and `mergeable_state === "dirty"`). PRs that are
+	 * simply "behind" the base branch remain valid and can be updated via rebase without
+	 * requiring closure.
+	 *
+	 * ### GitHub PR Mergeable States
+	 *
+	 * - `clean`: PR can be merged cleanly (no action needed)
+	 * - `behind`: PR is behind base branch but has no conflicts (can be rebased safely)
+	 * - `dirty`: PR has merge conflicts (requires closure and recreation)
+	 * - `unstable`: PR has failing checks (not a merge conflict, no closure needed)
+	 * - `blocked`: PR is blocked by review requirements (not a merge conflict)
+	 *
+	 * ### Implementation Details
+	 *
+	 * The method sets `needsUpdate = hasConflicts` where `hasConflicts` is determined by
+	 * checking if `mergeable === false` AND `mergeable_state === "dirty"`. This ensures
+	 * that PRs are only flagged for recreation when they have true merge conflicts, not
+	 * when they're merely out of sync with the base branch.
 	 *
 	 * @param prNumber Pull request number to check
 	 *
-	 * @returns A Promise resolving to an object with conflict status and mergeability info
+	 * @returns A Promise resolving to an object containing:
+	 * - `hasConflicts`: `true` only when PR has actual merge conflicts
+	 * - `mergeable`: GitHub's raw mergeable status (`true`/`false`/`null`)
+	 * - `mergeableState`: GitHub's mergeable state string (e.g., "clean", "dirty", "behind")
+	 * - `needsUpdate`: `true` only when PR has conflicts requiring closure
 	 *
 	 * @example
 	 * ```typescript
 	 * const status = await contentService.checkPullRequestStatus(123);
-	 * if (status.hasConflicts) {
-	 *   console.log('PR has conflicts and needs updating');
+	 * if (status.needsUpdate) {
+	 *   console.log('PR has conflicts and needs recreating');
+	 * } else if (status.mergeableState === 'behind') {
+	 *   console.log('PR is behind but can be rebased');
 	 * }
 	 * ```
 	 */
@@ -602,7 +622,7 @@ export class ContentService extends BaseGitHubService {
 
 			const pr = prResponse.data;
 			const hasConflicts = pr.mergeable === false && pr.mergeable_state === "dirty";
-			const needsUpdate = hasConflicts || pr.mergeable_state === "behind";
+			const needsUpdate = hasConflicts;
 
 			logger.info(
 				{
