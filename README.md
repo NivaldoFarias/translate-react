@@ -1,10 +1,7 @@
 # translate-react
 
-<div align="center" style="flex: wrap; justify-content: center; align-items: center; margin-bottom: 20px; color: #999;">
-<p style="font-size: 1.5rem;"><b>Work In Progress</b></p>
-<div>This project is actively being developed and may have breaking changes.</div>
-</div>
-
+<h3 align="center" style="color: #999;"><b>Work In Progress</b></h3>
+  
 Automated translation tool for React documentation using Large Language Models (LLMs). Processes markdown files, preserves formatting, and creates pull requests with translated content.
 
 ## Table of Contents
