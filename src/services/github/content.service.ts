@@ -38,6 +38,14 @@ export interface CommitTranslationOptions {
 	message: string;
 }
 
+/** Pull request mergeable status */
+export interface PullRequestStatus {
+	hasConflicts: boolean;
+	mergeable: boolean | null;
+	mergeableState: string;
+	needsUpdate: boolean;
+}
+
 /**
  * Service responsible for managing repository content and translations.
  *
@@ -289,27 +297,6 @@ export class ContentService extends BaseGitHubService {
 	 * Creates a pull request.
 	 *
 	 * @param options Pull request options
-	 *
-	 * @example
-	 * ```typescript
-	 * const options = {
-	 *   branch: 'translate/homepage',
-	 *   title: 'feat(i18n): translate homepage',
-	 *   body: 'Translates homepage content to Portuguese',
-	 *   baseBranch: 'main',
-	 * };
-	 *
-	 * const pr = await contentService.createPullRequest(options);
-	 * ```
-	 */
-	/**
-	 * Creates a pull request.
-	 *
-	 * @param options Pull request options
-	 *
-	 * @remarks
-	 * In dev mode, creates PRs against the fork; in production, against upstream.
-	 * Uses dynamic import for env to avoid circular dependencies.
 	 *
 	 * @example
 	 * ```typescript
@@ -608,12 +595,7 @@ export class ContentService extends BaseGitHubService {
 	 * }
 	 * ```
 	 */
-	public async checkPullRequestStatus(prNumber: number): Promise<{
-		hasConflicts: boolean;
-		mergeable: boolean | null;
-		mergeableState: string;
-		needsUpdate: boolean;
-	}> {
+	public async checkPullRequestStatus(prNumber: number): Promise<PullRequestStatus> {
 		try {
 			const prResponse = await this.octokit.pulls.get({
 				...this.repositories.upstream,

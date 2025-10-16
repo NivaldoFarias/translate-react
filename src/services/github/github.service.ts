@@ -325,18 +325,6 @@ export class GitHubService extends BaseGitHubService {
 	}
 
 	/**
-	 * Retrieves list of currently active branches.
-	 *
-	 * @example
-	 * ```typescript
-	 * const branches = github.getActiveBranches();
-	 * ```
-	 */
-	public getActiveBranches(): string[] {
-		return this.services.branch.getActiveBranches();
-	}
-
-	/**
 	 * Verifies GitHub token permissions.
 	 *
 	 * @example
