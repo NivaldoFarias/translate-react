@@ -448,6 +448,7 @@ export abstract class BaseRunnerService {
 		for (const file of uncheckedFiles) {
 			if (file.content.length > MAX_FILE_SIZE) {
 				numFilesTooLarge++;
+
 				logger.warn(
 					{ filename: file.filename, size: file.content.length, maxSize: MAX_FILE_SIZE },
 					"Skipping file: exceeds maximum size limit",
@@ -461,13 +462,12 @@ export abstract class BaseRunnerService {
 			);
 
 			if (file.sha && analysis.detectedLanguage) {
-				const confidence = analysis.languageScore.target / 100;
-				this.services.database.setLanguageCache(
-					file.path,
-					file.sha,
-					analysis.detectedLanguage,
-					confidence,
-				);
+				this.services.database.setLanguageCache({
+					filename: file.path,
+					contentHash: file.sha,
+					detectedLanguage: analysis.detectedLanguage,
+					confidence: analysis.languageScore.target,
+				});
 			}
 
 			if (analysis.isTranslated) {

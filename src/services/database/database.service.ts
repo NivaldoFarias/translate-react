@@ -8,6 +8,25 @@ import { TranslationFile } from "../translator.service";
 
 import { BaseDatabaseService } from "./base.service";
 
+export interface LanguageCache {
+	/**
+	 * The detected language code
+	 *
+	 * @example "pt"
+	 */
+	detectedLanguage: string;
+
+	/**
+	 * Confidence score, on a scale from 0 to 1, of the language detection
+	 *
+	 * @example 0.99
+	 */
+	confidence: number;
+
+	/** Timestamp of the language detection */
+	timestamp: number;
+}
+
 /**
  * Core service for managing persistent storage of translation workflow data.
  *
@@ -226,10 +245,7 @@ export class DatabaseService extends BaseDatabaseService {
 	 *
 	 * @returns Cached language data or null if not found/invalid
 	 */
-	public getLanguageCache(
-		filename: string,
-		contentHash: string,
-	): { detectedLanguage: string; confidence: number; timestamp: number } | null {
+	public getLanguageCache(filename: string, contentHash: string): LanguageCache | null {
 		const result = this.db.prepare(this.scripts.select.languageCache).get(filename, contentHash) as
 			| { detected_language: string; confidence: number; timestamp: number }
 			| undefined;
@@ -248,17 +264,23 @@ export class DatabaseService extends BaseDatabaseService {
 	 *
 	 * Uses REPLACE to update existing entries or insert new ones.
 	 *
+	 * @param languageCache
 	 * @param filename Name of the file
 	 * @param contentHash Git SHA of the file content
 	 * @param detectedLanguage Detected language code (e.g., 'pt', 'en')
 	 * @param confidence Detection confidence score (0-1)
 	 */
-	public setLanguageCache(
-		filename: string,
-		contentHash: string,
-		detectedLanguage: string,
-		confidence: number,
-	): void {
+	public setLanguageCache({
+		filename,
+		contentHash,
+		detectedLanguage,
+		confidence,
+	}: {
+		filename: string;
+		contentHash: string;
+		detectedLanguage: string;
+		confidence: number;
+	}): void {
 		this.db
 			.prepare(this.scripts.insert.languageCache)
 			.run(filename, contentHash, detectedLanguage, confidence, Date.now());
