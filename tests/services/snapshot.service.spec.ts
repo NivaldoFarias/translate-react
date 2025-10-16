@@ -3,7 +3,7 @@
  *
  * This suite covers snapshot creation, data persistence, retrieval operations,
 		const result = await snapshotService.loadLatest();
-		expect(result).toBeNull();nt.
+		expect(result).toBeNull();
  */
 
 import { existsSync } from "node:fs";
