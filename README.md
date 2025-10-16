@@ -50,7 +50,8 @@ Automation tool for translating React documentation repositories. Uses LLM APIs 
 5. Creates individual branches and pull requests for each file
 6. Updates tracking issues with progress and links to PRs
 
-For detailed workflow analysis including timing breakdowns and bottlenecks, see [WORKFLOW.md](./docs/WORKFLOW.md).
+> [!TIP]
+> For detailed workflow analysis including timing breakdowns and bottlenecks, see [WORKFLOW.md](./docs/WORKFLOW.md).
 
 ## Prerequisites
 
