@@ -68,7 +68,7 @@ export const MAX_FILE_SIZE = 200_000;
 export const FILE_FETCH_BATCH_SIZE = 10;
 
 /**
- * Minimum confidence threshold for language cache hits.
+ * Minimum confidence threshold for language cache hits, on a scale from 0 to 1.
  *
  * Cache entries below this confidence level are treated as cache misses,
  * triggering fresh language detection to ensure accuracy. Set to 0.8 (80%)

@@ -41,7 +41,8 @@ describe("SnapshotService", () => {
 				timestamp: Date.now(),
 				repositoryTree: [
 					{
-						path: "test.md",
+						path: "src/content/test.md",
+						filename: "test.md",
 						mode: "100644",
 						type: "blob",
 						sha: "abc123",
@@ -98,7 +99,8 @@ describe("SnapshotService", () => {
 		test("should append repository tree data", () => {
 			const repositoryTree = [
 				{
-					path: "new-file.md",
+					path: "src/content/new-file.md",
+					filename: "new-file.md",
 					mode: "100644",
 					type: "blob",
 					sha: "def456",

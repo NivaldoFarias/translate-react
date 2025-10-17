@@ -2,12 +2,13 @@ import type {
 	CacheCheckResult,
 	FileProcessingProgress,
 	LanguageDetectionResult,
+	PatchedRepositoryItem,
 	ProcessedFileResult,
 	PrFilterResult as PullRequestFilterResult,
-	RepositoryTreeItems,
+	RepositoryTreeItem,
 	RunnerOptions,
 } from "./runner.types";
-import type { SetNonNullable } from "type-fest";
+import type { SetNonNullable, SetRequired } from "type-fest";
 
 import { InitializationError, ResourceLoadError } from "@/errors/";
 import { GitHubService } from "@/services/github/";
@@ -174,7 +175,13 @@ export abstract class BaseRunnerService {
 	protected async fetchRepositoryTree(): Promise<void> {
 		if (!this.state.repositoryTree?.length) {
 			logger.info("Fetching repository content...");
-			this.state.repositoryTree = await this.services.github.getRepositoryTree();
+			const repositoryTree = await this.services.github.getRepositoryTree();
+
+			this.state.repositoryTree = repositoryTree.map((item) => {
+				const filename = item.path?.split("/").pop() ?? "";
+
+				return { ...item, filename };
+			}) as PatchedRepositoryItem[];
 
 			if (env.NODE_ENV === RuntimeEnvironment.Development) {
 				await this.services.snapshot.append("repositoryTree", this.state.repositoryTree);
@@ -262,37 +269,45 @@ export abstract class BaseRunnerService {
 	 * // ^? 135 (out of 192 files)
 	 * ```
 	 */
-	private async checkLanguageCache(files: RepositoryTreeItems): Promise<CacheCheckResult> {
+	private async checkLanguageCache(files: PatchedRepositoryItem[]): Promise<CacheCheckResult> {
 		logger.info("Checking language cache...");
 		const startTime = Date.now();
 
-		let cacheHits = 0;
-		let cacheMisses = 0;
 		const candidateFiles: typeof files = [];
 
-		for (const file of files) {
-			if (!file.sha || !file.path) {
-				candidateFiles.push(file);
-				continue;
-			}
+		const filesToFetchCache = files.filter((file) => !!file.sha) as SetRequired<
+			PatchedRepositoryItem,
+			"sha"
+		>[];
 
-			const cached = this.services.database.getLanguageCache(file.path, file.sha);
-			const targetLanguage = this.services.translator.languageDetector.languages.target;
+		const languageCaches = this.services.database.getLanguageCaches(
+			filesToFetchCache.map(({ filename, sha }) => {
+				return { filename, contentHash: sha };
+			}),
+		);
+
+		let cacheHits = 0;
+		let cacheMisses = 0;
+		const targetLanguage = this.services.translator.languageDetector.languages.target;
+
+		for (const file of files) {
+			const cache = languageCaches.get(file.filename);
 
 			if (
-				cached &&
-				cached.detectedLanguage === targetLanguage &&
-				cached.confidence > MIN_CACHE_CONFIDENCE
+				cache &&
+				cache.detectedLanguage === targetLanguage &&
+				cache.confidence > MIN_CACHE_CONFIDENCE
 			) {
 				cacheHits++;
 				logger.debug(
-					{ filename: file.path, language: cached.detectedLanguage, confidence: cached.confidence },
+					{ filename: file.path, language: cache.detectedLanguage, confidence: cache.confidence },
 					`Skipping cached ${targetLanguage} file`,
 				);
-			} else {
-				cacheMisses++;
-				candidateFiles.push(file);
+				continue;
 			}
+
+			cacheMisses++;
+			candidateFiles.push(file);
 		}
 
 		const elapsed = Date.now() - startTime;
@@ -325,7 +340,7 @@ export abstract class BaseRunnerService {
 	 * ```
 	 */
 	private async filterFilesByExistingPRs(
-		candidateFiles: RepositoryTreeItems,
+		candidateFiles: PatchedRepositoryItem[],
 	): Promise<PullRequestFilterResult> {
 		logger.info("Checking for existing open PRs...");
 
@@ -353,12 +368,10 @@ export abstract class BaseRunnerService {
 				continue;
 			}
 
-			const filename = file.path.split("/").pop() ?? file.path;
-
-			if (prFileMap.has(filename)) {
+			if (prFileMap.has(file.filename)) {
 				numFilesWithPRs++;
 				logger.debug(
-					{ fullPath: file.path, filename, prNumber: prFileMap.get(filename) },
+					{ fullPath: file.path, filename: file.filename, prNumber: prFileMap.get(file.filename) },
 					"Skipping file with existing PR",
 				);
 			} else {
@@ -392,7 +405,9 @@ export abstract class BaseRunnerService {
 	 * // ^? 45 (successfully fetched files)
 	 * ```
 	 */
-	private async fetchFileContents(filesToFetch: RepositoryTreeItems): Promise<TranslationFile[]> {
+	private async fetchFileContents(
+		filesToFetch: PatchedRepositoryItem[],
+	): Promise<TranslationFile[]> {
 		logger.info("Fetching file content...");
 
 		const uncheckedFiles: TranslationFile[] = [];
@@ -489,20 +504,18 @@ export abstract class BaseRunnerService {
 	 * @returns The batch of files
 	 */
 	protected async fetchBatch(
-		batch: RepositoryTreeItems,
+		batch: PatchedRepositoryItem[],
 		updateLoggerFn: () => void,
 	): Promise<(TranslationFile | null)[]> {
 		return await Promise.all(
 			batch.map(async (file) => {
-				const filename = file.path?.split("/").pop();
-
-				if (!filename || !file.sha || !file.path) return null;
+				if (!file.filename || !file.sha || !file.path) return null;
 
 				const content = await this.services.github.getFileContent(file);
 
 				updateLoggerFn();
 
-				return new TranslationFile(content, filename, file.path, file.sha);
+				return new TranslationFile(content, file.filename, file.path, file.sha);
 			}),
 		);
 	}

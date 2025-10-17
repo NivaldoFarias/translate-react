@@ -3,8 +3,8 @@ import { statSync } from "node:fs";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 import type { Stats } from "node:fs";
 
-import type { ProcessedFileResult } from "@/services/runner/";
-import type { SnapshotRecord } from "@/types";
+import type { PatchedRepositoryItem, ProcessedFileResult } from "@/services/runner/";
+import type { LanguageCacheRecord, SnapshotRecord } from "@/types";
 
 import { Snapshot } from "../snapshot.service";
 import { TranslationFile } from "../translator.service";
@@ -167,7 +167,7 @@ export class DatabaseService extends BaseDatabaseService {
 
 		const repositoryTree = this.db
 			.prepare(this.scripts.select.repositoryTreeBySnapshotId)
-			.all(snapshot.id) as RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"];
+			.all(snapshot.id) as PatchedRepositoryItem[];
 
 		const filesToTranslate = this.db
 			.prepare(this.scripts.select.filesToTranslateBySnapshotId)
@@ -244,7 +244,7 @@ export class DatabaseService extends BaseDatabaseService {
 	 */
 	public getLanguageCache(filename: string, contentHash: string): LanguageCache | null {
 		const result = this.db.prepare(this.scripts.select.languageCache).get(filename, contentHash) as
-			| { detected_language: string; confidence: number; timestamp: number }
+			| LanguageCacheRecord
 			| undefined;
 
 		if (!result) return null;
@@ -254,6 +254,47 @@ export class DatabaseService extends BaseDatabaseService {
 			confidence: result.confidence,
 			timestamp: result.timestamp,
 		};
+	}
+
+	/**
+	 * Retrieves multiple cached language detection results for files in a single query.
+	 *
+	 * Checks both filename and content hash (SHA) for each file to ensure cache validity.
+	 * Much more efficient than calling `getLanguageCache` N times.
+	 *
+	 * @param files Array of file entries with filename and content hash
+	 *
+	 * @returns Array of cached language data (only entries that exist in cache)
+	 */
+	public getLanguageCaches(
+		files: Array<{ filename: string; contentHash: string }>,
+	): Map<string, LanguageCache> {
+		if (files.length === 0) return new Map();
+
+		const placeholders = files.map(() => "(?, ?)").join(", ");
+		const query = `
+			SELECT filename, detected_language, confidence, timestamp 
+			FROM language_cache 
+			WHERE (filename, content_hash) IN (${placeholders})
+		`;
+
+		const params = files.flatMap((file) => [file.filename, file.contentHash]) as (
+			| string
+			| number
+		)[];
+
+		const results = this.db.prepare(query).all(...params) as Array<LanguageCacheRecord>;
+
+		return new Map(
+			results.map((row) => [
+				row.filename,
+				{
+					detectedLanguage: row.detected_language,
+					confidence: row.confidence,
+					timestamp: row.timestamp,
+				},
+			]),
+		);
 	}
 
 	/**

@@ -61,8 +61,13 @@ export interface ProcessedFileResult {
  * Represents the file structure of a repository at a specific commit.
  * Each item contains metadata like path, SHA, type, and size.
  */
-export type RepositoryTreeItems =
-	RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"];
+export type RepositoryTreeItem =
+	RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"][number];
+
+export interface PatchedRepositoryItem extends RepositoryTreeItem {
+	/** The filename extracted from the file's path */
+	filename: string;
+}
 
 /**
  * Statistics returned from language cache checking operation.
@@ -71,7 +76,7 @@ export type RepositoryTreeItems =
  */
 export interface CacheCheckResult {
 	/** Files that require further processing (cache miss or invalidation) */
-	candidateFiles: RepositoryTreeItems;
+	candidateFiles: PatchedRepositoryItem[];
 
 	/** Number of files found in cache with valid translation detection */
 	cacheHits: number;
@@ -87,7 +92,7 @@ export interface CacheCheckResult {
  */
 export interface PrFilterResult {
 	/** Files that need content fetching (no existing PR) */
-	filesToFetch: RepositoryTreeItems;
+	filesToFetch: PatchedRepositoryItem[];
 
 	/** Number of files skipped because they have existing open PRs */
 	numFilesWithPRs: number;
