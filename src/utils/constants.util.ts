@@ -142,7 +142,7 @@ export const environmentDefaults = {
 	REPO_FORK_NAME: "pt-br.react.dev",
 	REPO_UPSTREAM_OWNER: "reactjs",
 	REPO_UPSTREAM_NAME: "pt-br.react.dev",
-	LLM_MODEL: "google/gemini-2.5-flash-lite",
+	LLM_MODEL: "google/gemini-2.0-flash-exp:free",
 	BATCH_SIZE: 1,
 	TARGET_LANGUAGE: "pt-br",
 	SOURCE_LANGUAGE: "en",
