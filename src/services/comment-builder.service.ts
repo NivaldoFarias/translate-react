@@ -50,11 +50,10 @@ export class CommentBuilderService {
 				if (!translationFile) return null;
 
 				const pathParts = translationFile.path.split("/");
-				const filename = pathParts.pop() || "";
 
 				return {
 					pathParts: this.simplifyPathParts(pathParts),
-					filename,
+					filename: translationFile.filename,
 					prNumber: result.pullRequest?.number || 0,
 				};
 			})

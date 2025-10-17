@@ -1,5 +1,7 @@
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
+import type { PatchedRepositoryItem } from "@/services/runner/";
+
 import { extractErrorMessage } from "@/errors/";
 import { DatabaseService } from "@/services/database/";
 import { ProcessedFileResult } from "@/services/runner/";
@@ -16,7 +18,7 @@ export interface Snapshot {
 	timestamp: number;
 
 	/** The repository tree */
-	repositoryTree: RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"];
+	repositoryTree: PatchedRepositoryItem[];
 
 	/** The files to translate */
 	filesToTranslate: TranslationFile[];
