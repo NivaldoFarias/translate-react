@@ -18,6 +18,7 @@ import {
 	LLMErrorHelper,
 	TranslationValidationError,
 } from "@/errors/";
+import { RateLimiterService } from "@/services/rate-limiter/";
 import { env, LANGUAGE_SPECIFIC_RULES, logger, MAX_CHUNK_TOKENS } from "@/utils/";
 
 import { LanguageDetectorService } from "./language-detector.service";
@@ -92,6 +93,9 @@ export class TranslatorService {
 		},
 	});
 
+	/** Rate limiter for LLM API requests */
+	private readonly rateLimiter: RateLimiterService;
+
 	private readonly helpers = {
 		llm: new LLMErrorHelper(),
 		github: new GithubErrorHelper(),
@@ -100,6 +104,17 @@ export class TranslatorService {
 	public readonly languageDetector = new LanguageDetectorService();
 
 	public glossary: string | null = null;
+
+	/**
+	 * Creates a new translator service instance.
+	 *
+	 * Initializes the OpenAI client and rate limiter for LLM API requests.
+	 *
+	 * @param rateLimiter Optional rate limiter instance (creates new one if not provided)
+	 */
+	constructor(rateLimiter?: RateLimiterService) {
+		this.rateLimiter = rateLimiter ?? new RateLimiterService();
+	}
 
 	/**
 	 * Main translation method that processes files and manages the translation workflow.
@@ -706,7 +721,10 @@ export class TranslatorService {
 
 	/**
 	 * Sends content to the language model for translation.
+	 *
 	 * Constructs system and user prompts based on detected language.
+	 * Automatically applies rate limiting to prevent exceeding API limits,
+	 * especially important for free-tier LLM models with strict rate limits.
 	 *
 	 * @param content Content to translate
 	 *
@@ -721,15 +739,17 @@ export class TranslatorService {
 				"Calling language model for translation",
 			);
 
-			const completion = await this.llm.chat.completions.create({
-				model: env.LLM_MODEL,
-				temperature: 0.1,
-				max_tokens: env.MAX_TOKENS,
-				messages: [
-					{ role: "system", content: systemPrompt },
-					{ role: "user", content },
-				],
-			});
+			const completion = await this.rateLimiter.scheduleLLM(() =>
+				this.llm.chat.completions.create({
+					model: env.LLM_MODEL,
+					temperature: 0.1,
+					max_tokens: env.MAX_TOKENS,
+					messages: [
+						{ role: "system", content: systemPrompt },
+						{ role: "user", content },
+					],
+				}),
+			);
 
 			const translatedContent = completion.choices[0]?.message?.content;
 
