@@ -148,6 +148,45 @@ export class ContentService extends BaseGitHubService {
 	}
 
 	/**
+	 * Retrieves the list of files changed in a pull request.
+	 *
+	 * Uses GitHub's PR files API to fetch the actual files modified in the PR,
+	 * rather than relying on PR title parsing. This provides accurate file-based
+	 * filtering for translation workflows by comparing actual changed file paths
+	 * against candidate files needing translation.
+	 *
+	 * @param prNumber Pull request number to fetch changed files from
+	 *
+	 * @returns A `Promise` resolving to an array of file paths changed in the PR
+	 *
+	 * @example
+	 * ```typescript
+	 * const files = await contentService.getPullRequestFiles(123);
+	 * console.log(files);
+	 * // ^? ['src/content/learn/state-management.md', 'src/content/learn/hooks.md']
+	 * ```
+	 */
+	public async getPullRequestFiles(prNumber: number): Promise<string[]> {
+		try {
+			const response = await this.octokit.pulls.listFiles({
+				...this.repositories.upstream,
+				pull_number: prNumber,
+			});
+
+			const filePaths = response.data.map((file) => file.filename);
+
+			logger.debug({ prNumber, fileCount: filePaths.length }, "Fetched PR changed files");
+
+			return filePaths;
+		} catch (error) {
+			throw this.helpers.github.mapError(error, {
+				operation: "ContentService.getPullRequestFiles",
+				metadata: { prNumber, upstream: this.repositories.upstream },
+			});
+		}
+	}
+
+	/**
 	 * Retrieves markdown files that need translation.
 	 *
 	 * Filters and processes files based on content type.

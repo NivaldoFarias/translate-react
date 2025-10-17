@@ -1,6 +1,6 @@
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
-import type { PatchedRepositoryItem } from "@/services/runner/";
+import type { PatchedRepositoryItem, PullRequestStatus } from "@/services/runner/";
 
 import { extractErrorMessage } from "@/errors/";
 import { DatabaseService } from "@/services/database/";
@@ -25,6 +25,16 @@ export interface Snapshot {
 
 	/** The processed results */
 	processedResults: ProcessedFileResult[];
+
+	/**
+	 * Map of file paths to invalid PR information.
+	 *
+	 * Tracks files that have existing PRs with conflicts or unmergeable status.
+	 * Used to add informational notes when creating new PRs for these files.
+	 *
+	 * @default new Map()
+	 */
+	invalidPRsByFile?: Map<string, { prNumber: number; status: PullRequestStatus }>;
 }
 
 /** Manages the creation, saving, and loading of translation workflow snapshots */

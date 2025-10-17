@@ -65,7 +65,11 @@ export type RepositoryTreeItem =
 	RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"][number];
 
 export interface PatchedRepositoryItem extends RepositoryTreeItem {
-	/** The filename extracted from the file's path */
+	/**
+	 * The filename extracted from the file's path
+	 *
+	 * @example homepage.md
+	 */
 	filename: string;
 }
 
@@ -94,8 +98,31 @@ export interface PrFilterResult {
 	/** Files that need content fetching (no existing PR) */
 	filesToFetch: PatchedRepositoryItem[];
 
-	/** Number of files skipped because they have existing open PRs */
+	/** Number of files skipped because they have existing valid PRs */
 	numFilesWithPRs: number;
+
+	/**
+	 * Map of file paths to invalid PR information.
+	 *
+	 * Tracks files that have existing PRs with conflicts or unmergeable status.
+	 * Used to add informational notes when creating new PRs for these files.
+	 */
+	invalidPRsByFile: Map<string, { prNumber: number; status: PullRequestStatus }>;
+}
+
+/** Information about a pull request's mergeability and conflict status */
+export interface PullRequestStatus {
+	/** Whether the PR has actual merge conflicts (dirty state) */
+	hasConflicts: boolean;
+
+	/** GitHub's raw mergeable flag (can be null during calculation) */
+	mergeable: boolean | null;
+
+	/** GitHub's mergeable state string (clean, behind, dirty, etc.) */
+	mergeableState: string;
+
+	/** Whether the PR needs to be closed and recreated due to conflicts */
+	needsUpdate: boolean;
 }
 
 /**

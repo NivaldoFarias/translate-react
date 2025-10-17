@@ -5,12 +5,16 @@ import type {
 	PatchedRepositoryItem,
 	ProcessedFileResult,
 	PrFilterResult as PullRequestFilterResult,
+	PullRequestStatus,
 	RunnerOptions,
 } from "./runner.types";
+import type { RestEndpointMethodTypes } from "@octokit/rest";
 import type { SetNonNullable, SetRequired } from "type-fest";
 
+import type { PullRequestOptions } from "@/services/github/";
+
 import { InitializationError, ResourceLoadError } from "@/errors/";
-import { GitHubService } from "@/services/github/";
+import { BranchService, ContentService, RepositoryService } from "@/services/github/";
 import { Snapshot, SnapshotService } from "@/services/snapshot.service";
 import { TranslationFile, TranslatorService } from "@/services/translator.service";
 import {
@@ -54,7 +58,11 @@ export abstract class BaseRunnerService {
 
 	protected readonly services = {
 		/** GitHub service instance for repository operations */
-		github: new GitHubService(),
+		github: {
+			branch: new BranchService(),
+			repository: new RepositoryService(),
+			content: new ContentService(),
+		},
 
 		/** Translation service for content translation operations */
 		translator: new TranslatorService(),
@@ -108,7 +116,7 @@ export abstract class BaseRunnerService {
 	 * @throws {InitializationError} If token permissions verification fails
 	 */
 	protected async verifyPermissions(): Promise<void> {
-		const hasPermissions = await this.services.github.verifyTokenPermissions();
+		const hasPermissions = await this.services.github.repository.verifyTokenPermissions();
 
 		if (!hasPermissions) {
 			throw new InitializationError("Token permissions verification failed", {
@@ -127,7 +135,7 @@ export abstract class BaseRunnerService {
 	protected async syncFork(): Promise<boolean> {
 		logger.info("Checking fork status...");
 
-		const isForkSynced = await this.services.github.isForkSynced();
+		const isForkSynced = await this.services.github.repository.isForkSynced();
 
 		if (!isForkSynced) {
 			logger.info("Fork is out of sync, updating fork...");
@@ -136,7 +144,7 @@ export abstract class BaseRunnerService {
 				await this.services.snapshot.clear();
 			}
 
-			const syncSuccess = await this.services.github.syncFork();
+			const syncSuccess = await this.services.github.repository.syncFork();
 			if (!syncSuccess) {
 				throw new InitializationError("Failed to sync fork with upstream repository", {
 					operation: "syncFork",
@@ -174,7 +182,7 @@ export abstract class BaseRunnerService {
 	protected async fetchRepositoryTree(): Promise<void> {
 		if (!this.state.repositoryTree?.length) {
 			logger.info("Fetching repository content...");
-			const repositoryTree = await this.services.github.getRepositoryTree();
+			const repositoryTree = await this.services.github.repository.getRepositoryTree();
 
 			this.state.repositoryTree = repositoryTree.map((item) => {
 				const filename = item.path?.split("/").pop() ?? "";
@@ -187,7 +195,7 @@ export abstract class BaseRunnerService {
 			}
 
 			logger.info("Repository tree fetched, fetching glossary...");
-			const glossary = await this.services.github.getGlossary();
+			const glossary = await this.services.github.repository.fetchGlossary();
 
 			if (!glossary) {
 				throw new ResourceLoadError("Failed to fetch glossary", { operation: "fetchGlossary" });
@@ -205,15 +213,24 @@ export abstract class BaseRunnerService {
 	 *
 	 * Orchestrates the complete file discovery workflow by coordinating cache checks,
 	 * PR filtering, content fetching, and language detection. Each stage progressively
-	 * narrows the candidate set to minimize expensive operations.
+	 * narrows the candidate set to minimize expensive operations like API calls and
+	 * content analysis.
 	 *
-	 * The pipeline stages are:
-	 * 1. Language cache lookup to skip known translated files
-	 * 2. PR existence check to skip files with pending translations
-	 * 3. Batched content fetching from repository
-	 * 4. Size validation and language detection with cache updates
+	 * ### Pipeline Stages
 	 *
-	 * @throws {ResourceLoadError} If file content fetch fails
+	 * 1. **Language cache lookup**: Queries SQLite cache to skip known translated files
+	 * 2. **PR existence check**: Validates existing PRs to skip files with valid translations
+	 * 3. **Content fetching**: Downloads file content in parallel batches from GitHub
+	 * 4. **Language detection**: Analyzes content and updates cache with detection results
+	 *
+	 * ### Invalid PR Tracking
+	 *
+	 * Files with existing PRs that have merge conflicts are identified during stage 2
+	 * and stored in {@link state.invalidPRsByFile}. This information is later used in
+	 * {@link createPullRequestDescription} to add informational notes about conflicted
+	 * PRs when creating new translation PRs for the same file.
+	 *
+	 * @throws {ResourceLoadError} If file content fetch fails during stage 3
 	 */
 	protected async fetchFilesToTranslate(): Promise<void> {
 		if (this.state.filesToTranslate.length) {
@@ -228,8 +245,11 @@ export abstract class BaseRunnerService {
 		logger.info(`Processing ${uniqueFiles.length} files from repository tree...`);
 
 		const { candidateFiles, cacheHits } = await this.checkLanguageCache(uniqueFiles);
-		const { filesToFetch, numFilesWithPRs } = await this.filterFilesByExistingPRs(candidateFiles);
+		const { filesToFetch, numFilesWithPRs, invalidPRsByFile } =
+			await this.filterFilesByExistingPRs(candidateFiles);
 		const uncheckedFiles = await this.fetchFileContents(filesToFetch);
+
+		this.state.invalidPRsByFile = invalidPRsByFile;
 		const { numFilesFiltered, numFilesTooLarge } =
 			await this.detectAndCacheLanguages(uncheckedFiles);
 
@@ -323,39 +343,75 @@ export abstract class BaseRunnerService {
 	/**
 	 * Filters candidate files by checking for existing open pull requests.
 	 *
-	 * Fetches all open PRs and builds a mapping of filenames to PR numbers by parsing
-	 * PR titles. Files with existing translation PRs are excluded from further processing
-	 * to prevent duplicate translation efforts.
+	 * Fetches all open PRs and their changed files to build an accurate mapping of
+	 * which files have active PRs. Only skips files with VALID (mergeable) PRs.
+	 * Files with invalid/conflicted PRs are processed and tracked for notification
+	 * in new PR descriptions.
 	 *
-	 * @param candidateFiles Files remaining after cache check
+	 * ### Filtering Logic
 	 *
-	 * @returns Files requiring content fetch and count of files with existing PRs
+	 * 1. Fetch all open PRs and their changed files using file-based detection (not title parsing)
+	 * 2. Build a map of file paths to PR numbers for efficient lookup
+	 * 3. For each candidate file, check if it appears in any PR's changed files
+	 * 4. If PR exists, validate its merge status using {@link TranslationBranchManager.checkPullRequestStatus}
+	 * 5. Skip files with valid, mergeable PRs (no conflicts)
+	 * 6. Track invalid PRs (with conflicts) for later notification in new PR descriptions
+	 *
+	 * ### PR Status Validation
+	 *
+	 * Files are only skipped when their associated PR meets ALL criteria:
+	 * - PR is open
+	 * - PR is mergeable (`needsUpdate === false`)
+	 * - PR has no conflicts (`hasConflicts === false`)
+	 *
+	 * Files with invalid PRs are included for translation, and the invalid PR information
+	 * is stored in `invalidPRsByFile` for use in {@link createPullRequestDescription}.
+	 *
+	 * @param candidateFiles Files remaining after cache check that require PR validation
+	 *
+	 * @returns A `Promise` resolving to an object containing:
+	 * - `filesToFetch`: Files requiring content fetch (no valid PR exists)
+	 * - `numFilesWithPRs`: Count of files skipped due to valid existing PRs
+	 * - `invalidPRsByFile`: Map of file paths to invalid PR metadata for notification
 	 *
 	 * @example
 	 * ```typescript
 	 * const result = await this.filterFilesByExistingPRs(cachedCandidates);
 	 * console.log(result.numFilesWithPRs);
-	 * // ^? 12 (files already have open PRs)
+	 * // ^? 10 (files with valid, mergeable PRs)
+	 * console.log(result.invalidPRsByFile.size);
+	 * // ^? 2 (files with conflicted PRs that will be re-translated)
 	 * ```
 	 */
 	private async filterFilesByExistingPRs(
 		candidateFiles: PatchedRepositoryItem[],
 	): Promise<PullRequestFilterResult> {
-		logger.info("Checking for existing open PRs...");
+		logger.info("Checking for existing open PRs with file-based filtering...");
 
-		const openPRs = await this.services.github.listOpenPullRequests();
-		const prFileMap = new Map<string, number>();
+		const openPRs = await this.services.github.content.listOpenPullRequests();
+		const invalidPRsByFile = new Map<string, { prNumber: number; status: PullRequestStatus }>();
+		const prByFile = new Map<string, number>();
 
 		for (const pr of openPRs) {
-			const match = pr.title?.match(/Translate `(.+?)` to/);
-			if (match?.[1]) {
-				prFileMap.set(match[1], pr.number);
+			try {
+				const changedFiles = await this.services.github.content.getPullRequestFiles(pr.number);
+
+				for (const filePath of changedFiles) {
+					prByFile.set(filePath, pr.number);
+				}
+
+				logger.debug(
+					{ prNumber: pr.number, fileCount: changedFiles.length },
+					"Mapped PR to changed files",
+				);
+			} catch (error) {
+				logger.warn({ prNumber: pr.number, error }, "Failed to fetch PR files, skipping this PR");
 			}
 		}
 
 		logger.debug(
-			{ openPRCount: openPRs.length, mappedFiles: prFileMap.size },
-			"Open PRs mapped to filenames",
+			{ openPRCount: openPRs.length, mappedFiles: prByFile.size },
+			"Built file-to-PR mapping",
 		);
 
 		let numFilesWithPRs = 0;
@@ -367,23 +423,58 @@ export abstract class BaseRunnerService {
 				continue;
 			}
 
-			if (prFileMap.has(file.filename)) {
-				numFilesWithPRs++;
-				logger.debug(
-					{ fullPath: file.path, filename: file.filename, prNumber: prFileMap.get(file.filename) },
-					"Skipping file with existing PR",
-				);
+			const prNumber = prByFile.get(file.path);
+
+			if (prNumber) {
+				try {
+					const prStatus = await this.services.github.content.checkPullRequestStatus(prNumber);
+
+					if (prStatus.needsUpdate || prStatus.hasConflicts) {
+						invalidPRsByFile.set(file.path, { prNumber, status: prStatus });
+						filesToFetch.push(file);
+
+						logger.debug(
+							{
+								path: file.path,
+								prNumber,
+								mergeableState: prStatus.mergeableState,
+								hasConflicts: prStatus.hasConflicts,
+							},
+							"File has invalid PR - will create new translation",
+						);
+					} else {
+						numFilesWithPRs++;
+						logger.debug(
+							{
+								path: file.path,
+								prNumber,
+								mergeableState: prStatus.mergeableState,
+							},
+							"Skipping file with valid existing PR",
+						);
+					}
+				} catch (error) {
+					logger.warn(
+						{ path: file.path, prNumber, error },
+						"Failed to check PR status, including file for processing",
+					);
+					filesToFetch.push(file);
+				}
 			} else {
 				filesToFetch.push(file);
 			}
 		}
 
 		logger.info(
-			{ withPRs: numFilesWithPRs, toFetch: filesToFetch.length },
+			{
+				validPRs: numFilesWithPRs,
+				invalidPRs: invalidPRsByFile.size,
+				toFetch: filesToFetch.length,
+			},
 			`After PR filter: ${filesToFetch.length} files need content fetch`,
 		);
 
-		return { filesToFetch, numFilesWithPRs };
+		return { filesToFetch, numFilesWithPRs, invalidPRsByFile };
 	}
 
 	/**
@@ -510,7 +601,7 @@ export abstract class BaseRunnerService {
 			batch.map(async (file) => {
 				if (!file.filename || !file.sha || !file.path) return null;
 
-				const content = await this.services.github.getFileContent(file);
+				const content = await this.services.github.content.getFileContent(file);
 
 				updateLoggerFn();
 
@@ -527,7 +618,7 @@ export abstract class BaseRunnerService {
 	protected async updateIssueWithResults(): Promise<void> {
 		logger.info("Commenting on issue...");
 
-		const comment = await this.services.github.commentCompiledResultsOnIssue(
+		const comment = await this.services.github.content.commentCompiledResultsOnIssue(
 			this.state.processedResults,
 			this.state.filesToTranslate,
 		);
@@ -783,7 +874,7 @@ export abstract class BaseRunnerService {
 			);
 
 			const branchStartTime = Date.now();
-			metadata.branch = await this.services.github.createOrGetTranslationBranch(file);
+			metadata.branch = await this.createOrGetTranslationBranch(file);
 			const branchDuration = Date.now() - branchStartTime;
 
 			logger.debug(
@@ -810,7 +901,7 @@ export abstract class BaseRunnerService {
 				) || "Portuguese";
 
 			const commitStartTime = Date.now();
-			await this.services.github.commitTranslation({
+			await this.services.github.content.commitTranslation({
 				file,
 				branch: metadata.branch,
 				content: metadata.translation,
@@ -824,7 +915,7 @@ export abstract class BaseRunnerService {
 			);
 
 			const prStartTime = Date.now();
-			metadata.pullRequest = await this.services.github.createOrUpdatePullRequest(file, {
+			metadata.pullRequest = await this.createOrUpdatePullRequest(file, {
 				title: `Translate \`${file.filename}\` to ${languageName}`,
 				body: this.createPullRequestDescription(file, metadata),
 			});
@@ -890,7 +981,7 @@ export abstract class BaseRunnerService {
 
 		try {
 			const branchName = metadata.branch.ref.replace("refs/heads/", "");
-			await this.services.github.cleanupBranch(branchName);
+			await this.services.github.branch.deleteBranch(branchName);
 			logger.info(
 				{ branchName, filename: metadata.filename },
 				"Cleaned up branch after failed translation",
@@ -905,6 +996,33 @@ export abstract class BaseRunnerService {
 
 	abstract run(): Promise<void>;
 
+	/**
+	 * Creates a comprehensive pull request description for translated content.
+	 *
+	 * Generates a detailed PR body including translation metadata, review guidelines,
+	 * processing statistics, and optional conflict notices. When a file has an existing
+	 * invalid PR (with merge conflicts), includes a GitHub Flavored Markdown note to
+	 * inform maintainers about the duplicate PR situation.
+	 *
+	 * ### Description Components
+	 *
+	 * 1. **Conflict Notice** (conditional): GFM note about existing invalid PRs
+	 * 2. **Translation Overview**: Target language and AI-generated disclaimer
+	 * 3. **Review Guidelines**: Checklist for human review
+	 * 4. **Processing Statistics**: File sizes, compression ratio, timing
+	 * 5. **Technical Information**: Model, version, branch details
+	 *
+	 * ### Invalid PR Detection
+	 *
+	 * Checks {@link state.invalidPRsByFile} for conflicted PRs associated with the
+	 * current file. If found, adds a `[!NOTE]` callout with PR number and mergeable
+	 * state to guide maintainers in choosing which PR to merge.
+	 *
+	 * @param file Translation file being processed with original content
+	 * @param processingResult Processing metadata including translation and timing
+	 *
+	 * @returns Markdown-formatted PR description with all components
+	 */
 	protected createPullRequestDescription(
 		file: TranslationFile,
 		processingResult: ProcessedFileResult,
@@ -919,7 +1037,20 @@ export abstract class BaseRunnerService {
 		const translationLength = processingResult.translation?.length || 0;
 		const compressionRatio = sourceLength > 0 ? (translationLength / sourceLength).toFixed(2) : "0";
 
+		const invalidPRInfo = this.state.invalidPRsByFile?.get(file.path);
+		const conflictNotice =
+			invalidPRInfo ?
+				`
+> [!NOTE]
+> **Existing PR Detected**: This file already has an open pull request (#${invalidPRInfo.prNumber}) with merge conflicts or unmergeable status (\`${invalidPRInfo.status.mergeableState}\`).
+>
+> This new PR was automatically created with an updated translation. The decision on which PR to merge should be made by repository maintainers based on translation quality and technical requirements.
+
+`
+			:	"";
+
 		return `This pull request contains an automated translation of the referenced page to **${languageName}**.
+${conflictNotice}
 
 > [!IMPORTANT]
 > This translation was generated using AI/LLM and requires human review for accuracy, cultural context, and technical terminology.
@@ -968,5 +1099,194 @@ Please review this translation for:
 ---
 
 **Questions or suggestions?** Feel free to leave comments or request changes to improve the translation quality.`;
+	}
+
+	/**
+	 * Creates a new branch for translation work, or reuses an existing branch if appropriate.
+	 *
+	 * This method intelligently handles existing branches by evaluating their associated PRs
+	 * for merge conflicts. When a branch already exists, the method checks if there's an open
+	 * PR and evaluates its merge status using {@link ContentService.checkPullRequestStatus}.
+	 * Branches are only deleted and recreated when their associated PRs have actual merge
+	 * conflicts (not when they're simply behind the base branch).
+	 *
+	 * ### Branch Reuse Scenarios
+	 *
+	 * 1. **Branch exists with PR having no conflicts**: Reuses existing branch, preserving PR
+	 * 2. **Branch exists with PR having conflicts**: Closes PR, deletes branch, creates new branch
+	 * 3. **Branch exists without PR**: Reuses existing branch safely
+	 * 4. **No existing branch**: Creates new branch from base
+	 *
+	 * ### Conflict Detection Logic
+	 *
+	 * The method uses `checkPullRequestStatus()` which only flags PRs with `hasConflicts = true`
+	 * when GitHub indicates `mergeable === false` and `mergeable_state === "dirty"`. PRs that
+	 * are merely "behind" the base branch are considered safe to reuse and can be updated via
+	 * rebase without requiring closure.
+	 *
+	 * @param file Translation file being processed
+	 * @param baseBranch Optional base branch to create from (defaults to fork's default branch)
+	 *
+	 * @returns Branch reference data containing SHA and branch name for subsequent commit operations
+	 *
+	 * @example
+	 * ```typescript
+	 * const branch = await github.createOrGetTranslationBranch(file, 'main');
+	 * console.log(branch.ref);
+	 * // ^? "refs/heads/translate/content/learn/homepage.md"
+	 * ```
+	 *
+	 * @see {@link ContentService.checkPullRequestStatus} for conflict detection logic
+	 * @see {@link BranchService.getBranch} for branch existence checking
+	 */
+	public async createOrGetTranslationBranch(file: TranslationFile, baseBranch?: string) {
+		const actualBaseBranch =
+			baseBranch || (await this.services.github.repository.getDefaultBranch("fork"));
+		const branchName = `translate/${file.path.split("/").slice(2).join("/")}`;
+
+		logger.debug(
+			{ filename: file.filename, branchName },
+			"Checking for existing translation branch",
+		);
+		const existingBranch = await this.services.github.branch.getBranch(branchName);
+
+		if (existingBranch) {
+			logger.debug(
+				{ filename: file.filename, branchName },
+				"Existing branch found, checking associated PR status",
+			);
+
+			const upstreamPR = await this.services.github.content.findPullRequestByBranch(branchName);
+
+			if (upstreamPR) {
+				const prStatus = await this.services.github.content.checkPullRequestStatus(
+					upstreamPR.number,
+				);
+
+				if (prStatus.hasConflicts) {
+					logger.info(
+						{
+							filename: file.filename,
+							prNumber: upstreamPR.number,
+							mergeableState: prStatus.mergeableState,
+						},
+						"PR has merge conflicts, closing and recreating",
+					);
+					await this.services.github.content.createCommentOnPullRequest(
+						upstreamPR.number,
+						"This PR has merge conflicts and is being closed. A new PR with the updated translation will be created.",
+					);
+
+					await this.services.github.content.closePullRequest(upstreamPR.number);
+					await this.services.github.branch.deleteBranch(branchName);
+				} else {
+					logger.debug(
+						{
+							filename: file.filename,
+							prNumber: upstreamPR.number,
+							mergeableState: prStatus.mergeableState,
+						},
+						"PR exists with no conflicts, reusing existing branch",
+					);
+					return existingBranch.data;
+				}
+			} else {
+				logger.debug({ filename: file.filename, branchName }, "Branch exists without PR, reusing");
+				return existingBranch.data;
+			}
+		}
+
+		logger.debug({ filename: file.filename, branchName }, "Creating new translation branch");
+		const newBranch = await this.services.github.branch.createBranch(branchName, actualBaseBranch);
+
+		return newBranch.data;
+	}
+
+	/**
+	 * Handles pull request creation or reuse for a translation file.
+	 *
+	 * Implements intelligent PR lifecycle management by checking if a PR already exists for
+	 * the translation branch and evaluating its merge status. The method uses
+	 * {@link ContentService.checkPullRequestStatus} to determine if an existing PR has actual
+	 * merge conflicts. PRs are only closed and recreated when they have true conflicts
+	 * (indicated by `needsUpdate = true`). PRs that are merely behind the base branch are
+	 * preserved since they can be safely rebased without closure.
+	 *
+	 * ### PR Handling Logic
+	 *
+	 * 1. **No existing PR**: Creates new PR with provided options
+	 * 2. **Existing PR without conflicts**: Returns existing PR (preserves PR number and discussion)
+	 * 3. **Existing PR with conflicts**: Closes conflicted PR, creates new PR with updated content
+	 *
+	 * ### Conflict Resolution
+	 *
+	 * When conflicts are detected (`needsUpdate = true`), the method:
+	 * - Adds an explanatory comment to the existing PR
+	 * - Closes the conflicted PR
+	 * - Creates a new PR with the same title/body but fresh translation content
+	 *
+	 * @param file Translation file being processed
+	 * @param prOptions Pull request creation options (excluding branch, which is auto-generated)
+	 *
+	 * @returns Either the newly created PR data or the existing PR data if reused
+	 *
+	 * @example
+	 * ```typescript
+	 * const pr = await github.createOrUpdatePullRequest(file, {
+	 *   title: 'Translate homepage to Portuguese',
+	 *   body: 'Translation of homepage.md',
+	 *   baseBranch: 'main'
+	 * });
+	 * console.log(pr.number);
+	 * // ^? Existing PR number if reused, new PR number if created
+	 * ```
+	 *
+	 * @see {@link ContentService.checkPullRequestStatus} for conflict detection logic
+	 * @see {@link ContentService.findPullRequestByBranch} for PR lookup
+	 */
+	public async createOrUpdatePullRequest(
+		file: TranslationFile,
+		prOptions: Omit<PullRequestOptions, "branch">,
+	): Promise<
+		| RestEndpointMethodTypes["pulls"]["create"]["response"]["data"]
+		| RestEndpointMethodTypes["pulls"]["list"]["response"]["data"][number]
+	> {
+		const branchName = `translate/${file.path.split("/").slice(2).join("/")}`;
+		const existingPR = await this.services.github.content.findPullRequestByBranch(branchName);
+
+		if (existingPR) {
+			const prStatus = await this.services.github.content.checkPullRequestStatus(existingPR.number);
+
+			if (prStatus.needsUpdate) {
+				logger.info(
+					{ prNumber: existingPR.number, mergeableState: prStatus.mergeableState },
+					"Closing PR with merge conflicts and creating new one",
+				);
+				await this.services.github.content.createCommentOnPullRequest(
+					existingPR.number,
+					"This PR has merge conflicts and is being closed. A new PR with the updated translation will be created.",
+				);
+
+				await this.services.github.content.closePullRequest(existingPR.number);
+
+				return await this.services.github.content.createPullRequest({
+					branch: branchName,
+					...prOptions,
+					baseBranch: prOptions.baseBranch || "main",
+				});
+			}
+
+			logger.debug(
+				{ prNumber: existingPR.number, mergeableState: prStatus.mergeableState },
+				"PR exists with no conflicts, reusing",
+			);
+			return existingPR;
+		}
+
+		return await this.services.github.content.createPullRequest({
+			branch: branchName,
+			...prOptions,
+			baseBranch: prOptions.baseBranch || "main",
+		});
 	}
 }
