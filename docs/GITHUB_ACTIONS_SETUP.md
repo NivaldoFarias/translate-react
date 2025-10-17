@@ -16,7 +16,9 @@ Go to **Settings → Secrets and variables → Actions → Repository secrets** 
 
 #### `WORKFLOW_GITHUB_TOKEN`
 
-Personal Access Token for GitHub API operations.
+**Personal Access Token for GitHub API operations and PR creation.**
+
+**Important**: PRs will be created **under your GitHub account** using this token (not as github-actions[bot]).
 
 **How to create:**
 
@@ -46,18 +48,27 @@ API key for OpenAI/OpenRouter or other LLM service.
 
 Go to **Settings → Secrets and variables → Actions → Variables** and add:
 
-| Variable                | Example Value                      | Description                       |
-| ----------------------- | ---------------------------------- | --------------------------------- |
-| `REPO_FORK_OWNER`       | `nivaldofarias`                    | Your GitHub username/org          |
-| `REPO_FORK_NAME`        | `pt-br.react.dev`                  | Name of your fork                 |
-| `REPO_UPSTREAM_OWNER`   | `reactjs`                          | Upstream repository owner         |
-| `REPO_UPSTREAM_NAME`    | `pt-br.react.dev`                  | Upstream repository name          |
-| `TARGET_LANGUAGE`       | `pt-BR`                            | Target language code              |
-| `TRANSLATION_BASE_PATH` | `src/content`                      | Path to translation files         |
-| `LLM_MODEL`             | `google/gemini-2.0-flash-exp:free` | LLM model identifier (optional)   |
-| `OPENAI_BASE_URL`       | `https://api.openrouter.com/v1`    | API base URL (optional)           |
-| `LOG_LEVEL`             | `info`                             | Logging level (optional)          |
-| `ENABLE_AUTO_MERGE`     | `false`                            | Auto-merge PRs (use with caution) |
+| Variable              | Example Value                      | Description                                          | Required |
+| --------------------- | ---------------------------------- | ---------------------------------------------------- | -------- |
+| `TRANSLATION_ENABLED` | `true`                             | Master switch to enable/disable translation workflow | ✅ Yes    |
+| `NODE_ENV`            | `production`                       | Runtime environment (production/development)         | ✅ Yes    |
+| `BUN_ENV`             | `production`                       | Bun runtime environment                              | ✅ Yes    |
+| `REPO_FORK_OWNER`     | `nivaldofarias`                    | Your GitHub username/org                             | ✅ Yes    |
+| `REPO_FORK_NAME`      | `pt-br.react.dev`                  | Name of your fork                                    | ✅ Yes    |
+| `REPO_UPSTREAM_OWNER` | `reactjs`                          | Upstream repository owner                            | ✅ Yes    |
+| `REPO_UPSTREAM_NAME`  | `pt-br.react.dev`                  | Upstream repository name                             | ✅ Yes    |
+| `TARGET_LANGUAGE`     | `pt-br`                            | Target language code                                 | ✅ Yes    |
+| `LLM_MODEL`           | `google/gemini-2.0-flash-exp:free` | LLM model identifier                                 | ❌ No     |
+| `OPENAI_BASE_URL`     | `https://api.openrouter.com/v1`    | API base URL                                         | ❌ No     |
+| `LOG_LEVEL`           | `info`                             | Logging level (debug/info/warn/error)                | ❌ No     |
+| `LOG_TO_CONSOLE`      | `true`                             | Enable console logging in workflows                  | ❌ No     |
+| `ENABLE_AUTO_MERGE`   | `false`                            | Auto-merge PRs (⚠️ use with caution in production)    | ❌ No     |
+
+> [!IMPORTANT]
+> **Environment Configuration:**
+> - Set `NODE_ENV=production` and `BUN_ENV=production` for production runs (creates PRs to upstream)
+> - Set `NODE_ENV=development` or `BUN_ENV=development` for testing (creates PRs within your fork)
+> - PRs are created **under your GitHub account** (via `WORKFLOW_GITHUB_TOKEN`), not as github-actions[bot]
 
 ## Quick Setup Script
 
@@ -72,15 +83,18 @@ gh secret set WORKFLOW_GITHUB_TOKEN --repo $REPO
 gh secret set OPENAI_API_KEY --repo $REPO
 
 # Add variables
+gh variable set TRANSLATION_ENABLED --body "true" --repo $REPO
+gh variable set NODE_ENV --body "production" --repo $REPO
+gh variable set BUN_ENV --body "production" --repo $REPO
 gh variable set REPO_FORK_OWNER --body "your-username" --repo $REPO
 gh variable set REPO_FORK_NAME --body "pt-br.react.dev" --repo $REPO
 gh variable set REPO_UPSTREAM_OWNER --body "reactjs" --repo $REPO
 gh variable set REPO_UPSTREAM_NAME --body "pt-br.react.dev" --repo $REPO
 gh variable set TARGET_LANGUAGE --body "pt-BR" --repo $REPO
-gh variable set TRANSLATION_BASE_PATH --body "src/content" --repo $REPO
 gh variable set LLM_MODEL --body "google/gemini-2.0-flash-exp:free" --repo $REPO
 gh variable set OPENAI_BASE_URL --body "https://api.openrouter.com/v1" --repo $REPO
 gh variable set LOG_LEVEL --body "info" --repo $REPO
+gh variable set LOG_TO_CONSOLE --body "true" --repo $REPO
 gh variable set ENABLE_AUTO_MERGE --body "false" --repo $REPO
 ```
 
@@ -111,16 +125,19 @@ gh variable list --repo your-username/translate-react
 Expected output:
 
 ```
+BUN_ENV                 production
 ENABLE_AUTO_MERGE       false
-LLM_MODEL              google/gemini-2.0-flash-exp:free
-LOG_LEVEL              info
-OPENAI_BASE_URL        https://api.openrouter.com/v1
-REPO_FORK_NAME         pt-br.react.dev
-REPO_FORK_OWNER        nivaldofarias
-REPO_UPSTREAM_NAME     pt-br.react.dev
-REPO_UPSTREAM_OWNER    reactjs
-TARGET_LANGUAGE        pt-BR
-TRANSLATION_BASE_PATH  src/content
+LLM_MODEL               google/gemini-2.0-flash-exp:free
+LOG_LEVEL               info
+LOG_TO_CONSOLE          true
+NODE_ENV                production
+OPENAI_BASE_URL         https://api.openrouter.com/v1
+REPO_FORK_NAME          pt-br.react.dev
+REPO_FORK_OWNER         nivaldofarias
+REPO_UPSTREAM_NAME      pt-br.react.dev
+REPO_UPSTREAM_OWNER     reactjs
+TARGET_LANGUAGE         pt-br
+TRANSLATION_ENABLED     true
 ```
 
 ## Testing
@@ -146,6 +163,32 @@ Go to **Actions** tab and verify the CI workflow runs successfully.
 5. Click **Run workflow**
 
 Monitor the logs to ensure it completes successfully.
+
+## How It Works
+
+### Workflow Triggers
+
+The **Sync and Translate** workflow runs:
+- ⏰ **Scheduled**: Every 6 hours (checks for upstream changes)
+- 🖱️ **Manual**: Via workflow_dispatch (Actions → Run workflow button)
+- 🔔 **Webhook**: When upstream repository pushes (requires webhook setup)
+
+### PR Creation Flow
+
+1. **Git Operations** (checkout, sync, push): Uses `secrets.GITHUB_TOKEN` (automatic GitHub Actions token)
+2. **Commits**: Authored by `github-actions[bot]`
+3. **Pull Requests**: Created via `secrets.WORKFLOW_GITHUB_TOKEN` (your personal token)
+
+**Result**: PRs appear **under your GitHub account** (not github-actions[bot]), created from your fork to upstream.
+
+### Caching Strategy
+
+The workflow uses **node_modules caching** for optimal performance:
+- ✅ **First run**: ~15-20s install time, creates cache
+- ✅ **Cache hit**: ~1-2s (install completely skipped)
+- ✅ **Lockfile change**: Full install, cache updates
+
+**Cache key**: `node-modules-{os}-{bun.lock-hash}` - automatically invalidates when dependencies change.
 
 ## Troubleshooting
 

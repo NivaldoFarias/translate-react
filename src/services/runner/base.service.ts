@@ -5,7 +5,6 @@ import type {
 	PatchedRepositoryItem,
 	ProcessedFileResult,
 	PrFilterResult as PullRequestFilterResult,
-	RepositoryTreeItem,
 	RunnerOptions,
 } from "./runner.types";
 import type { SetNonNullable, SetRequired } from "type-fest";

@@ -41,6 +41,7 @@ jobs:
       # Upload as artifact with manual trigger timestamp
       - name: Upload database backup
         uses: actions/upload-artifact@v4
+        if: hashFiles('snapshots.sqlite') != ''
         with:
           name: database-backup-manual-${{ github.run_id }}
           path: |
@@ -51,12 +52,15 @@ jobs:
       - name: Summary
         run: |
           echo "## Database Backup Complete" >> $GITHUB_STEP_SUMMARY
-          echo "- **Artifact Name**: database-backup-manual-${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Retention**: 90 days" >> $GITHUB_STEP_SUMMARY
 
           if [ -f snapshots.sqlite ]; then
             SIZE=$(du -h snapshots.sqlite | cut -f1)
+            echo "- **Artifact Name**: database-backup-manual-${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
             echo "- **Database Size**: $SIZE" >> $GITHUB_STEP_SUMMARY
+            echo "- **Retention**: 90 days" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- **Status**: ⚠️ No database found in cache" >> $GITHUB_STEP_SUMMARY
+            echo "- **Action**: Run a translation workflow first to create the database" >> $GITHUB_STEP_SUMMARY
           fi
 
   database-restore:
@@ -72,6 +76,17 @@ jobs:
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
+
+      - name: Cache node_modules
+        id: cache-deps
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+
+      - name: Install dependencies
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+        run: bun install --frozen-lockfile
 
       # Download specified artifact
       - name: Download database artifact
@@ -118,7 +133,15 @@ jobs:
         with:
           bun-version: latest
 
+      - name: Cache node_modules
+        id: cache-deps
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+
       - name: Install dependencies
+        if: steps.cache-deps.outputs.cache-hit != 'true'
         run: bun install --frozen-lockfile
 
       # Restore current database from cache
@@ -178,6 +201,17 @@ jobs:
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
+
+      - name: Cache node_modules
+        id: cache-deps
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+
+      - name: Install dependencies
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+        run: bun install --frozen-lockfile
 
       # Restore current database from cache
       - name: Restore SQLite cache

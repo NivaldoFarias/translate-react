@@ -83,8 +83,7 @@ For detailed setup instructions, see [GitHub Actions Setup Guide](../../docs/GIT
 **Variables** (Settings → Secrets and variables → Actions → Variables):
 - `REPO_FORK_OWNER`, `REPO_FORK_NAME` - Your fork details
 - `REPO_UPSTREAM_OWNER`, `REPO_UPSTREAM_NAME` - Upstream repository
-- `TARGET_LANGUAGE` - Translation target (e.g., `pt-BR`)
-- `TRANSLATION_BASE_PATH` - Path to translate (default: `src/content`)
+- `TARGET_LANGUAGE` - Translation target (e.g., `pt-br`)
 
 ---
 

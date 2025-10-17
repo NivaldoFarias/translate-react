@@ -146,6 +146,7 @@ export const environmentDefaults = {
 	BATCH_SIZE: 1,
 	TARGET_LANGUAGE: "pt-br",
 	SOURCE_LANGUAGE: "en",
+	DEV_MODE_FORK_PR: false,
 
 	/** @see {@link https://github.com/reactjs/pt-br.react.dev/issues/555|Docs Progress Issue (pt-BR)} */
 	PROGRESS_ISSUE_NUMBER: 555,

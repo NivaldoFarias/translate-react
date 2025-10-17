@@ -141,7 +141,7 @@ const envSchema = z.object({
 	 *
 	 * @default false
 	 */
-	DEV_MODE_FORK_PR: z.stringbool().default(false),
+	DEV_MODE_FORK_PR: z.stringbool().default(environmentDefaults.DEV_MODE_FORK_PR),
 
 	/**
 	 * The URL of the application to override the default URL.
