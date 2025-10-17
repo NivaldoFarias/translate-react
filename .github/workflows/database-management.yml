@@ -12,6 +12,14 @@ on:
           - restore
           - clean
           - inspect
+      environment:
+        description: "Target environment (development or production)"
+        required: true
+        type: choice
+        options:
+          - development
+          - production
+        default: development
       artifact_run_id:
         description: "Run ID to restore from (for restore action)"
         required: false
@@ -22,28 +30,29 @@ jobs:
     name: Backup Database
     runs-on: ubuntu-latest
     if: inputs.action == 'backup'
+    environment: ${{ inputs.environment }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Restore current database from cache
+      # Restore current database from cache (environment-specific)
       - name: Restore SQLite cache
         uses: actions/cache/restore@v4
         with:
           path: |
             snapshots.sqlite
             snapshots.sqlite-journal
-          key: sqlite-cache-${{ github.repository }}-
+          key: sqlite-cache-${{ github.repository }}-${{ inputs.environment }}-
           restore-keys: |
-            sqlite-cache-${{ github.repository }}-
+            sqlite-cache-${{ github.repository }}-${{ inputs.environment }}-
 
       # Upload as artifact with manual trigger timestamp
       - name: Upload database backup
         uses: actions/upload-artifact@v4
         if: hashFiles('snapshots.sqlite') != ''
         with:
-          name: database-backup-manual-${{ github.run_id }}
+          name: database-backup-${{ inputs.environment }}-manual-${{ github.run_id }}
           path: |
             snapshots.sqlite
             snapshots.sqlite-journal
@@ -52,10 +61,11 @@ jobs:
       - name: Summary
         run: |
           echo "## Database Backup Complete" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
 
           if [ -f snapshots.sqlite ]; then
             SIZE=$(du -h snapshots.sqlite | cut -f1)
-            echo "- **Artifact Name**: database-backup-manual-${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Artifact Name**: database-backup-${{ inputs.environment }}-manual-${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
             echo "- **Database Size**: $SIZE" >> $GITHUB_STEP_SUMMARY
             echo "- **Retention**: 90 days" >> $GITHUB_STEP_SUMMARY
           else
@@ -67,6 +77,7 @@ jobs:
     name: Restore Database
     runs-on: ubuntu-latest
     if: inputs.action == 'restore'
+    environment: ${{ inputs.environment }}
 
     steps:
       - name: Checkout repository
@@ -104,25 +115,27 @@ jobs:
 
           bun run db:validate
 
-      # Save restored database to cache
+      # Save restored database to cache (environment-specific)
       - name: Save to cache
         uses: actions/cache/save@v4
         with:
           path: |
             snapshots.sqlite
             snapshots.sqlite-journal
-          key: sqlite-cache-${{ github.repository }}-restored-${{ github.run_id }}
+          key: sqlite-cache-${{ github.repository }}-${{ inputs.environment }}-restored-${{ github.run_id }}
 
       - name: Summary
         run: |
           echo "## Database Restore Complete" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Source Run ID**: ${{ inputs.artifact_run_id }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **New Cache Key**: sqlite-cache-${{ github.repository }}-restored-${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **New Cache Key**: sqlite-cache-${{ github.repository }}-${{ inputs.environment }}-restored-${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
 
   database-clean:
     name: Clean Old Snapshots
     runs-on: ubuntu-latest
     if: inputs.action == 'clean'
+    environment: ${{ inputs.environment }}
 
     steps:
       - name: Checkout repository
@@ -144,22 +157,22 @@ jobs:
         if: steps.cache-deps.outputs.cache-hit != 'true'
         run: bun install --frozen-lockfile
 
-      # Restore current database from cache
+      # Restore current database from cache (environment-specific)
       - name: Restore SQLite cache
         uses: actions/cache/restore@v4
         with:
           path: |
             snapshots.sqlite
             snapshots.sqlite-journal
-          key: sqlite-cache-${{ github.repository }}-
+          key: sqlite-cache-${{ github.repository }}-${{ inputs.environment }}-
           restore-keys: |
-            sqlite-cache-${{ github.repository }}-
+            sqlite-cache-${{ github.repository }}-${{ inputs.environment }}-
 
       # Create backup before cleaning
       - name: Backup before cleaning
         uses: actions/upload-artifact@v4
         with:
-          name: database-backup-before-clean-${{ github.run_id }}
+          name: database-backup-${{ inputs.environment }}-before-clean-${{ github.run_id }}
           path: |
             snapshots.sqlite
             snapshots.sqlite-journal
@@ -169,19 +182,20 @@ jobs:
       - name: Clean old snapshots
         run: bun run db:clean -- --keep 10
 
-      # Save cleaned database to cache
+      # Save cleaned database to cache (environment-specific)
       - name: Save cleaned database
         uses: actions/cache/save@v4
         with:
           path: |
             snapshots.sqlite
             snapshots.sqlite-journal
-          key: sqlite-cache-${{ github.repository }}-cleaned-${{ github.run_id }}
+          key: sqlite-cache-${{ github.repository }}-${{ inputs.environment }}-cleaned-${{ github.run_id }}
 
       - name: Summary
         run: |
           echo "## Database Cleanup Complete" >> $GITHUB_STEP_SUMMARY
-          echo "- **Backup Created**: database-backup-before-clean-${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Backup Created**: database-backup-${{ inputs.environment }}-before-clean-${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
 
           if [ -f snapshots.sqlite ]; then
             SIZE=$(du -h snapshots.sqlite | cut -f1)
@@ -192,6 +206,7 @@ jobs:
     name: Inspect Database
     runs-on: ubuntu-latest
     if: inputs.action == 'inspect'
+    environment: ${{ inputs.environment }}
 
     steps:
       - name: Checkout repository
@@ -213,16 +228,16 @@ jobs:
         if: steps.cache-deps.outputs.cache-hit != 'true'
         run: bun install --frozen-lockfile
 
-      # Restore current database from cache
+      # Restore current database from cache (environment-specific)
       - name: Restore SQLite cache
         uses: actions/cache/restore@v4
         with:
           path: |
             snapshots.sqlite
             snapshots.sqlite-journal
-          key: sqlite-cache-${{ github.repository }}-
+          key: sqlite-cache-${{ github.repository }}-${{ inputs.environment }}-
           restore-keys: |
-            sqlite-cache-${{ github.repository }}-
+            sqlite-cache-${{ github.repository }}-${{ inputs.environment }}-
 
       # Generate database report
       - name: Generate database report
@@ -238,13 +253,14 @@ jobs:
       - name: Upload report
         uses: actions/upload-artifact@v4
         with:
-          name: database-report-${{ github.run_id }}
+          name: database-report-${{ inputs.environment }}-${{ github.run_id }}
           path: database-report.txt
           retention-days: 30
 
       - name: Summary
         run: |
           echo "## Database Inspection Report" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           cat database-report.txt >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY

@@ -1,8 +1,17 @@
 name: Sync and Translate
 
 on:
-  # Manual trigger
+  # Manual trigger with environment selection
   workflow_dispatch:
+    inputs:
+      environment:
+        description: "Deployment environment"
+        required: true
+        type: choice
+        options:
+          - development
+          - production
+        default: development
 
   # Scheduled check for upstream changes (runs every 6 hours)
   schedule:
@@ -68,6 +77,8 @@ jobs:
     if: ${{ vars.NODE_ENV != '' && vars.TRANSLATION_ENABLED == 'true' && vars.REPO_UPSTREAM_OWNER != '' && vars.REPO_UPSTREAM_NAME != '' && vars.REPO_FORK_OWNER != '' && vars.REPO_FORK_NAME != '' && vars.TARGET_LANGUAGE != '' && needs.check-upstream-changes.outputs.has-changes == 'true' }}
     runs-on: ubuntu-latest
     needs: check-upstream-changes
+    # Use environment from workflow input (manual trigger) or SCHEDULED_ENVIRONMENT variable (scheduled/webhook)
+    environment: ${{ inputs.environment || vars.SCHEDULED_ENVIRONMENT || 'production' }}
 
     steps:
       - name: Checkout fork
@@ -106,15 +117,16 @@ jobs:
           git push origin main
 
       # Restore SQLite database from previous runs
+      # Cache is environment-specific to prevent dev/prod database conflicts
       - name: Restore SQLite cache
         uses: actions/cache/restore@v4
         with:
           path: |
             snapshots.sqlite
             snapshots.sqlite-journal
-          key: sqlite-cache-${{ github.repository }}-${{ github.run_id }}
+          key: sqlite-cache-${{ github.repository }}-${{ github.environment }}-${{ github.run_id }}
           restore-keys: |
-            sqlite-cache-${{ github.repository }}-
+            sqlite-cache-${{ github.repository }}-${{ github.environment }}-
 
       - name: Create .env file
         run: |
@@ -140,6 +152,7 @@ jobs:
         timeout-minutes: 120
 
       # Save SQLite database for next run
+      # Cache is environment-specific to prevent dev/prod database conflicts
       - name: Save SQLite cache
         uses: actions/cache/save@v4
         if: always()
@@ -147,7 +160,7 @@ jobs:
           path: |
             snapshots.sqlite
             snapshots.sqlite-journal
-          key: sqlite-cache-${{ github.repository }}-${{ github.run_id }}
+          key: sqlite-cache-${{ github.repository }}-${{ github.environment }}-${{ github.run_id }}
 
       # Upload database as artifact for debugging/recovery
       - name: Upload database artifact
@@ -173,6 +186,7 @@ jobs:
         if: always()
         run: |
           echo "## Translation Workflow Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: ${{ inputs.environment || vars.SCHEDULED_ENVIRONMENT || 'production' }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Upstream Commit**: ${{ needs.check-upstream-changes.outputs.latest-commit }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Workflow Run**: ${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
