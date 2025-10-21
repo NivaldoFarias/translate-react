@@ -610,11 +610,7 @@ export abstract class BaseRunnerService {
 		);
 	}
 
-	/**
-	 * Updates the progress issue with the translation results
-	 *
-	 * @throws {APIError} If commenting on the issue fails
-	 */
+	/** Updates the progress issue with the translation results */
 	protected async updateIssueWithResults(): Promise<void> {
 		logger.info("Commenting on issue...");
 
@@ -1008,7 +1004,6 @@ export abstract class BaseRunnerService {
 	 *
 	 * 1. **Conflict Notice** (conditional): GFM note about existing invalid PRs
 	 * 2. **Translation Overview**: Target language and AI-generated disclaimer
-	 * 3. **Review Guidelines**: Checklist for human review
 	 * 4. **Processing Statistics**: File sizes, compression ratio, timing
 	 * 5. **Technical Information**: Model, version, branch details
 	 *
@@ -1055,16 +1050,6 @@ ${conflictNotice}
 > [!IMPORTANT]
 > This translation was generated using AI/LLM and requires human review for accuracy, cultural context, and technical terminology.
 
-## Review Guidelines
-
-Please review this translation for:
-
-- [ ] **Accuracy**: Content meaning preserved from source
-- [ ] **Technical Terms**: Proper translation of React/development terminology
-- [ ] **Cultural Context**: Appropriate localization for target audience
-- [ ] **Formatting**: Markdown syntax and code blocks maintained
-- [ ] **Links**: Internal references and external links work correctly
-
 <details>
 <summary>Translation Details</summary>
 
@@ -1094,11 +1079,7 @@ Please review this translation for:
 ## Additional Resources
 
 - [Source Repository](${homepage}): Workflow and tooling details
-- [Translation Workflow Documentation](${homepage}#readme): Process overview and guidelines
-
----
-
-**Questions or suggestions?** Feel free to leave comments or request changes to improve the translation quality.`;
+- [Translation Workflow Documentation](${homepage}#readme): Process overview and guidelines`;
 	}
 
 	/**
