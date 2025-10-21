@@ -30,7 +30,7 @@ concurrency:
 jobs:
   sync-and-translate:
     name: Sync Fork and Run Translation
-    if: ${{ vars.NODE_ENV != '' && vars.TRANSLATION_ENABLED == 'true' && vars.REPO_UPSTREAM_OWNER != '' && vars.REPO_UPSTREAM_NAME != '' && vars.REPO_FORK_OWNER != '' && vars.REPO_FORK_NAME != '' && vars.TARGET_LANGUAGE != '' }}
+    if: ${{ vars.TRANSLATION_ENABLED == 'true' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment || vars.SCHEDULED_ENVIRONMENT || 'production' }}
 
