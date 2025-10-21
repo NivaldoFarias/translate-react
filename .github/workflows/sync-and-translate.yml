@@ -66,7 +66,7 @@ jobs:
         run: |
           git remote add upstream https://github.com/${{ vars.REPO_UPSTREAM_OWNER }}/${{ vars.REPO_UPSTREAM_NAME }}.git || true
           git fetch upstream
-          git checkout main
+          git checkout -B main origin/main
           git merge upstream/main --ff-only || git merge upstream/main -X theirs --allow-unrelated-histories
           git push origin main
 
