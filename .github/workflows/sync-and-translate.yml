@@ -38,7 +38,7 @@ jobs:
       - name: Checkout fork
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.WORKFLOW_GITHUB_TOKEN }}
           fetch-depth: 0
 
       - name: Setup Bun
@@ -56,19 +56,6 @@ jobs:
       - name: Install dependencies
         if: steps.cache-deps.outputs.cache-hit != 'true'
         run: bun install --frozen-lockfile
-
-      - name: Configure Git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-      - name: Add upstream remote and sync
-        run: |
-          git remote add upstream https://github.com/${{ vars.REPO_UPSTREAM_OWNER }}/${{ vars.REPO_UPSTREAM_NAME }}.git || true
-          git fetch upstream
-          git checkout -B main origin/main
-          git merge upstream/main --ff-only || git merge upstream/main -X theirs --allow-unrelated-histories
-          git push origin main
 
       # Restore SQLite database from previous runs
       # Cache is environment-specific to prevent dev/prod database conflicts
