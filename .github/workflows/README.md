@@ -283,31 +283,3 @@ This will trigger the `repository_dispatch` event in your fork.
 **Symptom**: Multiple workflows running simultaneously
 
 **Solution**: The `concurrency` setting prevents this, but if you manually trigger multiple times, cancel old runs
-
----
-
-## Future Enhancements
-
-- [ ] Add workflow for PR review automation
-- [ ] Implement database backup to cloud storage (S3, GCS)
-- [ ] Add notification system (Slack, Discord, email)
-- [ ] Create dashboard for translation progress
-- [ ] Add rollback mechanism for failed translations
-- [ ] Implement A/B testing for translation quality
-
----
-
-## Support
-
-For issues or questions:
-
-1. Check workflow logs in Actions tab
-2. Download and inspect artifacts
-3. Open an issue in the repository
-4. Review the main project documentation
-
----
-
-## License
-
-Same as the parent project (MIT).

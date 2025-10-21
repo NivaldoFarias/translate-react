@@ -68,6 +68,25 @@ export default class RunnerService extends BaseRunnerService {
 
 			logger.info("Translation workflow completed successfully");
 
+			if (
+				env.NODE_ENV === RuntimeEnvironment.Development &&
+				this.state.processedResults.length > 0
+			) {
+				const commentBuilder = this.services.github.content["services"].commentBuilder;
+				const commentContent = commentBuilder.concatComment(
+					commentBuilder.buildComment(this.state.processedResults, this.state.filesToTranslate),
+				);
+
+				logger.debug(
+					{
+						comment: commentContent,
+						resultsCount: this.state.processedResults.length,
+						filesCount: this.state.filesToTranslate.length,
+					},
+					"Generated GitHub issue comment (dev mode - not posted)",
+				);
+			}
+
 			if (this.shouldUpdateIssueComment) {
 				await this.updateIssueWithResults();
 			}
