@@ -66,13 +66,14 @@ export const logger = pino({
 		targets: [
 			/**
 			 * File transport - structured JSON logs
-			 * Creates log files in logs/ directory with ISO timestamp
+			 * Creates log files in logs/ directory with filesystem-safe timestamp
+			 * Format: YYYY-MM-DDTHH-mm-ss-sssZ (colons replaced with hyphens for NTFS compatibility)
 			 */
 			{
 				target: "pino/file",
 				level: "debug",
 				options: {
-					destination: `${process.cwd()}/logs/${new Date().toISOString()}.pino.log`,
+					destination: `${process.cwd()}/logs/${new Date().toISOString().replace(/:/g, "-")}.pino.log`,
 					mkdir: true,
 				},
 			},

@@ -7,6 +7,7 @@ import {
 	REACT_TRANSLATION_LANGUAGES,
 	RuntimeEnvironment,
 } from "./constants.util";
+import { logger } from "./logger.util";
 
 /**
  * Creates a secure token validation schema with common security checks.
@@ -232,7 +233,11 @@ export type Environment = z.infer<typeof envSchema>;
  */
 export function validateEnv() {
 	try {
-		return envSchema.parse(import.meta.env);
+		const env = envSchema.parse(import.meta.env);
+
+		logger.info("Environment variables successfully validated");
+
+		return env;
 	} catch (error) {
 		if (error instanceof z.ZodError) {
 			const issues = error.issues
