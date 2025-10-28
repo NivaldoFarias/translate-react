@@ -18,7 +18,7 @@ import {
 	LLMErrorHelper,
 	TranslationValidationError,
 } from "@/errors/";
-import { RateLimiterService } from "@/services/rate-limiter/";
+import { CONFIGS, RateLimiterService } from "@/services/rate-limiter/";
 import { env, LANGUAGE_SPECIFIC_RULES, logger, MAX_CHUNK_TOKENS } from "@/utils/";
 
 import { LanguageDetectorService } from "./language-detector.service";
@@ -113,7 +113,7 @@ export class TranslatorService {
 	 * @param rateLimiter Optional rate limiter instance (creates new one if not provided)
 	 */
 	constructor(rateLimiter?: RateLimiterService) {
-		this.rateLimiter = rateLimiter ?? new RateLimiterService();
+		this.rateLimiter = rateLimiter ?? new RateLimiterService({ llm: CONFIGS.freeLLM });
 	}
 
 	/**
@@ -739,7 +739,7 @@ export class TranslatorService {
 				"Calling language model for translation",
 			);
 
-			const completion = await this.rateLimiter.scheduleLLM(() =>
+			const completion = await this.rateLimiter.schedule("llm", () =>
 				this.llm.chat.completions.create({
 					model: env.LLM_MODEL,
 					temperature: 0.1,

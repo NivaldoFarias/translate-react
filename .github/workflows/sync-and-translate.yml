@@ -13,10 +13,6 @@ on:
           - production
         default: development
 
-  # Scheduled check for upstream changes (runs every 6 hours)
-  schedule:
-    - cron: "0 */6 * * *"
-
   # Trigger when a webhook is received from upstream repo
   # Note: This requires setting up a GitHub webhook from the upstream repo
   repository_dispatch:
