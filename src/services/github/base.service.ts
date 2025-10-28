@@ -3,7 +3,7 @@ import { Octokit } from "@octokit/rest";
 import type { components } from "@octokit/openapi-types";
 
 import { GithubErrorHelper, LLMErrorHelper } from "@/errors/";
-import { RateLimiterService } from "@/services/rate-limiter/";
+import { CONFIGS, RateLimiterService } from "@/services/rate-limiter/";
 import { env, logger } from "@/utils/";
 
 /** GitHub repository metadata for fork and upstream repositories */
@@ -83,7 +83,7 @@ export abstract class BaseGitHubService {
 			},
 		});
 
-		this.rateLimiter = rateLimiter ?? new RateLimiterService();
+		this.rateLimiter = rateLimiter ?? new RateLimiterService({ github: CONFIGS.githubAPI });
 	}
 
 	/**
@@ -105,6 +105,6 @@ export abstract class BaseGitHubService {
 	 * ```
 	 */
 	protected async withRateLimit<T>(fn: () => Promise<T>, priority?: number): Promise<T> {
-		return this.rateLimiter.scheduleGitHub(fn, priority);
+		return this.rateLimiter.schedule("github", fn, priority);
 	}
 }

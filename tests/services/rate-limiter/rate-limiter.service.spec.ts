@@ -9,19 +9,17 @@
 
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 
-import {
-	FREE_LLM_RATE_LIMITER_CONFIG,
-	GITHUB_RATE_LIMITER_CONFIG,
-	PAID_LLM_RATE_LIMITER_CONFIG,
-	RateLimiterService,
-} from "@/services/rate-limiter/";
+import { CONFIGS, RateLimiterService } from "@/services/rate-limiter/";
 
 describe("RateLimiterService", () => {
 	let rateLimiter: RateLimiterService;
 	let shutdownCalled = false;
 
 	beforeEach(() => {
-		rateLimiter = new RateLimiterService();
+		rateLimiter = new RateLimiterService({
+			github: CONFIGS.githubAPI,
+			llm: CONFIGS.freeLLM,
+		});
 		shutdownCalled = false;
 	});
 
@@ -39,15 +37,18 @@ describe("RateLimiterService", () => {
 			const githubMetrics = rateLimiter.getMetrics("github");
 			const llmMetrics = rateLimiter.getMetrics("llm");
 
-			expect(githubMetrics.totalRequests).toBe(0);
-			expect(githubMetrics.queuedRequests).toBe(0);
-			expect(githubMetrics.runningRequests).toBe(0);
-			expect(githubMetrics.failedRequests).toBe(0);
+			expect(githubMetrics).toBeDefined();
+			expect(llmMetrics).toBeDefined();
 
-			expect(llmMetrics.totalRequests).toBe(0);
-			expect(llmMetrics.queuedRequests).toBe(0);
-			expect(llmMetrics.runningRequests).toBe(0);
-			expect(llmMetrics.failedRequests).toBe(0);
+			expect(githubMetrics!.totalRequests).toBe(0);
+			expect(githubMetrics!.queuedRequests).toBe(0);
+			expect(githubMetrics!.runningRequests).toBe(0);
+			expect(githubMetrics!.failedRequests).toBe(0);
+
+			expect(llmMetrics!.totalRequests).toBe(0);
+			expect(llmMetrics!.queuedRequests).toBe(0);
+			expect(llmMetrics!.runningRequests).toBe(0);
+			expect(llmMetrics!.failedRequests).toBe(0);
 		});
 
 		test("should accept custom configurations", () => {
@@ -59,10 +60,35 @@ describe("RateLimiterService", () => {
 			expect(customRateLimiter).toBeDefined();
 		});
 
-		test("should use paid LLM config when specified", () => {
-			const paidRateLimiter = new RateLimiterService({ usePaidLLM: true });
+		test("should support different LLM tiers", () => {
+			const freeLimiter = new RateLimiterService({ llm: CONFIGS.freeLLM });
+			const paidLimiter = new RateLimiterService({ llm: CONFIGS.paidLLM });
 
-			expect(paidRateLimiter).toBeDefined();
+			expect(freeLimiter).toBeDefined();
+			expect(paidLimiter).toBeDefined();
+		});
+
+		test("should list registered services", () => {
+			const services = rateLimiter.getRegisteredServices();
+
+			expect(services).toContain("github");
+			expect(services).toContain("llm");
+			expect(services).toHaveLength(2);
+		});
+
+		test("should support dynamic service registration", () => {
+			const limiter = new RateLimiterService({
+				github: CONFIGS.githubAPI,
+			});
+
+			limiter.registerService("custom-api", {
+				maxConcurrent: 3,
+				minTime: 500,
+			});
+
+			const services = limiter.getRegisteredServices();
+			expect(services).toContain("github");
+			expect(services).toContain("custom-api");
 		});
 	});
 
@@ -70,26 +96,28 @@ describe("RateLimiterService", () => {
 		test("should schedule GitHub API requests", async () => {
 			const mockFn = mock(() => Promise.resolve({ data: "test" }));
 
-			const result = await rateLimiter.scheduleGitHub(mockFn);
+			const result = await rateLimiter.schedule("github", mockFn);
 
 			expect(result).toEqual({ data: "test" });
 			expect(mockFn).toHaveBeenCalledTimes(1);
 
 			const metrics = rateLimiter.getMetrics("github");
-			expect(metrics.totalRequests).toBe(1);
+			expect(metrics).toBeDefined();
+			expect(metrics!.totalRequests).toBe(1);
 		});
 
 		test("should handle multiple concurrent GitHub requests", async () => {
 			const mockFn = mock(() => Promise.resolve({ data: "test" }));
 
-			const requests = Array.from({ length: 5 }, () => rateLimiter.scheduleGitHub(mockFn));
+			const requests = Array.from({ length: 5 }, () => rateLimiter.schedule("github", mockFn));
 
 			await Promise.all(requests);
 
 			expect(mockFn).toHaveBeenCalledTimes(5);
 
 			const metrics = rateLimiter.getMetrics("github");
-			expect(metrics.totalRequests).toBe(5);
+			expect(metrics).toBeDefined();
+			expect(metrics!.totalRequests).toBe(5);
 		});
 
 		test("should respect rate limits for GitHub API", async () => {
@@ -98,9 +126,9 @@ describe("RateLimiterService", () => {
 
 			// Schedule 3 requests in quick succession
 			await Promise.all([
-				rateLimiter.scheduleGitHub(mockFn),
-				rateLimiter.scheduleGitHub(mockFn),
-				rateLimiter.scheduleGitHub(mockFn),
+				rateLimiter.schedule("github", mockFn),
+				rateLimiter.schedule("github", mockFn),
+				rateLimiter.schedule("github", mockFn),
 			]);
 
 			const endTime = Date.now();
@@ -111,17 +139,19 @@ describe("RateLimiterService", () => {
 			expect(duration).toBeGreaterThanOrEqual(1000);
 
 			const metrics = rateLimiter.getMetrics("github");
-			expect(metrics.totalRequests).toBe(3);
+			expect(metrics).toBeDefined();
+			expect(metrics!.totalRequests).toBe(3);
 		});
 
 		test("should handle GitHub API errors", async () => {
 			const mockError = new Error("GitHub API Error");
 			const mockFn = mock(() => Promise.reject(mockError));
 
-			await expect(rateLimiter.scheduleGitHub(mockFn)).rejects.toThrow("GitHub API Error");
+			await expect(rateLimiter.schedule("github", mockFn)).rejects.toThrow("GitHub API Error");
 
 			const metrics = rateLimiter.getMetrics("github");
-			expect(metrics.failedRequests).toBe(1);
+			expect(metrics).toBeDefined();
+			expect(metrics!.failedRequests).toBe(1);
 		});
 
 		test("should support request prioritization", async () => {
@@ -141,9 +171,9 @@ describe("RateLimiterService", () => {
 			});
 
 			// Schedule low priority first with delay, then high priority immediately
-			const lowPromise = rateLimiter.scheduleGitHub(mockLowPriority, 1);
+			const lowPromise = rateLimiter.schedule("github", mockLowPriority, 1);
 			await delay(50); // Small delay to ensure low priority is queued first
-			const highPromise = rateLimiter.scheduleGitHub(mockHighPriority, 10);
+			const highPromise = rateLimiter.schedule("github", mockHighPriority, 10);
 
 			await Promise.all([lowPromise, highPromise]);
 
@@ -157,13 +187,14 @@ describe("RateLimiterService", () => {
 		test("should schedule LLM API requests", async () => {
 			const mockFn = mock(() => Promise.resolve({ choices: [{ message: { content: "test" } }] }));
 
-			const result = await rateLimiter.scheduleLLM(mockFn);
+			const result = await rateLimiter.schedule("llm", mockFn);
 
 			expect(result).toEqual({ choices: [{ message: { content: "test" } }] });
 			expect(mockFn).toHaveBeenCalledTimes(1);
 
 			const metrics = rateLimiter.getMetrics("llm");
-			expect(metrics.totalRequests).toBe(1);
+			expect(metrics).toBeDefined();
+			expect(metrics!.totalRequests).toBe(1);
 		});
 
 		test("should enforce sequential execution for free LLM tier", async () => {
@@ -201,9 +232,9 @@ describe("RateLimiterService", () => {
 
 			// Schedule multiple requests
 			const promises = [
-				testRateLimiter.scheduleLLM(mockFn1),
-				testRateLimiter.scheduleLLM(mockFn2),
-				testRateLimiter.scheduleLLM(mockFn3),
+				testRateLimiter.schedule("llm", mockFn1),
+				testRateLimiter.schedule("llm", mockFn2),
+				testRateLimiter.schedule("llm", mockFn3),
 			];
 
 			await Promise.all(promises);
@@ -218,7 +249,8 @@ describe("RateLimiterService", () => {
 			}
 
 			const metrics = testRateLimiter.getMetrics("llm");
-			expect(metrics.totalRequests).toBe(3);
+			expect(metrics).toBeDefined();
+			expect(metrics!.totalRequests).toBe(3);
 
 			await testRateLimiter.shutdown();
 		}, 10_000); // Increase timeout to 10s
@@ -227,11 +259,12 @@ describe("RateLimiterService", () => {
 			const mockError = new Error("Rate limit exceeded");
 			const mockFn = mock(() => Promise.reject(mockError));
 
-			await expect(rateLimiter.scheduleLLM(mockFn)).rejects.toThrow("Rate limit exceeded");
+			await expect(rateLimiter.schedule("llm", mockFn)).rejects.toThrow("Rate limit exceeded");
 
 			const metrics = rateLimiter.getMetrics("llm");
-			expect(metrics.failedRequests).toBe(1);
-			expect(metrics.lastError).toBe("Rate limit exceeded");
+			expect(metrics).toBeDefined();
+			expect(metrics!.failedRequests).toBe(1);
+			expect(metrics!.lastError).toBe("Rate limit exceeded");
 		});
 	});
 
@@ -239,30 +272,32 @@ describe("RateLimiterService", () => {
 		test("should track GitHub metrics accurately", async () => {
 			const mockFn = mock(() => Promise.resolve({ data: "test" }));
 
-			await rateLimiter.scheduleGitHub(mockFn);
-			await rateLimiter.scheduleGitHub(mockFn);
+			await rateLimiter.schedule("github", mockFn);
+			await rateLimiter.schedule("github", mockFn);
 
 			const metrics = rateLimiter.getMetrics("github");
 
-			expect(metrics.totalRequests).toBe(2);
-			expect(metrics.runningRequests).toBe(0);
-			expect(metrics.queuedRequests).toBe(0);
-			expect(metrics.failedRequests).toBe(0);
-			expect(metrics.lastRequestTime).toBeInstanceOf(Date);
+			expect(metrics).toBeDefined();
+			expect(metrics!.totalRequests).toBe(2);
+			expect(metrics!.runningRequests).toBe(0);
+			expect(metrics!.queuedRequests).toBe(0);
+			expect(metrics!.failedRequests).toBe(0);
+			expect(metrics!.lastRequestTime).toBeInstanceOf(Date);
 		});
 
 		test("should track LLM metrics accurately", async () => {
 			const mockFn = mock(() => Promise.resolve({ data: "test" }));
 
-			await rateLimiter.scheduleLLM(mockFn);
+			await rateLimiter.schedule("llm", mockFn);
 
 			const metrics = rateLimiter.getMetrics("llm");
 
-			expect(metrics.totalRequests).toBe(1);
-			expect(metrics.runningRequests).toBe(0);
-			expect(metrics.queuedRequests).toBe(0);
-			expect(metrics.failedRequests).toBe(0);
-			expect(metrics.lastRequestTime).toBeInstanceOf(Date);
+			expect(metrics).toBeDefined();
+			expect(metrics!.totalRequests).toBe(1);
+			expect(metrics!.runningRequests).toBe(0);
+			expect(metrics!.queuedRequests).toBe(0);
+			expect(metrics!.failedRequests).toBe(0);
+			expect(metrics!.lastRequestTime).toBeInstanceOf(Date);
 		});
 
 		test("should return immutable metrics copies", () => {
@@ -276,11 +311,13 @@ describe("RateLimiterService", () => {
 
 	describe("Queue Management", () => {
 		test("should clear GitHub queue", async () => {
-			const testRateLimiter = new RateLimiterService();
+			const testRateLimiter = new RateLimiterService({
+				github: CONFIGS.githubAPI,
+			});
 			const mockFn = mock(() => new Promise((resolve) => setTimeout(resolve, 5000)));
 
 			// Schedule requests that will be queued
-			const promises = Array.from({ length: 5 }, () => testRateLimiter.scheduleGitHub(mockFn));
+			const promises = Array.from({ length: 5 }, () => testRateLimiter.schedule("github", mockFn));
 
 			// Wait a bit for requests to queue
 			await new Promise((resolve) => setTimeout(resolve, 100));
@@ -291,7 +328,8 @@ describe("RateLimiterService", () => {
 			await expect(Promise.all(promises)).rejects.toThrow();
 
 			const metrics = testRateLimiter.getMetrics("github");
-			expect(metrics.queuedRequests).toBe(0);
+			expect(metrics).toBeDefined();
+			expect(metrics!.queuedRequests).toBe(0);
 
 			// Properly shutdown (clearQueue already calls stop)
 			try {
@@ -302,11 +340,13 @@ describe("RateLimiterService", () => {
 		});
 
 		test("should clear LLM queue", async () => {
-			const testRateLimiter = new RateLimiterService();
+			const testRateLimiter = new RateLimiterService({
+				llm: CONFIGS.freeLLM,
+			});
 			const mockFn = mock(() => new Promise((resolve) => setTimeout(resolve, 5000)));
 
 			// Schedule requests that will be queued
-			const promises = Array.from({ length: 3 }, () => testRateLimiter.scheduleLLM(mockFn));
+			const promises = Array.from({ length: 3 }, () => testRateLimiter.schedule("llm", mockFn));
 
 			// Wait a bit for requests to queue
 			await new Promise((resolve) => setTimeout(resolve, 100));
@@ -317,7 +357,8 @@ describe("RateLimiterService", () => {
 			await expect(Promise.all(promises)).rejects.toThrow();
 
 			const metrics = testRateLimiter.getMetrics("llm");
-			expect(metrics.queuedRequests).toBe(0);
+			expect(metrics).toBeDefined();
+			expect(metrics!.queuedRequests).toBe(0);
 
 			// Properly shutdown (clearQueue already calls stop)
 			try {
@@ -332,27 +373,32 @@ describe("RateLimiterService", () => {
 		test("should shut down gracefully", async () => {
 			const mockFn = mock(() => Promise.resolve({ data: "test" }));
 
-			await rateLimiter.scheduleGitHub(mockFn);
-			await rateLimiter.scheduleLLM(mockFn);
+			await rateLimiter.schedule("github", mockFn);
+			await rateLimiter.schedule("llm", mockFn);
 
 			const githubMetrics = rateLimiter.getMetrics("github");
 			const llmMetrics = rateLimiter.getMetrics("llm");
 
-			expect(githubMetrics.totalRequests).toBe(1);
-			expect(llmMetrics.totalRequests).toBe(1);
+			expect(githubMetrics).toBeDefined();
+			expect(llmMetrics).toBeDefined();
+			expect(githubMetrics!.totalRequests).toBe(1);
+			expect(llmMetrics!.totalRequests).toBe(1);
 
 			await rateLimiter.shutdown();
 			shutdownCalled = true;
 		});
 
 		test("should handle shutdown with pending requests", async () => {
-			const testRateLimiter = new RateLimiterService();
+			const testRateLimiter = new RateLimiterService({
+				github: CONFIGS.githubAPI,
+				llm: CONFIGS.freeLLM,
+			});
 			const mockFn = mock(() => new Promise((resolve) => setTimeout(resolve, 5000)));
 
 			// Schedule long-running requests
 			const promises = [
-				testRateLimiter.scheduleGitHub(mockFn),
-				testRateLimiter.scheduleLLM(mockFn),
+				testRateLimiter.schedule("github", mockFn),
+				testRateLimiter.schedule("llm", mockFn),
 			];
 
 			// Shutdown immediately
@@ -364,22 +410,22 @@ describe("RateLimiterService", () => {
 	});
 
 	describe("Configuration Presets", () => {
-		test("GITHUB_RATE_LIMITER_CONFIG should have correct values", () => {
-			expect(GITHUB_RATE_LIMITER_CONFIG.maxConcurrent).toBe(10);
-			expect(GITHUB_RATE_LIMITER_CONFIG.minTime).toBe(720);
-			expect(GITHUB_RATE_LIMITER_CONFIG.reservoir).toBe(5);
+		test("PRESETS.githubAPI should have correct values", () => {
+			expect(CONFIGS.githubAPI.maxConcurrent).toBe(10);
+			expect(CONFIGS.githubAPI.minTime).toBe(720);
+			expect(CONFIGS.githubAPI.reservoir).toBe(5);
 		});
 
-		test("FREE_LLM_RATE_LIMITER_CONFIG should enforce strict limits", () => {
-			expect(FREE_LLM_RATE_LIMITER_CONFIG.maxConcurrent).toBe(1);
-			expect(FREE_LLM_RATE_LIMITER_CONFIG.minTime).toBe(60_000);
-			expect(FREE_LLM_RATE_LIMITER_CONFIG.reservoir).toBe(1);
+		test("PRESETS.freeLLM should enforce strict limits", () => {
+			expect(CONFIGS.freeLLM.maxConcurrent).toBe(1);
+			expect(CONFIGS.freeLLM.minTime).toBe(60_000);
+			expect(CONFIGS.freeLLM.reservoir).toBe(1);
 		});
 
-		test("PAID_LLM_RATE_LIMITER_CONFIG should allow more concurrency", () => {
-			expect(PAID_LLM_RATE_LIMITER_CONFIG.maxConcurrent).toBe(3);
-			expect(PAID_LLM_RATE_LIMITER_CONFIG.minTime).toBe(1000);
-			expect(PAID_LLM_RATE_LIMITER_CONFIG.reservoir).toBe(10);
+		test("PRESETS.paidLLM should allow more generous limits", () => {
+			expect(CONFIGS.paidLLM.maxConcurrent).toBe(3);
+			expect(CONFIGS.paidLLM.minTime).toBe(1000);
+			expect(CONFIGS.paidLLM.reservoir).toBe(10);
 		});
 	});
 });

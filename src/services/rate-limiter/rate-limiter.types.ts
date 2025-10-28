@@ -1,22 +1,4 @@
 /**
- * @fileoverview
- *
- * Type definitions for rate limiting functionality.
- *
- * Provides configuration interfaces and types for rate limiting across
- * different API services (GitHub, LLM providers).
- */
-
-/**
- * Supported API service types for rate limiting.
- *
- * Each service type has different rate limit requirements:
- * - `github`: GitHub API (5000 requests/hour for authenticated users)
- * - `llm`: Language model providers (varies by provider and tier)
- */
-export type ServiceType = "github" | "llm";
-
-/**
  * Configuration for rate limiter behavior.
  *
  * Follows token bucket algorithm with configurable reservoir and refill rates.
