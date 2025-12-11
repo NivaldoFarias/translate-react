@@ -181,6 +181,8 @@ dist
 
 # Github Copilot
 .github/instructions/
+.github/prompts/
+.github/chat-modes/
 .github/copilot-instructions.md
 
 # SpecStory
