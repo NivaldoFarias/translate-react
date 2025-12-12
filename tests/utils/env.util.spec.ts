@@ -1,10 +1,3 @@
-/**
- * @fileoverview
- * Test suite for Environment Utilities
- *
- * Tests environment variable validation and parsing
- */
-
 import { beforeEach, describe, expect, test } from "bun:test";
 
 import { RuntimeEnvironment } from "@/utils/constants.util";

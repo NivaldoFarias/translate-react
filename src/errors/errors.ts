@@ -69,7 +69,7 @@ export class APIError extends TranslationError {
 	 */
 	constructor(endpoint: string, statusCode: number, context?: Partial<ErrorContext>) {
 		super(
-			`API request to "${endpoint}" failed with status ${statusCode}`,
+			`API request to "${endpoint}" failed with status ${String(statusCode)}`,
 			ErrorCode.ApiError,
 			context,
 		);

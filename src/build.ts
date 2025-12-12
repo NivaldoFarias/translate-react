@@ -11,11 +11,15 @@ import { join } from "node:path";
 
 import Bun from "bun";
 
+import { logger as baseLogger } from "./utils";
+
+const logger = baseLogger.child({ component: "build" });
+
 if (import.meta.main) {
 	try {
 		await build();
 	} catch (error) {
-		console.error("❌ Build failed:", error);
+		logger.error(error, "❌ Build failed:");
 		process.exit(1);
 	}
 }
@@ -32,11 +36,11 @@ async function build(): Promise<Bun.BuildOutput> {
 	const DIST_DIR = join(ROOT_DIR, "dist");
 	const SRC_DIR = join(ROOT_DIR, "src");
 
-	console.log("🔨 Building translate-react...");
+	logger.info("Building translate-react");
 
 	/* Clean previous build artifacts */
 	await rm(DIST_DIR, { recursive: true, force: true });
-	console.log("✓ Cleaned dist directory");
+	logger.info("Cleaned dist directory");
 
 	/* Bundle application with Bun */
 	const result = await Bun.build({
@@ -52,19 +56,19 @@ async function build(): Promise<Bun.BuildOutput> {
 	});
 
 	if (!result.success) {
-		console.error("❌ Build failed:");
+		logger.error("❌ Build failed:");
 
 		for (const log of result.logs) {
-			console.error(log);
+			logger.error(log);
 		}
 
 		throw new Error("Build process failed");
 	}
 
-	console.log(`✓ Bundled application to ${DIST_DIR}`);
-	console.log(`  - ${result.outputs.length} output file(s)`);
+	logger.info(`✓ Bundled application to ${DIST_DIR}`);
+	logger.info(`  - ${String(result.outputs.length)} output file(s)`);
 
-	console.log("✅ Build complete!");
+	logger.info("✅ Build complete");
 
 	return result;
 }

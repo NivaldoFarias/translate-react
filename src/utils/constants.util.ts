@@ -33,20 +33,6 @@ export const processSignals = {
 /** Standard error messages used throughout the application */
 export const errorMessages = {
 	invalidKey: (key: string) => `Invalid key: ${key}`,
-	snapshotSaveFailed: "Failed to save snapshot",
-	snapshotAppendFailed: (key: string) => `Failed to append ${key}`,
-	snapshotLoadFailed: "Failed to load snapshot",
-	snapshotClearFailed: "Failed to clear snapshots",
-	snapshotCleanupFailed: "Failed to cleanup snapshots",
-	snapshotForceClear: "Forcefully cleared all snapshots as requested by FORCE_SNAPSHOT_CLEAR",
-} as const;
-
-/** Keys used in snapshot data structure */
-export const snapshotKeys = {
-	repositoryTree: "repositoryTree",
-	filesToTranslate: "filesToTranslate",
-	processedResults: "processedResults",
-	timestamp: "timestamp",
 } as const;
 
 /** Maximum number of tokens that can be translated in a single request */
@@ -134,7 +120,6 @@ export const environmentDefaults = {
 	NODE_ENV: RuntimeEnvironment.Development,
 	BUN_ENV: RuntimeEnvironment.Development,
 	LOG_LEVEL: LogLevel.Info,
-	FORCE_SNAPSHOT_CLEAR: false,
 	OPENAI_BASE_URL: "https://openrouter.ai/api/v1",
 	HEADER_APP_TITLE: `${name} v${version}`,
 	HEADER_APP_URL: homepage,
@@ -146,7 +131,6 @@ export const environmentDefaults = {
 	BATCH_SIZE: 1,
 	TARGET_LANGUAGE: "pt-br",
 	SOURCE_LANGUAGE: "en",
-	DEV_MODE_FORK_PR: false,
 
 	/** @see {@link https://github.com/reactjs/pt-br.react.dev/issues/555|Docs Progress Issue (pt-BR)} */
 	PROGRESS_ISSUE_NUMBER: 555,

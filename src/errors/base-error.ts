@@ -50,7 +50,7 @@ export enum ErrorCode {
 }
 
 /** Base context interface for all translation errors */
-export interface ErrorContext {
+export interface ErrorContext<T extends Record<string, unknown> = Record<string, unknown>> {
 	/** The severity level of the error */
 	sanity: ErrorSeverity;
 
@@ -64,7 +64,7 @@ export interface ErrorContext {
 	file?: BunFile | string;
 
 	/** Additional metadata about the error */
-	metadata?: Record<string, unknown>;
+	metadata?: T;
 
 	/** The timestamp when the error occurred */
 	timestamp?: Date;
@@ -75,7 +75,9 @@ export interface ErrorContext {
  *
  * Extends the native Error class with additional context and tracking capabilities
  */
-export class TranslationError extends Error {
+export class TranslationError<
+	T extends Record<string, unknown> = Record<string, unknown>,
+> extends Error {
 	/** Standardized error code */
 	public readonly code: ErrorCode;
 
@@ -83,7 +85,7 @@ export class TranslationError extends Error {
 	public readonly timestamp: Date;
 
 	/** Additional context about the error */
-	public readonly context: ErrorContext;
+	public readonly context: ErrorContext<T>;
 
 	/**
 	 * Initializes a new instance of the `TranslationError` class.
@@ -93,7 +95,7 @@ export class TranslationError extends Error {
 	constructor(
 		message: string,
 		code: ErrorCode = ErrorCode.UnknownError,
-		context: Partial<ErrorContext> = {},
+		context: Partial<ErrorContext<T>> = {},
 	) {
 		super(message);
 		this.name = this.constructor.name;

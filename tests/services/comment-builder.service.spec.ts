@@ -1,11 +1,3 @@
-/**
- * @fileoverview Tests for the {@link CommentBuilderService}.
- *
- * This suite covers hierarchical comment building, path simplification,
- * structure formatting, and GitHub issue comment generation functionality
- * for the translation workflow result presentation.
- */
-
 import { RestEndpointMethodTypes } from "@octokit/rest";
 import { beforeEach, describe, expect, test } from "bun:test";
 
@@ -26,14 +18,14 @@ describe("CommentBuilderService", () => {
 		return {
 			number: prNumber,
 			id: prNumber,
-			node_id: `PR_${prNumber}`,
-			url: `https://api.github.com/repos/test/test/pulls/${prNumber}`,
-			html_url: `https://github.com/test/test/pull/${prNumber}`,
-			diff_url: `https://github.com/test/test/pull/${prNumber}.diff`,
-			patch_url: `https://github.com/test/test/pull/${prNumber}.patch`,
-			issue_url: `https://github.com/test/test/issues/${prNumber}`,
-			commits_url: `https://api.github.com/repos/test/test/pulls/${prNumber}/commits`,
-			review_comments_url: `https://api.github.com/repos/test/test/pulls/${prNumber}/comments`,
+			node_id: `PR_${String(prNumber)}`,
+			url: `https://api.github.com/repos/test/test/pulls/${String(prNumber)}`,
+			html_url: `https://github.com/test/test/pull/${String(prNumber)}`,
+			diff_url: `https://github.com/test/test/pull/${String(prNumber)}.diff`,
+			patch_url: `https://github.com/test/test/pull/${String(prNumber)}.patch`,
+			issue_url: `https://github.com/test/test/issues/${String(prNumber)}`,
+			commits_url: `https://api.github.com/repos/test/test/pulls/${String(prNumber)}/commits`,
+			review_comments_url: `https://api.github.com/repos/test/test/pulls/${String(prNumber)}/comments`,
 		} as unknown as RestEndpointMethodTypes["pulls"]["list"]["response"]["data"][number];
 	};
 
@@ -434,20 +426,20 @@ describe("CommentBuilderService", () => {
 			const results: ProcessedFileResult[] = [];
 			const filesToTranslate: TranslationFile[] = [];
 
-			for (let i = 1; i <= 50; i++) {
+			for (let index = 1; index <= 50; index++) {
 				results.push({
-					filename: `file-${i.toString().padStart(2, "0")}.md`,
+					filename: `file-${index.toString().padStart(2, "0")}.md`,
 					branch: null,
-					translation: `# File ${i}`,
-					pullRequest: createMockPrData(100 + i),
+					translation: `# File ${String(index)}`,
+					pullRequest: createMockPrData(100 + index),
 					error: null,
 				});
 
 				filesToTranslate.push({
-					filename: `file-${i.toString().padStart(2, "0")}.md`,
-					path: `src/content/docs/batch/file-${i.toString().padStart(2, "0")}.md`,
-					content: `# File ${i}`,
-					sha: `sha_file_${i}`,
+					filename: `file-${index.toString().padStart(2, "0")}.md`,
+					path: `src/content/docs/batch/file-${index.toString().padStart(2, "0")}.md`,
+					content: `# File ${String(index)}`,
+					sha: `sha_file_${String(index)}`,
 				});
 			}
 

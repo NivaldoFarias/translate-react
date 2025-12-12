@@ -1,10 +1,3 @@
-/**
- * @fileoverview Tests for LLM error mapping helper
- *
- * Tests error mapping for OpenAI API errors, rate limit detection,
- * and generic error handling for language model operations.
- */
-
 import { describe, expect, test } from "bun:test";
 import { APIError } from "openai/error";
 

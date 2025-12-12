@@ -1,6 +1,6 @@
 import type { ProcessedFileResult } from "@/services/runner/";
 
-import { env } from "@/utils/";
+import { env, logger } from "@/utils/";
 
 import { TranslationFile } from "./translator.service";
 
@@ -16,6 +16,8 @@ export interface HierarchicalStructure {
 
 /** Service for building comments based on translation results */
 export class CommentBuilderService {
+	private readonly logger = logger.child({ component: CommentBuilderService.name });
+
 	/**
 	 * Builds a hierarchical comment for GitHub issues based on translation results.
 	 *
@@ -54,7 +56,7 @@ export class CommentBuilderService {
 				return {
 					pathParts: this.simplifyPathParts(pathParts),
 					filename: translationFile.filename,
-					prNumber: result.pullRequest?.number || 0,
+					prNumber: result.pullRequest?.number ?? 0,
 				};
 			})
 			.filter(Boolean);
@@ -139,11 +141,11 @@ export class CommentBuilderService {
 	 * ```
 	 */
 	private buildHierarchicalComment(
-		data: Array<{
+		data: {
 			pathParts: string[];
 			filename: string;
 			prNumber: number;
-		}>,
+		}[],
 	): string {
 		data.sort((a, b) => {
 			const pathA = a.pathParts.join("/");
@@ -158,10 +160,7 @@ export class CommentBuilderService {
 			let currentLevel = structure;
 
 			for (const part of item.pathParts) {
-				if (!currentLevel[part]) {
-					currentLevel[part] = { files: [] };
-				}
-
+				currentLevel[part] ??= { files: [] };
 				currentLevel = currentLevel[part] as HierarchicalStructure;
 			}
 
@@ -225,7 +224,7 @@ export class CommentBuilderService {
 			);
 
 			for (const file of sortedFiles) {
-				lines.push(`${indent}  - \`${file.filename}\`: #${file.prNumber}`);
+				lines.push(`${indent}  - \`${file.filename}\`: #${String(file.prNumber)}`);
 			}
 
 			const subDirs = Object.keys(currentLevel).filter((key) => key !== "files");

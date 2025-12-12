@@ -2,7 +2,7 @@ import Bottleneck from "bottleneck";
 
 import type { RateLimiterConfig, RateLimiterMetrics } from "./rate-limiter.types";
 
-import { logger } from "@/utils/";
+import { logger } from "@/utils";
 
 import { DEFAULT_RATE_LIMITER_METRICS } from "./rate-limiter.config";
 
@@ -41,6 +41,8 @@ import { DEFAULT_RATE_LIMITER_METRICS } from "./rate-limiter.config";
  * ```
  */
 export class RateLimiterService {
+	private readonly logger = logger.child({ component: RateLimiterService.name });
+
 	/** Rate limiter instances for registered services */
 	private readonly limiters: Map<string, Bottleneck>;
 
@@ -78,7 +80,7 @@ export class RateLimiterService {
 			this.registerService(serviceId, config);
 		}
 
-		logger.info(
+		this.logger.info(
 			{ services: Array.from(this.limiters.keys()), count: this.limiters.size },
 			"Rate limiter service initialized with registered services",
 		);
@@ -112,7 +114,7 @@ export class RateLimiterService {
 		const limiter = this.createLimiter(serviceId, config);
 		this.limiters.set(serviceId, limiter);
 
-		logger.info(
+		this.logger.info(
 			{
 				service: serviceId,
 				config: {
@@ -156,7 +158,7 @@ export class RateLimiterService {
 			metrics.queuedRequests++;
 
 			if (config.debug) {
-				logger.debug(
+				this.logger.debug(
 					{ service: serviceId, queued: metrics.queuedRequests, running: metrics.runningRequests },
 					"Request queued",
 				);
@@ -169,7 +171,7 @@ export class RateLimiterService {
 			metrics.queuedRequests = Math.max(0, metrics.queuedRequests - 1);
 
 			if (config.debug) {
-				logger.debug(
+				this.logger.debug(
 					{ service: serviceId, running: metrics.runningRequests, queued: metrics.queuedRequests },
 					"Request executing",
 				);
@@ -183,7 +185,7 @@ export class RateLimiterService {
 			metrics.lastRequestTime = new Date();
 
 			if (config.debug) {
-				logger.debug(
+				this.logger.debug(
 					{ service: serviceId, total: metrics.totalRequests, running: metrics.runningRequests },
 					"Request completed",
 				);
@@ -195,7 +197,7 @@ export class RateLimiterService {
 			metrics.failedRequests++;
 			metrics.lastError = error.message;
 
-			logger.warn(
+			this.logger.warn(
 				{
 					service: serviceId,
 					error: error.message,
@@ -208,7 +210,7 @@ export class RateLimiterService {
 
 		/** Warn when queue size exceeds high water mark */
 		limiter.on("depleted", () => {
-			logger.warn(
+			this.logger.warn(
 				{ service: serviceId, queued: metrics.queuedRequests, highWater: config.highWater },
 				"Rate limiter queue depleted (high water mark reached)",
 			);
@@ -348,9 +350,12 @@ export class RateLimiterService {
 
 		const queuedCount = metrics.queuedRequests;
 
-		limiter.stop({ dropWaitingJobs: true });
+		void limiter.stop({ dropWaitingJobs: true });
 
-		logger.warn({ service: serviceId, clearedJobs: queuedCount }, "Rate limiter queue cleared");
+		this.logger.warn(
+			{ service: serviceId, clearedJobs: queuedCount },
+			"Rate limiter queue cleared",
+		);
 
 		metrics.queuedRequests = 0;
 	}
@@ -370,7 +375,7 @@ export class RateLimiterService {
 	 * ```
 	 */
 	public async shutdown(): Promise<void> {
-		logger.info(
+		this.logger.info(
 			{ services: Array.from(this.limiters.keys()), count: this.limiters.size },
 			"Shutting down rate limiters...",
 		);
@@ -386,6 +391,6 @@ export class RateLimiterService {
 			finalMetrics[serviceId] = metrics;
 		}
 
-		logger.info({ metrics: finalMetrics }, "Rate limiters shut down");
+		this.logger.info({ metrics: finalMetrics }, "Rate limiters shut down");
 	}
 }

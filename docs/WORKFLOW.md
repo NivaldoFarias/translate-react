@@ -135,8 +135,7 @@ flowchart TD
     
     H --> I{Sync Success?}
     I -->|No| J[Throw InitializationError]
-    I -->|Yes| K[Clear Snapshot Cache]
-    K --> G
+    I -->|Yes| G
     
     style D fill:#ffebee,stroke:#d32f2f
     style J fill:#ffebee,stroke:#d32f2f
@@ -153,7 +152,6 @@ flowchart TD
 2. **Fork Synchronization** (`syncFork`)
    - Compares latest commit SHAs (fork vs upstream)
    - Executes merge if out of sync
-   - Clears snapshot cache on sync (prevents stale data)
 
 **GitHub API Calls**:
 

@@ -1,10 +1,3 @@
-/**
- * @fileoverview Tests for the {@link ContentService}.
- *
- * This suite covers content retrieval, file operations, commit creation,
- * and pull request management for GitHub-based translation workflow.
- */
-
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 
 import { ContentService } from "@/services/github/content.service";
@@ -56,7 +49,7 @@ describe("ContentService", () => {
 		expect(files[0]?.sha).toBe("abc123");
 	});
 
-	test("should commit translation", async () => {
+	test("should commit translation", () => {
 		const mockBranch = {
 			ref: "refs/heads/translate/test",
 			node_id: "branch-node-id",
@@ -154,7 +147,7 @@ describe("ContentService", () => {
 		expect(content).toBe("# Test Content");
 	});
 
-	test("should handle file content errors", async () => {
+	test("should handle file content errors", () => {
 		// @ts-expect-error - Mocking private property
 		contentService.octokit = {
 			git: {

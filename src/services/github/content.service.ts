@@ -57,7 +57,8 @@ export interface PullRequestStatus {
  * - Content filtering and validation
  */
 export class ContentService extends BaseGitHubService {
-	private readonly issueNumber = Number(env.PROGRESS_ISSUE_NUMBER);
+	private readonly logger = logger.child({ component: ContentService.name });
+	private readonly issueNumber = env.PROGRESS_ISSUE_NUMBER;
 	private readonly services = {
 		commentBuilder: new CommentBuilderService(),
 	};
@@ -83,7 +84,10 @@ export class ContentService extends BaseGitHubService {
 				}),
 			);
 
-			logger.info({ prNumber, commentId: response.data.id }, "Comment created on pull request");
+			this.logger.info(
+				{ prNumber, commentId: response.data.id },
+				"Comment created on pull request",
+			);
 
 			return response;
 		} catch (error) {
@@ -110,7 +114,7 @@ export class ContentService extends BaseGitHubService {
 				}),
 			);
 
-			logger.debug({ count: response.data.length }, "Listed open pull requests");
+			this.logger.debug({ count: response.data.length }, "Listed open pull requests");
 
 			return response.data;
 		} catch (error) {
@@ -137,7 +141,7 @@ export class ContentService extends BaseGitHubService {
 				pull_number: prNumber,
 			});
 
-			logger.debug(
+			this.logger.debug(
 				{ prNumber, title: response.data.title, state: response.data.state },
 				"Found pull request by number",
 			);
@@ -179,7 +183,7 @@ export class ContentService extends BaseGitHubService {
 
 			const filePaths = response.data.map((file) => file.filename);
 
-			logger.debug({ prNumber, fileCount: filePaths.length }, "Fetched PR changed files");
+			this.logger.debug({ prNumber, fileCount: filePaths.length }, "Fetched PR changed files");
 
 			return filePaths;
 		} catch (error) {
@@ -211,8 +215,8 @@ export class ContentService extends BaseGitHubService {
 				recursive: "true",
 			});
 
-			if (!repoTreeResponse.data.tree) {
-				logger.warn({ fork: this.repositories.fork }, "Repository tree is empty");
+			if (!repoTreeResponse.data.tree.length) {
+				this.logger.warn({ fork: this.repositories.fork }, "Repository tree is empty");
 				throw this.helpers.github.mapError(new Error("Repository tree is empty"), {
 					operation: "ContentService.getUntranslatedFiles",
 					metadata: { fork: this.repositories.fork },
@@ -222,7 +226,7 @@ export class ContentService extends BaseGitHubService {
 			const markdownFiles = this.filterMarkdownFiles(repoTreeResponse.data.tree);
 			const filesToProcess = maxFiles ? markdownFiles.slice(0, maxFiles) : markdownFiles;
 
-			logger.info(
+			this.logger.info(
 				{
 					totalMarkdownFiles: markdownFiles.length,
 					filesToProcess: filesToProcess.length,
@@ -240,7 +244,7 @@ export class ContentService extends BaseGitHubService {
 					const response = await this.withRateLimit(() =>
 						this.octokit.repos.getContent({
 							...this.repositories.fork,
-							path: file.path!,
+							path: file.path ?? "",
 						}),
 					);
 
@@ -250,10 +254,10 @@ export class ContentService extends BaseGitHubService {
 						path: file.path,
 						content: Buffer.from(response.data.content, "base64").toString(),
 						sha: response.data.sha,
-						filename: file.path.split("/").pop()!,
+						filename: file.path.split("/").pop() ?? "",
 					});
 				} catch (error) {
-					logger.debug(
+					this.logger.debug(
 						{ filePath: file.path, error },
 						"Skipping file - could not retrieve content",
 					);
@@ -261,7 +265,10 @@ export class ContentService extends BaseGitHubService {
 				}
 			}
 
-			logger.info({ filesRetrieved: files.length }, "Successfully retrieved untranslated files");
+			this.logger.info(
+				{ filesRetrieved: files.length },
+				"Successfully retrieved untranslated files",
+			);
 
 			return files;
 		} catch (error) {
@@ -316,7 +323,7 @@ export class ContentService extends BaseGitHubService {
 				sha: file.sha,
 			});
 
-			logger.info(
+			this.logger.info(
 				{
 					filePath: file.path,
 					branch: branch.ref,
@@ -362,10 +369,8 @@ export class ContentService extends BaseGitHubService {
 		baseBranch = "main",
 	}: PullRequestOptions): Promise<RestEndpointMethodTypes["pulls"]["create"]["response"]["data"]> {
 		try {
-			const { env } = await import("@/utils/");
-
-			const targetRepo = env.DEV_MODE_FORK_PR ? this.repositories.fork : this.repositories.upstream;
-			const headRef = env.DEV_MODE_FORK_PR ? branch : `${this.repositories.fork.owner}:${branch}`;
+			const targetRepo = this.repositories.upstream;
+			const headRef = `${this.repositories.fork.owner}:${branch}`;
 
 			const createPullRequestResponse = await this.octokit.pulls.create({
 				...targetRepo,
@@ -376,14 +381,13 @@ export class ContentService extends BaseGitHubService {
 				maintainer_can_modify: true,
 			});
 
-			logger.info(
+			this.logger.info(
 				{
 					prNumber: createPullRequestResponse.data.number,
 					title,
 					targetRepo: targetRepo.owner,
 					headRef,
 					baseBranch,
-					devMode: env.DEV_MODE_FORK_PR,
 				},
 				"Pull request created successfully",
 			);
@@ -426,7 +430,7 @@ export class ContentService extends BaseGitHubService {
 			const blobSha = file.sha;
 
 			if (!blobSha) {
-				logger.warn({ file }, "Invalid blob SHA - file missing SHA property");
+				this.logger.warn({ file }, "Invalid blob SHA - file missing SHA property");
 				throw this.helpers.github.mapError(new Error("Invalid blob SHA"), {
 					operation: "ContentService.getFileContent",
 					metadata: { filePath: file.path },
@@ -440,7 +444,7 @@ export class ContentService extends BaseGitHubService {
 
 			const content = Buffer.from(response.data.content, "base64").toString();
 
-			logger.debug(
+			this.logger.debug(
 				{
 					filePath: file.path,
 					blobSha,
@@ -491,12 +495,16 @@ export class ContentService extends BaseGitHubService {
 				issue_number: this.issueNumber,
 			});
 
-			if (!issueExistsResponse.data) {
-				logger.warn({ issueNumber: this.issueNumber }, "Issue not found");
-				throw this.helpers.github.mapError(new Error(`Issue ${this.issueNumber} not found`), {
-					operation: "ContentService.commentCompiledResultsOnIssue",
-					metadata: { issueNumber: this.issueNumber, upstream: this.repositories.upstream },
-				});
+			if (issueExistsResponse.data.state === "closed") {
+				this.logger.warn({ issueNumber: this.issueNumber }, "Issue closed");
+
+				throw this.helpers.github.mapError(
+					new Error(`Issue ${String(this.issueNumber)} is closed`),
+					{
+						operation: "ContentService.commentCompiledResultsOnIssue",
+						metadata: { issueNumber: this.issueNumber, upstream: this.repositories.upstream },
+					},
+				);
 			}
 
 			const listCommentsResponse = await this.octokit.issues.listComments({
@@ -513,7 +521,7 @@ export class ContentService extends BaseGitHubService {
 			});
 
 			if (userComment) {
-				logger.debug({ commentId: userComment.id }, "Updating existing comment on issue");
+				this.logger.debug({ commentId: userComment.id }, "Updating existing comment on issue");
 
 				const updateCommentResponse = await this.octokit.issues.updateComment({
 					...this.repositories.upstream,
@@ -524,7 +532,7 @@ export class ContentService extends BaseGitHubService {
 					comment_id: userComment.id,
 				});
 
-				logger.info(
+				this.logger.info(
 					{
 						issueNumber: this.issueNumber,
 						commentId: updateCommentResponse.data.id,
@@ -535,7 +543,7 @@ export class ContentService extends BaseGitHubService {
 				return updateCommentResponse.data;
 			}
 
-			logger.debug("No existing comment found - creating new comment");
+			this.logger.debug("No existing comment found - creating new comment");
 
 			const createCommentResponse = await this.octokit.issues.createComment({
 				...this.repositories.upstream,
@@ -545,7 +553,7 @@ export class ContentService extends BaseGitHubService {
 				),
 			});
 
-			logger.info(
+			this.logger.info(
 				{
 					issueNumber: this.issueNumber,
 					commentId: createCommentResponse.data.id,
@@ -584,7 +592,7 @@ export class ContentService extends BaseGitHubService {
 
 			const pr = response.data[0];
 
-			logger.debug(
+			this.logger.debug(
 				{ branchName, found: !!pr, prNumber: pr?.number },
 				"Searched for pull request by branch",
 			);
@@ -651,7 +659,7 @@ export class ContentService extends BaseGitHubService {
 			const hasConflicts = pr.mergeable === false && pr.mergeable_state === "dirty";
 			const needsUpdate = hasConflicts;
 
-			logger.info(
+			this.logger.info(
 				{
 					prNumber,
 					hasConflicts,
@@ -693,15 +701,7 @@ export class ContentService extends BaseGitHubService {
 				state: "closed",
 			});
 
-			if (response.status !== 200) {
-				logger.error({ prNumber, status: response.status }, "Failed to close pull request");
-				throw this.helpers.github.mapError(new Error(`Failed to close pull request ${prNumber}`), {
-					operation: "ContentService.closePullRequest",
-					metadata: { prNumber, status: response.status },
-				});
-			}
-
-			logger.info({ prNumber }, "Pull request closed successfully");
+			this.logger.info({ prNumber }, "Pull request closed successfully");
 
 			return response.data;
 		} catch (error) {

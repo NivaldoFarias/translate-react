@@ -1,10 +1,3 @@
-/**
- * @fileoverview Tests for {@link TranslationError}
- *
- * Validates error hierarchy, context preservation, serialization,
- * and custom error behavior.
- */
-
 import { describe, expect, test } from "bun:test";
 
 import { ErrorCode, TranslationError } from "@/errors/base-error";

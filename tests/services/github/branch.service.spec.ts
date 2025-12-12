@@ -1,26 +1,10 @@
-/**
- * @fileoverview Tests for the {@link BranchService}.
- *
- * This test suite covers Git branch operations including branch creation, deletion,
- * cleanup management, and fork commit verification. Tests include proper error handling,
- * cleanup handlers, branch tracking, and GitHub API integration patterns.
- *
- * Key test coverage areas:
- * - Branch lifecycle management (create, get, delete)
- * - Active branch tracking and cleanup
- * - Process termination signal handling
- * - Fork commit verification
- * - Error scenarios and recovery
- * - GitHub API response validation
- */
-
 import { Octokit } from "@octokit/rest";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { StatusCodes } from "http-status-codes";
 
 import { BranchService } from "@/services/github/branch.service";
 
-mock.module("@/utils/env.util", () => ({
+void mock.module("@/utils/env.util", () => ({
 	env: {
 		REPO_FORK_OWNER: "test-fork-owner",
 		REPO_FORK_NAME: "fork-repo",
@@ -158,29 +142,27 @@ describe("BranchService", () => {
 			expect(activeBranches).toContain("feature/test");
 		});
 
-		test("should handle branch creation errors and cleanup tracking", async () => {
+		test("should handle branch creation errors and cleanup tracking", () => {
 			// Override mock to simulate error
 			const errorMock = mock(() => Promise.reject(new Error("Branch creation failed")));
 
 			// @ts-expect-error - Overriding mock for specific test
 			branchService.octokit.git.createRef = errorMock;
 
-			await expect(branchService.createBranch("feature/test")).rejects.toThrow(
-				"Branch creation failed",
-			);
+			expect(branchService.createBranch("feature/test")).rejects.toThrow("Branch creation failed");
 
 			const activeBranches = Array.from(branchService.activeBranches);
 			expect(activeBranches).not.toContain("feature/test");
 		});
 
-		test("should handle base branch not found error", async () => {
+		test("should handle base branch not found error", () => {
 			// Override mock to simulate error
 			const errorMock = mock(() => Promise.reject(new Error("Reference not found")));
 
 			// @ts-expect-error - Overriding mock for specific test
 			branchService.octokit.git.getRef = errorMock;
 
-			await expect(branchService.createBranch("feature/test", "nonexistent")).rejects.toThrow(
+			expect(branchService.createBranch("feature/test", "nonexistent")).rejects.toThrow(
 				"Reference not found",
 			);
 		});
@@ -195,7 +177,7 @@ describe("BranchService", () => {
 			});
 
 			expect(result).not.toBeNull();
-			expect(result!.data.object.sha).toBe("abc123def456");
+			expect(result?.data.object.sha).toBe("abc123def456");
 		});
 
 		test("should return null for non-existent branch (404)", async () => {
@@ -211,7 +193,7 @@ describe("BranchService", () => {
 			expect(result).toBeNull();
 		});
 
-		test("should re-throw non-404 errors", async () => {
+		test("should re-throw non-404 errors", () => {
 			const error = new Error("Forbidden");
 			// @ts-expect-error - Adding status property to Error for testing
 			error.status = StatusCodes.FORBIDDEN;
@@ -220,7 +202,7 @@ describe("BranchService", () => {
 			// @ts-expect-error - Overriding mock for specific test
 			branchService.octokit.git.getRef = errorMock;
 
-			await expect(branchService.getBranch("protected")).rejects.toThrow("Forbidden");
+			expect(branchService.getBranch("protected")).rejects.toThrow("Forbidden");
 		});
 	});
 	describe("deleteBranch", () => {
@@ -246,7 +228,7 @@ describe("BranchService", () => {
 			// @ts-expect-error - Overriding mock for specific test
 			branchService.octokit.git.deleteRef = errorMock;
 
-			await expect(branchService.deleteBranch("feature/test")).rejects.toThrow("Deletion failed");
+			expect(branchService.deleteBranch("feature/test")).rejects.toThrow("Deletion failed");
 
 			// NOTE: Current implementation removes branch from tracking even on failure
 			// This is arguably a bug, but the test reflects actual behavior
@@ -362,7 +344,7 @@ describe("BranchService", () => {
 			await branchService.createBranch("feature/branch1");
 			await branchService.createBranch("feature/branch2");
 
-			// @ts-expect-error
+			// @ts-expect-error - Accessing protected method for testing
 			await branchService.cleanup();
 
 			expect(mockOctokit.git.deleteRef).toHaveBeenCalledTimes(2);
@@ -401,7 +383,7 @@ describe("BranchService", () => {
 			const activeBranches = Array.from(branchService.activeBranches);
 			expect(activeBranches).not.toContain("feature/test");
 		});
-		test("should handle rate limiting", async () => {
+		test("should handle rate limiting", () => {
 			const rateLimitError = new Error("API rate limit exceeded");
 			// @ts-expect-error - Adding status property to Error for testing
 			rateLimitError.status = StatusCodes.FORBIDDEN;
@@ -410,9 +392,7 @@ describe("BranchService", () => {
 			// @ts-expect-error - Overriding mock for specific test
 			branchService.octokit.git.createRef = errorMock;
 
-			await expect(branchService.createBranch("feature/test")).rejects.toThrow(
-				"API rate limit exceeded",
-			);
+			expect(branchService.createBranch("feature/test")).rejects.toThrow("API rate limit exceeded");
 		});
 	});
 	describe("Branch Name Validation", () => {

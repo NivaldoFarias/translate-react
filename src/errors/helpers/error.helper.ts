@@ -1,6 +1,15 @@
 import { RequestError } from "@octokit/request-error";
 
+import type { SetRequired } from "type-fest";
+
+import type { ErrorContext } from "@/errors/";
+
 import { ErrorCode, ErrorSeverity, TranslationError } from "@/errors/";
+
+export type MapErrorHelperContext<T extends Record<string, unknown>> = SetRequired<
+	Partial<ErrorContext<T>>,
+	"operation"
+>;
 
 export abstract class ErrorHelper {
 	/**
@@ -11,13 +20,10 @@ export abstract class ErrorHelper {
 	 *
 	 * @returns A {@link TranslationError} with appropriate code and context
 	 */
-	abstract mapError(
+	abstract mapError<T extends Record<string, unknown> = Record<string, unknown>>(
 		error: unknown,
-		context: {
-			operation: string;
-			metadata?: Record<string, unknown>;
-		},
-	): TranslationError;
+		context: MapErrorHelperContext<T>,
+	): TranslationError<T>;
 
 	/**
 	 * Determines the appropriate {@link ErrorCode} based on HTTP status code.
