@@ -1,10 +1,3 @@
-/**
- * @fileoverview Tests for the {@link LanguageDetectorService}.
- *
- * This suite covers language detection, translation analysis, and edge cases
- * for content language processing in the translation workflow.
- */
-
 import { beforeEach, describe, expect, test } from "bun:test";
 
 import { LanguageDetectorService } from "@/services/language-detector.service";

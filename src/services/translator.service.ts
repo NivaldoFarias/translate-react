@@ -82,6 +82,8 @@ export class TranslationFile {
  * ```
  */
 export class TranslatorService {
+	private readonly logger = logger.child({ component: TranslatorService.name });
+
 	/** Language model instance for translation */
 	private readonly llm = new OpenAI({
 		baseURL: env.OPENAI_BASE_URL,
@@ -153,7 +155,7 @@ export class TranslatorService {
 	 * ```
 	 */
 	public async translateContent(file: TranslationFile): Promise<string> {
-		if (!file.content?.length) {
+		if (!file.content.length) {
 			throw new EmptyContentError(file.filename, {
 				operation: "TranslatorService.translateContent",
 				file: file.path,
@@ -161,7 +163,7 @@ export class TranslatorService {
 			});
 		}
 
-		logger.debug(
+		this.logger.debug(
 			{
 				filename: file.filename,
 				contentLength: file.content.length,
@@ -176,7 +178,7 @@ export class TranslatorService {
 
 		this.validateTranslation(file, translatedContent);
 
-		logger.debug(
+		this.logger.debug(
 			{
 				filename: file.filename,
 				originalLength: file.content.length,
@@ -238,7 +240,7 @@ export class TranslatorService {
 
 		const sizeRatio = translatedContent.length / file.content.length;
 		if (sizeRatio < 0.5 || sizeRatio > 2.0) {
-			logger.warn(
+			this.logger.warn(
 				{
 					filename: file.filename,
 					sizeRatio: sizeRatio.toFixed(2),
@@ -249,11 +251,11 @@ export class TranslatorService {
 			);
 		}
 
-		const originalHeadings = (file.content.match(/^#{1,6}\s/gm) || []).length;
-		const translatedHeadings = (translatedContent.match(/^#{1,6}\s/gm) || []).length;
+		const originalHeadings = (file.content.match(/^#{1,6}\s/gm) ?? []).length;
+		const translatedHeadings = (translatedContent.match(/^#{1,6}\s/gm) ?? []).length;
 
 		if (originalHeadings > 0 && translatedHeadings === 0) {
-			logger.error(
+			this.logger.error(
 				{ filename: file.filename, originalHeadings, translatedHeadings },
 				"Translation lost all markdown headings",
 			);
@@ -276,7 +278,7 @@ export class TranslatorService {
 		if (originalHeadings > 0) {
 			const headingRatio = translatedHeadings / originalHeadings;
 			if (headingRatio < 0.8 || headingRatio > 1.2) {
-				logger.warn(
+				this.logger.warn(
 					{
 						filename: file.filename,
 						originalHeadings,
@@ -288,7 +290,7 @@ export class TranslatorService {
 			}
 		}
 
-		logger.debug(
+		this.logger.debug(
 			{
 				filename: file.filename,
 				sizeRatio: sizeRatio.toFixed(2),
@@ -308,12 +310,12 @@ export class TranslatorService {
 	 * @returns Resolves to `true` if content is already translated
 	 */
 	public async isContentTranslated(file: TranslationFile): Promise<boolean> {
-		if (!file.content?.length) return false;
+		if (!file.content.length) return false;
 
 		try {
 			const analysis = await this.languageDetector.analyzeLanguage(file.filename, file.content);
 
-			logger.debug(
+			this.logger.debug(
 				{
 					filename: file.filename,
 					isTranslated: analysis.isTranslated,
@@ -324,11 +326,11 @@ export class TranslatorService {
 
 			return analysis.isTranslated;
 		} catch (error) {
-			logger.error(
+			this.logger.error(
 				{
 					error,
 					filename: file.filename,
-					contentLength: file.content?.length || 0,
+					contentLength: file.content.length || 0,
 				},
 				"Error checking if content is translated - assuming not translated",
 			);
@@ -345,7 +347,7 @@ export class TranslatorService {
 	 * @returns Resolves to the detailed language analysis
 	 */
 	public async getLanguageAnalysis(file: TranslationFile) {
-		if (!file.content?.length) {
+		if (!file.content.length) {
 			throw new EmptyContentError(file.filename, {
 				operation: "TranslatorService.getLanguageAnalysis",
 				file: file.path,
@@ -482,8 +484,13 @@ export class TranslatorService {
 		let searchStartIndex = 0;
 
 		for (let index = 0; index < chunks.length - 1; index++) {
-			const currentChunk = chunks[index]!;
-			const nextChunk = chunks[index + 1]!;
+			const currentChunk = chunks[index];
+			const nextChunk = chunks[index + 1];
+
+			if (!currentChunk?.trim() || !nextChunk?.trim()) {
+				separators.push("\n\n");
+				continue;
+			}
 
 			const currentChunkIndex = content.indexOf(currentChunk.trim(), searchStartIndex);
 
@@ -566,14 +573,14 @@ export class TranslatorService {
 		const contentNeedsChunking = this.needsChunking(content);
 
 		if (!contentNeedsChunking) {
-			logger.debug({ contentLength: content.length }, "Content does not require chunking");
+			this.logger.debug({ contentLength: content.length }, "Content does not require chunking");
 			return await this.callLanguageModel(content);
 		}
 
 		const { chunks, separators } = await this.chunkContent(content);
 		const translatedChunks: string[] = [];
 
-		logger.debug(
+		this.logger.debug(
 			{
 				totalChunks: chunks.length,
 				originalContentLength: content.length,
@@ -586,7 +593,7 @@ export class TranslatorService {
 			const chunkStartTime = Date.now();
 
 			try {
-				logger.debug(
+				this.logger.debug(
 					{
 						chunkIndex: index + 1,
 						totalChunks: chunks.length,
@@ -601,7 +608,7 @@ export class TranslatorService {
 
 				const chunkDuration = Date.now() - chunkStartTime;
 
-				logger.info(
+				this.logger.info(
 					{
 						chunkIndex: index + 1,
 						totalChunks: chunks.length,
@@ -611,7 +618,7 @@ export class TranslatorService {
 					"Chunk translated successfully",
 				);
 
-				logger.debug(
+				this.logger.debug(
 					{
 						chunkIndex: index + 1,
 						originalLength: chunk.length,
@@ -621,7 +628,7 @@ export class TranslatorService {
 					"Chunk translation metrics",
 				);
 			} catch (error) {
-				logger.error(
+				this.logger.error(
 					{
 						error,
 						chunkIndex: index + 1,
@@ -653,7 +660,7 @@ export class TranslatorService {
 		 * the translation array was corrupted during processing.
 		 */
 		if (translatedChunks.length !== chunks.length) {
-			logger.error(
+			this.logger.error(
 				{
 					expectedChunks: chunks.length,
 					actualChunks: translatedChunks.length,
@@ -663,7 +670,7 @@ export class TranslatorService {
 			);
 
 			throw new ChunkProcessingError(
-				`Chunk count mismatch: expected ${chunks.length} chunks, but only ${translatedChunks.length} were translated`,
+				`Chunk count mismatch: expected ${String(chunks.length)} chunks, but only ${String(translatedChunks.length)} were translated`,
 				{
 					operation: "TranslatorService.translateWithChunking",
 					metadata: {
@@ -677,7 +684,7 @@ export class TranslatorService {
 			);
 		}
 
-		logger.debug(
+		this.logger.debug(
 			{
 				totalChunks: translatedChunks.length,
 				totalTranslatedLength: translatedChunks.reduce((sum, current) => sum + current.length, 0),
@@ -698,16 +705,16 @@ export class TranslatorService {
 		const translatedEndsWithNewline = reassembledContent.endsWith("\n");
 
 		if (originalEndsWithNewline && !translatedEndsWithNewline) {
-			const originalTrailingNewlines = content.match(/\n+$/)?.[0] ?? "";
+			const originalTrailingNewlines = /\n+$/.exec(content)?.[0] ?? "";
 			reassembledContent += originalTrailingNewlines;
 
-			logger.debug(
+			this.logger.debug(
 				{ addedTrailingNewlines: originalTrailingNewlines.length },
 				"Restored trailing newlines from original content",
 			);
 		}
 
-		logger.debug(
+		this.logger.debug(
 			{
 				reassembledLength: reassembledContent.length,
 				originalLength: content.length,
@@ -734,7 +741,7 @@ export class TranslatorService {
 		const systemPrompt = await this.getSystemPrompt(content);
 
 		try {
-			logger.debug(
+			this.logger.debug(
 				{ model: env.LLM_MODEL, contentLength: content.length, temperature: 0.1 },
 				"Calling language model for translation",
 			);
@@ -751,10 +758,10 @@ export class TranslatorService {
 				}),
 			);
 
-			const translatedContent = completion.choices[0]?.message?.content;
+			const translatedContent = completion.choices[0]?.message.content;
 
 			if (!translatedContent) {
-				logger.error({ model: env.LLM_MODEL }, "No content returned from language model");
+				this.logger.error({ model: env.LLM_MODEL }, "No content returned from language model");
 				throw new LLMErrorHelper().mapError(new Error("No content returned from language model"), {
 					operation: "TranslatorService.callLanguageModel",
 					metadata: {
@@ -764,7 +771,7 @@ export class TranslatorService {
 				});
 			}
 
-			logger.info(
+			this.logger.info(
 				{
 					model: env.LLM_MODEL,
 					translatedLength: translatedContent.length,
@@ -850,11 +857,11 @@ export class TranslatorService {
 
 		const languages = {
 			target:
-				this.languageDetector.getLanguageName(this.languageDetector.languages.target) ||
+				this.languageDetector.getLanguageName(this.languageDetector.languages.target) ??
 				"Brazilian Portuguese",
 			source:
 				detectedSourceCode ?
-					this.languageDetector.getLanguageName(detectedSourceCode) || "English"
+					(this.languageDetector.getLanguageName(detectedSourceCode) ?? "English")
 				:	"English",
 		};
 

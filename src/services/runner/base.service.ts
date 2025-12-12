@@ -14,8 +14,8 @@ import type { SetNonNullable, SetRequired } from "type-fest";
 import type { PullRequestOptions } from "@/services/github/";
 
 import { InitializationError, ResourceLoadError } from "@/errors/";
+import { LanguageCacheService } from "@/services/cache/";
 import { BranchService, ContentService, RepositoryService } from "@/services/github/";
-import { Snapshot, SnapshotService } from "@/services/snapshot.service";
 import { TranslationFile, TranslatorService } from "@/services/translator.service";
 import {
 	env,
@@ -28,11 +28,25 @@ import {
 } from "@/utils/";
 
 import { homepage, name, version } from "../../../package.json";
-import { DatabaseService } from "../database/database.service";
 
-export type RunnerState = Omit<Snapshot, "id">;
+export interface RunnerState {
+	repositoryTree: PatchedRepositoryItem[];
+	filesToTranslate: TranslationFile[];
+	processedResults: ProcessedFileResult[];
+	timestamp: number;
+
+	/**
+	 * Map of file paths to invalid PR information.
+	 *
+	 * Tracks files that have existing PRs with conflicts or unmergeable status.
+	 * Used to add informational notes when creating new PRs for these files.
+	 */
+	invalidPRsByFile?: Map<string, { prNumber: number; status: PullRequestStatus }>;
+}
 
 export abstract class BaseRunnerService {
+	protected logger = logger.child({ component: BaseRunnerService.name });
+
 	/**
 	 * Tracks progress for the current batch of files being processed
 	 *
@@ -67,11 +81,8 @@ export abstract class BaseRunnerService {
 		/** Translation service for content translation operations */
 		translator: new TranslatorService(),
 
-		/** Snapshot manager to persist and retrieve workflow state */
-		snapshot: new SnapshotService(),
-
-		/** Database service for persistent storage */
-		database: new DatabaseService(),
+		/** In-memory cache for language detection results */
+		languageCache: new LanguageCacheService(),
 	};
 
 	/** Statistics tracking for the translation process */
@@ -86,7 +97,7 @@ export abstract class BaseRunnerService {
 	 * Ensures graceful shutdown and cleanup of resources
 	 */
 	protected cleanup = () => {
-		logger.info("Shutting down gracefully...");
+		this.logger.info("Shutting down gracefully...");
 
 		setTimeout(() => void process.exit(0), 1000);
 	};
@@ -101,12 +112,8 @@ export abstract class BaseRunnerService {
 			batchSize: env.BATCH_SIZE,
 		},
 	) {
-		if (env.FORCE_SNAPSHOT_CLEAR) {
-			this.services.snapshot.clear();
-		}
-
 		setupSignalHandlers(this.cleanup, (message, error) => {
-			logger.error({ error, message }, "Signal handler triggered during cleanup");
+			this.logger.error({ error, message }, "Signal handler triggered during cleanup");
 		});
 	}
 
@@ -133,16 +140,12 @@ export abstract class BaseRunnerService {
 	 * @returns `true` if the fork is up to date, `false` otherwise
 	 */
 	protected async syncFork(): Promise<boolean> {
-		logger.info("Checking fork status...");
+		this.logger.info("Checking fork status...");
 
 		const isForkSynced = await this.services.github.repository.isForkSynced();
 
 		if (!isForkSynced) {
-			logger.info("Fork is out of sync, updating fork...");
-
-			if (env.NODE_ENV === RuntimeEnvironment.Development) {
-				await this.services.snapshot.clear();
-			}
+			this.logger.info("Fork is out of sync, updating fork...");
 
 			const syncSuccess = await this.services.github.repository.syncFork();
 			if (!syncSuccess) {
@@ -151,27 +154,12 @@ export abstract class BaseRunnerService {
 				});
 			}
 
-			logger.info("Fork synchronized with upstream repository");
+			this.logger.info("Fork synchronized with upstream repository");
 		} else {
-			logger.info("Fork is up to date");
+			this.logger.info("Fork is up to date");
 		}
 
 		return isForkSynced;
-	}
-
-	/**
-	 * Loads the latest snapshot from the snapshot service
-	 *
-	 * @param isForkSynced Whether the fork is up to date
-	 */
-	protected async loadSnapshot(isForkSynced: boolean): Promise<void> {
-		const latestSnapshot = await this.services.snapshot.loadLatest();
-
-		if (latestSnapshot && !isForkSynced) {
-			logger.info("Snapshot loaded from previous session");
-
-			this.state = latestSnapshot;
-		}
 	}
 
 	/**
@@ -180,32 +168,24 @@ export abstract class BaseRunnerService {
 	 * @throws {ResourceLoadError} If the repository tree or glossary fetch fails
 	 */
 	protected async fetchRepositoryTree(): Promise<void> {
-		if (!this.state.repositoryTree?.length) {
-			logger.info("Fetching repository content...");
-			const repositoryTree = await this.services.github.repository.getRepositoryTree();
+		this.logger.info("Fetching repository content...");
+		const repositoryTree = await this.services.github.repository.getRepositoryTree();
 
-			this.state.repositoryTree = repositoryTree.map((item) => {
-				const filename = item.path?.split("/").pop() ?? "";
+		this.state.repositoryTree = repositoryTree.map((item) => {
+			const filename = item.path?.split("/").pop() ?? "";
 
-				return { ...item, filename };
-			}) as PatchedRepositoryItem[];
+			return { ...item, filename };
+		}) as PatchedRepositoryItem[];
 
-			if (env.NODE_ENV === RuntimeEnvironment.Development) {
-				await this.services.snapshot.append("repositoryTree", this.state.repositoryTree);
-			}
+		this.logger.info("Repository tree fetched, fetching glossary...");
+		const glossary = await this.services.github.repository.fetchGlossary();
 
-			logger.info("Repository tree fetched, fetching glossary...");
-			const glossary = await this.services.github.repository.fetchGlossary();
-
-			if (!glossary) {
-				throw new ResourceLoadError("Failed to fetch glossary", { operation: "fetchGlossary" });
-			}
-
-			this.services.translator.glossary = glossary;
-			logger.info("Repository content fetched successfully");
-		} else {
-			logger.info("Repository tree already fetched (from snapshot)");
+		if (!glossary) {
+			throw new ResourceLoadError("Failed to fetch glossary", { operation: "fetchGlossary" });
 		}
+
+		this.services.translator.glossary = glossary;
+		this.logger.info("Repository content fetched successfully");
 	}
 
 	/**
@@ -234,7 +214,9 @@ export abstract class BaseRunnerService {
 	 */
 	protected async fetchFilesToTranslate(): Promise<void> {
 		if (this.state.filesToTranslate.length) {
-			logger.info(`Found ${this.state.filesToTranslate.length} files to translate (from snapshot)`);
+			this.logger.info(
+				`Found ${String(this.state.filesToTranslate.length)} files to translate (from snapshot)`,
+			);
 			return;
 		}
 
@@ -242,9 +224,9 @@ export abstract class BaseRunnerService {
 			(file, index, self) => index === self.findIndex((f) => f.path === file.path),
 		);
 
-		logger.info(`Processing ${uniqueFiles.length} files from repository tree...`);
+		this.logger.info(`Processing ${String(uniqueFiles.length)} files from repository tree...`);
 
-		const { candidateFiles, cacheHits } = await this.checkLanguageCache(uniqueFiles);
+		const { candidateFiles, cacheHits } = this.checkLanguageCache(uniqueFiles);
 		const { filesToFetch, numFilesWithPRs, invalidPRsByFile } =
 			await this.filterFilesByExistingPRs(candidateFiles);
 		const uncheckedFiles = await this.fetchFileContents(filesToFetch);
@@ -253,20 +235,18 @@ export abstract class BaseRunnerService {
 		const { numFilesFiltered, numFilesTooLarge } =
 			await this.detectAndCacheLanguages(uncheckedFiles);
 
-		if (env.NODE_ENV === RuntimeEnvironment.Development) {
-			await this.services.snapshot.append("filesToTranslate", this.state.filesToTranslate);
-		}
+		const totalFiltered = cacheHits + numFilesFiltered + numFilesWithPRs + numFilesTooLarge;
 
-		logger.info(
+		this.logger.info(
 			{
 				filesToTranslate: this.state.filesToTranslate.length,
 				cachedTranslated: cacheHits,
 				analyzedTranslated: numFilesFiltered,
 				withExistingPRs: numFilesWithPRs,
 				tooLarge: numFilesTooLarge,
-				totalFiltered: cacheHits + numFilesFiltered + numFilesWithPRs + numFilesTooLarge,
+				totalFiltered,
 			},
-			`Found ${this.state.filesToTranslate.length} files to translate (${cacheHits + numFilesFiltered + numFilesWithPRs + numFilesTooLarge} filtered)`,
+			`Found ${String(this.state.filesToTranslate.length)} files to translate (${String(totalFiltered)} filtered)`,
 		);
 	}
 
@@ -283,13 +263,13 @@ export abstract class BaseRunnerService {
 	 *
 	 * @example
 	 * ```typescript
-	 * const result = await this.checkLanguageCache(repositoryFiles);
+	 * const result =  this.checkLanguageCache(repositoryFiles);
 	 * console.log(result.cacheHits);
 	 * // ^? 135 (out of 192 files)
 	 * ```
 	 */
-	private async checkLanguageCache(files: PatchedRepositoryItem[]): Promise<CacheCheckResult> {
-		logger.info("Checking language cache...");
+	private checkLanguageCache(files: PatchedRepositoryItem[]): CacheCheckResult {
+		this.logger.info("Checking language cache...");
 		const startTime = Date.now();
 
 		const candidateFiles: typeof files = [];
@@ -299,7 +279,7 @@ export abstract class BaseRunnerService {
 			"sha"
 		>[];
 
-		const languageCaches = this.services.database.getLanguageCaches(
+		const languageCaches = this.services.languageCache.getMany(
 			filesToFetchCache.map(({ filename, sha }) => {
 				return { filename, contentHash: sha };
 			}),
@@ -318,7 +298,7 @@ export abstract class BaseRunnerService {
 				cache.confidence > MIN_CACHE_CONFIDENCE
 			) {
 				cacheHits++;
-				logger.debug(
+				this.logger.debug(
 					{ filename: file.path, language: cache.detectedLanguage, confidence: cache.confidence },
 					`Skipping cached ${targetLanguage} file`,
 				);
@@ -332,9 +312,9 @@ export abstract class BaseRunnerService {
 		const elapsed = Date.now() - startTime;
 		const hitRate = `${((cacheHits / files.length) * 100).toFixed(1)}%`;
 
-		logger.info(
+		this.logger.info(
 			{ cacheHits, cacheMisses, hitRate, timeMs: elapsed },
-			`Cache check complete: ${cacheHits} hits, ${cacheMisses} candidates`,
+			`Cache check complete: ${String(cacheHits)} hits, ${String(cacheMisses)} candidates`,
 		);
 
 		return { candidateFiles, cacheHits, cacheMisses };
@@ -386,7 +366,7 @@ export abstract class BaseRunnerService {
 	private async filterFilesByExistingPRs(
 		candidateFiles: PatchedRepositoryItem[],
 	): Promise<PullRequestFilterResult> {
-		logger.info("Checking for existing open PRs with file-based filtering...");
+		this.logger.info("Checking for existing open PRs with file-based filtering...");
 
 		const openPRs = await this.services.github.content.listOpenPullRequests();
 		const invalidPRsByFile = new Map<string, { prNumber: number; status: PullRequestStatus }>();
@@ -400,16 +380,19 @@ export abstract class BaseRunnerService {
 					prByFile.set(filePath, pr.number);
 				}
 
-				logger.debug(
+				this.logger.debug(
 					{ prNumber: pr.number, fileCount: changedFiles.length },
 					"Mapped PR to changed files",
 				);
 			} catch (error) {
-				logger.warn({ prNumber: pr.number, error }, "Failed to fetch PR files, skipping this PR");
+				this.logger.warn(
+					{ prNumber: pr.number, error },
+					"Failed to fetch PR files, skipping this PR",
+				);
 			}
 		}
 
-		logger.debug(
+		this.logger.debug(
 			{ openPRCount: openPRs.length, mappedFiles: prByFile.size },
 			"Built file-to-PR mapping",
 		);
@@ -433,7 +416,7 @@ export abstract class BaseRunnerService {
 						invalidPRsByFile.set(file.path, { prNumber, status: prStatus });
 						filesToFetch.push(file);
 
-						logger.debug(
+						this.logger.debug(
 							{
 								path: file.path,
 								prNumber,
@@ -444,7 +427,7 @@ export abstract class BaseRunnerService {
 						);
 					} else {
 						numFilesWithPRs++;
-						logger.debug(
+						this.logger.debug(
 							{
 								path: file.path,
 								prNumber,
@@ -454,7 +437,7 @@ export abstract class BaseRunnerService {
 						);
 					}
 				} catch (error) {
-					logger.warn(
+					this.logger.warn(
 						{ path: file.path, prNumber, error },
 						"Failed to check PR status, including file for processing",
 					);
@@ -465,13 +448,13 @@ export abstract class BaseRunnerService {
 			}
 		}
 
-		logger.info(
+		this.logger.info(
 			{
 				validPRs: numFilesWithPRs,
 				invalidPRs: invalidPRsByFile.size,
 				toFetch: filesToFetch.length,
 			},
-			`After PR filter: ${filesToFetch.length} files need content fetch`,
+			`After PR filter: ${String(filesToFetch.length)} files need content fetch`,
 		);
 
 		return { filesToFetch, numFilesWithPRs, invalidPRsByFile };
@@ -498,7 +481,7 @@ export abstract class BaseRunnerService {
 	private async fetchFileContents(
 		filesToFetch: PatchedRepositoryItem[],
 	): Promise<TranslationFile[]> {
-		logger.info("Fetching file content...");
+		this.logger.info("Fetching file content...");
 
 		const uncheckedFiles: TranslationFile[] = [];
 		let completedFiles = 0;
@@ -507,12 +490,14 @@ export abstract class BaseRunnerService {
 			completedFiles++;
 			const percentage = Math.floor((completedFiles / filesToFetch.length) * 100);
 			if (completedFiles % 10 === 0 || completedFiles === filesToFetch.length) {
-				logger.info(`Fetching files: ${completedFiles}/${filesToFetch.length} (${percentage}%)`);
+				this.logger.info(
+					`Fetching files: ${String(completedFiles)}/${String(filesToFetch.length)} (${String(percentage)}%)`,
+				);
 			}
 		};
 
-		for (let i = 0; i < filesToFetch.length; i += FILE_FETCH_BATCH_SIZE) {
-			const batch = filesToFetch.slice(i, i + FILE_FETCH_BATCH_SIZE);
+		for (let index = 0; index < filesToFetch.length; index += FILE_FETCH_BATCH_SIZE) {
+			const batch = filesToFetch.slice(index, index + FILE_FETCH_BATCH_SIZE);
 			const batchResults = await this.fetchBatch(batch, updateProgress);
 
 			uncheckedFiles.push(
@@ -554,7 +539,7 @@ export abstract class BaseRunnerService {
 			if (file.content.length > MAX_FILE_SIZE) {
 				numFilesTooLarge++;
 
-				logger.warn(
+				this.logger.warn(
 					{ filename: file.filename, size: file.content.length, maxSize: MAX_FILE_SIZE },
 					"Skipping file: exceeds maximum size limit",
 				);
@@ -567,11 +552,10 @@ export abstract class BaseRunnerService {
 			);
 
 			if (file.sha && analysis.detectedLanguage) {
-				this.services.database.setLanguageCache({
-					filename: file.path,
-					contentHash: file.sha,
+				this.services.languageCache.set(file.path, file.sha, {
 					detectedLanguage: analysis.detectedLanguage,
 					confidence: analysis.languageScore.target,
+					timestamp: Date.now(),
 				});
 			}
 
@@ -612,14 +596,14 @@ export abstract class BaseRunnerService {
 
 	/** Updates the progress issue with the translation results */
 	protected async updateIssueWithResults(): Promise<void> {
-		logger.info("Commenting on issue...");
+		this.logger.info("Commenting on issue...");
 
 		const comment = await this.services.github.content.commentCompiledResultsOnIssue(
 			this.state.processedResults,
 			this.state.filesToTranslate,
 		);
 
-		logger.info({ commentUrl: comment.html_url }, "Commented on translation issue");
+		this.logger.info({ commentUrl: comment.html_url }, "Commented on translation issue");
 	}
 
 	/**
@@ -650,14 +634,14 @@ export abstract class BaseRunnerService {
 	 * - Detailed error information for failed files
 	 * - Total execution time
 	 */
-	protected async printFinalStatistics(): Promise<void> {
+	protected printFinalStatistics(): void {
 		const elapsedTime = Math.ceil(Date.now() - this.metadata.timestamp);
 		const results = Array.from(this.metadata.results.values());
 
 		const successCount = results.filter(({ error }) => !error).length;
 		const failureCount = results.filter(({ error }) => !!error).length;
 
-		logger.info(
+		this.logger.info(
 			{ successCount, failureCount, elapsedTime: this.formatElapsedTime(elapsedTime) },
 			"Final statistics",
 		);
@@ -668,11 +652,11 @@ export abstract class BaseRunnerService {
 		>[];
 
 		if (failedFiles.length > 0) {
-			logger.warn(
+			this.logger.warn(
 				{
 					failures: failedFiles.map(({ filename, error }) => ({ filename, error: error.message })),
 				},
-				`Failed files (${failedFiles.length})`,
+				`Failed files (${String(failedFiles.length)})`,
 			);
 		}
 	}
@@ -691,7 +675,7 @@ export abstract class BaseRunnerService {
 		const sizes = ["B", "KB", "MB", "GB"];
 		const i = Math.floor(Math.log(bytes) / Math.log(k));
 
-		return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
+		return `${(bytes / Math.pow(k, i)).toFixed(1)} ${String(sizes[i])}`;
 	}
 
 	/**
@@ -732,7 +716,7 @@ export abstract class BaseRunnerService {
 	 * @throws {ResourceLoadError} If file content cannot be loaded
 	 */
 	protected async processInBatches(files: TranslationFile[], batchSize = 10): Promise<void> {
-		logger.info("Processing files in batches...");
+		this.logger.info("Processing files in batches...");
 
 		const batches = this.createBatches(files, batchSize);
 
@@ -776,7 +760,7 @@ export abstract class BaseRunnerService {
 		this.batchProgress.failed = 0;
 
 		try {
-			logger.info(batchInfo, "Processing batch");
+			this.logger.info(batchInfo, "Processing batch");
 
 			await Promise.all(
 				batch.map((file) => {
@@ -791,18 +775,18 @@ export abstract class BaseRunnerService {
 				}),
 			);
 
-			logger.info(
+			this.logger.info(
 				{ batchIndex: batchInfo.currentBatch, ...this.batchProgress },
 				"Batch processing completed",
 			);
 		} catch (error) {
-			logger.error({ error, batchInfo }, "Error processing batch");
+			this.logger.error({ error, batchInfo }, "Error processing batch");
 			throw error;
 		}
 
 		const successRate = Math.round((this.batchProgress.successful / batch.length) * 100);
 
-		logger.info(
+		this.logger.info(
 			{
 				batchIndex: batchInfo.currentBatch,
 				totalBatches: batchInfo.totalBatches,
@@ -810,7 +794,7 @@ export abstract class BaseRunnerService {
 				total: batch.length,
 				successRate,
 			},
-			`Batch ${batchInfo.currentBatch}/${batchInfo.totalBatches} completed: ${this.batchProgress.successful}/${batch.length} successful (${successRate}%)`,
+			`Batch ${String(batchInfo.currentBatch)}/${String(batchInfo.totalBatches)} completed: ${String(this.batchProgress.successful)}/${String(batch.length)} successful (${String(successRate)}%)`,
 		);
 	}
 
@@ -853,7 +837,7 @@ export abstract class BaseRunnerService {
 		file: TranslationFile,
 		_progress: FileProcessingProgress,
 	): Promise<void> {
-		const metadata = this.metadata.results.get(file.filename) || {
+		const metadata = this.metadata.results.get(file.filename) ?? {
 			branch: null,
 			filename: file.filename,
 			translation: null,
@@ -864,7 +848,7 @@ export abstract class BaseRunnerService {
 		const fileStartTime = Date.now();
 
 		try {
-			logger.debug(
+			this.logger.debug(
 				{ filename: file.filename, contentLength: file.content.length },
 				"Starting file processing workflow",
 			);
@@ -873,7 +857,7 @@ export abstract class BaseRunnerService {
 			metadata.branch = await this.createOrGetTranslationBranch(file);
 			const branchDuration = Date.now() - branchStartTime;
 
-			logger.debug(
+			this.logger.debug(
 				{ filename: file.filename, branchRef: metadata.branch.ref, durationMs: branchDuration },
 				"Branch creation completed",
 			);
@@ -882,7 +866,7 @@ export abstract class BaseRunnerService {
 			metadata.translation = await this.services.translator.translateContent(file);
 			const translationDuration = Date.now() - translationStartTime;
 
-			logger.debug(
+			this.logger.debug(
 				{
 					filename: file.filename,
 					translatedLength: metadata.translation.length,
@@ -894,7 +878,7 @@ export abstract class BaseRunnerService {
 			const languageName =
 				this.services.translator.languageDetector.getLanguageName(
 					this.services.translator.languageDetector.languages.target,
-				) || "Portuguese";
+				) ?? "Portuguese";
 
 			const commitStartTime = Date.now();
 			await this.services.github.content.commitTranslation({
@@ -905,7 +889,7 @@ export abstract class BaseRunnerService {
 			});
 			const commitDuration = Date.now() - commitStartTime;
 
-			logger.debug(
+			this.logger.debug(
 				{ filename: file.filename, durationMs: commitDuration },
 				"Commit completed - creating pull request",
 			);
@@ -919,7 +903,7 @@ export abstract class BaseRunnerService {
 			const prDuration = Date.now() - prStartTime;
 			const totalDuration = Date.now() - fileStartTime;
 
-			logger.debug(
+			this.logger.debug(
 				{
 					filename: file.filename,
 					prNumber: metadata.pullRequest.number,
@@ -938,7 +922,7 @@ export abstract class BaseRunnerService {
 		} catch (error) {
 			const failureDuration = Date.now() - fileStartTime;
 
-			logger.error(
+			this.logger.error(
 				{ error, filename: file.filename, durationMs: failureDuration },
 				"File processing failed",
 			);
@@ -961,7 +945,9 @@ export abstract class BaseRunnerService {
 	 */
 	private updateBatchProgress(status: "success" | "error"): void {
 		this.batchProgress.completed++;
-		status === "success" ? this.batchProgress.successful++ : this.batchProgress.failed++;
+
+		if (status === "success") this.batchProgress.successful++;
+		else this.batchProgress.failed++;
 	}
 
 	/**
@@ -978,12 +964,12 @@ export abstract class BaseRunnerService {
 		try {
 			const branchName = metadata.branch.ref.replace("refs/heads/", "");
 			await this.services.github.branch.deleteBranch(branchName);
-			logger.info(
+			this.logger.info(
 				{ branchName, filename: metadata.filename },
 				"Cleaned up branch after failed translation",
 			);
 		} catch (error) {
-			logger.error(
+			this.logger.error(
 				{ error, filename: metadata.filename, branchRef: metadata.branch.ref },
 				"Failed to cleanup branch after translation failure - non-critical",
 			);
@@ -1025,11 +1011,11 @@ export abstract class BaseRunnerService {
 		const languageName =
 			this.services.translator.languageDetector.getLanguageName(
 				this.services.translator.languageDetector.languages.target,
-			) || "Portuguese";
+			) ?? "Portuguese";
 
 		const processingTime = Date.now() - this.metadata.timestamp;
 		const sourceLength = file.content.length;
-		const translationLength = processingResult.translation?.length || 0;
+		const translationLength = processingResult.translation?.length ?? 0;
 		const compressionRatio = sourceLength > 0 ? (translationLength / sourceLength).toFixed(2) : "0";
 
 		const invalidPRInfo = this.state.invalidPRsByFile?.get(file.path);
@@ -1037,7 +1023,7 @@ export abstract class BaseRunnerService {
 			invalidPRInfo ?
 				`
 > [!NOTE]
-> **Existing PR Detected**: This file already has an open pull request (#${invalidPRInfo.prNumber}) with merge conflicts or unmergeable status (\`${invalidPRInfo.status.mergeableState}\`).
+> **Existing PR Detected**: This file already has an open pull request (#${String(invalidPRInfo.prNumber)}) with merge conflicts or unmergeable status (\`${invalidPRInfo.status.mergeableState}\`).
 >
 > This new PR was automatically created with an updated translation. The decision on which PR to merge should be made by repository maintainers based on translation quality and technical requirements.
 
@@ -1061,7 +1047,7 @@ ${conflictNotice}
 | **Translation Size** | ${this.formatBytes(translationLength)} |
 | **Content Ratio** | ${compressionRatio}x |
 | **File Path** | \`${file.path}\` |
-| **Processing Time** | ~${Math.ceil(processingTime / 1000)}s |
+| **Processing Time** | ~${String(Math.ceil(processingTime / 1000))}s |
 
 ###### ps.: The content ratio indicates how the translation length compares to the source (1.0x = same length, >1.0x = translation is longer). Different languages naturally have varying verbosity levels.
 
@@ -1069,8 +1055,8 @@ ${conflictNotice}
 
 - **Target Language**: ${languageName} (\`${this.services.translator.languageDetector.languages.target}\`)
 - **AI Model**: \`${env.LLM_MODEL}\` via Open Router API
-- **Generated**: ${new Date().toISOString().split("T")[0]}
-- **Branch**: \`${processingResult.branch?.ref || "unknown"}\`
+- **Generated**: ${new Date().toISOString().split("T")[0] ?? "unknown"}
+- **Branch**: \`${processingResult.branch?.ref ?? "unknown"}\`
 - **Translation Tool Version**: \`${name} v${version}\`
 
 
@@ -1122,17 +1108,17 @@ ${conflictNotice}
 	 */
 	public async createOrGetTranslationBranch(file: TranslationFile, baseBranch?: string) {
 		const actualBaseBranch =
-			baseBranch || (await this.services.github.repository.getDefaultBranch("fork"));
+			baseBranch ?? (await this.services.github.repository.getDefaultBranch("fork"));
 		const branchName = `translate/${file.path.split("/").slice(2).join("/")}`;
 
-		logger.debug(
+		this.logger.debug(
 			{ filename: file.filename, branchName },
 			"Checking for existing translation branch",
 		);
 		const existingBranch = await this.services.github.branch.getBranch(branchName);
 
 		if (existingBranch) {
-			logger.debug(
+			this.logger.debug(
 				{ filename: file.filename, branchName },
 				"Existing branch found, checking associated PR status",
 			);
@@ -1145,7 +1131,7 @@ ${conflictNotice}
 				);
 
 				if (prStatus.hasConflicts) {
-					logger.info(
+					this.logger.info(
 						{
 							filename: file.filename,
 							prNumber: upstreamPR.number,
@@ -1161,7 +1147,7 @@ ${conflictNotice}
 					await this.services.github.content.closePullRequest(upstreamPR.number);
 					await this.services.github.branch.deleteBranch(branchName);
 				} else {
-					logger.debug(
+					this.logger.debug(
 						{
 							filename: file.filename,
 							prNumber: upstreamPR.number,
@@ -1172,12 +1158,15 @@ ${conflictNotice}
 					return existingBranch.data;
 				}
 			} else {
-				logger.debug({ filename: file.filename, branchName }, "Branch exists without PR, reusing");
+				this.logger.debug(
+					{ filename: file.filename, branchName },
+					"Branch exists without PR, reusing",
+				);
 				return existingBranch.data;
 			}
 		}
 
-		logger.debug({ filename: file.filename, branchName }, "Creating new translation branch");
+		this.logger.debug({ filename: file.filename, branchName }, "Creating new translation branch");
 		const newBranch = await this.services.github.branch.createBranch(branchName, actualBaseBranch);
 
 		return newBranch.data;
@@ -1239,7 +1228,7 @@ ${conflictNotice}
 			const prStatus = await this.services.github.content.checkPullRequestStatus(existingPR.number);
 
 			if (prStatus.needsUpdate) {
-				logger.info(
+				this.logger.info(
 					{ prNumber: existingPR.number, mergeableState: prStatus.mergeableState },
 					"Closing PR with merge conflicts and creating new one",
 				);
@@ -1253,11 +1242,11 @@ ${conflictNotice}
 				return await this.services.github.content.createPullRequest({
 					branch: branchName,
 					...prOptions,
-					baseBranch: prOptions.baseBranch || "main",
+					baseBranch: prOptions.baseBranch ?? "main",
 				});
 			}
 
-			logger.debug(
+			this.logger.debug(
 				{ prNumber: existingPR.number, mergeableState: prStatus.mergeableState },
 				"PR exists with no conflicts, reusing",
 			);
@@ -1267,7 +1256,7 @@ ${conflictNotice}
 		return await this.services.github.content.createPullRequest({
 			branch: branchName,
 			...prOptions,
-			baseBranch: prOptions.baseBranch || "main",
+			baseBranch: prOptions.baseBranch ?? "main",
 		});
 	}
 }

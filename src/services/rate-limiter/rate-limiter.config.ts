@@ -44,7 +44,7 @@ export const CONFIGS = {
 		reservoirRefreshInterval: 720,
 		highWater: 100,
 		debug: false,
-	},
+	} satisfies RateLimiterConfig,
 
 	/**
 	 * Free-tier LLM API rate limiter configuration.
@@ -65,7 +65,7 @@ export const CONFIGS = {
 		reservoirRefreshInterval: 60_000,
 		highWater: 50,
 		debug: false,
-	},
+	} satisfies RateLimiterConfig,
 
 	/**
 	 * Paid-tier LLM API rate limiter configuration.
@@ -86,5 +86,5 @@ export const CONFIGS = {
 		reservoirRefreshInterval: 1000,
 		highWater: 100,
 		debug: false,
-	},
+	} satisfies RateLimiterConfig,
 } as const satisfies Record<string, RateLimiterConfig>;

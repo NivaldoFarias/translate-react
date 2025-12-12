@@ -1,15 +1,8 @@
-/**
- * @fileoverview Tests for the {@link BaseGitHubService}.
- *
- * This suite covers GitHub API client initialization, configuration management,
- * and core functionality for all GitHub-based services.
- */
-
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 
 import { BaseGitHubService } from "@/services/github/base.service";
 
-mock.module("@/utils/env.util", () => ({
+void mock.module("@/utils/env.util", () => ({
 	env: {
 		GITHUB_TOKEN: "gho_test_token_with_40_characters_exactly",
 		REPO_UPSTREAM_OWNER: "test-owner",
@@ -91,7 +84,7 @@ describe("Base GitHub Service", () => {
 		expect(rateLimit.data.resources.core.remaining).toBe(5000);
 	});
 
-	test("should handle API errors", async () => {
+	test("should handle API errors", () => {
 		// @ts-expect-error - Mocking private property
 		service.octokit = {
 			rateLimit: {

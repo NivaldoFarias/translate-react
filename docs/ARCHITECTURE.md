@@ -14,7 +14,7 @@ This document provides a comprehensive overview of the `translate-react` system 
     - [GitHub Service (`services/github/`)](#github-service-servicesgithub)
     - [Translator Service (`services/translator.service.ts`)](#translator-service-servicestranslatorservicets)
     - [Language Detector Service (`services/language-detector.service.ts`)](#language-detector-service-serviceslanguage-detectorservicets)
-    - [Database Service (`services/database.service.ts`)](#database-service-servicesdatabaseservicets)
+    - [Cache Service (`services/cache/`)](#cache-service-servicescache)
   - [Error Handling Architecture](#error-handling-architecture)
     - [Error Hierarchy](#error-hierarchy)
     - [Error Transformation Pipeline](#error-transformation-pipeline)
@@ -25,7 +25,6 @@ This document provides a comprehensive overview of the `translate-react` system 
   - [Design Patterns](#design-patterns)
     - [Inheritance-Based Service Design](#inheritance-based-service-design)
     - [Proxy Pattern for Error Handling](#proxy-pattern-for-error-handling)
-    - [Snapshot Pattern for State Persistence](#snapshot-pattern-for-state-persistence)
   - [Performance Considerations](#performance-considerations)
     - [Batch Processing](#batch-processing)
     - [Concurrent Operations](#concurrent-operations)
@@ -50,7 +49,7 @@ graph TB
         GitHub[GitHub Service]
         Translator[Translator Service]
         LangDetector[Language Detector]
-        DB[Database Service]
+        Cache[Cache Service]
     end
     
     subgraph "GitHub Sub-Services"
@@ -67,14 +66,13 @@ graph TB
     subgraph "External Systems"
         GitHubAPI[GitHub REST API]
         LLMAPI[LLM API<br/>OpenAI/OpenRouter]
-        SQLite[(SQLite DB)]
     end
     
     CLI --> Runner
     Runner --> GitHub
     Runner --> Translator
     Runner --> LangDetector
-    Runner --> DB
+    Runner --> Cache
     
     GitHub --> RepoSvc
     GitHub --> ContentSvc
@@ -86,8 +84,6 @@ graph TB
     
     Translator --> LLMAPI
     Translator --> LangDetector
-    
-    DB --> SQLite
     
     Runner -.-> ErrorHandler
     GitHub -.-> ErrorHandler
@@ -103,8 +99,8 @@ graph TB
     
     class CLI entryPoint
     class Runner orchestration
-    class GitHub,Translator,LangDetector,DB domain
-    class GitHubAPI,LLMAPI,SQLite external
+    class GitHub,Translator,LangDetector,Cache domain
+    class GitHubAPI,LLMAPI external
     class ErrorHandler,Logger crossCutting
 ```
 
@@ -174,7 +170,6 @@ The Runner Service acts as the **workflow orchestrator**, coordinating all other
 - Batch processing coordination
 - Progress tracking and logging
 - Error recovery and cleanup
-- Snapshot persistence (development mode)
 
 #### Key Methods
 
@@ -195,12 +190,11 @@ class RunnerService extends BaseRunnerService {
   private async fetchBatch(batch, updateFn): Promise<TranslationFile[]>
   
   // State management
-  protected async loadSnapshot(isForkSynced): Promise<void>
   protected async updateIssueWithResults(): Promise<void>
   
   // Cleanup and reporting
   private async cleanupFailedTranslation(metadata): Promise<void>
-  protected async printFinalStatistics(): Promise<void>
+  protected printFinalStatistics(): Promise<void>
 }
 ```
 
@@ -217,7 +211,7 @@ interface RunnerState {
 }
 ```
 
-This state is persisted to SQLite in development mode for interruption recovery.
+This state is held in memory during workflow execution.
 
 ### GitHub Service (`services/github/`)
 
@@ -436,45 +430,28 @@ The detector calculates a **translation ratio**:
 
 This approach handles mixed-language content (code examples, technical terms) better than binary detection.
 
-### Database Service (`services/database.service.ts`)
+### Cache Service (`services/cache/`)
 
-SQLite-based persistence for workflow state.
+In-memory caching for runtime-scoped data.
 
-#### Schema Structure
+#### Components
 
-```sql
-CREATE TABLE IF NOT EXISTS snapshots (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  repositoryTree TEXT NOT NULL,
-  filesToTranslate TEXT NOT NULL,
-  processedResults TEXT NOT NULL,
-  timestamp INTEGER NOT NULL
-);
+- **CacheService**: Generic cache with TTL support
+  - O(1) lookups using Map
+  - Automatic expiration handling
+  - Batch operations for efficiency
 
--- Future optimization: Add indexes
--- CREATE INDEX idx_timestamp ON snapshots(timestamp);
-```
-
-#### Snapshot System
-
-Snapshots are stored as **JSON-serialized state**:
-
-```typescript
-interface Snapshot {
-  id?: number;
-  repositoryTree: GitHubTreeItem[];
-  filesToTranslate: TranslationFile[];
-  processedResults: ProcessedFileResult[];
-  timestamp: number;
-}
-```
+- **LanguageCacheService**: Specialized cache for language detection
+  - Composite keys: `filename:contentHash`
+  - 1-hour TTL (sufficient for workflow runs)
+  - Content-based invalidation
 
 **Key operations**:
 
-- `save()`: Complete snapshot save
-- `append()`: Incremental updates to specific fields
-- `loadLatest()`: Retrieve most recent snapshot
-- `clear()`: Truncate table (development mode)
+- `set(key, value, ttl)`: Store with expiration
+- `get(key)`: Retrieve if not expired
+- `getMany(keys)`: Batch retrieval
+- `clear()`: Remove all entries
 
 ## Error Handling Architecture
 
@@ -554,33 +531,30 @@ Specific error codes for different GitHub API failures:
 ```mermaid
 flowchart TD
     A[Start Discovery] --> B[Fetch Repository Tree]
-    B --> C{Tree Cached?}
-    C -->|Yes| D[Load from Snapshot]
-    C -->|No| E[GET /git/trees/{sha}]
+    B --> C[GET /git/trees/{sha}]
     
-    E --> F[Filter .md in src/]
-    D --> F
+    C --> D[Filter .md in src/]
     
-    F --> G[Batch Files by 10]
-    G --> H[Fetch File Content]
+    D --> E[Batch Files by 10]
+    E --> F[Fetch File Content]
     
-    H --> I{Has Open PR?}
-    I -->|Yes| J[Skip File]
-    I -->|No| K{Size > MAX?}
+    F --> G{Has Open PR?}
+    G -->|Yes| H[Skip File]
+    G -->|No| I{Size > MAX?}
     
-    K -->|Yes| L[Skip File - Too Large]
-    K -->|No| M[Language Detection]
+    I -->|Yes| J[Skip File - Too Large]
+    I -->|No| K[Language Detection]
     
-    M --> N{Already Translated?}
-    N -->|Yes| O[Skip File]
-    N -->|No| P[Add to Translation Queue]
+    K --> L{Already Translated?}
+    L -->|Yes| M[Skip File]
+    L -->|No| N[Add to Translation Queue]
     
-    P --> Q[Discovery Complete]
-    J --> Q
-    L --> Q
-    O --> Q
+    N --> O[Discovery Complete]
+    H --> O
+    J --> O
+    M --> O
     
-    style H fill:#e1f5fe,stroke:#0277bd
+    style F fill:#e1f5fe,stroke:#0277bd
     style M fill:#f3e5f5,stroke:#7b1fa2
 ```
 
@@ -676,27 +650,6 @@ export function createErrorHandlingProxy<T extends object>(
 }
 ```
 
-### Snapshot Pattern for State Persistence
-
-Incremental state updates with append-only semantics:
-
-```typescript
-class SnapshotService {
-  async append<K extends keyof Snapshot>(
-    key: K,
-    value: Snapshot[K]
-  ): Promise<void> {
-    const latest = await this.loadLatest();
-    
-    await this.save({
-      ...latest,
-      [key]: value,
-      timestamp: Date.now()
-    });
-  }
-}
-```
-
 ## Performance Considerations
 
 ### Batch Processing
@@ -732,7 +685,6 @@ for (const batch of batches) {
 
 - Streaming content processing (no full repository in memory)
 - Garbage collection after each batch
-- Snapshot incremental updates (not full state rewrites)
 - Lazy loading of translation glossary
 
 ## References

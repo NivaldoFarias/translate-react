@@ -1,23 +1,16 @@
-/**
- * @fileoverview Tests for the {@link TranslatorService}.
- *
- * This suite covers content translation, error handling, language detection,
- * and all core translation workflow operations.
- */
-
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 
 import type OpenAI from "openai";
 
 import { TranslationFile, TranslatorService } from "@/services/translator.service";
 
-type MockOpenAI = {
+interface MockOpenAI {
 	chat: {
 		completions: {
 			create: ReturnType<typeof mock>;
 		};
 	};
-};
+}
 
 describe("TranslatorService", () => {
 	let translatorService: TranslatorService;
@@ -73,7 +66,7 @@ describe("TranslatorService", () => {
 			expect(mockOpenAI.chat.completions.create).toHaveBeenCalledTimes(1);
 		});
 
-		test("should handle empty content with error", async () => {
+		test("should handle empty content with error", () => {
 			const file: TranslationFile = {
 				path: "test/empty.md",
 				content: "",
@@ -81,12 +74,10 @@ describe("TranslatorService", () => {
 				filename: "empty.md",
 			};
 
-			await expect(translatorService.translateContent(file)).rejects.toThrow(
-				"File content is empty",
-			);
+			expect(translatorService.translateContent(file)).rejects.toThrow("File content is empty");
 		});
 
-		test("should handle whitespace-only content", async () => {
+		test("should handle whitespace-only content", () => {
 			mockOpenAI.chat.completions.create = mock(() =>
 				Promise.resolve({
 					choices: [{ message: { content: "   \n\t  \n  " } }],
@@ -102,7 +93,7 @@ describe("TranslatorService", () => {
 				filename: "whitespace.md",
 			};
 
-			await expect(translatorService.translateContent(file)).rejects.toThrow(
+			expect(translatorService.translateContent(file)).rejects.toThrow(
 				"Translation produced empty content",
 			);
 		});
@@ -136,7 +127,7 @@ describe("TranslatorService", () => {
 			expect(translation).toContain("```javascript");
 		});
 
-		test("should handle API errors gracefully", async () => {
+		test("should handle API errors gracefully", () => {
 			mockOpenAI.chat.completions.create = mock(() => Promise.reject(new Error("API Error")));
 			// @ts-expect-error - Mocking private property for testing
 			translatorService.llm = mockOpenAI as unknown as OpenAI;
@@ -148,7 +139,7 @@ describe("TranslatorService", () => {
 				filename: "error.md",
 			};
 
-			await expect(translatorService.translateContent(file)).rejects.toThrow("API Error");
+			expect(translatorService.translateContent(file)).rejects.toThrow("API Error");
 		});
 
 		test("should handle large content with chunking", async () => {

@@ -1,18 +1,7 @@
 import pino from "pino";
 
-import { LogLevel, RuntimeEnvironment } from "./constants.util";
+import {  RuntimeEnvironment } from "./constants.util";
 import { env } from "./env.util";
-
-/**
- * Determines the log level based on environment
- *
- * - Production: info and above
- * - Development: debug and above
- * - Can be overridden with `LOG_LEVEL` env var
- */
-const logLevel =
-	env.LOG_LEVEL ??
-	(env.NODE_ENV === RuntimeEnvironment.Production ? LogLevel.Info : LogLevel.Debug);
 
 /**
  * Main logger instance
@@ -41,7 +30,7 @@ const logLevel =
  * ```
  */
 export const logger = pino({
-	level: logLevel,
+	level: env.LOG_LEVEL,
 	base: {
 		pid: process.pid,
 		hostname: undefined,
@@ -86,7 +75,7 @@ export const logger = pino({
 				[
 					{
 						target: "pino-pretty",
-						level: logLevel,
+						level: env.LOG_LEVEL,
 						options: {
 							colorize: true,
 							translateTime: "HH:MM:ss.l",

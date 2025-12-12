@@ -1,6 +1,8 @@
 import { RequestError } from "@octokit/request-error";
 import { StatusCodes } from "http-status-codes";
 
+import type { MapErrorHelperContext } from "@/errors/";
+
 import { ErrorCode, ErrorHelper, ErrorSeverity, TranslationError } from "@/errors/";
 import { detectRateLimit, logger } from "@/utils/";
 
@@ -32,13 +34,10 @@ export class GithubErrorHelper implements ErrorHelper {
 	 * }
 	 * ```
 	 */
-	public mapError(
+	public mapError<T extends Record<string, unknown> = Record<string, unknown>>(
 		error: unknown,
-		context: {
-			operation: string;
-			metadata?: Record<string, unknown>;
-		},
-	): TranslationError {
+		context: MapErrorHelperContext<T>,
+	): TranslationError<T> {
 		/** Handle Octokit's RequestError type with status code mapping */
 		if (error instanceof RequestError) {
 			const errorCode = this.getErrorCodeFromStatus(error);
@@ -46,7 +45,7 @@ export class GithubErrorHelper implements ErrorHelper {
 
 			logger.error(
 				{
-					err: error,
+					error,
 					operation: context.operation,
 					statusCode: error.status,
 					errorCode,
@@ -59,10 +58,10 @@ export class GithubErrorHelper implements ErrorHelper {
 				sanity: severity,
 				operation: context.operation,
 				metadata: {
-					statusCode: error.status,
-					requestId: error.response?.headers?.["x-github-request-id"],
 					...context.metadata,
-				},
+					statusCode: error.status,
+					requestId: error.response?.headers["x-github-request-id"],
+				} as T & { statusCode: number; requestId: string | undefined },
 			});
 		}
 
@@ -70,11 +69,7 @@ export class GithubErrorHelper implements ErrorHelper {
 		if (error instanceof Error) {
 			if (detectRateLimit(error.message)) {
 				logger.warn(
-					{
-						err: error,
-						operation: context.operation,
-						...context.metadata,
-					},
+					{ error, operation: context.operation, ...context.metadata },
 					"Rate limit detected in error message",
 				);
 
@@ -86,11 +81,7 @@ export class GithubErrorHelper implements ErrorHelper {
 			}
 
 			logger.error(
-				{
-					err: error,
-					operation: context.operation,
-					...context.metadata,
-				},
+				{ error, operation: context.operation, ...context.metadata },
 				"Unexpected error",
 			);
 
@@ -104,11 +95,7 @@ export class GithubErrorHelper implements ErrorHelper {
 		/** Handle non-Error objects thrown as exceptions */
 		const message = String(error);
 		logger.error(
-			{
-				error: message,
-				operation: context.operation,
-				...context.metadata,
-			},
+			{ error: message, operation: context.operation, ...context.metadata },
 			"Non-Error object thrown",
 		);
 
@@ -120,13 +107,14 @@ export class GithubErrorHelper implements ErrorHelper {
 	}
 
 	public getErrorCodeFromStatus(error: RequestError): ErrorCode {
-		switch (error.status) {
+		switch (error.status as StatusCodes) {
 			case StatusCodes.UNAUTHORIZED:
 				return ErrorCode.GithubUnauthorized;
 			case StatusCodes.FORBIDDEN:
 				if (error.message.toLowerCase().includes("rate limit")) {
 					return ErrorCode.RateLimitExceeded;
 				}
+
 				return ErrorCode.GithubForbidden;
 			case StatusCodes.NOT_FOUND:
 				return ErrorCode.GithubNotFound;

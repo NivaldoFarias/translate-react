@@ -1,27 +1,11 @@
-/**
- * @fileoverview
- *
- * Helper utilities for mapping LLM errors to TranslationError instances.
- *
- * Provides explicit error mapping for OpenAI API errors with rate limit detection,
- * replacing the proxy-based error handling pattern with clear, maintainable code.
- */
-
 import { RequestError } from "@octokit/request-error";
 import { StatusCodes } from "http-status-codes";
 import { APIError } from "openai/error";
 
+import type { MapErrorHelperContext } from "@/errors";
+
 import { ErrorCode, ErrorHelper, ErrorSeverity, TranslationError } from "@/errors/";
 import { detectRateLimit, logger } from "@/utils/";
-
-/** Context for LLM error mapping operations */
-interface LLMErrorContext {
-	/** Operation that triggered the error (e.g., `"TranslatorService.callLanguageModel"`) */
-	operation: string;
-
-	/** Additional metadata for debugging and logging */
-	metadata?: Record<string, unknown>;
-}
 
 export class LLMErrorHelper implements ErrorHelper {
 	/**
@@ -47,38 +31,38 @@ export class LLMErrorHelper implements ErrorHelper {
 	 * }
 	 * ```
 	 */
-	public mapError(error: unknown, context: LLMErrorContext): TranslationError {
+	public mapError<T extends Record<string, unknown> = Record<string, unknown>>(
+		error: unknown,
+		context: MapErrorHelperContext<T>,
+	): TranslationError<T> {
 		const { operation, metadata = {} } = context;
 
 		/** Handle OpenAI APIError instances */
 		if (error instanceof APIError) {
-			const isRateLimit = detectRateLimit(error.message, error.status);
+			const isRateLimit = detectRateLimit(error.message, error.status as StatusCodes);
 
 			const errorCode = isRateLimit ? ErrorCode.RateLimitExceeded : ErrorCode.LLMApiError;
 			const severity = this.getSeverityFromCode(errorCode);
 
 			const errorMetadata = {
-				statusCode: error.status,
+				statusCode: error.status as number,
 				type: error.type,
 				originalMessage: error.message,
 				...metadata,
 			};
 
 			logger.error(
-				{
-					operation,
-					errorCode,
-					severity,
-					errorType: error.type,
-					isRateLimit,
-					...errorMetadata,
-				},
+				{ operation, errorCode, severity, errorType: error.type, isRateLimit, ...errorMetadata },
 				"LLM API error",
 			);
 
 			return new TranslationError(error.message, errorCode, {
 				operation,
-				metadata: errorMetadata,
+				metadata: errorMetadata as T & {
+					statusCode: number;
+					type: string;
+					originalMessage: string;
+				},
 			});
 		}
 
@@ -110,10 +94,9 @@ export class LLMErrorHelper implements ErrorHelper {
 
 				return new TranslationError(error.message, ErrorCode.RateLimitExceeded, {
 					operation,
-					metadata: {
-						errorType,
-						originalMessage: error.message,
-						...metadata,
+					metadata: { errorType, originalMessage: error.message, ...metadata } as T & {
+						errorType: string;
+						originalMessage: string;
 					},
 				});
 			}
@@ -133,10 +116,9 @@ export class LLMErrorHelper implements ErrorHelper {
 
 			return new TranslationError(error.message, ErrorCode.UnknownError, {
 				operation,
-				metadata: {
-					errorType,
-					originalMessage: error.message,
-					...metadata,
+				metadata: { errorType, originalMessage: error.message, ...metadata } as T & {
+					errorType: string;
+					originalMessage: string;
 				},
 			});
 		}
@@ -160,18 +142,19 @@ export class LLMErrorHelper implements ErrorHelper {
 			metadata: {
 				error: errorString,
 				...metadata,
-			},
+			} as T & { error: string },
 		});
 	}
 
 	public getErrorCodeFromStatus(error: RequestError): ErrorCode {
-		switch (error.status) {
+		switch (error.status as StatusCodes) {
 			case StatusCodes.UNAUTHORIZED:
 				return ErrorCode.Unauthorized;
 			case StatusCodes.FORBIDDEN:
 				if (error.message.toLowerCase().includes("rate limit")) {
 					return ErrorCode.RateLimitExceeded;
 				}
+
 				return ErrorCode.Forbidden;
 			case StatusCodes.NOT_FOUND:
 				return ErrorCode.NotFound;

@@ -35,9 +35,9 @@ function createTokenSchema(envName: string) {
 function isTestEnvironment(): boolean {
 	const env = import.meta.env;
 	return (
-		env["NODE_ENV"] === RuntimeEnvironment.Test ||
+		env.NODE_ENV === RuntimeEnvironment.Test ||
 		env["BUN_ENV"] === RuntimeEnvironment.Test ||
-		(typeof Bun !== "undefined" && Bun.isMainThread === false)
+		(typeof Bun !== "undefined" && !Bun.isMainThread)
 	);
 }
 
@@ -131,17 +131,6 @@ const envSchema = z.object({
 		.number()
 		.positive()
 		.default(environmentDefaults.PROGRESS_ISSUE_NUMBER),
-
-	/** Whether to clear the snapshot on startup. Used for development. */
-	FORCE_SNAPSHOT_CLEAR: z.stringbool().default(environmentDefaults.FORCE_SNAPSHOT_CLEAR),
-
-	/**
-	 * Whether to create PRs in the fork (development mode) or upstream (production mode).
-	 * When true, PRs are created against the fork for development purposes.
-	 *
-	 * @default false
-	 */
-	DEV_MODE_FORK_PR: z.stringbool().default(environmentDefaults.DEV_MODE_FORK_PR),
 
 	/**
 	 * The URL of the application to override the default URL.

@@ -14,6 +14,8 @@ import { logger } from "@/utils/";
  * - Repository content filtering
  */
 export class RepositoryService extends BaseGitHubService {
+	private readonly logger = logger.child({ component: RepositoryService.name });
+
 	/**
 	 * Gets the default branch name for a repository.
 	 *
@@ -31,7 +33,10 @@ export class RepositoryService extends BaseGitHubService {
 			const repoConfig = target === "fork" ? this.repositories.fork : this.repositories.upstream;
 			const response = await this.octokit.repos.get(repoConfig);
 
-			logger.debug({ target, branch: response.data.default_branch }, "Retrieved default branch");
+			this.logger.debug(
+				{ target, branch: response.data.default_branch },
+				"Retrieved default branch",
+			);
 
 			return response.data.default_branch;
 		} catch (error) {
@@ -63,7 +68,7 @@ export class RepositoryService extends BaseGitHubService {
 		filterIgnored = true,
 	): Promise<RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"]> {
 		try {
-			const branchName = baseBranch || (await this.getDefaultBranch("fork"));
+			const branchName = baseBranch ?? (await this.getDefaultBranch("fork"));
 			const response = await this.octokit.git.getTree({
 				...this.repositories.fork,
 				tree_sha: branchName,
@@ -73,7 +78,7 @@ export class RepositoryService extends BaseGitHubService {
 			const tree =
 				filterIgnored ? this.filterRepositoryTree(response.data.tree) : response.data.tree;
 
-			logger.info(
+			this.logger.info(
 				{
 					branch: branchName,
 					totalItems: response.data.tree.length,
@@ -105,17 +110,12 @@ export class RepositoryService extends BaseGitHubService {
 		try {
 			const response = await this.octokit.rest.users.getAuthenticated();
 
-			if (response.status !== 200) {
-				logger.warn({ status: response.status }, "Authentication status check failed");
-				return false;
-			}
-
 			await this.octokit.rest.repos.get(this.repositories.upstream);
 
-			logger.info({ user: response.data.login }, "Token permissions verified successfully");
+			this.logger.info({ user: response.data.login }, "Token permissions verified successfully");
 			return true;
 		} catch (error) {
-			logger.error({ err: error }, "Token permission verification failed");
+			this.logger.error({ err: error }, "Token permission verification failed");
 			return false;
 		}
 	}
@@ -151,7 +151,7 @@ export class RepositoryService extends BaseGitHubService {
 
 			const isSynced = upstreamCommits.data[0]?.sha === forkedCommits.data[0]?.sha;
 
-			logger.debug(
+			this.logger.debug(
 				{
 					isSynced,
 					upstreamSha: upstreamCommits.data[0]?.sha,
@@ -162,7 +162,7 @@ export class RepositoryService extends BaseGitHubService {
 
 			return isSynced;
 		} catch (error) {
-			logger.error({ err: error }, "Failed to check fork synchronization");
+			this.logger.error({ err: error }, "Failed to check fork synchronization");
 			return false;
 		}
 	}
@@ -185,27 +185,18 @@ export class RepositoryService extends BaseGitHubService {
 				branch: "main",
 			});
 
-			const success = mergeResponse.status === 200;
+			this.logger.info(
+				{
+					fork: this.repositories.fork,
+					message: mergeResponse.data.message,
+					mergeType: mergeResponse.data.merge_type,
+				},
+				"Fork synchronized successfully",
+			);
 
-			if (success) {
-				logger.info(
-					{
-						fork: this.repositories.fork,
-						message: mergeResponse.data.message,
-						mergeType: mergeResponse.data.merge_type,
-					},
-					"Fork synchronized successfully",
-				);
-			} else {
-				logger.warn(
-					{ fork: this.repositories.fork, status: mergeResponse.status },
-					"Fork synchronization returned unexpected status",
-				);
-			}
-
-			return success;
+			return true;
 		} catch (error) {
-			logger.error({ err: error, fork: this.repositories.fork }, "Failed to synchronize fork");
+			this.logger.error({ err: error, fork: this.repositories.fork }, "Failed to synchronize fork");
 			return false;
 		}
 	}
@@ -255,14 +246,14 @@ export class RepositoryService extends BaseGitHubService {
 
 			if ("content" in response.data) {
 				const content = Buffer.from(response.data.content, "base64").toString();
-				logger.info({ contentLength: content.length }, "Glossary fetched successfully");
+				this.logger.info({ contentLength: content.length }, "Glossary fetched successfully");
 				return content;
 			}
 
-			logger.warn("Glossary file exists but has no content");
+			this.logger.warn("Glossary file exists but has no content");
 			return null;
 		} catch (error) {
-			logger.debug({ err: error }, "Glossary file not found or inaccessible");
+			this.logger.debug({ err: error }, "Glossary file not found or inaccessible");
 			return null;
 		}
 	}

@@ -633,40 +633,6 @@ The workflow uses **environment-specific caching** for isolation and optimal per
 - ✅ **Lockfile change**: Full install, cache updates
 - **Cache key**: `node-modules-{os}-{bun.lock-hash}` - automatically invalidates when dependencies change
 
-#### SQLite Database Cache (Environment-Specific)
-- ✅ **Separate databases** for `development` and `production` environments
-- ✅ **Prevents conflicts** between dev testing and prod translations
-- ✅ **Isolated state** - dev changes don't affect production database
-- **Cache key format**: `sqlite-cache-{repository}-{environment}-{run_id}`
-  - Example (dev): `sqlite-cache-owner/repo-development-123456`
-  - Example (prod): `sqlite-cache-owner/repo-production-789012`
-
-> [!IMPORTANT]
-> **Database Isolation**: Development and production use completely separate database caches. This means:
-> - Testing in development won't affect production translation state
-> - You can safely experiment with database operations in development
-> - Database management operations (backup, restore, clean, inspect) are environment-specific
-
-### Database Management
-
-The **Database Management** workflow provides tools to manage environment-specific databases:
-
-**Available Actions**:
-1. **Backup**: Create a manual backup of the current database
-2. **Restore**: Restore database from a specific artifact
-3. **Clean**: Remove old snapshots (keeps last 10)
-4. **Inspect**: Generate a detailed database report
-
-**Usage**:
-1. Go to **Actions** → **Database Management**
-2. Click **Run workflow**
-3. Select **action** (backup/restore/clean/inspect)
-4. Select **environment** (development/production)
-5. For restore: Provide **artifact_run_id**
-6. Click **Run workflow**
-
-**Environment Selection**: Each database operation is environment-specific, ensuring you're working with the correct database (dev or prod).
-
 ## Troubleshooting
 
 ### Environment-Specific Issues
@@ -746,12 +712,6 @@ gh variable list --repo your-username/translate-react --env development | grep R
 **Problem**: The workflow runs but doesn't sync/translate.
 
 **Solution**: This is normal if upstream hasn't changed. Manually trigger with `workflow_dispatch` to test.
-
-#### Database cache not persisting
-
-**Problem**: Each run starts fresh without previous state.
-
-**Solution**: Check that the cache is being saved/restored correctly in the workflow logs.
 
 #### Wrong Token Being Used
 
@@ -967,53 +927,6 @@ If using Environments properly, this shouldn't happen because:
 2. Review which secrets were used in the logs
 3. If production was compromised, rotate the affected tokens
 4. Verify environment configuration before rerunning
-
-### Why are database caches environment-specific?
-
-**Problem without environment-specific caches**: If both development and production shared the same database cache, you could:
-- Accidentally overwrite production translation state while testing
-- Lose production progress when experimenting in development
-- Have inconsistent state between environments
-
-**Solution**: Environment-specific cache keys ensure:
-- ✅ Development has its own isolated database
-- ✅ Production has its own isolated database
-- ✅ Testing doesn't affect production state
-- ✅ You can safely restore/backup each environment independently
-
-**Cache Key Format**:
-```
-sqlite-cache-{repository}-{environment}-{run_id}
-```
-
-**Example**:
-- Development: `sqlite-cache-owner/repo-development-123456`
-- Production: `sqlite-cache-owner/repo-production-789012`
-
-### How do I backup or restore a database for a specific environment?
-
-Use the **Database Management** workflow:
-
-**To Backup**:
-1. Go to **Actions** → **Database Management**
-2. Click **Run workflow**
-3. Select action: **backup**
-4. Select environment: **development** or **production**
-5. Click **Run workflow**
-6. Artifact will be created: `database-backup-{environment}-manual-{run_id}`
-
-**To Restore**:
-1. Find the artifact name from a previous run (e.g., from the artifacts list)
-2. Note the run ID (e.g., `123456` from `database-backup-production-manual-123456`)
-3. Go to **Actions** → **Database Management**
-4. Click **Run workflow**
-5. Select action: **restore**
-6. Select environment: **development** or **production**
-7. Enter artifact_run_id: `123456`
-8. Click **Run workflow**
-
-> [!TIP]
-> Always backup before performing risky operations like cleaning or major changes!
 
 ## Next Steps
 

@@ -76,10 +76,18 @@ export abstract class BaseGitHubService {
 				timeout: env.GITHUB_REQUEST_TIMEOUT,
 			},
 			log: {
-				debug: (message: string) => octokitLogger.debug(message),
-				info: (message: string) => octokitLogger.info(message),
-				warn: (message: string) => octokitLogger.warn(message),
-				error: (message: string) => octokitLogger.error(message),
+				debug: (message: string) => {
+					octokitLogger.debug(message);
+				},
+				info: (message: string) => {
+					octokitLogger.info(message);
+				},
+				warn: (message: string) => {
+					octokitLogger.warn(message);
+				},
+				error: (message: string) => {
+					octokitLogger.error(message);
+				},
 			},
 		});
 

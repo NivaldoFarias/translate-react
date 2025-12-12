@@ -1,10 +1,3 @@
-/**
- * @fileoverview Tests for specialized error classes
- *
- * Tests for EmptyContentError, TranslationValidationError, ChunkProcessingError,
- * and other error classes to ensure proper error handling and context preservation.
- */
-
 import { describe, expect, test } from "bun:test";
 
 import {

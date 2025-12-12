@@ -1,10 +1,3 @@
-/**
- * @fileoverview Tests for GitHub error mapping helper
- *
- * Tests error mapping, rate limit detection, and GitHub-specific
- * error handling utilities.
- */
-
 import { RequestError } from "@octokit/request-error";
 import { describe, expect, test } from "bun:test";
 import { StatusCodes } from "http-status-codes";
@@ -181,9 +174,8 @@ describe("GithubErrorHelper", () => {
 			const mapped = helper.mapError(error, context);
 
 			expect(mapped.context.operation).toBe("GitHub.getFile");
-			expect(mapped.context.metadata).toEqual(
-				expect.objectContaining({ path: "test.md", repo: "test/repo" }),
-			);
+			expect(mapped.context.metadata?.path).toBe(context.metadata.path);
+			expect(mapped.context.metadata?.repo).toBe(context.metadata.repo);
 		});
 
 		test("should handle RequestError from Octokit", () => {

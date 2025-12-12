@@ -24,7 +24,7 @@ export function setupSignalHandlers(
 
 	for (const signal of Object.values(processSignals)) {
 		process.on(signal, (...args: unknown[]) => {
-			(async () => {
+			void (async () => {
 				try {
 					await cleanUpFn(...args);
 				} catch (error) {
