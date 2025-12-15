@@ -29,7 +29,6 @@ describe("CommentBuilderService", () => {
 		} as unknown as RestEndpointMethodTypes["pulls"]["list"]["response"]["data"][number];
 	};
 
-	/** Helper function to create mock ProcessedFileResult */
 	const createMockResult = (
 		filename: string,
 		prNumber: number | null = null,
@@ -43,18 +42,17 @@ describe("CommentBuilderService", () => {
 		};
 	};
 
-	/** Helper function to create mock TranslationFile */
 	const createMockTranslationFile = (filename: string, path: string): TranslationFile =>
 		new TranslationFile(`# Content of ${filename}`, filename, path, `sha_${filename}`);
 
 	describe("Constructor", () => {
-		test("should initialize correctly", () => {
+		test("should initialize correctly when instantiated", () => {
 			expect(commentBuilderService).toBeInstanceOf(CommentBuilderService);
 		});
 	});
 
 	describe("buildComment", () => {
-		test("should build hierarchical comment from results and files", () => {
+		test("should build hierarchical comment when results and files are provided", () => {
 			const results: ProcessedFileResult[] = [
 				createMockResult("intro.md", 123),
 				createMockResult("api.md", 124),

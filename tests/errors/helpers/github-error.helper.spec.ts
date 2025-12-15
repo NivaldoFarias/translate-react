@@ -9,66 +9,35 @@ describe("GithubErrorHelper", () => {
 	const helper = new GithubErrorHelper();
 
 	describe("RequestError mapping", () => {
-		test("should map 404 RequestError to NotFound", () => {
-			const error = new RequestError("Not Found", StatusCodes.NOT_FOUND, {
-				request: {
-					method: "GET",
-					url: "https://api.github.com/repos/test/test",
-					headers: {},
-				},
-				response: {
-					status: StatusCodes.NOT_FOUND,
-					url: "https://api.github.com/repos/test/test",
-					headers: {},
-					data: {},
-				},
-			});
+		test.each([
+			[StatusCodes.NOT_FOUND, "Not Found", ErrorCode.GithubNotFound],
+			[StatusCodes.UNAUTHORIZED, "Unauthorized", ErrorCode.GithubUnauthorized],
+			[StatusCodes.FORBIDDEN, "Forbidden", ErrorCode.GithubForbidden],
+		])(
+			"should map %d status to %s error code when RequestError occurs",
+			(status, message, expectedCode) => {
+				const error = new RequestError(message, status, {
+					request: {
+						method: "GET",
+						url: "https://api.github.com/repos/test/test",
+						headers: {},
+					},
+					response: {
+						status,
+						url: "https://api.github.com/repos/test/test",
+						headers: {},
+						data: {},
+					},
+				});
 
-			const mapped = helper.mapError(error, { operation: "test" });
+				const mapped = helper.mapError(error, { operation: "test" });
 
-			expect(mapped.code).toBe(ErrorCode.GithubNotFound);
-			expect(mapped.message).toContain("Not Found");
-		});
-
-		test("should map 401 RequestError to Unauthorized", () => {
-			const error = new RequestError("Unauthorized", StatusCodes.UNAUTHORIZED, {
-				request: {
-					method: "GET",
-					url: "https://api.github.com/repos/test/test",
-					headers: {},
-				},
-				response: {
-					status: StatusCodes.UNAUTHORIZED,
-					url: "https://api.github.com/repos/test/test",
-					headers: {},
-					data: {},
-				},
-			});
-
-			const mapped = helper.mapError(error, { operation: "test" });
-
-			expect(mapped.code).toBe(ErrorCode.GithubUnauthorized);
-		});
-
-		test("should map 403 RequestError to Forbidden", () => {
-			const error = new RequestError("Forbidden", StatusCodes.FORBIDDEN, {
-				request: {
-					method: "GET",
-					url: "https://api.github.com/repos/test/test",
-					headers: {},
-				},
-				response: {
-					status: StatusCodes.FORBIDDEN,
-					url: "https://api.github.com/repos/test/test",
-					headers: {},
-					data: {},
-				},
-			});
-
-			const mapped = helper.mapError(error, { operation: "test" });
-
-			expect(mapped.code).toBe(ErrorCode.GithubForbidden);
-		});
+				expect(mapped.code).toBe(expectedCode);
+				if (expectedCode === ErrorCode.GithubNotFound) {
+					expect(mapped.message).toContain(message);
+				}
+			},
+		);
 
 		test("should detect rate limit from error message", () => {
 			const error = new Error("API rate limit exceeded");

@@ -93,7 +93,7 @@ describe("BranchService", () => {
 	});
 
 	describe("Constructor", () => {
-		test("should initialize with configuration from environment", () => {
+		test("should initialize with configuration when service is created", () => {
 			expect(branchService).toBeInstanceOf(BranchService);
 			// @ts-expect-error - Accessing protected property for testing
 			expect(branchService.repositories.upstream).toEqual(mockUpstream);
@@ -101,14 +101,14 @@ describe("BranchService", () => {
 			expect(branchService.repositories.fork).toEqual(mockFork);
 		});
 
-		test("should initialize empty active branches set", () => {
+		test("should initialize empty active branches set when instantiated", () => {
 			const activeBranches = Array.from(branchService.activeBranches);
 			expect(activeBranches).toEqual([]);
 		});
 	});
 
 	describe("createBranch", () => {
-		test("should create branch from main by default", async () => {
+		test("should create branch from main when no base branch is specified", async () => {
 			const result = await branchService.createBranch("feature/test");
 
 			expect(mockOctokit.git.getRef).toHaveBeenCalledWith({
@@ -126,7 +126,7 @@ describe("BranchService", () => {
 			expect(result.data).toBeDefined();
 		});
 
-		test("should create branch from specified base branch", async () => {
+		test("should create branch from specified base branch when base branch is provided", async () => {
 			await branchService.createBranch("feature/test", "develop");
 
 			expect(mockOctokit.git.getRef).toHaveBeenCalledWith({
@@ -135,17 +135,15 @@ describe("BranchService", () => {
 			});
 		});
 
-		test("should track created branch for cleanup", async () => {
+		test("should track created branch when branch is created successfully", async () => {
 			await branchService.createBranch("feature/test");
 
 			const activeBranches = Array.from(branchService.activeBranches);
 			expect(activeBranches).toContain("feature/test");
 		});
 
-		test("should handle branch creation errors and cleanup tracking", () => {
-			// Override mock to simulate error
+		test("should handle branch creation errors and cleanup tracking when error occurs", () => {
 			const errorMock = mock(() => Promise.reject(new Error("Branch creation failed")));
-
 			// @ts-expect-error - Overriding mock for specific test
 			branchService.octokit.git.createRef = errorMock;
 

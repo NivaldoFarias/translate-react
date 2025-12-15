@@ -12,9 +12,6 @@ void mock.module("@/utils/env.util", () => ({
 	},
 }));
 
-/**
- * Concrete implementation of BaseGitHubService for testing
- */
 class TestGitHubService extends BaseGitHubService {
 	public getOctokit() {
 		return this.octokit;
@@ -40,13 +37,13 @@ describe("Base GitHub Service", () => {
 		service = new TestGitHubService();
 	});
 
-	test("should initialize with configuration from environment", () => {
+	test("should initialize with configuration when service is created", () => {
 		expect(service.getOctokit()).toBeDefined();
 		expect(service.getUpstream()).toBeDefined();
 		expect(service.getFork()).toBeDefined();
 	});
 
-	test("should have valid Octokit instance", () => {
+	test("should have valid Octokit instance when initialized", () => {
 		const octokit = service.getOctokit();
 		expect(octokit).toBeDefined();
 		expect(octokit.rest).toBeDefined();

@@ -14,7 +14,7 @@ describe("CacheService", () => {
 	});
 
 	describe("set and get", () => {
-		test("should store and retrieve a value when key is valid", () => {
+		test("should store and retrieve value when valid key is provided", () => {
 			cache.set("key1", "value1", 1000);
 
 			const result = cache.get("key1");
@@ -22,13 +22,13 @@ describe("CacheService", () => {
 			expect(result).toBe("value1");
 		});
 
-		test("should return null when key does not exist", () => {
+		test("should return null when key does not exist in cache", () => {
 			const result = cache.get("nonexistent");
 
 			expect(result).toBeNull();
 		});
 
-		test("should return null when value has expired beyond TTL", async () => {
+		test("should return null when cached value has expired", async () => {
 			cache.set("key1", "value1", 50);
 
 			await new Promise((resolve) => setTimeout(resolve, 100));

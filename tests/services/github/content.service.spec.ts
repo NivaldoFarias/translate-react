@@ -10,7 +10,7 @@ describe("ContentService", () => {
 		contentService = new ContentService();
 	});
 
-	test("should get untranslated files", async () => {
+	test("should get untranslated files when batch size is specified", async () => {
 		const mockTree = {
 			data: {
 				tree: [
@@ -49,7 +49,7 @@ describe("ContentService", () => {
 		expect(files[0]?.sha).toBe("abc123");
 	});
 
-	test("should commit translation", () => {
+	test("should commit translation when valid translation data is provided", () => {
 		const mockBranch = {
 			ref: "refs/heads/translate/test",
 			node_id: "branch-node-id",
@@ -96,7 +96,7 @@ describe("ContentService", () => {
 		).resolves.toBeDefined();
 	});
 
-	test("should create pull request", async () => {
+	test("should create pull request when valid PR data is provided", async () => {
 		const mockPR = {
 			number: 1,
 			title: "test: new translation",

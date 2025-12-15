@@ -53,12 +53,8 @@ describe("LLMErrorHelper", () => {
 			});
 
 			expect(mapped.context.operation).toBe("TranslatorService.callLanguageModel");
-			expect(mapped.context.metadata).toEqual(
-				expect.objectContaining({
-					model: "gpt-4",
-					contentLength: 1500,
-				}),
-			);
+			expect(mapped.context.metadata?.model).toBe("gpt-4");
+			expect(mapped.context.metadata?.contentLength).toBe(1500);
 		});
 	});
 
@@ -114,18 +110,18 @@ describe("LLMErrorHelper", () => {
 			expect(mapped.code).toBe(ErrorCode.RateLimitExceeded);
 		});
 
-		test("should detect rate limit from error message pattern", () => {
-			const patterns = ["rate limit exceeded", "too many requests", "429 error", "quota exceeded"];
-
-			patterns.forEach((message) => {
+		test.each([["rate limit exceeded"], ["too many requests"], ["429 error"], ["quota exceeded"]])(
+			"should detect rate limit when error message contains '%s'",
+			(message) => {
 				const error = new Error(message);
+
 				const mapped = helper.mapError(error, {
 					operation: "TranslatorService.callLanguageModel",
 				});
 
 				expect(mapped.code).toBe(ErrorCode.RateLimitExceeded);
-			});
-		});
+			},
+		);
 
 		test("should handle generic Error instances", () => {
 			const error = new Error("Unknown LLM error");
@@ -208,13 +204,9 @@ describe("LLMErrorHelper", () => {
 				},
 			});
 
-			expect(mapped.context.metadata).toEqual(
-				expect.objectContaining({
-					model: "gpt-4",
-					temperature: 0.7,
-					maxTokens: 2000,
-				}),
-			);
+			expect(mapped.context.metadata?.model).toBe("gpt-4");
+			expect(mapped.context.metadata?.temperature).toBe(0.7);
+			expect(mapped.context.metadata?.maxTokens).toBe(2000);
 		});
 
 		test("should handle missing metadata gracefully", () => {

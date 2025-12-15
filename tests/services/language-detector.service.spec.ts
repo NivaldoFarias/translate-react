@@ -115,22 +115,23 @@ mesmo com a presença deste código em inglês no meio do documento.
 	});
 
 	describe("detectLanguage", () => {
-		test("should detect English content", async () => {
+		test("should detect English content when English text is provided", async () => {
 			const englishText =
 				"This is a comprehensive English text sample for testing language detection purposes.";
+
 			const detected = await detector.detectPrimaryLanguage(englishText);
 
 			expect(detected).toBeDefined();
 			expect(detected).toBe("en");
 		});
 
-		test("should detect Portuguese content", async () => {
+		test("should detect Portuguese content when Portuguese text is provided", async () => {
 			const portugueseText =
 				"Este é um texto abrangente em português brasileiro para fins de teste de detecção de idioma com conteúdo suficiente.";
+
 			const detected = await detector.detectPrimaryLanguage(portugueseText);
 
 			expect(detected).toBeDefined();
-			// CLD may return "pt" for Portuguese content
 			expect(detected).not.toBe("en");
 			expect(detected).not.toBe("und");
 		});
