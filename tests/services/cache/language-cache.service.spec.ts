@@ -14,7 +14,7 @@ describe("LanguageCacheService", () => {
 	});
 
 	describe("set and get", () => {
-		test("should store and retrieve language detection result when valid parameters provided", () => {
+		test("should store and retrieve language detection result when valid entry is provided", () => {
 			const entry = {
 				detectedLanguage: "pt",
 				confidence: 0.99,
@@ -22,31 +22,32 @@ describe("LanguageCacheService", () => {
 			};
 
 			cache.set("docs/hello.md", "abc123", entry);
+
 			const result = cache.get("docs/hello.md", "abc123");
 
 			expect(result).toEqual(entry);
 		});
 
-		test("should return null when file does not exist in cache", () => {
+		test("should return null when requested file does not exist in cache", () => {
 			const result = cache.get("docs/nonexistent.md", "xyz789");
 
 			expect(result).toBeNull();
 		});
 
-		test("should return null when content hash differs from cached entry", () => {
+		test("should return null when content hash differs from cached entry hash", () => {
 			const entry = {
 				detectedLanguage: "pt",
 				confidence: 0.99,
 				timestamp: Date.now(),
 			};
-
 			cache.set("docs/hello.md", "abc123", entry);
+
 			const result = cache.get("docs/hello.md", "different-hash");
 
 			expect(result).toBeNull();
 		});
 
-		test("should isolate cache entries using composite key when same filename has different hashes", () => {
+		test("should isolate cache entries when same filename has different content hashes", () => {
 			const entry1 = {
 				detectedLanguage: "pt",
 				confidence: 0.99,
@@ -67,7 +68,7 @@ describe("LanguageCacheService", () => {
 	});
 
 	describe("getMany", () => {
-		test("should retrieve multiple language cache entries efficiently when all entries exist", () => {
+		test("should retrieve multiple language cache entries when all entries exist", () => {
 			const entry1 = {
 				detectedLanguage: "pt",
 				confidence: 0.99,
@@ -83,10 +84,10 @@ describe("LanguageCacheService", () => {
 				confidence: 0.97,
 				timestamp: Date.now(),
 			};
-
 			cache.set("docs/file1.md", "hash1", entry1);
 			cache.set("docs/file2.md", "hash2", entry2);
 			cache.set("docs/file3.md", "hash3", entry3);
+
 			const results = cache.getMany([
 				{ filename: "docs/file1.md", contentHash: "hash1" },
 				{ filename: "docs/file2.md", contentHash: "hash2" },

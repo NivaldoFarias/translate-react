@@ -18,7 +18,7 @@ import {
 	LLMErrorHelper,
 	TranslationValidationError,
 } from "@/errors/";
-import { CONFIGS, RateLimiterService } from "@/services/rate-limiter/";
+import { llmRateLimiter } from "@/services/rate-limiter/";
 import { env, LANGUAGE_SPECIFIC_RULES, logger, MAX_CHUNK_TOKENS } from "@/utils/";
 
 import { LanguageDetectorService } from "./language-detector.service";
@@ -95,9 +95,6 @@ export class TranslatorService {
 		},
 	});
 
-	/** Rate limiter for LLM API requests */
-	private readonly rateLimiter: RateLimiterService;
-
 	private readonly helpers = {
 		llm: new LLMErrorHelper(),
 		github: new GithubErrorHelper(),
@@ -106,17 +103,6 @@ export class TranslatorService {
 	public readonly languageDetector = new LanguageDetectorService();
 
 	public glossary: string | null = null;
-
-	/**
-	 * Creates a new translator service instance.
-	 *
-	 * Initializes the OpenAI client and rate limiter for LLM API requests.
-	 *
-	 * @param rateLimiter Optional rate limiter instance (creates new one if not provided)
-	 */
-	constructor(rateLimiter?: RateLimiterService) {
-		this.rateLimiter = rateLimiter ?? new RateLimiterService({ llm: CONFIGS.freeLLM });
-	}
 
 	/**
 	 * Main translation method that processes files and manages the translation workflow.
@@ -746,7 +732,7 @@ export class TranslatorService {
 				"Calling language model for translation",
 			);
 
-			const completion = await this.rateLimiter.schedule("llm", () =>
+			const completion = await llmRateLimiter.schedule(() =>
 				this.llm.chat.completions.create({
 					model: env.LLM_MODEL,
 					temperature: 0.1,

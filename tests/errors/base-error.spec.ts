@@ -4,7 +4,7 @@ import { ErrorCode, TranslationError } from "@/errors/base-error";
 
 describe("TranslationError", () => {
 	describe("Constructor", () => {
-		test("should create error with basic properties", () => {
+		test("should create error with basic properties when instantiated", () => {
 			const error = new TranslationError("Test error", ErrorCode.GithubApiError, {
 				operation: "test.operation",
 			});
@@ -16,7 +16,7 @@ describe("TranslationError", () => {
 			expect(error.name).toBe("TranslationError");
 		});
 
-		test("should preserve error context", () => {
+		test("should preserve error context when context object is provided", () => {
 			const context = {
 				operation: "test.operation",
 				file: "test.ts",
@@ -30,7 +30,7 @@ describe("TranslationError", () => {
 			expect(error.context.metadata).toEqual({ key: "value" });
 		});
 
-		test("should include timestamp in context", () => {
+		test("should include timestamp in context when error is created", () => {
 			const error = new TranslationError("Test error", ErrorCode.UnknownError, {
 				operation: "test",
 			});
@@ -39,7 +39,7 @@ describe("TranslationError", () => {
 			expect(error.context.timestamp).toBeInstanceOf(Date);
 		});
 
-		test("should preserve stack trace", () => {
+		test("should preserve stack trace when error is created", () => {
 			const error = new TranslationError("Test error", ErrorCode.UnknownError, {
 				operation: "test",
 			});
@@ -50,18 +50,15 @@ describe("TranslationError", () => {
 	});
 
 	describe("Error Codes", () => {
-		test("should handle different error codes", () => {
-			const codes = [
-				ErrorCode.GithubApiError,
-				ErrorCode.NotFound,
-				ErrorCode.UnknownError,
-				ErrorCode.RateLimitExceeded,
-			];
+		test.each([
+			[ErrorCode.GithubApiError],
+			[ErrorCode.NotFound],
+			[ErrorCode.UnknownError],
+			[ErrorCode.RateLimitExceeded],
+		])("should handle error code %s when provided", (code) => {
+			const error = new TranslationError("Test", code, { operation: "test" });
 
-			codes.forEach((code) => {
-				const error = new TranslationError("Test", code, { operation: "test" });
-				expect(error.code).toBe(code);
-			});
+			expect(error.code).toBe(code);
 		});
 	});
 

@@ -3,7 +3,7 @@ import { Octokit } from "@octokit/rest";
 import type { components } from "@octokit/openapi-types";
 
 import { GithubErrorHelper, LLMErrorHelper } from "@/errors/";
-import { CONFIGS, RateLimiterService } from "@/services/rate-limiter/";
+import { githubRateLimiter } from "@/services/rate-limiter/";
 import { env, logger } from "@/utils/";
 
 /** GitHub repository metadata for fork and upstream repositories */
@@ -17,6 +17,8 @@ export interface BaseRepositories {
 	upstream: RepositoryMetadata;
 	fork: RepositoryMetadata;
 }
+
+const octokitLogger = logger.child({ component: "octokit" });
 
 /**
  * Base service for GitHub operations.
@@ -33,10 +35,26 @@ export interface BaseRepositories {
  */
 export abstract class BaseGitHubService {
 	/** GitHub API client instance */
-	protected readonly octokit: Octokit;
-
-	/** Rate limiter for GitHub API requests */
-	protected readonly rateLimiter: RateLimiterService;
+	protected readonly octokit = new Octokit({
+		auth: env.GITHUB_TOKEN,
+		request: {
+			timeout: env.GITHUB_REQUEST_TIMEOUT,
+		},
+		log: {
+			debug: (message: string) => {
+				octokitLogger.debug(message);
+			},
+			info: (message: string) => {
+				octokitLogger.info(message);
+			},
+			warn: (message: string) => {
+				octokitLogger.warn(message);
+			},
+			error: (message: string) => {
+				octokitLogger.error(message);
+			},
+		},
+	});
 
 	protected readonly helpers = {
 		llm: new LLMErrorHelper(),
@@ -54,45 +72,6 @@ export abstract class BaseGitHubService {
 			repo: env.REPO_FORK_NAME,
 		},
 	};
-
-	/**
-	 * Creates a new base GitHub service instance.
-	 *
-	 * Initializes Octokit client with authentication and logging integration.
-	 * Octokit operations are logged through a child logger that respects the
-	 * application's `LOG_LEVEL` configuration for consistent observability.
-	 *
-	 * Configures request timeouts to prevent indefinite hangs on API calls.
-	 * Also initializes rate limiting to prevent hitting GitHub API limits.
-	 *
-	 * @param rateLimiter Optional rate limiter instance (creates new one if not provided)
-	 */
-	constructor(rateLimiter?: RateLimiterService) {
-		const octokitLogger = logger.child({ component: "octokit" });
-
-		this.octokit = new Octokit({
-			auth: env.GITHUB_TOKEN,
-			request: {
-				timeout: env.GITHUB_REQUEST_TIMEOUT,
-			},
-			log: {
-				debug: (message: string) => {
-					octokitLogger.debug(message);
-				},
-				info: (message: string) => {
-					octokitLogger.info(message);
-				},
-				warn: (message: string) => {
-					octokitLogger.warn(message);
-				},
-				error: (message: string) => {
-					octokitLogger.error(message);
-				},
-			},
-		});
-
-		this.rateLimiter = rateLimiter ?? new RateLimiterService({ github: CONFIGS.githubAPI });
-	}
 
 	/**
 	 * Executes a GitHub API request with rate limiting.
@@ -113,6 +92,6 @@ export abstract class BaseGitHubService {
 	 * ```
 	 */
 	protected async withRateLimit<T>(fn: () => Promise<T>, priority?: number): Promise<T> {
-		return this.rateLimiter.schedule("github", fn, priority);
+		return githubRateLimiter.schedule(fn, priority);
 	}
 }

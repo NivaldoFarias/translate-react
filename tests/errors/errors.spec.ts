@@ -14,16 +14,15 @@ import {
 
 describe("Specialized Error Classes", () => {
 	describe("EmptyContentError", () => {
-		test("should create error with filename", () => {
+		test("should create error with filename when instantiated", () => {
 			const error = new EmptyContentError("test.md");
 
 			expect(error).toBeInstanceOf(Error);
 			expect(error.message).toContain("test.md");
 			expect(error.message).toContain("empty");
-			// File is in message, but not explicitly set in context.file
 		});
 
-		test("should include additional context", () => {
+		test("should include additional context when context object is provided", () => {
 			const error = new EmptyContentError("test.md", {
 				metadata: { size: 0 },
 			});
@@ -31,7 +30,7 @@ describe("Specialized Error Classes", () => {
 			expect(error.context.metadata).toEqual({ size: 0 });
 		});
 
-		test("should have correct error code", () => {
+		test("should have correct error code when created", () => {
 			const error = new EmptyContentError("test.md");
 
 			expect(error.code).toBeDefined();
@@ -39,7 +38,7 @@ describe("Specialized Error Classes", () => {
 	});
 
 	describe("TranslationValidationError", () => {
-		test("should create error with reason and filename", () => {
+		test("should create error with reason and filename when instantiated", () => {
 			const error = new TranslationValidationError("Invalid format", "test.md");
 
 			expect(error.message).toContain("Invalid format");

@@ -4,126 +4,89 @@ import type { RateLimiterConfig, RateLimiterMetrics } from "./rate-limiter.types
 
 import { logger } from "@/utils";
 
-import { DEFAULT_RATE_LIMITER_METRICS } from "./rate-limiter.config";
+import { CONFIGS } from "./rate-limiter.config";
 
 /**
- * Service for rate limiting API requests across different providers.
+ * Rate limiter for a single API service.
  *
- * Uses token bucket algorithm to enforce rate limits while maximizing throughput.
- * Supports dynamic service registration - any number of services can be registered
- * with their own rate limit configurations.
+ * Wraps Bottleneck with centralized event listener setup, metrics tracking,
+ * and logging. Each instance manages rate limiting for one specific API.
  *
  * ### Features
  *
- * - Dynamic per-service rate limiting
- * - Token bucket with burst capacity
+ * - Token bucket algorithm with burst capacity
  * - Request queuing and prioritization
  * - Comprehensive metrics tracking
- * - Automatic retry on rate limit errors
- * - Graceful degradation
+ * - Automatic error handling
+ * - Graceful shutdown
  *
  * @example
  * ```typescript
- * // Register services with custom configs
- * const rateLimiter = new RateLimiterService({
- *   github: { maxConcurrent: 10, minTime: 720, reservoir: 5 },
- *   llm: { maxConcurrent: 1, minTime: 60_000, reservoir: 1 }
- * });
+ * import { githubRateLimiter, llmRateLimiter } from '@/services/rate-limiter';
  *
- * // Schedule requests for registered services
- * const repos = await rateLimiter.schedule('github',
+ * // Schedule GitHub API request
+ * const repos = await githubRateLimiter.schedule(
  *   () => octokit.repos.listForOrg({ org: 'facebook' })
  * );
  *
- * const translation = await rateLimiter.schedule('llm',
- *   () => openai.chat.completions.create({ ... })
+ * // Schedule LLM API request with priority
+ * const completion = await llmRateLimiter.schedule(
+ *   () => openai.chat.completions.create({ ... }),
+ *   5
  * );
  * ```
  */
-export class RateLimiterService {
-	private readonly logger = logger.child({ component: RateLimiterService.name });
+export class RateLimiter {
+	private readonly logger = logger.child({ component: RateLimiter.name });
 
-	/** Rate limiter instances for registered services */
-	private readonly limiters: Map<string, Bottleneck>;
+	/** Bottleneck rate limiter instance */
+	private readonly limiter: Bottleneck;
 
-	/** Metrics tracking for each registered service */
-	private metrics: Map<string, RateLimiterMetrics>;
+	/** Metrics tracking for this rate limiter */
+	private readonly metrics: RateLimiterMetrics;
+
+	/** Identifier for logging context */
+	private readonly name: string;
+
+	/** Tracks whether shutdown has been called */
+	private isShutdown = false;
 
 	/**
-	 * Creates a new rate limiter service instance.
+	 * Creates a new rate limiter instance.
 	 *
-	 * Initializes Bottleneck instances for each provided service configuration.
-	 * Services are registered dynamically based on the config map provided.
+	 * Initializes Bottleneck with the provided configuration and sets up
+	 * event handlers for metrics tracking, logging, and error handling.
 	 *
-	 * @param configs Map of service identifiers to their rate limiter configurations
+	 * @param config Rate limiter configuration
+	 * @param name Identifier for logging and metrics context
 	 *
 	 * @example
 	 * ```typescript
-	 * // Register multiple services
-	 * const rateLimiter = new RateLimiterService({
-	 *   github: { maxConcurrent: 10, minTime: 720 },
-	 *   llm: { maxConcurrent: 1, minTime: 60_000 },
-	 *   stripe: { maxConcurrent: 5, minTime: 100 }
-	 * });
-	 *
-	 * // Register single service
-	 * const rateLimiter = new RateLimiterService({
-	 *   'weather-api': { maxConcurrent: 3, minTime: 1000 }
-	 * });
+	 * const limiter = new RateLimiter(CONFIGS.githubAPI, 'github');
 	 * ```
 	 */
-	constructor(configs: Record<string, RateLimiterConfig>) {
-		this.limiters = new Map();
-		this.metrics = new Map();
+	constructor(config: RateLimiterConfig, name: string) {
+		this.name = name;
+		this.metrics = {
+			totalRequests: 0,
+			queuedRequests: 0,
+			runningRequests: 0,
+			failedRequests: 0,
+			averageWaitTime: 0,
+		};
 
-		for (const [serviceId, config] of Object.entries(configs)) {
-			this.registerService(serviceId, config);
-		}
-
-		this.logger.info(
-			{ services: Array.from(this.limiters.keys()), count: this.limiters.size },
-			"Rate limiter service initialized with registered services",
-		);
-	}
-
-	/**
-	 * Registers a new service with the rate limiter.
-	 *
-	 * Can be called after construction to add services dynamically.
-	 *
-	 * @param serviceId Unique identifier for the service
-	 * @param config Rate limiter configuration for this service
-	 *
-	 * @throws {Error} If service is already registered
-	 *
-	 * @example
-	 * ```typescript
-	 * rateLimiter.registerService('new-api', {
-	 *   maxConcurrent: 2,
-	 *   minTime: 500
-	 * });
-	 * ```
-	 */
-	public registerService(serviceId: string, config: RateLimiterConfig): void {
-		if (this.limiters.has(serviceId)) {
-			throw new Error(`Service '${serviceId}' is already registered`);
-		}
-
-		this.metrics.set(serviceId, DEFAULT_RATE_LIMITER_METRICS);
-
-		const limiter = this.createLimiter(serviceId, config);
-		this.limiters.set(serviceId, limiter);
+		this.limiter = this.createLimiter(config);
 
 		this.logger.info(
 			{
-				service: serviceId,
+				name: this.name,
 				config: {
 					maxConcurrent: config.maxConcurrent,
 					minTime: config.minTime,
 					reservoir: config.reservoir,
 				},
 			},
-			"Service registered with rate limiter",
+			"Rate limiter initialized",
 		);
 	}
 
@@ -131,35 +94,26 @@ export class RateLimiterService {
 	 * Creates and configures a Bottleneck limiter instance.
 	 *
 	 * Sets up event handlers for metrics tracking, logging, and error handling.
+	 * All event listener setup is centralized here to ensure consistent behavior.
 	 *
-	 * @param serviceId Identifier of service for logging context
 	 * @param config Rate limiter configuration
 	 *
 	 * @returns Configured Bottleneck instance
 	 */
-	private createLimiter(serviceId: string, config: RateLimiterConfig): Bottleneck {
-		const limiter = new Bottleneck({
-			maxConcurrent: config.maxConcurrent,
-			minTime: config.minTime,
-			reservoir: config.reservoir,
-			reservoirRefreshAmount: config.reservoirRefreshAmount,
-			reservoirRefreshInterval: config.reservoirRefreshInterval,
-			highWater: config.highWater,
-			strategy: Bottleneck.strategy.LEAK,
-		});
-
-		const metrics = this.metrics.get(serviceId);
-		if (!metrics) {
-			throw new Error(`Metrics not initialized for service '${serviceId}'`);
-		}
+	private createLimiter(config: RateLimiterConfig): Bottleneck {
+		const limiter = new Bottleneck({ ...config, strategy: Bottleneck.strategy.LEAK });
 
 		/** Track when requests are queued */
 		limiter.on("queued", () => {
-			metrics.queuedRequests++;
+			this.metrics.queuedRequests++;
 
 			if (config.debug) {
 				this.logger.debug(
-					{ service: serviceId, queued: metrics.queuedRequests, running: metrics.runningRequests },
+					{
+						name: this.name,
+						queued: this.metrics.queuedRequests,
+						running: this.metrics.runningRequests,
+					},
 					"Request queued",
 				);
 			}
@@ -167,12 +121,16 @@ export class RateLimiterService {
 
 		/** Track when requests start executing */
 		limiter.on("executing", () => {
-			metrics.runningRequests++;
-			metrics.queuedRequests = Math.max(0, metrics.queuedRequests - 1);
+			this.metrics.runningRequests++;
+			this.metrics.queuedRequests = Math.max(0, this.metrics.queuedRequests - 1);
 
 			if (config.debug) {
 				this.logger.debug(
-					{ service: serviceId, running: metrics.runningRequests, queued: metrics.queuedRequests },
+					{
+						name: this.name,
+						running: this.metrics.runningRequests,
+						queued: this.metrics.queuedRequests,
+					},
 					"Request executing",
 				);
 			}
@@ -180,13 +138,17 @@ export class RateLimiterService {
 
 		/** Track when requests complete successfully */
 		limiter.on("done", () => {
-			metrics.runningRequests = Math.max(0, metrics.runningRequests - 1);
-			metrics.totalRequests++;
-			metrics.lastRequestTime = new Date();
+			this.metrics.runningRequests = Math.max(0, this.metrics.runningRequests - 1);
+			this.metrics.totalRequests++;
+			this.metrics.lastRequestTime = new Date();
 
 			if (config.debug) {
 				this.logger.debug(
-					{ service: serviceId, total: metrics.totalRequests, running: metrics.runningRequests },
+					{
+						name: this.name,
+						total: this.metrics.totalRequests,
+						running: this.metrics.runningRequests,
+					},
 					"Request completed",
 				);
 			}
@@ -194,15 +156,15 @@ export class RateLimiterService {
 
 		/** Track when requests fail */
 		limiter.on("failed", (error: Error) => {
-			metrics.failedRequests++;
-			metrics.lastError = error.message;
+			this.metrics.failedRequests++;
+			this.metrics.lastError = error.message;
 
 			this.logger.warn(
 				{
-					service: serviceId,
+					name: this.name,
 					error: error.message,
-					failed: metrics.failedRequests,
-					total: metrics.totalRequests,
+					failed: this.metrics.failedRequests,
+					total: this.metrics.totalRequests,
 				},
 				"Rate limited request failed",
 			);
@@ -211,7 +173,7 @@ export class RateLimiterService {
 		/** Warn when queue size exceeds high water mark */
 		limiter.on("depleted", () => {
 			this.logger.warn(
-				{ service: serviceId, queued: metrics.queuedRequests, highWater: config.highWater },
+				{ name: this.name, queued: this.metrics.queuedRequests, highWater: config.highWater },
 				"Rate limiter queue depleted (high water mark reached)",
 			);
 		});
@@ -220,177 +182,162 @@ export class RateLimiterService {
 	}
 
 	/**
-	 * Schedules an API request with rate limiting for a specific service.
+	 * Schedules an API request with rate limiting.
 	 *
-	 * Queues the request and executes it when the service's rate limit allows.
-	 * Automatically handles queueing and throttling based on service configuration.
+	 * Queues the request and executes it when the rate limit allows.
+	 * Automatically handles queueing and throttling based on configuration.
 	 *
-	 * @param serviceId Identifier of the registered service
 	 * @param fn Function that performs the API request
 	 * @param priority Optional priority (higher = executed sooner)
 	 *
 	 * @returns Promise resolving to the request result
 	 *
-	 * @throws {Error} If service is not registered
-	 *
 	 * @example
 	 * ```typescript
-	 * // Schedule GitHub API request
-	 * const repos = await rateLimiter.schedule('github',
-	 *   () => octokit.repos.listForOrg({ org: 'facebook' }),
-	 *   5 // High priority
+	 * // Schedule request
+	 * const repos = await githubRateLimiter.schedule(
+	 *   () => octokit.repos.listForOrg({ org: 'facebook' })
 	 * );
 	 *
-	 * // Schedule LLM API request
-	 * const completion = await rateLimiter.schedule('llm',
-	 *   () => openai.chat.completions.create({ ... })
-	 * );
-	 *
-	 * // Schedule custom service request
-	 * const weather = await rateLimiter.schedule('weather-api',
-	 *   () => fetch('https://api.weather.com/current')
+	 * // Schedule with priority
+	 * const completion = await llmRateLimiter.schedule(
+	 *   () => openai.chat.completions.create({ ... }),
+	 *   5
 	 * );
 	 * ```
 	 */
-	public async schedule<T>(serviceId: string, fn: () => Promise<T>, priority?: number): Promise<T> {
-		const limiter = this.limiters.get(serviceId);
-
-		if (!limiter) {
-			throw new Error(
-				`Service '${serviceId}' is not registered. Available services: ${Array.from(this.limiters.keys()).join(", ")}`,
-			);
-		}
-
-		return limiter.schedule({ priority }, fn);
+	public async schedule<T>(fn: () => Promise<T>, priority?: number): Promise<T> {
+		return this.limiter.schedule({ priority }, fn);
 	}
 
 	/**
-	 * Retrieves current metrics for a service.
+	 * Retrieves current metrics snapshot.
 	 *
 	 * Provides insights into rate limiter behavior, queue status,
 	 * and API usage patterns.
 	 *
-	 * @param serviceId Identifier of service to get metrics for
-	 *
-	 * @returns Current metrics snapshot, or undefined if service not registered
+	 * @returns Current metrics snapshot
 	 *
 	 * @example
 	 * ```typescript
-	 * const metrics = rateLimiter.getMetrics('github');
-	 * if (metrics) {
-	 *   console.log(`Total requests: ${metrics.totalRequests}`);
-	 *   console.log(`Queued: ${metrics.queuedRequests}`);
-	 * }
+	 * const metrics = githubRateLimiter.getMetrics();
+	 * console.log(`Total requests: ${metrics.totalRequests}`);
+	 * console.log(`Queued: ${metrics.queuedRequests}`);
 	 * ```
 	 */
-	public getMetrics(serviceId: string): Readonly<RateLimiterMetrics> | undefined {
-		const metrics = this.metrics.get(serviceId);
-		return metrics ? { ...metrics } : undefined;
+	public getMetrics(): Readonly<RateLimiterMetrics> {
+		return { ...this.metrics };
 	}
 
 	/**
-	 * Retrieves metrics for all registered services.
-	 *
-	 * @returns Map of service identifiers to their metrics
-	 *
-	 * @example
-	 * ```typescript
-	 * const allMetrics = rateLimiter.getAllMetrics();
-	 * for (const [service, metrics] of allMetrics) {
-	 *   console.log(`${service}: ${metrics.totalRequests} requests`);
-	 * }
-	 * ```
-	 */
-	public getAllMetrics(): ReadonlyMap<string, Readonly<RateLimiterMetrics>> {
-		const snapshot = new Map<string, Readonly<RateLimiterMetrics>>();
-		for (const [serviceId, metrics] of this.metrics) {
-			snapshot.set(serviceId, { ...metrics });
-		}
-		return snapshot;
-	}
-
-	/**
-	 * Lists all registered service identifiers.
-	 *
-	 * @returns Array of registered service identifiers
-	 *
-	 * @example
-	 * ```typescript
-	 * const services = rateLimiter.getRegisteredServices();
-	 * console.log('Available services:', services); // ['github', 'llm', 'stripe']
-	 * ```
-	 */
-	public getRegisteredServices(): readonly string[] {
-		return Array.from(this.limiters.keys());
-	}
-
-	/**
-	 * Clears all queued requests for a service.
+	 * Clears all queued requests.
 	 *
 	 * Useful for emergency shutdowns or when you want to abandon
-	 * all pending requests.
-	 *
-	 * @param serviceId Identifier of service to clear queue for
-	 *
-	 * @throws {Error} If service is not registered
+	 * all pending requests. Note: This effectively stops the limiter.
 	 *
 	 * @example
 	 * ```typescript
-	 * // Clear GitHub queue
-	 * rateLimiter.clearQueue('github');
+	 * githubRateLimiter.clearQueue();
 	 * ```
 	 */
-	public clearQueue(serviceId: string): void {
-		const limiter = this.limiters.get(serviceId);
-		const metrics = this.metrics.get(serviceId);
-
-		if (!limiter || !metrics) {
-			throw new Error(`Service '${serviceId}' is not registered`);
+	public clearQueue(): void {
+		if (this.isShutdown) {
+			this.logger.debug({ name: this.name }, "Rate limiter already shut down, cannot clear queue");
+			return;
 		}
 
-		const queuedCount = metrics.queuedRequests;
+		const queuedCount = this.metrics.queuedRequests;
 
-		void limiter.stop({ dropWaitingJobs: true });
+		void this.limiter.stop({ dropWaitingJobs: true });
+		this.isShutdown = true;
 
-		this.logger.warn(
-			{ service: serviceId, clearedJobs: queuedCount },
-			"Rate limiter queue cleared",
-		);
+		this.logger.warn({ name: this.name, clearedJobs: queuedCount }, "Rate limiter queue cleared");
 
-		metrics.queuedRequests = 0;
+		this.metrics.queuedRequests = 0;
 	}
 
 	/**
-	 * Gracefully shuts down all rate limiters.
+	 * Gracefully shuts down the rate limiter.
 	 *
 	 * Waits for running requests to complete but drops queued requests.
-	 * Should be called during application shutdown.
+	 * Should be called during application shutdown. Safe to call multiple times.
+	 *
+	 * @param dropWaitingJobs Whether to drop waiting jobs (default: true)
 	 *
 	 * @example
 	 * ```typescript
 	 * process.on('SIGTERM', async () => {
-	 *   await rateLimiter.shutdown();
+	 *   await githubRateLimiter.shutdown();
 	 *   process.exit(0);
 	 * });
 	 * ```
 	 */
-	public async shutdown(): Promise<void> {
-		this.logger.info(
-			{ services: Array.from(this.limiters.keys()), count: this.limiters.size },
-			"Shutting down rate limiters...",
-		);
-
-		const shutdownPromises = Array.from(this.limiters.values()).map((limiter) =>
-			limiter.stop({ dropWaitingJobs: true }),
-		);
-
-		await Promise.all(shutdownPromises);
-
-		const finalMetrics: Record<string, RateLimiterMetrics> = {};
-		for (const [serviceId, metrics] of this.metrics) {
-			finalMetrics[serviceId] = metrics;
+	public async shutdown(dropWaitingJobs = true): Promise<void> {
+		if (this.isShutdown) {
+			this.logger.debug({ name: this.name }, "Rate limiter already shut down, skipping");
+			return;
 		}
 
-		this.logger.info({ metrics: finalMetrics }, "Rate limiters shut down");
+		this.isShutdown = true;
+		this.logger.info({ name: this.name }, "Shutting down rate limiter...");
+
+		await this.limiter.stop({ dropWaitingJobs });
+
+		this.logger.info({ name: this.name, metrics: this.metrics }, "Rate limiter shut down");
 	}
 }
+
+/**
+ * Creates a new rate limiter instance.
+ *
+ * Factory function for creating rate limiters with custom configurations.
+ * Useful for testing or creating additional rate limiters at runtime.
+ *
+ * @param config Rate limiter configuration
+ * @param name Identifier for logging and metrics context
+ *
+ * @returns New RateLimiter instance
+ *
+ * @example
+ * ```typescript
+ * // For testing
+ * const testLimiter = createRateLimiter(CONFIGS.githubAPI, 'test-github');
+ * ```
+ */
+export function createRateLimiter(config: RateLimiterConfig, name: string): RateLimiter {
+	return new RateLimiter(config, name);
+}
+
+/**
+ * Singleton rate limiter instance for GitHub API requests.
+ *
+ * Pre-configured with GitHub API rate limits (5000 requests/hour).
+ * Use this instance across the entire application for GitHub API calls.
+ *
+ * @example
+ * ```typescript
+ * import { githubRateLimiter } from '@/services/rate-limiter';
+ *
+ * const repos = await githubRateLimiter.schedule(
+ *   () => octokit.repos.listForOrg({ org: 'facebook' })
+ * );
+ * ```
+ */
+export const githubRateLimiter = new RateLimiter(CONFIGS.githubAPI, "github");
+
+/**
+ * Singleton rate limiter instance for LLM API requests (free tier).
+ *
+ * Pre-configured with free tier LLM rate limits (1-2 requests/minute).
+ * Use this instance across the entire application for LLM API calls.
+ *
+ * @example
+ * ```typescript
+ * import { llmRateLimiter } from '@/services/rate-limiter';
+ *
+ * const completion = await llmRateLimiter.schedule(
+ *   () => openai.chat.completions.create({ ... })
+ * );
+ * ```
+ */
+export const llmRateLimiter = new RateLimiter(CONFIGS.freeLLM, "llm");

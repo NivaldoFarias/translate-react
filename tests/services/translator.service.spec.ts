@@ -45,14 +45,13 @@ describe("TranslatorService", () => {
 	});
 
 	describe("translateContent", () => {
-		test("should translate content successfully", async () => {
+		test("should translate content successfully when valid content is provided", async () => {
 			const mockResponse = {
 				choices: [{ message: { content: "Olá mundo" } }],
 			};
 			mockOpenAI.chat.completions.create = mock(() => Promise.resolve(mockResponse));
 			// @ts-expect-error - Mocking private property for testing
 			translatorService.llm = mockOpenAI as unknown as OpenAI;
-
 			const file: TranslationFile = {
 				path: "test/file.md",
 				content: "Hello world",
@@ -66,7 +65,7 @@ describe("TranslatorService", () => {
 			expect(mockOpenAI.chat.completions.create).toHaveBeenCalledTimes(1);
 		});
 
-		test("should handle empty content with error", () => {
+		test("should throw error when content is empty", () => {
 			const file: TranslationFile = {
 				path: "test/empty.md",
 				content: "",
@@ -77,7 +76,7 @@ describe("TranslatorService", () => {
 			expect(translatorService.translateContent(file)).rejects.toThrow("File content is empty");
 		});
 
-		test("should handle whitespace-only content", () => {
+		test("should throw error when content is whitespace-only", () => {
 			mockOpenAI.chat.completions.create = mock(() =>
 				Promise.resolve({
 					choices: [{ message: { content: "   \n\t  \n  " } }],
