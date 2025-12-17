@@ -1,6 +1,6 @@
 import pino from "pino";
 
-import {  RuntimeEnvironment } from "./constants.util";
+import { RuntimeEnvironment } from "./constants.util";
 import { env } from "./env.util";
 
 /**

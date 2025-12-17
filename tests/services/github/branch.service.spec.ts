@@ -165,6 +165,7 @@ describe("BranchService", () => {
 			);
 		});
 	});
+
 	describe("getBranch", () => {
 		test("should retrieve branch information", async () => {
 			const result = await branchService.getBranch("main");
@@ -203,6 +204,7 @@ describe("BranchService", () => {
 			expect(branchService.getBranch("protected")).rejects.toThrow("Forbidden");
 		});
 	});
+
 	describe("deleteBranch", () => {
 		test("should delete branch and remove from tracking", async () => {
 			await branchService.createBranch("feature/test");
@@ -234,6 +236,7 @@ describe("BranchService", () => {
 			expect(activeBranches).not.toContain("feature/test");
 		});
 	});
+
 	describe("getActiveBranches", () => {
 		test("should return empty array when no branches tracked", () => {
 			const activeBranches = Array.from(branchService.activeBranches);
@@ -330,6 +333,7 @@ describe("BranchService", () => {
 			expect(result).toBe(false);
 		});
 	});
+
 	describe("Cleanup and Error Handling", () => {
 		test("should clean up all active branches", async () => {
 			// Mock contentService to avoid network calls
@@ -381,6 +385,7 @@ describe("BranchService", () => {
 			const activeBranches = Array.from(branchService.activeBranches);
 			expect(activeBranches).not.toContain("feature/test");
 		});
+
 		test("should handle rate limiting", () => {
 			const rateLimitError = new Error("API rate limit exceeded");
 			// @ts-expect-error - Adding status property to Error for testing
@@ -393,6 +398,7 @@ describe("BranchService", () => {
 			expect(branchService.createBranch("feature/test")).rejects.toThrow("API rate limit exceeded");
 		});
 	});
+
 	describe("Branch Name Validation", () => {
 		test("should handle special characters in branch names", async () => {
 			await branchService.createBranch("feature/test-branch_123");
