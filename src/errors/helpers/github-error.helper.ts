@@ -7,6 +7,8 @@ import { ErrorCode, ErrorHelper, ErrorSeverity, TranslationError } from "@/error
 import { detectRateLimit, logger } from "@/utils/";
 
 export class GithubErrorHelper implements ErrorHelper {
+	private readonly logger = logger.child({ component: GithubErrorHelper.name });
+
 	/**
 	 * Maps GitHub RequestError to appropriate {@link TranslationError} with context.
 	 *
@@ -43,7 +45,7 @@ export class GithubErrorHelper implements ErrorHelper {
 			const errorCode = this.getErrorCodeFromStatus(error);
 			const severity = this.getSeverityFromCode(errorCode);
 
-			logger.error(
+			this.logger.error(
 				{
 					error,
 					operation: context.operation,
@@ -68,7 +70,7 @@ export class GithubErrorHelper implements ErrorHelper {
 		/** Handle generic Error instances with rate limit detection */
 		if (error instanceof Error) {
 			if (detectRateLimit(error.message)) {
-				logger.warn(
+				this.logger.warn(
 					{ error, operation: context.operation, ...context.metadata },
 					"Rate limit detected in error message",
 				);
@@ -80,7 +82,7 @@ export class GithubErrorHelper implements ErrorHelper {
 				});
 			}
 
-			logger.error(
+			this.logger.error(
 				{ error, operation: context.operation, ...context.metadata },
 				"Unexpected error",
 			);
@@ -94,7 +96,7 @@ export class GithubErrorHelper implements ErrorHelper {
 
 		/** Handle non-Error objects thrown as exceptions */
 		const message = String(error);
-		logger.error(
+		this.logger.error(
 			{ error: message, operation: context.operation, ...context.metadata },
 			"Non-Error object thrown",
 		);

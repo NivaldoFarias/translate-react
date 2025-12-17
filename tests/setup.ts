@@ -43,7 +43,8 @@ function resetTestEnvironment(): void {
 		HEADER_APP_URL: "https://testapp.com",
 		LOG_LEVEL: LogLevel.Debug,
 		MAX_TOKENS: 4096,
-		LOG_TO_CONSOLE: false,
+		// @ts-expect-error - setting test value
+		LOG_TO_CONSOLE: "false",
 		GITHUB_REQUEST_TIMEOUT: 60_000,
 	};
 

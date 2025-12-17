@@ -8,6 +8,8 @@ import { ErrorCode, ErrorHelper, ErrorSeverity, TranslationError } from "@/error
 import { detectRateLimit, logger } from "@/utils/";
 
 export class LLMErrorHelper implements ErrorHelper {
+	private readonly logger = logger.child({ component: LLMErrorHelper.name });
+
 	/**
 	 * Maps LLM/OpenAI errors to {@link TranslationError} with proper classification and logging.
 	 *
@@ -51,7 +53,7 @@ export class LLMErrorHelper implements ErrorHelper {
 				...metadata,
 			};
 
-			logger.error(
+			this.logger.error(
 				{ operation, errorCode, severity, errorType: error.type, isRateLimit, ...errorMetadata },
 				"LLM API error",
 			);
@@ -80,7 +82,7 @@ export class LLMErrorHelper implements ErrorHelper {
 			const hasRateLimitPattern = detectRateLimit(error.message);
 
 			if (isKnownRateLimitError || hasRateLimitPattern) {
-				logger.error(
+				this.logger.error(
 					{
 						operation,
 						errorCode: ErrorCode.RateLimitExceeded,
@@ -102,7 +104,7 @@ export class LLMErrorHelper implements ErrorHelper {
 			}
 
 			/** Generic error handling for unknown Error types */
-			logger.error(
+			this.logger.error(
 				{
 					operation,
 					errorCode: ErrorCode.UnknownError,
@@ -126,7 +128,7 @@ export class LLMErrorHelper implements ErrorHelper {
 		/** Handle non-Error objects */
 		const errorString = String(error);
 
-		logger.error(
+		this.logger.error(
 			{
 				operation,
 				errorCode: ErrorCode.UnknownError,
