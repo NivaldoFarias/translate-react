@@ -34,7 +34,6 @@ function resetTestEnvironment(): void {
 		REPO_FORK_NAME: "test-fork-repo",
 		REPO_UPSTREAM_OWNER: "test-upstream-owner",
 		NODE_ENV: RuntimeEnvironment.Test,
-		BUN_ENV: RuntimeEnvironment.Test,
 		BATCH_SIZE: 5,
 		REPO_UPSTREAM_NAME: "test-upstream-repo",
 		SOURCE_LANGUAGE: "en",

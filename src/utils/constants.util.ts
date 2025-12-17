@@ -3,7 +3,7 @@ import { homepage, name, version } from "../../package.json";
 /**
  * Available runtime environments for the application.
  *
- * Maps to `NODE_ENV` and `BUN_ENV` environment variables
+ * Maps to `NODE_ENV` environment variables
  */
 export enum RuntimeEnvironment {
 	Development = "development",
@@ -118,7 +118,6 @@ export type ReactLanguageCode = (typeof REACT_TRANSLATION_LANGUAGES)[number];
 
 export const environmentDefaults = {
 	NODE_ENV: RuntimeEnvironment.Development,
-	BUN_ENV: RuntimeEnvironment.Development,
 	LOG_LEVEL: LogLevel.Info,
 	OPENAI_BASE_URL: "https://openrouter.ai/api/v1",
 	HEADER_APP_TITLE: `${name} v${version}`,

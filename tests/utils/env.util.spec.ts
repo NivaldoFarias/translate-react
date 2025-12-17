@@ -16,7 +16,6 @@ describe("Environment Utilities", () => {
 			REPO_FORK_NAME: "test-repo",
 			REPO_UPSTREAM_OWNER: "test-original-owner",
 			NODE_ENV: "test",
-			BUN_ENV: "test",
 			FORCE_SNAPSHOT_CLEAR: "false",
 			DEV_MODE_FORK_PR: "false",
 			LOG_TO_CONSOLE: "false",
@@ -31,9 +30,6 @@ describe("Environment Utilities", () => {
 	});
 
 	test("should throw error for missing required variables", () => {
-		// In non-test environment, GITHUB_TOKEN would be required
-		// Since we're in test env, we test that the schema correctly validates enum values
-		// which are always required (no default, no optional)
 		(import.meta.env as Record<string, unknown>)["NODE_ENV"] = "invalid-environment";
 
 		expect(() => {

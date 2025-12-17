@@ -67,28 +67,22 @@ API key for OpenAI/OpenRouter or other LLM service.
 
 Go to **Settings → Secrets and variables → Actions → Variables** and add:
 
-| Variable                | Example Value                      | Description                                          | Required |
-| ----------------------- | ---------------------------------- | ---------------------------------------------------- | -------- |
-| `TRANSLATION_ENABLED`   | `true`                             | Master switch to enable/disable translation workflow | ✅ Yes    |
-| `NODE_ENV`              | `production`                       | Runtime environment (production/development)         | ✅ Yes    |
-| `BUN_ENV`               | `production`                       | Bun runtime environment                              | ✅ Yes    |
-| `REPO_FORK_OWNER`       | `nivaldofarias`                    | Your GitHub username/org                             | ✅ Yes    |
-| `REPO_FORK_NAME`        | `pt-br.react.dev`                  | Name of your fork                                    | ✅ Yes    |
-| `REPO_UPSTREAM_OWNER`   | `reactjs`                          | Upstream repository owner                            | ✅ Yes    |
-| `REPO_UPSTREAM_NAME`    | `pt-br.react.dev`                  | Upstream repository name                             | ✅ Yes    |
-| `TARGET_LANGUAGE`       | `pt-br`                            | Target language code                                 | ✅ Yes    |
-| `LLM_MODEL`             | `google/gemini-2.0-flash-exp:free` | LLM model identifier                                 | ❌ No     |
-| `OPENAI_BASE_URL`       | `https://api.openrouter.com/v1`    | API base URL                                         | ❌ No     |
-| `LOG_LEVEL`             | `info`                             | Logging level (debug/info/warn/error)                | ❌ No     |
-| `LOG_TO_CONSOLE`        | `true`                             | Enable console logging in workflows                  | ❌ No     |
-| `ENABLE_AUTO_MERGE`     | `false`                            | Auto-merge PRs (⚠️ use with caution in production)    | ❌ No     |
-| `SCHEDULED_ENVIRONMENT` | `production`                       | Which environment scheduled/webhook runs use         | ✅ Yes    |
+| Variable              | Example Value                      | Description                                          | Required |
+| --------------------- | ---------------------------------- | ---------------------------------------------------- | -------- |
+| `TRANSLATION_ENABLED` | `true`                             | Master switch to enable/disable translation workflow | ✅ Yes    |
+| `NODE_ENV`            | `production`                       | Runtime environment (production/development)         | ✅ Yes    |
+| `REPO_FORK_OWNER`     | `nivaldofarias`                    | Your GitHub username/org                             | ✅ Yes    |
+| `REPO_FORK_NAME`      | `pt-br.react.dev`                  | Name of your fork                                    | ✅ Yes    |
+| `REPO_UPSTREAM_OWNER` | `reactjs`                          | Upstream repository owner                            | ✅ Yes    |
+| `REPO_UPSTREAM_NAME`  | `pt-br.react.dev`                  | Upstream repository name                             | ✅ Yes    |
+| `TARGET_LANGUAGE`     | `pt-br`                            | Target language code                                 | ✅ Yes    |
+| `LLM_MODEL`           | `google/gemini-2.0-flash-exp:free` | LLM model identifier                                 | ❌ No     |
+| `OPENAI_BASE_URL`     | `https://api.openrouter.com/v1`    | API base URL                                         | ❌ No     |
+| `LOG_LEVEL`           | `info`                             | Logging level (debug/info/warn/error)                | ❌ No     |
+| `LOG_TO_CONSOLE`      | `true`                             | Enable console logging in workflows                  | ❌ No     |
 
 > [!IMPORTANT]
 > **Environment Configuration:**
-> - Set `NODE_ENV=production` and `BUN_ENV=production` for production runs (creates PRs to upstream)
-> - Set `NODE_ENV=development` or `BUN_ENV=development` for testing (creates PRs within your fork)
-> - Set `SCHEDULED_ENVIRONMENT` to control which environment automated runs use
 > - PRs are created **under your GitHub account** (via `WORKFLOW_GITHUB_TOKEN`), not as github-actions[bot]
 
 ## Using GitHub Environments (Recommended)
@@ -182,25 +176,21 @@ For each environment, add the secrets that differ between production and develop
 
 **Production Environment (`production`)**:
 
-| Variable            | Value             | Description                      |
-| :------------------ | :---------------- | :------------------------------- |
-| `NODE_ENV`          | `production`      | Enables production mode          |
-| `BUN_ENV`           | `production`      | Bun runtime production mode      |
-| `REPO_FORK_OWNER`   | `reactjs`         | Upstream owner (PRs go here)     |
-| `REPO_FORK_NAME`    | `pt-br.react.dev` | Upstream repository name         |
-| `ENABLE_AUTO_MERGE` | `false`           | Disable auto-merge in production |
-| `LOG_LEVEL`         | `info`            | Less verbose logging             |
+| Variable          | Value             | Description                  |
+| :---------------- | :---------------- | :--------------------------- |
+| `NODE_ENV`        | `production`      | Enables production mode      |
+| `REPO_FORK_OWNER` | `reactjs`         | Upstream owner (PRs go here) |
+| `REPO_FORK_NAME`  | `pt-br.react.dev` | Upstream repository name     |
+| `LOG_LEVEL`       | `info`            | Less verbose logging         |
 
 **Development Environment (`development`)**:
 
-| Variable            | Value             | Description                   |
-| :------------------ | :---------------- | :---------------------------- |
-| `NODE_ENV`          | `development`     | Enables development mode      |
-| `BUN_ENV`           | `development`     | Bun runtime development mode  |
-| `REPO_FORK_OWNER`   | `your-username`   | Your fork owner (PRs go here) |
-| `REPO_FORK_NAME`    | `pt-br.react.dev` | Your fork name                |
-| `ENABLE_AUTO_MERGE` | `true`            | Can enable for testing        |
-| `LOG_LEVEL`         | `debug`           | Verbose logging for debugging |
+| Variable          | Value             | Description                   |
+| :---------------- | :---------------- | :---------------------------- |
+| `NODE_ENV`        | `development`     | Enables development mode      |
+| `REPO_FORK_OWNER` | `your-username`   | Your fork owner (PRs go here) |
+| `REPO_FORK_NAME`  | `pt-br.react.dev` | Your fork name                |
+| `LOG_LEVEL`       | `debug`           | Verbose logging for debugging |
 
 #### Complete Configuration Overview
 
@@ -213,7 +203,6 @@ This table shows all configuration values across repository and environment leve
 | `OPENAI_API_KEY`         | Free tier key                      | Production key    | Test key (optional)  |
 | **Common Variables**     |                                    |                   |                      |
 | `TRANSLATION_ENABLED`    | `true`                             | (inherits)        | (inherits)           |
-| `SCHEDULED_ENVIRONMENT`  | `production`                       | (inherits)        | (inherits)           |
 | `REPO_UPSTREAM_OWNER`    | `reactjs`                          | (inherits)        | (inherits)           |
 | `REPO_UPSTREAM_NAME`     | `pt-br.react.dev`                  | (inherits)        | (inherits)           |
 | `TARGET_LANGUAGE`        | `pt-br`                            | (inherits)        | (inherits)           |
@@ -222,10 +211,8 @@ This table shows all configuration values across repository and environment leve
 | `LOG_TO_CONSOLE`         | `true`                             | (inherits)        | (inherits)           |
 | **Environment-Specific** |                                    |                   |                      |
 | `NODE_ENV`               | (not set)                          | `production`      | `development`        |
-| `BUN_ENV`                | (not set)                          | `production`      | `development`        |
 | `REPO_FORK_OWNER`        | (not set)                          | `reactjs`         | `your-username`      |
 | `REPO_FORK_NAME`         | (not set)                          | `pt-br.react.dev` | `pt-br.react.dev`    |
-| `ENABLE_AUTO_MERGE`      | (not set)                          | `false`           | `true`               |
 | `LOG_LEVEL`              | (not set)                          | `info`            | `debug`              |
 
 > [!NOTE]
@@ -257,7 +244,6 @@ Use both repository-level and environment-level configuration for maximum flexib
 
 # Variables (available to all workflows)
 - TRANSLATION_ENABLED: "true"
-- SCHEDULED_ENVIRONMENT: "production"  # Controls which env scheduled/webhook runs use
 - REPO_UPSTREAM_OWNER: "reactjs"
 - REPO_UPSTREAM_NAME: "pt-br.react.dev"
 - TARGET_LANGUAGE: "pt-br"
@@ -268,8 +254,7 @@ Use both repository-level and environment-level configuration for maximum flexib
 
 **Environment-Level (Override for Specific Stages)**:
 
-- **Production**: Override `WORKFLOW_GITHUB_TOKEN`, `NODE_ENV`, `BUN_ENV`, `REPO_FORK_OWNER`, `LOG_LEVEL`
-- **Development**: Override `NODE_ENV`, `BUN_ENV`, `REPO_FORK_OWNER`, `LOG_LEVEL`, `ENABLE_AUTO_MERGE`
+- **Production**: Override `WORKFLOW_GITHUB_TOKEN`, `NODE_ENV`, `REPO_FORK_OWNER`, `LOG_LEVEL`
 
 #### Precedence Example
 
@@ -287,44 +272,9 @@ The workflow has been updated to support **environment selection via inputs** fo
 The workflow now includes:
 
 1. **Manual Trigger (workflow_dispatch)**: Dropdown to select environment
-2. **Scheduled Runs**: Uses `SCHEDULED_ENVIRONMENT` variable (defaults to `production`)
-3. **Webhook Triggers**: Uses `SCHEDULED_ENVIRONMENT` variable (defaults to `production`)
-
-```yaml
-on:
-  workflow_dispatch:
-    inputs:
-      environment:
-        description: "Deployment environment"
-        required: true
-        type: choice
-        options:
-          - development
-          - production
-        default: development
-
-jobs:
-  sync-and-translate:
-    runs-on: ubuntu-latest
-    # Dynamic environment selection
-    environment: ${{ inputs.environment || vars.SCHEDULED_ENVIRONMENT || 'production' }}
-    steps:
-      # ... workflow steps
-```
 
 #### Configuring Scheduled Environment
 
-To control which environment scheduled runs use, set the `SCHEDULED_ENVIRONMENT` variable:
-
-**For Production Scheduled Runs** (default):
-```bash
-gh variable set SCHEDULED_ENVIRONMENT --body "production" --repo your-username/translate-react
-```
-
-**For Development Scheduled Runs** (testing):
-```bash
-gh variable set SCHEDULED_ENVIRONMENT --body "development" --repo your-username/translate-react
-```
 
 > [!WARNING]
 > **Breaking Change**: The workflow now requires environments to be properly configured. Without environment setup, it will fall back to repository-level secrets/variables.
@@ -348,7 +298,6 @@ gh secret set OPENAI_API_KEY --repo $REPO --body "your-api-key"
 
 # Add repository-level variables (common to all environments)
 gh variable set TRANSLATION_ENABLED --body "true" --repo $REPO
-gh variable set SCHEDULED_ENVIRONMENT --body "production" --repo $REPO  # Controls which env scheduled runs use
 gh variable set REPO_UPSTREAM_OWNER --body "reactjs" --repo $REPO
 gh variable set REPO_UPSTREAM_NAME --body "pt-br.react.dev" --repo $REPO
 gh variable set TARGET_LANGUAGE --body "pt-br" --repo $REPO
@@ -371,10 +320,8 @@ gh secret set OPENAI_API_KEY --repo $REPO --env production --body "your-prod-api
 
 # Add production variables
 gh variable set NODE_ENV --body "production" --repo $REPO --env production
-gh variable set BUN_ENV --body "production" --repo $REPO --env production
 gh variable set REPO_FORK_OWNER --body "reactjs" --repo $REPO --env production
 gh variable set REPO_FORK_NAME --body "pt-br.react.dev" --repo $REPO --env production
-gh variable set ENABLE_AUTO_MERGE --body "false" --repo $REPO --env production
 gh variable set LOG_LEVEL --body "info" --repo $REPO --env production
 
 # Development Environment
@@ -386,10 +333,8 @@ gh secret set OPENAI_API_KEY --repo $REPO --env development --body "your-dev-api
 
 # Add development variables
 gh variable set NODE_ENV --body "development" --repo $REPO --env development
-gh variable set BUN_ENV --body "development" --repo $REPO --env development
 gh variable set REPO_FORK_OWNER --body "your-username" --repo $REPO --env development
 gh variable set REPO_FORK_NAME --body "pt-br.react.dev" --repo $REPO --env development
-gh variable set ENABLE_AUTO_MERGE --body "true" --repo $REPO --env development
 gh variable set LOG_LEVEL --body "debug" --repo $REPO --env development
 ```
 
@@ -486,8 +431,6 @@ gh variable list --repo your-username/translate-react --env production
 Expected output:
 
 ```
-BUN_ENV                 production
-ENABLE_AUTO_MERGE       false
 LOG_LEVEL               info
 NODE_ENV                production
 REPO_FORK_NAME          pt-br.react.dev
@@ -503,8 +446,6 @@ gh variable list --repo your-username/translate-react --env development
 Expected output:
 
 ```
-BUN_ENV                 development
-ENABLE_AUTO_MERGE       true
 LOG_LEVEL               debug
 NODE_ENV                development
 REPO_FORK_NAME          pt-br.react.dev
@@ -564,7 +505,7 @@ Before testing production, always test with the development environment to avoid
 Monitor the logs to ensure:
 - ✅ Workflow uses `development` environment
 - ✅ PRs are created in **your fork** (not upstream)
-- ✅ `NODE_ENV` and `BUN_ENV` are set to `development`
+- ✅ `NODE_ENV` is set to `development`
 - ✅ `REPO_FORK_OWNER` points to your username
 
 ### 3. Test Production Environment (After Development Testing)
@@ -583,7 +524,7 @@ Monitor the logs to ensure:
 - ✅ Deployment requires approval (if configured)
 - ✅ Workflow uses `production` environment
 - ✅ PRs are created in the **upstream repository**
-- ✅ `NODE_ENV` and `BUN_ENV` are set to `production`
+- ✅ `NODE_ENV` is set to `production`
 - ✅ `REPO_FORK_OWNER` points to upstream owner (e.g., `reactjs`)
 
 ### 4. Verify Environment Precedence
@@ -601,7 +542,6 @@ Alternatively, add a debug step to your workflow:
 - name: Debug Environment Configuration
   run: |
     echo "NODE_ENV: ${{ vars.NODE_ENV }}"
-    echo "BUN_ENV: ${{ vars.BUN_ENV }}"
     echo "REPO_FORK_OWNER: ${{ vars.REPO_FORK_OWNER }}"
     echo "LOG_LEVEL: ${{ vars.LOG_LEVEL }}"
 ```
@@ -644,7 +584,6 @@ The workflow uses **environment-specific caching** for isolation and optimal per
 **Solution**: 
 1. Verify the workflow is using the correct environment (`production` vs `development`)
 2. Check that `REPO_FORK_OWNER` is correctly set in the environment variables
-3. Ensure `NODE_ENV` and `BUN_ENV` match the intended environment
 4. Review the workflow logs to confirm which environment variables are being used
 
 ```bash
@@ -848,26 +787,10 @@ You can also add a debug step to your workflow:
 4. Options: `development` (default) or `production`
 
 **For Scheduled/Webhook Runs**:
-- Set the `SCHEDULED_ENVIRONMENT` repository variable to `production` or `development`
 - This controls which environment automated runs use
 
 **Default Behavior**:
 - Manual triggers: Default to `development` (safe for testing)
-- Scheduled/webhook: Default to `production` (or value of `SCHEDULED_ENVIRONMENT`)
-
-### Can I change which environment scheduled runs use?
-
-**Yes!** Set the `SCHEDULED_ENVIRONMENT` repository variable:
-
-```bash
-# For production scheduled runs (recommended)
-gh variable set SCHEDULED_ENVIRONMENT --body "production" --repo your-username/translate-react
-
-# For development scheduled runs (testing)
-gh variable set SCHEDULED_ENVIRONMENT --body "development" --repo your-username/translate-react
-```
-
-This allows you to test automated workflows in development before enabling production scheduling.
 
 ### Can I change environment variables without restarting the workflow?
 
