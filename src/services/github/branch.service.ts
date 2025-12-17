@@ -229,25 +229,28 @@ export class BranchService extends BaseGitHubService {
 			try {
 				const pr = await this.contentService.findPullRequestByBranch(branch);
 
-				if (pr) {
-					const prStatus = await this.contentService.checkPullRequestStatus(pr.number);
-
-					if (prStatus.needsUpdate) {
-						this.logger.info(
-							{ branch, prNumber: pr.number, mergeableState: prStatus.mergeableState },
-							"Cleanup: Deleting branch with conflicted PR",
-						);
-
-						await this.deleteBranch(branch);
-					} else {
-						this.logger.info(
-							{ branch, prNumber: pr.number, mergeableState: prStatus.mergeableState },
-							"Cleanup: Preserving branch with valid PR",
-						);
-					}
-				} else {
+				if (!pr) {
 					this.logger.info({ branch }, "Cleanup: Deleting branch without PR");
+
 					await this.deleteBranch(branch);
+
+					return;
+				}
+
+				const prStatus = await this.contentService.checkPullRequestStatus(pr.number);
+
+				if (prStatus.needsUpdate) {
+					this.logger.info(
+						{ branch, prNumber: pr.number, mergeableState: prStatus.mergeableState },
+						"Cleanup: Deleting branch with conflicted PR",
+					);
+
+					await this.deleteBranch(branch);
+				} else {
+					this.logger.info(
+						{ branch, prNumber: pr.number, mergeableState: prStatus.mergeableState },
+						"Cleanup: Preserving branch with valid PR",
+					);
 				}
 			} catch (error) {
 				this.logger.error({ branch, error }, "Cleanup: Error checking branch, skipping deletion");
