@@ -53,18 +53,6 @@ jobs:
         if: steps.cache-deps.outputs.cache-hit != 'true'
         run: bun install --frozen-lockfile
 
-      # Restore SQLite database from previous runs
-      # Cache is environment-specific to prevent dev/prod database conflicts
-      - name: Restore SQLite cache
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            snapshots.sqlite
-            snapshots.sqlite-journal
-          key: sqlite-cache-${{ github.repository }}-${{ inputs.environment }}-${{ github.run_id }}
-          restore-keys: |
-            sqlite-cache-${{ github.repository }}-${{ inputs.environment }}-
-
       - name: Create .env file
         run: |
           cat > .env << EOF
@@ -87,28 +75,6 @@ jobs:
       - name: Run translation workflow
         run: bun run start
         timeout-minutes: 120
-
-      # Save SQLite database for next run
-      # Cache is environment-specific to prevent dev/prod database conflicts
-      - name: Save SQLite cache
-        uses: actions/cache/save@v4
-        if: always()
-        with:
-          path: |
-            snapshots.sqlite
-            snapshots.sqlite-journal
-          key: sqlite-cache-${{ github.repository }}-${{ inputs.environment }}-${{ github.run_id }}
-
-      # Upload database as artifact for debugging/recovery
-      - name: Upload database artifact
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: translation-database-${{ github.run_id }}
-          path: |
-            snapshots.sqlite
-            snapshots.sqlite-journal
-          retention-days: 30
 
       # Upload logs
       - name: Upload logs

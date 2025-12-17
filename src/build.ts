@@ -52,7 +52,7 @@ async function build(): Promise<Bun.BuildOutput> {
 		minify: true,
 		tsconfig: join(ROOT_DIR, "tsconfig.json"),
 		sourcemap: "external",
-		external: ["sqlite3", "better-sqlite3", "cld", "@mapbox/node-pre-gyp"],
+		external: ["cld", "@mapbox/node-pre-gyp"],
 	});
 
 	if (!result.success) {
