@@ -234,7 +234,7 @@ export class BranchService extends BaseGitHubService {
 
 					await this.deleteBranch(branch);
 
-					return;
+					continue;
 				}
 
 				const prStatus = await this.contentService.checkPullRequestStatus(pr.number);
