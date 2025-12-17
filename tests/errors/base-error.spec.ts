@@ -4,7 +4,7 @@ import { ErrorCode, TranslationError } from "@/errors/base-error";
 
 describe("TranslationError", () => {
 	describe("Constructor", () => {
-		test("should create error with basic properties when instantiated", () => {
+		test("should create error with all basic properties when instantiated with valid parameters", () => {
 			const error = new TranslationError("Test error", ErrorCode.GithubApiError, {
 				operation: "test.operation",
 			});
@@ -16,7 +16,7 @@ describe("TranslationError", () => {
 			expect(error.name).toBe("TranslationError");
 		});
 
-		test("should preserve error context when context object is provided", () => {
+		test("should preserve all context fields when context object is provided", () => {
 			const context = {
 				operation: "test.operation",
 				file: "test.ts",
@@ -30,7 +30,7 @@ describe("TranslationError", () => {
 			expect(error.context.metadata).toEqual({ key: "value" });
 		});
 
-		test("should include timestamp in context when error is created", () => {
+		test("should automatically include timestamp in context when error is created", () => {
 			const error = new TranslationError("Test error", ErrorCode.UnknownError, {
 				operation: "test",
 			});
@@ -55,7 +55,7 @@ describe("TranslationError", () => {
 			[ErrorCode.NotFound],
 			[ErrorCode.UnknownError],
 			[ErrorCode.RateLimitExceeded],
-		])("should handle error code %s when provided", (code) => {
+		])("should correctly assign error code %s when provided", (code) => {
 			const error = new TranslationError("Test", code, { operation: "test" });
 
 			expect(error.code).toBe(code);
@@ -63,7 +63,7 @@ describe("TranslationError", () => {
 	});
 
 	describe("toJSON", () => {
-		test("should serialize to JSON correctly", () => {
+		test("should have all error properties accessible for serialization when properties are accessed", () => {
 			const error = new TranslationError("Test error", ErrorCode.GithubApiError, {
 				operation: "test.operation",
 				file: "test.ts",
@@ -77,7 +77,7 @@ describe("TranslationError", () => {
 			expect(error.timestamp).toBeDefined();
 		});
 
-		test("should include all context fields in JSON", () => {
+		test("should include nested metadata for serialization when metadata is present", () => {
 			const error = new TranslationError("Test", ErrorCode.UnknownError, {
 				operation: "test",
 				metadata: { nested: { value: 123 } },
@@ -88,7 +88,7 @@ describe("TranslationError", () => {
 	});
 
 	describe("Error Chaining", () => {
-		test("should handle errors without cause", () => {
+		test("should handle errors without cause when no cause is provided", () => {
 			const error = new TranslationError("Wrapped error", ErrorCode.UnknownError, {
 				operation: "test",
 			});
@@ -98,13 +98,35 @@ describe("TranslationError", () => {
 	});
 
 	describe("Edge Cases", () => {
-		test("should handle empty message", () => {
+		test("should handle empty message when empty string is provided", () => {
 			const error = new TranslationError("", ErrorCode.UnknownError, { operation: "test" });
 
 			expect(error.message).toBe("");
 		});
 
-		test("should handle minimal context", () => {
+		test("should handle very long messages when message exceeds 1000 characters", () => {
+			const longMessage = "A".repeat(5000);
+
+			const error = new TranslationError(longMessage, ErrorCode.UnknownError, {
+				operation: "test",
+			});
+
+			expect(error.message).toBe(longMessage);
+			expect(error.message.length).toBe(5000);
+		});
+
+		test("should handle messages with special characters when special characters are present", () => {
+			const specialMessage = "Error: <test> & 'quotes' \"double\" \n\t\r unicode: 🚀 émojis";
+
+			const error = new TranslationError(specialMessage, ErrorCode.UnknownError, {
+				operation: "test",
+			});
+
+			expect(error.message).toBe(specialMessage);
+			expect(error.message).toContain("🚀");
+		});
+
+		test("should handle minimal context when only operation is provided", () => {
 			const error = new TranslationError("Test", ErrorCode.UnknownError, {
 				operation: "minimal",
 			});
@@ -113,12 +135,19 @@ describe("TranslationError", () => {
 			expect(error.context.file).toBeUndefined();
 		});
 
-		test("should handle complex metadata", () => {
+		test("should handle complex nested metadata when deeply nested objects are provided", () => {
 			const metadata = {
 				array: [1, 2, 3],
 				object: { nested: true },
 				string: "value",
 				number: 42,
+				deepNesting: {
+					level1: {
+						level2: {
+							level3: "deep value",
+						},
+					},
+				},
 			};
 
 			const error = new TranslationError("Test", ErrorCode.UnknownError, {
@@ -127,6 +156,32 @@ describe("TranslationError", () => {
 			});
 
 			expect(error.context.metadata).toEqual(metadata);
+		});
+
+		test("should handle undefined metadata when metadata is not provided", () => {
+			const error = new TranslationError("Test", ErrorCode.UnknownError, {
+				operation: "test",
+			});
+
+			expect(error.context.metadata).toBeUndefined();
+		});
+
+		test("should handle null values in metadata when null is explicitly provided", () => {
+			const error = new TranslationError("Test", ErrorCode.UnknownError, {
+				operation: "test",
+				metadata: { nullValue: null, undefinedValue: undefined },
+			});
+
+			expect(error.context.metadata?.nullValue).toBeNull();
+			expect(error.context.metadata?.undefinedValue).toBeUndefined();
+		});
+
+		test("should handle operation names with special characters when special chars are present", () => {
+			const error = new TranslationError("Test", ErrorCode.UnknownError, {
+				operation: "test.operation:with-special_chars/path",
+			});
+
+			expect(error.context.operation).toBe("test.operation:with-special_chars/path");
 		});
 	});
 });

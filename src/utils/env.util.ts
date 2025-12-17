@@ -123,13 +123,11 @@ const envSchema = z.object({
 	/**
 	 * The issue number of the progress tracking issue.
 	 *
-	 * @default 555
-	 * @see {@link environmentDefaults.PROGRESS_ISSUE_NUMBER}
+	 * Used to post progress updates after a translation workflow.
+	 *
+	 * @see [CommentBuilderService](../services/comment-builder.service.ts)
 	 */
-	PROGRESS_ISSUE_NUMBER: z.coerce
-		.number()
-		.positive()
-		.default(environmentDefaults.PROGRESS_ISSUE_NUMBER),
+	PROGRESS_ISSUE_NUMBER: z.coerce.number().positive().optional(),
 
 	/**
 	 * The URL of the application to override the default URL.

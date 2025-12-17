@@ -134,7 +134,6 @@ describe("GithubErrorHelper", () => {
 					data: {},
 				},
 			});
-
 			const context = {
 				operation: "GitHub.getFile",
 				metadata: { path: "test.md", repo: "test/repo" },
@@ -175,12 +174,12 @@ describe("GithubErrorHelper", () => {
 				"too many requests",
 			];
 
-			patterns.forEach((message) => {
+			for (const message of patterns) {
 				const error = new Error(message);
 				const mapped = helper.mapError(error, { operation: "test" });
 
 				expect(mapped.code).toBe(ErrorCode.RateLimitExceeded);
-			});
+			}
 		});
 
 		test("should handle errors without status code", () => {
@@ -209,6 +208,36 @@ describe("GithubErrorHelper", () => {
 			const mapped = helper.mapError(error, { operation: "test" });
 
 			expect(mapped.message).toContain("Specific error details");
+		});
+
+		test("should handle empty context", () => {
+			const error = new Error("Test error");
+			const context = { operation: "" };
+
+			const mapped = helper.mapError(error, context);
+
+			expect(mapped.code).toBe(ErrorCode.UnknownError);
+			expect(mapped.context.operation).toBe("");
+		});
+
+		test("should handle missing response headers in RequestError", () => {
+			const error = new RequestError("Error", StatusCodes.BAD_REQUEST, {
+				request: {
+					method: "GET",
+					url: "https://api.github.com/repos/test/test",
+					headers: {},
+				},
+				response: {
+					status: StatusCodes.BAD_REQUEST,
+					url: "https://api.github.com/repos/test/test",
+					headers: {},
+					data: {},
+				},
+			});
+
+			const mapped = helper.mapError(error, { operation: "test" });
+
+			expect(mapped.code).toBe(ErrorCode.GithubApiError);
 		});
 	});
 });

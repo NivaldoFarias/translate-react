@@ -1,35 +1,62 @@
-import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
 
-import type OpenAI from "openai";
+import type { ChatCompletion } from "openai/resources.mjs";
 
 import { TranslationFile, TranslatorService } from "@/services/translator.service";
 
-interface MockOpenAI {
-	chat: {
-		completions: {
-			create: ReturnType<typeof mock>;
+let mockChatCompletionsCreate = mock(() => Promise.resolve({} as ChatCompletion));
+
+void mock.module("openai", () => {
+	class MockOpenAI {
+		constructor() {}
+
+		chat = {
+			completions: {
+				create: mockChatCompletionsCreate,
+			},
 		};
+	}
+
+	return {
+		default: MockOpenAI,
+		OpenAI: MockOpenAI,
 	};
-}
+});
+
+void mock.module("@/services/rate-limiter/", () => ({
+	llmRateLimiter: {
+		schedule: (fn: () => Promise<unknown>) => fn(),
+	},
+}));
 
 describe("TranslatorService", () => {
 	let translatorService: TranslatorService;
-	let mockOpenAI: MockOpenAI;
 
 	beforeEach(() => {
+		mockChatCompletionsCreate.mockClear();
+
 		translatorService = new TranslatorService();
 
-		mockOpenAI = {
-			chat: {
-				completions: {
-					create: mock(() =>
-						Promise.resolve({
-							choices: [{ message: { content: "Texto traduzido" } }],
-						}),
-					),
-				},
+		spyOn(translatorService.languageDetector, "detectPrimaryLanguage").mockResolvedValue("en");
+		spyOn(translatorService.languageDetector, "getLanguageName").mockImplementation(
+			(code: string) => {
+				if (code === "en") return "English";
+				if (code === "pt-br") return "Brazilian Portuguese";
+				return undefined;
 			},
-		};
+		);
+		spyOn(translatorService.languageDetector, "analyzeLanguage").mockResolvedValue({
+			languageScore: { target: 0.1, source: 0.9 },
+			ratio: 0.1,
+			isTranslated: false,
+			detectedLanguage: "en",
+			rawResult: {
+				reliable: true,
+				textBytes: 1234,
+				languages: [],
+				chunks: [],
+			},
+		});
 	});
 
 	describe("Constructor", () => {
@@ -40,18 +67,38 @@ describe("TranslatorService", () => {
 
 		test("should initialize language detector with provided config", () => {
 			const service = new TranslatorService();
+
 			expect(service).toBeInstanceOf(TranslatorService);
+			expect(service.languageDetector).toBeDefined();
 		});
 	});
 
 	describe("translateContent", () => {
 		test("should translate content successfully when valid content is provided", async () => {
-			const mockResponse = {
-				choices: [{ message: { content: "Olá mundo" } }],
-			};
-			mockOpenAI.chat.completions.create = mock(() => Promise.resolve(mockResponse));
-			// @ts-expect-error - Mocking private property for testing
-			translatorService.llm = mockOpenAI as unknown as OpenAI;
+			mockChatCompletionsCreate.mockResolvedValue({
+				id: "chatcmpl-123",
+				created: 1_701_764_769,
+				model: "gpt-4-0314",
+				object: "chat.completion",
+				choices: [
+					{
+						message: {
+							content: "Olá mundo",
+							refusal: null,
+							role: "assistant",
+						},
+						finish_reason: "stop",
+						index: 0,
+						logprobs: null,
+					},
+				],
+				usage: {
+					total_tokens: 50,
+					completion_tokens: 50,
+					prompt_tokens: 0,
+				},
+			} as ChatCompletion);
+
 			const file: TranslationFile = {
 				path: "test/file.md",
 				content: "Hello world",
@@ -62,7 +109,7 @@ describe("TranslatorService", () => {
 			const translation = await translatorService.translateContent(file);
 
 			expect(translation).toBe("Olá mundo");
-			expect(mockOpenAI.chat.completions.create).toHaveBeenCalledTimes(1);
+			expect(mockChatCompletionsCreate).toHaveBeenCalledTimes(1);
 		});
 
 		test("should throw error when content is empty", () => {
@@ -77,13 +124,10 @@ describe("TranslatorService", () => {
 		});
 
 		test("should throw error when content is whitespace-only", () => {
-			mockOpenAI.chat.completions.create = mock(() =>
-				Promise.resolve({
-					choices: [{ message: { content: "   \n\t  \n  " } }],
-				}),
-			);
-			// @ts-expect-error - Mocking private property for testing
-			translatorService.llm = mockOpenAI as unknown as OpenAI;
+			mockChatCompletionsCreate.mockResolvedValue({
+				choices: [{ message: { content: "   \n\t  \n  " } }],
+				usage: { total_tokens: 10 },
+			} as ChatCompletion);
 
 			const file: TranslationFile = {
 				path: "test/whitespace.md",
@@ -98,7 +142,7 @@ describe("TranslatorService", () => {
 		});
 
 		test("should preserve code blocks in translated content", async () => {
-			const mockResponse = {
+			mockChatCompletionsCreate.mockResolvedValue({
 				choices: [
 					{
 						message: {
@@ -106,10 +150,8 @@ describe("TranslatorService", () => {
 						},
 					},
 				],
-			};
-			mockOpenAI.chat.completions.create = mock(() => Promise.resolve(mockResponse));
-			// @ts-expect-error - Mocking private property for testing
-			translatorService.llm = mockOpenAI as unknown as OpenAI;
+				usage: { total_tokens: 80 },
+			} as ChatCompletion);
 
 			const file: TranslationFile = {
 				path: "test/code.md",
@@ -127,9 +169,7 @@ describe("TranslatorService", () => {
 		});
 
 		test("should handle API errors gracefully", () => {
-			mockOpenAI.chat.completions.create = mock(() => Promise.reject(new Error("API Error")));
-			// @ts-expect-error - Mocking private property for testing
-			translatorService.llm = mockOpenAI as unknown as OpenAI;
+			mockChatCompletionsCreate.mockRejectedValue(new Error("API Error"));
 
 			const file: TranslationFile = {
 				path: "test/error.md",
@@ -143,13 +183,10 @@ describe("TranslatorService", () => {
 
 		test("should handle large content with chunking", async () => {
 			const largeContent = "Large content ".repeat(1000);
-			mockOpenAI.chat.completions.create = mock(() =>
-				Promise.resolve({
-					choices: [{ message: { content: "Conteúdo grande traduzido" } }],
-				}),
-			);
-			// @ts-expect-error - Mocking private property for testing
-			translatorService.llm = mockOpenAI as unknown as OpenAI;
+			mockChatCompletionsCreate.mockResolvedValue({
+				choices: [{ message: { content: "Conteúdo grande traduzido" } }],
+				usage: { total_tokens: 500 },
+			} as ChatCompletion);
 
 			const file: TranslationFile = {
 				path: "test/large.md",
@@ -180,6 +217,19 @@ describe("TranslatorService", () => {
 		});
 
 		test("should detect Portuguese content as translated", async () => {
+			spyOn(translatorService.languageDetector, "analyzeLanguage").mockResolvedValue({
+				languageScore: { target: 0.9, source: 0.1 },
+				ratio: 0.9,
+				isTranslated: true,
+				detectedLanguage: "pt",
+				rawResult: {
+					reliable: true,
+					textBytes: 1234,
+					languages: [],
+					chunks: [],
+				},
+			});
+
 			const file: TranslationFile = new TranslationFile(
 				"Este é um conteúdo em português que já foi traduzido.",
 				"portuguese.md",
@@ -206,105 +256,20 @@ describe("TranslatorService", () => {
 		});
 	});
 
-	// TODO: These tests need to be updated to test public methods instead of private ones
-	/*
-	describe("cleanupTranslatedContent", () => {
-		test("should remove markdown fences when not in original", () => {
-			const translatedContent = `# Título\n\nTexto traduzido\n\`\`\``;
-			const originalContent = `# Title\n\nOriginal text`;
-
-			const cleaned = translatorService.cleanupTranslatedContent(
-				translatedContent,
-				originalContent,
-			);
-
-			expect(cleaned).toBe("# Título\n\nTexto traduzido");
-			expect(cleaned).not.toEndWith("```");
-		});
-
-		test("should preserve markdown fences when in original", () => {
-			const translatedContent = `# Título\n\nTexto traduzido\n\`\`\``;
-			const originalContent = `# Title\n\nOriginal text\n\`\`\``;
-
-			const cleaned = translatorService.cleanupTranslatedContent(
-				translatedContent,
-				originalContent,
-			);
-
-			expect(cleaned).toBe("# Título\n\nTexto traduzido\n```");
-		});
-
-		test("should handle content without YAML frontmatter prefix", () => {
-			const translatedContent = "Some prefix content\n---\ntitle: Test\nContent here";
-
-			const cleaned = translatorService.cleanupTranslatedContent(translatedContent);
-
-			expect(cleaned).toBe("---\ntitle: Test\nContent here");
-		});
-	});
-	*/
-
-	// TODO: These tests need to be updated - chunkAndRetryTranslation method doesn't exist
-	/*
-	describe("chunkAndRetryTranslation", () => {
-		test("should handle content chunking for large texts", async () => {
-			const content =
-				"# Large Section\n\nThis is a large content block that needs to be chunked. ".repeat(100);
-			mockOpenAI.chat.completions.create = mock(() =>
-				Promise.resolve({
-					choices: [
-						{
-							message: {
-								content:
-									"# Seção Grande\n\nEste é um bloco de conteúdo grande que precisa ser dividido. ",
-							},
-						},
-					],
-				}),
-			);
-			// @ts-expect-error - Mocking private property for testing
-			translatorService.llm = mockOpenAI as unknown as OpenAI;
-
-			const result = await translatorService.chunkAndRetryTranslation(content);
-
-			expect(result).toBeDefined();
-			expect(typeof result).toBe("string");
-			expect(result.length).toBeGreaterThan(0);
-		});
-
-		test("should handle empty content in chunking", async () => {
-			mockOpenAI.chat.completions.create = mock(() =>
-				Promise.resolve({
-					choices: [{ message: { content: null } }],
-				}),
-			);
-			// @ts-expect-error - Mocking private property for testing
-			translatorService.llm = mockOpenAI as unknown as OpenAI;
-
-			expect(await translatorService.chunkAndRetryTranslation("test content")).rejects.toThrow(
-				"No content returned",
-			);
-		});
-	});
-	*/
-
 	describe("Edge Cases and Error Handling", () => {
 		test("should handle malformed markdown content", async () => {
 			const malformedContent = "# Incomplete header\n```\nUnclosed code block\n## Another header";
-			mockOpenAI.chat.completions.create = mock(() =>
-				Promise.resolve({
-					choices: [
-						{
-							message: {
-								content:
-									"# Cabeçalho incompleto\n```\nBloco de código não fechado\n## Outro cabeçalho",
-							},
+			mockChatCompletionsCreate.mockResolvedValue({
+				choices: [
+					{
+						message: {
+							content:
+								"# Cabeçalho incompleto\n```\nBloco de código não fechado\n## Outro cabeçalho",
 						},
-					],
-				}),
-			);
-			// @ts-expect-error - Mocking private property for testing
-			translatorService.llm = mockOpenAI as unknown as OpenAI;
+					},
+				],
+				usage: { total_tokens: 60 },
+			} as ChatCompletion);
 
 			const file: TranslationFile = {
 				path: "test/malformed.md",
@@ -321,15 +286,12 @@ describe("TranslatorService", () => {
 
 		test("should handle special characters and emojis", async () => {
 			const contentWithEmojis = "Hello world! 🌍 This has special chars: àáâãäåæçèéêë";
-			mockOpenAI.chat.completions.create = mock(() =>
-				Promise.resolve({
-					choices: [
-						{ message: { content: "Olá mundo! 🌍 Isto tem caracteres especiais: àáâãäåæçèéêë" } },
-					],
-				}),
-			);
-			// @ts-expect-error - Mocking private property for testing
-			translatorService.llm = mockOpenAI as unknown as OpenAI;
+			mockChatCompletionsCreate.mockResolvedValue({
+				choices: [
+					{ message: { content: "Olá mundo! 🌍 Isto tem caracteres especiais: àáâãäåæçèéêë" } },
+				],
+				usage: { total_tokens: 40 },
+			} as ChatCompletion);
 
 			const file: TranslationFile = {
 				path: "test/special.md",
@@ -350,6 +312,54 @@ describe("TranslatorService", () => {
 			translatorService.glossary = glossary;
 
 			expect(translatorService.glossary).toBe(glossary);
+		});
+
+		test("should handle null response from API", () => {
+			mockChatCompletionsCreate.mockResolvedValue({
+				choices: [{ message: { content: null } }],
+				usage: { total_tokens: 10 },
+			} as ChatCompletion);
+
+			const file: TranslationFile = {
+				path: "test/null.md",
+				content: "Test content",
+				sha: "null123",
+				filename: "null.md",
+			};
+
+			expect(translatorService.translateContent(file)).rejects.toThrow();
+		});
+
+		test("should handle undefined response from API", () => {
+			mockChatCompletionsCreate.mockResolvedValue({
+				choices: [{ message: {} }],
+				usage: { total_tokens: 10 },
+			} as ChatCompletion);
+
+			const file: TranslationFile = {
+				path: "test/undefined.md",
+				content: "Test content",
+				sha: "undef123",
+				filename: "undefined.md",
+			};
+
+			expect(translatorService.translateContent(file)).rejects.toThrow();
+		});
+
+		test("should handle empty choices array from API", () => {
+			mockChatCompletionsCreate.mockResolvedValue({
+				choices: [],
+				usage: { total_tokens: 10 },
+			} as ChatCompletion);
+
+			const file: TranslationFile = {
+				path: "test/empty-choices.md",
+				content: "Test content",
+				sha: "empty123",
+				filename: "empty-choices.md",
+			};
+
+			expect(translatorService.translateContent(file)).rejects.toThrow();
 		});
 	});
 });

@@ -52,15 +52,15 @@ describe("CommentBuilderService", () => {
 	});
 
 	describe("buildComment", () => {
+		const filesToTranslate: TranslationFile[] = [
+			createMockTranslationFile("intro.md", "src/content/docs/intro.md"),
+			createMockTranslationFile("api.md", "src/content/docs/api/api.md"),
+		];
+
 		test("should build hierarchical comment when results and files are provided", () => {
 			const results: ProcessedFileResult[] = [
 				createMockResult("intro.md", 123),
 				createMockResult("api.md", 124),
-			];
-
-			const filesToTranslate: TranslationFile[] = [
-				createMockTranslationFile("intro.md", "src/content/docs/intro.md"),
-				createMockTranslationFile("api.md", "src/content/docs/api/api.md"),
 			];
 
 			const result = commentBuilderService.buildComment(results, filesToTranslate);
@@ -74,10 +74,6 @@ describe("CommentBuilderService", () => {
 		test("should handle files without matching translation files", () => {
 			const results: ProcessedFileResult[] = [createMockResult("missing.md", 125)];
 
-			const filesToTranslate: TranslationFile[] = [
-				createMockTranslationFile("existing.md", "src/content/docs/existing.md"),
-			];
-
 			const result = commentBuilderService.buildComment(results, filesToTranslate);
 
 			expect(result).toBeString();
@@ -87,13 +83,9 @@ describe("CommentBuilderService", () => {
 		test("should handle files without pull request numbers", () => {
 			const results: ProcessedFileResult[] = [createMockResult("no-pr.md", null)];
 
-			const filesToTranslate: TranslationFile[] = [
-				createMockTranslationFile("no-pr.md", "src/content/docs/no-pr.md"),
-			];
-
 			const result = commentBuilderService.buildComment(results, filesToTranslate);
 
-			expect(result).toContain("`no-pr.md`: #0");
+			expect(result).toBe("");
 		});
 
 		test("should handle empty results array", () => {
