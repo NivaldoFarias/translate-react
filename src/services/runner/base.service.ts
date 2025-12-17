@@ -198,7 +198,7 @@ export abstract class BaseRunnerService {
 	 *
 	 * ### Pipeline Stages
 	 *
-	 * 1. **Language cache lookup**: Queries SQLite cache to skip known translated files
+	 * 1. **Language cache lookup**: Queries cache to skip known translated files
 	 * 2. **PR existence check**: Validates existing PRs to skip files with valid translations
 	 * 3. **Content fetching**: Downloads file content in parallel batches from GitHub
 	 * 4. **Language detection**: Analyzes content and updates cache with detection results
@@ -253,7 +253,7 @@ export abstract class BaseRunnerService {
 	/**
 	 * Checks language cache to identify files already known to be translated.
 	 *
-	 * Queries the SQLite cache for each file using its path and content hash (SHA).
+	 * Queries the cache for each file using its path and content hash (SHA).
 	 * Files with cached Portuguese detection results above the confidence threshold
 	 * are filtered out, avoiding expensive content fetching and re-analysis.
 	 *
