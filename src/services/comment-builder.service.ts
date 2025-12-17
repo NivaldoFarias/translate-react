@@ -147,11 +147,13 @@ export class CommentBuilderService {
 			prNumber: number;
 		}[],
 	): string {
-		data.sort((a, b) => {
-			const pathA = a.pathParts.join("/");
-			const pathB = b.pathParts.join("/");
+		data.sort((left, right) => {
+			const pathA = left.pathParts.join("/");
+			const pathB = right.pathParts.join("/");
 
-			return pathA === pathB ? a.filename.localeCompare(b.filename) : pathA.localeCompare(pathB);
+			return pathA === pathB ?
+					left.filename.localeCompare(right.filename)
+				:	pathA.localeCompare(pathB);
 		});
 
 		const structure: HierarchicalStructure = {};

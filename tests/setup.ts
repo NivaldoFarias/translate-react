@@ -41,19 +41,13 @@ function resetTestEnvironment(): void {
 		TARGET_LANGUAGE: "pt-br",
 		HEADER_APP_TITLE: "Test App",
 		HEADER_APP_URL: "https://testapp.com",
-		PROGRESS_ISSUE_NUMBER: 1,
-		OPENAI_PROJECT_ID: "test-project-id",
-		LOG_LEVEL: LogLevel.Info,
+		LOG_LEVEL: LogLevel.Debug,
 		MAX_TOKENS: 4096,
-		LOG_TO_CONSOLE: false,
+		LOG_TO_CONSOLE: "false",
 		GITHUB_REQUEST_TIMEOUT: 60_000,
 	};
 
 	// @ts-expect-error - augmenting globalThis for test environment
 	globalThis.mockEnv = testEnv;
 	Object.assign(process.env, testEnv);
-
-	if (typeof import.meta.env === "object") {
-		Object.assign(import.meta.env, testEnv);
-	}
 }

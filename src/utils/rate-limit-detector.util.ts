@@ -31,7 +31,7 @@ export function detectRateLimit(errorMessage: string, statusCode?: number): bool
 	/** Common rate limit patterns from various providers */
 	const rateLimitPatterns = [
 		"rate limit",
-		"429", // HTTP status code as string
+		String(StatusCodes.TOO_MANY_REQUESTS), // HTTP status code as string
 		"free-models-per-", // OpenRouter free tier limit
 		"quota", // General quota exceeded patterns
 		"too many requests", // Standard rate limit message

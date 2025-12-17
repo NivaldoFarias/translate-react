@@ -132,9 +132,6 @@ export const environmentDefaults = {
 	TARGET_LANGUAGE: "pt-br",
 	SOURCE_LANGUAGE: "en",
 
-	/** @see {@link https://github.com/reactjs/pt-br.react.dev/issues/555|Docs Progress Issue (pt-BR)} */
-	PROGRESS_ISSUE_NUMBER: 555,
-
 	/** Maximum tokens to generate in a single LLM response */
 	MAX_TOKENS: 8192,
 
