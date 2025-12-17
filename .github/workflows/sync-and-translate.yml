@@ -1,7 +1,6 @@
 name: Sync and Translate
 
 on:
-  # Manual trigger with environment selection
   workflow_dispatch:
     inputs:
       environment:
@@ -18,7 +17,6 @@ on:
   repository_dispatch:
     types: [upstream-push]
 
-# Only allow one translation workflow to run at a time
 concurrency:
   group: translation-workflow
   cancel-in-progress: false
@@ -28,7 +26,7 @@ jobs:
     name: Sync Fork and Run Translation
     if: ${{ vars.TRANSLATION_ENABLED == 'true' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment || vars.SCHEDULED_ENVIRONMENT || 'production' }}
+    environment: ${{ inputs.environment || 'production' }}
 
     steps:
       - name: Checkout fork
@@ -57,7 +55,6 @@ jobs:
         run: |
           cat > .env << EOF
           NODE_ENV=${{ vars.NODE_ENV }}
-          BUN_ENV=${{ vars.BUN_ENV }}
           LOG_LEVEL=${{ vars.LOG_LEVEL }}
           GITHUB_TOKEN=${{ secrets.WORKFLOW_GITHUB_TOKEN }}
           OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
@@ -69,14 +66,12 @@ jobs:
           OPENAI_BASE_URL=${{ vars.OPENAI_BASE_URL }}
           TARGET_LANGUAGE=${{ vars.TARGET_LANGUAGE }}
           LOG_TO_CONSOLE=${{ vars.LOG_TO_CONSOLE }}
-          ENABLE_AUTO_MERGE=${{ vars.ENABLE_AUTO_MERGE }}
           EOF
 
       - name: Run translation workflow
         run: bun run start
         timeout-minutes: 120
 
-      # Upload logs
       - name: Upload logs
         uses: actions/upload-artifact@v4
         if: always()
@@ -89,6 +84,6 @@ jobs:
         if: always()
         run: |
           echo "## Translation Workflow Summary" >> $GITHUB_STEP_SUMMARY
-          echo "- **Environment**: ${{ inputs.environment || vars.SCHEDULED_ENVIRONMENT || 'production' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: ${{ inputs.environment || 'production' }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Workflow Run**: ${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY

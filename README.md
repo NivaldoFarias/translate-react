@@ -171,7 +171,6 @@ These must be set in your `.env` *(or `.env.dev`, for development)* file:
 | Variable                | Default       | Description                                                            |
 | ----------------------- | ------------- | ---------------------------------------------------------------------- |
 | `NODE_ENV`              | `development` | Runtime environment                                                    |
-| `BUN_ENV`               | `development` | Bun-specific environment                                               |
 | `LOG_LEVEL`             | `info`        | Logging verbosity (`trace`\|`debug`\|`info`\|`warn`\|`error`\|`fatal`) |
 | `LOG_TO_CONSOLE`        | `true`        | Enable console logging in addition to file logs                        |
 | `PROGRESS_ISSUE_NUMBER` | `555`         | GitHub issue number for progress reports                               |

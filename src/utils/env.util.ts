@@ -30,12 +30,11 @@ function createTokenSchema(envName: string) {
 /**
  * Detects if running in test environment.
  *
- * Checks NODE_ENV, BUN_ENV, and Bun's built-in test detection.
+ * Checks NODE_ENV, and Bun's built-in test detection.
  */
 function isTestEnvironment(): boolean {
 	return (
 		import.meta.env.NODE_ENV === RuntimeEnvironment.Test ||
-		import.meta.env["BUN_ENV"] === RuntimeEnvironment.Test ||
 		(typeof Bun !== "undefined" && !Bun.isMainThread)
 	);
 }
@@ -48,13 +47,6 @@ const envSchema = z.object({
 	 * @default "development"
 	 */
 	NODE_ENV: z.enum(RuntimeEnvironment).default(environmentDefaults.NODE_ENV),
-
-	/**
-	 * Bun's runtime environment.
-	 *
-	 * @default "development"
-	 */
-	BUN_ENV: z.enum(RuntimeEnvironment).default(environmentDefaults.BUN_ENV),
 
 	/**
 	 * Logging level for the application.
