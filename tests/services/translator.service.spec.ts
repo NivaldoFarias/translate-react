@@ -4,12 +4,10 @@ import type { ChatCompletion } from "openai/resources.mjs";
 
 import { TranslationFile, TranslatorService } from "@/services/translator.service";
 
-let mockChatCompletionsCreate = mock(() => Promise.resolve({} as ChatCompletion));
+const mockChatCompletionsCreate = mock(() => Promise.resolve({} as ChatCompletion));
 
 void mock.module("openai", () => {
 	class MockOpenAI {
-		constructor() {}
-
 		chat = {
 			completions: {
 				create: mockChatCompletionsCreate,
@@ -350,7 +348,7 @@ describe("TranslatorService", () => {
 			mockChatCompletionsCreate.mockResolvedValue({
 				choices: [],
 				usage: { total_tokens: 10 },
-			} as ChatCompletion);
+			} as unknown as ChatCompletion);
 
 			const file: TranslationFile = {
 				path: "test/empty-choices.md",

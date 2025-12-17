@@ -490,6 +490,8 @@ export class ContentService extends BaseGitHubService {
 		filesToTranslate: TranslationFile[],
 	): Promise<RestEndpointMethodTypes["issues"]["createComment"]["response"]["data"]> {
 		try {
+			if (!this.issueNumber) throw new Error("No progress issue number configured");
+
 			const issueExistsResponse = await this.octokit.issues.get({
 				...this.repositories.upstream,
 				issue_number: this.issueNumber,
