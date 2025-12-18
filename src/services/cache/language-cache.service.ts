@@ -4,10 +4,12 @@ import { CacheService } from "./cache.service";
 
 /** Language detection cache entry structure */
 export interface LanguageCacheEntry {
-	/** Detected language code (e.g., "pt", "en") */
+	/** Detected language code (e.g., `"pt"`, `"en"`) */
 	detectedLanguage: string;
-	/** Confidence score from 0 to 1 */
+
+	/** Confidence score from `0` to `1` */
 	confidence: number;
+
 	/** Timestamp when language was detected */
 	timestamp: number;
 }

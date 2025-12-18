@@ -1,22 +1,21 @@
 import { TranslationError } from "@/errors/";
 import RunnerService from "@/services/runner/runner.service";
-import { TranslatorService } from "@/services/translator.service";
-import { env, logger } from "@/utils/";
+import { logger as __logger, env } from "@/utils/";
 
 import { name, version } from "../package.json";
+
+const logger = __logger.child({ component: "main" });
 
 if (import.meta.main) {
 	try {
 		logger.info(
 			{ version, component: name, environment: env.NODE_ENV, targetLanguage: env.TARGET_LANGUAGE },
-			"Starting translation workflow",
+			"Starting workflow",
 		);
-
-		await TranslatorService.testConnectivity();
 
 		await workflow();
 
-		logger.info("Translation workflow completed successfully");
+		logger.info("Workflow completed successfully");
 
 		process.exit(0);
 	} catch (error) {
@@ -28,10 +27,10 @@ if (import.meta.main) {
 					operation: error.context.operation,
 					metadata: error.context.metadata,
 				},
-				"Translation workflow failed with TranslationError",
+				"Workflow failed with TranslationError",
 			);
 		} else {
-			logger.fatal({ error }, "Translation workflow failed with unexpected error");
+			logger.fatal({ error }, "Workflow failed with unexpected error");
 		}
 
 		process.exit(1);
@@ -43,8 +42,6 @@ if (import.meta.main) {
  *
  * Creates and runs the Runner service which orchestrates the entire translation process.
  * Validates success rate against configured threshold and exits with appropriate code.
- *
- * @throws {TranslationError} If any critical error occurs during translation
  */
 async function workflow(): Promise<void> {
 	const runner = new RunnerService();
@@ -67,7 +64,7 @@ async function workflow(): Promise<void> {
 		);
 
 		throw new Error(
-			`Translation workflow failed: success rate ${successPercentage}% ` +
+			`Workflow failed: success rate ${successPercentage}% ` +
 				`is below minimum threshold of ${thresholdPercentage}%`,
 		);
 	}

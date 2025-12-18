@@ -38,7 +38,7 @@ The system follows a **modular, service-oriented architecture** with clear separ
 ```mermaid
 graph TB
     subgraph "Entry Point"
-        CLI[CLI / index.ts]
+        CLI[CLI / main.ts]
     end
     
     subgraph "Orchestration Layer"
@@ -609,7 +609,7 @@ abstract class BaseGitHubService {
   protected readonly helpers: HelperServices;
   
   constructor(config?: GitHubServiceConfig) {
-    this.octokit = new Octokit({ auth: env.GITHUB_TOKEN });
+    this.octokit = new Octokit({ auth: env.GH_TOKEN });
     this.repositories = { fork: {...}, upstream: {...} };
     this.helpers = { github: new GitHubErrorHelper(), ... };
   }

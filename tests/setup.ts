@@ -1,13 +1,3 @@
-/**
- * @fileoverview Test setup and configuration for the Bun test runner.
- *
- * This file configures global test environment settings, mocks, and utilities
- * that are used across all test suites in the project.
- *
- * CRITICAL: Environment setup happens BEFORE imports to ensure env.util
- * validation sees test environment configuration.
- */
-
 import type { Environment } from "@/utils";
 
 import { LogLevel, RuntimeEnvironment } from "@/utils/constants.util";
@@ -26,7 +16,7 @@ function resetTestEnvironment(): void {
 	 * This ensures [`env.util.ts`](../src/utils/env.util.ts) can detect test environment during validation
 	 */
 	const testEnv: Environment = {
-		GITHUB_TOKEN: "ghp_1234567890abcdefghijklmnopqrstuvwxyzABCD",
+		GH_TOKEN: "ghp_1234567890abcdefghijklmnopqrstuvwxyzABCD",
 		OPENAI_API_KEY: "sk-1234567890abcdefghijklmnopqrstuvwxyzABCDEF1234567890",
 		LLM_MODEL: "test-model",
 		OPENAI_BASE_URL: "https://openrouter.ai/api/v1",
@@ -42,9 +32,9 @@ function resetTestEnvironment(): void {
 		HEADER_APP_URL: "https://testapp.com",
 		LOG_LEVEL: LogLevel.Debug,
 		MAX_TOKENS: 4096,
-		// @ts-expect-error - setting test value
+		// @ts-expect-error - actual zod schema validation expects `stringbool`, but type expects boolean
 		LOG_TO_CONSOLE: "false",
-		GITHUB_REQUEST_TIMEOUT: 60_000,
+		GH_REQUEST_TIMEOUT: 60_000,
 	};
 
 	// @ts-expect-error - augmenting globalThis for test environment

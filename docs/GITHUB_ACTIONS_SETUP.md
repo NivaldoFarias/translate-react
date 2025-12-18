@@ -33,7 +33,7 @@ Quick reference for configuring the GitHub Actions workflows for this project.
 
 Go to **Settings → Secrets and variables → Actions → Repository secrets** and add:
 
-#### `WORKFLOW_GITHUB_TOKEN`
+#### `GH_TOKEN`
 
 **Personal Access Token for GitHub API operations and PR creation.**
 
@@ -49,7 +49,7 @@ Go to **Settings → Secrets and variables → Actions → Repository secrets** 
    - ✅ `workflow` (Update GitHub Action workflows)
 5. Click **Generate token**
 6. Copy the token (you won't see it again!)
-7. Add it as `WORKFLOW_GITHUB_TOKEN` in your repository secrets
+7. Add it as `GH_TOKEN` in your repository secrets
 
 #### `OPENAI_API_KEY`
 
@@ -83,7 +83,7 @@ Go to **Settings → Secrets and variables → Actions → Variables** and add:
 
 > [!IMPORTANT]
 > **Environment Configuration:**
-> - PRs are created **under your GitHub account** (via `WORKFLOW_GITHUB_TOKEN`), not as github-actions[bot]
+> - PRs are created **under your GitHub account** (via `GH_TOKEN`), not as github-actions[bot]
 
 ## Using GitHub Environments (Recommended)
 
@@ -157,17 +157,17 @@ For each environment, add the secrets that differ between production and develop
 
 **Production Environment (`production`)**:
 
-| Secret                  | Value               | Description                                    |
-| :---------------------- | :------------------ | :--------------------------------------------- |
-| `WORKFLOW_GITHUB_TOKEN` | Your production PAT | Token with write access to upstream repository |
-| `OPENAI_API_KEY`        | Production API key  | May use different rate limits or account       |
+| Secret           | Value               | Description                                    |
+| :--------------- | :------------------ | :--------------------------------------------- |
+| `GH_TOKEN`       | Your production PAT | Token with write access to upstream repository |
+| `OPENAI_API_KEY` | Production API key  | May use different rate limits or account       |
 
 **Development Environment (`development`)**:
 
-| Secret                  | Value                    | Description                               |
-| :---------------------- | :----------------------- | :---------------------------------------- |
-| `WORKFLOW_GITHUB_TOKEN` | Your development PAT     | Token with write access to your fork only |
-| `OPENAI_API_KEY`        | Development/test API key | May use free tier or test account         |
+| Secret           | Value                    | Description                               |
+| :--------------- | :----------------------- | :---------------------------------------- |
+| `GH_TOKEN`       | Your development PAT     | Token with write access to your fork only |
+| `OPENAI_API_KEY` | Development/test API key | May use free tier or test account         |
 
 > [!TIP]
 > **Token Scoping Best Practice**: Use separate GitHub PATs for production and development. The development token should only have access to your fork, while the production token needs access to the upstream repository.
@@ -199,7 +199,7 @@ This table shows all configuration values across repository and environment leve
 | Configuration            | Repository-Level                   | Production Env    | Development Env      |
 | :----------------------- | :--------------------------------- | :---------------- | :------------------- |
 | **Secrets**              |                                    |                   |                      |
-| `WORKFLOW_GITHUB_TOKEN`  | Dev token (default)                | Production token  | Dev token (optional) |
+| `GH_TOKEN`               | Dev token (default)                | Production token  | Dev token (optional) |
 | `OPENAI_API_KEY`         | Free tier key                      | Production key    | Test key (optional)  |
 | **Common Variables**     |                                    |                   |                      |
 | `TRANSLATION_ENABLED`    | `true`                             | (inherits)        | (inherits)           |
@@ -239,7 +239,7 @@ Use both repository-level and environment-level configuration for maximum flexib
 
 ```yaml
 # Secrets (available to all workflows)
-- WORKFLOW_GITHUB_TOKEN (development token as default)
+- GH_TOKEN (development token as default)
 - OPENAI_API_KEY (free tier as default)
 
 # Variables (available to all workflows)
@@ -254,7 +254,7 @@ Use both repository-level and environment-level configuration for maximum flexib
 
 **Environment-Level (Override for Specific Stages)**:
 
-- **Production**: Override `WORKFLOW_GITHUB_TOKEN`, `NODE_ENV`, `REPO_FORK_OWNER`, `LOG_LEVEL`
+- **Production**: Override `GH_TOKEN`, `NODE_ENV`, `REPO_FORK_OWNER`, `LOG_LEVEL`
 
 #### Precedence Example
 
@@ -293,7 +293,7 @@ REPO="your-username/translate-react"
 # ===== Repository-Level Setup (Common/Default Values) =====
 
 # Add repository-level secrets (development defaults)
-gh secret set WORKFLOW_GITHUB_TOKEN --repo $REPO --body "your-dev-token"
+gh secret set GH_TOKEN --repo $REPO --body "your-dev-token"
 gh secret set OPENAI_API_KEY --repo $REPO --body "your-api-key"
 
 # Add repository-level variables (common to all environments)
@@ -315,7 +315,7 @@ gh variable set LOG_TO_CONSOLE --body "true" --repo $REPO
 gh api repos/$REPO/environments/production -X PUT
 
 # Add production secrets
-gh secret set WORKFLOW_GITHUB_TOKEN --repo $REPO --env production --body "your-prod-token"
+gh secret set GH_TOKEN --repo $REPO --env production --body "your-prod-token"
 gh secret set OPENAI_API_KEY --repo $REPO --env production --body "your-prod-api-key"
 
 # Add production variables
@@ -328,7 +328,7 @@ gh variable set LOG_LEVEL --body "info" --repo $REPO --env production
 gh api repos/$REPO/environments/development -X PUT
 
 # Add development secrets (optional if same as repository-level)
-gh secret set WORKFLOW_GITHUB_TOKEN --repo $REPO --env development --body "your-dev-token"
+gh secret set GH_TOKEN --repo $REPO --env development --body "your-dev-token"
 gh secret set OPENAI_API_KEY --repo $REPO --env development --body "your-dev-api-key"
 
 # Add development variables
@@ -350,7 +350,7 @@ gh variable set LOG_LEVEL --body "debug" --repo $REPO --env development
 If you prefer to use the GitHub UI:
 
 1. **Repository Secrets** (Settings → Secrets and variables → Actions → Secrets):
-   - Add `WORKFLOW_GITHUB_TOKEN` and `OPENAI_API_KEY`
+   - Add `GH_TOKEN` and `OPENAI_API_KEY`
 
 2. **Repository Variables** (Settings → Secrets and variables → Actions → Variables):
    - Add common variables listed above
@@ -372,7 +372,7 @@ Expected output:
 
 ```
 OPENAI_API_KEY          Updated 2025-01-10
-WORKFLOW_GITHUB_TOKEN   Updated 2025-01-10
+GH_TOKEN   Updated 2025-01-10
 ```
 
 ### 2. Check Repository-Level Variables
@@ -419,7 +419,7 @@ Expected output:
 
 ```
 OPENAI_API_KEY          Updated 2025-01-10
-WORKFLOW_GITHUB_TOKEN   Updated 2025-01-10
+GH_TOKEN   Updated 2025-01-10
 ```
 
 #### Check Production Environment Variables
@@ -557,9 +557,9 @@ The **Sync and Translate** workflow runs:
 
 ### PR Creation Flow
 
-1. **Git Operations** (checkout, sync, push): Uses `secrets.GITHUB_TOKEN` (automatic GitHub Actions token)
+1. **Git Operations** (checkout, sync, push): Uses `secrets.GH_TOKEN` (automatic GitHub Actions token)
 2. **Commits**: Authored by `github-actions[bot]`
-3. **Pull Requests**: Created via `secrets.WORKFLOW_GITHUB_TOKEN` (your personal token)
+3. **Pull Requests**: Created via `secrets.GH_TOKEN` (your personal token)
 
 **Result**: PRs appear **under your GitHub account** (not github-actions[bot]), created from your fork to upstream.
 
@@ -631,7 +631,7 @@ gh variable list --repo your-username/translate-react --env development | grep R
 **Problem**: The workflow can't access the repository or create PRs.
 
 **Solution**: 
-- Check that `WORKFLOW_GITHUB_TOKEN` has the `repo` and `workflow` scopes
+- Check that `GH_TOKEN` has the `repo` and `workflow` scopes
 - For production: Verify the token has access to the upstream repository
 - For development: Verify the token has access to your fork
 - Consider using separate tokens for each environment for better security
@@ -688,7 +688,7 @@ Go to **Settings → Actions → Artifacts and logs** and delete old artifacts t
 ### General Security
 
 1. **Never commit secrets**: Always use GitHub Secrets for sensitive data
-2. **Rotate tokens**: Update `WORKFLOW_GITHUB_TOKEN` every 90 days minimum
+2. **Rotate tokens**: Update `GH_TOKEN` every 90 days minimum
 3. **Limit permissions**: Use fine-grained tokens when possible instead of classic PATs
 4. **Monitor logs**: Check for sensitive data leaks in workflow logs
 5. **Enable branch protection**: Protect `main` branch from direct pushes

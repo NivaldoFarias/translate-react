@@ -119,7 +119,7 @@ These must be set in your `.env` *(or `.env.dev`, for development)* file:
 
 | Variable         | Description                                                |
 | ---------------- | ---------------------------------------------------------- |
-| `GITHUB_TOKEN`   | GitHub Personal Access Token with `repo` scope             |
+| `GH_TOKEN`       | GitHub Personal Access Token with `repo` scope             |
 | `OPENAI_API_KEY` | API key for LLM service (OpenAI, OpenRouter, Azure OpenAI) |
 
 ### Optional Environment Variables
@@ -130,13 +130,13 @@ These must be set in your `.env` *(or `.env.dev`, for development)* file:
 <details>
 <summary><b>GitHub Configuration</b></summary>
 
-| Variable                 | Default           | Description                          |
-| ------------------------ | ----------------- | ------------------------------------ |
-| `REPO_FORK_OWNER`        | `nivaldofarias`   | Fork owner username/organization     |
-| `REPO_FORK_NAME`         | `pt-br.react.dev` | Fork repository name                 |
-| `REPO_UPSTREAM_OWNER`    | `reactjs`         | Upstream owner username/organization |
-| `REPO_UPSTREAM_NAME`     | `pt-br.react.dev` | Upstream repository name             |
-| `GITHUB_REQUEST_TIMEOUT` | `30000`           | GitHub API timeout (milliseconds)    |
+| Variable              | Default           | Description                          |
+| --------------------- | ----------------- | ------------------------------------ |
+| `REPO_FORK_OWNER`     | `nivaldofarias`   | Fork owner username/organization     |
+| `REPO_FORK_NAME`      | `pt-br.react.dev` | Fork repository name                 |
+| `REPO_UPSTREAM_OWNER` | `reactjs`         | Upstream owner username/organization |
+| `REPO_UPSTREAM_NAME`  | `pt-br.react.dev` | Upstream repository name             |
+| `GH_REQUEST_TIMEOUT`  | `30000`           | GitHub API timeout (milliseconds)    |
 
 </details>
 
@@ -205,7 +205,7 @@ translate-react/
 │  │   ├── runner/                # Workflow orchestration
 │  │   └── translator.service.ts  # LLM translation engine
 │  ├── utils/                     # Utilities and constants
-│  └── index.ts                   # Entry point
+│  └── main.ts                    # Entry point
 │
 ├── docs/                         # Documentation
 └── logs/                         # Structured error logs (JSONL)
@@ -257,9 +257,9 @@ NODE_ENV=development
 <details>
 <summary><b>Environment Validation Errors</b></summary>
 
-**Error**: `❌ Invalid environment variables: - GITHUB_TOKEN: String must contain at least 1 character(s)`
+**Error**: `❌ Invalid environment variables: - GH_TOKEN: String must contain at least 1 character(s)`
 
-**Solution**: Ensure required variables (`GITHUB_TOKEN`, `OPENAI_API_KEY`) are set in `.env` file.
+**Solution**: Ensure required variables (`GH_TOKEN`, `OPENAI_API_KEY`) are set in `.env` file.
 
 </details>
 

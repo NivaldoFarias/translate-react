@@ -1,13 +1,3 @@
-/**
- * @fileoverview
- *
- * React-aware Language Detection Service using Google's CLD library.
- *
- * Provides language detection and translation status determination specifically
- * for React documentation translation workflows. Validates against the 38 official
- * React translation languages and uses {@link Intl.DisplayNames} for human-readable names.
- */
-
 import cld from "cld";
 
 import type { ReactLanguageCode } from "@/utils/";

@@ -98,7 +98,7 @@ export abstract class BaseRunnerService {
 	 * Ensures graceful shutdown and cleanup of resources
 	 */
 	protected cleanup = () => {
-		this.logger.info("Shutting down gracefully...");
+		this.logger.info("Shutting down gracefully");
 
 		setTimeout(() => void process.exit(0), 1000);
 	};
@@ -116,6 +116,15 @@ export abstract class BaseRunnerService {
 		setupSignalHandlers(this.cleanup, (message, error) => {
 			this.logger.error({ error, message }, "Signal handler triggered during cleanup");
 		});
+	}
+
+	/**
+	 * Calls {@link TranslatorService.testConnectivity} to verify LLM connectivity
+	 *
+	 * @throws {InitializationError} If LLM connectivity test fails
+	 */
+	protected async verifyLLMConnectivity(): Promise<void> {
+		await this.services.translator.testConnectivity();
 	}
 
 	/**
@@ -141,12 +150,12 @@ export abstract class BaseRunnerService {
 	 * @returns `true` if the fork is up to date, `false` otherwise
 	 */
 	protected async syncFork(): Promise<boolean> {
-		this.logger.info("Checking fork status...");
+		this.logger.info("Checking fork status");
 
 		const isForkSynced = await this.services.github.repository.isForkSynced();
 
 		if (!isForkSynced) {
-			this.logger.info("Fork is out of sync, updating fork...");
+			this.logger.info("Fork is out of sync, updating fork");
 
 			const syncSuccess = await this.services.github.repository.syncFork();
 			if (!syncSuccess) {
@@ -169,7 +178,7 @@ export abstract class BaseRunnerService {
 	 * @throws {ResourceLoadError} If the repository tree or glossary fetch fails
 	 */
 	protected async fetchRepositoryTree(): Promise<void> {
-		this.logger.info("Fetching repository content...");
+		this.logger.info("Fetching repository content");
 		const repositoryTree = await this.services.github.repository.getRepositoryTree();
 
 		this.state.repositoryTree = repositoryTree.map((item) => {
@@ -178,7 +187,7 @@ export abstract class BaseRunnerService {
 			return { ...item, filename };
 		}) as PatchedRepositoryItem[];
 
-		this.logger.info("Repository tree fetched, fetching glossary...");
+		this.logger.info("Repository tree fetched, fetching glossary");
 		const glossary = await this.services.github.repository.fetchGlossary();
 
 		if (!glossary) {
@@ -270,7 +279,7 @@ export abstract class BaseRunnerService {
 	 * ```
 	 */
 	private checkLanguageCache(files: PatchedRepositoryItem[]): CacheCheckResult {
-		this.logger.info("Checking language cache...");
+		this.logger.info("Checking language cache");
 		const startTime = Date.now();
 
 		const candidateFiles: typeof files = [];
@@ -367,7 +376,7 @@ export abstract class BaseRunnerService {
 	private async filterFilesByExistingPRs(
 		candidateFiles: PatchedRepositoryItem[],
 	): Promise<PullRequestFilterResult> {
-		this.logger.info("Checking for existing open PRs with file-based filtering...");
+		this.logger.info("Checking for existing open PRs with file-based filtering");
 
 		const openPRs = await this.services.github.content.listOpenPullRequests();
 		const invalidPRsByFile = new Map<string, { prNumber: number; status: PullRequestStatus }>();
@@ -482,7 +491,7 @@ export abstract class BaseRunnerService {
 	private async fetchFileContents(
 		filesToFetch: PatchedRepositoryItem[],
 	): Promise<TranslationFile[]> {
-		this.logger.info("Fetching file content...");
+		this.logger.info("Fetching file content");
 
 		const uncheckedFiles: TranslationFile[] = [];
 		let completedFiles = 0;
@@ -597,7 +606,7 @@ export abstract class BaseRunnerService {
 
 	/** Updates the progress issue with the translation results */
 	protected async updateIssueWithResults(): Promise<void> {
-		this.logger.info("Commenting on issue...");
+		this.logger.info("Commenting on issue");
 
 		const comment = await this.services.github.content.commentCompiledResultsOnIssue(
 			this.state.processedResults,
@@ -728,7 +737,7 @@ export abstract class BaseRunnerService {
 	 * @throws {ResourceLoadError} If file content cannot be loaded
 	 */
 	protected async processInBatches(files: TranslationFile[], batchSize = 10): Promise<void> {
-		this.logger.info("Processing files in batches...");
+		this.logger.info("Processing files in batches");
 
 		const batches = this.createBatches(files, batchSize);
 

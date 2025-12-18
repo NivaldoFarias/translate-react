@@ -1,12 +1,3 @@
-/**
- * @fileoverview
- *
- * Core service for translating content using OpenAI's language models.
- *
- * Handles the entire translation workflow including content parsing, language detection,
- * model interaction, response processing, and metrics tracking.
- */
-
 import { MarkdownTextSplitter } from "@langchain/textsplitters";
 import { encodingForModel } from "js-tiktoken";
 import OpenAI from "openai";
@@ -15,6 +6,7 @@ import {
 	ChunkProcessingError,
 	EmptyContentError,
 	GithubErrorHelper,
+	InitializationError,
 	LLMErrorHelper,
 	TranslationValidationError,
 } from "@/errors/";
@@ -119,53 +111,48 @@ export class TranslatorService {
 	 * console.log("✅ LLM API is healthy");
 	 * ```
 	 */
-	public static async testConnectivity(): Promise<void> {
-		const testLogger = logger.child({ component: "LLMHealthCheck" });
-
+	public async testConnectivity(): Promise<void> {
 		try {
-			testLogger.info("Testing LLM API connectivity...");
+			this.logger.info("Testing LLM API connectivity");
 
-			const llm = new OpenAI({
-				baseURL: env.OPENAI_BASE_URL,
-				apiKey: env.OPENAI_API_KEY,
-				project: env.OPENAI_PROJECT_ID,
-				defaultHeaders: {
-					"X-Title": env.HEADER_APP_TITLE,
-					"HTTP-Referer": env.HEADER_APP_URL,
-				},
-			});
-
-			const response = await llm.chat.completions.create({
+			const response = await this.llm.chat.completions.create({
 				model: env.LLM_MODEL,
-				messages: [{ role: "user", content: "test" }],
+				messages: [{ role: "user", content: "ping" }],
 				max_tokens: 5,
 				temperature: 0.1,
 			});
 
-			if (!response.id) {
-				throw new Error("Invalid LLM API response: missing response ID");
+			if (isLLMResponseValid(response)) {
+				throw new InitializationError("Invalid LLM API response: missing response metadata");
 			}
 
-			testLogger.info(
-				{ model: env.LLM_MODEL, responseId: response.id },
-				"✅ LLM API connectivity test successful",
+			this.logger.info(
+				{
+					model: env.LLM_MODEL,
+					response: {
+						id: response.id,
+						usage: response.usage,
+						message: response.choices.at(0)?.message,
+					},
+				},
+				"LLM API connectivity test successful",
 			);
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
 
-			testLogger.fatal(
-				{
-					error: errorMessage,
-					model: env.LLM_MODEL,
-					baseURL: env.OPENAI_BASE_URL,
-				},
+			this.logger.fatal(
+				{ error: errorMessage, model: env.LLM_MODEL, baseURL: env.OPENAI_BASE_URL },
 				"❌ LLM API connectivity test failed",
 			);
 
 			throw new Error(
 				`LLM API connectivity test failed: ${errorMessage}. ` +
-					`Please verify OPENAI_API_KEY and model availability (${env.LLM_MODEL})`,
+					`Please verify OpenAI-related environment variables and network access.`,
 			);
+		}
+
+		function isLLMResponseValid(response: OpenAI.Chat.Completions.ChatCompletion): boolean {
+			return !response.id || !response.usage?.total_tokens || !response.choices.at(0)?.message;
 		}
 	}
 
@@ -813,6 +800,7 @@ export class TranslatorService {
 
 			if (!translatedContent) {
 				this.logger.error({ model: env.LLM_MODEL }, "No content returned from language model");
+
 				throw new LLMErrorHelper().mapError(new Error("No content returned from language model"), {
 					operation: "TranslatorService.callLanguageModel",
 					metadata: {
