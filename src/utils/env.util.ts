@@ -103,7 +103,7 @@ const envSchema = z.object({
 	/**
 	 * The OpenAI/OpenRouter/etc API base URL.
 	 *
-	 * @default "https://api.openrouter.com/v1"
+	 * @default "https://openrouter.ai/api/v1"
 	 */
 	OPENAI_BASE_URL: z.url().default(environmentDefaults.OPENAI_BASE_URL),
 

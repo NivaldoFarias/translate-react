@@ -146,7 +146,7 @@ These must be set in your `.env` *(or `.env.dev`, for development)* file:
 | Variable            | Default                                            | Description                              |
 | ------------------- | -------------------------------------------------- | ---------------------------------------- |
 | `LLM_MODEL`         | `google/gemini-2.0-flash-exp:free`                 | Model ID for translation                 |
-| `OPENAI_BASE_URL`   | `https://api.openrouter.com/v1`                    | API endpoint                             |
+| `OPENAI_BASE_URL`   | `https://openrouter.ai/api/v1`                     | API endpoint                             |
 | `OPENAI_PROJECT_ID` | —                                                  | Optional: OpenAI project ID for tracking |
 | `MAX_TOKENS`        | `8192`                                             | Maximum tokens per LLM response          |
 | `HEADER_APP_URL`    | `https://github.com/NivaldoFarias/translate-react` | App URL for OpenRouter tracking          |
