@@ -5,6 +5,7 @@ import OpenAI from "openai";
 import {
 	ChunkProcessingError,
 	EmptyContentError,
+	ErrorSeverity,
 	GithubErrorHelper,
 	InitializationError,
 	LLMErrorHelper,
@@ -123,7 +124,10 @@ export class TranslatorService {
 			});
 
 			if (isLLMResponseValid(response)) {
-				throw new InitializationError("Invalid LLM API response: missing response metadata");
+				throw new InitializationError("Invalid LLM API response: missing response metadata", {
+					sanity: ErrorSeverity.Fatal,
+					metadata: { ...response },
+				});
 			}
 
 			this.logger.info(
@@ -145,10 +149,7 @@ export class TranslatorService {
 				"❌ LLM API connectivity test failed",
 			);
 
-			throw new Error(
-				`LLM API connectivity test failed: ${errorMessage}. ` +
-					`Please verify OpenAI-related environment variables and network access.`,
-			);
+			throw error;
 		}
 
 		function isLLMResponseValid(response: OpenAI.Chat.Completions.ChatCompletion): boolean {
