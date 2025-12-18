@@ -142,12 +142,7 @@ export class TranslatorService {
 				"LLM API connectivity test successful",
 			);
 		} catch (error) {
-			const errorMessage = error instanceof Error ? error.message : String(error);
-
-			this.logger.fatal(
-				{ error: errorMessage, model: env.LLM_MODEL, baseURL: env.OPENAI_BASE_URL },
-				"❌ LLM API connectivity test failed",
-			);
+			this.logger.fatal(error, "❌ LLM API connectivity test failed");
 
 			throw error;
 		}
