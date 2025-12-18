@@ -17,7 +17,7 @@ if (import.meta.main) {
 		await workflow();
 
 		logger.info("Translation workflow completed successfully");
-		
+
 		process.exit(0);
 	} catch (error) {
 		if (error instanceof TranslationError) {
