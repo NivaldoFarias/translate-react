@@ -12,8 +12,6 @@ on:
           - production
         default: development
 
-  # Trigger when a webhook is received from upstream repo
-  # Note: This requires setting up a GitHub webhook from the upstream repo
   repository_dispatch:
     types: [upstream-push]
 
@@ -54,18 +52,36 @@ jobs:
       - name: Create .env file
         run: |
           cat > .env << EOF
+          # Core Configuration
           NODE_ENV=${{ vars.NODE_ENV }}
           LOG_LEVEL=${{ vars.LOG_LEVEL }}
+          LOG_TO_CONSOLE=${{ vars.LOG_TO_CONSOLE }}
+
+          # API Credentials
           GITHUB_TOKEN=${{ secrets.WORKFLOW_GITHUB_TOKEN }}
           OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+
+          # Repository Configuration
           REPO_FORK_OWNER=${{ vars.REPO_FORK_OWNER }}
           REPO_FORK_NAME=${{ vars.REPO_FORK_NAME }}
           REPO_UPSTREAM_OWNER=${{ vars.REPO_UPSTREAM_OWNER }}
           REPO_UPSTREAM_NAME=${{ vars.REPO_UPSTREAM_NAME }}
+
+          # LLM Configuration
           LLM_MODEL=${{ vars.LLM_MODEL }}
           OPENAI_BASE_URL=${{ vars.OPENAI_BASE_URL }}
+          OPENAI_PROJECT_ID=${{ vars.OPENAI_PROJECT_ID }}
+          MAX_TOKENS=${{ vars.MAX_TOKENS }}
+
+          # Translation Configuration
           TARGET_LANGUAGE=${{ vars.TARGET_LANGUAGE }}
-          LOG_TO_CONSOLE=${{ vars.LOG_TO_CONSOLE }}
+          SOURCE_LANGUAGE=${{ vars.SOURCE_LANGUAGE }}
+
+          # Workflow Configuration
+          BATCH_SIZE=${{ vars.BATCH_SIZE }}
+          PROGRESS_ISSUE_NUMBER=${{ vars.PROGRESS_ISSUE_NUMBER }}
+          GITHUB_REQUEST_TIMEOUT=${{ vars.GITHUB_REQUEST_TIMEOUT }}
+          MIN_SUCCESS_RATE=${{ vars.MIN_SUCCESS_RATE }}
           EOF
 
       - name: Run translation workflow

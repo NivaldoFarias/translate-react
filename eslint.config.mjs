@@ -44,6 +44,7 @@ export default defineConfig(
 		rules: {
 			/* ESLint */
 			"no-unused-vars": "off",
+			"no-unsafe-finally": "off",
 			"no-console": "error",
 
 			/* TypeScript */

@@ -7,6 +7,7 @@ import type {
 	PrFilterResult as PullRequestFilterResult,
 	PullRequestStatus,
 	RunnerOptions,
+	WorkflowStatistics,
 } from "./runner.types";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 import type { SetNonNullable, SetRequired } from "type-fest";
@@ -634,17 +635,12 @@ export abstract class BaseRunnerService {
 	 * - Detailed error information for failed files
 	 * - Total execution time
 	 */
-	protected printFinalStatistics(): void {
+	protected printFinalStatistics(): WorkflowStatistics {
 		const elapsedTime = Math.ceil(Date.now() - this.metadata.timestamp);
 		const results = Array.from(this.metadata.results.values());
 
 		const successCount = results.filter(({ error }) => !error).length;
 		const failureCount = results.filter(({ error }) => !!error).length;
-
-		this.logger.info(
-			{ successCount, failureCount, elapsedTime: this.formatElapsedTime(elapsedTime) },
-			"Final statistics",
-		);
 
 		const failedFiles = results.filter(({ error }) => !!error) as SetNonNullable<
 			ProcessedFileResult,
@@ -659,6 +655,22 @@ export abstract class BaseRunnerService {
 				`Failed files (${String(failedFiles.length)})`,
 			);
 		}
+
+		const totalCount = results.length;
+		const successRate = totalCount > 0 ? successCount / totalCount : 0;
+
+		this.logger.info(
+			{
+				successCount,
+				failureCount,
+				totalCount,
+				elapsedTime: this.formatElapsedTime(elapsedTime),
+				successRate,
+			},
+			"Final statistics",
+		);
+
+		return { successCount, failureCount, totalCount, successRate };
 	}
 
 	/**
@@ -976,7 +988,7 @@ export abstract class BaseRunnerService {
 		}
 	}
 
-	abstract run(): Promise<void>;
+	abstract run(): Promise<WorkflowStatistics>;
 
 	/**
 	 * Creates a comprehensive pull request description for translated content.

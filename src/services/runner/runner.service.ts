@@ -1,3 +1,5 @@
+import type { WorkflowStatistics } from "./runner.types";
+
 import { extractErrorMessage } from "@/errors/";
 import { BaseRunnerService } from "@/services/runner/base.service";
 import { env, logger } from "@/utils/";
@@ -39,8 +41,10 @@ export default class RunnerService extends BaseRunnerService {
 	 * 4. Identifies files for translation
 	 * 5. Processes files in batches
 	 * 6. Reports results
+	 *
+	 * @returns Statistics about the workflow execution (success/failure counts)
 	 */
-	public async run(): Promise<void> {
+	public async run(): Promise<WorkflowStatistics> {
 		try {
 			this.logger.info("Starting translation workflow");
 
@@ -60,7 +64,7 @@ export default class RunnerService extends BaseRunnerService {
 
 			this.state.processedResults = Array.from(this.metadata.results.values());
 
-			this.logger.info("Translation workflow completed successfully");
+			this.logger.info("Translation workflow completed");
 
 			if (this.shouldUpdateIssueComment) {
 				await this.updateIssueWithResults();
@@ -70,7 +74,7 @@ export default class RunnerService extends BaseRunnerService {
 
 			throw error;
 		} finally {
-			this.printFinalStatistics();
+			return this.printFinalStatistics();
 		}
 	}
 }
