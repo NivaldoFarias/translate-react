@@ -35,12 +35,13 @@ export default class RunnerService extends BaseRunnerService {
 	 *
 	 * ### Workflow
 	 *
-	 * 1. Verifies GitHub token permissions
-	 * 2. Syncs fork with upstream
-	 * 3. Fetches repository tree
-	 * 4. Identifies files for translation
-	 * 5. Processes files in batches
-	 * 6. Reports results
+	 * 1. Verifies LLM connectivity
+	 * 2. Verifies GitHub token permissions
+	 * 3. Syncs fork with upstream
+	 * 4. Fetches repository tree
+	 * 5. Identifies files for translation
+	 * 6. Processes files in batches
+	 * 7. Reports results
 	 *
 	 * @returns Statistics about the workflow execution (success/failure counts)
 	 */
@@ -70,12 +71,12 @@ export default class RunnerService extends BaseRunnerService {
 			if (this.shouldUpdateIssueComment) {
 				await this.updateIssueWithResults();
 			}
+
+			return this.printFinalStatistics();
 		} catch (error) {
 			this.logger.error({ error: extractErrorMessage(error) }, "Translation workflow failed");
 
 			throw error;
-		} finally {
-			return this.printFinalStatistics();
 		}
 	}
 }
