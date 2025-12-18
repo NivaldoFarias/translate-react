@@ -191,6 +191,16 @@ const envSchema = z.object({
 		.number()
 		.positive()
 		.default(environmentDefaults.GITHUB_REQUEST_TIMEOUT),
+
+	/**
+	 * Minimum success rate (0-1) required for workflow to pass.
+	 *
+	 * If the translation success rate falls below this threshold, the workflow
+	 * will exit with a non-zero code. Set to 0 to disable failure detection.
+	 *
+	 * @default 0.5 (50%)
+	 */
+	MIN_SUCCESS_RATE: z.coerce.number().min(0).max(1).default(environmentDefaults.MIN_SUCCESS_RATE),
 });
 
 /** Type definition for the environment configuration */

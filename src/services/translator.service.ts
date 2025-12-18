@@ -105,6 +105,71 @@ export class TranslatorService {
 	public glossary: string | null = null;
 
 	/**
+	 * Tests LLM API connectivity and authentication.
+	 *
+	 * Makes a minimal API call to verify credentials and model availability
+	 * before starting the translation workflow. This prevents wasting time
+	 * on failed workflows due to API issues.
+	 *
+	 * @throws {Error} If LLM API is not accessible or credentials are invalid
+	 *
+	 * @example
+	 * ```typescript
+	 * await TranslatorService.testConnectivity();
+	 * console.log("✅ LLM API is healthy");
+	 * ```
+	 */
+	public static async testConnectivity(): Promise<void> {
+		const testLogger = logger.child({ component: "LLMHealthCheck" });
+
+		try {
+			testLogger.info("Testing LLM API connectivity...");
+
+			const llm = new OpenAI({
+				baseURL: env.OPENAI_BASE_URL,
+				apiKey: env.OPENAI_API_KEY,
+				project: env.OPENAI_PROJECT_ID,
+				defaultHeaders: {
+					"X-Title": env.HEADER_APP_TITLE,
+					"HTTP-Referer": env.HEADER_APP_URL,
+				},
+			});
+
+			const response = await llm.chat.completions.create({
+				model: env.LLM_MODEL,
+				messages: [{ role: "user", content: "test" }],
+				max_tokens: 5,
+				temperature: 0.1,
+			});
+
+			if (!response.id) {
+				throw new Error("Invalid LLM API response: missing response ID");
+			}
+
+			testLogger.info(
+				{ model: env.LLM_MODEL, responseId: response.id },
+				"✅ LLM API connectivity test successful",
+			);
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+
+			testLogger.fatal(
+				{
+					error: errorMessage,
+					model: env.LLM_MODEL,
+					baseURL: env.OPENAI_BASE_URL,
+				},
+				"❌ LLM API connectivity test failed",
+			);
+
+			throw new Error(
+				`LLM API connectivity test failed: ${errorMessage}. ` +
+					`Please verify OPENAI_API_KEY and model availability (${env.LLM_MODEL})`,
+			);
+		}
+	}
+
+	/**
 	 * Main translation method that processes files and manages the translation workflow.
 	 *
 	 * Automatically handles large files through intelligent chunking while preserving

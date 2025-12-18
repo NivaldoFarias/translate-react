@@ -137,3 +137,22 @@ export interface LanguageDetectionResult {
 	/** Number of files exceeding maximum size limit */
 	numFilesTooLarge: number;
 }
+
+/**
+ * Statistics returned from the workflow execution.
+ *
+ * Used to determine if the workflow met success rate thresholds.
+ */
+export interface WorkflowStatistics {
+	/** Number of files successfully translated */
+	successCount: number;
+
+	/** Number of files that failed translation */
+	failureCount: number;
+
+	/** Total number of files processed (success + failure) */
+	totalCount: number;
+
+	/** Success rate as a decimal (0-1) */
+	successRate: number;
+}
