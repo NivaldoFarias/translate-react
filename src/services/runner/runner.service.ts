@@ -53,6 +53,7 @@ export default class RunnerService extends BaseRunnerService {
 					`Upstream: ${env.REPO_UPSTREAM_OWNER}/${env.REPO_UPSTREAM_NAME}`,
 			);
 
+			await this.verifyLLMConnectivity();
 			await this.verifyPermissions();
 			await this.syncFork();
 

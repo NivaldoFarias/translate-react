@@ -279,7 +279,7 @@ export class RateLimiter {
 		}
 
 		this.isShutdown = true;
-		this.logger.info({ name: this.name }, "Shutting down rate limiter...");
+		this.logger.info({ name: this.name }, "Shutting down rate limiter");
 
 		await this.limiter.stop({ dropWaitingJobs });
 

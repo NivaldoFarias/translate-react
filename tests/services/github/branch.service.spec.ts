@@ -10,7 +10,7 @@ void mock.module("@/utils/env.util", () => ({
 		REPO_FORK_NAME: "fork-repo",
 		REPO_UPSTREAM_OWNER: "upstream-owner",
 		REPO_UPSTREAM_NAME: "upstream-repo",
-		GITHUB_TOKEN: "gho_test_token_with_40_characters_exactly",
+		GH_TOKEN: "gho_test_token_with_40_characters_exactly",
 	},
 }));
 

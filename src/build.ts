@@ -1,19 +1,11 @@
-/**
- * @file Build configuration for translate-react using Bun bundler.
- * @module build
- * @description Bundles the application into a standalone executable with all
- *   dependencies embedded. Targets Node.js runtime with ESM output format.
- * @see https://bun.com/docs/bundler
- */
-
 import { rm } from "node:fs/promises";
 import { join } from "node:path";
 
 import Bun from "bun";
 
-import { logger as baseLogger } from "./utils";
+import { logger as __logger } from "./utils";
 
-const logger = baseLogger.child({ component: "build" });
+const logger = __logger.child({ component: "build" });
 
 if (import.meta.main) {
 	try {
@@ -44,7 +36,7 @@ async function build(): Promise<Bun.BuildOutput> {
 
 	/* Bundle application with Bun */
 	const result = await Bun.build({
-		entrypoints: [join(SRC_DIR, "index.ts")],
+		entrypoints: [join(SRC_DIR, "main.ts")],
 		outdir: DIST_DIR,
 		target: "node",
 		format: "esm",

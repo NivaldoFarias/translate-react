@@ -36,9 +36,9 @@ const octokitLogger = logger.child({ component: "octokit" });
 export abstract class BaseGitHubService {
 	/** GitHub API client instance */
 	protected readonly octokit = new Octokit({
-		auth: env.GITHUB_TOKEN,
+		auth: env.GH_TOKEN,
 		request: {
-			timeout: env.GITHUB_REQUEST_TIMEOUT,
+			timeout: env.GH_REQUEST_TIMEOUT,
 		},
 		log: {
 			debug: (message: string) => {

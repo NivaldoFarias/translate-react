@@ -56,10 +56,8 @@ const envSchema = z.object({
 	LOG_LEVEL: z.enum(LogLevel).default(environmentDefaults.LOG_LEVEL),
 
 	/** The GitHub Personal Access Token (optional in test environment) */
-	GITHUB_TOKEN:
-		isTestEnvironment() ?
-			createTokenSchema("GITHUB_TOKEN").optional()
-		:	createTokenSchema("GITHUB_TOKEN"),
+	GH_TOKEN:
+		isTestEnvironment() ? createTokenSchema("GH_TOKEN").optional() : createTokenSchema("GH_TOKEN"),
 
 	/** The OpenAI/OpenRouter/etc API key (optional in test environment) */
 	OPENAI_API_KEY:
@@ -187,10 +185,7 @@ const envSchema = z.object({
 	 *
 	 * @default 30000
 	 */
-	GITHUB_REQUEST_TIMEOUT: z.coerce
-		.number()
-		.positive()
-		.default(environmentDefaults.GITHUB_REQUEST_TIMEOUT),
+	GH_REQUEST_TIMEOUT: z.coerce.number().positive().default(environmentDefaults.GH_REQUEST_TIMEOUT),
 
 	/**
 	 * Minimum success rate (0-1) required for workflow to pass.

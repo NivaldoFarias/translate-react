@@ -112,7 +112,7 @@ sequenceDiagram
 
 **Environment Requirements**:
 
-- `GITHUB_TOKEN`: Valid GitHub PAT with `repo` scope
+- `GH_TOKEN`: Valid GitHub PAT with `repo` scope
 - `OPENAI_API_KEY`: Valid API key for translation service
 - All other variables validated per `envSchema` in `env.util.ts`
 

@@ -4,7 +4,7 @@ import { BaseGitHubService } from "@/services/github/base.service";
 
 void mock.module("@/utils/env.util", () => ({
 	env: {
-		GITHUB_TOKEN: "gho_test_token_with_40_characters_exactly",
+		GH_TOKEN: "gho_test_token_with_40_characters_exactly",
 		REPO_UPSTREAM_OWNER: "test-owner",
 		REPO_UPSTREAM_NAME: "test-repo",
 		REPO_FORK_OWNER: "fork-owner",

@@ -138,7 +138,7 @@ export const environmentDefaults = {
 	LOG_TO_CONSOLE: true,
 
 	/** Timeout for GitHub API requests in milliseconds */
-	GITHUB_REQUEST_TIMEOUT: 30_000,
+	GH_REQUEST_TIMEOUT: 30_000,
 
 	/** Minimum success rate (0-1) required for workflow to pass */
 	MIN_SUCCESS_RATE: 0.5,

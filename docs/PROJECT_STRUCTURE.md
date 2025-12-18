@@ -30,7 +30,7 @@ translate-react/
 │
 ├── Application Source
 │   └── src/                                  # Main application code
-│       ├── index.ts                          # Application entry point
+│       ├── main.ts                           # Application entry point
 │       ├── build.ts                          # Bun bundler build configuration
 │       ├── types.d.ts                        # Global type definitions
 │       │
