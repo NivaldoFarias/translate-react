@@ -77,7 +77,7 @@ Go to **Settings → Secrets and variables → Actions → Variables** and add:
 | `REPO_UPSTREAM_NAME`  | `pt-br.react.dev`                  | Upstream repository name                             | ✅ Yes    |
 | `TARGET_LANGUAGE`     | `pt-br`                            | Target language code                                 | ✅ Yes    |
 | `LLM_MODEL`           | `google/gemini-2.0-flash-exp:free` | LLM model identifier                                 | ❌ No     |
-| `OPENAI_BASE_URL`     | `https://api.openrouter.com/v1`    | API base URL                                         | ❌ No     |
+| `OPENAI_BASE_URL`     | `https://openrouter.ai/api/v1`     | API base URL                                         | ❌ No     |
 | `LOG_LEVEL`           | `info`                             | Logging level (debug/info/warn/error)                | ❌ No     |
 | `LOG_TO_CONSOLE`      | `true`                             | Enable console logging in workflows                  | ❌ No     |
 
@@ -207,7 +207,7 @@ This table shows all configuration values across repository and environment leve
 | `REPO_UPSTREAM_NAME`     | `pt-br.react.dev`                  | (inherits)        | (inherits)           |
 | `TARGET_LANGUAGE`        | `pt-br`                            | (inherits)        | (inherits)           |
 | `LLM_MODEL`              | `google/gemini-2.0-flash-exp:free` | (inherits)        | (inherits)           |
-| `OPENAI_BASE_URL`        | `https://api.openrouter.com/v1`    | (inherits)        | (inherits)           |
+| `OPENAI_BASE_URL`        | `https://openrouter.ai/api/v1`     | (inherits)        | (inherits)           |
 | `LOG_TO_CONSOLE`         | `true`                             | (inherits)        | (inherits)           |
 | **Environment-Specific** |                                    |                   |                      |
 | `NODE_ENV`               | (not set)                          | `production`      | `development`        |
@@ -248,7 +248,7 @@ Use both repository-level and environment-level configuration for maximum flexib
 - REPO_UPSTREAM_NAME: "pt-br.react.dev"
 - TARGET_LANGUAGE: "pt-br"
 - LLM_MODEL: "google/gemini-2.0-flash-exp:free"
-- OPENAI_BASE_URL: "https://api.openrouter.com/v1"
+- OPENAI_BASE_URL: "https://openrouter.ai/api/v1"
 - LOG_TO_CONSOLE: "true"
 ```
 
@@ -302,7 +302,7 @@ gh variable set REPO_UPSTREAM_OWNER --body "reactjs" --repo $REPO
 gh variable set REPO_UPSTREAM_NAME --body "pt-br.react.dev" --repo $REPO
 gh variable set TARGET_LANGUAGE --body "pt-br" --repo $REPO
 gh variable set LLM_MODEL --body "google/gemini-2.0-flash-exp:free" --repo $REPO
-gh variable set OPENAI_BASE_URL --body "https://api.openrouter.com/v1" --repo $REPO
+gh variable set OPENAI_BASE_URL --body "https://openrouter.ai/api/v1" --repo $REPO
 gh variable set LOG_TO_CONSOLE --body "true" --repo $REPO
 
 # ===== Environment Setup =====
@@ -386,7 +386,7 @@ Expected output (common/default values):
 ```
 LLM_MODEL               google/gemini-2.0-flash-exp:free
 LOG_TO_CONSOLE          true
-OPENAI_BASE_URL         https://api.openrouter.com/v1
+OPENAI_BASE_URL         https://openrouter.ai/api/v1
 REPO_FORK_NAME          pt-br.react.dev
 REPO_UPSTREAM_NAME      pt-br.react.dev
 REPO_UPSTREAM_OWNER     reactjs
