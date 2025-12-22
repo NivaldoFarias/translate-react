@@ -49,20 +49,20 @@ export const CONFIGS = {
 	/**
 	 * Free-tier LLM API rate limiter configuration.
 	 *
-	 * Free models typically have strict limits:
-	 * - OpenRouter free tier: ~1-2 requests/minute
-	 * - Enforces sequential execution (maxConcurrent: 1)
-	 * - No burst capacity (reservoir: 1)
-	 * - 60 second minimum between requests for safety
+	 * Optimized configuration for free LLM APIs like OpenRouter:
+	 * - Supports concurrent requests (maxConcurrent: 5)
+	 * - Moderate burst capacity (reservoir: 5)
+	 * - 20 second minimum between request batches (~3 req/minute)
+	 * - Balances throughput with API stability
 	 *
 	 * @see {@link https://openrouter.ai/docs/limits|OpenRouter Rate Limits}
 	 */
 	freeLLM: {
-		maxConcurrent: 1,
-		minTime: 60_000,
-		reservoir: 1,
+		maxConcurrent: 5,
+		minTime: 20_000,
+		reservoir: 5,
 		reservoirRefreshAmount: 1,
-		reservoirRefreshInterval: 60_000,
+		reservoirRefreshInterval: 20_000,
 		highWater: 50,
 		debug: false,
 	} satisfies RateLimiterConfig,
