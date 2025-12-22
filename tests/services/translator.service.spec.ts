@@ -27,6 +27,17 @@ void mock.module("@/services/rate-limiter/", () => ({
 	},
 }));
 
+void mock.module("@/utils/backoff.util", () => ({
+	withExponentialBackoff: (fn: () => Promise<unknown>) => fn(),
+	DEFAULT_BACKOFF_CONFIG: {
+		initialDelay: 1000,
+		maxDelay: 60_000,
+		maxRetries: 5,
+		multiplier: 2,
+		jitter: true,
+	},
+}));
+
 describe("TranslatorService", () => {
 	let translatorService: TranslatorService;
 

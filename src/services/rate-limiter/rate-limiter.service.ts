@@ -2,7 +2,7 @@ import Bottleneck from "bottleneck";
 
 import type { RateLimiterConfig, RateLimiterMetrics } from "./rate-limiter.types";
 
-import { logger } from "@/utils";
+import { env, logger } from "@/utils";
 
 import { CONFIGS } from "./rate-limiter.config";
 
@@ -326,10 +326,11 @@ export function createRateLimiter(config: RateLimiterConfig, name: string): Rate
 export const githubRateLimiter = new RateLimiter(CONFIGS.githubAPI, "github");
 
 /**
- * Singleton rate limiter instance for LLM API requests (free tier).
+ * Singleton rate limiter instance for LLM API requests.
  *
- * Pre-configured with free tier LLM rate limits (1-2 requests/minute).
- * Use this instance across the entire application for LLM API calls.
+ * Pre-configured with optimized concurrent request settings. Configuration
+ * can be overridden using `LLM_MAX_CONCURRENT` and `LLM_MIN_TIME_MS`
+ * environment variables.
  *
  * @example
  * ```typescript
@@ -340,4 +341,13 @@ export const githubRateLimiter = new RateLimiter(CONFIGS.githubAPI, "github");
  * );
  * ```
  */
-export const llmRateLimiter = new RateLimiter(CONFIGS.freeLLM, "llm");
+export const llmRateLimiter = new RateLimiter(
+	{
+		...CONFIGS.freeLLM,
+		maxConcurrent: env.LLM_MAX_CONCURRENT,
+		minTime: env.LLM_MIN_TIME_MS,
+		reservoir: env.LLM_MAX_CONCURRENT,
+		reservoirRefreshInterval: env.LLM_MIN_TIME_MS,
+	},
+	"llm",
+);

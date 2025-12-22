@@ -12,7 +12,13 @@ import {
 	TranslationValidationError,
 } from "@/errors/";
 import { llmRateLimiter } from "@/services/rate-limiter/";
-import { env, LANGUAGE_SPECIFIC_RULES, logger, MAX_CHUNK_TOKENS } from "@/utils/";
+import {
+	env,
+	LANGUAGE_SPECIFIC_RULES,
+	logger,
+	MAX_CHUNK_TOKENS,
+	withExponentialBackoff,
+} from "@/utils/";
 
 import { LanguageDetectorService } from "./language-detector.service";
 
@@ -780,16 +786,24 @@ export class TranslatorService {
 				"Calling language model for translation",
 			);
 
-			const completion = await llmRateLimiter.schedule(() =>
-				this.llm.chat.completions.create({
-					model: env.LLM_MODEL,
-					temperature: 0.1,
-					max_tokens: env.MAX_TOKENS,
-					messages: [
-						{ role: "system", content: systemPrompt },
-						{ role: "user", content },
-					],
-				}),
+			const completion = await withExponentialBackoff(
+				() =>
+					llmRateLimiter.schedule(() =>
+						this.llm.chat.completions.create({
+							model: env.LLM_MODEL,
+							temperature: 0.1,
+							max_tokens: env.MAX_TOKENS,
+							messages: [
+								{ role: "system", content: systemPrompt },
+								{ role: "user", content },
+							],
+						}),
+					),
+				{
+					maxRetries: 5,
+					initialDelay: 2000,
+					maxDelay: 60_000,
+				},
 			);
 
 			const translatedContent = completion.choices[0]?.message.content;

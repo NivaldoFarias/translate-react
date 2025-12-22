@@ -300,10 +300,10 @@ describe("RateLimiter", () => {
 				expect(CONFIGS.githubAPI.reservoir).toBe(5);
 			});
 
-			test("should enforce strict limits for free LLM tier when CONFIGS.freeLLM is accessed", () => {
-				expect(CONFIGS.freeLLM.maxConcurrent).toBe(1);
-				expect(CONFIGS.freeLLM.minTime).toBe(60_000);
-				expect(CONFIGS.freeLLM.reservoir).toBe(1);
+			test("should use optimized configuration for free LLM tier when CONFIGS.freeLLM is accessed", () => {
+				expect(CONFIGS.freeLLM.maxConcurrent).toBe(5);
+				expect(CONFIGS.freeLLM.minTime).toBe(20_000);
+				expect(CONFIGS.freeLLM.reservoir).toBe(5);
 			});
 
 			test("should allow more generous limits for paid LLM tier when CONFIGS.paidLLM is accessed", () => {

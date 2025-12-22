@@ -196,6 +196,26 @@ const envSchema = z.object({
 	 * @default 0.5 (50%)
 	 */
 	MIN_SUCCESS_RATE: z.coerce.number().min(0).max(1).default(environmentDefaults.MIN_SUCCESS_RATE),
+
+	/**
+	 * Maximum concurrent LLM API requests.
+	 *
+	 * Controls how many translation requests can run simultaneously. Higher values
+	 * improve throughput but may trigger rate limits. Adjust based on your API tier.
+	 *
+	 * @default 5
+	 */
+	LLM_MAX_CONCURRENT: z.coerce.number().positive().default(5),
+
+	/**
+	 * Minimum time between LLM API request batches in **milliseconds**.
+	 *
+	 * Enforces a delay between request batches to prevent rate limit errors.
+	 * Lower values increase throughput but may trigger API rate limits.
+	 *
+	 * @default 20000 (20 seconds)
+	 */
+	LLM_MIN_TIME_MS: z.coerce.number().positive().default(20_000),
 });
 
 /** Type definition for the environment configuration */
