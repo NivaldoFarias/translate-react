@@ -1,5 +1,6 @@
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
+import { mapGithubError } from "@/errors/";
 import { BaseGitHubService } from "@/services/github/base.service";
 import { logger } from "@/utils/";
 
@@ -40,8 +41,8 @@ export class RepositoryService extends BaseGitHubService {
 
 			return response.data.default_branch;
 		} catch (error) {
-			throw this.helpers.github.mapError(error, {
-				operation: "RepositoryService.getDefaultBranch",
+			throw mapGithubError(error, {
+				operation: `${RepositoryService.name}.getDefaultBranch`,
 				metadata: {
 					target,
 					repoConfig: target === "fork" ? this.repositories.fork : this.repositories.upstream,
@@ -90,8 +91,8 @@ export class RepositoryService extends BaseGitHubService {
 
 			return tree;
 		} catch (error) {
-			throw this.helpers.github.mapError(error, {
-				operation: "RepositoryService.getRepositoryTree",
+			throw mapGithubError(error, {
+				operation: `${RepositoryService.name}.getRepositoryTree`,
 				metadata: { baseBranch, filterIgnored, fork: this.repositories.fork },
 			});
 		}
@@ -117,6 +118,25 @@ export class RepositoryService extends BaseGitHubService {
 		} catch (error) {
 			this.logger.error({ err: error }, "Token permission verification failed");
 			return false;
+		}
+	}
+
+	/**
+	 * Checks if the fork repository exists. If it does not exist, an error is thrown.
+	 */
+	public async forkExists(): Promise<void> {
+		try {
+			const response = await this.octokit.repos.get(this.repositories.fork);
+
+			this.logger.info(
+				{ fork: this.repositories.fork, exists: !!response.data },
+				"Fork repository existence checked",
+			);
+		} catch (error) {
+			throw mapGithubError(error, {
+				operation: `${RepositoryService.name}.forkExists`,
+				metadata: { fork: this.repositories.fork },
+			});
 		}
 	}
 

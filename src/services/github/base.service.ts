@@ -2,7 +2,6 @@ import { Octokit } from "@octokit/rest";
 
 import type { components } from "@octokit/openapi-types";
 
-import { GithubErrorHelper, LLMErrorHelper } from "@/errors/";
 import { githubRateLimiter } from "@/services/rate-limiter/";
 import { env, logger } from "@/utils/";
 
@@ -31,7 +30,6 @@ const octokitLogger = logger.child({ component: "octokit" });
  * - GitHub client initialization
  * - Repository configuration management
  * - Rate limiting for API requests
- * - Common error handling
  */
 export abstract class BaseGitHubService {
 	/** GitHub API client instance */
@@ -55,11 +53,6 @@ export abstract class BaseGitHubService {
 			},
 		},
 	});
-
-	protected readonly helpers = {
-		llm: new LLMErrorHelper(),
-		github: new GithubErrorHelper(),
-	};
 
 	/** Repository metadata for upstream and fork repositories */
 	protected readonly repositories: BaseRepositories = {

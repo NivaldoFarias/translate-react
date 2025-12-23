@@ -16,27 +16,25 @@ describe("TranslationError", () => {
 			expect(error.name).toBe("TranslationError");
 		});
 
-		test("should preserve all context fields when context object is provided", () => {
+		test("should preserve operation and metadata when context object is provided", () => {
 			const context = {
 				operation: "test.operation",
-				file: "test.ts",
 				metadata: { key: "value" },
 			};
 
 			const error = new TranslationError("Test error", ErrorCode.NotFound, context);
 
-			expect(error.context.operation).toBe("test.operation");
-			expect(error.context.file).toBe("test.ts");
-			expect(error.context.metadata).toEqual({ key: "value" });
+			expect(error.operation).toBe("test.operation");
+			expect(error.metadata).toEqual({ key: "value" });
 		});
 
-		test("should automatically include timestamp in context when error is created", () => {
+		test("should automatically include timestamp when error is created", () => {
 			const error = new TranslationError("Test error", ErrorCode.UnknownError, {
 				operation: "test",
 			});
 
-			expect(error.context.timestamp).toBeDefined();
-			expect(error.context.timestamp).toBeInstanceOf(Date);
+			expect(error.timestamp).toBeDefined();
+			expect(error.timestamp).toBeInstanceOf(Date);
 		});
 
 		test("should preserve stack trace when error is created", () => {
@@ -66,14 +64,14 @@ describe("TranslationError", () => {
 		test("should have all error properties accessible for serialization when properties are accessed", () => {
 			const error = new TranslationError("Test error", ErrorCode.GithubApiError, {
 				operation: "test.operation",
-				file: "test.ts",
+				metadata: { file: "test.ts" },
 			});
 
 			expect(error.name).toBe("TranslationError");
 			expect(error.message).toBe("Test error");
 			expect(error.code).toBe(ErrorCode.GithubApiError);
-			expect(error.context.operation).toBe("test.operation");
-			expect(error.context.file).toBe("test.ts");
+			expect(error.operation).toBe("test.operation");
+			expect(error.metadata).toEqual({ file: "test.ts" });
 			expect(error.timestamp).toBeDefined();
 		});
 
@@ -83,7 +81,7 @@ describe("TranslationError", () => {
 				metadata: { nested: { value: 123 } },
 			});
 
-			expect(error.context.metadata).toEqual({ nested: { value: 123 } });
+			expect(error.metadata).toEqual({ nested: { value: 123 } });
 		});
 	});
 
@@ -131,8 +129,8 @@ describe("TranslationError", () => {
 				operation: "minimal",
 			});
 
-			expect(error.context.operation).toBe("minimal");
-			expect(error.context.file).toBeUndefined();
+			expect(error.operation).toBe("minimal");
+			expect(error.metadata).toBeUndefined();
 		});
 
 		test("should handle complex nested metadata when deeply nested objects are provided", () => {
@@ -155,7 +153,7 @@ describe("TranslationError", () => {
 				metadata,
 			});
 
-			expect(error.context.metadata).toEqual(metadata);
+			expect(error.metadata).toEqual(metadata);
 		});
 
 		test("should handle undefined metadata when metadata is not provided", () => {
@@ -163,7 +161,7 @@ describe("TranslationError", () => {
 				operation: "test",
 			});
 
-			expect(error.context.metadata).toBeUndefined();
+			expect(error.metadata).toBeUndefined();
 		});
 
 		test("should handle null values in metadata when null is explicitly provided", () => {
@@ -172,8 +170,8 @@ describe("TranslationError", () => {
 				metadata: { nullValue: null, undefinedValue: undefined },
 			});
 
-			expect(error.context.metadata?.nullValue).toBeNull();
-			expect(error.context.metadata?.undefinedValue).toBeUndefined();
+			expect(error.metadata?.nullValue).toBeNull();
+			expect(error.metadata?.undefinedValue).toBeUndefined();
 		});
 
 		test("should handle operation names with special characters when special chars are present", () => {
@@ -181,7 +179,7 @@ describe("TranslationError", () => {
 				operation: "test.operation:with-special_chars/path",
 			});
 
-			expect(error.context.operation).toBe("test.operation:with-special_chars/path");
+			expect(error.operation).toBe("test.operation:with-special_chars/path");
 		});
 	});
 });

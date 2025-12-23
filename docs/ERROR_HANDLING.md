@@ -2,7 +2,7 @@
 
 ## Overview
 
-The translation workflow uses a structured error handling system with typed error classes that extend the base `TranslationError` class. Each error provides rich context including operation details, file information, and metadata for debugging.
+The translation workflow uses a simplified error handling system with typed error classes that extend the base `TranslationError` class. Each error provides context through optional `operation` and `metadata` properties for debugging.
 
 ## Error Class Hierarchy
 
@@ -10,45 +10,44 @@ The translation workflow uses a structured error handling system with typed erro
 Error (Native)
 └── TranslationError (Base)
     ├── InitializationError
-    ├── MissingKeyError
-    ├── UnsupportedLanguageError
     ├── ResourceLoadError
-    ├── APIError
-    ├── ValidationError
-    ├── EmptyContentError [NEW]
-    ├── TranslationValidationError [NEW]
-    └── ChunkProcessingError [NEW]
+    ├── EmptyContentError
+    ├── TranslationValidationError
+    └── ChunkProcessingError
 ```
 
 ## Error Codes
 
 ### Content-Related Codes
 
-| Code                     | Description                                      | Severity |
-| ------------------------ | ------------------------------------------------ | -------- |
-| `NoContent`              | File content is empty or missing                 | ERROR    |
-| `InvalidContent`         | Content format or structure is invalid           | ERROR    |
-| `ContentTooLong`         | Content exceeds maximum allowed length           | ERROR    |
-| `FormatValidationFailed` | Translation format validation failed             | ERROR    |
-| `ChunkProcessingFailed`  | Chunk processing failed during translation [NEW] | FATAL    |
+| Code                     | Description                                |
+| ------------------------ | ------------------------------------------ |
+| `NoContent`              | File content is empty or missing           |
+| `InvalidContent`         | Content format or structure is invalid     |
+| `ContentTooLong`         | Content exceeds maximum allowed length     |
+| `FormatValidationFailed` | Translation format validation failed       |
+| `ChunkProcessingFailed`  | Chunk processing failed during translation |
 
 ### Process-Related Codes
 
-| Code                  | Description                   | Severity |
-| --------------------- | ----------------------------- | -------- |
-| `TranslationFailed`   | Translation process failed    | ERROR    |
-| `ValidationError`     | General validation error      | ERROR    |
-| `InitializationError` | Service initialization failed | FATAL    |
+| Code                  | Description                   |
+| --------------------- | ----------------------------- |
+| `TranslationFailed`   | Translation process failed    |
+| `InitializationError` | Service initialization failed |
 
 ### API-Related Codes
 
-| Code                | Description                    | Severity |
-| ------------------- | ------------------------------ | -------- |
-| `LLMApiError`       | LLM API request failed         | ERROR    |
-| `GithubApiError`    | GitHub API request failed      | ERROR    |
-| `GithubRateLimited` | GitHub API rate limit exceeded | WARN     |
+| Code                 | Description                  |
+| -------------------- | ---------------------------- |
+| `LLMApiError`        | LLM API request failed       |
+| `GithubApiError`     | GitHub API request failed    |
+| `RateLimitExceeded`  | API rate limit exceeded      |
+| `GithubNotFound`     | GitHub resource not found    |
+| `GithubUnauthorized` | GitHub authentication failed |
+| `GithubForbidden`    | GitHub access forbidden      |
+| `GithubServerError`  | GitHub server error          |
 
-## New Error Classes
+## Error Classes
 
 ### EmptyContentError
 
@@ -59,7 +58,6 @@ Error (Native)
 ```typescript
 throw new EmptyContentError(filename, {
   operation: "TranslatorService.translateContent",
-  file: filePath,
   metadata: { filename, path },
 });
 ```
@@ -83,9 +81,9 @@ throw new TranslationValidationError(
   filename,
   {
     operation: "TranslatorService.validateTranslation",
-    file: filePath,
     metadata: {
       filename,
+      path,
       originalLength,
       translatedLength,
     },
@@ -97,7 +95,6 @@ throw new TranslationValidationError(
 
 - Empty translation output
 - Complete loss of markdown headings
-- Critical structural corruption
 
 **Error Code**: `FormatValidationFailed`
 
@@ -131,20 +128,57 @@ throw new ChunkProcessingError(
 
 **Error Code**: `ChunkProcessingFailed`
 
-**Severity**: FATAL (prevents incomplete translations from being committed)
+## TranslationError Structure
 
-## Error Context Structure
-
-All errors include standardized context:
+All errors include standardized properties:
 
 ```typescript
-interface ErrorContext {
-  sanity: ErrorSeverity;              // DEBUG, INFO, WARN, ERROR, FATAL
-  code: ErrorCode;                    // Standardized error code
-  operation?: string;                 // Operation that failed (e.g., "TranslatorService.translateContent")
-  file?: BunFile | string;            // File path or Bun file object
-  metadata?: Record<string, unknown>; // Additional context (file info, metrics, etc.)
-  timestamp?: Date;                   // When error occurred
+interface TranslationErrorContext<T extends Record<string, unknown>> {
+  operation?: string;  // Operation that failed (e.g., "TranslatorService.translateContent")
+  metadata?: T;        // Additional context (file info, metrics, etc.)
+}
+
+class TranslationError<T extends Record<string, unknown>> extends Error {
+  readonly code: ErrorCode;           // Standardized error code
+  readonly operation?: string;        // Operation that failed
+  readonly metadata?: T;              // Additional context
+  readonly timestamp: Date;           // When error occurred
+}
+```
+
+## Error Mapping Functions
+
+### mapGithubError
+
+Maps GitHub/Octokit errors to `TranslationError`:
+
+```typescript
+import { mapGithubError } from "@/errors/helpers/github-error.helper";
+
+try {
+  await octokit.rest.repos.getContent({ ... });
+} catch (error) {
+  throw mapGithubError(error, {
+    operation: "ContentService.getFileContent",
+    metadata: { path, owner, repo },
+  });
+}
+```
+
+### mapLLMError
+
+Maps OpenAI/LLM errors to `TranslationError`:
+
+```typescript
+import { mapLLMError } from "@/errors/helpers/llm-error.helper";
+
+try {
+  await openai.chat.completions.create({ ... });
+} catch (error) {
+  throw mapLLMError(error, {
+    operation: "TranslatorService.callLanguageModel",
+    metadata: { model, chunkIndex, chunkSize },
+  });
 }
 ```
 
@@ -152,19 +186,13 @@ interface ErrorContext {
 
 ### Service-Level Error Handling
 
-Services throw typed errors with rich context:
+Services throw typed errors with context:
 
 ```typescript
-// Before (generic Error)
-if (!file.content?.length) {
-  throw new Error(`File content is empty: ${file.filename}`);
-}
-
-// After (typed error with context)
+// Typed error with context
 if (!file.content?.length) {
   throw new EmptyContentError(file.filename, {
     operation: "TranslatorService.translateContent",
-    file: file.path,
     metadata: { filename: file.filename, path: file.path },
   });
 }
@@ -172,13 +200,13 @@ if (!file.content?.length) {
 
 ### Error Mapping
 
-LLM and GitHub errors are mapped to standardized types:
+LLM and GitHub errors are mapped using pure functions:
 
 ```typescript
 try {
   const translatedChunk = await this.callLanguageModel(chunk);
 } catch (error) {
-  throw this.helpers.llm.mapError(error, {
+  throw mapLLMError(error, {
     operation: "TranslatorService.translateWithChunking",
     metadata: {
       chunkIndex: i,
@@ -221,30 +249,6 @@ graph TD
     H -->|Yes| J[Return Translation]
 ```
 
-## Error Logging
-
-All errors are logged with appropriate context:
-
-```typescript
-logger.error(
-  {
-    error,
-    filename: file.filename,
-    operation: "translateContent",
-    metadata: { contentLength: file.content.length },
-  },
-  "Translation failed for file"
-);
-```
-
-### Log Levels by Error Type
-
-| Error Type                   | Log Level | Context Included                                    |
-| ---------------------------- | --------- | --------------------------------------------------- |
-| `EmptyContentError`          | ERROR     | Filename, file path, operation                      |
-| `TranslationValidationError` | ERROR     | Filename, validation details, content lengths       |
-| `ChunkProcessingError`       | FATAL     | Chunk counts, sizes, content length, missing chunks |
-
 ## Best Practices
 
 ### 1. Always Provide Operation Context
@@ -252,7 +256,6 @@ logger.error(
 ```typescript
 throw new EmptyContentError(filename, {
   operation: "ServiceName.methodName", // Always include calling context
-  file: filePath,
   metadata: relevantData,
 });
 ```
@@ -262,6 +265,7 @@ throw new EmptyContentError(filename, {
 ```typescript
 metadata: {
   filename,              // File being processed
+  path,                  // File path
   originalLength,        // Original content size
   translatedLength,      // Translated content size
   chunkIndex,            // Current chunk (if chunking)
@@ -274,13 +278,19 @@ metadata: {
 - **EmptyContentError**: Content validation before processing
 - **TranslationValidationError**: Translation output validation
 - **ChunkProcessingError**: Chunk workflow issues (critical)
-- **ValidationError**: General validation failures
+- **InitializationError**: Service initialization failures
+- **ResourceLoadError**: Resource loading failures
 
-### 4. Log Before Throwing
+### 4. Use Pure Function Error Mappers
 
 ```typescript
-logger.error({ context }, "Error description");
-throw new SpecificError(message, context);
+import { mapGithubError } from "@/errors/helpers/github-error.helper";
+import { mapLLMError } from "@/errors/helpers/llm-error.helper";
+
+// In catch blocks
+catch (error) {
+  throw mapGithubError(error, { operation, metadata });
+}
 ```
 
 ## Testing Error Handling
@@ -303,7 +313,6 @@ test("throws EmptyContentError for empty content", () => {
 
 ```typescript
 test("handles chunk count mismatch", async () => {
-  // Setup scenario where chunk processing fails
   const largeContent = generateLargeContent();
   
   try {
@@ -311,7 +320,7 @@ test("handles chunk count mismatch", async () => {
   } catch (error) {
     expect(error).toBeInstanceOf(ChunkProcessingError);
     expect(error.code).toBe(ErrorCode.ChunkProcessingFailed);
-    expect(error.context.metadata).toHaveProperty("expectedChunks");
+    expect(error.metadata).toHaveProperty("expectedChunks");
   }
 });
 ```
@@ -320,6 +329,7 @@ test("handles chunk count mismatch", async () => {
 
 - `/src/errors/base-error.ts`: Base error class and error codes
 - `/src/errors/errors.ts`: Concrete error class implementations
-- `/src/errors/helpers/`: Error mapping helpers (LLM, GitHub)
+- `/src/errors/helpers/github-error.helper.ts`: GitHub error mapping function
+- `/src/errors/helpers/llm-error.helper.ts`: LLM error mapping function
 - `/src/services/translator.service.ts`: Primary error usage
 - `/src/services/runner/base.service.ts`: Error handling in workflow

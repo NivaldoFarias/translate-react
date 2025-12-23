@@ -20,7 +20,9 @@
 		"format": "prettier --write '**/*.{ts,js,cjs,mjs,json}'",
 		"format:check": "prettier --check '**/*.{ts,js,cjs,mjs,json}'",
 		"type-check": "tsc",
-		"test": "bun test"
+		"test": "bun test",
+		"test:watch": "bun test --watch",
+		"test:coverage": "bun test --coverage"
 	},
 	"dependencies": {
 		"@langchain/textsplitters": "^0.1.0",

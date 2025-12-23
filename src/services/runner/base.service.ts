@@ -137,7 +137,7 @@ export abstract class BaseRunnerService {
 
 		if (!hasPermissions) {
 			throw new InitializationError("Token permissions verification failed", {
-				operation: "verifyTokenPermissions",
+				operation: `${BaseRunnerService.name}.verifyTokenPermissions`,
 			});
 		}
 	}
@@ -150,8 +150,9 @@ export abstract class BaseRunnerService {
 	 * @returns `true` if the fork is up to date, `false` otherwise
 	 */
 	protected async syncFork(): Promise<boolean> {
-		this.logger.info("Checking fork status");
+		this.logger.info("Checking fork existance and its status");
 
+		await this.services.github.repository.forkExists();
 		const isForkSynced = await this.services.github.repository.isForkSynced();
 
 		if (!isForkSynced) {
@@ -160,7 +161,7 @@ export abstract class BaseRunnerService {
 			const syncSuccess = await this.services.github.repository.syncFork();
 			if (!syncSuccess) {
 				throw new InitializationError("Failed to sync fork with upstream repository", {
-					operation: "syncFork",
+					operation: `${BaseRunnerService.name}.syncFork`,
 				});
 			}
 
@@ -191,7 +192,9 @@ export abstract class BaseRunnerService {
 		const glossary = await this.services.github.repository.fetchGlossary();
 
 		if (!glossary) {
-			throw new ResourceLoadError("Failed to fetch glossary", { operation: "fetchGlossary" });
+			throw new ResourceLoadError("Failed to fetch glossary", {
+				operation: `${BaseRunnerService.name}.fetchGlossary`,
+			});
 		}
 
 		this.services.translator.glossary = glossary;

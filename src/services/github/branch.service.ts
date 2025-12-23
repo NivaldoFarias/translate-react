@@ -1,6 +1,7 @@
 import { RestEndpointMethodTypes } from "@octokit/rest";
 import { StatusCodes } from "http-status-codes";
 
+import { mapGithubError } from "@/errors/";
 import { BaseGitHubService, ContentService } from "@/services/github/";
 import { env, logger, setupSignalHandlers } from "@/utils/";
 
@@ -53,8 +54,8 @@ export class BranchService extends BaseGitHubService {
 
 			return response.data.default_branch;
 		} catch (error) {
-			throw this.helpers.github.mapError(error, {
-				operation: "BranchService.getDefaultBranch",
+			throw mapGithubError(error, {
+				operation: `${BranchService.name}.getDefaultBranch`,
 				metadata: { fork: this.repositories.fork },
 			});
 		}
@@ -117,8 +118,8 @@ export class BranchService extends BaseGitHubService {
 			return branchRef;
 		} catch (error) {
 			this.activeBranches.delete(branchName);
-			throw this.helpers.github.mapError(error, {
-				operation: "BranchService.createBranch",
+			throw mapGithubError(error, {
+				operation: `${BranchService.name}.createBranch`,
 				metadata: { branchName, baseBranch, fork: this.repositories.fork },
 			});
 		}
@@ -153,8 +154,8 @@ export class BranchService extends BaseGitHubService {
 				return null;
 			}
 
-			throw this.helpers.github.mapError(error, {
-				operation: "BranchService.getBranch",
+			throw mapGithubError(error, {
+				operation: `${BranchService.name}.getBranch`,
 				metadata: { branchName, fork: this.repositories.fork },
 			});
 		}
@@ -188,8 +189,8 @@ export class BranchService extends BaseGitHubService {
 		} catch (error) {
 			this.activeBranches.delete(branchName);
 
-			throw this.helpers.github.mapError(error, {
-				operation: "BranchService.deleteBranch",
+			throw mapGithubError(error, {
+				operation: `${BranchService.name}.deleteBranch`,
 				metadata: { branchName, fork: this.repositories.fork },
 			});
 		}
@@ -296,8 +297,8 @@ export class BranchService extends BaseGitHubService {
 
 			return hasCommits;
 		} catch (error) {
-			throw this.helpers.github.mapError(error, {
-				operation: "BranchService.checkIfCommitExistsOnFork",
+			throw mapGithubError(error, {
+				operation: `${BranchService.name}.checkIfCommitExistsOnFork`,
 				metadata: { branchName, fork: this.repositories.fork, expectedAuthor: env.REPO_FORK_OWNER },
 			});
 		}
