@@ -5,10 +5,8 @@ import OpenAI from "openai";
 import {
 	ChunkProcessingError,
 	EmptyContentError,
-	ErrorSeverity,
-	GithubErrorHelper,
 	InitializationError,
-	LLMErrorHelper,
+	mapLLMError,
 	TranslationValidationError,
 } from "@/errors/";
 import { llmRateLimiter } from "@/services/rate-limiter/";
@@ -94,11 +92,6 @@ export class TranslatorService {
 		},
 	});
 
-	private readonly helpers = {
-		llm: new LLMErrorHelper(),
-		github: new GithubErrorHelper(),
-	};
-
 	public readonly languageDetector = new LanguageDetectorService();
 
 	public glossary: string | null = null;
@@ -131,8 +124,8 @@ export class TranslatorService {
 
 			if (isLLMResponseValid(response)) {
 				throw new InitializationError("Invalid LLM API response: missing response metadata", {
-					sanity: ErrorSeverity.Fatal,
-					metadata: { ...response },
+					operation: `${TranslatorService.name}.testConnectivity`,
+					metadata: { response },
 				});
 			}
 
@@ -197,8 +190,7 @@ export class TranslatorService {
 	public async translateContent(file: TranslationFile): Promise<string> {
 		if (!file.content.length) {
 			throw new EmptyContentError(file.filename, {
-				operation: "TranslatorService.translateContent",
-				file: file.path,
+				operation: `${TranslatorService.name}.translateContent`,
 				metadata: { filename: file.filename, path: file.path },
 			});
 		}
@@ -268,10 +260,10 @@ export class TranslatorService {
 	private validateTranslation(file: TranslationFile, translatedContent: string): void {
 		if (!translatedContent || translatedContent.trim().length === 0) {
 			throw new TranslationValidationError("Translation produced empty content", file.filename, {
-				operation: "TranslatorService.validateTranslation",
-				file: file.path,
+				operation: `${TranslatorService.name}.validateTranslation`,
 				metadata: {
 					filename: file.filename,
+					path: file.path,
 					originalLength: file.content.length,
 					translatedLength: translatedContent.length,
 				},
@@ -303,9 +295,9 @@ export class TranslatorService {
 				"All markdown headings lost during translation",
 				file.filename,
 				{
-					operation: "TranslatorService.validateTranslation",
-					file: file.path,
+					operation: `${TranslatorService.name}.validateTranslation`,
 					metadata: {
+						path: file.path,
 						originalHeadings,
 						translatedHeadings,
 						originalLength: file.content.length,
@@ -389,8 +381,7 @@ export class TranslatorService {
 	public async getLanguageAnalysis(file: TranslationFile) {
 		if (!file.content.length) {
 			throw new EmptyContentError(file.filename, {
-				operation: "TranslatorService.getLanguageAnalysis",
-				file: file.path,
+				operation: `${TranslatorService.name}.getLanguageAnalysis`,
 				metadata: { filename: file.filename, path: file.path },
 			});
 		}
@@ -678,8 +669,8 @@ export class TranslatorService {
 					"Failed to translate content chunk",
 				);
 
-				throw this.helpers.llm.mapError(error, {
-					operation: "TranslatorService.translateWithChunking",
+				throw mapLLMError(error, {
+					operation: `${TranslatorService.name}.translateWithChunking`,
 					metadata: {
 						chunkIndex: index,
 						totalChunks: chunks.length,
@@ -712,7 +703,7 @@ export class TranslatorService {
 			throw new ChunkProcessingError(
 				`Chunk count mismatch: expected ${String(chunks.length)} chunks, but only ${String(translatedChunks.length)} were translated`,
 				{
-					operation: "TranslatorService.translateWithChunking",
+					operation: `${TranslatorService.name}.translateWithChunking`,
 					metadata: {
 						expectedChunks: chunks.length,
 						actualChunks: translatedChunks.length,
@@ -811,8 +802,8 @@ export class TranslatorService {
 			if (!translatedContent) {
 				this.logger.error({ model: env.LLM_MODEL }, "No content returned from language model");
 
-				throw new LLMErrorHelper().mapError(new Error("No content returned from language model"), {
-					operation: "TranslatorService.callLanguageModel",
+				throw mapLLMError(new Error("No content returned from language model"), {
+					operation: `${TranslatorService.name}.callLanguageModel`,
 					metadata: {
 						model: env.LLM_MODEL,
 						contentLength: content.length,
@@ -831,8 +822,8 @@ export class TranslatorService {
 
 			return translatedContent;
 		} catch (error) {
-			throw this.helpers.llm.mapError(error, {
-				operation: "TranslatorService.callLanguageModel",
+			throw mapLLMError(error, {
+				operation: `${TranslatorService.name}.callLanguageModel`,
 				metadata: {
 					model: env.LLM_MODEL,
 					contentLength: content.length,

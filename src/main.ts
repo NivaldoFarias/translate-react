@@ -24,8 +24,8 @@ if (import.meta.main) {
 				{
 					error,
 					errorCode: error.code,
-					operation: error.context.operation,
-					metadata: error.context.metadata,
+					operation: error.operation,
+					metadata: error.metadata,
 				},
 				"Workflow failed with TranslationError",
 			);

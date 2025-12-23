@@ -288,7 +288,7 @@ describe("backoff.util", () => {
 			const delays: number[] = [];
 			const startTimes: number[] = [];
 
-			for (let i = 0; i < 3; i++) {
+			for (let step = 0; step < 3; step++) {
 				operation.mockClear();
 				const startTime = Date.now();
 				startTimes.push(startTime);

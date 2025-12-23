@@ -3,11 +3,9 @@ import { describe, expect, test } from "bun:test";
 import { StatusCodes } from "http-status-codes";
 
 import { ErrorCode } from "@/errors/base-error";
-import { GithubErrorHelper } from "@/errors/helpers/github-error.helper";
+import { mapGithubError } from "@/errors/helpers/github-error.helper";
 
-describe("GithubErrorHelper", () => {
-	const helper = new GithubErrorHelper();
-
+describe("mapGithubError", () => {
 	describe("RequestError mapping", () => {
 		test.each([
 			[StatusCodes.NOT_FOUND, "Not Found", ErrorCode.GithubNotFound],
@@ -30,7 +28,7 @@ describe("GithubErrorHelper", () => {
 					},
 				});
 
-				const mapped = helper.mapError(error, { operation: "test" });
+				const mapped = mapGithubError(error, { operation: "test" });
 
 				expect(mapped.code).toBe(expectedCode);
 				if (expectedCode === ErrorCode.GithubNotFound) {
@@ -42,7 +40,7 @@ describe("GithubErrorHelper", () => {
 		test("should detect rate limit from error message", () => {
 			const error = new Error("API rate limit exceeded");
 
-			const mapped = helper.mapError(error, { operation: "test" });
+			const mapped = mapGithubError(error, { operation: "test" });
 
 			expect(mapped.code).toBe(ErrorCode.RateLimitExceeded);
 		});
@@ -64,7 +62,7 @@ describe("GithubErrorHelper", () => {
 				},
 			});
 
-			const mapped = helper.mapError(error, { operation: "test" });
+			const mapped = mapGithubError(error, { operation: "test" });
 
 			expect(mapped.code).toBe(ErrorCode.RateLimitExceeded);
 		});
@@ -84,7 +82,7 @@ describe("GithubErrorHelper", () => {
 				},
 			});
 
-			const mapped = helper.mapError(error, { operation: "test" });
+			const mapped = mapGithubError(error, { operation: "test" });
 
 			expect(mapped.code).toBe(ErrorCode.GithubServerError);
 		});
@@ -104,7 +102,7 @@ describe("GithubErrorHelper", () => {
 				},
 			});
 
-			const mapped = helper.mapError(error, { operation: "test" });
+			const mapped = mapGithubError(error, { operation: "test" });
 
 			expect(mapped.code).toBe(ErrorCode.GithubApiError);
 		});
@@ -114,7 +112,7 @@ describe("GithubErrorHelper", () => {
 		test("should handle unknown Error instances", () => {
 			const error = new Error("Unknown error");
 
-			const mapped = helper.mapError(error, { operation: "test" });
+			const mapped = mapGithubError(error, { operation: "test" });
 
 			expect(mapped.code).toBe(ErrorCode.UnknownError);
 			expect(mapped.message).toContain("Unknown error");
@@ -139,11 +137,11 @@ describe("GithubErrorHelper", () => {
 				metadata: { path: "test.md", repo: "test/repo" },
 			};
 
-			const mapped = helper.mapError(error, context);
+			const mapped = mapGithubError(error, context);
 
-			expect(mapped.context.operation).toBe("GitHub.getFile");
-			expect(mapped.context.metadata?.path).toBe(context.metadata.path);
-			expect(mapped.context.metadata?.repo).toBe(context.metadata.repo);
+			expect(mapped.operation).toBe("GitHub.getFile");
+			expect(mapped.metadata?.path).toBe(context.metadata.path);
+			expect(mapped.metadata?.repo).toBe(context.metadata.repo);
 		});
 
 		test("should handle RequestError from Octokit", () => {
@@ -161,7 +159,7 @@ describe("GithubErrorHelper", () => {
 				},
 			});
 
-			const mapped = helper.mapError(requestError, { operation: "test" });
+			const mapped = mapGithubError(requestError, { operation: "test" });
 
 			expect(mapped.code).toBe(ErrorCode.GithubNotFound);
 		});
@@ -176,7 +174,7 @@ describe("GithubErrorHelper", () => {
 
 			for (const message of patterns) {
 				const error = new Error(message);
-				const mapped = helper.mapError(error, { operation: "test" });
+				const mapped = mapGithubError(error, { operation: "test" });
 
 				expect(mapped.code).toBe(ErrorCode.RateLimitExceeded);
 			}
@@ -185,7 +183,7 @@ describe("GithubErrorHelper", () => {
 		test("should handle errors without status code", () => {
 			const error = new Error("Network error");
 
-			const mapped = helper.mapError(error, { operation: "test" });
+			const mapped = mapGithubError(error, { operation: "test" });
 
 			expect(mapped.code).toBe(ErrorCode.UnknownError);
 		});
@@ -205,7 +203,7 @@ describe("GithubErrorHelper", () => {
 				},
 			});
 
-			const mapped = helper.mapError(error, { operation: "test" });
+			const mapped = mapGithubError(error, { operation: "test" });
 
 			expect(mapped.message).toContain("Specific error details");
 		});
@@ -214,10 +212,10 @@ describe("GithubErrorHelper", () => {
 			const error = new Error("Test error");
 			const context = { operation: "" };
 
-			const mapped = helper.mapError(error, context);
+			const mapped = mapGithubError(error, context);
 
 			expect(mapped.code).toBe(ErrorCode.UnknownError);
-			expect(mapped.context.operation).toBe("");
+			expect(mapped.operation).toBe("");
 		});
 
 		test("should handle missing response headers in RequestError", () => {
@@ -235,7 +233,7 @@ describe("GithubErrorHelper", () => {
 				},
 			});
 
-			const mapped = helper.mapError(error, { operation: "test" });
+			const mapped = mapGithubError(error, { operation: "test" });
 
 			expect(mapped.code).toBe(ErrorCode.GithubApiError);
 		});
