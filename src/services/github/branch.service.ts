@@ -187,8 +187,6 @@ export class BranchService extends BaseGitHubService {
 
 			return response;
 		} catch (error) {
-			this.activeBranches.delete(branchName);
-
 			throw mapGithubError(error, {
 				operation: `${BranchService.name}.deleteBranch`,
 				metadata: { branchName, fork: this.repositories.fork },

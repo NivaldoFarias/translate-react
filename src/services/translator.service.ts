@@ -9,14 +9,9 @@ import {
 	mapLLMError,
 	TranslationValidationError,
 } from "@/errors/";
+import { LocaleService } from "@/services/locale/";
 import { llmRateLimiter } from "@/services/rate-limiter/";
-import {
-	env,
-	LANGUAGE_SPECIFIC_RULES,
-	logger,
-	MAX_CHUNK_TOKENS,
-	withExponentialBackoff,
-} from "@/utils/";
+import { env, logger, MAX_CHUNK_TOKENS, withExponentialBackoff } from "@/utils/";
 
 import { LanguageDetectorService } from "./language-detector.service";
 
@@ -92,9 +87,21 @@ export class TranslatorService {
 		},
 	});
 
+	/** Locale service for language-specific rules */
+	private readonly localeService: LocaleService;
+
 	public readonly languageDetector = new LanguageDetectorService();
 
 	public glossary: string | null = null;
+
+	/**
+	 * Creates a new TranslatorService instance.
+	 *
+	 * @param localeService Optional locale service for dependency injection (defaults to singleton)
+	 */
+	constructor(localeService?: LocaleService) {
+		this.localeService = localeService ?? LocaleService.get();
+	}
 
 	/**
 	 * Tests LLM API connectivity and authentication.
@@ -910,10 +917,7 @@ export class TranslatorService {
 				`\n## TERMINOLOGY GLOSSARY\nApply these exact translations for the specified terms:\n${this.glossary}\n`
 			:	"";
 
-		const langSpecificRules =
-			languages.target in LANGUAGE_SPECIFIC_RULES ?
-				LANGUAGE_SPECIFIC_RULES[languages.target as keyof typeof LANGUAGE_SPECIFIC_RULES]
-			:	"";
+		const langSpecificRules = this.localeService.locale.rules.specific;
 
 		return `# ROLE
 You are an expert technical translator specializing in React documentation.

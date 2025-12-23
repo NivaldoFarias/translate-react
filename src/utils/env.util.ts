@@ -231,11 +231,13 @@ export type Environment = z.infer<typeof envSchema>;
  * 2. Updates `import.meta.env` with validated values
  * 3. Throws detailed error messages for invalid configurations
  *
+ * @param env Optional environment object to validate (defaults to `import.meta.env`)
+ *
  * @throws {Error} Detailed validation errors if environment variables are invalid
  */
-export function validateEnv() {
+export function validateEnv(env?: Environment): Environment {
 	try {
-		return envSchema.parse(import.meta.env);
+		return envSchema.parse(env ?? import.meta.env);
 	} catch (error) {
 		if (error instanceof z.ZodError) {
 			const issues = error.issues

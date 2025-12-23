@@ -143,12 +143,3 @@ export const environmentDefaults = {
 	/** Minimum success rate (0-1) required for workflow to pass */
 	MIN_SUCCESS_RATE: 0.5,
 } as const;
-
-/** Glossary of terms with exact translations to enforce */
-export const LANGUAGE_SPECIFIC_RULES = {
-	"Brazilian Portuguese": `\n# PORTUGUESE (BRAZIL) SPECIFIC RULES
-- ALWAYS translate 'deprecated' and related terms (deprecation, deprecating, deprecates) to 'descontinuado(a)', 'descontinuada', 'obsoleto(a)' or 'obsoleta' in ALL contexts (documentation text, comments, headings, lists, etc.)
-	- Exception: Do NOT translate 'deprecated' in HTML comment IDs like {/*deprecated-something*/} - keep these exactly as-is
-	- Exception: Do NOT translate 'deprecated' in URLs, anchor links, or code variable names
-- When a MDN document is referenced, update the language slug to the Brazilian Portuguese version ('https://developer.mozilla.org/<slug>/*' => 'https://developer.mozilla.org/pt-BR/*')`,
-};
