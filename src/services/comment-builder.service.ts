@@ -1,7 +1,9 @@
+import type { LocaleDefinition } from "@/locales/";
 import type { ProcessedFileResult } from "@/services/runner/";
 
 import { env, logger } from "@/utils/";
 
+import { LocaleService } from "./locale/";
 import { TranslationFile } from "./translator.service";
 
 export interface FileEntry {
@@ -17,6 +19,16 @@ export interface HierarchicalStructure {
 /** Service for building comments based on translation results */
 export class CommentBuilderService {
 	private readonly logger = logger.child({ component: CommentBuilderService.name });
+	private readonly locale: LocaleDefinition;
+
+	/**
+	 * Creates a new CommentBuilderService instance.
+	 *
+	 * @param localeService Optional locale service for dependency injection (defaults to singleton)
+	 */
+	constructor(localeService?: LocaleService) {
+		this.locale = (localeService ?? LocaleService.get()).locale;
+	}
 
 	/**
 	 * Builds a hierarchical comment for GitHub issues based on translation results.
@@ -242,13 +254,8 @@ export class CommentBuilderService {
 	/** Comment template for issue comments */
 	public get comment() {
 		return {
-			prefix: `As seguintes páginas foram traduzidas e PRs foram criados:`,
-			suffix: `###### Observações
-	
-	- As traduções foram geradas por uma LLM e requerem revisão humana para garantir precisão técnica e fluência.
-	- Alguns arquivos podem ter PRs de tradução existentes em análise. Verifiquei duplicações, mas recomendo conferir.
-	- O fluxo de trabalho de automação completo está disponível no repositório [\`translate-react\`](https://github.com/${env.REPO_FORK_OWNER}/translate-react) para referência e contribuições.
-	- Esta implementação é um trabalho em progresso e pode apresentar inconsistências em conteúdos técnicos complexos ou formatação específica.`,
+			prefix: this.locale.comment.prefix,
+			suffix: this.locale.comment.suffix(env.REPO_FORK_OWNER),
 		};
 	}
 }

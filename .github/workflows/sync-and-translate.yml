@@ -12,25 +12,43 @@ on:
           - production
         default: development
 
-  repository_dispatch:
-    types: [upstream-push]
-
 concurrency:
-  group: translation-workflow
+  group: translation-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   sync-and-translate:
-    name: Sync Fork and Run Translation
-    if: ${{ vars.TRANSLATION_ENABLED == 'true' || github.event_name == 'workflow_dispatch' }}
+    name: Sync & Translate (${{ matrix.lang }})
+    if: ${{ vars.TRANSLATION_ENABLED == 'true' }}
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment || 'production' }}
-
+    environment: ${{ inputs.environment }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - lang: "pt-br"
+            upstream_owner: "reactjs"
+            upstream_name: "pt-br.react.dev"
+            fork_owner: "nivaldofarias"
+            fork_name: "pt-br.react.dev"
+        # - lang: "ru"
+        #   upstream_owner: "reactjs"
+        #   upstream_name: "ru.react.dev"
+        #   fork_owner: "nivaldofarias"
+        #   fork_name: "ru.react.dev"
     steps:
-      - name: Checkout fork
+      - name: Generate Bot Token
+        id: generate-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+
+      - name: Checkout main repository
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GH_TOKEN }}
+          token: ${{ steps.generate-token.outputs.token }}
           fetch-depth: 0
 
       - name: Setup Bun
@@ -52,32 +70,21 @@ jobs:
       - name: Create .env file
         run: |
           cat > .env << EOF
-          # Core Configuration
           NODE_ENV=${{ vars.NODE_ENV }}
           LOG_LEVEL=${{ vars.LOG_LEVEL }}
           LOG_TO_CONSOLE=${{ vars.LOG_TO_CONSOLE }}
-
-          # API Credentials
-          GH_TOKEN=${{ secrets.GH_TOKEN }}
+          GH_TOKEN=${{ steps.generate-token.outputs.token }}
           OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
-
-          # Repository Configuration
-          REPO_FORK_OWNER=${{ vars.REPO_FORK_OWNER }}
-          REPO_FORK_NAME=${{ vars.REPO_FORK_NAME }}
-          REPO_UPSTREAM_OWNER=${{ vars.REPO_UPSTREAM_OWNER }}
-          REPO_UPSTREAM_NAME=${{ vars.REPO_UPSTREAM_NAME }}
-
-          # LLM Configuration
+          TARGET_LANGUAGE=${{ matrix.lang }}
+          SOURCE_LANGUAGE=en
+          REPO_FORK_OWNER=${{ matrix.fork_owner }}
+          REPO_FORK_NAME=${{ matrix.fork_name }}
+          REPO_UPSTREAM_OWNER=${{ matrix.upstream_owner }}
+          REPO_UPSTREAM_NAME=${{ matrix.upstream_name }}
           LLM_MODEL=${{ vars.LLM_MODEL }}
           OPENAI_BASE_URL=${{ vars.OPENAI_BASE_URL }}
           OPENAI_PROJECT_ID=${{ vars.OPENAI_PROJECT_ID }}
           MAX_TOKENS=${{ vars.MAX_TOKENS }}
-
-          # Translation Configuration
-          TARGET_LANGUAGE=${{ vars.TARGET_LANGUAGE }}
-          SOURCE_LANGUAGE=${{ vars.SOURCE_LANGUAGE }}
-
-          # Workflow Configuration
           BATCH_SIZE=${{ vars.BATCH_SIZE }}
           PROGRESS_ISSUE_NUMBER=${{ vars.PROGRESS_ISSUE_NUMBER }}
           GH_REQUEST_TIMEOUT=${{ vars.GH_REQUEST_TIMEOUT }}
@@ -92,14 +99,6 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: translation-logs-${{ github.run_id }}
+          name: translation-logs-${{ matrix.lang }}-${{ github.run_id }}
           path: logs/
           retention-days: 7
-
-      - name: Workflow summary
-        if: always()
-        run: |
-          echo "## Translation Workflow Summary" >> $GITHUB_STEP_SUMMARY
-          echo "- **Environment**: ${{ inputs.environment || 'production' }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Workflow Run**: ${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY

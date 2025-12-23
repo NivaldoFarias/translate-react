@@ -2,16 +2,6 @@ import { beforeEach, describe, expect, mock, test } from "bun:test";
 
 import { BaseGitHubService } from "@/services/github/base.service";
 
-void mock.module("@/utils/env.util", () => ({
-	env: {
-		GH_TOKEN: "gho_test_token_with_40_characters_exactly",
-		REPO_UPSTREAM_OWNER: "test-owner",
-		REPO_UPSTREAM_NAME: "test-repo",
-		REPO_FORK_OWNER: "fork-owner",
-		REPO_FORK_NAME: "fork-repo",
-	},
-}));
-
 class TestGitHubService extends BaseGitHubService {
 	public getOctokit() {
 		return this.octokit;
@@ -51,8 +41,11 @@ describe("Base GitHub Service", () => {
 	});
 
 	test("should store configuration correctly", () => {
-		expect(service.getUpstream()).toEqual({ owner: "test-owner", repo: "test-repo" });
-		expect(service.getFork()).toEqual({ owner: "fork-owner", repo: "fork-repo" });
+		expect(service.getUpstream()).toEqual({
+			owner: "test-upstream-owner",
+			repo: "test-upstream-repo",
+		});
+		expect(service.getFork()).toEqual({ owner: "test-fork-owner", repo: "test-fork-repo" });
 	});
 
 	test("should handle API rate limits", async () => {
