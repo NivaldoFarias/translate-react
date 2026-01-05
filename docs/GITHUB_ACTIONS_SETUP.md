@@ -51,7 +51,7 @@ Go to **Settings → Secrets and variables → Actions → Repository secrets** 
 6. Copy the token (you won't see it again!)
 7. Add it as `GH_TOKEN` in your repository secrets
 
-#### `OPENAI_API_KEY`
+#### `LLM_API_KEY`
 
 API key for OpenAI/OpenRouter or other LLM service.
 
@@ -61,7 +61,7 @@ API key for OpenAI/OpenRouter or other LLM service.
 2. Sign up/Login
 3. Go to **Keys** section
 4. Create a new API key
-5. Add it as `OPENAI_API_KEY` in your repository secrets
+5. Add it as `LLM_API_KEY` in your repository secrets
 
 ### 2. Repository Variables
 
@@ -69,20 +69,21 @@ Go to **Settings → Secrets and variables → Actions → Variables** and add:
 
 | Variable              | Example Value                      | Description                                          | Required |
 | --------------------- | ---------------------------------- | ---------------------------------------------------- | -------- |
-| `TRANSLATION_ENABLED` | `true`                             | Master switch to enable/disable translation workflow | ✅ Yes    |
-| `NODE_ENV`            | `production`                       | Runtime environment (production/development)         | ✅ Yes    |
-| `REPO_FORK_OWNER`     | `nivaldofarias`                    | Your GitHub username/org                             | ✅ Yes    |
-| `REPO_FORK_NAME`      | `pt-br.react.dev`                  | Name of your fork                                    | ✅ Yes    |
-| `REPO_UPSTREAM_OWNER` | `reactjs`                          | Upstream repository owner                            | ✅ Yes    |
-| `REPO_UPSTREAM_NAME`  | `pt-br.react.dev`                  | Upstream repository name                             | ✅ Yes    |
-| `TARGET_LANGUAGE`     | `pt-br`                            | Target language code                                 | ✅ Yes    |
-| `LLM_MODEL`           | `google/gemini-2.0-flash-exp:free` | LLM model identifier                                 | ❌ No     |
-| `OPENAI_BASE_URL`     | `https://openrouter.ai/api/v1`     | API base URL                                         | ❌ No     |
-| `LOG_LEVEL`           | `info`                             | Logging level (debug/info/warn/error)                | ❌ No     |
-| `LOG_TO_CONSOLE`      | `true`                             | Enable console logging in workflows                  | ❌ No     |
+| `TRANSLATION_ENABLED` | `true`                             | Master switch to enable/disable translation workflow | ✅ Yes   |
+| `NODE_ENV`            | `production`                       | Runtime environment (production/development)         | ✅ Yes   |
+| `REPO_FORK_OWNER`     | `nivaldofarias`                    | Your GitHub username/org                             | ✅ Yes   |
+| `REPO_FORK_NAME`      | `pt-br.react.dev`                  | Name of your fork                                    | ✅ Yes   |
+| `REPO_UPSTREAM_OWNER` | `reactjs`                          | Upstream repository owner                            | ✅ Yes   |
+| `REPO_UPSTREAM_NAME`  | `pt-br.react.dev`                  | Upstream repository name                             | ✅ Yes   |
+| `TARGET_LANGUAGE`     | `pt-br`                            | Target language code                                 | ✅ Yes   |
+| `LLM_MODEL`           | `google/gemini-2.0-flash-exp:free` | LLM model identifier                                 | ❌ No    |
+| `LLM_API_BASE_URL`    | `https://openrouter.ai/api/v1`     | API base URL                                         | ❌ No    |
+| `LOG_LEVEL`           | `info`                             | Logging level (debug/info/warn/error)                | ❌ No    |
+| `LOG_TO_CONSOLE`      | `true`                             | Enable console logging in workflows                  | ❌ No    |
 
 > [!IMPORTANT]
 > **Environment Configuration:**
+>
 > - PRs are created **under your GitHub account** (via `GH_TOKEN`), not as github-actions[bot]
 
 ## Using GitHub Environments (Recommended)
@@ -93,7 +94,7 @@ For projects that need different configurations for **production** and **develop
 
 | Feature          | Repository-Level                          | Environment-Level                                                  |
 | :--------------- | :---------------------------------------- | :----------------------------------------------------------------- |
-| **Access Scope** | Available to *all* workflows and jobs     | Available *only* to jobs that explicitly reference the environment |
+| **Access Scope** | Available to _all_ workflows and jobs     | Available _only_ to jobs that explicitly reference the environment |
 | **Purpose**      | Common values shared across all workflows | Stage-specific values (production, staging, development)           |
 | **Precedence**   | Lower (overridden by environment values)  | Higher (overrides repository-level when names collide)             |
 | **Protection**   | Basic repository permissions              | Enhanced: required reviewers, wait timers, deployment gates        |
@@ -110,18 +111,20 @@ graph TD
     D -->|No| F{Variable exists in Repository?}
     F -->|Yes| C
     F -->|No| G[Variable Undefined]
-    
+
     style E fill:#90EE90
     style C fill:#87CEEB
     style G fill:#FFB6C6
 ```
 
 **Example**: If `REPO_FORK_OWNER` is set to:
+
 - **Repository-level**: `your-username`
 - **Production environment**: `reactjs`
 - **Development environment**: (not set)
 
 Then:
+
 - Job with `environment: production` → Uses `reactjs` ✅
 - Job with `environment: development` → Uses `your-username` (fallback) ✅
 - Job with no environment → Uses `your-username` ✅
@@ -157,17 +160,17 @@ For each environment, add the secrets that differ between production and develop
 
 **Production Environment (`production`)**:
 
-| Secret           | Value               | Description                                    |
-| :--------------- | :------------------ | :--------------------------------------------- |
-| `GH_TOKEN`       | Your production PAT | Token with write access to upstream repository |
-| `OPENAI_API_KEY` | Production API key  | May use different rate limits or account       |
+| Secret        | Value               | Description                                    |
+| :------------ | :------------------ | :--------------------------------------------- |
+| `GH_TOKEN`    | Your production PAT | Token with write access to upstream repository |
+| `LLM_API_KEY` | Production API key  | May use different rate limits or account       |
 
 **Development Environment (`development`)**:
 
-| Secret           | Value                    | Description                               |
-| :--------------- | :----------------------- | :---------------------------------------- |
-| `GH_TOKEN`       | Your development PAT     | Token with write access to your fork only |
-| `OPENAI_API_KEY` | Development/test API key | May use free tier or test account         |
+| Secret        | Value                    | Description                               |
+| :------------ | :----------------------- | :---------------------------------------- |
+| `GH_TOKEN`    | Your development PAT     | Token with write access to your fork only |
+| `LLM_API_KEY` | Development/test API key | May use free tier or test account         |
 
 > [!TIP]
 > **Token Scoping Best Practice**: Use separate GitHub PATs for production and development. The development token should only have access to your fork, while the production token needs access to the upstream repository.
@@ -200,14 +203,14 @@ This table shows all configuration values across repository and environment leve
 | :----------------------- | :--------------------------------- | :---------------- | :------------------- |
 | **Secrets**              |                                    |                   |                      |
 | `GH_TOKEN`               | Dev token (default)                | Production token  | Dev token (optional) |
-| `OPENAI_API_KEY`         | Free tier key                      | Production key    | Test key (optional)  |
+| `LLM_API_KEY`            | Free tier key                      | Production key    | Test key (optional)  |
 | **Common Variables**     |                                    |                   |                      |
 | `TRANSLATION_ENABLED`    | `true`                             | (inherits)        | (inherits)           |
 | `REPO_UPSTREAM_OWNER`    | `reactjs`                          | (inherits)        | (inherits)           |
 | `REPO_UPSTREAM_NAME`     | `pt-br.react.dev`                  | (inherits)        | (inherits)           |
 | `TARGET_LANGUAGE`        | `pt-br`                            | (inherits)        | (inherits)           |
 | `LLM_MODEL`              | `google/gemini-2.0-flash-exp:free` | (inherits)        | (inherits)           |
-| `OPENAI_BASE_URL`        | `https://openrouter.ai/api/v1`     | (inherits)        | (inherits)           |
+| `LLM_API_BASE_URL`       | `https://openrouter.ai/api/v1`     | (inherits)        | (inherits)           |
 | `LOG_TO_CONSOLE`         | `true`                             | (inherits)        | (inherits)           |
 | **Environment-Specific** |                                    |                   |                      |
 | `NODE_ENV`               | (not set)                          | `production`      | `development`        |
@@ -240,7 +243,7 @@ Use both repository-level and environment-level configuration for maximum flexib
 ```yaml
 # Secrets (available to all workflows)
 - GH_TOKEN (development token as default)
-- OPENAI_API_KEY (free tier as default)
+- LLM_API_KEY (free tier as default)
 
 # Variables (available to all workflows)
 - TRANSLATION_ENABLED: "true"
@@ -248,7 +251,7 @@ Use both repository-level and environment-level configuration for maximum flexib
 - REPO_UPSTREAM_NAME: "pt-br.react.dev"
 - TARGET_LANGUAGE: "pt-br"
 - LLM_MODEL: "google/gemini-2.0-flash-exp:free"
-- OPENAI_BASE_URL: "https://openrouter.ai/api/v1"
+- LLM_API_BASE_URL: "https://openrouter.ai/api/v1"
 - LOG_TO_CONSOLE: "true"
 ```
 
@@ -275,7 +278,6 @@ The workflow now includes:
 
 #### Configuring Scheduled Environment
 
-
 > [!WARNING]
 > **Breaking Change**: The workflow now requires environments to be properly configured. Without environment setup, it will fall back to repository-level secrets/variables.
 
@@ -294,7 +296,7 @@ REPO="your-username/translate-react"
 
 # Add repository-level secrets (development defaults)
 gh secret set GH_TOKEN --repo $REPO --body "your-dev-token"
-gh secret set OPENAI_API_KEY --repo $REPO --body "your-api-key"
+gh secret set LLM_API_KEY --repo $REPO --body "your-api-key"
 
 # Add repository-level variables (common to all environments)
 gh variable set TRANSLATION_ENABLED --body "true" --repo $REPO
@@ -302,7 +304,7 @@ gh variable set REPO_UPSTREAM_OWNER --body "reactjs" --repo $REPO
 gh variable set REPO_UPSTREAM_NAME --body "pt-br.react.dev" --repo $REPO
 gh variable set TARGET_LANGUAGE --body "pt-br" --repo $REPO
 gh variable set LLM_MODEL --body "google/gemini-2.0-flash-exp:free" --repo $REPO
-gh variable set OPENAI_BASE_URL --body "https://openrouter.ai/api/v1" --repo $REPO
+gh variable set LLM_API_BASE_URL --body "https://openrouter.ai/api/v1" --repo $REPO
 gh variable set LOG_TO_CONSOLE --body "true" --repo $REPO
 
 # ===== Environment Setup =====
@@ -316,7 +318,7 @@ gh api repos/$REPO/environments/production -X PUT
 
 # Add production secrets
 gh secret set GH_TOKEN --repo $REPO --env production --body "your-prod-token"
-gh secret set OPENAI_API_KEY --repo $REPO --env production --body "your-prod-api-key"
+gh secret set LLM_API_KEY --repo $REPO --env production --body "your-prod-api-key"
 
 # Add production variables
 gh variable set NODE_ENV --body "production" --repo $REPO --env production
@@ -329,7 +331,7 @@ gh api repos/$REPO/environments/development -X PUT
 
 # Add development secrets (optional if same as repository-level)
 gh secret set GH_TOKEN --repo $REPO --env development --body "your-dev-token"
-gh secret set OPENAI_API_KEY --repo $REPO --env development --body "your-dev-api-key"
+gh secret set LLM_API_KEY --repo $REPO --env development --body "your-dev-api-key"
 
 # Add development variables
 gh variable set NODE_ENV --body "development" --repo $REPO --env development
@@ -340,6 +342,7 @@ gh variable set LOG_LEVEL --body "debug" --repo $REPO --env development
 
 > [!NOTE]
 > **Prerequisites**:
+>
 > - [GitHub CLI](https://cli.github.com/) version 2.32.0+ installed
 > - If environment creation fails, create them manually via **Settings → Environments**
 > - Replace `your-username` with your GitHub username
@@ -350,7 +353,7 @@ gh variable set LOG_LEVEL --body "debug" --repo $REPO --env development
 If you prefer to use the GitHub UI:
 
 1. **Repository Secrets** (Settings → Secrets and variables → Actions → Secrets):
-   - Add `GH_TOKEN` and `OPENAI_API_KEY`
+   - Add `GH_TOKEN` and `LLM_API_KEY`
 
 2. **Repository Variables** (Settings → Secrets and variables → Actions → Variables):
    - Add common variables listed above
@@ -371,7 +374,7 @@ gh secret list --repo your-username/translate-react
 Expected output:
 
 ```
-OPENAI_API_KEY          Updated 2025-01-10
+LLM_API_KEY          Updated 2025-01-10
 GH_TOKEN   Updated 2025-01-10
 ```
 
@@ -386,7 +389,7 @@ Expected output (common/default values):
 ```
 LLM_MODEL               google/gemini-2.0-flash-exp:free
 LOG_TO_CONSOLE          true
-OPENAI_BASE_URL         https://openrouter.ai/api/v1
+LLM_API_BASE_URL         https://openrouter.ai/api/v1
 REPO_FORK_NAME          pt-br.react.dev
 REPO_UPSTREAM_NAME      pt-br.react.dev
 REPO_UPSTREAM_OWNER     reactjs
@@ -418,7 +421,7 @@ gh secret list --repo your-username/translate-react --env production
 Expected output:
 
 ```
-OPENAI_API_KEY          Updated 2025-01-10
+LLM_API_KEY          Updated 2025-01-10
 GH_TOKEN   Updated 2025-01-10
 ```
 
@@ -462,18 +465,18 @@ Expected output (if protection is enabled):
 
 ```json
 [
-  {
-    "type": "required_reviewers",
-    "reviewers": [
-      {
-        "type": "User",
-        "reviewer": {
-          "login": "your-username",
-          "id": 123456
-        }
-      }
-    ]
-  }
+	{
+		"type": "required_reviewers",
+		"reviewers": [
+			{
+				"type": "User",
+				"reviewer": {
+					"login": "your-username",
+					"id": 123456
+				}
+			}
+		]
+	}
 ]
 ```
 
@@ -503,6 +506,7 @@ Before testing production, always test with the development environment to avoid
 6. Click **Run workflow**
 
 Monitor the logs to ensure:
+
 - ✅ Workflow uses `development` environment
 - ✅ PRs are created in **your fork** (not upstream)
 - ✅ `NODE_ENV` is set to `development`
@@ -521,6 +525,7 @@ Only after confirming the development environment works correctly:
 7. If you configured **Required Reviewers**, you'll need to approve the deployment in the Actions tab
 
 Monitor the logs to ensure:
+
 - ✅ Deployment requires approval (if configured)
 - ✅ Workflow uses `production` environment
 - ✅ PRs are created in the **upstream repository**
@@ -551,6 +556,7 @@ Alternatively, add a debug step to your workflow:
 ### Workflow Triggers
 
 The **Sync and Translate** workflow runs:
+
 - ⏰ **Scheduled**: Every 6 hours (checks for upstream changes)
 - 🖱️ **Manual**: Via workflow_dispatch (Actions → Run workflow button)
 - 🔔 **Webhook**: When upstream repository pushes (requires webhook setup)
@@ -568,6 +574,7 @@ The **Sync and Translate** workflow runs:
 The workflow uses **environment-specific caching** for isolation and optimal performance:
 
 #### Node Modules Cache
+
 - ✅ **First run**: ~15-20s install time, creates cache
 - ✅ **Cache hit**: ~1-2s (install completely skipped)
 - ✅ **Lockfile change**: Full install, cache updates
@@ -581,10 +588,11 @@ The workflow uses **environment-specific caching** for isolation and optimal per
 
 **Problem**: PRs are being created in your fork when they should go to upstream (or vice versa).
 
-**Solution**: 
+**Solution**:
+
 1. Verify the workflow is using the correct environment (`production` vs `development`)
 2. Check that `REPO_FORK_OWNER` is correctly set in the environment variables
-4. Review the workflow logs to confirm which environment variables are being used
+3. Review the workflow logs to confirm which environment variables are being used
 
 ```bash
 # Check production environment
@@ -599,6 +607,7 @@ gh variable list --repo your-username/translate-react --env development | grep R
 **Problem**: Environment-specific variables aren't taking effect; repository-level values are used instead.
 
 **Solution**:
+
 1. Verify the workflow job includes `environment: production` or `environment: development`
 2. Check that the variable name is exactly the same in both repository and environment levels
 3. Confirm the variable is set in the specific environment (not just repository-level)
@@ -608,7 +617,8 @@ gh variable list --repo your-username/translate-react --env development | grep R
 
 **Problem**: Production workflow is waiting indefinitely for approval.
 
-**Solution**: 
+**Solution**:
+
 1. Go to **Actions** tab → Select the running workflow
 2. Click **Review deployments** button
 3. Check the `production` environment and click **Approve and deploy**
@@ -619,6 +629,7 @@ gh variable list --repo your-username/translate-react --env development | grep R
 **Problem**: Workflow fails with "secret not found" error when using environment.
 
 **Solution**:
+
 1. Verify the secret is set in the **specific environment**, not just repository-level
 2. Check the secret name matches exactly (case-sensitive)
 3. Ensure the workflow job includes `environment: <environment-name>`
@@ -630,7 +641,8 @@ gh variable list --repo your-username/translate-react --env development | grep R
 
 **Problem**: The workflow can't access the repository or create PRs.
 
-**Solution**: 
+**Solution**:
+
 - Check that `GH_TOKEN` has the `repo` and `workflow` scopes
 - For production: Verify the token has access to the upstream repository
 - For development: Verify the token has access to your fork
@@ -640,7 +652,8 @@ gh variable list --repo your-username/translate-react --env development | grep R
 
 **Problem**: API authentication fails.
 
-**Solution**: 
+**Solution**:
+
 - Verify secrets are set correctly in the appropriate environment
 - Check that tokens haven't expired (GitHub PATs can be set with expiration dates)
 - For OpenRouter: Verify your API key is active and has sufficient credits
@@ -657,6 +670,7 @@ gh variable list --repo your-username/translate-react --env development | grep R
 **Problem**: Development token used in production (or vice versa).
 
 **Solution**:
+
 1. Verify that environment-specific secrets are properly configured
 2. Check that the workflow explicitly references the correct environment
 3. Review the workflow logs during the authentication step
@@ -698,7 +712,7 @@ Go to **Settings → Actions → Artifacts and logs** and delete old artifacts t
 6. **Separate tokens by environment**: Use different GitHub PATs for production and development
    - Development token: Access to your fork only
    - Production token: Access to upstream repository only
-7. **Enable deployment protection for production**: 
+7. **Enable deployment protection for production**:
    - Add **Required Reviewers** to manually approve production deployments
    - Set a **Wait Timer** to allow last-minute cancellation
 8. **Limit environment access**: In organization repositories, restrict who can access production environment
@@ -711,6 +725,7 @@ Go to **Settings → Actions → Artifacts and logs** and delete old artifacts t
 For **Fine-Grained Personal Access Tokens** (recommended over classic):
 
 **Development Token**:
+
 - Repository access: Only your fork
 - Permissions:
   - Contents: Read and write
@@ -718,6 +733,7 @@ For **Fine-Grained Personal Access Tokens** (recommended over classic):
   - Workflows: Read and write (if modifying workflow files)
 
 **Production Token**:
+
 - Repository access: Upstream repository
 - Permissions:
   - Contents: Read only (if not pushing directly)
@@ -729,6 +745,7 @@ For **Fine-Grained Personal Access Tokens** (recommended over classic):
 ### When should I use Environments vs Repository-level configuration?
 
 **Use Environments when:**
+
 - ✅ You have multiple deployment stages (production, staging, development)
 - ✅ You need different secrets/variables for different stages
 - ✅ You want deployment protection (approvals, wait timers)
@@ -736,6 +753,7 @@ For **Fine-Grained Personal Access Tokens** (recommended over classic):
 - ✅ You're working on a project that deploys to different targets
 
 **Use Repository-level only when:**
+
 - ❌ You have a simple workflow with no deployment stages
 - ❌ All workflows use exactly the same configuration
 - ❌ You don't need deployment protection or approval gates
@@ -745,6 +763,7 @@ For **Fine-Grained Personal Access Tokens** (recommended over classic):
 ### What happens if I set the same variable at both repository and environment levels?
 
 The **environment-level value always takes precedence** over the repository-level value when a job runs in that environment. This allows you to:
+
 1. Set default values at repository level
 2. Override specific values for each environment
 3. Keep common configuration DRY (Don't Repeat Yourself)
@@ -754,12 +773,14 @@ The **environment-level value always takes precedence** over the repository-leve
 **No!** Only override the variables that need to be different per environment. Variables not defined in the environment will fall back to repository-level values.
 
 **Example Strategy:**
-- **Repository-level**: Common values like `TARGET_LANGUAGE`, `LLM_MODEL`, `OPENAI_BASE_URL`
+
+- **Repository-level**: Common values like `TARGET_LANGUAGE`, `LLM_MODEL`, `LLM_API_BASE_URL`
 - **Environment-level**: Stage-specific values like `NODE_ENV`, `REPO_FORK_OWNER`, `LOG_LEVEL`
 
 ### Can I have more than two environments?
 
 **Yes!** You can create as many environments as needed. Common setups include:
+
 - `development` - For testing in your fork
 - `staging` - For pre-production testing (optional)
 - `production` - For creating PRs to upstream
@@ -767,12 +788,14 @@ The **environment-level value always takes precedence** over the repository-leve
 ### How do I know which environment my workflow is using?
 
 Check the workflow logs under the "Set up job" step. It will show:
+
 ```
 Environment: production
 Environment URL: https://github.com/owner/repo/deployments/production
 ```
 
 You can also add a debug step to your workflow:
+
 ```yaml
 - name: Show Environment
   run: echo "Running in environment: ${{ github.environment }}"
@@ -781,20 +804,24 @@ You can also add a debug step to your workflow:
 ### How do I select the environment when running the workflow?
 
 **For Manual Triggers (workflow_dispatch)**:
+
 1. Go to **Actions** tab → **Sync and Translate**
 2. Click **Run workflow**
 3. Select environment from the **"Deployment environment"** dropdown
 4. Options: `development` (default) or `production`
 
 **For Scheduled/Webhook Runs**:
+
 - This controls which environment automated runs use
 
 **Default Behavior**:
+
 - Manual triggers: Default to `development` (safe for testing)
 
 ### Can I change environment variables without restarting the workflow?
 
 **No.** Environment variables are set at the start of the workflow run. To use new values:
+
 1. Update the variable in GitHub Settings
 2. Re-run the workflow or trigger a new run
 3. The new run will use the updated values
@@ -811,6 +838,7 @@ You can also add a debug step to your workflow:
 ### How do deployment protection rules work?
 
 When you add **Required Reviewers** to an environment:
+
 1. Workflow runs normally until it reaches a job with that environment
 2. Job pauses and shows "Waiting for approval" status
 3. Designated reviewers receive a notification
@@ -822,6 +850,7 @@ When you add **Required Reviewers** to an environment:
 ### Can I test my workflow without creating PRs?
 
 **Yes!** You can:
+
 1. Use the `development` environment configured to target your fork
 2. Add a workflow input to enable "dry-run" mode
 3. Modify the workflow to skip PR creation and only log what would be done
@@ -830,6 +859,7 @@ When you add **Required Reviewers** to an environment:
 ### Do environment secrets/variables cost extra?
 
 **No.** There's no additional cost for using Environments, Secrets, or Variables. The only costs are:
+
 - GitHub Actions minutes (usage-based)
 - Storage for artifacts and logs
 - API usage (LLM services, etc.)
@@ -841,11 +871,13 @@ When you add **Required Reviewers** to an environment:
 ### What if I accidentally run production with development credentials?
 
 If using Environments properly, this shouldn't happen because:
+
 1. Environment secrets are isolated (production job can't access development secrets)
 2. Deployment protection rules require manual approval
 3. Different tokens are scoped to different repositories
 
 **Recovery**:
+
 1. Cancel the running workflow immediately (click "Cancel workflow")
 2. Review which secrets were used in the logs
 3. If production was compromised, rotate the affected tokens

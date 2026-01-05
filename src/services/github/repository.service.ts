@@ -1,8 +1,13 @@
+import type { BaseGitHubServiceDependencies } from "./base.service";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 import { mapGithubError } from "@/errors/";
-import { BaseGitHubService } from "@/services/github/base.service";
 import { logger } from "@/utils/";
+
+import { BaseGitHubService } from "./base.service";
+
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface RepositoryServiceDependencies extends BaseGitHubServiceDependencies {}
 
 /**
  * Service responsible for repository operations and fork management.
@@ -16,6 +21,10 @@ import { logger } from "@/utils/";
  */
 export class RepositoryService extends BaseGitHubService {
 	private readonly logger = logger.child({ component: RepositoryService.name });
+
+	public constructor(dependencies: RepositoryServiceDependencies) {
+		super(dependencies);
+	}
 
 	/**
 	 * Gets the default branch name for a repository.

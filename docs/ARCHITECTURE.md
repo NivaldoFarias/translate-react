@@ -25,6 +25,12 @@ This document provides a comprehensive overview of the `translate-react` system 
   - [Design Patterns](#design-patterns)
     - [Inheritance-Based Service Design](#inheritance-based-service-design)
     - [Proxy Pattern for Error Handling](#proxy-pattern-for-error-handling)
+  - [Dependency Injection Architecture](#dependency-injection-architecture)
+    - [ServiceFactory Pattern](#servicefactory-pattern)
+    - [Key Components](#key-components)
+    - [Dependency Interfaces](#dependency-interfaces)
+    - [Testing with DI](#testing-with-di)
+    - [Composition Root](#composition-root)
   - [Performance Considerations](#performance-considerations)
     - [Batch Processing](#batch-processing)
     - [Concurrent Operations](#concurrent-operations)
@@ -40,63 +46,63 @@ graph TB
     subgraph "Entry Point"
         CLI[CLI / main.ts]
     end
-    
+
     subgraph "Orchestration Layer"
         Runner[Runner Service]
     end
-    
+
     subgraph "Domain Services"
         GitHub[GitHub Service]
         Translator[Translator Service]
         LangDetector[Language Detector]
         Cache[Cache Service]
     end
-    
+
     subgraph "GitHub Sub-Services"
         RepoSvc[Repository Service]
         ContentSvc[Content Service]
         BranchSvc[Branch Service]
     end
-    
+
     subgraph "Cross-Cutting Concerns"
         ErrorHandler[Error Handler]
         Logger[Pino Logger]
     end
-    
+
     subgraph "External Systems"
         GitHubAPI[GitHub REST API]
         LLMAPI[LLM API<br/>OpenAI/OpenRouter]
     end
-    
+
     CLI --> Runner
     Runner --> GitHub
     Runner --> Translator
     Runner --> LangDetector
     Runner --> Cache
-    
+
     GitHub --> RepoSvc
     GitHub --> ContentSvc
     GitHub --> BranchSvc
-    
+
     RepoSvc --> GitHubAPI
     ContentSvc --> GitHubAPI
     BranchSvc --> GitHubAPI
-    
+
     Translator --> LLMAPI
     Translator --> LangDetector
-    
+
     Runner -.-> ErrorHandler
     GitHub -.-> ErrorHandler
     Translator -.-> ErrorHandler
-    
+
     ErrorHandler --> Logger
-    
+
     classDef entryPoint fill:#e1f5fe,stroke:#0277bd,stroke-width:2px
     classDef orchestration fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
     classDef domain fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
     classDef external fill:#fff3e0,stroke:#f57c00,stroke-width:2px
     classDef crossCutting fill:#fce4ec,stroke:#c2185b,stroke-width:2px
-    
+
     class CLI entryPoint
     class Runner orchestration
     class GitHub,Translator,LangDetector,Cache domain
@@ -116,7 +122,7 @@ classDiagram
         #helpers: HelperServices
         +constructor(config)
     }
-    
+
     class RepositoryService {
         +getDefaultBranch()
         +getRepositoryTree()
@@ -126,7 +132,7 @@ classDiagram
         +fetchGlossary()
         -filterRepositoryTree()
     }
-    
+
     class ContentService {
         +getFileContent()
         +listOpenPullRequests()
@@ -135,24 +141,24 @@ classDiagram
         +createCommentOnPullRequest()
         +commentCompiledResultsOnIssue()
     }
-    
+
     class BranchService {
         +createOrGetTranslationBranch()
         +cleanupBranch()
         +deleteBranch()
     }
-    
+
     class GitHubService {
         -repository: RepositoryService
         -content: ContentService
         -branch: BranchService
         +* (delegates to sub-services)
     }
-    
+
     BaseGitHubService <|-- RepositoryService
     BaseGitHubService <|-- ContentService
     BaseGitHubService <|-- BranchService
-    
+
     GitHubService *-- RepositoryService
     GitHubService *-- ContentService
     GitHubService *-- BranchService
@@ -175,26 +181,26 @@ The Runner Service acts as the **workflow orchestrator**, coordinating all other
 
 ```typescript
 class RunnerService extends BaseRunnerService {
-  // Main workflow execution
-  async run(): Promise<void>
-  
-  // Workflow stages
-  protected async verifyPermissions(): Promise<void>
-  protected async syncFork(): Promise<boolean>
-  protected async fetchRepositoryTree(): Promise<void>
-  protected async fetchFilesToTranslate(): Promise<void>
-  protected async processInBatches(files, batchSize): Promise<void>
-  
-  // File processing
-  private async processFile(file, progress): Promise<void>
-  private async fetchBatch(batch, updateFn): Promise<TranslationFile[]>
-  
-  // State management
-  protected async updateIssueWithResults(): Promise<void>
-  
-  // Cleanup and reporting
-  private async cleanupFailedTranslation(metadata): Promise<void>
-  protected printFinalStatistics(): Promise<void>
+	// Main workflow execution
+	async run(): Promise<void>;
+
+	// Workflow stages
+	protected async verifyPermissions(): Promise<void>;
+	protected async syncFork(): Promise<boolean>;
+	protected async fetchRepositoryTree(): Promise<void>;
+	protected async fetchFilesToTranslate(): Promise<void>;
+	protected async processInBatches(files, batchSize): Promise<void>;
+
+	// File processing
+	private async processFile(file, progress): Promise<void>;
+	private async fetchBatch(batch, updateFn): Promise<TranslationFile[]>;
+
+	// State management
+	protected async updateIssueWithResults(): Promise<void>;
+
+	// Cleanup and reporting
+	private async cleanupFailedTranslation(metadata): Promise<void>;
+	protected printFinalStatistics(): Promise<void>;
 }
 ```
 
@@ -204,10 +210,10 @@ The Runner maintains workflow state in a `RunnerState` object:
 
 ```typescript
 interface RunnerState {
-  repositoryTree: GitHubTreeItem[];
-  filesToTranslate: TranslationFile[];
-  processedResults: ProcessedFileResult[];
-  timestamp: number;
+	repositoryTree: GitHubTreeItem[];
+	filesToTranslate: TranslationFile[];
+	processedResults: ProcessedFileResult[];
+	timestamp: number;
 }
 ```
 
@@ -223,14 +229,15 @@ The main `GitHubService` delegates to three specialized sub-services:
 
 ```typescript
 class GitHubService {
-  private repository: RepositoryService;
-  private content: ContentService;
-  private branch: BranchService;
-  
-  // Delegation methods expose sub-service functionality
-  public getRepositoryTree = (...args) => this.repository.getRepositoryTree(...args);
-  public createOrUpdatePullRequest = (...args) => this.content.createOrUpdatePullRequest(...args);
-  public createOrGetTranslationBranch = (...args) => this.branch.createOrGetTranslationBranch(...args);
+	private repository: RepositoryService;
+	private content: ContentService;
+	private branch: BranchService;
+
+	// Delegation methods expose sub-service functionality
+	public getRepositoryTree = (...args) => this.repository.getRepositoryTree(...args);
+	public createOrUpdatePullRequest = (...args) => this.content.createOrUpdatePullRequest(...args);
+	public createOrGetTranslationBranch = (...args) =>
+		this.branch.createOrGetTranslationBranch(...args);
 }
 ```
 
@@ -249,28 +256,27 @@ Manages repository-level operations:
 
 ```typescript
 class RepositoryService extends BaseGitHubService {
-  async getRepositoryTree(baseBranch?: string, filterIgnored = true) {
-    const branchName = baseBranch || await this.getDefaultBranch('fork');
-    const response = await this.octokit.git.getTree({
-      ...this.repositories.fork,
-      tree_sha: branchName,
-      recursive: 'true',
-    });
-    
-    return filterIgnored 
-      ? this.filterRepositoryTree(response.data.tree)
-      : response.data.tree;
-  }
-  
-  // Filters for .md files in src/ directory
-  protected filterRepositoryTree(tree) {
-    return tree.filter(item => 
-      item.path &&
-      item.path.endsWith('.md') &&
-      item.path.includes('/') &&
-      item.path.includes('src/')
-    );
-  }
+	async getRepositoryTree(baseBranch?: string, filterIgnored = true) {
+		const branchName = baseBranch || (await this.getDefaultBranch("fork"));
+		const response = await this.octokit.git.getTree({
+			...this.repositories.fork,
+			tree_sha: branchName,
+			recursive: "true",
+		});
+
+		return filterIgnored ? this.filterRepositoryTree(response.data.tree) : response.data.tree;
+	}
+
+	// Filters for .md files in src/ directory
+	protected filterRepositoryTree(tree) {
+		return tree.filter(
+			(item) =>
+				item.path &&
+				item.path.endsWith(".md") &&
+				item.path.includes("/") &&
+				item.path.includes("src/"),
+		);
+	}
 }
 ```
 
@@ -294,10 +300,10 @@ sequenceDiagram
     participant R as Runner
     participant C as ContentService
     participant G as GitHub API
-    
+
     R->>C: createOrUpdatePullRequest(file, options)
     C->>G: Check if PR exists (by branch)
-    
+
     alt PR Exists
         G-->>C: Return existing PR
         C->>G: Update PR (title, body)
@@ -307,7 +313,7 @@ sequenceDiagram
         Note over C,G: title, body, head, base
         G-->>C: New PR created
     end
-    
+
     C-->>R: PR data
 ```
 
@@ -340,7 +346,7 @@ graph LR
     G --> H
     H --> I[Format Validation]
     I --> J[Output Translation]
-    
+
     style C fill:#fff3e0,stroke:#f57c00
     style E fill:#e1f5fe,stroke:#0277bd
 ```
@@ -360,16 +366,16 @@ async translateLargeContent(content: string): Promise<string> {
     chunkSize: MAX_CHUNK_TOKENS,
     chunkOverlap: 200, // Preserve context
   });
-  
+
   const chunks = await splitter.splitText(content);
   const translations: string[] = [];
-  
+
   for (const [index, chunk] of chunks.entries()) {
     const context = index > 0 ? translations[index - 1].slice(-500) : '';
     const translated = await this.translateChunk(chunk, context);
     translations.push(translated);
   }
-  
+
   return translations.join('\n\n');
 }
 ```
@@ -393,17 +399,17 @@ graph TD
     A[Input Content] --> B{Content Length Check}
     B -->|< MIN_LENGTH| C[Return: Unknown]
     B -->|>= MIN_LENGTH| D[CLD Detection]
-    
+
     D --> E{Reliable?}
     E -->|Yes| F{Confidence > 80%?}
     E -->|No| G[Return: Low Confidence]
-    
+
     F -->|Yes| H{Language Matches Target?}
     F -->|No| G
-    
+
     H -->|Yes| I[Return: Already Translated]
     H -->|No| J[Return: Needs Translation]
-    
+
     style E fill:#fff3e0,stroke:#f57c00
     style F fill:#e1f5fe,stroke:#0277bd
 ```
@@ -412,14 +418,14 @@ graph TD
 
 ```typescript
 interface LanguageAnalysis {
-  languageScore: {
-    target: number;  // Percentage of target language
-    source: number;  // Percentage of source language
-  };
-  ratio: number;           // Target / Source ratio
-  isTranslated: boolean;   // ratio > TRANSLATION_THRESHOLD (0.5)
-  detectedLanguage: string | undefined;
-  rawResult: cld.DetectLanguage;
+	languageScore: {
+		target: number; // Percentage of target language
+		source: number; // Percentage of source language
+	};
+	ratio: number; // Target / Source ratio
+	isTranslated: boolean; // ratio > TRANSLATION_THRESHOLD (0.5)
+	detectedLanguage: string | undefined;
+	rawResult: cld.DetectLanguage;
 }
 ```
 
@@ -465,23 +471,23 @@ classDiagram
         +context: ErrorContext
         +originalError?: Error
     }
-    
+
     class APIError {
         +code: GITHUB_* | OPENAI_*
     }
-    
+
     class ResourceLoadError {
         +code: RESOURCE_LOAD_FAILED
     }
-    
+
     class InitializationError {
         +code: INITIALIZATION_FAILED
     }
-    
+
     class ValidationError {
         +code: VALIDATION_FAILED
     }
-    
+
     TranslationError <|-- APIError
     TranslationError <|-- ResourceLoadError
     TranslationError <|-- InitializationError
@@ -497,7 +503,7 @@ sequenceDiagram
     participant H as Error Handler
     participant M as Error Mapper
     participant L as Logger
-    
+
     S->>S: Operation fails
     S->>P: Throw raw error
     P->>H: handleError(error, context)
@@ -532,28 +538,28 @@ Specific error codes for different GitHub API failures:
 flowchart TD
     A[Start Discovery] --> B[Fetch Repository Tree]
     B --> C[GET /git/trees/{sha}]
-    
+
     C --> D[Filter .md in src/]
-    
+
     D --> E[Batch Files by 10]
     E --> F[Fetch File Content]
-    
+
     F --> G{Has Open PR?}
     G -->|Yes| H[Skip File]
     G -->|No| I{Size > MAX?}
-    
+
     I -->|Yes| J[Skip File - Too Large]
     I -->|No| K[Language Detection]
-    
+
     K --> L{Already Translated?}
     L -->|Yes| M[Skip File]
     L -->|No| N[Add to Translation Queue]
-    
+
     N --> O[Discovery Complete]
     H --> O
     J --> O
     M --> O
-    
+
     style F fill:#e1f5fe,stroke:#0277bd
     style M fill:#f3e5f5,stroke:#7b1fa2
 ```
@@ -564,34 +570,34 @@ flowchart TD
 flowchart TD
     A[Translation Queue] --> B[Process in Batches]
     B --> C[For Each File]
-    
+
     C --> D[Create Translation Branch]
     D --> E{Branch Exists?}
     E -->|Yes| F[Use Existing]
     E -->|No| G[Create New Branch]
-    
+
     F --> H[Translate Content]
     G --> H
-    
+
     H --> I{Size > Chunk Threshold?}
     I -->|Yes| J[Chunked Translation]
     I -->|No| K[Direct Translation]
-    
+
     J --> L[Reassemble Chunks]
     K --> M[Validate Translation]
     L --> M
-    
+
     M --> N{Valid?}
     N -->|No| O[Error: Cleanup Branch]
     N -->|Yes| P[Commit to Branch]
-    
+
     P --> Q[Create Pull Request]
     Q --> R[Update Progress Issue]
     R --> S[Complete]
-    
+
     O --> T[Log Error]
     T --> S
-    
+
     style H fill:#e8f5e9,stroke:#388e3c
     style M fill:#fff3e0,stroke:#f57c00
 ```
@@ -607,7 +613,7 @@ abstract class BaseGitHubService {
   protected readonly octokit: Octokit;
   protected readonly repositories: RepositoryConfig;
   protected readonly helpers: HelperServices;
-  
+
   constructor(config?: GitHubServiceConfig) {
     this.octokit = new Octokit({ auth: env.GH_TOKEN });
     this.repositories = { fork: {...}, upstream: {...} };
@@ -617,6 +623,7 @@ abstract class BaseGitHubService {
 ```
 
 **Benefits**:
+
 - Shared authentication and configuration
 - Consistent error handling via helpers
 - Protected access to common utilities
@@ -626,29 +633,62 @@ abstract class BaseGitHubService {
 Services are wrapped in error handling proxies:
 
 ```typescript
-export function createErrorHandlingProxy<T extends object>(
-  target: T,
-  context: string
-): T {
-  return new Proxy(target, {
-    get(target, prop) {
-      const original = target[prop];
-      
-      if (typeof original === 'function') {
-        return async function(...args: unknown[]) {
-          try {
-            return await original.apply(target, args);
-          } catch (error) {
-            throw handleError(error, { operation: `${context}.${String(prop)}` });
-          }
-        };
-      }
-      
-      return original;
-    }
-  });
+export function createErrorHandlingProxy<T extends object>(target: T, context: string): T {
+	return new Proxy(target, {
+		get(target, prop) {
+			const original = target[prop];
+
+			if (typeof original === "function") {
+				return async function (...args: unknown[]) {
+					try {
+						return await original.apply(target, args);
+					} catch (error) {
+						throw handleError(error, { operation: `${context}.${String(prop)}` });
+					}
+				};
+			}
+
+			return original;
+		},
+	});
 }
 ```
+
+## Dependency Injection Architecture
+
+The project uses **constructor-based dependency injection** via `ServiceFactory` for testability and SOLID compliance.
+
+### ServiceFactory (Composition Root)
+
+`ServiceFactory` centralizes service instantiation in `main.ts`:
+
+- **Singletons**: `getOctokit()`, `getOpenAI()`, `getLLMRateLimiter()`
+- **Service factories**: `createBranchService()`, `createContentService()`, `createRepositoryService()`, `createTranslatorService()`, `createRunnerService()`
+
+Each service declares dependencies via typed interfaces (e.g., `BranchServiceDependencies`, `TranslatorServiceDependencies`). See [src/services/](../src/services/) for interface definitions.
+
+### Testing with DI
+
+Tests inject mocks directly via constructor instead of using `mock.module()`:
+
+```typescript
+const service = new BranchService({
+	octokit: createMockOctokit(),
+	repositories: testRepositories,
+	contentService: createMockContentService(),
+});
+```
+
+Mock factories are centralized in `tests/mocks/` for consistent test setup.
+
+### Benefits
+
+| Aspect       | Before DI                    | After DI                 |
+| ------------ | ---------------------------- | ------------------------ |
+| Test setup   | `mock.module()` interception | Constructor injection    |
+| Dependencies | Hidden in class bodies       | Explicit in interfaces   |
+| Coupling     | Services create services     | Factory creates all      |
+| Testability  | Module interception needed   | Type-safe mocks injected |
 
 ## Performance Considerations
 
@@ -664,9 +704,7 @@ Files are processed in configurable batches to balance:
 const batches = this.createBatches(files, batchSize);
 
 for (const batch of batches) {
-  await Promise.all(
-    batch.map(file => this.processFile(file, progress))
-  );
+	await Promise.all(batch.map((file) => this.processFile(file, progress)));
 }
 ```
 

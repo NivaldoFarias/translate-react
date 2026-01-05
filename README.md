@@ -76,7 +76,7 @@ Automation tool for translating React documentation repositories. Uses LLM APIs 
 
 ### Supported Repositories
 
-Designed for React documentation repositories but can be adapted to any markdown-based documentation with `src/` directory structure *(with some tweaks)*.
+Designed for React documentation repositories but can be adapted to any markdown-based documentation with `src/` directory structure _(with some tweaks)_.
 
 ## Quick Start
 
@@ -115,12 +115,12 @@ Environment variables are validated at runtime using Zod schemas. See [`src/util
 
 ### Required Environment Variables
 
-These must be set in your `.env` *(or `.env.dev`, for development)* file:
+These must be set in your `.env` _(or `.env.dev`, for development)_ file:
 
-| Variable         | Description                                                |
-| ---------------- | ---------------------------------------------------------- |
-| `GH_TOKEN`       | GitHub Personal Access Token with `repo` scope             |
-| `OPENAI_API_KEY` | API key for LLM service (OpenAI, OpenRouter, Azure OpenAI) |
+| Variable      | Description                                                |
+| ------------- | ---------------------------------------------------------- |
+| `GH_TOKEN`    | GitHub Personal Access Token with `repo` scope             |
+| `LLM_API_KEY` | API key for LLM service (OpenAI, OpenRouter, Azure OpenAI) |
 
 ### Optional Environment Variables
 
@@ -146,7 +146,7 @@ These must be set in your `.env` *(or `.env.dev`, for development)* file:
 | Variable            | Default                                            | Description                              |
 | ------------------- | -------------------------------------------------- | ---------------------------------------- |
 | `LLM_MODEL`         | `google/gemini-2.0-flash-exp:free`                 | Model ID for translation                 |
-| `OPENAI_BASE_URL`   | `https://openrouter.ai/api/v1`                     | API endpoint                             |
+| `LLM_API_BASE_URL`  | `https://openrouter.ai/api/v1`                     | API endpoint                             |
 | `OPENAI_PROJECT_ID` | —                                                  | Optional: OpenAI project ID for tracking |
 | `MAX_TOKENS`        | `8192`                                             | Maximum tokens per LLM response          |
 | `HEADER_APP_URL`    | `https://github.com/NivaldoFarias/translate-react` | App URL for OpenRouter tracking          |
@@ -228,9 +228,11 @@ Contributions are welcome. Follow these guidelines:
 1. Fork repository and create feature branch
 2. Install dependencies: `bun install`
 3. Create `.env.dev` with development configuration:
+
 ```bash
 NODE_ENV=development
 ```
+
 4. Run tests: `bun test`
 
 ### Development Standards
@@ -259,7 +261,7 @@ NODE_ENV=development
 
 **Error**: `❌ Invalid environment variables: - GH_TOKEN: String must contain at least 1 character(s)`
 
-**Solution**: Ensure required variables (`GH_TOKEN`, `OPENAI_API_KEY`) are set in `.env` file.
+**Solution**: Ensure required variables (`GH_TOKEN`, `LLM_API_KEY`) are set in `.env` file.
 
 </details>
 
@@ -286,7 +288,7 @@ NODE_ENV=development
 
 **Error**: `OpenAI API error: insufficient_quota`
 
-**Solution**: Check API key has sufficient credits. Switch providers by changing `OPENAI_BASE_URL`.
+**Solution**: Check API key has sufficient credits. Switch providers by changing `LLM_API_BASE_URL`.
 
 </details>
 
@@ -301,7 +303,7 @@ NODE_ENV=development
 LOG_LEVEL="debug" bun dev
 ```
 
-#### Analyze error logs *(`.jsonl` format)*:
+#### Analyze error logs _(`.jsonl` format)_:
 
 ##### View Recent Errors
 

@@ -1,9 +1,14 @@
+import { Octokit } from "@octokit/rest";
+import { createMockOctokit, testRepositories } from "@tests/mocks";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 
-import { BaseGitHubService } from "@/services/github/base.service";
+import type { BaseGitHubServiceDependencies } from "@/services/";
 
+import { BaseGitHubService } from "@/services/";
+
+/** Concrete test implementation of BaseGitHubService */
 class TestGitHubService extends BaseGitHubService {
-	public getOctokit() {
+	public getOctokit(): Octokit {
 		return this.octokit;
 	}
 
@@ -20,11 +25,20 @@ class TestGitHubService extends BaseGitHubService {
 	}
 }
 
+/** Creates test service with dependencies */
+function createTestService(overrides?: Partial<BaseGitHubServiceDependencies>): TestGitHubService {
+	const defaults: BaseGitHubServiceDependencies = {
+		octokit: createMockOctokit() as unknown as Octokit,
+		repositories: testRepositories,
+	};
+	return new TestGitHubService({ ...defaults, ...overrides });
+}
+
 describe("Base GitHub Service", () => {
 	let service: TestGitHubService;
 
 	beforeEach(() => {
-		service = new TestGitHubService();
+		service = createTestService();
 	});
 
 	test("should initialize with configuration when service is created", () => {
@@ -62,12 +76,13 @@ describe("Base GitHub Service", () => {
 			},
 		};
 
-		// @ts-expect-error - Mocking private property
-		service.octokit = {
-			rateLimit: {
-				get: mock(() => Promise.resolve(mockRateLimit)),
-			},
-		};
+		const mockOctokit = {
+			rest: {},
+			request: mock(() => Promise.resolve({})),
+			rateLimit: { get: mock(() => Promise.resolve(mockRateLimit)) },
+		} as unknown as Octokit;
+
+		service = createTestService({ octokit: mockOctokit });
 
 		const rateLimit = await service.getRateLimit();
 		expect(rateLimit.data.resources.core.limit).toBe(5000);
@@ -75,12 +90,13 @@ describe("Base GitHub Service", () => {
 	});
 
 	test("should handle API errors", () => {
-		// @ts-expect-error - Mocking private property
-		service.octokit = {
-			rateLimit: {
-				get: mock(() => Promise.reject(new Error("API Error"))),
-			},
-		};
+		const mockOctokit = {
+			rest: {},
+			request: mock(() => Promise.resolve({})),
+			rateLimit: { get: mock(() => Promise.reject(new Error("API Error"))) },
+		} as unknown as Octokit;
+
+		service = createTestService({ octokit: mockOctokit });
 
 		expect(service.getRateLimit()).rejects.toThrow("API Error");
 	});
@@ -99,27 +115,28 @@ describe("Base GitHub Service", () => {
 			},
 		};
 
-		// @ts-expect-error - Mocking private property for testing
-		service.octokit = {
-			rateLimit: {
-				get: mock(() => Promise.resolve(mockRateLimit)),
-			},
-		};
+		const mockOctokit = {
+			rest: {},
+			request: mock(() => Promise.resolve({})),
+			rateLimit: { get: mock(() => Promise.resolve(mockRateLimit)) },
+		} as unknown as Octokit;
+
+		service = createTestService({ octokit: mockOctokit });
 
 		const rateLimit = await service.getRateLimit();
 		expect(rateLimit.data.resources.core.remaining).toBe(0);
 	});
 
-	test("should use correct repository details from environment", () => {
+	test("should use correct repository details from configuration", () => {
 		const upstream = service.getUpstream();
 		const fork = service.getFork();
 
 		expect(upstream).toBeDefined();
-		expect(upstream.owner).toBeDefined();
-		expect(upstream.repo).toBeDefined();
+		expect(upstream.owner).toBe("test-upstream-owner");
+		expect(upstream.repo).toBe("test-upstream-repo");
 
 		expect(fork).toBeDefined();
-		expect(fork.owner).toBeDefined();
-		expect(fork.repo).toBeDefined();
+		expect(fork.owner).toBe("test-fork-owner");
+		expect(fork.repo).toBe("test-fork-repo");
 	});
 });

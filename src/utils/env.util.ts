@@ -27,18 +27,6 @@ function createTokenSchema(envName: string) {
 		);
 }
 
-/**
- * Detects if running in test environment.
- *
- * Checks NODE_ENV, and Bun's built-in test detection.
- */
-function isTestEnvironment(): boolean {
-	return (
-		import.meta.env.NODE_ENV === RuntimeEnvironment.Test ||
-		(typeof Bun !== "undefined" && !Bun.isMainThread)
-	);
-}
-
 /** Environment configuration schema for runtime validation */
 const envSchema = z.object({
 	/**
@@ -56,14 +44,10 @@ const envSchema = z.object({
 	LOG_LEVEL: z.enum(LogLevel).default(environmentDefaults.LOG_LEVEL),
 
 	/** The GitHub Personal Access Token (optional in test environment) */
-	GH_TOKEN:
-		isTestEnvironment() ? createTokenSchema("GH_TOKEN").optional() : createTokenSchema("GH_TOKEN"),
+	GH_TOKEN: createTokenSchema("GH_TOKEN"),
 
 	/** The OpenAI/OpenRouter/etc API key (optional in test environment) */
-	OPENAI_API_KEY:
-		isTestEnvironment() ?
-			createTokenSchema("OPENAI_API_KEY").optional()
-		:	createTokenSchema("OPENAI_API_KEY"),
+	LLM_API_KEY: createTokenSchema("LLM_API_KEY"),
 
 	/**
 	 * The owner _(user or organization)_ of the forked repository.
@@ -105,7 +89,7 @@ const envSchema = z.object({
 	 *
 	 * @default "https://openrouter.ai/api/v1"
 	 */
-	OPENAI_BASE_URL: z.url().default(environmentDefaults.OPENAI_BASE_URL),
+	LLM_API_BASE_URL: z.url().default(environmentDefaults.LLM_API_BASE_URL),
 
 	/** The OpenAI project's ID. Used for activity tracking on OpenAI. */
 	OPENAI_PROJECT_ID: z.string().optional(),

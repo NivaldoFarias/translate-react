@@ -1,3 +1,6 @@
+import type { LanguageCacheService } from "../cache";
+import type { BranchService, ContentService, RepositoryService } from "../github";
+import type { TranslationFile, TranslatorService } from "../translator.service";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 /**
@@ -155,4 +158,43 @@ export interface WorkflowStatistics {
 
 	/** Success rate as a decimal (0-1) */
 	successRate: number;
+}
+
+/** Dependency injection interface for GitHub services */
+export interface GitHubServices {
+	/** Branch management service */
+	branch: BranchService;
+
+	/** Repository operations service */
+	repository: RepositoryService;
+
+	/** Content and PR management service */
+	content: ContentService;
+}
+
+/** Dependency injection interface for RunnerService */
+export interface RunnerServiceDependencies {
+	/** GitHub API services */
+	github: GitHubServices;
+
+	/** Translation service for LLM operations */
+	translator: TranslatorService;
+
+	/** Language detection cache */
+	languageCache: LanguageCacheService;
+}
+
+export interface RunnerState {
+	repositoryTree: PatchedRepositoryItem[];
+	filesToTranslate: TranslationFile[];
+	processedResults: ProcessedFileResult[];
+	timestamp: number;
+
+	/**
+	 * Map of file paths to invalid PR information.
+	 *
+	 * Tracks files that have existing PRs with conflicts or unmergeable status.
+	 * Used to add informational notes when creating new PRs for these files.
+	 */
+	invalidPRsByFile?: Map<string, { prNumber: number; status: PullRequestStatus }>;
 }

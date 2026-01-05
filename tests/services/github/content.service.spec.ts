@@ -1,136 +1,84 @@
+import {
+	createGitMocks,
+	createIssuesMocks,
+	createMockCommentBuilderService,
+	createMockOctokit,
+	createPullsMocks,
+	createReposMocks,
+	testRepositories,
+} from "@tests/mocks";
 import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test";
 
-import type { TranslationFile } from "@/services/translator.service";
+import type {
+	MockCommentBuilderService,
+	MockOctokitGit,
+	MockOctokitIssues,
+	MockOctokitPulls,
+	MockOctokitRepos,
+} from "@tests/mocks";
 
-import { ContentService } from "@/services/github/content.service";
+import type { ContentServiceDependencies, TranslationFile } from "@/services/";
 
-/** Mocked Octokit instance structure */
-const mockOctokit = {
-	git: {
-		getTree: mock(() =>
-			Promise.resolve({
-				data: {
-					tree: [
-						{
-							path: "src/test/file.md",
-							type: "blob",
-							sha: "abc123",
-							url: "https://api.github.com/repos/test/test/git/blobs/abc123",
-						},
-					],
-				},
-			}),
-		),
-		getBlob: mock(() =>
-			Promise.resolve({
-				data: {
-					content: Buffer.from("# Test Content").toString("base64"),
-					encoding: "base64",
-				},
-			}),
-		),
-	},
-	repos: {
-		getContent: mock(() =>
-			Promise.resolve({
-				data: {
-					type: "file",
-					encoding: "base64",
-					content: Buffer.from("# Test Content").toString("base64"),
-					sha: "abc123",
-				},
-			}),
-		),
-		createOrUpdateFileContents: mock(() =>
-			Promise.resolve({
-				data: {
-					content: { sha: "new-sha" },
-					commit: { sha: "commit-sha" },
-				},
-			}),
-		),
-	},
-	pulls: {
-		list: mock(() => Promise.resolve({ data: [] })),
-		create: mock(() =>
-			Promise.resolve({
-				data: {
-					number: 1,
-					title: "test: new translation",
-					html_url: "https://github.com/test/test/pull/1",
-				},
-			}),
-		),
-	},
-};
+import { ContentService } from "@/services/";
 
-void mock.module("@octokit/rest", () => {
-	return {
-		Octokit: class MockOctokit {
-			git = mockOctokit.git;
-			repos = mockOctokit.repos;
-			pulls = mockOctokit.pulls;
-		},
+/** Creates test ContentService with dependencies */
+function createTestContentService(
+	overrides?: Partial<ContentServiceDependencies>,
+	gitMocks?: MockOctokitGit,
+	reposMocks?: MockOctokitRepos,
+	pullsMocks?: MockOctokitPulls,
+	issuesMocks?: MockOctokitIssues,
+): {
+	service: ContentService;
+	mocks: {
+		git: MockOctokitGit;
+		repos: MockOctokitRepos;
+		pulls: MockOctokitPulls;
+		issues: MockOctokitIssues;
+		commentBuilder: MockCommentBuilderService;
 	};
-});
+} {
+	const git = gitMocks ?? createGitMocks();
+	const repos = reposMocks ?? createReposMocks();
+	const pulls = pullsMocks ?? createPullsMocks();
+	const issues = issuesMocks ?? createIssuesMocks();
+	const commentBuilder = createMockCommentBuilderService();
 
-void mock.module("@/services/comment-builder.service", () => {
-	return {
-		CommentBuilderService: class MockCommentBuilderService {
-			build = mock(() => "Mock comment");
-		},
+	const defaults: ContentServiceDependencies = {
+		// @ts-expect-error - mocked octokit
+		octokit: createMockOctokit({ git, repos, pulls, issues }),
+		repositories: testRepositories,
+		// @ts-expect-error - mocked comment builder
+		commentBuilderService: commentBuilder,
+		issueNumber: 555,
 	};
-});
+
+	return {
+		service: new ContentService({ ...defaults, ...overrides }),
+		mocks: { git, repos, pulls, issues, commentBuilder },
+	};
+}
 
 describe("ContentService", () => {
 	let contentService: ContentService;
+	let gitMocks: MockOctokitGit;
+	let reposMocks: MockOctokitRepos;
+	let pullsMocks: MockOctokitPulls;
+	let issuesMocks: MockOctokitIssues;
+	let commentBuilderMocks: MockCommentBuilderService;
 
 	afterAll(() => {
 		mock.clearAllMocks();
 	});
 
 	beforeEach(() => {
-		mockOctokit.git.getTree.mockClear();
-		mockOctokit.git.getBlob.mockClear();
-		mockOctokit.repos.getContent.mockClear();
-		mockOctokit.repos.createOrUpdateFileContents.mockClear();
-		mockOctokit.pulls.list.mockClear();
-		mockOctokit.pulls.create.mockClear();
-
-		mockOctokit.git.getTree.mockImplementation(() =>
-			Promise.resolve({
-				data: {
-					tree: [
-						{
-							path: "src/test/file.md",
-							type: "blob",
-							sha: "abc123",
-							url: "https://api.github.com/repos/test/test/git/blobs/abc123",
-						},
-					],
-				},
-			}),
-		);
-		mockOctokit.git.getBlob.mockImplementation(() =>
-			Promise.resolve({
-				data: {
-					content: Buffer.from("# Test Content").toString("base64"),
-					encoding: "base64",
-				},
-			}),
-		);
-		mockOctokit.repos.getContent.mockImplementation(() =>
-			Promise.resolve({
-				data: {
-					type: "file",
-					encoding: "base64",
-					content: Buffer.from("# Test Content").toString("base64"),
-					sha: "abc123",
-				},
-			}),
-		);
-
-		contentService = new ContentService();
+		const { service, mocks } = createTestContentService();
+		contentService = service;
+		gitMocks = mocks.git;
+		reposMocks = mocks.repos;
+		pullsMocks = mocks.pulls;
+		issuesMocks = mocks.issues;
+		commentBuilderMocks = mocks.commentBuilder;
 	});
 
 	test("should get untranslated files when batch size is specified", async () => {
@@ -168,7 +116,7 @@ describe("ContentService", () => {
 		});
 
 		expect(result).toBeDefined();
-		expect(mockOctokit.repos.createOrUpdateFileContents).toHaveBeenCalled();
+		expect(reposMocks.createOrUpdateFileContents).toHaveBeenCalled();
 	});
 
 	test("should create pull request when valid PR data is provided", async () => {
@@ -196,7 +144,7 @@ describe("ContentService", () => {
 	});
 
 	test("should handle file content errors when file does not exist", () => {
-		mockOctokit.git.getBlob.mockImplementation(() => Promise.reject(new Error("Not Found")));
+		gitMocks.getBlob.mockRejectedValueOnce(new Error("Not Found"));
 
 		const file: TranslationFile = {
 			path: "src/test/non-existent.md",
@@ -206,5 +154,371 @@ describe("ContentService", () => {
 		};
 
 		expect(contentService.getFileContent(file)).rejects.toThrow("Not Found");
+	});
+
+	describe("listOpenPullRequests", () => {
+		test("should return list of open pull requests when called", async () => {
+			pullsMocks.list.mockResolvedValueOnce({
+				data: [
+					// @ts-expect-error - partial pr data mock
+					{ number: 1, title: "PR 1" },
+					// @ts-expect-error - partial pr data mock
+					{ number: 2, title: "PR 2" },
+				],
+			});
+
+			const prs = await contentService.listOpenPullRequests();
+
+			expect(prs).toHaveLength(2);
+			expect(pullsMocks.list).toHaveBeenCalledWith({
+				...testRepositories.upstream,
+				state: "open",
+			});
+		});
+
+		test("should return empty array when no open PRs exist", async () => {
+			pullsMocks.list.mockResolvedValueOnce({ data: [] });
+
+			const prs = await contentService.listOpenPullRequests();
+
+			expect(prs).toHaveLength(0);
+		});
+
+		test("should throw mapped error when API call fails", () => {
+			pullsMocks.list.mockRejectedValueOnce(new Error("API Error"));
+
+			expect(contentService.listOpenPullRequests()).rejects.toThrow();
+		});
+	});
+
+	describe("findPullRequestByNumber", () => {
+		test("should return PR data when PR exists", async () => {
+			pullsMocks.get.mockResolvedValueOnce({
+				data: { number: 42, title: "Test PR", state: "open" },
+			});
+			const response = await contentService.findPullRequestByNumber(42);
+
+			expect(response.data.number).toBe(42);
+			expect(pullsMocks.get).toHaveBeenCalledWith({
+				...testRepositories.upstream,
+				pull_number: 42,
+			});
+		});
+
+		test("should throw mapped error when PR does not exist", () => {
+			pullsMocks.get.mockRejectedValueOnce(new Error("Not Found"));
+
+			expect(contentService.findPullRequestByNumber(999)).rejects.toThrow();
+		});
+	});
+
+	describe("getPullRequestFiles", () => {
+		test("should return list of file paths when PR has files", async () => {
+			pullsMocks.listFiles.mockResolvedValueOnce({
+				// @ts-expect-error - partial pr data mock
+				data: [{ filename: "src/file1.md" }, { filename: "src/file2.md" }],
+			});
+			const files = await contentService.getPullRequestFiles(123);
+
+			expect(files).toEqual(["src/file1.md", "src/file2.md"]);
+			expect(pullsMocks.listFiles).toHaveBeenCalledWith({
+				...testRepositories.upstream,
+				pull_number: 123,
+			});
+		});
+
+		test("should return empty array when PR has no files", async () => {
+			pullsMocks.listFiles.mockResolvedValueOnce({ data: [] });
+
+			const files = await contentService.getPullRequestFiles(123);
+
+			expect(files).toEqual([]);
+		});
+
+		test("should throw mapped error when API call fails", () => {
+			pullsMocks.listFiles.mockRejectedValueOnce(new Error("API Error"));
+
+			expect(contentService.getPullRequestFiles(123)).rejects.toThrow();
+		});
+	});
+
+	describe("getUntranslatedFiles", () => {
+		test("should throw error when repository tree is empty", () => {
+			gitMocks.getTree.mockResolvedValueOnce({ data: { tree: [] } });
+
+			expect(contentService.getUntranslatedFiles()).rejects.toThrow();
+		});
+
+		test("should skip files without path", async () => {
+			gitMocks.getTree.mockResolvedValueOnce({
+				data: {
+					tree: [
+						{ path: "src/test/file.md", type: "blob", sha: "abc123", url: "" },
+						{ type: "blob", sha: "def456", url: "" },
+					],
+				},
+			});
+
+			const files = await contentService.getUntranslatedFiles();
+
+			expect(files).toHaveLength(1);
+		});
+
+		test("should limit files when maxFiles is specified", async () => {
+			gitMocks.getTree.mockResolvedValueOnce({
+				data: {
+					tree: [
+						{ path: "src/test/file1.md", type: "blob", sha: "abc123", url: "" },
+						{ path: "src/test/file2.md", type: "blob", sha: "def456", url: "" },
+						{ path: "src/test/file3.md", type: "blob", sha: "ghi789", url: "" },
+					],
+				},
+			});
+
+			const files = await contentService.getUntranslatedFiles(2);
+
+			expect(files).toHaveLength(2);
+		});
+	});
+
+	describe("commitTranslation", () => {
+		test("should throw mapped error when commit fails", () => {
+			reposMocks.createOrUpdateFileContents.mockRejectedValueOnce(new Error("Commit failed"));
+
+			const mockBranch = {
+				ref: "refs/heads/translate/test",
+				node_id: "branch-node-id",
+				url: "https://api.github.com/repos/test/test/git/refs/heads/translate/test",
+				object: { type: "commit", sha: "branch-sha", url: "" },
+			};
+
+			const mockFile = {
+				path: "src/test/file.md",
+				content: "# Original",
+				sha: "abc123",
+				filename: "file.md",
+			};
+
+			expect(
+				contentService.commitTranslation({
+					branch: mockBranch,
+					file: mockFile,
+					content: "# Translated",
+					message: "translate: test",
+				}),
+			).rejects.toThrow();
+		});
+	});
+
+	describe("createPullRequest", () => {
+		test("should use custom base branch when specified", async () => {
+			pullsMocks.create.mockResolvedValueOnce({
+				data: { number: 1, title: "Test PR", html_url: "https://github.com/test/pull/1" },
+			});
+			await contentService.createPullRequest({
+				branch: "translate/test",
+				title: "Test PR",
+				body: "Test body",
+				baseBranch: "develop",
+			});
+
+			expect(pullsMocks.create).toHaveBeenCalledWith(expect.objectContaining({ base: "develop" }));
+		});
+
+		test("should throw mapped error when PR creation fails", () => {
+			pullsMocks.create.mockRejectedValueOnce(new Error("PR creation failed"));
+
+			expect(
+				contentService.createPullRequest({
+					branch: "translate/test",
+					title: "Test PR",
+					body: "Test body",
+				}),
+			).rejects.toThrow();
+		});
+	});
+
+	describe("findPullRequestByBranch", () => {
+		test("should return PR when branch matches", async () => {
+			pullsMocks.list.mockResolvedValueOnce({
+				// @ts-expect-error - partial pr `head` attribute mock
+				data: [{ number: 1, head: { ref: "translate/test" }, title: "Test PR" }],
+			});
+			const pr = await contentService.findPullRequestByBranch("translate/test");
+
+			expect(pr?.number).toBe(1);
+			expect(pullsMocks.list).toHaveBeenCalledWith({
+				...testRepositories.upstream,
+				head: `${testRepositories.fork.owner}:translate/test`,
+			});
+		});
+
+		test("should return undefined when no PR matches branch", async () => {
+			pullsMocks.list.mockResolvedValueOnce({ data: [] });
+
+			const pr = await contentService.findPullRequestByBranch("translate/test");
+
+			expect(pr).toBeUndefined();
+		});
+
+		test("should throw mapped error when API call fails", () => {
+			pullsMocks.list.mockRejectedValueOnce(new Error("API Error"));
+
+			expect(contentService.findPullRequestByBranch("translate/test")).rejects.toThrow();
+		});
+	});
+
+	describe("createCommentOnPullRequest", () => {
+		test("should create comment on PR successfully", async () => {
+			issuesMocks.createComment.mockResolvedValueOnce({ data: { id: 123, body: "Test comment" } });
+			const result = await contentService.createCommentOnPullRequest(42, "Test comment");
+
+			expect(result.data.id).toBe(123);
+			expect(issuesMocks.createComment).toHaveBeenCalledWith({
+				...testRepositories.upstream,
+				issue_number: 42,
+				body: "Test comment",
+			});
+		});
+
+		test("should throw mapped error when comment creation fails", () => {
+			issuesMocks.createComment.mockRejectedValueOnce(new Error("Comment failed"));
+
+			expect(contentService.createCommentOnPullRequest(42, "Test")).rejects.toThrow();
+		});
+	});
+
+	describe("checkPullRequestStatus", () => {
+		test("should return clean status when PR is mergeable", async () => {
+			pullsMocks.get.mockImplementation(() =>
+				Promise.resolve({
+					data: {
+						number: 1,
+						mergeable: true,
+						mergeable_state: "clean",
+					},
+				}),
+			);
+
+			const status = await contentService.checkPullRequestStatus(1);
+
+			expect(status.hasConflicts).toBe(false);
+			expect(status.needsUpdate).toBe(false);
+			expect(status.mergeableState).toBe("clean");
+		});
+
+		test("should return dirty status when PR has conflicts", async () => {
+			pullsMocks.get.mockResolvedValueOnce({
+				data: {
+					number: 1,
+					mergeable: false,
+					mergeable_state: "dirty",
+				},
+			});
+
+			const status = await contentService.checkPullRequestStatus(1);
+
+			expect(status.hasConflicts).toBe(true);
+			expect(status.needsUpdate).toBe(true);
+			expect(status.mergeableState).toBe("dirty");
+		});
+
+		test("should return behind status without conflicts", async () => {
+			pullsMocks.get.mockResolvedValueOnce({
+				data: {
+					number: 1,
+					mergeable: true,
+					mergeable_state: "behind",
+				},
+			});
+
+			const status = await contentService.checkPullRequestStatus(1);
+
+			expect(status.hasConflicts).toBe(false);
+			expect(status.needsUpdate).toBe(false);
+			expect(status.mergeableState).toBe("behind");
+		});
+
+		test("should throw mapped error when API call fails", () => {
+			pullsMocks.get.mockImplementation(() => Promise.reject(new Error("API Error")));
+
+			expect(contentService.checkPullRequestStatus(1)).rejects.toThrow();
+		});
+	});
+
+	describe("closePullRequest", () => {
+		test("should close PR successfully", async () => {
+			pullsMocks.update.mockResolvedValueOnce({ data: { number: 42, state: "closed" } });
+			const result = await contentService.closePullRequest(42);
+
+			expect(result.state).toBe("closed");
+			expect(pullsMocks.update).toHaveBeenCalledWith({
+				...testRepositories.upstream,
+				pull_number: 42,
+				state: "closed",
+			});
+		});
+
+		test("should throw mapped error when PR closure fails", () => {
+			pullsMocks.update.mockRejectedValueOnce(new Error("Close failed"));
+
+			expect(contentService.closePullRequest(42)).rejects.toThrow();
+		});
+	});
+
+	describe("commentCompiledResultsOnIssue", () => {
+		test("should throw error when no issue number configured", () => {
+			const { service } = createTestContentService({ issueNumber: undefined });
+
+			expect(service.commentCompiledResultsOnIssue([], [])).rejects.toThrow(
+				"No progress issue number configured",
+			);
+		});
+
+		test("should throw error when issue is closed", () => {
+			issuesMocks.get.mockResolvedValueOnce({ data: { number: 555, state: "closed" } });
+
+			expect(contentService.commentCompiledResultsOnIssue([], [])).rejects.toThrow();
+		});
+
+		test("should create new comment when no existing user comment found", async () => {
+			issuesMocks.get.mockResolvedValueOnce({ data: { number: 555, state: "open" } });
+			issuesMocks.listComments.mockResolvedValueOnce({ data: [] });
+			issuesMocks.createComment.mockResolvedValueOnce({ data: { id: 999, body: "New comment" } });
+
+			const result = await contentService.commentCompiledResultsOnIssue([], []);
+
+			expect(result.id).toBe(999);
+			expect(issuesMocks.createComment).toHaveBeenCalled();
+		});
+
+		test("should update existing comment when user comment found", async () => {
+			issuesMocks.get.mockResolvedValueOnce({ data: { number: 555, state: "open" } });
+			issuesMocks.listComments.mockResolvedValueOnce({
+				data: [
+					// @ts-expect-error - partial comment `user` attribute data mock
+					{ id: 888, user: { login: "test-fork-owner" }, body: "Existing comment with suffix" },
+				],
+			});
+			issuesMocks.updateComment.mockResolvedValueOnce({
+				data: { id: 888, body: "Updated comment" },
+			});
+			commentBuilderMocks.comment.suffix = "suffix";
+
+			const result = await contentService.commentCompiledResultsOnIssue([], []);
+
+			expect(result.id).toBe(888);
+			expect(issuesMocks.updateComment).toHaveBeenCalledWith(
+				expect.objectContaining({
+					comment_id: 888,
+				}),
+			);
+		});
+
+		test("should throw mapped error when API call fails", () => {
+			issuesMocks.get.mockRejectedValueOnce(new Error("API Error"));
+
+			expect(contentService.commentCompiledResultsOnIssue([], [])).rejects.toThrow();
+		});
 	});
 });

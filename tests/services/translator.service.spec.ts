@@ -1,34 +1,35 @@
+import {
+	createChatCompletionsMock,
+	createMockChatCompletion,
+	createMockOpenAI,
+	createMockRateLimiter,
+} from "@tests/mocks";
 import { beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
 
-import type { ChatCompletion } from "openai/resources.mjs";
+import type { ChatCompletion } from "openai/resources";
 
-import { TranslationFile, TranslatorService } from "@/services/translator.service";
+import type { TranslatorServiceDependencies } from "@/services/";
 
-const mockChatCompletionsCreate = mock(() => Promise.resolve({} as ChatCompletion));
+import { TranslationFile, TranslatorService } from "@/services/";
 
-void mock.module("openai", () => {
-	class MockOpenAI {
-		chat = {
-			completions: {
-				create: mockChatCompletionsCreate,
-			},
-		};
-	}
+/** Module-scoped mock for chat completions (can be spied/cleared per test) */
+const mockChatCompletionsCreate = createChatCompletionsMock();
 
-	return {
-		default: MockOpenAI,
-		OpenAI: MockOpenAI,
+/** Creates test TranslatorService with optional overrides */
+function createTestTranslatorService(
+	overrides?: Partial<TranslatorServiceDependencies>,
+): TranslatorService {
+	const defaults: TranslatorServiceDependencies = {
+		openai: createMockOpenAI(mockChatCompletionsCreate),
+		rateLimiter: createMockRateLimiter(),
+		model: "test-model",
 	};
-});
+	return new TranslatorService({ ...defaults, ...overrides });
+}
 
-void mock.module("@/services/rate-limiter/", () => ({
-	llmRateLimiter: {
-		schedule: (fn: () => Promise<unknown>) => fn(),
-	},
-}));
-
+// Mock backoff utility to execute immediately without retries
 void mock.module("@/utils/backoff.util", () => ({
-	withExponentialBackoff: (fn: () => Promise<unknown>) => fn(),
+	withExponentialBackoff: <T>(fn: () => Promise<T>) => fn(),
 	DEFAULT_BACKOFF_CONFIG: {
 		initialDelay: 1000,
 		maxDelay: 60_000,
@@ -44,7 +45,7 @@ describe("TranslatorService", () => {
 	beforeEach(() => {
 		mockChatCompletionsCreate.mockClear();
 
-		translatorService = new TranslatorService();
+		translatorService = createTestTranslatorService();
 
 		spyOn(translatorService.languageDetector, "detectPrimaryLanguage").mockResolvedValue("en");
 		spyOn(translatorService.languageDetector, "getLanguageName").mockImplementation(
@@ -75,7 +76,7 @@ describe("TranslatorService", () => {
 		});
 
 		test("should initialize language detector with provided config", () => {
-			const service = new TranslatorService();
+			const service = createTestTranslatorService();
 
 			expect(service).toBeInstanceOf(TranslatorService);
 			expect(service.languageDetector).toBeDefined();

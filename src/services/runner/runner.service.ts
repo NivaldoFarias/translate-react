@@ -1,8 +1,9 @@
-import type { WorkflowStatistics } from "./runner.types";
+import type { RunnerOptions, RunnerServiceDependencies, WorkflowStatistics } from "./runner.types";
 
 import { extractErrorMessage } from "@/errors/";
-import { BaseRunnerService } from "@/services/runner/base.service";
 import { env, logger } from "@/utils/";
+
+import { BaseRunnerService } from "./base.service";
 
 /**
  * Main orchestrator class that manages the entire translation process workflow.
@@ -19,13 +20,19 @@ import { env, logger } from "@/utils/";
  *
  * @example
  * ```typescript
- * const runner = new RunnerService(options);
+ * const runner = new RunnerService(dependencies, options);
  * await runner.run();
  * ```
  */
-export default class RunnerService extends BaseRunnerService {
-	constructor() {
-		super();
+export class RunnerService extends BaseRunnerService {
+	/**
+	 * Creates a new RunnerService with injected dependencies.
+	 *
+	 * @param services Injected service dependencies
+	 * @param options Runner configuration options
+	 */
+	constructor(services: RunnerServiceDependencies, options?: RunnerOptions) {
+		super(services, options);
 
 		this.logger = logger.child({ component: RunnerService.name });
 	}

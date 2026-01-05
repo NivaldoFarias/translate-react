@@ -119,7 +119,7 @@ export type ReactLanguageCode = (typeof REACT_TRANSLATION_LANGUAGES)[number];
 export const environmentDefaults = {
 	NODE_ENV: RuntimeEnvironment.Development,
 	LOG_LEVEL: LogLevel.Info,
-	OPENAI_BASE_URL: "https://openrouter.ai/api/v1",
+	LLM_API_BASE_URL: "https://openrouter.ai/api/v1",
 	HEADER_APP_TITLE: `${name} v${version}`,
 	HEADER_APP_URL: homepage,
 	REPO_FORK_OWNER: "nivaldofarias",

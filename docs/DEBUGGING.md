@@ -58,9 +58,9 @@ For files requiring chunking, debug logs include:
 
 ```json
 {
-  "totalChunks": 4,
-  "originalContentLength": 30500,
-  "chunkSizes": [13796, 3106, 15498, 4529]
+	"totalChunks": 4,
+	"originalContentLength": 30500,
+	"chunkSizes": [13796, 3106, 15498, 4529]
 }
 ```
 
@@ -68,13 +68,13 @@ Each chunk shows:
 
 ```json
 {
-  "chunkIndex": 1,
-  "totalChunks": 4,
-  "chunkSize": 13796,
-  "estimatedTokens": 8686,
-  "translatedLength": 13796,
-  "sizeRatio": "1.05",
-  "durationMs": 4200
+	"chunkIndex": 1,
+	"totalChunks": 4,
+	"chunkSize": 13796,
+	"estimatedTokens": 8686,
+	"translatedLength": 13796,
+	"sizeRatio": "1.05",
+	"durationMs": 4200
 }
 ```
 
@@ -84,15 +84,15 @@ Complete timing breakdown for each file:
 
 ```json
 {
-  "filename": "react-19-upgrade-guide.md",
-  "prNumber": 613,
-  "timing": {
-    "branchMs": 300,
-    "translationMs": 18500,
-    "commitMs": 1200,
-    "prMs": 800,
-    "totalMs": 20800
-  }
+	"filename": "react-19-upgrade-guide.md",
+	"prNumber": 613,
+	"timing": {
+		"branchMs": 300,
+		"translationMs": 18500,
+		"commitMs": 1200,
+		"prMs": 800,
+		"totalMs": 20800
+	}
 }
 ```
 
@@ -135,10 +135,10 @@ grep "Content reassembly completed" logs/*.log
 
 ```json
 {
-  "level": 50,
-  "expectedChunks": 4,
-  "actualChunks": 3,
-  "msg": "Critical: Chunk count mismatch detected"
+	"level": 50,
+	"expectedChunks": 4,
+	"actualChunks": 3,
+	"msg": "Critical: Chunk count mismatch detected"
 }
 ```
 
@@ -146,10 +146,10 @@ grep "Content reassembly completed" logs/*.log
 
 ```json
 {
-  "level": 50,
-  "originalHeadings": 45,
-  "translatedHeadings": 0,
-  "msg": "Translation lost all markdown headings"
+	"level": 50,
+	"originalHeadings": 45,
+	"translatedHeadings": 0,
+	"msg": "Translation lost all markdown headings"
 }
 ```
 
@@ -157,9 +157,9 @@ grep "Content reassembly completed" logs/*.log
 
 ```json
 {
-  "level": 40,
-  "sizeRatio": "0.35",
-  "msg": "Translation size ratio outside expected range (0.5-2.0)"
+	"level": 40,
+	"sizeRatio": "0.35",
+	"msg": "Translation size ratio outside expected range (0.5-2.0)"
 }
 ```
 
@@ -178,9 +178,10 @@ grep "Content reassembly completed" logs/*.log
 1. Enable debug logging
 2. Run translation for single file
 3. Check logs for:
-  - Total chunks vs. translated chunks
-  - Individual chunk completion times
-  - Commit timestamp vs. last chunk completion
+
+- Total chunks vs. translated chunks
+- Individual chunk completion times
+- Commit timestamp vs. last chunk completion
 
 ### Issue: Race Condition Suspected
 
@@ -262,11 +263,14 @@ To understand where chunks are split:
 
 ```typescript
 // Add to chunkContent() temporarily
-logger.debug({
-  chunkIndex: i,
-  chunkStart: chunk.substring(0, 100),
-  chunkEnd: chunk.substring(chunk.length - 100),
-}, 'Chunk boundary preview');
+logger.debug(
+	{
+		chunkIndex: i,
+		chunkStart: chunk.substring(0, 100),
+		chunkEnd: chunk.substring(chunk.length - 100),
+	},
+	"Chunk boundary preview",
+);
 ```
 
 ### Translation Content Inspection
@@ -275,11 +279,14 @@ To inspect translated content before commit:
 
 ```typescript
 // Add to processFile() after translation
-logger.debug({
-  filename: file.filename,
-  translationPreview: metadata.translation.substring(0, 500),
-  translationLength: metadata.translation.length,
-}, 'Translation content preview');
+logger.debug(
+	{
+		filename: file.filename,
+		translationPreview: metadata.translation.substring(0, 500),
+		translationLength: metadata.translation.length,
+	},
+	"Translation content preview",
+);
 ```
 
 ## Next Steps for Investigation

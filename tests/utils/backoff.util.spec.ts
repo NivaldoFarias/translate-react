@@ -2,7 +2,7 @@ import { RequestError } from "@octokit/request-error";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { StatusCodes } from "http-status-codes";
 
-import { DEFAULT_BACKOFF_CONFIG, withExponentialBackoff } from "@/utils/backoff.util";
+import { DEFAULT_BACKOFF_CONFIG, withExponentialBackoff } from "@/utils/";
 
 function createRequestError({ message, status }: { message: string; status: number }) {
 	return new RequestError(message, status, {

@@ -1,9 +1,17 @@
 import { RestEndpointMethodTypes } from "@octokit/rest";
 import { StatusCodes } from "http-status-codes";
 
+import type { BaseGitHubServiceDependencies } from "./base.service";
+
 import { mapGithubError } from "@/errors/";
-import { BaseGitHubService, ContentService } from "@/services/github/";
 import { env, logger, setupSignalHandlers } from "@/utils/";
+
+import { BaseGitHubService } from "./base.service";
+import { ContentService } from "./content.service";
+
+export interface BranchServiceDependencies extends BaseGitHubServiceDependencies {
+	contentService: ContentService;
+}
 
 /**
  * Service responsible for Git branch operations and lifecycle management.
@@ -18,7 +26,9 @@ import { env, logger, setupSignalHandlers } from "@/utils/";
  */
 export class BranchService extends BaseGitHubService {
 	private readonly logger = logger.child({ component: BranchService.name });
-	private readonly contentService = new ContentService();
+	private readonly services: {
+		content: ContentService;
+	};
 
 	/** Set of branch names currently being tracked for cleanup */
 	public activeBranches = new Set<string>();
@@ -28,8 +38,10 @@ export class BranchService extends BaseGitHubService {
 	 *
 	 * Initializes the GitHub client and sets up cleanup handlers.
 	 */
-	constructor() {
-		super();
+	constructor(dependencies: BranchServiceDependencies) {
+		super(dependencies);
+
+		this.services = { content: dependencies.contentService };
 
 		setupSignalHandlers(async () => {
 			await this.cleanup();
@@ -226,7 +238,7 @@ export class BranchService extends BaseGitHubService {
 
 		for (const branch of branchesToCheck) {
 			try {
-				const pr = await this.contentService.findPullRequestByBranch(branch);
+				const pr = await this.services.content.findPullRequestByBranch(branch);
 
 				if (!pr) {
 					this.logger.info({ branch }, "Cleanup: Deleting branch without PR");
@@ -236,7 +248,7 @@ export class BranchService extends BaseGitHubService {
 					continue;
 				}
 
-				const prStatus = await this.contentService.checkPullRequestStatus(pr.number);
+				const prStatus = await this.services.content.checkPullRequestStatus(pr.number);
 
 				if (prStatus.needsUpdate) {
 					this.logger.info(

@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
 
-import { RuntimeEnvironment } from "@/utils/constants.util";
-import { validateEnv, env as validEnv } from "@/utils/env.util";
+import { RuntimeEnvironment, validateEnv } from "@/utils/";
+
+import { testEnv as validEnv } from "../setup";
 
 describe("Environment Utilities", () => {
 	describe("validateEnv", () => {
@@ -9,7 +10,7 @@ describe("Environment Utilities", () => {
 			const env = validateEnv(validEnv);
 
 			expect(env.GH_TOKEN).toBe("ghp_1234567890abcdefghijklmnopqrstuvwxyzABCD");
-			expect(env.OPENAI_API_KEY).toBe("sk-1234567890abcdefghijklmnopqrstuvwxyzABCDEF1234567890");
+			expect(env.LLM_API_KEY).toBe("sk-1234567890abcdefghijklmnopqrstuvwxyzABCDEF1234567890");
 			expect(env.NODE_ENV).toBe(RuntimeEnvironment.Test);
 		});
 
@@ -23,14 +24,14 @@ describe("Environment Utilities", () => {
 		test("should use default values for optional variables when not provided", () => {
 			const minimalEnv = {
 				GH_TOKEN: validEnv.GH_TOKEN,
-				OPENAI_API_KEY: validEnv.OPENAI_API_KEY,
+				LLM_API_KEY: validEnv.LLM_API_KEY,
 				NODE_ENV: RuntimeEnvironment.Test,
 			};
 
 			// @ts-expect-error - missing optional variables
 			const env = validateEnv(minimalEnv);
 
-			expect(env.OPENAI_BASE_URL).toBe("https://openrouter.ai/api/v1");
+			expect(env.LLM_API_BASE_URL).toBe("https://openrouter.ai/api/v1");
 		});
 
 		test("should throw error when token is too short", () => {

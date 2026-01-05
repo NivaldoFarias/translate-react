@@ -57,8 +57,8 @@ Error (Native)
 
 ```typescript
 throw new EmptyContentError(filename, {
-  operation: "TranslatorService.translateContent",
-  metadata: { filename, path },
+	operation: "TranslatorService.translateContent",
+	metadata: { filename, path },
 });
 ```
 
@@ -76,19 +76,15 @@ throw new EmptyContentError(filename, {
 **Usage**:
 
 ```typescript
-throw new TranslationValidationError(
-  "Translation produced empty content",
-  filename,
-  {
-    operation: "TranslatorService.validateTranslation",
-    metadata: {
-      filename,
-      path,
-      originalLength,
-      translatedLength,
-    },
-  }
-);
+throw new TranslationValidationError("Translation produced empty content", filename, {
+	operation: "TranslatorService.validateTranslation",
+	metadata: {
+		filename,
+		path,
+		originalLength,
+		translatedLength,
+	},
+});
 ```
 
 **When Thrown**:
@@ -106,17 +102,17 @@ throw new TranslationValidationError(
 
 ```typescript
 throw new ChunkProcessingError(
-  `Chunk count mismatch: expected ${expected} chunks, but only ${actual} were translated`,
-  {
-    operation: "TranslatorService.translateWithChunking",
-    metadata: {
-      expectedChunks,
-      actualChunks,
-      missingChunks,
-      contentLength,
-      chunkSizes,
-    },
-  }
+	`Chunk count mismatch: expected ${expected} chunks, but only ${actual} were translated`,
+	{
+		operation: "TranslatorService.translateWithChunking",
+		metadata: {
+			expectedChunks,
+			actualChunks,
+			missingChunks,
+			contentLength,
+			chunkSizes,
+		},
+	},
 );
 ```
 
@@ -134,15 +130,15 @@ All errors include standardized properties:
 
 ```typescript
 interface TranslationErrorContext<T extends Record<string, unknown>> {
-  operation?: string;  // Operation that failed (e.g., "TranslatorService.translateContent")
-  metadata?: T;        // Additional context (file info, metrics, etc.)
+	operation?: string; // Operation that failed (e.g., "TranslatorService.translateContent")
+	metadata?: T; // Additional context (file info, metrics, etc.)
 }
 
 class TranslationError<T extends Record<string, unknown>> extends Error {
-  readonly code: ErrorCode;           // Standardized error code
-  readonly operation?: string;        // Operation that failed
-  readonly metadata?: T;              // Additional context
-  readonly timestamp: Date;           // When error occurred
+	readonly code: ErrorCode; // Standardized error code
+	readonly operation?: string; // Operation that failed
+	readonly metadata?: T; // Additional context
+	readonly timestamp: Date; // When error occurred
 }
 ```
 
@@ -191,10 +187,10 @@ Services throw typed errors with context:
 ```typescript
 // Typed error with context
 if (!file.content?.length) {
-  throw new EmptyContentError(file.filename, {
-    operation: "TranslatorService.translateContent",
-    metadata: { filename: file.filename, path: file.path },
-  });
+	throw new EmptyContentError(file.filename, {
+		operation: "TranslatorService.translateContent",
+		metadata: { filename: file.filename, path: file.path },
+	});
 }
 ```
 
@@ -204,16 +200,16 @@ LLM and GitHub errors are mapped using pure functions:
 
 ```typescript
 try {
-  const translatedChunk = await this.callLanguageModel(chunk);
+	const translatedChunk = await this.callLanguageModel(chunk);
 } catch (error) {
-  throw mapLLMError(error, {
-    operation: "TranslatorService.translateWithChunking",
-    metadata: {
-      chunkIndex: i,
-      totalChunks: chunks.length,
-      chunkSize: chunk.length,
-    },
-  });
+	throw mapLLMError(error, {
+		operation: "TranslatorService.translateWithChunking",
+		metadata: {
+			chunkIndex: i,
+			totalChunks: chunks.length,
+			chunkSize: chunk.length,
+		},
+	});
 }
 ```
 
@@ -255,8 +251,8 @@ graph TD
 
 ```typescript
 throw new EmptyContentError(filename, {
-  operation: "ServiceName.methodName", // Always include calling context
-  metadata: relevantData,
+	operation: "ServiceName.methodName", // Always include calling context
+	metadata: relevantData,
 });
 ```
 
@@ -299,13 +295,13 @@ catch (error) {
 
 ```typescript
 import { expect, test } from "bun:test";
+
 import { EmptyContentError } from "@/errors/";
 
 test("throws EmptyContentError for empty content", () => {
-  const file = new TranslationFile("", "test.md", "path/test.md", "sha123");
-  
-  expect(() => translator.translateContent(file))
-    .toThrow(EmptyContentError);
+	const file = new TranslationFile("", "test.md", "path/test.md", "sha123");
+
+	expect(() => translator.translateContent(file)).toThrow(EmptyContentError);
 });
 ```
 
@@ -313,15 +309,15 @@ test("throws EmptyContentError for empty content", () => {
 
 ```typescript
 test("handles chunk count mismatch", async () => {
-  const largeContent = generateLargeContent();
-  
-  try {
-    await translator.translateContent(file);
-  } catch (error) {
-    expect(error).toBeInstanceOf(ChunkProcessingError);
-    expect(error.code).toBe(ErrorCode.ChunkProcessingFailed);
-    expect(error.metadata).toHaveProperty("expectedChunks");
-  }
+	const largeContent = generateLargeContent();
+
+	try {
+		await translator.translateContent(file);
+	} catch (error) {
+		expect(error).toBeInstanceOf(ChunkProcessingError);
+		expect(error.code).toBe(ErrorCode.ChunkProcessingFailed);
+		expect(error.metadata).toHaveProperty("expectedChunks");
+	}
 });
 ```
 

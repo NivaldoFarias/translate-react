@@ -1,9 +1,10 @@
-import type { LocaleDefinition } from "@/locales/";
-import type { ProcessedFileResult } from "@/services/runner/";
+import type { ProcessedFileResult } from "./runner";
+
+import type { LocaleDefinition } from "@/locales";
 
 import { env, logger } from "@/utils/";
 
-import { LocaleService } from "./locale/";
+import { LocaleService } from "./locale";
 import { TranslationFile } from "./translator.service";
 
 export interface FileEntry {

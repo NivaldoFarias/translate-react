@@ -2,6 +2,8 @@ import { MarkdownTextSplitter } from "@langchain/textsplitters";
 import { encodingForModel } from "js-tiktoken";
 import OpenAI from "openai";
 
+import type { RateLimiter } from "./rate-limiter";
+
 import {
 	ChunkProcessingError,
 	EmptyContentError,
@@ -9,11 +11,49 @@ import {
 	mapLLMError,
 	TranslationValidationError,
 } from "@/errors/";
-import { LocaleService } from "@/services/locale/";
-import { llmRateLimiter } from "@/services/rate-limiter/";
 import { env, logger, MAX_CHUNK_TOKENS, withExponentialBackoff } from "@/utils/";
 
 import { LanguageDetectorService } from "./language-detector.service";
+import { LocaleService } from "./locale";
+
+/** LLM configuration for TranslatorService */
+export interface TranslatorLLMConfig {
+	/** LLM API base URL */
+	baseUrl: string;
+
+	/** LLM API key */
+	apiKey: string;
+
+	/** OpenAI project ID (optional) */
+	projectId?: string;
+
+	/** LLM model identifier */
+	model: string;
+
+	/** Application title header */
+	headerAppTitle: string;
+
+	/** Application URL header */
+	headerAppUrl: string;
+}
+
+/** Dependency injection interface for TranslatorService */
+export interface TranslatorServiceDependencies {
+	/** OpenAI client instance for LLM API calls */
+	openai: OpenAI;
+
+	/** Rate limiter for LLM API requests */
+	rateLimiter: RateLimiter;
+
+	/** LLM model identifier for chat completions */
+	model: string;
+
+	/** Optional locale service (defaults to singleton) */
+	localeService?: LocaleService;
+
+	/** Optional language detector service */
+	languageDetector?: LanguageDetectorService;
+}
 
 /**
  * Result of content chunking operation containing chunks and their separators.
@@ -66,7 +106,11 @@ export class TranslationFile {
  *
  * @example
  * ```typescript
- * const translator = new TranslatorService({ source: 'en', target: 'pt' });
+ * const translator = new TranslatorService({
+ *   openai: openaiClient,
+ *   rateLimiter: llmRateLimiter,
+ *   model: 'gpt-4',
+ * });
  * translator.setGlossary('React -> React\ncomponent -> componente');
  *
  * const result = await translator.translateContent(file);
@@ -76,31 +120,35 @@ export class TranslationFile {
 export class TranslatorService {
 	private readonly logger = logger.child({ component: TranslatorService.name });
 
-	/** Language model instance for translation */
-	private readonly llm = new OpenAI({
-		baseURL: env.OPENAI_BASE_URL,
-		apiKey: env.OPENAI_API_KEY,
-		project: env.OPENAI_PROJECT_ID,
-		defaultHeaders: {
-			"X-Title": env.HEADER_APP_TITLE,
-			"HTTP-Referer": env.HEADER_APP_URL,
-		},
-	});
+	/** OpenAI client instance for LLM API calls */
+	private readonly openai: OpenAI;
+
+	/** Rate limiter for LLM API requests */
+	private readonly rateLimiter: RateLimiter;
+
+	/** LLM model identifier for chat completions */
+	private readonly model: string;
 
 	/** Locale service for language-specific rules */
 	private readonly localeService: LocaleService;
 
-	public readonly languageDetector = new LanguageDetectorService();
+	/** Language detector for content analysis */
+	public readonly languageDetector: LanguageDetectorService;
 
+	/** Glossary for consistent term translations */
 	public glossary: string | null = null;
 
 	/**
-	 * Creates a new TranslatorService instance.
+	 * Creates a new TranslatorService instance with injected dependencies.
 	 *
-	 * @param localeService Optional locale service for dependency injection (defaults to singleton)
+	 * @param dependencies Dependency injection container with OpenAI client, rate limiter, and configuration
 	 */
-	constructor(localeService?: LocaleService) {
-		this.localeService = localeService ?? LocaleService.get();
+	constructor(dependencies: TranslatorServiceDependencies) {
+		this.openai = dependencies.openai;
+		this.rateLimiter = dependencies.rateLimiter;
+		this.model = dependencies.model;
+		this.localeService = dependencies.localeService ?? LocaleService.get();
+		this.languageDetector = dependencies.languageDetector ?? new LanguageDetectorService();
 	}
 
 	/**
@@ -122,8 +170,8 @@ export class TranslatorService {
 		try {
 			this.logger.info("Testing LLM API connectivity");
 
-			const response = await this.llm.chat.completions.create({
-				model: env.LLM_MODEL,
+			const response = await this.openai.chat.completions.create({
+				model: this.model,
 				messages: [{ role: "user", content: "ping" }],
 				max_tokens: 5,
 				temperature: 0.1,
@@ -138,7 +186,7 @@ export class TranslatorService {
 
 			this.logger.info(
 				{
-					model: env.LLM_MODEL,
+					model: this.model,
 					response: {
 						id: response.id,
 						usage: response.usage,
@@ -780,15 +828,15 @@ export class TranslatorService {
 
 		try {
 			this.logger.debug(
-				{ model: env.LLM_MODEL, contentLength: content.length, temperature: 0.1 },
+				{ model: this.model, contentLength: content.length, temperature: 0.1 },
 				"Calling language model for translation",
 			);
 
 			const completion = await withExponentialBackoff(
 				() =>
-					llmRateLimiter.schedule(() =>
-						this.llm.chat.completions.create({
-							model: env.LLM_MODEL,
+					this.rateLimiter.schedule(() =>
+						this.openai.chat.completions.create({
+							model: this.model,
 							temperature: 0.1,
 							max_tokens: env.MAX_TOKENS,
 							messages: [
@@ -807,12 +855,12 @@ export class TranslatorService {
 			const translatedContent = completion.choices[0]?.message.content;
 
 			if (!translatedContent) {
-				this.logger.error({ model: env.LLM_MODEL }, "No content returned from language model");
+				this.logger.error({ model: this.model }, "No content returned from language model");
 
 				throw mapLLMError(new Error("No content returned from language model"), {
 					operation: `${TranslatorService.name}.callLanguageModel`,
 					metadata: {
-						model: env.LLM_MODEL,
+						model: this.model,
 						contentLength: content.length,
 					},
 				});
@@ -820,7 +868,7 @@ export class TranslatorService {
 
 			this.logger.info(
 				{
-					model: env.LLM_MODEL,
+					model: this.model,
 					translatedLength: translatedContent.length,
 					tokensUsed: completion.usage?.total_tokens,
 				},
@@ -832,7 +880,7 @@ export class TranslatorService {
 			throw mapLLMError(error, {
 				operation: `${TranslatorService.name}.callLanguageModel`,
 				metadata: {
-					model: env.LLM_MODEL,
+					model: this.model,
 					contentLength: content.length,
 				},
 			});

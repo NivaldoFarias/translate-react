@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 
-import { LanguageDetectorService } from "@/services/language-detector.service";
+import { LanguageDetectorService } from "@/services/";
 
 describe("LanguageDetector", () => {
 	let detector: LanguageDetectorService;

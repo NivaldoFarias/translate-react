@@ -1,7 +1,7 @@
-import type { LocaleDefinition } from "@/locales/";
+import type { LocaleDefinition } from "@/locales";
 import type { ReactLanguageCode } from "@/utils/";
 
-import { ptBrLocale } from "@/locales/";
+import { ptBrLocale } from "@/locales";
 import { env, logger } from "@/utils/";
 
 /**

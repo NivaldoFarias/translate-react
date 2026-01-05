@@ -74,7 +74,7 @@ jobs:
           LOG_LEVEL=${{ vars.LOG_LEVEL }}
           LOG_TO_CONSOLE=${{ vars.LOG_TO_CONSOLE }}
           GH_TOKEN=${{ steps.generate-token.outputs.token }}
-          OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+          LLM_API_KEY=${{ secrets.LLM_API_KEY }}
           TARGET_LANGUAGE=${{ matrix.lang }}
           SOURCE_LANGUAGE=en
           REPO_FORK_OWNER=${{ matrix.fork_owner }}
@@ -82,7 +82,7 @@ jobs:
           REPO_UPSTREAM_OWNER=${{ matrix.upstream_owner }}
           REPO_UPSTREAM_NAME=${{ matrix.upstream_name }}
           LLM_MODEL=${{ vars.LLM_MODEL }}
-          OPENAI_BASE_URL=${{ vars.OPENAI_BASE_URL }}
+          LLM_API_BASE_URL=${{ vars.LLM_API_BASE_URL }}
           OPENAI_PROJECT_ID=${{ vars.OPENAI_PROJECT_ID }}
           MAX_TOKENS=${{ vars.MAX_TOKENS }}
           BATCH_SIZE=${{ vars.BATCH_SIZE }}
