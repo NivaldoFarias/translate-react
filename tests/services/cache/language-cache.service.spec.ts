@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-import { LanguageCacheService } from "@/services/cache/language-cache.service";
+import { LanguageCacheService } from "@/services/";
 
 describe("LanguageCacheService", () => {
 	let cache: LanguageCacheService;

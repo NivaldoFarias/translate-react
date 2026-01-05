@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
 
-import type { RateLimiter, RateLimiterMetrics } from "@/services/rate-limiter";
+import type { RateLimiter, RateLimiterMetrics } from "@/services/";
 
-import { CONFIGS, createRateLimiter } from "@/services/rate-limiter";
+import { CONFIGS, createRateLimiter } from "@/services/";
+import { delay } from "@/utils/";
 
 /**
  * Validates that metrics contain expected structure with zero values.
@@ -16,15 +17,6 @@ function expectZeroMetrics(metrics: RateLimiterMetrics): void {
 	expect(metrics.runningRequests).toBe(0);
 	expect(metrics.failedRequests).toBe(0);
 }
-
-/**
- * Creates a delay promise for testing async timing.
- *
- * @param ms Milliseconds to delay
- *
- * @returns Promise that resolves after delay
- */
-const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 describe("RateLimiter", () => {
 	let rateLimiter: RateLimiter | undefined;

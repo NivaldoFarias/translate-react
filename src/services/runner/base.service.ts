@@ -1,3 +1,4 @@
+import type { PullRequestOptions } from "../github";
 import type {
 	CacheCheckResult,
 	FileProcessingProgress,
@@ -7,17 +8,14 @@ import type {
 	PrFilterResult as PullRequestFilterResult,
 	PullRequestStatus,
 	RunnerOptions,
+	RunnerServiceDependencies,
+	RunnerState,
 	WorkflowStatistics,
 } from "./runner.types";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 import type { SetNonNullable, SetRequired } from "type-fest";
 
-import type { PullRequestOptions } from "@/services/github/";
-
 import { InitializationError, ResourceLoadError } from "@/errors/";
-import { LanguageCacheService } from "@/services/cache/";
-import { BranchService, ContentService, RepositoryService } from "@/services/github/";
-import { TranslationFile, TranslatorService } from "@/services/translator.service";
 import {
 	env,
 	FILE_FETCH_BATCH_SIZE,
@@ -29,21 +27,7 @@ import {
 } from "@/utils/";
 
 import { homepage, name, version } from "../../../package.json";
-
-export interface RunnerState {
-	repositoryTree: PatchedRepositoryItem[];
-	filesToTranslate: TranslationFile[];
-	processedResults: ProcessedFileResult[];
-	timestamp: number;
-
-	/**
-	 * Map of file paths to invalid PR information.
-	 *
-	 * Tracks files that have existing PRs with conflicts or unmergeable status.
-	 * Used to add informational notes when creating new PRs for these files.
-	 */
-	invalidPRsByFile?: Map<string, { prNumber: number; status: PullRequestStatus }>;
-}
+import { TranslationFile } from "../translator.service";
 
 export abstract class BaseRunnerService {
 	protected logger = logger.child({ component: BaseRunnerService.name });
@@ -71,20 +55,8 @@ export abstract class BaseRunnerService {
 		timestamp: Date.now(),
 	};
 
-	protected readonly services = {
-		/** GitHub service instance for repository operations */
-		github: {
-			branch: new BranchService(),
-			repository: new RepositoryService(),
-			content: new ContentService(),
-		},
-
-		/** Translation service for content translation operations */
-		translator: new TranslatorService(),
-
-		/** In-memory cache for language detection results */
-		languageCache: new LanguageCacheService(),
-	};
+	/** Injected service dependencies */
+	protected readonly services: RunnerServiceDependencies;
 
 	/** Statistics tracking for the translation process */
 	protected metadata = {
@@ -104,15 +76,21 @@ export abstract class BaseRunnerService {
 	};
 
 	/**
-	 * Initializes the runner with environment validation and signal handlers
+	 * Initializes the runner with injected dependencies and signal handlers.
 	 *
-	 * Sets up process event listeners for graceful termination
+	 * Sets up process event listeners for graceful termination.
+	 *
+	 * @param services Injected service dependencies
+	 * @param options Runner configuration options
 	 */
 	constructor(
+		services: RunnerServiceDependencies,
 		protected readonly options: RunnerOptions = {
 			batchSize: env.BATCH_SIZE,
 		},
 	) {
+		this.services = services;
+
 		setupSignalHandlers(this.cleanup, (message, error) => {
 			this.logger.error({ error, message }, "Signal handler triggered during cleanup");
 		});

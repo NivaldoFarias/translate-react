@@ -1,4 +1,4 @@
-import { logger } from "@/utils";
+import { logger } from "@/utils/";
 
 /** Cache entry with value and expiration timestamp */
 export interface CacheEntry<T> {

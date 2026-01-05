@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-import { ptBrLocale } from "@/locales/";
-import { LocaleService } from "@/services/locale/";
+import { ptBrLocale } from "@/locales";
+import { LocaleService } from "@/services/";
 
 describe("LocaleService", () => {
 	beforeEach(() => {

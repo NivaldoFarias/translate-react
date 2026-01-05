@@ -1,5 +1,5 @@
 import { TranslationError } from "@/errors/";
-import RunnerService from "@/services/runner/runner.service";
+import { createServiceConfigFromEnv, ServiceFactory } from "@/services/";
 import { logger as __logger, env } from "@/utils/";
 
 import { name, version } from "../package.json";
@@ -22,8 +22,8 @@ if (import.meta.main) {
 		if (error instanceof TranslationError) {
 			logger.fatal(
 				{
-					error,
-					errorCode: error.code,
+					message: error.message,
+					code: error.code,
 					operation: error.operation,
 					metadata: error.metadata,
 				},
@@ -40,11 +40,13 @@ if (import.meta.main) {
 /**
  * Main translation workflow execution.
  *
- * Creates and runs the Runner service which orchestrates the entire translation process.
- * Validates success rate against configured threshold and exits with appropriate code.
+ * Creates services via ServiceFactory (composition root) and runs the
+ * translation workflow. Validates success rate against configured threshold.
  */
 async function workflow(): Promise<void> {
-	const runner = new RunnerService();
+	const config = createServiceConfigFromEnv();
+	const factory = new ServiceFactory(config);
+	const runner = factory.createRunnerService();
 
 	const statistics = await runner.run();
 

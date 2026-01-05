@@ -2,8 +2,7 @@ import { Octokit } from "@octokit/rest";
 
 import type { components } from "@octokit/openapi-types";
 
-import { githubRateLimiter } from "@/services/rate-limiter/";
-import { env, logger } from "@/utils/";
+import { githubRateLimiter } from "../rate-limiter";
 
 /** GitHub repository metadata for fork and upstream repositories */
 export interface RepositoryMetadata {
@@ -17,7 +16,10 @@ export interface BaseRepositories {
 	fork: RepositoryMetadata;
 }
 
-const octokitLogger = logger.child({ component: "octokit" });
+export interface BaseGitHubServiceDependencies {
+	octokit: Octokit;
+	repositories: BaseRepositories;
+}
 
 /**
  * Base service for GitHub operations.
@@ -33,38 +35,20 @@ const octokitLogger = logger.child({ component: "octokit" });
  */
 export abstract class BaseGitHubService {
 	/** GitHub API client instance */
-	protected readonly octokit = new Octokit({
-		auth: env.GH_TOKEN,
-		request: {
-			timeout: env.GH_REQUEST_TIMEOUT,
-		},
-		log: {
-			debug: (message: string) => {
-				octokitLogger.debug(message);
-			},
-			info: (message: string) => {
-				octokitLogger.info(message);
-			},
-			warn: (message: string) => {
-				octokitLogger.warn(message);
-			},
-			error: (message: string) => {
-				octokitLogger.error(message);
-			},
-		},
-	});
+	protected readonly octokit: Octokit;
 
 	/** Repository metadata for upstream and fork repositories */
-	protected readonly repositories: BaseRepositories = {
-		upstream: {
-			owner: env.REPO_UPSTREAM_OWNER,
-			repo: env.REPO_UPSTREAM_NAME,
-		},
-		fork: {
-			owner: env.REPO_FORK_OWNER,
-			repo: env.REPO_FORK_NAME,
-		},
-	};
+	protected readonly repositories: BaseRepositories;
+
+	/**
+	 * Creates an instance of {@link BaseGitHubService}
+	 *
+	 * @param dependencies Dependencies for the service
+	 */
+	constructor(dependencies: BaseGitHubServiceDependencies) {
+		this.octokit = dependencies.octokit;
+		this.repositories = dependencies.repositories;
+	}
 
 	/**
 	 * Executes a GitHub API request with rate limiting.

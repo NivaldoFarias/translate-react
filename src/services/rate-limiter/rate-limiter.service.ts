@@ -2,7 +2,7 @@ import Bottleneck from "bottleneck";
 
 import type { RateLimiterConfig, RateLimiterMetrics } from "./rate-limiter.types";
 
-import { env, logger } from "@/utils";
+import { env, logger } from "@/utils/";
 
 import { CONFIGS } from "./rate-limiter.config";
 

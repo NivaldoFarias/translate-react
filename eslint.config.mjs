@@ -52,6 +52,12 @@ export default defineConfig(
 		},
 	},
 	{
+		files: ["tests/**"],
+		rules: {
+			"@typescript-eslint/no-unused-vars": "off",
+		},
+	},
+	{
 		files: ["*.cjs"],
 		languageOptions: {
 			globals: globals.commonjs,

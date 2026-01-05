@@ -77,7 +77,7 @@ translate-react/
 │       ├── setup.ts                                # Test configuration
 │       ├── errors/                                 # Error handling tests
 │       ├── services/                               # Service tests
-│       │   ├── comment-builder.service.spec.ts  
+│       │   ├── comment-builder.service.spec.ts
 │       │   ├── language-detector.service.spec.ts
 │       │   ├── translator.service.spec.ts
 │       │   ├── cache/                              # Cache service tests

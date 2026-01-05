@@ -1,13 +1,13 @@
+import type { ProcessedFileResult, PullRequestStatus } from "./../runner";
+import type { TranslationFile } from "./../translator.service";
+import type { BaseGitHubServiceDependencies } from "./base.service";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
-import type { ProcessedFileResult } from "@/services/runner/";
-
 import { mapGithubError } from "@/errors/";
-import { BaseGitHubService } from "@/services/github/";
 import { env, logger } from "@/utils/";
 
-import { CommentBuilderService } from "../comment-builder.service";
-import { TranslationFile } from "../translator.service";
+import { CommentBuilderService } from "./../comment-builder.service";
+import { BaseGitHubService } from "./base.service";
 
 /** Pull request options */
 export interface PullRequestOptions {
@@ -39,12 +39,9 @@ export interface CommitTranslationOptions {
 	message: string;
 }
 
-/** Pull request mergeable status */
-export interface PullRequestStatus {
-	hasConflicts: boolean;
-	mergeable: boolean | null;
-	mergeableState: string;
-	needsUpdate: boolean;
+export interface ContentServiceDependencies extends BaseGitHubServiceDependencies {
+	commentBuilderService: CommentBuilderService;
+	issueNumber?: number;
 }
 
 /**
@@ -59,10 +56,17 @@ export interface PullRequestStatus {
  */
 export class ContentService extends BaseGitHubService {
 	private readonly logger = logger.child({ component: ContentService.name });
-	private readonly issueNumber = env.PROGRESS_ISSUE_NUMBER;
-	private readonly services = {
-		commentBuilder: new CommentBuilderService(),
+	private readonly issueNumber: number | undefined;
+	private readonly services: {
+		commentBuilder: CommentBuilderService;
 	};
+
+	constructor(dependencies: ContentServiceDependencies) {
+		super(dependencies);
+
+		this.services = { commentBuilder: dependencies.commentBuilderService };
+		this.issueNumber = dependencies.issueNumber;
+	}
 
 	/**
 	 * Creates a comment on a pull request.
