@@ -4,12 +4,6 @@ import type { Environment } from "@/utils/";
 
 import { LogLevel, RuntimeEnvironment, validateEnv } from "@/utils/";
 
-/**
- * Mock only the exported `env` constant for global test usage.
- *
- * Individual test files (like env.util.spec.ts) can import the real `validateEnv`
- * function to test its actual validation behavior.
- */
 /** Test environment configuration matching the schema from env.util.ts */
 export const testEnv: Environment = {
 	GH_TOKEN: "ghp_1234567890abcdefghijklmnopqrstuvwxyzABCD",
