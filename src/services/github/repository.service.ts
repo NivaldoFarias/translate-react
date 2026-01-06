@@ -228,6 +228,101 @@ export class RepositoryService extends BaseGitHubService {
 	}
 
 	/**
+	 * Compares fork and upstream repository trees to identify changed files.
+	 *
+	 * Fetches trees from both repositories and compares file SHAs to determine
+	 * which files have been modified in the upstream but not yet synced to the fork.
+	 * This optimization prevents unnecessary content fetching for files that haven't
+	 * changed since the last translation.
+	 *
+	 * ### Comparison Logic
+	 *
+	 * 1. Fetch trees from both fork and upstream repositories
+	 * 2. Build a map of file paths to SHAs for the fork
+	 * 3. For each file in upstream, check if:
+	 *    - File exists in fork with different SHA (changed)
+	 *    - File doesn't exist in fork (new)
+	 * 4. Return only files that differ or are new
+	 *
+	 * @param baseBranch Branch to compare (defaults to fork's default branch)
+	 * @param filterIgnored Whether to filter ignored paths
+	 *
+	 * @returns Array of files that have changed between fork and upstream
+	 *
+	 * @example
+	 * ```typescript
+	 * const changedFiles = await repoService.compareRepositoryTrees('main', true);
+	 * console.log(`${changedFiles.length} files need translation`);
+	 * ```
+	 */
+	public async compareRepositoryTrees(
+		baseBranch?: string,
+		filterIgnored = true,
+	): Promise<RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"]> {
+		try {
+			const branchName = baseBranch ?? (await this.getDefaultBranch("fork"));
+
+			const [forkResponse, upstreamResponse] = await Promise.all([
+				this.octokit.git.getTree({
+					...this.repositories.fork,
+					tree_sha: branchName,
+					recursive: "true",
+				}),
+				this.octokit.git.getTree({
+					...this.repositories.upstream,
+					tree_sha: branchName,
+					recursive: "true",
+				}),
+			]);
+
+			const forkTree =
+				filterIgnored ? this.filterRepositoryTree(forkResponse.data.tree) : forkResponse.data.tree;
+
+			const upstreamTree =
+				filterIgnored ?
+					this.filterRepositoryTree(upstreamResponse.data.tree)
+				:	upstreamResponse.data.tree;
+
+			const forkFileMap = new Map<string, string>();
+			for (const file of forkTree) {
+				if (file.path && file.sha) {
+					forkFileMap.set(file.path, file.sha);
+				}
+			}
+
+			const changedFiles = upstreamTree.filter((upstreamFile) => {
+				if (!upstreamFile.path || !upstreamFile.sha) {
+					return false;
+				}
+
+				const forkSha = forkFileMap.get(upstreamFile.path);
+
+				return !forkSha || forkSha !== upstreamFile.sha;
+			});
+
+			this.logger.info(
+				{
+					branch: branchName,
+					forkFiles: forkTree.length,
+					upstreamFiles: upstreamTree.length,
+					changedFiles: changedFiles.length,
+					filterIgnored,
+				},
+				"Compared repository trees",
+			);
+
+			return changedFiles;
+		} catch (error) {
+			throw mapGithubError(error, `${RepositoryService.name}.compareRepositoryTrees`, {
+				baseBranch,
+				filterIgnored,
+				fork: this.repositories.fork,
+				upstream: this.repositories.upstream,
+			});
+		}
+	}
+
+	/**
 	 * Filters repository tree for valid markdown files.
 	 *
 	 * @param tree Repository tree from GitHub API

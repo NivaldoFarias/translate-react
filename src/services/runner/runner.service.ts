@@ -70,16 +70,14 @@ export class RunnerService extends BaseRunnerService {
 			await timeOperation("Fetch Files to Translate", () => this.fetchFilesToTranslate());
 
 			await timeOperation("Process Files in Batches", () =>
-				this.processInBatches(this.state.filesToTranslate, this.options.batchSize),
+				this.processInBatches(this.options.batchSize),
 			);
 
 			this.state.processedResults = Array.from(this.metadata.results.values());
 
 			this.logger.info("Translation workflow completed");
 
-			if (this.shouldUpdateIssueComment) {
-				await timeOperation("Update Issue Comment", () => this.updateIssueWithResults());
-			}
+			await timeOperation("Update Issue Comment", () => this.updateIssueWithResults());
 
 			return this.printFinalStatistics();
 		} catch (error) {
