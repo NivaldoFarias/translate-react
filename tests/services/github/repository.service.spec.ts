@@ -372,4 +372,151 @@ describe("RepositoryService", () => {
 			expect(tree).toHaveLength(1);
 		});
 	});
+
+	describe("compareRepositoryTrees", () => {
+		test("should return files that differ between fork and upstream", async () => {
+			gitMocks.getTree
+				.mockResolvedValueOnce({
+					data: {
+						tree: [
+							{ path: "src/file1.md", type: "blob", sha: "abc123", url: "" },
+							{ path: "src/file2.md", type: "blob", sha: "def456", url: "" },
+						],
+					},
+				})
+				.mockResolvedValueOnce({
+					data: {
+						tree: [
+							{ path: "src/file1.md", type: "blob", sha: "abc123", url: "" },
+							{ path: "src/file2.md", type: "blob", sha: "xyz789", url: "" },
+							{ path: "src/file3.md", type: "blob", sha: "new456", url: "" },
+						],
+					},
+				});
+
+			const changedFiles = await repositoryService.compareRepositoryTrees("main", false);
+
+			expect(gitMocks.getTree).toHaveBeenCalledTimes(2);
+			expect(changedFiles).toHaveLength(2);
+			expect(changedFiles.some((f) => f.path === "src/file2.md")).toBe(true);
+			expect(changedFiles.some((f) => f.path === "src/file3.md")).toBe(true);
+			expect(changedFiles.some((f) => f.path === "src/file1.md")).toBe(false);
+		});
+
+		test("should return empty array when all files are synchronized", async () => {
+			gitMocks.getTree
+				.mockResolvedValueOnce({
+					data: {
+						tree: [
+							{ path: "src/file1.md", type: "blob", sha: "abc123", url: "" },
+							{ path: "src/file2.md", type: "blob", sha: "def456", url: "" },
+						],
+					},
+				})
+				.mockResolvedValueOnce({
+					data: {
+						tree: [
+							{ path: "src/file1.md", type: "blob", sha: "abc123", url: "" },
+							{ path: "src/file2.md", type: "blob", sha: "def456", url: "" },
+						],
+					},
+				});
+
+			const changedFiles = await repositoryService.compareRepositoryTrees("main", false);
+
+			expect(changedFiles).toHaveLength(0);
+		});
+
+		test("should return all upstream files when fork is empty", async () => {
+			gitMocks.getTree
+				.mockResolvedValueOnce({
+					data: { tree: [] },
+				})
+				.mockResolvedValueOnce({
+					data: {
+						tree: [
+							{ path: "src/file1.md", type: "blob", sha: "abc123", url: "" },
+							{ path: "src/file2.md", type: "blob", sha: "def456", url: "" },
+						],
+					},
+				});
+
+			const changedFiles = await repositoryService.compareRepositoryTrees("main", false);
+
+			expect(changedFiles).toHaveLength(2);
+		});
+
+		test("should apply filtering when filterIgnored is true", async () => {
+			gitMocks.getTree
+				.mockResolvedValueOnce({
+					data: {
+						tree: [
+							{ path: "src/test/file.md", type: "blob", sha: "abc123", url: "" },
+							{ path: "README.md", type: "blob", sha: "def456", url: "" },
+						],
+					},
+				})
+				.mockResolvedValueOnce({
+					data: {
+						tree: [
+							{ path: "src/test/file.md", type: "blob", sha: "xyz789", url: "" },
+							{ path: "README.md", type: "blob", sha: "uvw123", url: "" },
+						],
+					},
+				});
+
+			const changedFiles = await repositoryService.compareRepositoryTrees("main", true);
+
+			expect(changedFiles).toHaveLength(1);
+			expect(changedFiles[0]?.path).toBe("src/test/file.md");
+		});
+
+		test("should use default branch when no branch specified", async () => {
+			reposMocks.get.mockResolvedValueOnce({
+				data: { default_branch: "develop" },
+			});
+
+			gitMocks.getTree.mockResolvedValue({
+				data: { tree: [] },
+			});
+
+			await repositoryService.compareRepositoryTrees();
+
+			expect(reposMocks.get).toHaveBeenCalledWith(testRepositories.fork);
+			expect(gitMocks.getTree).toHaveBeenCalledWith(
+				expect.objectContaining({ tree_sha: "develop" }),
+			);
+		});
+
+		test("should handle files without path or sha", async () => {
+			gitMocks.getTree
+				.mockResolvedValueOnce({
+					data: {
+						tree: [{ path: "src/file1.md", type: "blob", sha: "abc123", url: "" }],
+					},
+				})
+				.mockResolvedValueOnce({
+					data: {
+						tree: [
+							{ path: undefined, type: "blob", sha: "xyz789", url: "" },
+							{ path: "src/file2.md", type: "blob", sha: undefined, url: "" },
+							{ path: "src/file3.md", type: "blob", sha: "new456", url: "" },
+						],
+					},
+				});
+
+			const changedFiles = await repositoryService.compareRepositoryTrees("main", false);
+
+			expect(changedFiles).toHaveLength(1);
+			expect(changedFiles[0]?.path).toBe("src/file3.md");
+		});
+
+		test("should throw mapped error when API call fails", () => {
+			gitMocks.getTree.mockRejectedValueOnce(
+				Object.assign(new Error("API Error"), { status: StatusCodes.INTERNAL_SERVER_ERROR }),
+			);
+
+			expect(repositoryService.compareRepositoryTrees("main")).rejects.toThrow();
+		});
+	});
 });

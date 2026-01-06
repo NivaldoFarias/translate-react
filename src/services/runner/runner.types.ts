@@ -139,6 +139,9 @@ export interface LanguageDetectionResult {
 
 	/** Number of files exceeding maximum size limit */
 	numFilesTooLarge: number;
+
+	/** Files that require translation */
+	filesToTranslate: TranslationFile[];
 }
 
 /**
