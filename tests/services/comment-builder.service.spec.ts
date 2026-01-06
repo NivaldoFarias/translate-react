@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, test } from "bun:test";
 
 import type { ProcessedFileResult } from "@/services/";
 
-import { TranslationFile, CommentBuilderService } from "@/services/";
+import { CommentBuilderService, TranslationFile } from "@/services/";
 
 describe("CommentBuilderService", () => {
 	let commentBuilderService: CommentBuilderService;
