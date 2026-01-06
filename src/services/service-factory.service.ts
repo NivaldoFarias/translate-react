@@ -18,7 +18,7 @@ import { TranslatorService } from "./translator.service";
 /** Configuration interface for service instantiation */
 export interface ServiceConfig {
 	/** GitHub Personal Access Token */
-	githubToken: string;
+	githubToken?: string;
 
 	/** Request timeout in milliseconds */
 	requestTimeout: number;
@@ -32,7 +32,7 @@ export interface ServiceConfig {
 	/** LLM API configuration */
 	llm: {
 		/** LLM API key */
-		apiKey: string;
+		apiKey?: string;
 
 		/** LLM model to use */
 		model: string;
