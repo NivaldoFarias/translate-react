@@ -24,6 +24,7 @@ import {
 	MIN_CACHE_CONFIDENCE,
 	RuntimeEnvironment,
 	setupSignalHandlers,
+	timeOperation,
 } from "@/utils/";
 
 import { homepage, name, version } from "../../../package.json";
@@ -212,19 +213,30 @@ export abstract class BaseRunnerService {
 		}
 
 		const uniqueFiles = this.state.repositoryTree.filter(
-			(file, index, self) => index === self.findIndex((f) => f.path === file.path),
+			(file, index, self) => index === self.findIndex((compare) => compare.path === file.path),
 		);
 
 		this.logger.info(`Processing ${String(uniqueFiles.length)} files from repository tree...`);
 
-		const { candidateFiles, cacheHits } = this.checkLanguageCache(uniqueFiles);
-		const { filesToFetch, numFilesWithPRs, invalidPRsByFile } =
-			await this.filterFilesByExistingPRs(candidateFiles);
-		const uncheckedFiles = await this.fetchFileContents(filesToFetch);
+		const { candidateFiles, cacheHits } = await timeOperation("Check Language Cache", () =>
+			Promise.resolve(this.checkLanguageCache(uniqueFiles)),
+		);
+
+		const { filesToFetch, numFilesWithPRs, invalidPRsByFile } = await timeOperation(
+			"Filter Files by Existing PRs",
+			async () => this.filterFilesByExistingPRs(candidateFiles),
+		);
+
+		const uncheckedFiles = await timeOperation("Fetch File Contents", async () =>
+			this.fetchFileContents(filesToFetch),
+		);
 
 		this.state.invalidPRsByFile = invalidPRsByFile;
-		const { numFilesFiltered, numFilesTooLarge } =
-			await this.detectAndCacheLanguages(uncheckedFiles);
+
+		const { numFilesFiltered, numFilesTooLarge } = await timeOperation(
+			"Detect and Cache Languages",
+			async () => this.detectAndCacheLanguages(uncheckedFiles),
+		);
 
 		const totalFiltered = cacheHits + numFilesFiltered + numFilesWithPRs + numFilesTooLarge;
 
