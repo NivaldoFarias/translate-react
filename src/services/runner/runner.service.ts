@@ -1,7 +1,7 @@
 import type { RunnerOptions, RunnerServiceDependencies, WorkflowStatistics } from "./runner.types";
 
 import { extractErrorMessage } from "@/errors/";
-import { env, logger } from "@/utils/";
+import { env, logger, timeOperation } from "@/utils/";
 
 import { BaseRunnerService } from "./base.service";
 
@@ -61,22 +61,24 @@ export class RunnerService extends BaseRunnerService {
 					`Upstream: ${env.REPO_UPSTREAM_OWNER}/${env.REPO_UPSTREAM_NAME}`,
 			);
 
-			await this.verifyLLMConnectivity();
-			await this.verifyPermissions();
-			await this.syncFork();
+			await timeOperation("Verify LLM Connectivity", () => this.verifyLLMConnectivity());
+			await timeOperation("Verify GitHub Permissions", () => this.verifyPermissions());
+			await timeOperation("Sync Fork", () => this.syncFork());
 
-			await this.fetchRepositoryTree();
+			await timeOperation("Fetch Repository Tree", () => this.fetchRepositoryTree());
 
-			await this.fetchFilesToTranslate();
+			await timeOperation("Fetch Files to Translate", () => this.fetchFilesToTranslate());
 
-			await this.processInBatches(this.state.filesToTranslate, this.options.batchSize);
+			await timeOperation("Process Files in Batches", () =>
+				this.processInBatches(this.state.filesToTranslate, this.options.batchSize),
+			);
 
 			this.state.processedResults = Array.from(this.metadata.results.values());
 
 			this.logger.info("Translation workflow completed");
 
 			if (this.shouldUpdateIssueComment) {
-				await this.updateIssueWithResults();
+				await timeOperation("Update Issue Comment", () => this.updateIssueWithResults());
 			}
 
 			return this.printFinalStatistics();
