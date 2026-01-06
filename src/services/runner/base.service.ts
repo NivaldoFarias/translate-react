@@ -283,11 +283,7 @@ export abstract class BaseRunnerService {
 		for (const file of files) {
 			const cache = languageCaches.get(file.filename);
 
-			if (
-				cache &&
-				cache.detectedLanguage === targetLanguage &&
-				cache.confidence > MIN_CACHE_CONFIDENCE
-			) {
+			if (cache?.detectedLanguage === targetLanguage && cache.confidence > MIN_CACHE_CONFIDENCE) {
 				cacheHits++;
 				this.logger.debug(
 					{ filename: file.path, language: cache.detectedLanguage, confidence: cache.confidence },

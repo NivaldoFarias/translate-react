@@ -1,15 +1,6 @@
 import { mock } from "bun:test";
 
-import type { Mock } from "bun:test";
-
-import type {
-	BranchService,
-	CommentBuilderService,
-	ContentService,
-	LanguageCacheService,
-	RepositoryService,
-	TranslatorService,
-} from "@/services/";
+import type { ContentService } from "@/services/";
 
 /**
  * Creates a mock CommentBuilderService for testing.
