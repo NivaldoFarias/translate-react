@@ -1,46 +1,93 @@
-import type { TranslationErrorContext } from "./base-error";
+import { ApplicationError, ErrorCode } from "./base-error";
 
-import { ErrorCode, TranslationError } from "./base-error";
-
-/** Thrown when the translation service fails to initialize */
-export class InitializationError extends TranslationError {
-	constructor(message: string, context?: TranslationErrorContext) {
-		super(message, ErrorCode.InitializationError, context);
-	}
+/**
+ * Creates an error for service initialization failures.
+ *
+ * @param message Description of initialization failure
+ * @param operation The operation that failed
+ * @param metadata Additional debugging context
+ */
+export function createInitializationError(
+	message: string,
+	operation?: string,
+	metadata?: Record<string, unknown>,
+): ApplicationError {
+	return new ApplicationError(message, ErrorCode.InitializationError, operation, metadata);
 }
 
-/** Thrown when loading translation resources fails */
-export class ResourceLoadError extends TranslationError {
-	constructor(resource: string, context?: TranslationErrorContext) {
-		super(
-			`Failed to load translation resource "${resource}"`,
-			ErrorCode.ResourceLoadError,
-			context,
-		);
-	}
+/**
+ * Creates an error for resource loading failures.
+ *
+ * @param resource Name of the resource that failed to load
+ * @param operation The operation that failed
+ * @param metadata Additional debugging context
+ */
+export function createResourceLoadError(
+	resource: string,
+	operation?: string,
+	metadata?: Record<string, unknown>,
+): ApplicationError {
+	return new ApplicationError(
+		`Failed to load translation resource "${resource}"`,
+		ErrorCode.ResourceLoadError,
+		operation,
+		metadata,
+	);
 }
 
-/** Thrown when content is empty or missing */
-export class EmptyContentError extends TranslationError {
-	constructor(filename: string, context?: TranslationErrorContext) {
-		super(`File content is empty: ${filename}`, ErrorCode.NoContent, context);
-	}
+/**
+ * Creates an error for empty or missing file content.
+ *
+ * @param filename Name of the file with empty content
+ * @param operation The operation that failed
+ * @param metadata Additional debugging context
+ */
+export function createEmptyContentError(
+	filename: string,
+	operation?: string,
+	metadata?: Record<string, unknown>,
+): ApplicationError {
+	return new ApplicationError(
+		`File content is empty: ${filename}`,
+		ErrorCode.NoContent,
+		operation,
+		metadata,
+	);
 }
 
-/** Thrown when translation produces empty or invalid output */
-export class TranslationValidationError extends TranslationError {
-	constructor(message: string, filename: string, context?: TranslationErrorContext) {
-		super(
-			`Translation validation failed for ${filename}: ${message}`,
-			ErrorCode.FormatValidationFailed,
-			context,
-		);
-	}
+/**
+ * Creates an error for translation validation failures.
+ *
+ * @param message Description of the validation failure
+ * @param filename Name of the file being validated
+ * @param operation The operation that failed
+ * @param metadata Additional debugging context
+ */
+export function createTranslationValidationError(
+	message: string,
+	filename: string,
+	operation?: string,
+	metadata?: Record<string, unknown>,
+): ApplicationError {
+	return new ApplicationError(
+		`Translation validation failed for ${filename}: ${message}`,
+		ErrorCode.FormatValidationFailed,
+		operation,
+		metadata,
+	);
 }
 
-/** Thrown when chunk processing fails during translation */
-export class ChunkProcessingError extends TranslationError {
-	constructor(message: string, context?: TranslationErrorContext) {
-		super(message, ErrorCode.ChunkProcessingFailed, context);
-	}
+/**
+ * Creates an error for chunk processing failures during translation.
+ *
+ * @param message Description of the chunk processing failure
+ * @param operation The operation that failed
+ * @param metadata Additional debugging context (e.g., chunkIndex, totalChunks)
+ */
+export function createChunkProcessingError(
+	message: string,
+	operation?: string,
+	metadata?: Record<string, unknown>,
+): ApplicationError {
+	return new ApplicationError(message, ErrorCode.ChunkProcessingFailed, operation, metadata);
 }

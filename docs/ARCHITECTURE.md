@@ -465,7 +465,7 @@ In-memory caching for runtime-scoped data.
 
 ```mermaid
 classDiagram
-    class TranslationError {
+    class ApplicationError {
         +code: string
         +severity: ErrorSeverity
         +context: ErrorContext
@@ -488,10 +488,10 @@ classDiagram
         +code: VALIDATION_FAILED
     }
 
-    TranslationError <|-- APIError
-    TranslationError <|-- ResourceLoadError
-    TranslationError <|-- InitializationError
-    TranslationError <|-- ValidationError
+    ApplicationError <|-- APIError
+    ApplicationError <|-- ResourceLoadError
+    ApplicationError <|-- InitializationError
+    ApplicationError <|-- ValidationError
 ```
 
 ### Error Transformation Pipeline
@@ -510,11 +510,11 @@ sequenceDiagram
     H->>M: mapError(error)
     M->>M: Identify error type
     M->>M: Add context
-    M-->>H: TranslationError
+    M-->>H: ApplicationError
     H->>L: Log structured error
     H->>H: Format error message
     H-->>P: Transformed error
-    P-->>S: Throw TranslationError
+    P-->>S: Throw ApplicationError
 ```
 
 ### GitHub API Error Mapping

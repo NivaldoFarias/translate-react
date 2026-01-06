@@ -66,9 +66,8 @@ export class BranchService extends BaseGitHubService {
 
 			return response.data.default_branch;
 		} catch (error) {
-			throw mapGithubError(error, {
-				operation: `${BranchService.name}.getDefaultBranch`,
-				metadata: { fork: this.repositories.fork },
+			throw mapGithubError(error, `${BranchService.name}.getDefaultBranch`, {
+				fork: this.repositories.fork,
 			});
 		}
 	}
@@ -130,9 +129,10 @@ export class BranchService extends BaseGitHubService {
 			return branchRef;
 		} catch (error) {
 			this.activeBranches.delete(branchName);
-			throw mapGithubError(error, {
-				operation: `${BranchService.name}.createBranch`,
-				metadata: { branchName, baseBranch, fork: this.repositories.fork },
+			throw mapGithubError(error, `${BranchService.name}.createBranch`, {
+				branchName,
+				baseBranch,
+				fork: this.repositories.fork,
 			});
 		}
 	}
@@ -166,9 +166,9 @@ export class BranchService extends BaseGitHubService {
 				return null;
 			}
 
-			throw mapGithubError(error, {
-				operation: `${BranchService.name}.getBranch`,
-				metadata: { branchName, fork: this.repositories.fork },
+			throw mapGithubError(error, `${BranchService.name}.getBranch`, {
+				branchName,
+				fork: this.repositories.fork,
 			});
 		}
 	}
@@ -199,9 +199,9 @@ export class BranchService extends BaseGitHubService {
 
 			return response;
 		} catch (error) {
-			throw mapGithubError(error, {
-				operation: `${BranchService.name}.deleteBranch`,
-				metadata: { branchName, fork: this.repositories.fork },
+			throw mapGithubError(error, `${BranchService.name}.deleteBranch`, {
+				branchName,
+				fork: this.repositories.fork,
 			});
 		}
 	}
@@ -307,9 +307,10 @@ export class BranchService extends BaseGitHubService {
 
 			return hasCommits;
 		} catch (error) {
-			throw mapGithubError(error, {
-				operation: `${BranchService.name}.checkIfCommitExistsOnFork`,
-				metadata: { branchName, fork: this.repositories.fork, expectedAuthor: env.REPO_FORK_OWNER },
+			throw mapGithubError(error, `${BranchService.name}.checkIfCommitExistsOnFork`, {
+				branchName,
+				fork: this.repositories.fork,
+				expectedAuthor: env.REPO_FORK_OWNER,
 			});
 		}
 	}

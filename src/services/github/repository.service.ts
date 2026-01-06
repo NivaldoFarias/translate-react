@@ -50,12 +50,9 @@ export class RepositoryService extends BaseGitHubService {
 
 			return response.data.default_branch;
 		} catch (error) {
-			throw mapGithubError(error, {
-				operation: `${RepositoryService.name}.getDefaultBranch`,
-				metadata: {
-					target,
-					repoConfig: target === "fork" ? this.repositories.fork : this.repositories.upstream,
-				},
+			throw mapGithubError(error, `${RepositoryService.name}.getDefaultBranch`, {
+				target,
+				repoConfig: target === "fork" ? this.repositories.fork : this.repositories.upstream,
 			});
 		}
 	}
@@ -100,9 +97,10 @@ export class RepositoryService extends BaseGitHubService {
 
 			return tree;
 		} catch (error) {
-			throw mapGithubError(error, {
-				operation: `${RepositoryService.name}.getRepositoryTree`,
-				metadata: { baseBranch, filterIgnored, fork: this.repositories.fork },
+			throw mapGithubError(error, `${RepositoryService.name}.getRepositoryTree`, {
+				baseBranch,
+				filterIgnored,
+				fork: this.repositories.fork,
 			});
 		}
 	}
@@ -142,9 +140,8 @@ export class RepositoryService extends BaseGitHubService {
 				"Fork repository existence checked",
 			);
 		} catch (error) {
-			throw mapGithubError(error, {
-				operation: `${RepositoryService.name}.forkExists`,
-				metadata: { fork: this.repositories.fork },
+			throw mapGithubError(error, `${RepositoryService.name}.forkExists`, {
+				fork: this.repositories.fork,
 			});
 		}
 	}

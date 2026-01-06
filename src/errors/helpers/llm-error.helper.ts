@@ -1,61 +1,79 @@
 import { StatusCodes } from "http-status-codes";
 import { APIError } from "openai/error";
 
-import type { TranslationErrorContext } from "@/errors/base-error";
-
-import { ErrorCode, TranslationError } from "@/errors/base-error";
+import { ApplicationError, ErrorCode } from "@/errors/base-error";
 import { detectRateLimit, logger } from "@/utils/";
 
 const helperLogger = logger.child({ component: "LLMErrorHelper" });
 
+/** Base metadata fields added by mapLLMError for all error types */
+interface LLMErrorBaseMetadata {
+	/** Original error message */
+	originalMessage?: string;
+
+	/** Type of the error (if available) */
+	errorType?: string;
+
+	/** String representation of the error (for non-Error types) */
+	error?: string;
+}
+
+/** Additional metadata fields added for APIError instances */
+interface LLMApiErrorMetadata extends LLMErrorBaseMetadata {
+	/** HTTP status code from LLM API response */
+	statusCode: number;
+
+	/** Specific error type from LLM API (if available) */
+	type: string | undefined;
+}
+
 /**
- * Maps LLM/OpenAI errors to {@link TranslationError} with proper classification.
+ * Maps LLM/OpenAI errors to {@link ApplicationError} with proper classification.
  *
  * Handles rate limit detection, API errors, and unknown errors with structured logging.
  *
  * @param error The error to map
- * @param context Context with operation name and optional metadata
+ * @param operation The operation that failed
+ * @param metadata Optional additional debugging context
  *
- * @returns `TranslationError` instance with appropriate code and metadata
+ * @returns `ApplicationError` instance with appropriate code and metadata
  *
  * @example
  * ```typescript
  * try {
  *   await openai.chat.completions.create({ ... });
  * } catch (error) {
- *   throw mapLLMError(error, {
- *     operation: "TranslatorService.callLanguageModel",
- *     metadata: { model: "gpt-4", contentLength: 1500 }
+ *   throw mapLLMError(error, "TranslatorService.callLanguageModel", {
+ *     model: "gpt-4",
+ *     contentLength: 1500
  *   });
  * }
  * ```
  */
-export function mapLLMError<T extends Record<string, unknown> = Record<string, unknown>>(
+export function mapLLMError<T extends Record<string, unknown> = Record<string, never>>(
 	error: unknown,
-	context: TranslationErrorContext<T>,
-): TranslationError {
-	const { operation, metadata } = context;
+	operation: string,
+	metadata?: T,
+): ApplicationError<LLMErrorBaseMetadata & LLMApiErrorMetadata & T> {
+	type CombinedMetadata = LLMErrorBaseMetadata & LLMApiErrorMetadata & T;
 
 	if (error instanceof APIError) {
 		const isRateLimit = detectRateLimit(error.message, error.status as StatusCodes);
 		const errorCode = isRateLimit ? ErrorCode.RateLimitExceeded : ErrorCode.LLMApiError;
 
 		const errorMetadata = {
-			statusCode: error.status as number,
+			statusCode: Number(error.status),
 			type: error.type,
 			originalMessage: error.message,
 			...metadata,
-		};
+		} as CombinedMetadata;
 
 		helperLogger.error(
 			{ operation, errorCode, errorType: error.type, isRateLimit, statusCode: error.status },
 			"LLM API error",
 		);
 
-		return new TranslationError(error.message, errorCode, {
-			operation,
-			metadata: errorMetadata,
-		});
+		return new ApplicationError(error.message, errorCode, operation, errorMetadata);
 	}
 
 	if (error instanceof Error) {
@@ -74,10 +92,11 @@ export function mapLLMError<T extends Record<string, unknown> = Record<string, u
 				"Rate limit exceeded",
 			);
 
-			return new TranslationError(error.message, ErrorCode.RateLimitExceeded, {
-				operation,
-				metadata: { errorType, originalMessage: error.message, ...metadata },
-			});
+			return new ApplicationError(error.message, ErrorCode.RateLimitExceeded, operation, {
+				errorType,
+				originalMessage: error.message,
+				...metadata,
+			} as CombinedMetadata);
 		}
 
 		helperLogger.error(
@@ -85,10 +104,11 @@ export function mapLLMError<T extends Record<string, unknown> = Record<string, u
 			"Unknown LLM error",
 		);
 
-		return new TranslationError(error.message, ErrorCode.UnknownError, {
-			operation,
-			metadata: { errorType, originalMessage: error.message, ...metadata },
-		});
+		return new ApplicationError(error.message, ErrorCode.UnknownError, operation, {
+			errorType,
+			originalMessage: error.message,
+			...metadata,
+		} as CombinedMetadata);
 	}
 
 	const errorString = String(error);
@@ -98,8 +118,8 @@ export function mapLLMError<T extends Record<string, unknown> = Record<string, u
 		"Unknown non-Error LLM exception",
 	);
 
-	return new TranslationError(errorString, ErrorCode.UnknownError, {
-		operation,
-		metadata: { error: errorString, ...metadata },
-	});
+	return new ApplicationError(errorString, ErrorCode.UnknownError, operation, {
+		error: errorString,
+		...metadata,
+	} as CombinedMetadata);
 }
