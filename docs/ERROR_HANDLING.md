@@ -2,19 +2,22 @@
 
 ## Overview
 
-The translation workflow uses a simplified error handling system with typed error classes that extend the base `TranslationError` class. Each error provides context through optional `operation` and `metadata` properties for debugging.
+The translation workflow uses a simplified error handling system with a single `ApplicationError` class and factory functions for common error scenarios. Each error provides context through optional `operation` and `metadata` properties for debugging.
 
-## Error Class Hierarchy
+## Error Structure
 
 ```
 Error (Native)
-└── TranslationError (Base)
-    ├── InitializationError
-    ├── ResourceLoadError
-    ├── EmptyContentError
-    ├── TranslationValidationError
-    └── ChunkProcessingError
+└── ApplicationError (single class with error codes)
 ```
+
+### Factory Functions
+
+- `createInitializationError()` - Service initialization failures
+- `createResourceLoadError()` - Resource loading failures
+- `createEmptyContentError()` - Empty file content
+- `createTranslationValidationError()` - Translation output validation
+- `createChunkProcessingError()` - Chunk workflow issues
 
 ## Error Codes
 
@@ -47,19 +50,18 @@ Error (Native)
 | `GithubForbidden`    | GitHub access forbidden      |
 | `GithubServerError`  | GitHub server error          |
 
-## Error Classes
+## Error Factory Functions
 
-### EmptyContentError
+### createEmptyContentError
 
-**Purpose**: Thrown when file content is empty or missing before processing.
+**Purpose**: Creates an error when file content is empty or missing before processing.
 
 **Usage**:
 
 ```typescript
-throw new EmptyContentError(filename, {
-	operation: "TranslatorService.translateContent",
-	metadata: { filename, path },
-});
+import { createEmptyContentError } from "@/errors";
+
+throw createEmptyContentError(filename, "TranslatorService.translateContent", { filename, path });
 ```
 
 **When Thrown**:
@@ -69,22 +71,26 @@ throw new EmptyContentError(filename, {
 
 **Error Code**: `NoContent`
 
-### TranslationValidationError
+### createTranslationValidationError
 
-**Purpose**: Thrown when translated output fails validation checks.
+**Purpose**: Creates an error when translated output fails validation checks.
 
 **Usage**:
 
 ```typescript
-throw new TranslationValidationError("Translation produced empty content", filename, {
-	operation: "TranslatorService.validateTranslation",
-	metadata: {
+import { createTranslationValidationError } from "@/errors";
+
+throw createTranslationValidationError(
+	"Translation produced empty content",
+	filename,
+	"TranslatorService.validateTranslation",
+	{
 		filename,
 		path,
 		originalLength,
 		translatedLength,
 	},
-});
+);
 ```
 
 **When Thrown**:
@@ -94,24 +100,24 @@ throw new TranslationValidationError("Translation produced empty content", filen
 
 **Error Code**: `FormatValidationFailed`
 
-### ChunkProcessingError
+### createChunkProcessingError
 
-**Purpose**: Thrown when chunk processing fails during translation (critical workflow error).
+**Purpose**: Creates an error when chunk processing fails during translation (critical workflow error).
 
 **Usage**:
 
 ```typescript
-throw new ChunkProcessingError(
+import { createChunkProcessingError } from "@/errors";
+
+throw createChunkProcessingError(
 	`Chunk count mismatch: expected ${expected} chunks, but only ${actual} were translated`,
+	"TranslatorService.translateWithChunking",
 	{
-		operation: "TranslatorService.translateWithChunking",
-		metadata: {
-			expectedChunks,
-			actualChunks,
-			missingChunks,
-			contentLength,
-			chunkSizes,
-		},
+		expectedChunks,
+		actualChunks,
+		missingChunks,
+		contentLength,
+		chunkSizes,
 	},
 );
 ```
@@ -124,21 +130,22 @@ throw new ChunkProcessingError(
 
 **Error Code**: `ChunkProcessingFailed`
 
-## TranslationError Structure
+## ApplicationError Class
 
-All errors include standardized properties:
+All errors are instances of `ApplicationError` with standardized properties:
 
 ```typescript
-interface TranslationErrorContext<T extends Record<string, unknown>> {
-	operation?: string; // Operation that failed (e.g., "TranslatorService.translateContent")
-	metadata?: T; // Additional context (file info, metrics, etc.)
-}
-
-class TranslationError<T extends Record<string, unknown>> extends Error {
+class ApplicationError extends Error {
 	readonly code: ErrorCode; // Standardized error code
-	readonly operation?: string; // Operation that failed
-	readonly metadata?: T; // Additional context
-	readonly timestamp: Date; // When error occurred
+	readonly operation: string; // Operation that failed (defaults to "UnknownOperation")
+	readonly metadata?: Record<string, unknown>; // Additional context
+
+	constructor(
+		message: string,
+		code: ErrorCode,
+		operation?: string,
+		metadata?: Record<string, unknown>,
+	);
 }
 ```
 
@@ -146,7 +153,7 @@ class TranslationError<T extends Record<string, unknown>> extends Error {
 
 ### mapGithubError
 
-Maps GitHub/Octokit errors to `TranslationError`:
+Maps GitHub/Octokit errors to `ApplicationError`:
 
 ```typescript
 import { mapGithubError } from "@/errors/helpers/github-error.helper";
@@ -154,16 +161,13 @@ import { mapGithubError } from "@/errors/helpers/github-error.helper";
 try {
   await octokit.rest.repos.getContent({ ... });
 } catch (error) {
-  throw mapGithubError(error, {
-    operation: "ContentService.getFileContent",
-    metadata: { path, owner, repo },
-  });
+  throw mapGithubError(error, "ContentService.getFileContent", { path, owner, repo });
 }
 ```
 
 ### mapLLMError
 
-Maps OpenAI/LLM errors to `TranslationError`:
+Maps OpenAI/LLM errors to `ApplicationError`:
 
 ```typescript
 import { mapLLMError } from "@/errors/helpers/llm-error.helper";
@@ -171,10 +175,7 @@ import { mapLLMError } from "@/errors/helpers/llm-error.helper";
 try {
   await openai.chat.completions.create({ ... });
 } catch (error) {
-  throw mapLLMError(error, {
-    operation: "TranslatorService.callLanguageModel",
-    metadata: { model, chunkIndex, chunkSize },
-  });
+  throw mapLLMError(error, "TranslatorService.callLanguageModel", { model, chunkIndex, chunkSize });
 }
 ```
 
@@ -182,14 +183,16 @@ try {
 
 ### Service-Level Error Handling
 
-Services throw typed errors with context:
+Services throw typed errors with context using factory functions:
 
 ```typescript
-// Typed error with context
+import { createEmptyContentError } from "@/errors";
+
+// Factory function with context
 if (!file.content?.length) {
-	throw new EmptyContentError(file.filename, {
-		operation: "TranslatorService.translateContent",
-		metadata: { filename: file.filename, path: file.path },
+	throw createEmptyContentError(file.filename, "TranslatorService.translateContent", {
+		filename: file.filename,
+		path: file.path,
 	});
 }
 ```
@@ -202,13 +205,10 @@ LLM and GitHub errors are mapped using pure functions:
 try {
 	const translatedChunk = await this.callLanguageModel(chunk);
 } catch (error) {
-	throw mapLLMError(error, {
-		operation: "TranslatorService.translateWithChunking",
-		metadata: {
-			chunkIndex: i,
-			totalChunks: chunks.length,
-			chunkSize: chunk.length,
-		},
+	throw mapLLMError(error, "TranslatorService.translateWithChunking", {
+		chunkIndex: i,
+		totalChunks: chunks.length,
+		chunkSize: chunk.length,
 	});
 }
 ```
@@ -250,10 +250,11 @@ graph TD
 ### 1. Always Provide Operation Context
 
 ```typescript
-throw new EmptyContentError(filename, {
-	operation: "ServiceName.methodName", // Always include calling context
-	metadata: relevantData,
-});
+throw createEmptyContentError(
+	filename,
+	"ServiceName.methodName", // Always include calling context
+	relevantData,
+);
 ```
 
 ### 2. Include Relevant Metadata
@@ -269,13 +270,13 @@ metadata: {
 }
 ```
 
-### 3. Use Appropriate Error Classes
+### 3. Use Appropriate Factory Functions
 
-- **EmptyContentError**: Content validation before processing
-- **TranslationValidationError**: Translation output validation
-- **ChunkProcessingError**: Chunk workflow issues (critical)
-- **InitializationError**: Service initialization failures
-- **ResourceLoadError**: Resource loading failures
+- **createEmptyContentError**: Content validation before processing
+- **createTranslationValidationError**: Translation output validation
+- **createChunkProcessingError**: Chunk workflow issues (critical)
+- **createInitializationError**: Service initialization failures
+- **createResourceLoadError**: Resource loading failures
 
 ### 4. Use Pure Function Error Mappers
 
@@ -285,7 +286,7 @@ import { mapLLMError } from "@/errors/helpers/llm-error.helper";
 
 // In catch blocks
 catch (error) {
-  throw mapGithubError(error, { operation, metadata });
+  throw mapGithubError(error, operation, metadata);
 }
 ```
 
@@ -296,12 +297,12 @@ catch (error) {
 ```typescript
 import { expect, test } from "bun:test";
 
-import { EmptyContentError } from "@/errors/";
+import { ApplicationError, ErrorCode } from "@/errors";
 
-test("throws EmptyContentError for empty content", () => {
+test("throws error for empty content", () => {
 	const file = new TranslationFile("", "test.md", "path/test.md", "sha123");
 
-	expect(() => translator.translateContent(file)).toThrow(EmptyContentError);
+	expect(() => translator.translateContent(file)).toThrow(ApplicationError);
 });
 ```
 
@@ -314,7 +315,7 @@ test("handles chunk count mismatch", async () => {
 	try {
 		await translator.translateContent(file);
 	} catch (error) {
-		expect(error).toBeInstanceOf(ChunkProcessingError);
+		expect(error).toBeInstanceOf(ApplicationError);
 		expect(error.code).toBe(ErrorCode.ChunkProcessingFailed);
 		expect(error.metadata).toHaveProperty("expectedChunks");
 	}
@@ -324,7 +325,7 @@ test("handles chunk count mismatch", async () => {
 ## Related Files
 
 - `/src/errors/base-error.ts`: Base error class and error codes
-- `/src/errors/errors.ts`: Concrete error class implementations
+- `/src/errors/errors.ts`: Error factory function implementations
 - `/src/errors/helpers/github-error.helper.ts`: GitHub error mapping function
 - `/src/errors/helpers/llm-error.helper.ts`: LLM error mapping function
 - `/src/services/translator.service.ts`: Primary error usage

@@ -2,8 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { StatusCodes } from "http-status-codes";
 import { APIError } from "openai/error";
 
-import { ErrorCode } from "@/errors/base-error";
-import { mapLLMError } from "@/errors/helpers/llm-error.helper";
+import { ErrorCode, mapLLMError } from "@/errors/";
 
 describe("mapLLMError", () => {
 	describe("APIError mapping", () => {
@@ -11,9 +10,7 @@ describe("mapLLMError", () => {
 			const message = "Invalid request";
 			const error = new APIError(StatusCodes.BAD_REQUEST, { message }, message, {});
 
-			const mapped = mapLLMError(error, {
-				operation: "TranslatorService.callLanguageModel",
-			});
+			const mapped = mapLLMError(error, "TranslatorService.callLanguageModel");
 
 			expect(mapped.message).toContain("Invalid request");
 		});
@@ -22,14 +19,14 @@ describe("mapLLMError", () => {
 			const message = "Bad request";
 			const error = new APIError(StatusCodes.BAD_REQUEST, { message }, message, {});
 
-			const mapped = mapLLMError(error, {
-				operation: "TranslatorService.callLanguageModel",
-				metadata: { model: "gpt-4", contentLength: 1500 },
+			const mapped = mapLLMError(error, "TranslatorService.callLanguageModel", {
+				model: "gpt-4",
+				contentLength: 1500,
 			});
 
 			expect(mapped.operation).toBe("TranslatorService.callLanguageModel");
-			expect(mapped.metadata?.["model"]).toBe("gpt-4");
-			expect(mapped.metadata?.["contentLength"]).toBe(1500);
+			expect(mapped.metadata?.model).toBe("gpt-4");
+			expect(mapped.metadata?.contentLength).toBe(1500);
 		});
 	});
 
@@ -43,9 +40,7 @@ describe("mapLLMError", () => {
 		])("should detect rate limit when error message contains '%s'", (message, errorCode) => {
 			const error = new Error(message);
 
-			const mapped = mapLLMError(error, {
-				operation: "TranslatorService.callLanguageModel",
-			});
+			const mapped = mapLLMError(error, "TranslatorService.callLanguageModel");
 
 			expect(mapped.code).toBe(errorCode);
 			expect(mapped.message).toContain(message);
@@ -55,9 +50,7 @@ describe("mapLLMError", () => {
 			test("should handle string errors", () => {
 				const error = "String error message";
 
-				const mapped = mapLLMError(error, {
-					operation: "TranslatorService.callLanguageModel",
-				});
+				const mapped = mapLLMError(error, "TranslatorService.callLanguageModel");
 
 				expect(mapped.message).toContain("String error message");
 			});
@@ -65,9 +58,7 @@ describe("mapLLMError", () => {
 			test("should handle null errors", () => {
 				const error = null;
 
-				const mapped = mapLLMError(error, {
-					operation: "TranslatorService.callLanguageModel",
-				});
+				const mapped = mapLLMError(error, "TranslatorService.callLanguageModel");
 
 				expect(mapped.message).toBe("null");
 			});
@@ -75,9 +66,7 @@ describe("mapLLMError", () => {
 			test("should handle undefined errors", () => {
 				const error = undefined;
 
-				const mapped = mapLLMError(error, {
-					operation: "TranslatorService.callLanguageModel",
-				});
+				const mapped = mapLLMError(error, "TranslatorService.callLanguageModel");
 
 				expect(mapped.message).toBe("undefined");
 			});
@@ -85,9 +74,7 @@ describe("mapLLMError", () => {
 			test("should handle object errors", () => {
 				const error = { message: "Object error", code: 500 };
 
-				const mapped = mapLLMError(error, {
-					operation: "TranslatorService.callLanguageModel",
-				});
+				const mapped = mapLLMError(error, "TranslatorService.callLanguageModel");
 
 				expect(mapped.code).toBe(ErrorCode.UnknownError);
 				expect(mapped.message).toContain("[object Object]");
@@ -95,29 +82,24 @@ describe("mapLLMError", () => {
 		});
 
 		describe("Context preservation", () => {
-			test("should preserve metadata context", () => {
+			test("should preserve metadata", () => {
 				const error = new Error("Test error");
 
-				const mapped = mapLLMError(error, {
-					operation: "TranslatorService.translateText",
-					metadata: {
-						model: "gpt-4",
-						temperature: 0.7,
-						maxTokens: 2000,
-					},
+				const mapped = mapLLMError(error, "TranslatorService.translateText", {
+					model: "gpt-4",
+					temperature: 0.7,
+					maxTokens: 2000,
 				});
 
-				expect(mapped.metadata?.["model"]).toBe("gpt-4");
-				expect(mapped.metadata?.["temperature"]).toBe(0.7);
-				expect(mapped.metadata?.["maxTokens"]).toBe(2000);
+				expect(mapped.metadata?.model).toBe("gpt-4");
+				expect(mapped.metadata?.temperature).toBe(0.7);
+				expect(mapped.metadata?.maxTokens).toBe(2000);
 			});
 
 			test("should handle missing metadata gracefully", () => {
 				const error = new Error("Test error");
 
-				const mapped = mapLLMError(error, {
-					operation: "TranslatorService.translateText",
-				});
+				const mapped = mapLLMError(error, "TranslatorService.translateText");
 
 				expect(mapped.operation).toBe("TranslatorService.translateText");
 				expect(mapped.metadata).toBeDefined();
@@ -129,9 +111,7 @@ describe("mapLLMError", () => {
 				const message = "";
 				const error = new APIError(StatusCodes.BAD_REQUEST, { message }, message, {});
 
-				const mapped = mapLLMError(error, {
-					operation: "TranslatorService.callLanguageModel",
-				});
+				const mapped = mapLLMError(error, "TranslatorService.callLanguageModel");
 
 				expect(mapped.code).toBe(ErrorCode.LLMApiError);
 				expect(mapped.message).toContain(message);
@@ -141,18 +121,16 @@ describe("mapLLMError", () => {
 				const message = "Error: <script>alert('xss')</script>";
 				const error = new APIError(StatusCodes.BAD_REQUEST, { message }, message, {});
 
-				const mapped = mapLLMError(error, {
-					operation: "TranslatorService.callLanguageModel",
-				});
+				const mapped = mapLLMError(error, "TranslatorService.callLanguageModel");
 
 				expect(mapped.code).toBe(ErrorCode.LLMApiError);
 				expect(mapped.message).toContain("<script>");
 			});
 
-			test("should handle empty operation context", () => {
+			test("should handle empty operation", () => {
 				const error = new Error("Test error");
 
-				const mapped = mapLLMError(error, { operation: "" });
+				const mapped = mapLLMError(error, "");
 
 				expect(mapped.operation).toBe("");
 				expect(mapped.code).toBe(ErrorCode.UnknownError);
@@ -162,9 +140,7 @@ describe("mapLLMError", () => {
 				const longMessage = "Error: " + "x".repeat(10000);
 				const error = new Error(longMessage);
 
-				const mapped = mapLLMError(error, {
-					operation: "TranslatorService.callLanguageModel",
-				});
+				const mapped = mapLLMError(error, "TranslatorService.callLanguageModel");
 
 				expect(mapped.code).toBe(ErrorCode.UnknownError);
 				expect(mapped.message).toBe(longMessage);

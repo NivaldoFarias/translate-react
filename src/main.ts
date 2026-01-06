@@ -1,4 +1,4 @@
-import { TranslationError } from "@/errors/";
+import { ApplicationError } from "@/errors/";
 import { createServiceConfigFromEnv, ServiceFactory } from "@/services/";
 import { logger as __logger, env } from "@/utils/";
 
@@ -19,15 +19,15 @@ if (import.meta.main) {
 
 		process.exit(0);
 	} catch (error) {
-		if (error instanceof TranslationError) {
+		if (error instanceof ApplicationError) {
 			logger.fatal(
 				{
-					message: error.message,
+					message: error.getDisplayMessage(),
 					code: error.code,
 					operation: error.operation,
 					metadata: error.metadata,
 				},
-				"Workflow failed with TranslationError",
+				"Workflow failed with ApplicationError",
 			);
 		} else {
 			logger.fatal({ error }, "Workflow failed with unexpected error");

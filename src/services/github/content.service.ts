@@ -96,9 +96,9 @@ export class ContentService extends BaseGitHubService {
 
 			return response;
 		} catch (error) {
-			throw mapGithubError(error, {
-				operation: `${ContentService.name}.createCommentOnPullRequest`,
-				metadata: { prNumber, upstream: this.repositories.upstream },
+			throw mapGithubError(error, `${ContentService.name}.createCommentOnPullRequest`, {
+				prNumber,
+				upstream: this.repositories.upstream,
 			});
 		}
 	}
@@ -123,9 +123,8 @@ export class ContentService extends BaseGitHubService {
 
 			return response.data;
 		} catch (error) {
-			throw mapGithubError(error, {
-				operation: `${ContentService.name}.listOpenPullRequests`,
-				metadata: { upstream: this.repositories.upstream },
+			throw mapGithubError(error, `${ContentService.name}.listOpenPullRequests`, {
+				upstream: this.repositories.upstream,
 			});
 		}
 	}
@@ -153,9 +152,9 @@ export class ContentService extends BaseGitHubService {
 
 			return response;
 		} catch (error) {
-			throw mapGithubError(error, {
-				operation: `${ContentService.name}.findPullRequestByNumber`,
-				metadata: { prNumber, upstream: this.repositories.upstream },
+			throw mapGithubError(error, `${ContentService.name}.findPullRequestByNumber`, {
+				prNumber,
+				upstream: this.repositories.upstream,
 			});
 		}
 	}
@@ -192,9 +191,9 @@ export class ContentService extends BaseGitHubService {
 
 			return filePaths;
 		} catch (error) {
-			throw mapGithubError(error, {
-				operation: `${ContentService.name}.getPullRequestFiles`,
-				metadata: { prNumber, upstream: this.repositories.upstream },
+			throw mapGithubError(error, `${ContentService.name}.getPullRequestFiles`, {
+				prNumber,
+				upstream: this.repositories.upstream,
 			});
 		}
 	}
@@ -222,10 +221,11 @@ export class ContentService extends BaseGitHubService {
 
 			if (!repoTreeResponse.data.tree.length) {
 				this.logger.warn({ fork: this.repositories.fork }, "Repository tree is empty");
-				throw mapGithubError(new Error("Repository tree is empty"), {
-					operation: `${ContentService.name}.getUntranslatedFiles`,
-					metadata: { fork: this.repositories.fork },
-				});
+				throw mapGithubError(
+					new Error("Repository tree is empty"),
+					`${ContentService.name}.getUntranslatedFiles`,
+					{ fork: this.repositories.fork },
+				);
 			}
 
 			const markdownFiles = this.filterMarkdownFiles(repoTreeResponse.data.tree);
@@ -277,9 +277,9 @@ export class ContentService extends BaseGitHubService {
 
 			return files;
 		} catch (error) {
-			throw mapGithubError(error, {
-				operation: `${ContentService.name}.getUntranslatedFiles`,
-				metadata: { maxFiles, fork: this.repositories.fork },
+			throw mapGithubError(error, `${ContentService.name}.getUntranslatedFiles`, {
+				maxFiles,
+				fork: this.repositories.fork,
 			});
 		}
 	}
@@ -339,13 +339,10 @@ export class ContentService extends BaseGitHubService {
 
 			return response;
 		} catch (error) {
-			throw mapGithubError(error, {
-				operation: `${ContentService.name}.commitTranslation`,
-				metadata: {
-					filePath: file.path,
-					branchRef: branch.ref,
-					commitMessage: message,
-				},
+			throw mapGithubError(error, `${ContentService.name}.commitTranslation`, {
+				filePath: file.path,
+				branchRef: branch.ref,
+				commitMessage: message,
 			});
 		}
 	}
@@ -399,9 +396,10 @@ export class ContentService extends BaseGitHubService {
 
 			return createPullRequestResponse.data;
 		} catch (error) {
-			throw mapGithubError(error, {
-				operation: `${ContentService.name}.createPullRequest`,
-				metadata: { branch, title, baseBranch },
+			throw mapGithubError(error, `${ContentService.name}.createPullRequest`, {
+				branch,
+				title,
+				baseBranch,
 			});
 		}
 	}
@@ -436,10 +434,11 @@ export class ContentService extends BaseGitHubService {
 
 			if (!blobSha) {
 				this.logger.warn({ file }, "Invalid blob SHA - file missing SHA property");
-				throw mapGithubError(new Error("Invalid blob SHA"), {
-					operation: `${ContentService.name}.getFileContent`,
-					metadata: { filePath: file.path },
-				});
+				throw mapGithubError(
+					new Error("Invalid blob SHA"),
+					`${ContentService.name}.getFileContent`,
+					{ filePath: file.path },
+				);
 			}
 
 			const response = await this.octokit.git.getBlob({
@@ -460,9 +459,9 @@ export class ContentService extends BaseGitHubService {
 
 			return content;
 		} catch (error) {
-			throw mapGithubError(error, {
-				operation: `${ContentService.name}.getFileContent`,
-				metadata: { filePath: file.path, blobSha: file.sha },
+			throw mapGithubError(error, `${ContentService.name}.getFileContent`, {
+				filePath: file.path,
+				blobSha: file.sha,
 			});
 		}
 	}
@@ -505,10 +504,11 @@ export class ContentService extends BaseGitHubService {
 			if (issueExistsResponse.data.state === "closed") {
 				this.logger.warn({ issueNumber: this.issueNumber }, "Issue closed");
 
-				throw mapGithubError(new Error(`Issue ${String(this.issueNumber)} is closed`), {
-					operation: `${ContentService.name}.commentCompiledResultsOnIssue`,
-					metadata: { issueNumber: this.issueNumber, upstream: this.repositories.upstream },
-				});
+				throw mapGithubError(
+					new Error(`Issue ${String(this.issueNumber)} is closed`),
+					`${ContentService.name}.commentCompiledResultsOnIssue`,
+					{ issueNumber: this.issueNumber, upstream: this.repositories.upstream },
+				);
 			}
 
 			const listCommentsResponse = await this.octokit.issues.listComments({
@@ -567,13 +567,10 @@ export class ContentService extends BaseGitHubService {
 
 			return createCommentResponse.data;
 		} catch (error) {
-			throw mapGithubError(error, {
-				operation: `${ContentService.name}.commentCompiledResultsOnIssue`,
-				metadata: {
-					issueNumber: this.issueNumber,
-					filesCount: filesToTranslate.length,
-					resultsCount: results.length,
-				},
+			throw mapGithubError(error, `${ContentService.name}.commentCompiledResultsOnIssue`, {
+				issueNumber: this.issueNumber,
+				filesCount: filesToTranslate.length,
+				resultsCount: results.length,
 			});
 		}
 	}
@@ -603,9 +600,9 @@ export class ContentService extends BaseGitHubService {
 
 			return pr;
 		} catch (error) {
-			throw mapGithubError(error, {
-				operation: `${ContentService.name}.findPullRequestByBranch`,
-				metadata: { branchName, forkOwner: this.repositories.fork.owner },
+			throw mapGithubError(error, `${ContentService.name}.findPullRequestByBranch`, {
+				branchName,
+				forkOwner: this.repositories.fork.owner,
 			});
 		}
 	}
@@ -681,9 +678,9 @@ export class ContentService extends BaseGitHubService {
 				needsUpdate,
 			};
 		} catch (error) {
-			throw mapGithubError(error, {
-				operation: `${ContentService.name}.checkPullRequestStatus`,
-				metadata: { prNumber, upstream: this.repositories.upstream },
+			throw mapGithubError(error, `${ContentService.name}.checkPullRequestStatus`, {
+				prNumber,
+				upstream: this.repositories.upstream,
 			});
 		}
 	}
@@ -709,9 +706,9 @@ export class ContentService extends BaseGitHubService {
 
 			return response.data;
 		} catch (error) {
-			throw mapGithubError(error, {
-				operation: `${ContentService.name}.closePullRequest`,
-				metadata: { prNumber, upstream: this.repositories.upstream },
+			throw mapGithubError(error, `${ContentService.name}.closePullRequest`, {
+				prNumber,
+				upstream: this.repositories.upstream,
 			});
 		}
 	}

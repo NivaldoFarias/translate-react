@@ -15,7 +15,7 @@ import type {
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 import type { SetNonNullable, SetRequired } from "type-fest";
 
-import { InitializationError, ResourceLoadError } from "@/errors/";
+import { createInitializationError, createResourceLoadError } from "@/errors/";
 import {
 	env,
 	FILE_FETCH_BATCH_SIZE,
@@ -114,9 +114,10 @@ export abstract class BaseRunnerService {
 		const hasPermissions = await this.services.github.repository.verifyTokenPermissions();
 
 		if (!hasPermissions) {
-			throw new InitializationError("Token permissions verification failed", {
-				operation: `${BaseRunnerService.name}.verifyTokenPermissions`,
-			});
+			throw createInitializationError(
+				"Token permissions verification failed",
+				`${BaseRunnerService.name}.verifyTokenPermissions`,
+			);
 		}
 	}
 
@@ -138,9 +139,10 @@ export abstract class BaseRunnerService {
 
 			const syncSuccess = await this.services.github.repository.syncFork();
 			if (!syncSuccess) {
-				throw new InitializationError("Failed to sync fork with upstream repository", {
-					operation: `${BaseRunnerService.name}.syncFork`,
-				});
+				throw createInitializationError(
+					"Failed to sync fork with upstream repository",
+					`${BaseRunnerService.name}.syncFork`,
+				);
 			}
 
 			this.logger.info("Fork synchronized with upstream repository");
@@ -170,9 +172,7 @@ export abstract class BaseRunnerService {
 		const glossary = await this.services.github.repository.fetchGlossary();
 
 		if (!glossary) {
-			throw new ResourceLoadError("Failed to fetch glossary", {
-				operation: `${BaseRunnerService.name}.fetchGlossary`,
-			});
+			throw createResourceLoadError("glossary", `${BaseRunnerService.name}.fetchRepositoryTree`);
 		}
 
 		this.services.translator.glossary = glossary;

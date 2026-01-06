@@ -29,9 +29,6 @@ This document provides a detailed breakdown of the translation workflow executio
     - [ProcessedFileResult](#processedfileresult)
     - [RunnerState](#runnerstate)
   - [Error Recovery Flow](#error-recovery-flow)
-  - [Development vs Production Mode](#development-vs-production-mode)
-    - [Development Mode (`DEV_MODE_FORK_PR=true`)](#development-mode-dev_mode_fork_prtrue)
-    - [Production Mode (`DEV_MODE_FORK_PR=false`)](#production-mode-dev_mode_fork_prfalse)
   - [References](#references)
 
 ## Overview
@@ -482,7 +479,7 @@ stateDiagram-v2
     Reassembly --> Validation
 
     Validation --> CommitSuccess : Valid
-    Validation --> TranslationError : Invalid
+    Validation --> ApplicationError : Invalid
 
     CommitSuccess --> PRCreation
 
@@ -491,7 +488,7 @@ stateDiagram-v2
 
     UpdateMetadata --> [*]
 
-    TranslationError --> Cleanup
+    ApplicationError --> Cleanup
     PRError --> Cleanup
     Cleanup --> [*]
 ```
@@ -683,57 +680,6 @@ flowchart TD
 
     style E fill:#ffebee,stroke:#d32f2f
     style O fill:#ffebee,stroke:#d32f2f
-```
-
-## Development vs Production Mode
-
-### Development Mode (`DEV_MODE_FORK_PR=true`)
-
-**Characteristics**:
-
-- PRs created against fork (not upstream)
-- Snapshot persistence enabled
-- More verbose logging
-- Faster iteration (resume from snapshots)
-
-**Workflow Differences**:
-
-```mermaid
-flowchart LR
-    A[File Translated] --> B{Mode?}
-    B -->|Development| C[Create PR in Fork]
-    B -->|Production| D[Create PR in Upstream]
-
-    C --> E[Update Local Issue]
-    D --> F[Update Upstream Issue]
-
-    E --> G[Save Snapshot]
-    F --> H[Clear Snapshot]
-
-    style C fill:#e1f5fe,stroke:#0277bd
-    style D fill:#f3e5f5,stroke:#7b1fa2
-```
-
-### Production Mode (`DEV_MODE_FORK_PR=false`)
-
-**Characteristics**:
-
-- PRs created against upstream (official contributions)
-- Snapshot cleared on completion
-- Production-level error handling
-- Progress updates to upstream issue
-
-**Additional Checks**:
-
-```typescript
-if (NODE_ENV === "production") {
-	// Stricter validation
-	validateGlossaryAdherence(translation);
-	validateFormattingPreservation(translation);
-
-	// Cleanup after completion
-	await snapshot.clear();
-}
 ```
 
 ## References

@@ -35,30 +35,18 @@ export enum ErrorCode {
 	UnknownError = "UNKNOWN_ERROR",
 }
 
-/** Context for translation errors providing operation and debugging information */
-export interface TranslationErrorContext<
-	T extends Record<string, unknown> = Record<string, unknown>,
-> {
-	/** The operation that failed */
-	operation: string;
-
-	/** Additional metadata for debugging */
-	metadata?: T;
-}
-
 /**
  * Base error class for all translation-related errors.
  *
- * Provides standardized error handling with error codes and optional context.
+ * Provides standardized error handling with error codes and optional metadata.
+ *
+ * @template T Type of the metadata object
  */
-export class TranslationError<
+export class ApplicationError<
 	T extends Record<string, unknown> = Record<string, unknown>,
 > extends Error {
 	/** Standardized error code */
 	public readonly code: ErrorCode;
-
-	/** Timestamp when the error was created */
-	public readonly timestamp: Date;
 
 	/** The operation that failed */
 	public readonly operation: string;
@@ -69,14 +57,14 @@ export class TranslationError<
 	constructor(
 		message: string,
 		code: ErrorCode = ErrorCode.UnknownError,
-		context: TranslationErrorContext<T> | undefined,
+		operation?: string,
+		metadata?: T,
 	) {
 		super(message);
 		this.name = this.constructor.name;
 		this.code = code;
-		this.timestamp = new Date();
-		this.operation = context?.operation ?? "UnknownOperation";
-		this.metadata = context?.metadata;
+		this.operation = operation ?? "UnknownOperation";
+		this.metadata = metadata;
 
 		Object.setPrototypeOf(this, new.target.prototype);
 	}
@@ -97,7 +85,7 @@ export class TranslationError<
  * @returns Human-readable error message
  */
 export function extractErrorMessage(error: unknown): string {
-	if (error instanceof TranslationError) return error.getDisplayMessage();
+	if (error instanceof ApplicationError) return error.getDisplayMessage();
 	if (error instanceof Error) return error.message;
 
 	return String(error);
