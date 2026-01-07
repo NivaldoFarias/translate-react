@@ -64,7 +64,7 @@ export class FileDiscoveryManager {
 			(file, index, self) => index === self.findIndex((compare) => compare.path === file.path),
 		);
 
-		this.logger.info(`Processing ${String(uniqueFiles.length)} files from repository tree...`);
+		this.logger.info(`Processing ${uniqueFiles.length} files from repository tree...`);
 
 		const { candidateFiles, cacheHits } = this.checkCache(uniqueFiles);
 
@@ -95,7 +95,7 @@ export class FileDiscoveryManager {
 					total: totalFiltered,
 				},
 			},
-			`Translation pipeline complete: ${String(filesToTranslate.length)} files need translation (${String(totalFiltered)} filtered across stages)`,
+			`Translation pipeline complete: ${filesToTranslate.length} files need translation (${totalFiltered} filtered across stages)`,
 		);
 
 		return { filesToTranslate, invalidPRsByFile };
@@ -161,7 +161,7 @@ export class FileDiscoveryManager {
 
 		this.logger.info(
 			{ cacheHits, cacheMisses, hitRate, timeMs: elapsed },
-			`Cache check complete: ${String(cacheHits)} hits, ${String(cacheMisses)} candidates`,
+			`Cache check complete: ${cacheHits} hits, ${cacheMisses} candidates`,
 		);
 
 		return { candidateFiles, cacheHits, cacheMisses };
@@ -299,7 +299,7 @@ export class FileDiscoveryManager {
 				invalidPRs: invalidPRsByFile.size,
 				toFetch: filesToFetch.length,
 			},
-			`After PR filter: ${String(filesToFetch.length)} files need content fetch`,
+			`After PR filter: ${filesToFetch.length} files need content fetch`,
 		);
 
 		return { filesToFetch, numFilesWithPRs, invalidPRsByFile };
@@ -334,7 +334,7 @@ export class FileDiscoveryManager {
 			const percentage = Math.floor((completedFiles / filesToFetch.length) * 100);
 			if (completedFiles % 10 === 0 || completedFiles === filesToFetch.length) {
 				this.logger.info(
-					`Fetching files: ${String(completedFiles)}/${String(filesToFetch.length)} (${String(percentage)}%)`,
+					`Fetching files: ${completedFiles}/${filesToFetch.length} (${percentage}%)`,
 				);
 			}
 		};

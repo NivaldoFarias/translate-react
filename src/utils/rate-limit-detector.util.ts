@@ -38,7 +38,7 @@ export function detectRateLimit(errorMessage: string, statusCode?: number): bool
 	 */
 	const rateLimitPatterns = [
 		"rate limit",
-		String(StatusCodes.TOO_MANY_REQUESTS),
+		"429",
 		"free-models-per-",
 		"quota",
 		"too many requests",

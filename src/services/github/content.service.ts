@@ -505,7 +505,7 @@ export class ContentService extends BaseGitHubService {
 				this.logger.warn({ issueNumber: this.issueNumber }, "Issue closed");
 
 				throw mapGithubError(
-					new Error(`Issue ${String(this.issueNumber)} is closed`),
+					new Error(`Issue ${this.issueNumber} is closed`),
 					`${ContentService.name}.commentCompiledResultsOnIssue`,
 					{ issueNumber: this.issueNumber, upstream: this.repositories.upstream },
 				);

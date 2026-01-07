@@ -239,7 +239,7 @@ export class CommentBuilderService {
 			);
 
 			for (const file of sortedFiles) {
-				lines.push(`${indent}  - \`${file.filename}\`: #${String(file.prNumber)}`);
+				lines.push(`${indent}  - \`${file.filename}\`: #${file.prNumber}`);
 			}
 
 			const subDirs = Object.keys(currentLevel).filter((key) => key !== "files");

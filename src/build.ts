@@ -58,7 +58,7 @@ async function build(): Promise<Bun.BuildOutput> {
 	}
 
 	logger.info(`✓ Bundled application to ${DIST_DIR}`);
-	logger.info(`  - ${String(result.outputs.length)} output file(s)`);
+	logger.info(`  - ${result.outputs.length} output file(s)`);
 
 	logger.info("✅ Build complete");
 

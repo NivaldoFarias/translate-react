@@ -341,8 +341,9 @@ export class TranslatorService {
 			);
 		}
 
-		const originalHeadings = (file.content.match(/^#{1,6}\s/gm) ?? []).length;
-		const translatedHeadings = (translatedContent.match(/^#{1,6}\s/gm) ?? []).length;
+		const CATCH_HEADINGS_REGEX = /^#{1,6}\s/gm;
+		const originalHeadings = (file.content.match(CATCH_HEADINGS_REGEX) ?? []).length;
+		const translatedHeadings = (translatedContent.match(CATCH_HEADINGS_REGEX) ?? []).length;
 
 		if (originalHeadings > 0 && translatedHeadings === 0) {
 			this.logger.error(
@@ -575,11 +576,19 @@ export class TranslatorService {
 			const currentChunk = chunks[index];
 			const nextChunk = chunks[index + 1];
 
-			if (!currentChunk?.trim() || !nextChunk?.trim()) {
+			if (currentChunk === undefined || nextChunk === undefined) {
+				logger.warn(
+					{ index, chunksLength: chunks.length },
+					"TranslatorService: encountered undefined chunk while computing separators",
+				);
 				separators.push("\n\n");
 				continue;
 			}
 
+			if (!currentChunk.trim() || !nextChunk.trim()) {
+				separators.push("\n\n");
+				continue;
+			}
 			const currentChunkIndex = content.indexOf(currentChunk.trim(), searchStartIndex);
 
 			if (currentChunkIndex === -1) {
@@ -755,7 +764,7 @@ export class TranslatorService {
 			);
 
 			throw createChunkProcessingError(
-				`Chunk count mismatch: expected ${String(chunks.length)} chunks, but only ${String(translatedChunks.length)} were translated`,
+				`Chunk count mismatch: expected ${chunks.length} chunks, but only ${translatedChunks.length} were translated`,
 				`${TranslatorService.name}.translateWithChunking`,
 				{
 					expectedChunks: chunks.length,

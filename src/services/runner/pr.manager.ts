@@ -110,7 +110,7 @@ export class PRManager {
 				{
 					failures: failedFiles.map(({ filename, error }) => ({ filename, error: error.message })),
 				},
-				`Failed files (${String(failedFiles.length)})`,
+				`Failed files (${failedFiles.length})`,
 			);
 		}
 
