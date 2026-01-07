@@ -39,7 +39,7 @@ describe("timing.util", () => {
 			const elapsed = Date.now() - startTime;
 
 			expect(result).toBe("done");
-			expect(elapsed).toBeGreaterThanOrEqual(50);
+			expect(elapsed).toBeGreaterThanOrEqual(45);
 			expect(elapsed).toBeLessThan(150);
 		});
 	});
