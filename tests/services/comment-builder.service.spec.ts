@@ -18,14 +18,14 @@ describe("CommentBuilderService", () => {
 		return {
 			number: prNumber,
 			id: prNumber,
-			node_id: `PR_${String(prNumber)}`,
-			url: `https://api.github.com/repos/test/test/pulls/${String(prNumber)}`,
-			html_url: `https://github.com/test/test/pull/${String(prNumber)}`,
-			diff_url: `https://github.com/test/test/pull/${String(prNumber)}.diff`,
-			patch_url: `https://github.com/test/test/pull/${String(prNumber)}.patch`,
-			issue_url: `https://github.com/test/test/issues/${String(prNumber)}`,
-			commits_url: `https://api.github.com/repos/test/test/pulls/${String(prNumber)}/commits`,
-			review_comments_url: `https://api.github.com/repos/test/test/pulls/${String(prNumber)}/comments`,
+			node_id: `PR_${prNumber}`,
+			url: `https://api.github.com/repos/test/test/pulls/${prNumber}`,
+			html_url: `https://github.com/test/test/pull/${prNumber}`,
+			diff_url: `https://github.com/test/test/pull/${prNumber}.diff`,
+			patch_url: `https://github.com/test/test/pull/${prNumber}.patch`,
+			issue_url: `https://github.com/test/test/issues/${prNumber}`,
+			commits_url: `https://api.github.com/repos/test/test/pulls/${prNumber}/commits`,
+			review_comments_url: `https://api.github.com/repos/test/test/pulls/${prNumber}/comments`,
 		} as unknown as RestEndpointMethodTypes["pulls"]["list"]["response"]["data"][number];
 	};
 
@@ -420,7 +420,7 @@ describe("CommentBuilderService", () => {
 				results.push({
 					filename: `file-${index.toString().padStart(2, "0")}.md`,
 					branch: null,
-					translation: `# File ${String(index)}`,
+					translation: `# File ${index}`,
 					pullRequest: createMockPrData(100 + index),
 					error: null,
 				});
@@ -428,8 +428,8 @@ describe("CommentBuilderService", () => {
 				filesToTranslate.push({
 					filename: `file-${index.toString().padStart(2, "0")}.md`,
 					path: `src/content/docs/batch/file-${index.toString().padStart(2, "0")}.md`,
-					content: `# File ${String(index)}`,
-					sha: `sha_file_${String(index)}`,
+					content: `# File ${index}`,
+					sha: `sha_file_${index}`,
 				});
 			}
 

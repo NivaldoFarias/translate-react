@@ -200,7 +200,7 @@ export abstract class BaseRunnerService {
 	protected async fetchFilesToTranslate(): Promise<void> {
 		if (this.state.filesToTranslate.length) {
 			this.logger.info(
-				`Found ${String(this.state.filesToTranslate.length)} files to translate (from snapshot)`,
+				`Found ${this.state.filesToTranslate.length} files to translate (from snapshot)`,
 			);
 			return;
 		}

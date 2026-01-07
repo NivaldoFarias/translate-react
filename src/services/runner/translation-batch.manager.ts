@@ -153,7 +153,7 @@ export class TranslationBatchManager {
 				total: batch.length,
 				successRate,
 			},
-			`Batch ${String(batchInfo.currentBatch)}/${String(batchInfo.totalBatches)} completed: ${String(this.batchProgress.successful)}/${String(batch.length)} successful (${String(successRate)}%)`,
+			`Batch ${batchInfo.currentBatch}/${batchInfo.totalBatches} completed: ${this.batchProgress.successful}/${batch.length} successful (${successRate}%)`,
 		);
 
 		return results;
@@ -573,6 +573,6 @@ ${conflictNotice}
 		const sizes = ["B", "KB", "MB", "GB"];
 		const i = Math.floor(Math.log(bytes) / Math.log(k));
 
-		return `${(bytes / Math.pow(k, i)).toFixed(1)} ${String(sizes[i])}`;
+		return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
 	}
 }
