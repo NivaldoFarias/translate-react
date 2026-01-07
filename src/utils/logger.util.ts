@@ -1,5 +1,6 @@
 import pino from "pino";
 
+import { nftsCompatibleDateString } from "./common.util";
 import { RuntimeEnvironment } from "./constants.util";
 import { env } from "./env.util";
 
@@ -62,7 +63,7 @@ export const logger = pino({
 				target: "pino/file",
 				level: "debug",
 				options: {
-					destination: `${process.cwd()}/logs/${new Date().toISOString().replace(/:/g, "-")}.pino.log`,
+					destination: `${process.cwd()}/logs/${nftsCompatibleDateString()}.pino.log`,
 					mkdir: true,
 				},
 			},

@@ -4,5 +4,5 @@ export * from "./env.util";
 export * from "./logger.util";
 export * from "./rate-limit-detector.util";
 export * from "./setup-signal-handlers.util";
-export * from "./delay.util";
+export * from "./common.util";
 export * from "./timing.util";
