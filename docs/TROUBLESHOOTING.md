@@ -21,29 +21,29 @@ This document provides comprehensive guidance for troubleshooting common issues,
 
 ### Environment & Configuration
 
-| Error | Cause | Solution |
-| ----- | ----- | -------- |
-| `GH_TOKEN: String must contain at least 1 character(s)` | Missing environment variable | Set `GH_TOKEN` in your `.env` or `.env.dev` file |
-| `LLM_API_KEY: String must contain at least 1 character(s)` | Missing environment variable | Set `LLM_API_KEY` in your `.env` or `.env.dev` file |
-| `Zod validation failed` | Invalid environment configuration | Check [`src/utils/env.util.ts`](../src/utils/env.util.ts) for schema requirements |
+| Error                                                      | Cause                             | Solution                                                                          |
+| ---------------------------------------------------------- | --------------------------------- | --------------------------------------------------------------------------------- |
+| `GH_TOKEN: String must contain at least 1 character(s)`    | Missing environment variable      | Set `GH_TOKEN` in your `.env` or `.env.dev` file                                  |
+| `LLM_API_KEY: String must contain at least 1 character(s)` | Missing environment variable      | Set `LLM_API_KEY` in your `.env` or `.env.dev` file                               |
+| `Zod validation failed`                                    | Invalid environment configuration | Check [`src/utils/env.util.ts`](../src/utils/env.util.ts) for schema requirements |
 
 ### GitHub API Issues
 
-| Error | Cause | Solution |
-| ----- | ----- | -------- |
-| `GITHUB_NOT_FOUND` | Repository not found or inaccessible | Verify repository exists and token has `repo` scope |
-| `GITHUB_RATE_LIMITED` | API rate limit exceeded | Tool auto-retries with exponential backoff; consider GitHub App token for heavy usage |
-| `GITHUB_FORBIDDEN` | Insufficient permissions | Verify token has write access to fork repository |
-| `GITHUB_CONFLICT` | Branch already exists or merge conflict | Delete existing branch or resolve conflict manually |
+| Error                 | Cause                                   | Solution                                                                              |
+| --------------------- | --------------------------------------- | ------------------------------------------------------------------------------------- |
+| `GITHUB_NOT_FOUND`    | Repository not found or inaccessible    | Verify repository exists and token has `repo` scope                                   |
+| `GITHUB_RATE_LIMITED` | API rate limit exceeded                 | Tool auto-retries with exponential backoff; consider GitHub App token for heavy usage |
+| `GITHUB_FORBIDDEN`    | Insufficient permissions                | Verify token has write access to fork repository                                      |
+| `GITHUB_CONFLICT`     | Branch already exists or merge conflict | Delete existing branch or resolve conflict manually                                   |
 
 ### LLM/Translation Issues
 
-| Error | Cause | Solution |
-| ----- | ----- | -------- |
-| `OpenAI API error: insufficient_quota` | API credits exhausted | Check API credits; switch providers via `LLM_API_BASE_URL` |
-| `LLM_RATE_LIMITED` | Too many requests to LLM API | Reduce `BATCH_SIZE` or wait for rate limit reset |
-| `LLM_TIMEOUT` | Request took too long | Increase timeout or reduce content size |
-| `Translation validation failed` | Output doesn't match expected format | Check LLM model compatibility; review prompt template |
+| Error                                  | Cause                                | Solution                                                   |
+| -------------------------------------- | ------------------------------------ | ---------------------------------------------------------- |
+| `OpenAI API error: insufficient_quota` | API credits exhausted                | Check API credits; switch providers via `LLM_API_BASE_URL` |
+| `LLM_RATE_LIMITED`                     | Too many requests to LLM API         | Reduce `BATCH_SIZE` or wait for rate limit reset           |
+| `LLM_TIMEOUT`                          | Request took too long                | Increase timeout or reduce content size                    |
+| `Translation validation failed`        | Output doesn't match expected format | Check LLM model compatibility; review prompt template      |
 
 ---
 
@@ -435,9 +435,9 @@ If you're unable to resolve an issue:
 
 ## Related Documentation
 
-| Document                                    | Description                              |
-| ------------------------------------------- | ---------------------------------------- |
-| [ERROR_HANDLING.md](./ERROR_HANDLING.md)    | Error taxonomy and recovery mechanisms   |
-| [WORKFLOW.md](./WORKFLOW.md)                | Execution workflow with timing analysis  |
-| [ARCHITECTURE.md](./ARCHITECTURE.md)        | System architecture and service design   |
+| Document                                       | Description                             |
+| ---------------------------------------------- | --------------------------------------- |
+| [ERROR_HANDLING.md](./ERROR_HANDLING.md)       | Error taxonomy and recovery mechanisms  |
+| [WORKFLOW.md](./WORKFLOW.md)                   | Execution workflow with timing analysis |
+| [ARCHITECTURE.md](./ARCHITECTURE.md)           | System architecture and service design  |
 | [PROJECT_STRUCTURE.md](./PROJECT_STRUCTURE.md) | Directory structure and file navigation |
