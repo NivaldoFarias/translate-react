@@ -58,7 +58,7 @@ describe("timing.util", () => {
 		test("should return timing result on stop", async () => {
 			const timer = new Timer("stopTest");
 
-			await sleep(0);
+			await sleep(50);
 			const result = timer.stop();
 
 			expect(result.operation).toBe("stopTest");
