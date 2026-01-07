@@ -128,6 +128,7 @@ describe("backoff.util", () => {
 			});
 
 			const operation = mock(() => Promise.reject(error));
+			const startTime = Date.now();
 
 			expect(
 				withExponentialBackoff(operation, {
@@ -138,18 +139,20 @@ describe("backoff.util", () => {
 					jitter: false,
 				}),
 			).rejects.toThrow("Server error");
+			const elapsedTime = Date.now() - startTime;
+
+			expect(elapsedTime).toBeGreaterThanOrEqual(3700);
+			expect(elapsedTime).toBeLessThan(4500);
 
 			expect(operation).toHaveBeenCalledTimes(4);
 		});
 
 		test("should handle network timeout errors as retryable", async () => {
-			const timeoutError = new Error("Connection timeout");
-
 			let attemptCount = 0;
 			const operation = mock(() => {
 				attemptCount++;
 				if (attemptCount < 2) {
-					return Promise.reject(timeoutError);
+					return Promise.reject(new Error("Connection timeout"));
 				}
 				return Promise.resolve("success");
 			});

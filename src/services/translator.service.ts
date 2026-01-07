@@ -203,7 +203,7 @@ export class TranslatorService {
 		}
 
 		function isLLMResponseValid(response: OpenAI.Chat.Completions.ChatCompletion): boolean {
-			return !response.id || !response.usage?.total_tokens || !response.choices.at(0)?.message;
+			return !!response.id || !!response.usage?.total_tokens || !!response.choices.at(0)?.message;
 		}
 	}
 
@@ -577,7 +577,7 @@ export class TranslatorService {
 			const nextChunk = chunks[index + 1];
 
 			if (currentChunk === undefined || nextChunk === undefined) {
-				logger.warn(
+				this.logger.warn(
 					{ index, chunksLength: chunks.length },
 					"TranslatorService: encountered undefined chunk while computing separators",
 				);
