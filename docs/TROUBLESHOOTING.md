@@ -23,8 +23,8 @@ This document provides comprehensive guidance for troubleshooting common issues,
 
 | Error                                                      | Cause                             | Solution                                                                          |
 | ---------------------------------------------------------- | --------------------------------- | --------------------------------------------------------------------------------- |
-| `GH_TOKEN: String must contain at least 1 character(s)`    | Missing environment variable      | Set `GH_TOKEN` in your `.env` or `.env.dev` file                                  |
-| `LLM_API_KEY: String must contain at least 1 character(s)` | Missing environment variable      | Set `LLM_API_KEY` in your `.env` or `.env.dev` file                               |
+| `GH_TOKEN: String must contain at least 1 character(s)`    | Missing environment variable      | Set `GH_TOKEN` in your `.env` file                                                |
+| `LLM_API_KEY: String must contain at least 1 character(s)` | Missing environment variable      | Set `LLM_API_KEY` in your `.env` file                                             |
 | `Zod validation failed`                                    | Invalid environment configuration | Check [`src/utils/env.util.ts`](../src/utils/env.util.ts) for schema requirements |
 
 ### GitHub API Issues
@@ -65,7 +65,7 @@ LOG_LEVEL="debug" bun run dev
 LOG_LEVEL="debug" bun run start
 ```
 
-**Via Environment File** — add to your `.env.dev` or `.env` file:
+**Via Environment File** — add to your `.env` file:
 
 ```ini
 LOG_LEVEL="debug"
