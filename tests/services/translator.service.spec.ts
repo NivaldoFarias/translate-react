@@ -27,7 +27,7 @@ function createTestTranslatorService(
 	return new TranslatorService({ ...defaults, ...overrides });
 }
 
-// Mock backoff utility to execute immediately without retries
+/** Mock backoff utility to execute immediately without retries */
 void mock.module("@/utils/backoff.util", () => ({
 	withExponentialBackoff: <T>(fn: () => Promise<T>) => fn(),
 	DEFAULT_BACKOFF_CONFIG: {
@@ -370,6 +370,20 @@ describe("TranslatorService", () => {
 			};
 
 			expect(translatorService.translateContent(file)).rejects.toThrow();
+		});
+
+		test("should return false for invalid LLM response", () => {
+			const invalidResponse = createMockChatCompletion({
+				id: undefined,
+				usage: undefined,
+				// @ts-expect-error - invalid `message` type for testing
+				choices: [{ message: null }],
+			});
+
+			// @ts-expect-error - call to a private method
+			const isValid = translatorService.isLLMResponseValid(invalidResponse);
+
+			expect(isValid).toBe(false);
 		});
 	});
 });

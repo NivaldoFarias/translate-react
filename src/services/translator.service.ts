@@ -177,7 +177,7 @@ export class TranslatorService {
 				temperature: 0.1,
 			});
 
-			if (!isLLMResponseValid(response)) {
+			if (!this.isLLMResponseValid(response)) {
 				throw createInitializationError(
 					"Invalid LLM API response: missing response metadata",
 					`${TranslatorService.name}.testConnectivity`,
@@ -201,10 +201,10 @@ export class TranslatorService {
 
 			throw error;
 		}
+	}
 
-		function isLLMResponseValid(response: OpenAI.Chat.Completions.ChatCompletion): boolean {
-			return !!response.id || !!response.usage?.total_tokens || !!response.choices.at(0)?.message;
-		}
+	private isLLMResponseValid(response: OpenAI.Chat.Completions.ChatCompletion): boolean {
+		return !!response.id || !!response.usage?.total_tokens || !!response.choices.at(0)?.message;
 	}
 
 	/**
