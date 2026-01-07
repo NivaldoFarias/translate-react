@@ -1,5 +1,22 @@
 # Error Handling Architecture
 
+## Table of Contents
+
+- [Error Handling Architecture](#error-handling-architecture)
+  - [Table of Contents](#table-of-contents)
+  - [Overview](#overview)
+  - [Error Structure](#error-structure)
+  - [Error Codes](#error-codes)
+  - [Error Factory Functions](#error-factory-functions)
+  - [ApplicationError Class](#applicationerror-class)
+  - [Error Mapping Functions](#error-mapping-functions)
+  - [Error Handling Patterns](#error-handling-patterns)
+  - [Best Practices](#best-practices)
+  - [Testing Error Handling](#testing-error-handling)
+  - [Related Documentation](#related-documentation)
+
+---
+
 ## Overview
 
 The translation workflow uses a simplified error handling system with a single `ApplicationError` class and factory functions for common error scenarios. Each error provides context through optional `operation` and `metadata` properties for debugging.
@@ -322,11 +339,20 @@ test("handles chunk count mismatch", async () => {
 });
 ```
 
-## Related Files
+## Related Documentation
 
-- `/src/errors/base-error.ts`: Base error class and error codes
-- `/src/errors/errors.ts`: Error factory function implementations
-- `/src/errors/helpers/github-error.helper.ts`: GitHub error mapping function
-- `/src/errors/helpers/llm-error.helper.ts`: LLM error mapping function
-- `/src/services/translator.service.ts`: Primary error usage
-- `/src/services/runner/base.service.ts`: Error handling in workflow
+| Document                             | Description                                     |
+| ------------------------------------ | ----------------------------------------------- |
+| [DEBUGGING.md](./DEBUGGING.md)       | Troubleshooting guide and diagnostic procedures |
+| [ARCHITECTURE.md](./ARCHITECTURE.md) | System architecture and service design          |
+
+### Source Files
+
+| File                                                                                        | Description                            |
+| ------------------------------------------------------------------------------------------- | -------------------------------------- |
+| [`src/errors/base-error.ts`](../src/errors/base-error.ts)                                   | Base error class and error codes       |
+| [`src/errors/errors.ts`](../src/errors/errors.ts)                                           | Error factory function implementations |
+| [`src/errors/helpers/github-error.helper.ts`](../src/errors/helpers/github-error.helper.ts) | GitHub error mapping function          |
+| [`src/errors/helpers/llm-error.helper.ts`](../src/errors/helpers/llm-error.helper.ts)       | LLM error mapping function             |
+| [`src/services/translator.service.ts`](../src/services/translator.service.ts)               | Primary error usage                    |
+| [`src/services/runner/base.service.ts`](../src/services/runner/base.service.ts)             | Error handling in workflow             |

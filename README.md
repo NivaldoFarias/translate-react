@@ -30,11 +30,9 @@ Automated translation tool for React documentation using Large Language Models (
   - [Contributing](#contributing)
     - [Setup](#setup)
     - [Development Standards](#development-standards)
-    - [Patterns](#patterns)
   - [Troubleshooting](#troubleshooting)
     - [Common Issues](#common-issues)
     - [Debug Mode](#debug-mode)
-    - [Getting Help](#getting-help)
   - [License](#license)
 
 ## Overview
@@ -102,9 +100,6 @@ Then, Edit `.env` with your API keys (see [Configuration section](#configuration
 
 ### 4. Run in Development Mode
 
-> [!IMPORTANT]
-> Make sure to setup a `.env.dev` file with `DEV_MODE_FORK_PR=true` to create PRs against your fork instead of upstream. This prevents permission issues during development.
-
 ```bash
 bun run dev
 ```
@@ -115,7 +110,7 @@ Environment variables are validated at runtime using Zod schemas. See [`src/util
 
 ### Required Environment Variables
 
-These must be set in your `.env` _(or `.env.dev`, for development)_ file:
+These must be set in your `.env` file:
 
 | Variable      | Description                                                |
 | ------------- | ---------------------------------------------------------- |
@@ -161,7 +156,7 @@ These must be set in your `.env` _(or `.env.dev`, for development)_ file:
 | ----------------- | ------- | --------------------------------------- |
 | `TARGET_LANGUAGE` | `pt-br` | Target translation language (ISO 639-1) |
 | `SOURCE_LANGUAGE` | `en`    | Source language (ISO 639-1)             |
-| `BATCH_SIZE`      | `10`    | Files to process in parallel            |
+| `BATCH_SIZE`      | `1`     | Files to process in parallel            |
 
 </details>
 
@@ -199,25 +194,36 @@ bun start
 translate-react/
 ├─ src/
 │  ├── errors/                    # Error handling system
+│  ├── locales/                   # Language locale definitions
 │  ├── services/                  # Core services
 │  │   ├── cache/                 # In-memory caching
 │  │   ├── github/                # GitHub API integration
+│  │   ├── locale/                # Locale management
+│  │   ├── rate-limiter/          # API rate limiting
 │  │   ├── runner/                # Workflow orchestration
+│  │   ├── service-factory.service.ts  # Dependency injection
 │  │   └── translator.service.ts  # LLM translation engine
 │  ├── utils/                     # Utilities and constants
 │  └── main.ts                    # Entry point
 │
-├── docs/                         # Documentation
+├── docs/                         # Technical documentation
+├── tests/                        # Test suite
 └── logs/                         # Structured error logs (JSONL)
 ```
 
+> [!TIP]
+> For the complete directory structure with file-level details, see [PROJECT_STRUCTURE.md](./docs/PROJECT_STRUCTURE.md).
+
 ## Documentation
 
-- [**ARCHITECTURE.md**](./docs/ARCHITECTURE.md) - System architecture, service design, error handling patterns, and design decisions
-- [**WORKFLOW.md**](./docs/WORKFLOW.md) - Detailed execution workflow with timing analysis, bottleneck identification, and performance data
-- [**ERROR_HANDLING.md**](./docs/ERROR_HANDLING.md) - Error taxonomy, recovery mechanisms, and debugging strategies
-- [**DEBUGGING.md**](./docs/DEBUGGING.md) - Troubleshooting guides and diagnostic procedures
-- [**PROJECT_STRUCTURE.md**](./docs/PROJECT_STRUCTURE.md) - Comprehensive project organization, directory structure, and navigation guide
+| Document                                                  | Description                                                  |
+| --------------------------------------------------------- | ------------------------------------------------------------ |
+| [ARCHITECTURE.md](./docs/ARCHITECTURE.md)                 | System architecture, service design, and design patterns     |
+| [WORKFLOW.md](./docs/WORKFLOW.md)                         | Execution workflow with timing analysis and performance data |
+| [ERROR_HANDLING.md](./docs/ERROR_HANDLING.md)             | Error taxonomy and recovery mechanisms                       |
+| [TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md)           | Troubleshooting guide and diagnostic procedures              |
+| [PROJECT_STRUCTURE.md](./docs/PROJECT_STRUCTURE.md)       | Complete directory structure and navigation guide            |
+| [GITHUB_ACTIONS_SETUP.md](./docs/GITHUB_ACTIONS_SETUP.md) | CI/CD workflow configuration guide                           |
 
 ## Contributing
 
@@ -227,107 +233,42 @@ Contributions are welcome. Follow these guidelines:
 
 1. Fork repository and create feature branch
 2. Install dependencies: `bun install`
-3. Create `.env.dev` with development configuration:
-
-```bash
-NODE_ENV=development
-```
-
+3. Create `.env` with `NODE_ENV=development`
 4. Run tests: `bun test`
 
 ### Development Standards
 
-- **TypeScript**: All code must be properly typed
+- **TypeScript**: All code must be properly typed with strict mode enabled
 - **Bun Runtime**: Use Bun exclusively (not npm/yarn/pnpm)
-- **Error Handling**: Follow established error patterns (see [ERROR_HANDLING.md](./docs/ERROR_HANDLING.md))
-- **Documentation**: Maintain comprehensive JSDoc comments (see [.github/instructions/jsdocs.instructions.md](./.github/instructions/jsdocs.instructions.md))
-- **Commits**: Use conventional commit format (see [.github/instructions/commit.instructions.md](./.github/instructions/commit.instructions.md))
-- **Testing**: Add tests for new features
+- **Error Handling**: Follow established patterns in [ERROR_HANDLING.md](./docs/ERROR_HANDLING.md)
+- **Testing**: Add tests for new features using Bun's test runner
 - **Code Style**: Follow ESLint/Prettier configuration
+- **Commits**: Use [Conventional Commits](https://www.conventionalcommits.org/) format
 
-### Patterns
-
-- **Services**: Extend appropriate base classes
-- **Errors**: Create specific error types for new failure scenarios
-- **Environment**: Add new variables to Zod schema in `env.util.ts`
-- **Caching**: Use existing cache service for runtime state
+> [!TIP]
+> See [ARCHITECTURE.md](./docs/ARCHITECTURE.md) for service design patterns when extending the codebase.
 
 ## Troubleshooting
 
 ### Common Issues
 
-<details>
-<summary><b>Environment Validation Errors</b></summary>
-
-**Error**: `❌ Invalid environment variables: - GH_TOKEN: String must contain at least 1 character(s)`
-
-**Solution**: Ensure required variables (`GH_TOKEN`, `LLM_API_KEY`) are set in `.env` file.
-
-</details>
-
-<details>
-<summary><b>GitHub "Not Found" Errors</b></summary>
-
-**Error**: `GITHUB_NOT_FOUND - https://docs.github.com/rest/git/refs#get-a-reference`
-
-**Solution**: Set `DEV_MODE_FORK_PR=true` in `.env.dev` to create PRs against your fork instead of upstream (prevents permission issues during development).
-
-</details>
-
-<details>
-<summary><b>GitHub API Rate Limiting</b></summary>
-
-**Error**: `GITHUB_RATE_LIMITED - API rate limit exceeded`
-
-**Solution**: Tool automatically retries with exponential backoff. For heavy usage, consider GitHub App token instead of PAT.
-
-</details>
-
-<details>
-<summary><b>Translation API Errors</b></summary>
-
-**Error**: `OpenAI API error: insufficient_quota`
-
-**Solution**: Check API key has sufficient credits. Switch providers by changing `LLM_API_BASE_URL`.
-
-</details>
+| Error                                                   | Solution                                                                  |
+| ------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `GH_TOKEN: String must contain at least 1 character(s)` | Set `GH_TOKEN` and `LLM_API_KEY` in `.env`                                |
+| `GITHUB_NOT_FOUND`                                      | Verify repository permissions and token scope                             |
+| `GITHUB_RATE_LIMITED`                                   | Tool auto-retries with backoff; consider GitHub App token for heavy usage |
+| `OpenAI API error: insufficient_quota`                  | Check API credits; switch providers via `LLM_API_BASE_URL`                |
 
 ### Debug Mode
 
-> [!TIP]
-> For a more detailed debugging guidance, see [`DEBUGGING.md`](./docs/DEBUGGING.md).
-
-#### Enable verbose logging:
+Enable verbose logging:
 
 ```bash
 LOG_LEVEL="debug" bun dev
 ```
 
-#### Analyze error logs _(`.jsonl` format)_:
-
-##### View Recent Errors
-
-```bash
-tail -f logs/$(ls -t logs/ | head -1) | jq '.'
-```
-
-##### Filter by Error Type
-
-```bash
-grep "GITHUB_NOT_FOUND" logs/*.log | jq '.'
-```
-
-##### Error Pattern Analysis
-
-```bash
-cat logs/*.log | jq '.code' | sort | uniq -c
-```
-
-### Getting Help
-
-- [GitHub Issues](https://github.com/NivaldoFarias/translate-react/issues) - Bug reports and feature requests
-- [GitHub Discussions](https://github.com/NivaldoFarias/translate-react/discussions) - Questions and support
-- [Documentation](./docs/) - Detailed technical documentation
+> [!TIP]
+> For comprehensive troubleshooting guidance including diagnostic procedures and log analysis, see [TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md).
 
 ## License
 
