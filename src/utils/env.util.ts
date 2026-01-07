@@ -27,16 +27,9 @@ function createTokenSchema(envName: string) {
 		);
 }
 
-/**
- * Detects if running in test environment.
- *
- * Checks NODE_ENV, and Bun's built-in test detection.
- */
+/** Detects if running in test environment */
 function isTestEnvironment(): boolean {
-	return (
-		import.meta.env.NODE_ENV === RuntimeEnvironment.Test ||
-		(typeof Bun !== "undefined" && !Bun.isMainThread)
-	);
+	return import.meta.env.NODE_ENV === RuntimeEnvironment.Test;
 }
 
 /** Environment configuration schema for runtime validation */
