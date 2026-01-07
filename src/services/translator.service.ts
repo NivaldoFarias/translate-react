@@ -177,7 +177,7 @@ export class TranslatorService {
 				temperature: 0.1,
 			});
 
-			if (isLLMResponseValid(response)) {
+			if (!isLLMResponseValid(response)) {
 				throw createInitializationError(
 					"Invalid LLM API response: missing response metadata",
 					`${TranslatorService.name}.testConnectivity`,
@@ -577,15 +577,16 @@ export class TranslatorService {
 			const nextChunk = chunks[index + 1];
 
 			if (currentChunk === undefined || nextChunk === undefined) {
-				this.logger.warn(
-					{ index, chunksLength: chunks.length },
+				throw createChunkProcessingError(
 					"TranslatorService: encountered undefined chunk while computing separators",
 				);
-				separators.push("\n\n");
-				continue;
 			}
 
 			if (!currentChunk.trim() || !nextChunk.trim()) {
+				this.logger.warn(
+					{ index, chunksLength: chunks.length },
+					"TranslatorService: encountered empty chunk while computing separators",
+				);
 				separators.push("\n\n");
 				continue;
 			}
@@ -797,7 +798,8 @@ export class TranslatorService {
 		const translatedEndsWithNewline = reassembledContent.endsWith("\n");
 
 		if (originalEndsWithNewline && !translatedEndsWithNewline) {
-			const originalTrailingNewlines = /\n+$/.exec(content)?.[0] ?? "";
+			const TRAILING_NEWLINES_REGEX = /\n+$/;
+			const originalTrailingNewlines = TRAILING_NEWLINES_REGEX.exec(content)?.[0] ?? "";
 			reassembledContent += originalTrailingNewlines;
 
 			this.logger.debug(
