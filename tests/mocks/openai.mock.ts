@@ -2,34 +2,27 @@ import { mock } from "bun:test";
 import OpenAI from "openai";
 
 import type { ChatCompletion } from "openai/resources.mjs";
+import type { PartialDeep } from "type-fest";
 
 import type { RateLimiter } from "@/services/";
 
 /**
  * Creates a mock ChatCompletion response.
  *
- * @param content The translated content to return
- * @param options Additional response options
+ * @param overrides Optional overrides for the ChatCompletion fields
  *
  * @returns Mock ChatCompletion object
  */
-export function createMockChatCompletion(
-	content: string,
-	options?: {
-		id?: string;
-		model?: string;
-		totalTokens?: number;
-	},
-): ChatCompletion {
+export function createMockChatCompletion(overrides?: PartialDeep<ChatCompletion>): ChatCompletion {
 	return {
-		id: options?.id ?? "chatcmpl-test-123",
+		id: "chatcmpl-test-123",
 		created: Date.now(),
-		model: options?.model ?? "test-model",
+		model: "test-model",
 		object: "chat.completion",
 		choices: [
 			{
 				message: {
-					content,
+					content: "",
 					refusal: null,
 					role: "assistant",
 				},
@@ -39,16 +32,35 @@ export function createMockChatCompletion(
 			},
 		],
 		usage: {
-			total_tokens: options?.totalTokens ?? 50,
+			total_tokens: 50,
 			completion_tokens: 30,
 			prompt_tokens: 20,
 		},
+		...overrides,
 	} as ChatCompletion;
 }
 
 /** Factory for creating chat completions mock function */
 export function createChatCompletionsMock(defaultResponse?: ChatCompletion) {
-	return mock(() => Promise.resolve(defaultResponse ?? createMockChatCompletion("Olá mundo")));
+	return mock(() =>
+		Promise.resolve(
+			defaultResponse ??
+				createMockChatCompletion({
+					choices: [
+						{
+							message: {
+								content: "Olá mundo",
+								refusal: null,
+								role: "assistant",
+							},
+							finish_reason: "length",
+							index: 0,
+							logprobs: null,
+						},
+					],
+				}),
+		),
+	);
 }
 
 /**
