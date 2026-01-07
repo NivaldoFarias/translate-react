@@ -119,9 +119,15 @@ describe("RepositoryService", () => {
 				data: {
 					tree: [
 						{ path: "src/test/file.md", type: "blob", sha: "abc123", url: "" },
-						{ path: "README.md", type: "blob", sha: "def456", url: "" }, // Should be filtered (no src/)
-						{ path: "src/component.tsx", type: "blob", sha: "ghi789", url: "" }, // Should be filtered (not .md)
-						{ path: "file.md", type: "blob", sha: "jkl012", url: "" }, // Should be filtered (no directory)
+
+						/**  Should be filtered (no src/) */
+						{ path: "README.md", type: "blob", sha: "def456", url: "" },
+
+						/** Should be filtered (not .md) */
+						{ path: "src/component.tsx", type: "blob", sha: "ghi789", url: "" },
+
+						/** Should be filtered (no directory) */
+						{ path: "file.md", type: "blob", sha: "jkl012", url: "" },
 					],
 				},
 			});
