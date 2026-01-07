@@ -21,9 +21,6 @@ This document provides a detailed breakdown of the translation workflow executio
     - [Content Discovery Workflow](#content-discovery-workflow)
     - [Translation Workflow](#translation-workflow)
     - [GitHub Integration Workflow](#github-integration-workflow)
-  - [Timing Analysis](#timing-analysis)
-    - [Current Performance Baseline](#current-performance-baseline)
-    - [Performance Bottlenecks](#performance-bottlenecks)
   - [Data Structures](#data-structures)
     - [TranslationFile](#translationfile)
     - [ProcessedFileResult](#processedfileresult)
@@ -177,15 +174,15 @@ flowchart LR
     B -->|Yes| C[Load Cached Tree]
     B -->|No| D[Fetch Repository Tree]
 
-    D --> E[GET /git/trees/{sha}?recursive=true]
+    D --> E["GET /git/trees?recursive=true"]
     E --> F[Receive 700+ items]
     C --> G[Filter Results]
     F --> G
 
     G --> H[Apply Filters]
-    H --> I[.md files only]
-    I --> J[src/ directory only]
-    J --> K[Has path & SHA]
+    H --> I[".md files only"]
+    I --> J["src/ directory only"]
+    J --> K[Has path and SHA]
 
     K --> L[192 files remain]
     L --> M[Fetch Glossary]
@@ -395,7 +392,7 @@ flowchart LR
     C -->|No| E
 
     D --> F[Format Results Table]
-    F --> G[POST /repos/{owner}/{repo}/issues/{number}/comments]
+    F --> G["POST issues/comments"]
     G --> H[Comment Created]
     H --> E
 
@@ -438,23 +435,20 @@ flowchart LR
 **Detailed timing and operations**:
 
 ```mermaid
-gantt
-    title Content Discovery Stage (Typical Run)
-    dateFormat ss
-    axisFormat %S
+flowchart LR
+    subgraph Init["Initialization ~2s"]
+        A1[Verify Permissions] --> A2[Check Fork Status]
+    end
 
-    section Initialization
-    Verify Permissions   :a1, 00, 1s
-    Check Fork Status    :a2, after a1, 1s
+    subgraph Fetch["Tree Fetching ~3s"]
+        B1[GET Default Branch] --> B2[GET Repository Tree] --> B3[Filter Results]
+    end
 
-    section Tree Fetching
-    GET Default Branch   :b1, after a2, 1s
-    GET Repository Tree  :b2, after b1, 1s
-    Filter Tree Results  :b3, after b2, 1s
+    subgraph Gloss["Glossary ~2s"]
+        C1[GET Glossary File] --> C2[Parse Glossary]
+    end
 
-    section Glossary
-    GET Glossary File    :c1, after b3, 1s
-    Parse Glossary       :c2, after c1, 1s
+    Init --> Fetch --> Gloss
 ```
 
 ### Translation Workflow
@@ -506,8 +500,8 @@ flowchart TD
     D -->|Yes| E[Update Existing PR]
     D -->|No| F[Create New PR]
 
-    E --> G[PATCH /pulls/{number}]
-    F --> H[POST /pulls]
+    E --> G["PATCH /pulls"]
+    F --> H["POST /pulls"]
 
     G --> I[PR Updated]
     H --> J[PR Created]
@@ -522,85 +516,6 @@ flowchart TD
     M --> O[Complete]
     N --> O
 ```
-
-## Timing Analysis
-
-### Current Performance Baseline
-
-Based on production log analysis (`2025-10-14T15:06:09.071Z`):
-
-| Phase                  | Duration  | % of Total | Bottleneck? |
-| ---------------------- | --------- | ---------- | ----------- |
-| Initialization         | 0.1s      | 0.5%       | ❌          |
-| Repository Setup       | 1.8s      | 9.6%       | ❌          |
-| Content Discovery      | 3.0s      | 16.0%      | ⚠️          |
-| **File Filtering**     | **14.0s** | **74.5%**  | ✅          |
-| Translation (per file) | ~5s       | Variable   | ❌          |
-| Progress Reporting     | 0.5s      | 2.7%       | ❌          |
-
-**Total Discovery Time**: ~18.8s for 192 files
-
-### Performance Bottlenecks
-
-#### Primary Bottleneck: File Content Fetching
-
-**Problem**: Sequential batch fetching of all files before filtering
-
-```typescript
-// Current approach (inefficient)
-for (const file of allFiles) {
-	const content = await fetchContent(file); // ~400ms each
-
-	if (hasOpenPR(file)) continue; // Check AFTER fetch
-	if (isTranslated(content)) continue; // Check AFTER fetch
-
-	queue.push(file);
-}
-```
-
-**Impact**:
-
-- Fetches content for ~150 files that will be skipped
-- ~60s wasted on unnecessary API calls
-- 80% of files filtered out post-fetch
-
-**Optimization Opportunity**:
-
-```typescript
-// Optimized approach (proposed)
-const prs = await fetchOpenPRs(); // 1 call, ~0.5s
-const translated = await getTranslatedFromHistory(); // 1 call, ~0.5s
-
-const candidates = allFiles.filter((f) => !prs.has(f.name) && !translated.has(f.name));
-
-// Only fetch content for candidates (~20 files)
-for (const file of candidates) {
-	const content = await fetchContent(file); // ~400ms × 20 = 8s
-	queue.push(file);
-}
-```
-
-**Expected Improvement**: 60s → 9s (85% reduction)
-
-#### Secondary Bottleneck: Language Detection
-
-**Problem**: Full CLD analysis on every file
-
-```typescript
-// Current: ~25ms per file × 192 files = 4.8s
-await cld.detect(fullContent);
-```
-
-**Optimization**: Fast heuristics + sampling
-
-```typescript
-// Proposed: ~1ms per file × 192 files = 0.2s
-if (containsKeywords(content, targetLanguage)) return true;
-if (cld.detect(content.slice(0, 1000)).reliable) return true;
-// Full CLD only if ambiguous
-```
-
-**Expected Improvement**: 4.8s → 0.2s (96% reduction)
 
 ## Data Structures
 
