@@ -1,9 +1,9 @@
+import { sleep } from "bun";
 import { afterEach, describe, expect, mock, test } from "bun:test";
 
 import type { RateLimiter, RateLimiterMetrics } from "@/services/";
 
 import { CONFIGS, createRateLimiter } from "@/services/";
-import { delay } from "@/utils/";
 
 /**
  * Validates that metrics contain expected structure with zero values.
@@ -216,7 +216,7 @@ describe("RateLimiter", () => {
 					() => rateLimiter?.schedule(mockLongRunningRequest) ?? Promise.resolve(null),
 				);
 
-				await delay(queueWaitMs);
+				await sleep(queueWaitMs);
 				rateLimiter.clearQueue();
 
 				const errorPromise = Promise.all(promises);
@@ -240,7 +240,7 @@ describe("RateLimiter", () => {
 					() => rateLimiter?.schedule(mockLongRunningRequest) ?? Promise.resolve(null),
 				);
 
-				await delay(queueWaitMs);
+				await sleep(queueWaitMs);
 				rateLimiter.clearQueue();
 
 				const errorPromise = Promise.all(promises);

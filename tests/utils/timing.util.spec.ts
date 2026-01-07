@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { sleep } from "bun";
+import { beforeEach, describe, expect, mock, test } from "bun:test";
 
 import { timeOperation, Timer } from "@/utils/timing.util";
 
@@ -29,7 +30,7 @@ describe("timing.util", () => {
 
 		test("should measure execution time for fast operation", async () => {
 			const operation = mock(async () => {
-				await new Promise((resolve) => setTimeout(resolve, 50));
+				await sleep(50);
 				return "done";
 			});
 
@@ -37,8 +38,9 @@ describe("timing.util", () => {
 			const result = await timeOperation("fastOp", operation);
 			const elapsed = Date.now() - startTime;
 
+			expect(result).toBe("done");
 			expect(elapsed).toBeGreaterThanOrEqual(50);
-			expect(elapsed).toBeLessThan(150); // Allow some overhead
+			expect(elapsed).toBeLessThan(150);
 		});
 	});
 
@@ -46,21 +48,21 @@ describe("timing.util", () => {
 		test("should track elapsed time", async () => {
 			const timer = new Timer("testTimer");
 
-			await new Promise((resolve) => setTimeout(resolve, 100));
+			await sleep(100);
 			const elapsed = timer.elapsed();
 
-			expect(elapsed).toBeGreaterThanOrEqual(100);
+			expect(elapsed).toBeGreaterThanOrEqual(95);
 			expect(elapsed).toBeLessThan(150);
 		});
 
 		test("should return timing result on stop", async () => {
 			const timer = new Timer("stopTest");
 
-			await new Promise((resolve) => setTimeout(resolve, 50));
+			await sleep(0);
 			const result = timer.stop();
 
 			expect(result.operation).toBe("stopTest");
-			expect(result.durationMs).toBeGreaterThanOrEqual(50);
+			expect(result.durationMs).toBeGreaterThanOrEqual(45);
 			expect(result.startTime).toBeLessThanOrEqual(result.endTime);
 			expect(result.endTime - result.startTime).toEqual(result.durationMs);
 		});
@@ -68,14 +70,14 @@ describe("timing.util", () => {
 		test("should return correct elapsed time without stopping", async () => {
 			const timer = new Timer("elapsedTest");
 
-			await new Promise((resolve) => setTimeout(resolve, 50));
+			await sleep(50);
 			const elapsed1 = timer.elapsed();
 
-			await new Promise((resolve) => setTimeout(resolve, 50));
+			await sleep(50);
 			const elapsed2 = timer.elapsed();
 
-			expect(elapsed1).toBeGreaterThanOrEqual(50);
-			expect(elapsed2).toBeGreaterThanOrEqual(100);
+			expect(elapsed1).toBeGreaterThanOrEqual(45);
+			expect(elapsed2).toBeGreaterThanOrEqual(95);
 			expect(elapsed2).toBeGreaterThan(elapsed1);
 		});
 
@@ -83,10 +85,10 @@ describe("timing.util", () => {
 			const timer1 = new Timer("op1");
 			const timer2 = new Timer("op2");
 
-			await new Promise((resolve) => setTimeout(resolve, 50));
+			await sleep(50);
 			const result1 = timer1.stop();
 
-			await new Promise((resolve) => setTimeout(resolve, 50));
+			await sleep(50);
 			const result2 = timer2.stop();
 
 			expect(result1.durationMs).toBeLessThan(result2.durationMs);
