@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   sync-and-translate:
-    name: Sync & Translate (${{ matrix.lang }})
+    name: Sync & Translate
     if: ${{ vars.TRANSLATION_ENABLED == 'true' }}
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
@@ -91,7 +91,7 @@ jobs:
           MIN_SUCCESS_RATE=${{ vars.MIN_SUCCESS_RATE }}
           EOF
 
-      - name: Run translation workflow
+      - name: Run translation workflow (${{ matrix.lang }})
         run: bun run start
         timeout-minutes: 120
 
