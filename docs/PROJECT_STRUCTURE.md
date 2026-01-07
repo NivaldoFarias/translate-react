@@ -1,6 +1,6 @@
 # Project Structure
 
-A comprehensive overview of the translate-react project organization, designed for maintainability and developer understanding.
+A comprehensive overview of the translate-react project organization.
 
 ## Directory Structure Overview
 
@@ -10,12 +10,13 @@ translate-react/
 │   ├── README.md                             # Main project documentation
 │   ├── LICENSE                               # MIT License
 │   └── docs/                                 # Technical documentation
-│       ├── README.md                         # Documentation entrypoint
+│       ├── README.md                         # Documentation index
 │       ├── ARCHITECTURE.md                   # System architecture and service design
 │       ├── WORKFLOW.md                       # Execution workflow and timing analysis
 │       ├── ERROR_HANDLING.md                 # Error taxonomy and recovery mechanisms
-│       ├── DEBUGGING.md                      # Troubleshooting and diagnostics
-│       ├── PROJECT_STRUCTURE.md              # This file - project structure overview
+│       ├── TROUBLESHOOTING.md                      # Troubleshooting and diagnostics
+│       ├── PROJECT_STRUCTURE.md              # This file
+│       └── GITHUB_ACTIONS_SETUP.md           # CI/CD configuration guide
 │
 ├── Configuration Files
 │   ├── package.json                          # Dependencies, scripts, and metadata
@@ -40,63 +41,97 @@ translate-react/
 │       │   ├── errors.ts                     # Specific error implementations
 │       │   └── helpers/                      # Error helper utilities
 │       │       ├── index.ts
-│       │       ├── error.helper.ts           # General error utilities
 │       │       ├── github-error.helper.ts    # GitHub error mapping
 │       │       └── llm-error.helper.ts       # LLM error handling
 │       │
+│       ├── locales/                          # Language locale definitions
+│       │   ├── index.ts                      # Locale exports
+│       │   ├── types.ts                      # Locale type definitions
+│       │   └── pt-br.locale.ts               # Portuguese (Brazil) locale
+│       │
 │       ├── services/                         # Core business logic services
+│       │   ├── index.ts                      # Service exports
+│       │   ├── service-factory.service.ts    # Dependency injection factory
 │       │   ├── comment-builder.service.ts    # PR comment generation
 │       │   ├── language-detector.service.ts  # Language detection (CLD)
 │       │   ├── translator.service.ts         # LLM translation engine
 │       │   │
 │       │   ├── cache/                        # Runtime cache services
+│       │   │   ├── index.ts
 │       │   │   ├── cache.service.ts          # Generic in-memory cache
 │       │   │   └── language-cache.service.ts # Language detection cache
 │       │   │
 │       │   ├── github/                       # GitHub API integration
+│       │   │   ├── index.ts
 │       │   │   ├── base.service.ts           # Base GitHub service
 │       │   │   ├── branch.service.ts         # Branch management
 │       │   │   ├── content.service.ts        # Content and PR operations
-│       │   │   ├── github.service.ts         # Main GitHub orchestrator
 │       │   │   └── repository.service.ts     # Repository operations
 │       │   │
+│       │   ├── locale/                       # Locale management
+│       │   │   ├── index.ts
+│       │   │   └── locale.service.ts         # Locale service
+│       │   │
+│       │   ├── rate-limiter/                 # API rate limiting
+│       │   │   ├── index.ts
+│       │   │   ├── rate-limiter.config.ts    # Rate limiter presets
+│       │   │   ├── rate-limiter.service.ts   # Rate limiter implementation
+│       │   │   └── rate-limiter.types.ts     # Rate limiter types
+│       │   │
 │       │   └── runner/                       # Workflow orchestration
+│       │       ├── index.ts
+│       │       ├── runner.types.ts           # Runner type definitions
 │       │       ├── base.service.ts           # Base runner implementation
-│       │       └── runner.service.ts         # Main workflow orchestrator
+│       │       ├── runner.service.ts         # Main workflow orchestrator
+│       │       ├── file-discovery.manager.ts # File discovery logic
+│       │       ├── translation-batch.manager.ts # Batch processing
+│       │       └── pr.manager.ts             # PR creation and management
 │       │
 │       └── utils/                            # Utility functions and constants
 │           ├── index.ts                      # Utility exports
 │           ├── constants.util.ts             # Application constants
 │           ├── env.util.ts                   # Environment validation (Zod)
 │           ├── logger.util.ts                # Pino logger configuration
+│           ├── backoff.util.ts               # Exponential backoff utility
+│           ├── common.util.ts                # Common utilities
+│           ├── timing.util.ts                # Timing/profiling utilities
 │           ├── rate-limit-detector.util.ts   # Rate limit detection
 │           └── setup-signal-handlers.util.ts # Process signal handlers
 │
 ├── Testing Infrastructure
-│   └── tests/                                      # Test suite
-│       ├── setup.ts                                # Test configuration
-│       ├── errors/                                 # Error handling tests
-│       ├── services/                               # Service tests
+│   └── tests/                                # Test suite
+│       ├── setup.ts                          # Test configuration
+│       ├── mocks/                            # Mock implementations
+│       │   ├── index.ts
+│       │   ├── octokit.mock.ts
+│       │   ├── openai.mock.ts
+│       │   ├── repositories.mock.ts
+│       │   └── services.mock.ts
+│       ├── errors/                           # Error handling tests
+│       │   ├── base-error.spec.ts
+│       │   ├── errors.spec.ts
+│       │   └── helpers/
+│       │       ├── github-error.helper.spec.ts
+│       │       └── llm-error.helper.spec.ts
+│       ├── services/                         # Service tests
 │       │   ├── comment-builder.service.spec.ts
 │       │   ├── language-detector.service.spec.ts
+│       │   ├── service-factory.service.spec.ts
 │       │   ├── translator.service.spec.ts
-│       │   ├── cache/                              # Cache service tests
-│       │   │   ├── cache.service.spec.ts
-│       │   │   └── language-cache.service.spec.ts
-│       │   └── github/                             # GitHub service tests
-│       │       ├── base.service.spec.ts
-│       │       ├── branch.service.spec.ts
-│       │       └── content.service.spec.ts
-│       └── utils/                                  # Utility tests
-│           └── env.util.spec.ts
+│       │   ├── cache/
+│       │   ├── github/
+│       │   ├── locale/
+│       │   └── rate-limiter/
+│       └── utils/                            # Utility tests
+│           ├── backoff.util.spec.ts
+│           ├── env.util.spec.ts
+│           └── timing.util.spec.ts
 │
 └── Runtime Artifacts (Auto-generated)
-    ├── dist/                              # Build output directory (gitignored)
-    │   ├── index.js                       # Bundled application
-    │   ├── index.js.map                   # Source map for debugging
-    ├── logs/                              # Structured error logs (JSONL)
-    ├── node_modules/                      # Package dependencies
-    └── bun.lockb                          # Bun lockfile
+    ├── dist/                                 # Build output directory (gitignored)
+    ├── logs/                                 # Structured error logs (JSONL)
+    ├── node_modules/                         # Package dependencies
+    └── bun.lock                              # Bun lockfile
 ```
 
 ## Key Organization Principles
@@ -106,25 +141,24 @@ translate-react/
 - Core business logic organized into specialized services
 - Clear separation between GitHub integration, translation, and orchestration
 - Inheritance-based service hierarchy with protected access modifiers
+- Dependency injection via `ServiceFactory` for testability
 
 ### 2. Error-First Design
 
 - Dedicated error handling system with custom error types
 - GitHub-specific error mapping for better debugging
-- Proxy pattern for automatic error wrapping and context enrichment
+- Factory functions for common error scenarios
 
 ### 3. Documentation-Driven Development
 
 - Comprehensive technical documentation in `docs/` directory
-- Inline JSDoc comments following project standards
-- Instruction files for coding conventions and standards
+- Inline JSDoc comments for API documentation
 
 ### 4. Developer Experience Priority
 
 - Bun-first runtime (no npm/yarn/pnpm)
 - TypeScript with strict type checking
 - Comprehensive test coverage with Bun test runner
-- Diagnostic scripts for debugging and troubleshooting
 
 ## File Type Categories
 
@@ -144,50 +178,46 @@ translate-react/
 | Service                        | Responsibility                  | Dependencies      |
 | ------------------------------ | ------------------------------- | ----------------- |
 | `runner.service.ts`            | Main workflow orchestration     | All services      |
-| `github.service.ts`            | GitHub API integration          | Octokit REST API  |
+| `service-factory.service.ts`   | Dependency injection            | All services      |
 | `translator.service.ts`        | LLM translation engine          | OpenAI-compatible |
 | `language-detector.service.ts` | Language detection and analysis | CLD library       |
 | `cache.service.ts`             | Generic in-memory cache         | None              |
 | `language-cache.service.ts`    | Language detection cache        | Cache service     |
+| `rate-limiter.service.ts`      | API rate limiting               | Bottleneck        |
+| `locale.service.ts`            | Locale management               | None              |
 
 ### Error Handling Files
 
-| File                     | Purpose                        | Pattern  |
-| ------------------------ | ------------------------------ | -------- |
-| `base-error.ts`          | Base error classes             | Class    |
-| `errors.ts`              | Specific error implementations | Class    |
-| `error.helper.ts`        | Error utilities                | Function |
-| `github-error.helper.ts` | GitHub error mapping           | Function |
-| `llm-error.helper.ts`    | LLM error handling             | Function |
+| File                     | Purpose                 | Pattern  |
+| ------------------------ | ----------------------- | -------- |
+| `base-error.ts`          | Base error class        | Class    |
+| `errors.ts`              | Error factory functions | Factory  |
+| `github-error.helper.ts` | GitHub error mapping    | Function |
+| `llm-error.helper.ts`    | LLM error handling      | Function |
 
 ## Quick Navigation
 
 ### Development Tasks
 
-- **Start development**: `bun run dev` (watch mode)
-- **Run production**: `bun start`
-- **Build bundle**: `bun run build` (creates `dist/` directory)
-- **Linting**: `bun run lint` / `bun run lint:fix`
-- **Formatting**: `bun run format`
-- **Type checking**: `bun run type-check`
-- **Testing**: `bun test`
-
-### Documentation
-
-- **Architecture**: `docs/ARCHITECTURE.md`
-- **Workflow**: `docs/WORKFLOW.md`
-- **Error Handling**: `docs/ERROR_HANDLING.md`
-- **Debugging**: `docs/DEBUGGING.md`
-- **Main README**: `README.md`
+| Task        | Command                             |
+| ----------- | ----------------------------------- |
+| Development | `bun run dev` (watch mode)          |
+| Production  | `bun start`                         |
+| Build       | `bun run build`                     |
+| Lint        | `bun run lint` / `bun run lint:fix` |
+| Format      | `bun run format`                    |
+| Type Check  | `bun run type-check`                |
+| Test        | `bun test`                          |
 
 ### Key Directories
 
-- **Application logic**: `src/`
-- **Services**: `src/services/`
-- **Error handling**: `src/errors/`
-- **Tests**: `tests/`
-- **Scripts**: `scripts/`
-- **Documentation**: `docs/`
+| Directory       | Purpose                 |
+| --------------- | ----------------------- |
+| `src/`          | Application source code |
+| `src/services/` | Core business logic     |
+| `src/errors/`   | Error handling system   |
+| `tests/`        | Test suite              |
+| `docs/`         | Technical documentation |
 
 ## Service Architecture Patterns
 
@@ -196,26 +226,30 @@ translate-react/
 ```plaintext
 BaseRunner
 └── RunnerService (main orchestrator)
+    ├── FileDiscoveryManager
+    ├── TranslationBatchManager
+    └── PRManager
 
 BaseGitHub
 ├── RepositoryService (fork sync, tree operations)
 ├── BranchService (branch lifecycle)
-├── ContentService (file operations, PR management)
-└── GitHubService (main GitHub orchestrator)
+└── ContentService (file operations, PR management)
 ```
 
 ### Service Dependencies
 
 ```plaintext
-RunnerService
-├── GitHubService
-│   ├── RepositoryService
-│   ├── BranchService
-│   └── ContentService
-├── TranslatorService
-├── LanguageDetectorService
-└── LanguageCacheService
-    └── CacheService<T>
+ServiceFactory (creates all services)
+└── RunnerService
+    ├── RepositoryService
+    ├── BranchService
+    ├── ContentService
+    ├── TranslatorService
+    │   └── RateLimiterService
+    ├── LanguageDetectorService
+    ├── LanguageCacheService
+    │   └── CacheService<T>
+    └── LocaleService
 ```
 
 ### Error Handling Flow
@@ -253,12 +287,10 @@ Service Method
 
 1. Check error logs in `logs/` directory
 2. Enable debug mode with `LOG_LEVEL=debug`
-3. Consult `docs/DEBUGGING.md` for common issues
+3. Consult [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) for common issues
 
 ### Testing Workflow
 
-1. Write tests following `testing.instructions.md`
+1. Write tests using Bun's test runner
 2. Run tests with `bun test`
-3. Check coverage (if enabled)
-4. Use test scripts in `scripts/` for integration testing
-5. Follow TDD principles for new features
+3. Run with coverage: `bun test --coverage`
