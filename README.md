@@ -30,11 +30,9 @@ Automated translation tool for React documentation using Large Language Models (
   - [Contributing](#contributing)
     - [Setup](#setup)
     - [Development Standards](#development-standards)
-    - [Patterns](#patterns)
   - [Troubleshooting](#troubleshooting)
     - [Common Issues](#common-issues)
     - [Debug Mode](#debug-mode)
-    - [Getting Help](#getting-help)
   - [License](#license)
 
 ## Overview
@@ -102,9 +100,6 @@ Then, Edit `.env` with your API keys (see [Configuration section](#configuration
 
 ### 4. Run in Development Mode
 
-> [!IMPORTANT]
-> Make sure to setup a `.env.dev` file with `DEV_MODE_FORK_PR=true` to create PRs against your fork instead of upstream. This prevents permission issues during development.
-
 ```bash
 bun run dev
 ```
@@ -115,7 +110,7 @@ Environment variables are validated at runtime using Zod schemas. See [`src/util
 
 ### Required Environment Variables
 
-These must be set in your `.env` _(or `.env.dev`, for development)_ file:
+These must be set in your `.env` file:
 
 | Variable      | Description                                                |
 | ------------- | ---------------------------------------------------------- |
@@ -238,7 +233,7 @@ Contributions are welcome. Follow these guidelines:
 
 1. Fork repository and create feature branch
 2. Install dependencies: `bun install`
-3. Create `.env.dev` with `NODE_ENV=development`
+3. Create `.env` with `NODE_ENV=development`
 4. Run tests: `bun test`
 
 ### Development Standards

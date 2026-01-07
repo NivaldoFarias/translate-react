@@ -25,8 +25,6 @@ translate-react/
 │   ├── eslint.config.mjs                     # Code linting rules
 │   ├── prettier.config.mjs                   # Code formatting configuration
 │   ├── .env.example                          # Environment variables template
-│   ├── .env                                  # Local environment variables (gitignored)
-│   ├── .env.dev                              # Development environment (gitignored)
 │   └── .gitignore                            # Git ignore rules
 │
 ├── Application Source
