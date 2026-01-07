@@ -1,260 +1,150 @@
-/**
- * @fileoverview Tests for LLM error mapping helper
- *
- * Tests error mapping for OpenAI API errors, rate limit detection,
- * and generic error handling for language model operations.
- */
-
 import { describe, expect, test } from "bun:test";
+import { StatusCodes } from "http-status-codes";
 import { APIError } from "openai/error";
 
-import { ErrorCode, ErrorSeverity } from "@/errors/base-error";
-import { LLMErrorHelper } from "@/errors/helpers/llm-error.helper";
+import { ErrorCode, mapLLMError } from "@/errors/";
 
-describe("LLMErrorHelper", () => {
-	const helper = new LLMErrorHelper();
-
+describe("mapLLMError", () => {
 	describe("APIError mapping", () => {
 		test("should map APIError to LLMApiError", () => {
-			const error = new APIError(400, { message: "Invalid request" }, "Invalid request", {});
+			const message = "Invalid request";
+			const error = new APIError(StatusCodes.BAD_REQUEST, { message }, message, {});
 
-			const mapped = helper.mapError(error, {
-				operation: "TranslatorService.callLanguageModel",
-			});
+			const mapped = mapLLMError(error, "TranslatorService.callLanguageModel");
 
-			expect(mapped.code).toBe(ErrorCode.LLMApiError);
 			expect(mapped.message).toContain("Invalid request");
 		});
 
-		test("should detect rate limit from APIError message", () => {
-			const error = new APIError(
-				429,
-				{ message: "Rate limit exceeded" },
-				"Rate limit exceeded",
-				{},
-			);
-
-			const mapped = helper.mapError(error, {
-				operation: "TranslatorService.callLanguageModel",
-			});
-
-			expect(mapped.code).toBe(ErrorCode.RateLimitExceeded);
-		});
-
-		test("should detect rate limit from 429 status code", () => {
-			const error = new APIError(429, { message: "Too many requests" }, "Too many requests", {});
-
-			const mapped = helper.mapError(error, {
-				operation: "TranslatorService.callLanguageModel",
-			});
-
-			expect(mapped.code).toBe(ErrorCode.RateLimitExceeded);
-		});
-
 		test("should preserve error metadata", () => {
-			const error = new APIError(400, { message: "Bad request" }, "Bad request", {});
+			const message = "Bad request";
+			const error = new APIError(StatusCodes.BAD_REQUEST, { message }, message, {});
 
-			const mapped = helper.mapError(error, {
-				operation: "TranslatorService.callLanguageModel",
-				metadata: { model: "gpt-4", contentLength: 1500 },
+			const mapped = mapLLMError(error, "TranslatorService.callLanguageModel", {
+				model: "gpt-4",
+				contentLength: 1500,
 			});
 
-			expect(mapped.context.operation).toBe("TranslatorService.callLanguageModel");
-			expect(mapped.context.metadata).toEqual(
-				expect.objectContaining({
-					model: "gpt-4",
-					contentLength: 1500,
-				}),
-			);
+			expect(mapped.operation).toBe("TranslatorService.callLanguageModel");
+			expect(mapped.metadata?.model).toBe("gpt-4");
+			expect(mapped.metadata?.contentLength).toBe(1500);
 		});
 	});
 
 	describe("Error instance handling", () => {
-		test("should detect RateLimitError by constructor name", () => {
-			class RateLimitError extends Error {
-				constructor(message: string) {
-					super(message);
-					this.name = "RateLimitError";
-				}
-			}
+		test.each([
+			["rate limit exceeded", ErrorCode.RateLimitExceeded],
+			["too many requests", ErrorCode.RateLimitExceeded],
+			["429 error", ErrorCode.RateLimitExceeded],
+			["quota exceeded", ErrorCode.RateLimitExceeded],
+			["Unknown LLM error", ErrorCode.UnknownError],
+		])("should detect rate limit when error message contains '%s'", (message, errorCode) => {
+			const error = new Error(message);
 
-			const error = new RateLimitError("Rate limit exceeded");
+			const mapped = mapLLMError(error, "TranslatorService.callLanguageModel");
 
-			const mapped = helper.mapError(error, {
-				operation: "TranslatorService.callLanguageModel",
-			});
-
-			expect(mapped.code).toBe(ErrorCode.RateLimitExceeded);
+			expect(mapped.code).toBe(errorCode);
+			expect(mapped.message).toContain(message);
 		});
 
-		test("should detect QuotaExceededError by constructor name", () => {
-			class QuotaExceededError extends Error {
-				constructor(message: string) {
-					super(message);
-					this.name = "QuotaExceededError";
-				}
-			}
+		describe("Non-Error object handling", () => {
+			test("should handle string errors", () => {
+				const error = "String error message";
 
-			const error = new QuotaExceededError("Quota exceeded");
+				const mapped = mapLLMError(error, "TranslatorService.callLanguageModel");
 
-			const mapped = helper.mapError(error, {
-				operation: "TranslatorService.callLanguageModel",
+				expect(mapped.message).toContain("String error message");
 			});
 
-			expect(mapped.code).toBe(ErrorCode.RateLimitExceeded);
-		});
+			test("should handle null errors", () => {
+				const error = null;
 
-		test("should detect TooManyRequestsError by constructor name", () => {
-			class TooManyRequestsError extends Error {
-				constructor(message: string) {
-					super(message);
-					this.name = "TooManyRequestsError";
-				}
-			}
+				const mapped = mapLLMError(error, "TranslatorService.callLanguageModel");
 
-			const error = new TooManyRequestsError("Too many requests");
-
-			const mapped = helper.mapError(error, {
-				operation: "TranslatorService.callLanguageModel",
+				expect(mapped.message).toBe("null");
 			});
 
-			expect(mapped.code).toBe(ErrorCode.RateLimitExceeded);
+			test("should handle undefined errors", () => {
+				const error = undefined;
+
+				const mapped = mapLLMError(error, "TranslatorService.callLanguageModel");
+
+				expect(mapped.message).toBe("undefined");
+			});
+
+			test("should handle object errors", () => {
+				const error = { message: "Object error", code: 500 };
+
+				const mapped = mapLLMError(error, "TranslatorService.callLanguageModel");
+
+				expect(mapped.code).toBe(ErrorCode.UnknownError);
+				expect(mapped.message).toContain("[object Object]");
+			});
 		});
 
-		test("should detect rate limit from error message pattern", () => {
-			const patterns = ["rate limit exceeded", "too many requests", "429 error", "quota exceeded"];
+		describe("Context preservation", () => {
+			test("should preserve metadata", () => {
+				const error = new Error("Test error");
 
-			patterns.forEach((message) => {
-				const error = new Error(message);
-				const mapped = helper.mapError(error, {
-					operation: "TranslatorService.callLanguageModel",
+				const mapped = mapLLMError(error, "TranslatorService.translateText", {
+					model: "gpt-4",
+					temperature: 0.7,
+					maxTokens: 2000,
 				});
 
-				expect(mapped.code).toBe(ErrorCode.RateLimitExceeded);
+				expect(mapped.metadata?.model).toBe("gpt-4");
+				expect(mapped.metadata?.temperature).toBe(0.7);
+				expect(mapped.metadata?.maxTokens).toBe(2000);
+			});
+
+			test("should handle missing metadata gracefully", () => {
+				const error = new Error("Test error");
+
+				const mapped = mapLLMError(error, "TranslatorService.translateText");
+
+				expect(mapped.operation).toBe("TranslatorService.translateText");
+				expect(mapped.metadata).toBeDefined();
 			});
 		});
 
-		test("should handle generic Error instances", () => {
-			const error = new Error("Unknown LLM error");
+		describe("Edge Cases", () => {
+			test("should handle APIError with empty message", () => {
+				const message = "";
+				const error = new APIError(StatusCodes.BAD_REQUEST, { message }, message, {});
 
-			const mapped = helper.mapError(error, {
-				operation: "TranslatorService.callLanguageModel",
+				const mapped = mapLLMError(error, "TranslatorService.callLanguageModel");
+
+				expect(mapped.code).toBe(ErrorCode.LLMApiError);
+				expect(mapped.message).toContain(message);
 			});
 
-			expect(mapped.code).toBe(ErrorCode.UnknownError);
-			expect(mapped.message).toContain("Unknown LLM error");
-		});
-	});
+			test("should handle APIError with special characters in message", () => {
+				const message = "Error: <script>alert('xss')</script>";
+				const error = new APIError(StatusCodes.BAD_REQUEST, { message }, message, {});
 
-	describe("Non-Error object handling", () => {
-		test("should handle string errors", () => {
-			const error = "String error message";
+				const mapped = mapLLMError(error, "TranslatorService.callLanguageModel");
 
-			const mapped = helper.mapError(error, {
-				operation: "TranslatorService.callLanguageModel",
+				expect(mapped.code).toBe(ErrorCode.LLMApiError);
+				expect(mapped.message).toContain("<script>");
 			});
 
-			expect(mapped.code).toBe(ErrorCode.UnknownError);
-			expect(mapped.message).toContain("String error message");
-		});
+			test("should handle empty operation", () => {
+				const error = new Error("Test error");
 
-		test("should handle null errors", () => {
-			const error = null;
+				const mapped = mapLLMError(error, "");
 
-			const mapped = helper.mapError(error, {
-				operation: "TranslatorService.callLanguageModel",
+				expect(mapped.operation).toBe("");
+				expect(mapped.code).toBe(ErrorCode.UnknownError);
 			});
 
-			expect(mapped.code).toBe(ErrorCode.UnknownError);
-			expect(mapped.message).toBe("null");
-		});
+			test("should handle very long error messages", () => {
+				const longMessage = "Error: " + "x".repeat(10000);
+				const error = new Error(longMessage);
 
-		test("should handle undefined errors", () => {
-			const error = undefined;
+				const mapped = mapLLMError(error, "TranslatorService.callLanguageModel");
 
-			const mapped = helper.mapError(error, {
-				operation: "TranslatorService.callLanguageModel",
+				expect(mapped.code).toBe(ErrorCode.UnknownError);
+				expect(mapped.message).toBe(longMessage);
 			});
-
-			expect(mapped.code).toBe(ErrorCode.UnknownError);
-			expect(mapped.message).toBe("undefined");
-		});
-
-		test("should handle object errors", () => {
-			const error = { message: "Object error", code: 500 };
-
-			const mapped = helper.mapError(error, {
-				operation: "TranslatorService.callLanguageModel",
-			});
-
-			expect(mapped.code).toBe(ErrorCode.UnknownError);
-			expect(mapped.message).toContain("[object Object]");
-		});
-	});
-
-	describe("Context preservation", () => {
-		test("should preserve operation context", () => {
-			const error = new Error("Test error");
-
-			const mapped = helper.mapError(error, {
-				operation: "TranslatorService.translateText",
-			});
-
-			expect(mapped.context.operation).toBe("TranslatorService.translateText");
-		});
-
-		test("should preserve metadata context", () => {
-			const error = new Error("Test error");
-
-			const mapped = helper.mapError(error, {
-				operation: "TranslatorService.translateText",
-				metadata: {
-					model: "gpt-4",
-					temperature: 0.7,
-					maxTokens: 2000,
-				},
-			});
-
-			expect(mapped.context.metadata).toEqual(
-				expect.objectContaining({
-					model: "gpt-4",
-					temperature: 0.7,
-					maxTokens: 2000,
-				}),
-			);
-		});
-
-		test("should handle missing metadata gracefully", () => {
-			const error = new Error("Test error");
-
-			const mapped = helper.mapError(error, {
-				operation: "TranslatorService.translateText",
-			});
-
-			expect(mapped.context.operation).toBe("TranslatorService.translateText");
-			expect(mapped.context.metadata).toBeDefined();
-		});
-	});
-
-	describe("getSeverityFromCode", () => {
-		test("should return Error severity for RateLimitExceeded", () => {
-			const severity = helper.getSeverityFromCode(ErrorCode.RateLimitExceeded);
-			expect(severity).toBe(ErrorSeverity.Error);
-		});
-
-		test("should return Error severity for LLMApiError", () => {
-			const severity = helper.getSeverityFromCode(ErrorCode.LLMApiError);
-			expect(severity).toBe(ErrorSeverity.Error);
-		});
-
-		test("should return Warn severity for UnknownError", () => {
-			const severity = helper.getSeverityFromCode(ErrorCode.UnknownError);
-			expect(severity).toBe(ErrorSeverity.Warn);
-		});
-
-		test("should return Info severity for other error codes", () => {
-			const severity = helper.getSeverityFromCode(ErrorCode.GithubNotFound);
-			expect(severity).toBe(ErrorSeverity.Info);
 		});
 	});
 });

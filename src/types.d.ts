@@ -98,3 +98,20 @@ export interface SnapshotRecord extends DatabaseRecord {
     /** Timestamp when the snapshot was created */
     timestamp: number;
 }
+
+export interface LanguageCacheRecord {
+    /** File name */
+    filename: string;
+
+    /** Content hash */
+    content_hash: string;
+
+    /** Detected programming language */
+    detected_language: string;
+
+    /** Confidence score (0 to 1) */
+    confidence: number;
+
+    /** Timestamp when the cache entry was created */
+    timestamp: number;
+}

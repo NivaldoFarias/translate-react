@@ -59,7 +59,6 @@ Automation tool for translating React documentation repositories. Uses LLM APIs 
 
 - **Bun** v1.0.0+ (primary runtime and package manager)[^1]
 - **Node.js** v20+ (dependency compatibility)
-- **SQLite3** (state persistence, usually pre-installed)
 - **Git** (repository operations)
 
 [^1]: This project uses Bun exclusively. Do not use npm/yarn/pnpm.
@@ -77,7 +76,7 @@ Automation tool for translating React documentation repositories. Uses LLM APIs 
 
 ### Supported Repositories
 
-Designed for React documentation repositories but can be adapted to any markdown-based documentation with `src/` directory structure *(with some tweaks)*.
+Designed for React documentation repositories but can be adapted to any markdown-based documentation with `src/` directory structure _(with some tweaks)_.
 
 ## Quick Start
 
@@ -116,12 +115,12 @@ Environment variables are validated at runtime using Zod schemas. See [`src/util
 
 ### Required Environment Variables
 
-These must be set in your `.env` *(or `.env.dev`, for development)* file:
+These must be set in your `.env` _(or `.env.dev`, for development)_ file:
 
-| Variable         | Description                                                |
-| ---------------- | ---------------------------------------------------------- |
-| `GITHUB_TOKEN`   | GitHub Personal Access Token with `repo` scope             |
-| `OPENAI_API_KEY` | API key for LLM service (OpenAI, OpenRouter, Azure OpenAI) |
+| Variable      | Description                                                |
+| ------------- | ---------------------------------------------------------- |
+| `GH_TOKEN`    | GitHub Personal Access Token with `repo` scope             |
+| `LLM_API_KEY` | API key for LLM service (OpenAI, OpenRouter, Azure OpenAI) |
 
 ### Optional Environment Variables
 
@@ -131,13 +130,13 @@ These must be set in your `.env` *(or `.env.dev`, for development)* file:
 <details>
 <summary><b>GitHub Configuration</b></summary>
 
-| Variable                 | Default           | Description                          |
-| ------------------------ | ----------------- | ------------------------------------ |
-| `REPO_FORK_OWNER`        | `nivaldofarias`   | Fork owner username/organization     |
-| `REPO_FORK_NAME`         | `pt-br.react.dev` | Fork repository name                 |
-| `REPO_UPSTREAM_OWNER`    | `reactjs`         | Upstream owner username/organization |
-| `REPO_UPSTREAM_NAME`     | `pt-br.react.dev` | Upstream repository name             |
-| `GITHUB_REQUEST_TIMEOUT` | `30000`           | GitHub API timeout (milliseconds)    |
+| Variable              | Default           | Description                          |
+| --------------------- | ----------------- | ------------------------------------ |
+| `REPO_FORK_OWNER`     | `nivaldofarias`   | Fork owner username/organization     |
+| `REPO_FORK_NAME`      | `pt-br.react.dev` | Fork repository name                 |
+| `REPO_UPSTREAM_OWNER` | `reactjs`         | Upstream owner username/organization |
+| `REPO_UPSTREAM_NAME`  | `pt-br.react.dev` | Upstream repository name             |
+| `GH_REQUEST_TIMEOUT`  | `30000`           | GitHub API timeout (milliseconds)    |
 
 </details>
 
@@ -147,11 +146,11 @@ These must be set in your `.env` *(or `.env.dev`, for development)* file:
 | Variable            | Default                                            | Description                              |
 | ------------------- | -------------------------------------------------- | ---------------------------------------- |
 | `LLM_MODEL`         | `google/gemini-2.0-flash-exp:free`                 | Model ID for translation                 |
-| `OPENAI_BASE_URL`   | `https://api.openrouter.com/v1`                    | API endpoint                             |
+| `LLM_API_BASE_URL`  | `https://openrouter.ai/api/v1`                     | API endpoint                             |
 | `OPENAI_PROJECT_ID` | —                                                  | Optional: OpenAI project ID for tracking |
 | `MAX_TOKENS`        | `8192`                                             | Maximum tokens per LLM response          |
 | `HEADER_APP_URL`    | `https://github.com/NivaldoFarias/translate-react` | App URL for OpenRouter tracking          |
-| `HEADER_APP_TITLE`  | `translate-react v0.1.13`                          | App title for OpenRouter tracking        |
+| `HEADER_APP_TITLE`  | `translate-react v0.1.18`                          | App title for OpenRouter tracking        |
 
 </details>
 
@@ -172,12 +171,9 @@ These must be set in your `.env` *(or `.env.dev`, for development)* file:
 | Variable                | Default       | Description                                                            |
 | ----------------------- | ------------- | ---------------------------------------------------------------------- |
 | `NODE_ENV`              | `development` | Runtime environment                                                    |
-| `BUN_ENV`               | `development` | Bun-specific environment                                               |
 | `LOG_LEVEL`             | `info`        | Logging verbosity (`trace`\|`debug`\|`info`\|`warn`\|`error`\|`fatal`) |
 | `LOG_TO_CONSOLE`        | `true`        | Enable console logging in addition to file logs                        |
 | `PROGRESS_ISSUE_NUMBER` | `555`         | GitHub issue number for progress reports                               |
-| `FORCE_SNAPSHOT_CLEAR`  | `false`       | Clear snapshot cache on startup                                        |
-| `DEV_MODE_FORK_PR`      | `false`       | Create PRs in fork (dev) vs upstream (production)                      |
 
 </details>
 
@@ -191,15 +187,11 @@ Development mode with auto-reload on file changes:
 bun run dev
 ```
 
-**Development Configuration**: Create `.env.dev` and set `DEV_MODE_FORK_PR=true` to create PRs against your fork instead of upstream. This prevents permission issues during testing.
-
 ### Production Mode
 
 ```bash
 bun start
 ```
-
-**Production Behavior**: Creates PRs against upstream repository for official contributions.
 
 ## Project Structure
 
@@ -208,17 +200,15 @@ translate-react/
 ├─ src/
 │  ├── errors/                    # Error handling system
 │  ├── services/                  # Core services
+│  │   ├── cache/                 # In-memory caching
 │  │   ├── github/                # GitHub API integration
 │  │   ├── runner/                # Workflow orchestration
-│  │   ├── database.service.ts    # SQLite state persistence
-│  │   ├── snapshot.service.ts    # Snapshot management
 │  │   └── translator.service.ts  # LLM translation engine
 │  ├── utils/                     # Utilities and constants
-│  └── index.ts                   # Entry point
+│  └── main.ts                    # Entry point
 │
 ├── docs/                         # Documentation
-├── logs/                         # Structured error logs (JSONL)
-└── snapshots.sqlite              # State persistence database
+└── logs/                         # Structured error logs (JSONL)
 ```
 
 ## Documentation
@@ -238,11 +228,11 @@ Contributions are welcome. Follow these guidelines:
 1. Fork repository and create feature branch
 2. Install dependencies: `bun install`
 3. Create `.env.dev` with development configuration:
+
 ```bash
-DEV_MODE_FORK_PR=true
-FORCE_SNAPSHOT_CLEAR=true
 NODE_ENV=development
 ```
+
 4. Run tests: `bun test`
 
 ### Development Standards
@@ -260,7 +250,7 @@ NODE_ENV=development
 - **Services**: Extend appropriate base classes
 - **Errors**: Create specific error types for new failure scenarios
 - **Environment**: Add new variables to Zod schema in `env.util.ts`
-- **Database**: Use existing database service for persistence
+- **Caching**: Use existing cache service for runtime state
 
 ## Troubleshooting
 
@@ -269,9 +259,9 @@ NODE_ENV=development
 <details>
 <summary><b>Environment Validation Errors</b></summary>
 
-**Error**: `❌ Invalid environment variables: - GITHUB_TOKEN: String must contain at least 1 character(s)`
+**Error**: `❌ Invalid environment variables: - GH_TOKEN: String must contain at least 1 character(s)`
 
-**Solution**: Ensure required variables (`GITHUB_TOKEN`, `OPENAI_API_KEY`) are set in `.env` file.
+**Solution**: Ensure required variables (`GH_TOKEN`, `LLM_API_KEY`) are set in `.env` file.
 
 </details>
 
@@ -298,16 +288,7 @@ NODE_ENV=development
 
 **Error**: `OpenAI API error: insufficient_quota`
 
-**Solution**: Check API key has sufficient credits. Switch providers by changing `OPENAI_BASE_URL`.
-
-</details>
-
-<details>
-<summary><b>SQLite Database Lock</b></summary>
-
-**Error**: `Database is locked`
-
-**Solution**: Ensure no other instances are running. In development, use `FORCE_SNAPSHOT_CLEAR=true` to reset database.
+**Solution**: Check API key has sufficient credits. Switch providers by changing `LLM_API_BASE_URL`.
 
 </details>
 
@@ -322,7 +303,7 @@ NODE_ENV=development
 LOG_LEVEL="debug" bun dev
 ```
 
-#### Analyze error logs *(`.jsonl` format)*:
+#### Analyze error logs _(`.jsonl` format)_:
 
 ##### View Recent Errors
 

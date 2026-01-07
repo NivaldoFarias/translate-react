@@ -1,13 +1,6 @@
-/**
- * @fileoverview Tests for the {@link LanguageDetectorService}.
- *
- * This suite covers language detection, translation analysis, and edge cases
- * for content language processing in the translation workflow.
- */
-
 import { beforeEach, describe, expect, test } from "bun:test";
 
-import { LanguageDetectorService } from "@/services/language-detector.service";
+import { LanguageDetectorService } from "@/services/";
 
 describe("LanguageDetector", () => {
 	let detector: LanguageDetectorService;
@@ -122,22 +115,23 @@ mesmo com a presença deste código em inglês no meio do documento.
 	});
 
 	describe("detectLanguage", () => {
-		test("should detect English content", async () => {
+		test("should detect English content when English text is provided", async () => {
 			const englishText =
 				"This is a comprehensive English text sample for testing language detection purposes.";
+
 			const detected = await detector.detectPrimaryLanguage(englishText);
 
 			expect(detected).toBeDefined();
 			expect(detected).toBe("en");
 		});
 
-		test("should detect Portuguese content", async () => {
+		test("should detect Portuguese content when Portuguese text is provided", async () => {
 			const portugueseText =
 				"Este é um texto abrangente em português brasileiro para fins de teste de detecção de idioma com conteúdo suficiente.";
+
 			const detected = await detector.detectPrimaryLanguage(portugueseText);
 
 			expect(detected).toBeDefined();
-			// CLD may return "pt" for Portuguese content
 			expect(detected).not.toBe("en");
 			expect(detected).not.toBe("und");
 		});
@@ -181,6 +175,36 @@ mesmo com a presença deste código em inglês no meio do documento.
 
 			expect(analysis).toBeDefined();
 			expect(typeof analysis.isTranslated).toBe("boolean");
+		});
+
+		test("should handle whitespace-only content", async () => {
+			const filename = "whitespace.md";
+			const whitespaceText = "   \n\t\t\n   ";
+
+			const analysis = await detector.analyzeLanguage(filename, whitespaceText);
+
+			expect(analysis.isTranslated).toBe(false);
+			expect(analysis.ratio).toBe(0);
+		});
+
+		test("should handle very long content efficiently", async () => {
+			const filename = "long.md";
+			const longText = "Este é um texto em português. ".repeat(1000);
+
+			const analysis = await detector.analyzeLanguage(filename, longText);
+
+			expect(analysis).toBeDefined();
+			expect(analysis.detectedLanguage).toBeDefined();
+		});
+
+		test("should handle content with only punctuation", async () => {
+			const filename = "punctuation.md";
+			const punctuationText = "!@#$%^&*()_+-={}[]|\\:;\"'<>?,./";
+
+			const analysis = await detector.analyzeLanguage(filename, punctuationText);
+
+			expect(analysis.isTranslated).toBe(false);
+			expect(analysis.ratio).toBe(0);
 		});
 	});
 });

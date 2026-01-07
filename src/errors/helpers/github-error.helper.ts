@@ -1,164 +1,127 @@
 import { RequestError } from "@octokit/request-error";
 import { StatusCodes } from "http-status-codes";
 
-import { ErrorCode, ErrorHelper, ErrorSeverity, TranslationError } from "@/errors/";
+import { ApplicationError, ErrorCode } from "@/errors/base-error";
 import { detectRateLimit, logger } from "@/utils/";
 
-export class GithubErrorHelper implements ErrorHelper {
-	/**
-	 * Maps GitHub RequestError to appropriate {@link TranslationError} with context.
-	 *
-	 * Handles common GitHub API error scenarios:
-	 * - 401 Unauthorized
-	 * - 403 Forbidden (including rate limits)
-	 * - 404 Not Found
-	 * - 422 Unprocessable Entity
-	 * - 5xx Server Errors
-	 *
-	 * @param error The error to map
-	 * @param context Additional context to include in the error
-	 *
-	 * @returns A `TranslationError` with appropriate code and context
-	 *
-	 * @example
-	 * ```typescript
-	 * try {
-	 *   await octokit.repos.get({ owner, repo });
-	 * } catch (error) {
-	 *   throw new GithubErrorHelper().mapError(error, {
-	 *     operation: 'GitHubService.getRepository',
-	 *     metadata: { owner, repo }
-	 *   });
-	 * }
-	 * ```
-	 */
-	public mapError(
-		error: unknown,
-		context: {
-			operation: string;
-			metadata?: Record<string, unknown>;
-		},
-	): TranslationError {
-		/** Handle Octokit's RequestError type with status code mapping */
-		if (error instanceof RequestError) {
-			const errorCode = this.getErrorCodeFromStatus(error);
-			const severity = this.getSeverityFromCode(errorCode);
+const helperLogger = logger.child({ component: "GithubErrorHelper" });
 
-			logger.error(
-				{
-					err: error,
-					operation: context.operation,
-					statusCode: error.status,
-					errorCode,
-					...context.metadata,
-				},
-				"GitHub API error",
-			);
+/** Base metadata fields added by mapGithubError for all error types */
+interface GithubErrorBaseMetadata {
+	/** HTTP status code from GitHub response */
+	statusCode?: number;
 
-			return new TranslationError(error.message, errorCode, {
-				sanity: severity,
-				operation: context.operation,
-				metadata: {
-					statusCode: error.status,
-					requestId: error.response?.headers?.["x-github-request-id"],
-					...context.metadata,
-				},
-			});
-		}
+	/** GitHub request ID from response headers */
+	requestId?: string;
+}
 
-		/** Handle generic Error instances with rate limit detection */
-		if (error instanceof Error) {
-			if (detectRateLimit(error.message)) {
-				logger.warn(
-					{
-						err: error,
-						operation: context.operation,
-						...context.metadata,
-					},
-					"Rate limit detected in error message",
-				);
+/**
+ * Maps GitHub errors to {@link ApplicationError} with appropriate error codes.
+ *
+ * Handles common GitHub API error scenarios:
+ * - `401` Unauthorized
+ * - `403` Forbidden (including rate limits)
+ * - `404` Not Found
+ * - `422` Unprocessable Entity
+ * - `5xx` Server Errors
+ *
+ * @param error The error to map
+ * @param operation The operation that failed
+ * @param metadata Optional additional debugging context
+ *
+ * @returns A `ApplicationError` with appropriate code and context
+ *
+ * @example
+ * ```typescript
+ * try {
+ *   await octokit.repos.get({ owner, repo });
+ * } catch (error) {
+ *   throw mapGithubError(error, "GitHubService.getRepository", { owner, repo });
+ * }
+ * ```
+ */
+export function mapGithubError<T extends Record<string, unknown> = Record<string, never>>(
+	error: unknown,
+	operation: string,
+	metadata?: T,
+): ApplicationError<GithubErrorBaseMetadata & T> {
+	type CombinedMetadata = GithubErrorBaseMetadata & T;
 
-				return new TranslationError(error.message, ErrorCode.RateLimitExceeded, {
-					sanity: ErrorSeverity.Warn,
-					operation: context.operation,
-					metadata: context.metadata,
-				});
-			}
+	if (error instanceof RequestError) {
+		const errorCode = getGithubErrorCode(error);
 
-			logger.error(
-				{
-					err: error,
-					operation: context.operation,
-					...context.metadata,
-				},
-				"Unexpected error",
-			);
-
-			return new TranslationError(error.message, ErrorCode.UnknownError, {
-				sanity: ErrorSeverity.Error,
-				operation: context.operation,
-				metadata: context.metadata,
-			});
-		}
-
-		/** Handle non-Error objects thrown as exceptions */
-		const message = String(error);
-		logger.error(
-			{
-				error: message,
-				operation: context.operation,
-				...context.metadata,
-			},
-			"Non-Error object thrown",
+		helperLogger.error(
+			{ error, operation, statusCode: error.status, errorCode, ...metadata },
+			"GitHub API error",
 		);
 
-		return new TranslationError(message, ErrorCode.UnknownError, {
-			sanity: ErrorSeverity.Error,
-			operation: context.operation,
-			metadata: context.metadata,
-		});
+		return new ApplicationError(error.message, errorCode, operation, {
+			...metadata,
+			statusCode: error.status,
+			requestId: error.response?.headers["x-github-request-id"],
+		} as CombinedMetadata);
 	}
 
-	public getErrorCodeFromStatus(error: RequestError): ErrorCode {
-		switch (error.status) {
-			case StatusCodes.UNAUTHORIZED:
-				return ErrorCode.GithubUnauthorized;
-			case StatusCodes.FORBIDDEN:
-				if (error.message.toLowerCase().includes("rate limit")) {
-					return ErrorCode.RateLimitExceeded;
-				}
-				return ErrorCode.GithubForbidden;
-			case StatusCodes.NOT_FOUND:
-				return ErrorCode.GithubNotFound;
-			case StatusCodes.UNPROCESSABLE_ENTITY:
-				return ErrorCode.ValidationError;
-			case StatusCodes.INTERNAL_SERVER_ERROR:
-			case StatusCodes.BAD_GATEWAY:
-			case StatusCodes.SERVICE_UNAVAILABLE:
-			case StatusCodes.GATEWAY_TIMEOUT:
-				return ErrorCode.GithubServerError;
-			default:
-				if (!error.status) return ErrorCode.GithubApiError;
+	if (error instanceof Error) {
+		if (detectRateLimit(error.message)) {
+			helperLogger.warn({ error, operation, ...metadata }, "Rate limit detected in error message");
 
-				return ErrorCode.GithubApiError;
+			return new ApplicationError(
+				error.message,
+				ErrorCode.RateLimitExceeded,
+				operation,
+				metadata as CombinedMetadata,
+			);
 		}
+
+		helperLogger.error({ error, operation, ...metadata }, "Unexpected error");
+
+		return new ApplicationError(
+			error.message,
+			ErrorCode.UnknownError,
+			operation,
+			metadata as CombinedMetadata,
+		);
 	}
 
-	public getSeverityFromCode(code: ErrorCode): ErrorSeverity {
-		switch (code) {
-			case ErrorCode.RateLimitExceeded:
-				return ErrorSeverity.Warn;
-			case ErrorCode.GithubNotFound:
-			case ErrorCode.ValidationError:
-				return ErrorSeverity.Info;
-			case ErrorCode.GithubServerError:
-			case ErrorCode.GithubApiError:
-				return ErrorSeverity.Error;
-			case ErrorCode.GithubUnauthorized:
-			case ErrorCode.GithubForbidden:
-				return ErrorSeverity.Fatal;
-			default:
-				return ErrorSeverity.Error;
-		}
+	const message = String(error);
+	helperLogger.error({ error: message, operation, ...metadata }, "Non-Error object thrown");
+
+	return new ApplicationError(
+		message,
+		ErrorCode.UnknownError,
+		operation,
+		metadata as CombinedMetadata,
+	);
+}
+
+/**
+ * Determines the appropriate {@link ErrorCode} based on GitHub status code.
+ *
+ * @param error The {@link RequestError} from Octokit
+ *
+ * @returns The appropriate {@link ErrorCode}
+ */
+function getGithubErrorCode(error: RequestError): ErrorCode {
+	switch (error.status as StatusCodes) {
+		case StatusCodes.UNAUTHORIZED:
+			return ErrorCode.GithubUnauthorized;
+		case StatusCodes.FORBIDDEN:
+			if (error.message.toLowerCase().includes("rate limit")) {
+				return ErrorCode.RateLimitExceeded;
+			}
+
+			return ErrorCode.GithubForbidden;
+		case StatusCodes.NOT_FOUND:
+			return ErrorCode.GithubNotFound;
+		case StatusCodes.UNPROCESSABLE_ENTITY:
+			return ErrorCode.ValidationError;
+		case StatusCodes.INTERNAL_SERVER_ERROR:
+		case StatusCodes.BAD_GATEWAY:
+		case StatusCodes.SERVICE_UNAVAILABLE:
+		case StatusCodes.GATEWAY_TIMEOUT:
+			return ErrorCode.GithubServerError;
+		default:
+			return ErrorCode.GithubApiError;
 	}
 }

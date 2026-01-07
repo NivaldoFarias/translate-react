@@ -23,16 +23,16 @@ Technical documentation for the `translate-react` project. This directory contai
 - **Purpose**: Comprehensive technical documentation of the system architecture, service design patterns, and implementation details.
 - **Contents**:
   - **System Overview**: High-level architecture diagram showing component relationships
-  - **Service-Oriented Architecture**: Detailed breakdown of the five core services:
+  - **Service-Oriented Architecture**: Detailed breakdown of the core services:
     - Runner Service (workflow orchestration)
     - GitHub Service (API integration and repository operations)
     - Translator Service (LLM translation engine)
     - Language Detector Service (content analysis)
-    - Database Service (SQLite state persistence)
+    - Cache Service (runtime state management)
   - **Service Hierarchy**: Class diagrams showing inheritance patterns and relationships
   - **Error Handling Architecture**: Proxy pattern implementation and error transformation pipeline
   - **Data Flow Diagrams**: Visual representation of discovery and translation phases
-  - **Design Patterns**: Implementation details for inheritance, proxy, and snapshot patterns
+  - **Design Patterns**: Implementation details for inheritance and error handling patterns
   - **Performance Considerations**: Optimization strategies and bottleneck mitigation
 - **Best For**:
   - Understanding how the system is structured
@@ -87,11 +87,11 @@ Technical documentation for the `translate-react` project. This directory contai
 - **File**: [DEBUGGING.md](./DEBUGGING.md)
 - **Purpose**: Troubleshooting guides, diagnostic procedures, and common issue resolution.
 - **Contents**:
-  - **Common Issues**: Environment validation, GitHub permissions, API rate limits, database locks
+  - **Common Issues**: Environment validation, GitHub permissions, API rate limits
   - **Diagnostic Commands**: Log analysis, error filtering, pattern detection
   - **Debug Mode**: Enabling verbose logging and tracing
   - **Log Analysis**: JSONL parsing and querying techniques
-  - **Development Tools**: Snapshot management, force clearing, testing strategies
+  - **Development Tools**: Testing strategies and debugging techniques
   - **Production Troubleshooting**: Issue resolution in production environments
 - **Best For**:
   - Resolving common errors and issues

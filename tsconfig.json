@@ -17,15 +17,16 @@
         "noPropertyAccessFromIndexSignature": true,
 
         /* Other Options */
-        "skipLibCheck": false,
+        "skipLibCheck": true,
         "esModuleInterop": true,
         "forceConsistentCasingInFileNames": true,
         "isolatedModules": true,
         "baseUrl": ".",
         "paths": {
-            "@/*": ["src/*"]
+            "@/*": ["src/*"],
+            "@tests/*": ["tests/*"]
         }
     },
-    "include": ["src/**/*", "tests/**/*", "scripts/**/*", "./*.config.*"],
+    "include": ["src/**/*", "tests/**/*", "./*.config.*"],
     "exclude": ["node_modules", "dist"]
 }

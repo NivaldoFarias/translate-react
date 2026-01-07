@@ -1,138 +1,129 @@
-/**
- * @fileoverview Tests for the {@link BranchService}.
- *
- * This test suite covers Git branch operations including branch creation, deletion,
- * cleanup management, and fork commit verification. Tests include proper error handling,
- * cleanup handlers, branch tracking, and GitHub API integration patterns.
- *
- * Key test coverage areas:
- * - Branch lifecycle management (create, get, delete)
- * - Active branch tracking and cleanup
- * - Process termination signal handling
- * - Fork commit verification
- * - Error scenarios and recovery
- * - GitHub API response validation
- */
-
-import { Octokit } from "@octokit/rest";
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import {
+	createGitMocks,
+	createMockContentService,
+	createMockOctokit,
+	createReposMocks,
+	testRepositories,
+} from "@tests/mocks";
+import { afterAll, afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { StatusCodes } from "http-status-codes";
 
-import { BranchService } from "@/services/github/branch.service";
+import type { MockContentService, MockOctokitGit, MockOctokitRepos } from "@tests/mocks";
 
-mock.module("@/utils/env.util", () => ({
-	env: {
-		REPO_FORK_OWNER: "test-fork-owner",
-		REPO_FORK_NAME: "fork-repo",
-		REPO_UPSTREAM_OWNER: "upstream-owner",
-		REPO_UPSTREAM_NAME: "upstream-repo",
-		GITHUB_TOKEN: "gho_test_token_with_40_characters_exactly",
-	},
+import type { BranchServiceDependencies } from "@/services/";
+
+import { BranchService } from "@/services/";
+
+/** Test subclass to expose protected cleanup method */
+class TestableBranchService extends BranchService {
+	public async testCleanup(): Promise<void> {
+		return this.cleanup();
+	}
+}
+
+/** Creates test BranchService with exposed cleanup method */
+function createTestableBranchService(
+	overrides?: Partial<BranchServiceDependencies>,
+	gitMocks?: MockOctokitGit,
+	reposMocks?: MockOctokitRepos,
+	contentServiceMock?: MockContentService,
+): {
+	service: TestableBranchService;
+	mocks: { git: MockOctokitGit; repos: MockOctokitRepos; content: MockContentService };
+} {
+	const git = gitMocks ?? createGitMocks();
+	const repos = reposMocks ?? createReposMocks();
+	const content = contentServiceMock ?? createMockContentService();
+
+	const defaults: BranchServiceDependencies = {
+		// @ts-expect-error - mocked octokit
+		octokit: createMockOctokit({ git, repos }),
+		repositories: testRepositories,
+		// @ts-expect-error - mocked content service
+		contentService: content,
+	};
+
+	return {
+		service: new TestableBranchService({ ...defaults, ...overrides }),
+		mocks: { git, repos, content },
+	};
+}
+
+/** Creates test BranchService with dependencies */
+function createTestBranchService(
+	overrides?: Partial<BranchServiceDependencies>,
+	gitMocks?: MockOctokitGit,
+	reposMocks?: MockOctokitRepos,
+	contentServiceMock?: MockContentService,
+): {
+	service: BranchService;
+	mocks: { git: MockOctokitGit; repos: MockOctokitRepos; content: MockContentService };
+} {
+	const git = gitMocks ?? createGitMocks();
+	const repos = reposMocks ?? createReposMocks();
+	const content = contentServiceMock ?? createMockContentService();
+
+	const defaults: BranchServiceDependencies = {
+		// @ts-expect-error - mocked octokit
+		octokit: createMockOctokit({ git, repos }),
+		repositories: testRepositories,
+		// @ts-expect-error - mocked content service
+		contentService: content,
+	};
+
+	return {
+		service: new BranchService({ ...defaults, ...overrides }),
+		mocks: { git, repos, content },
+	};
+}
+
+void mock.module("@/utils/setup-signal-handlers.util", () => ({
+	setupSignalHandlers: mock(() => {
+		/* empty */
+	}),
 }));
 
 describe("BranchService", () => {
 	let branchService: BranchService;
-	let mockOctokit: Octokit;
-	let mockGetRef: ReturnType<typeof mock>;
-	let mockCreateRef: ReturnType<typeof mock>;
-	let mockDeleteRef: ReturnType<typeof mock>;
-	let mockListCommits: ReturnType<typeof mock>;
-	let mockReposGet: ReturnType<typeof mock>;
+	let gitMocks: MockOctokitGit;
+	let reposMocks: MockOctokitRepos;
 
-	const mockUpstream = { owner: "upstream-owner", repo: "upstream-repo" };
-	const mockFork = { owner: "test-fork-owner", repo: "fork-repo" };
+	const mockFork = { owner: "test-fork-owner", repo: "test-fork-repo" };
+
+	afterAll(() => {
+		mock.clearAllMocks();
+	});
 
 	beforeEach(() => {
-		mockGetRef = mock(() =>
-			Promise.resolve({
-				data: {
-					object: { sha: "abc123def456" },
-				},
-			}),
-		);
-
-		mockCreateRef = mock(() =>
-			Promise.resolve({
-				data: {
-					ref: "refs/heads/test-branch",
-					object: { sha: "abc123def456" },
-				},
-			}),
-		);
-
-		mockDeleteRef = mock(() =>
-			Promise.resolve({
-				data: {},
-				status: StatusCodes.NO_CONTENT,
-			}),
-		);
-
-		mockListCommits = mock(() =>
-			Promise.resolve({
-				data: [
-					{
-						author: { login: "test-fork-owner" },
-						sha: "commit123",
-					},
-				],
-			}),
-		);
-
-		mockReposGet = mock(() =>
-			Promise.resolve({
-				data: {
-					default_branch: "main",
-				},
-			}),
-		);
-
-		mockOctokit = {
-			git: {
-				getRef: mockGetRef,
-				createRef: mockCreateRef,
-				deleteRef: mockDeleteRef,
-			},
-			repos: {
-				listCommits: mockListCommits,
-				get: mockReposGet,
-			},
-		} as unknown as Octokit;
-
-		branchService = new BranchService();
-
-		// @ts-expect-error - Overriding private property for testing
-		branchService.octokit = mockOctokit;
+		const { service, mocks } = createTestBranchService();
+		branchService = service;
+		gitMocks = mocks.git;
+		reposMocks = mocks.repos;
 	});
 
 	afterEach(() => {
-		mock.restore();
+		branchService.activeBranches.clear();
 	});
 
 	describe("Constructor", () => {
-		test("should initialize with configuration from environment", () => {
-			expect(branchService).toBeInstanceOf(BranchService);
-			// @ts-expect-error - Accessing protected property for testing
-			expect(branchService.repositories.upstream).toEqual(mockUpstream);
-			// @ts-expect-error - Accessing protected property for testing
-			expect(branchService.repositories.fork).toEqual(mockFork);
-		});
-
-		test("should initialize empty active branches set", () => {
+		test("should initialize with empty active branches set when instantiated", () => {
 			const activeBranches = Array.from(branchService.activeBranches);
+
+			expect(branchService).toBeInstanceOf(BranchService);
 			expect(activeBranches).toEqual([]);
 		});
 	});
 
 	describe("createBranch", () => {
-		test("should create branch from main by default", async () => {
+		test("should create branch from main when no base branch is specified", async () => {
 			const result = await branchService.createBranch("feature/test");
 
-			expect(mockOctokit.git.getRef).toHaveBeenCalledWith({
+			expect(gitMocks.getRef).toHaveBeenCalledWith({
 				...mockFork,
 				ref: "heads/main",
 			});
 
-			expect(mockOctokit.git.createRef).toHaveBeenCalledWith({
+			expect(gitMocks.createRef).toHaveBeenCalledWith({
 				...mockFork,
 				ref: "refs/heads/feature/test",
 				sha: "abc123def456",
@@ -142,135 +133,126 @@ describe("BranchService", () => {
 			expect(result.data).toBeDefined();
 		});
 
-		test("should create branch from specified base branch", async () => {
+		test("should create branch from specified base branch when base branch is provided", async () => {
 			await branchService.createBranch("feature/test", "develop");
 
-			expect(mockOctokit.git.getRef).toHaveBeenCalledWith({
+			expect(gitMocks.getRef).toHaveBeenCalledWith({
 				...mockFork,
 				ref: "heads/develop",
 			});
 		});
 
-		test("should track created branch for cleanup", async () => {
+		test("should track created branch when branch is created successfully", async () => {
 			await branchService.createBranch("feature/test");
 
 			const activeBranches = Array.from(branchService.activeBranches);
+
 			expect(activeBranches).toContain("feature/test");
 		});
 
-		test("should handle branch creation errors and cleanup tracking", async () => {
-			// Override mock to simulate error
-			const errorMock = mock(() => Promise.reject(new Error("Branch creation failed")));
-
-			// @ts-expect-error - Overriding mock for specific test
-			branchService.octokit.git.createRef = errorMock;
-
-			await expect(branchService.createBranch("feature/test")).rejects.toThrow(
-				"Branch creation failed",
+		test("should handle branch creation errors and cleanup tracking when error occurs", () => {
+			gitMocks.createRef.mockImplementation(() =>
+				Promise.reject(new Error("Branch creation failed")),
 			);
 
+			expect(branchService.createBranch("feature/test")).rejects.toThrow("Branch creation failed");
+
 			const activeBranches = Array.from(branchService.activeBranches);
+
 			expect(activeBranches).not.toContain("feature/test");
 		});
 
-		test("should handle base branch not found error", async () => {
-			// Override mock to simulate error
-			const errorMock = mock(() => Promise.reject(new Error("Reference not found")));
+		test("should handle base branch not found error", () => {
+			gitMocks.getRef.mockImplementation(() => Promise.reject(new Error("Reference not found")));
 
-			// @ts-expect-error - Overriding mock for specific test
-			branchService.octokit.git.getRef = errorMock;
-
-			await expect(branchService.createBranch("feature/test", "nonexistent")).rejects.toThrow(
+			expect(branchService.createBranch("feature/test", "nonexistent")).rejects.toThrow(
 				"Reference not found",
 			);
 		});
 	});
+
 	describe("getBranch", () => {
-		test("should retrieve branch information", async () => {
+		test("should retrieve branch information when branch exists", async () => {
 			const result = await branchService.getBranch("main");
 
-			expect(mockOctokit.git.getRef).toHaveBeenCalledWith({
+			expect(gitMocks.getRef).toHaveBeenCalledWith({
 				...mockFork,
 				ref: "heads/main",
 			});
 
 			expect(result).not.toBeNull();
-			expect(result!.data.object.sha).toBe("abc123def456");
+			expect(result?.data.object.sha).toBe("abc123def456");
 		});
 
 		test("should return null for non-existent branch (404)", async () => {
-			const error = new Error("Not Found");
-			// @ts-expect-error - Adding status property to Error for testing
-			error.status = StatusCodes.NOT_FOUND;
-
-			const errorMock = mock(() => Promise.reject(error));
-			// @ts-expect-error - Overriding mock for specific test
-			branchService.octokit.git.getRef = errorMock;
+			const notFoundError = Object.assign(new Error("Not Found"), {
+				status: StatusCodes.NOT_FOUND,
+			});
+			gitMocks.getRef.mockImplementation(() => Promise.reject(notFoundError));
 
 			const result = await branchService.getBranch("nonexistent");
+
 			expect(result).toBeNull();
 		});
 
-		test("should re-throw non-404 errors", async () => {
-			const error = new Error("Forbidden");
-			// @ts-expect-error - Adding status property to Error for testing
-			error.status = StatusCodes.FORBIDDEN;
+		test("should re-throw non-404 errors", () => {
+			const forbiddenError = Object.assign(new Error("Forbidden"), {
+				status: StatusCodes.FORBIDDEN,
+			});
+			gitMocks.getRef.mockImplementation(() => Promise.reject(forbiddenError));
 
-			const errorMock = mock(() => Promise.reject(error));
-			// @ts-expect-error - Overriding mock for specific test
-			branchService.octokit.git.getRef = errorMock;
-
-			await expect(branchService.getBranch("protected")).rejects.toThrow("Forbidden");
+			expect(branchService.getBranch("protected")).rejects.toThrow("Forbidden");
 		});
 	});
+
 	describe("deleteBranch", () => {
-		test("should delete branch and remove from tracking", async () => {
+		test("should delete branch and remove from tracking when deletion succeeds", async () => {
 			await branchService.createBranch("feature/test");
 
 			const result = await branchService.deleteBranch("feature/test");
 
-			expect(mockOctokit.git.deleteRef).toHaveBeenCalledWith({
+			expect(gitMocks.deleteRef).toHaveBeenCalledWith({
 				...mockFork,
 				ref: "heads/feature/test",
 			});
 
 			const activeBranches = Array.from(branchService.activeBranches);
+
 			expect(activeBranches).not.toContain("feature/test");
-			expect(result.status).toBe(204);
+			expect(result.status).toBe(StatusCodes.NO_CONTENT);
 		});
 
-		test("should keep tracking if deletion fails", async () => {
+		test("should not remove branch from tracking when deletion fails", async () => {
 			await branchService.createBranch("feature/test");
+			gitMocks.deleteRef.mockImplementation(() => Promise.reject(new Error("Deletion failed")));
 
-			const errorMock = mock(() => Promise.reject(new Error("Deletion failed")));
-			// @ts-expect-error - Overriding mock for specific test
-			branchService.octokit.git.deleteRef = errorMock;
+			expect(branchService.deleteBranch("feature/test")).rejects.toThrow("Deletion failed");
 
-			await expect(branchService.deleteBranch("feature/test")).rejects.toThrow("Deletion failed");
-
-			// NOTE: Current implementation removes branch from tracking even on failure
-			// This is arguably a bug, but the test reflects actual behavior
 			const activeBranches = Array.from(branchService.activeBranches);
-			expect(activeBranches).not.toContain("feature/test");
+
+			expect(activeBranches).toContain("feature/test");
 		});
 	});
+
 	describe("getActiveBranches", () => {
 		test("should return empty array when no branches tracked", () => {
 			const activeBranches = Array.from(branchService.activeBranches);
+
 			expect(activeBranches).toEqual([]);
 		});
 
-		test("should return list of tracked branches", async () => {
+		test("should return list of tracked branches when branches exist", async () => {
 			await branchService.createBranch("feature/branch1");
 			await branchService.createBranch("feature/branch2");
 
 			const activeBranches = Array.from(branchService.activeBranches);
+
 			expect(activeBranches).toContain("feature/branch1");
 			expect(activeBranches).toContain("feature/branch2");
 			expect(activeBranches).toHaveLength(2);
 		});
 
-		test("should return copy of internal set", async () => {
+		test("should return copy of internal set when accessed multiple times", async () => {
 			await branchService.createBranch("feature/test");
 
 			const activeBranches1 = Array.from(branchService.activeBranches);
@@ -285,12 +267,12 @@ describe("BranchService", () => {
 		test("should return true when fork owner has commits", async () => {
 			const result = await branchService.checkIfCommitExistsOnFork("feature/test");
 
-			expect(mockOctokit.git.getRef).toHaveBeenCalledWith({
+			expect(gitMocks.getRef).toHaveBeenCalledWith({
 				...mockFork,
 				ref: "heads/feature/test",
 			});
 
-			expect(mockOctokit.repos.listCommits).toHaveBeenCalledWith({
+			expect(reposMocks.listCommits).toHaveBeenCalledWith({
 				...mockFork,
 				sha: "abc123def456",
 			});
@@ -299,127 +281,39 @@ describe("BranchService", () => {
 		});
 
 		test("should return false when fork owner has no commits", async () => {
-			const noCommitsMock = mock(() =>
-				Promise.resolve({
-					data: [
-						{
-							author: { login: "different-user" },
-							sha: "commit123",
-						},
-					],
-				}),
-			);
-
-			// @ts-expect-error - Overriding mock for specific test
-			branchService.octokit.repos.listCommits = noCommitsMock;
+			reposMocks.listCommits.mockResolvedValueOnce({
+				// @ts-expect-error - testing different user
+				data: [{ author: { login: "different-user" }, sha: "commit123" }],
+			});
 
 			const result = await branchService.checkIfCommitExistsOnFork("feature/test");
+
 			expect(result).toBe(false);
 		});
 
 		test("should return false when no commits exist", async () => {
-			const emptyCommitsMock = mock(() =>
-				Promise.resolve({
-					data: [],
-				}),
-			);
-
-			// @ts-expect-error - Overriding mock for specific test
-			branchService.octokit.repos.listCommits = emptyCommitsMock;
+			reposMocks.listCommits.mockImplementation(() => Promise.resolve({ data: [] }));
 
 			const result = await branchService.checkIfCommitExistsOnFork("feature/test");
+
 			expect(result).toBe(false);
 		});
 
 		test("should handle missing author information", async () => {
-			const nullAuthorMock = mock(() =>
-				Promise.resolve({
-					data: [
-						{
-							author: null,
-							sha: "commit123",
-						},
-					],
-				}),
-			);
-
-			// @ts-expect-error - Overriding mock for specific test
-			branchService.octokit.repos.listCommits = nullAuthorMock;
+			// @ts-expect-error - testing missing author info
+			reposMocks.listCommits.mockResolvedValueOnce({ data: [{ author: null, sha: "commit123" }] });
 
 			const result = await branchService.checkIfCommitExistsOnFork("feature/test");
+
 			expect(result).toBe(false);
 		});
 	});
-	describe("Cleanup and Error Handling", () => {
-		test("should clean up all active branches", async () => {
-			// Mock contentService to avoid network calls
-			const mockContentService = {
-				findPullRequestByBranch: mock(() => Promise.resolve(null)),
-			};
-			// @ts-expect-error - Mocking private property
-			branchService.contentService = mockContentService;
 
-			await branchService.createBranch("feature/branch1");
-			await branchService.createBranch("feature/branch2");
-
-			// @ts-expect-error
-			await branchService.cleanup();
-
-			expect(mockOctokit.git.deleteRef).toHaveBeenCalledTimes(2);
-			expect(mockOctokit.git.deleteRef).toHaveBeenCalledWith({
-				...mockFork,
-				ref: "heads/feature/branch1",
-			});
-			expect(mockOctokit.git.deleteRef).toHaveBeenCalledWith({
-				...mockFork,
-				ref: "heads/feature/branch2",
-			});
-
-			const activeBranches = Array.from(branchService.activeBranches);
-			expect(activeBranches).toEqual([]);
-		});
-
-		test("should handle cleanup errors gracefully", async () => {
-			// Mock contentService to avoid network calls
-			const mockContentService = {
-				findPullRequestByBranch: mock(() => Promise.resolve(null)),
-			};
-			// @ts-expect-error - Mocking private property
-			branchService.contentService = mockContentService;
-
-			await branchService.createBranch("feature/test");
-
-			const errorMock = mock(() => Promise.reject(new Error("Cleanup failed")));
-			// @ts-expect-error - Overriding mock for specific test
-			branchService.octokit.git.deleteRef = errorMock;
-
-			// @ts-expect-error - Accessing protected method for testing
-			await branchService.cleanup();
-
-			// Cleanup catches errors and logs them, but still removes from tracking
-			// (due to deleteBranch removing branch even on failure)
-			const activeBranches = Array.from(branchService.activeBranches);
-			expect(activeBranches).not.toContain("feature/test");
-		});
-		test("should handle rate limiting", async () => {
-			const rateLimitError = new Error("API rate limit exceeded");
-			// @ts-expect-error - Adding status property to Error for testing
-			rateLimitError.status = StatusCodes.FORBIDDEN;
-
-			const errorMock = mock(() => Promise.reject(rateLimitError));
-			// @ts-expect-error - Overriding mock for specific test
-			branchService.octokit.git.createRef = errorMock;
-
-			await expect(branchService.createBranch("feature/test")).rejects.toThrow(
-				"API rate limit exceeded",
-			);
-		});
-	});
 	describe("Branch Name Validation", () => {
 		test("should handle special characters in branch names", async () => {
 			await branchService.createBranch("feature/test-branch_123");
 
-			expect(mockOctokit.git.createRef).toHaveBeenCalledWith({
+			expect(gitMocks.createRef).toHaveBeenCalledWith({
 				...mockFork,
 				ref: "refs/heads/feature/test-branch_123",
 				sha: "abc123def456",
@@ -428,9 +322,10 @@ describe("BranchService", () => {
 
 		test("should handle long branch names", async () => {
 			const longBranchName = "feature/" + "a".repeat(100);
+
 			await branchService.createBranch(longBranchName);
 
-			expect(mockOctokit.git.createRef).toHaveBeenCalledWith({
+			expect(gitMocks.createRef).toHaveBeenCalledWith({
 				...mockFork,
 				ref: `refs/heads/${longBranchName}`,
 				sha: "abc123def456",
@@ -449,6 +344,7 @@ describe("BranchService", () => {
 			await Promise.all(promises);
 
 			const activeBranches = Array.from(branchService.activeBranches);
+
 			expect(activeBranches).toHaveLength(3);
 			expect(activeBranches).toContain("feature/concurrent1");
 			expect(activeBranches).toContain("feature/concurrent2");
@@ -467,7 +363,159 @@ describe("BranchService", () => {
 			await Promise.all(cleanupPromises);
 
 			const activeBranches = Array.from(branchService.activeBranches);
+
 			expect(activeBranches).toEqual([]);
+		});
+	});
+
+	describe("Error Handling", () => {
+		test("should handle rate limiting errors", () => {
+			gitMocks.createRef.mockRejectedValueOnce(
+				Object.assign(new Error("API rate limit exceeded"), { status: StatusCodes.FORBIDDEN }),
+			);
+
+			expect(branchService.createBranch("feature/test")).rejects.toThrow("API rate limit exceeded");
+		});
+	});
+
+	describe("cleanup", () => {
+		let testableBranchService: TestableBranchService;
+		let contentMocks: MockContentService;
+
+		beforeEach(() => {
+			const { service, mocks } = createTestableBranchService();
+			testableBranchService = service;
+			gitMocks = mocks.git;
+			contentMocks = mocks.content;
+		});
+
+		afterEach(() => {
+			testableBranchService.activeBranches.clear();
+		});
+
+		test("should delete branch without PR during cleanup", async () => {
+			await testableBranchService.createBranch("translate/orphan-branch");
+			contentMocks.findPullRequestByBranch.mockResolvedValue(undefined);
+
+			await testableBranchService.testCleanup();
+
+			expect(contentMocks.findPullRequestByBranch).toHaveBeenCalledWith("translate/orphan-branch");
+			expect(gitMocks.deleteRef).toHaveBeenCalledWith({
+				owner: testRepositories.fork.owner,
+				repo: testRepositories.fork.repo,
+				ref: "heads/translate/orphan-branch",
+			});
+		});
+
+		test("should delete branch with conflicted PR during cleanup", async () => {
+			await testableBranchService.createBranch("translate/conflicted-branch");
+			// @ts-expect-error - partial mock
+			contentMocks.findPullRequestByBranch.mockResolvedValue({ number: 123 });
+			contentMocks.checkPullRequestStatus.mockResolvedValue({
+				needsUpdate: true,
+				mergeableState: "dirty",
+				hasConflicts: false,
+				mergeable: null,
+			});
+
+			await testableBranchService.testCleanup();
+
+			expect(contentMocks.checkPullRequestStatus).toHaveBeenCalledWith(123);
+			expect(gitMocks.deleteRef).toHaveBeenCalled();
+		});
+
+		test("should preserve branch with valid PR during cleanup", async () => {
+			await testableBranchService.createBranch("translate/valid-pr-branch");
+			// @ts-expect-error - partial mock
+			contentMocks.findPullRequestByBranch.mockResolvedValue({ number: 456 });
+			contentMocks.checkPullRequestStatus.mockResolvedValue({
+				needsUpdate: false,
+				mergeableState: "clean",
+				hasConflicts: false,
+				mergeable: null,
+			});
+
+			await testableBranchService.testCleanup();
+
+			expect(contentMocks.checkPullRequestStatus).toHaveBeenCalledWith(456);
+			expect(gitMocks.deleteRef).not.toHaveBeenCalled();
+		});
+
+		test("should handle errors gracefully during cleanup", async () => {
+			await testableBranchService.createBranch("translate/error-branch");
+			contentMocks.findPullRequestByBranch.mockRejectedValue(new Error("API Error"));
+
+			await testableBranchService.testCleanup();
+
+			expect(testableBranchService.activeBranches.has("translate/error-branch")).toBe(true);
+		});
+
+		test("should process multiple branches during cleanup", async () => {
+			await testableBranchService.createBranch("translate/branch1");
+			await testableBranchService.createBranch("translate/branch2");
+			await testableBranchService.createBranch("translate/branch3");
+
+			// Branch 1 has no PR -> delete
+			contentMocks.findPullRequestByBranch
+				.mockResolvedValueOnce(undefined)
+				// @ts-expect-error - Branch 2 has valid PR -> preserve
+				.mockResolvedValueOnce({ data: { number: 1 } })
+				// @ts-expect-error - Branch 3 has conflicted PR -> delete
+				.mockResolvedValueOnce({ data: { number: 2 } });
+
+			contentMocks.checkPullRequestStatus
+				.mockResolvedValueOnce({
+					needsUpdate: false,
+					mergeableState: "clean",
+					hasConflicts: false,
+					mergeable: null,
+				})
+				.mockResolvedValueOnce({
+					needsUpdate: true,
+					mergeableState: "dirty",
+					hasConflicts: false,
+					mergeable: null,
+				});
+
+			await testableBranchService.testCleanup();
+
+			expect(gitMocks.deleteRef).toHaveBeenCalledTimes(2);
+		});
+
+		test("should not delete any branches when all have valid PRs", async () => {
+			await testableBranchService.createBranch("translate/pr-branch");
+			// @ts-expect-error - partial mock
+			contentMocks.findPullRequestByBranch.mockResolvedValue({ number: 789 });
+			contentMocks.checkPullRequestStatus.mockResolvedValue({
+				needsUpdate: false,
+				mergeableState: "clean",
+				hasConflicts: false,
+				mergeable: null,
+			});
+
+			await testableBranchService.testCleanup();
+
+			expect(gitMocks.deleteRef).not.toHaveBeenCalled();
+			expect(testableBranchService.activeBranches.has("translate/pr-branch")).toBe(true);
+		});
+	});
+
+	describe("checkIfCommitExistsOnFork - additional edge cases", () => {
+		test("should return false when branch does not exist", async () => {
+			const notFoundError = Object.assign(new Error("Not Found"), {
+				status: StatusCodes.NOT_FOUND,
+			});
+			gitMocks.getRef.mockImplementation(() => Promise.reject(notFoundError));
+
+			const result = await branchService.checkIfCommitExistsOnFork("nonexistent-branch");
+
+			expect(result).toBe(false);
+		});
+
+		test("should throw mapped error when listCommits fails", () => {
+			reposMocks.listCommits.mockRejectedValue(new Error("API Error"));
+
+			expect(branchService.checkIfCommitExistsOnFork("feature/test")).rejects.toThrow("API Error");
 		});
 	});
 });

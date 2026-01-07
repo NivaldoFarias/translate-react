@@ -1,63 +1,63 @@
-/**
- * @fileoverview
- * Test suite for Environment Utilities
- *
- * Tests environment variable validation and parsing
- */
+import { describe, expect, test } from "bun:test";
 
-import { beforeEach, describe, expect, test } from "bun:test";
+import { RuntimeEnvironment, validateEnv } from "@/utils/";
 
-import { RuntimeEnvironment } from "@/utils/constants.util";
-import { validateEnv } from "@/utils/env.util";
+import { testEnv as validEnv } from "../setup";
 
 describe("Environment Utilities", () => {
-	const originalEnv = process.env;
+	describe("validateEnv", () => {
+		test("should validate correct environment variables when valid env is provided", () => {
+			const env = validateEnv(validEnv);
 
-	beforeEach(() => {
-		process.env = { ...originalEnv };
-		Object.assign(import.meta.env, {
-			GITHUB_TOKEN: "ghp_1234567890abcdefghijklmnopqrstuvwxyzABCD",
-			OPENAI_API_KEY: "sk-1234567890abcdefghijklmnopqrstuvwxyzABCDEF1234567890",
-			LLM_MODEL: "test-model",
-			REPO_FORK_OWNER: "test-owner",
-			REPO_FORK_NAME: "test-repo",
-			REPO_UPSTREAM_OWNER: "test-original-owner",
-			NODE_ENV: "test",
-			BUN_ENV: "test",
-			FORCE_SNAPSHOT_CLEAR: "false",
-			DEV_MODE_FORK_PR: "false",
-			LOG_TO_CONSOLE: "false",
+			expect(env.GH_TOKEN).toBe("ghp_1234567890abcdefghijklmnopqrstuvwxyzABCD");
+			expect(env.LLM_API_KEY).toBe("sk-1234567890abcdefghijklmnopqrstuvwxyzABCDEF1234567890");
+			expect(env.NODE_ENV).toBe(RuntimeEnvironment.Test);
 		});
-	});
 
-	test("should validate correct environment variables", () => {
-		const env = validateEnv();
-		expect(env.GITHUB_TOKEN).toBe("ghp_1234567890abcdefghijklmnopqrstuvwxyzABCD");
-		expect(env.OPENAI_API_KEY).toBe("sk-1234567890abcdefghijklmnopqrstuvwxyzABCDEF1234567890");
-		expect(env.NODE_ENV).toBe(RuntimeEnvironment.Test);
-	});
+		test("should throw error when NODE_ENV has invalid value", () => {
+			const invalidEnv = { ...validEnv, NODE_ENV: "invalid-environment" };
 
-	test("should throw error for missing required variables", () => {
-		// In non-test environment, GITHUB_TOKEN would be required
-		// Since we're in test env, we test that the schema correctly validates enum values
-		// which are always required (no default, no optional)
-		(import.meta.env as Record<string, unknown>)["NODE_ENV"] = "invalid-environment";
+			// @ts-expect-error - intentionally invalid for testing
+			expect(() => validateEnv(invalidEnv)).toThrow();
+		});
 
-		expect(() => {
-			validateEnv();
-		}).toThrow();
-	});
+		test("should use default values for optional variables when not provided", () => {
+			const minimalEnv = {
+				GH_TOKEN: validEnv.GH_TOKEN,
+				LLM_API_KEY: validEnv.LLM_API_KEY,
+				NODE_ENV: RuntimeEnvironment.Test,
+			};
 
-	test("should use default values for optional variables", () => {
-		const env = validateEnv();
-		expect(env.OPENAI_BASE_URL).toBe("https://openrouter.ai/api/v1");
-	});
+			// @ts-expect-error - missing optional variables
+			const env = validateEnv(minimalEnv);
 
-	test("should validate enum values", () => {
-		Object.assign(import.meta.env, { NODE_ENV: "invalid" });
+			expect(env.LLM_API_BASE_URL).toBe("https://openrouter.ai/api/v1");
+		});
 
-		expect(() => {
-			validateEnv();
-		}).toThrow();
+		test("should throw error when token is too short", () => {
+			const invalidEnv = { ...validEnv, GH_TOKEN: "short" };
+
+			expect(() => validateEnv(invalidEnv)).toThrow("GH_TOKEN looks too short");
+		});
+
+		test("should throw error when token contains placeholder value", () => {
+			const invalidEnv = { ...validEnv, GH_TOKEN: "CHANGE_ME" };
+
+			expect(() => validateEnv(invalidEnv)).toThrow("appears to be a placeholder");
+		});
+
+		test("should coerce numeric string values to numbers", () => {
+			const envWithStringNumbers = {
+				...validEnv,
+				MAX_TOKENS: "8192",
+				BATCH_SIZE: "10",
+			};
+
+			// @ts-expect-error - testing string to number coercion
+			const env = validateEnv(envWithStringNumbers);
+
+			expect(env.MAX_TOKENS).toBe(8192);
+			expect(env.BATCH_SIZE).toBe(10);
+		});
 	});
 });

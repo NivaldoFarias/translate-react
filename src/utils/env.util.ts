@@ -27,18 +27,9 @@ function createTokenSchema(envName: string) {
 		);
 }
 
-/**
- * Detects if running in test environment.
- *
- * Checks NODE_ENV, BUN_ENV, and Bun's built-in test detection.
- */
+/** Detects if running in test environment */
 function isTestEnvironment(): boolean {
-	const env = import.meta.env;
-	return (
-		env["NODE_ENV"] === RuntimeEnvironment.Test ||
-		env["BUN_ENV"] === RuntimeEnvironment.Test ||
-		(typeof Bun !== "undefined" && Bun.isMainThread === false)
-	);
+	return import.meta.env.NODE_ENV === RuntimeEnvironment.Test;
 }
 
 /** Environment configuration schema for runtime validation */
@@ -51,13 +42,6 @@ const envSchema = z.object({
 	NODE_ENV: z.enum(RuntimeEnvironment).default(environmentDefaults.NODE_ENV),
 
 	/**
-	 * Bun's runtime environment.
-	 *
-	 * @default "development"
-	 */
-	BUN_ENV: z.enum(RuntimeEnvironment).default(environmentDefaults.BUN_ENV),
-
-	/**
 	 * Logging level for the application.
 	 *
 	 * @default "info"
@@ -65,16 +49,14 @@ const envSchema = z.object({
 	LOG_LEVEL: z.enum(LogLevel).default(environmentDefaults.LOG_LEVEL),
 
 	/** The GitHub Personal Access Token (optional in test environment) */
-	GITHUB_TOKEN:
-		isTestEnvironment() ?
-			createTokenSchema("GITHUB_TOKEN").optional()
-		:	createTokenSchema("GITHUB_TOKEN"),
+	GH_TOKEN:
+		isTestEnvironment() ? createTokenSchema("GH_TOKEN").optional() : createTokenSchema("GH_TOKEN"),
 
 	/** The OpenAI/OpenRouter/etc API key (optional in test environment) */
-	OPENAI_API_KEY:
+	LLM_API_KEY:
 		isTestEnvironment() ?
-			createTokenSchema("OPENAI_API_KEY").optional()
-		:	createTokenSchema("OPENAI_API_KEY"),
+			createTokenSchema("LLM_API_KEY").optional()
+		:	createTokenSchema("LLM_API_KEY"),
 
 	/**
 	 * The owner _(user or organization)_ of the forked repository.
@@ -114,9 +96,9 @@ const envSchema = z.object({
 	/**
 	 * The OpenAI/OpenRouter/etc API base URL.
 	 *
-	 * @default "https://api.openrouter.com/v1"
+	 * @default "https://openrouter.ai/api/v1"
 	 */
-	OPENAI_BASE_URL: z.url().default(environmentDefaults.OPENAI_BASE_URL),
+	LLM_API_BASE_URL: z.url().default(environmentDefaults.LLM_API_BASE_URL),
 
 	/** The OpenAI project's ID. Used for activity tracking on OpenAI. */
 	OPENAI_PROJECT_ID: z.string().optional(),
@@ -124,24 +106,11 @@ const envSchema = z.object({
 	/**
 	 * The issue number of the progress tracking issue.
 	 *
-	 * @default 555
-	 * @see {@link environmentDefaults.PROGRESS_ISSUE_NUMBER}
-	 */
-	PROGRESS_ISSUE_NUMBER: z.coerce
-		.number()
-		.positive()
-		.default(environmentDefaults.PROGRESS_ISSUE_NUMBER),
-
-	/** Whether to clear the snapshot on startup. Used for development. */
-	FORCE_SNAPSHOT_CLEAR: z.stringbool().default(environmentDefaults.FORCE_SNAPSHOT_CLEAR),
-
-	/**
-	 * Whether to create PRs in the fork (development mode) or upstream (production mode).
-	 * When true, PRs are created against the fork for development purposes.
+	 * Used to post progress updates after a translation workflow.
 	 *
-	 * @default false
+	 * @see [CommentBuilderService](../services/comment-builder.service.ts)
 	 */
-	DEV_MODE_FORK_PR: z.stringbool().default(false),
+	PROGRESS_ISSUE_NUMBER: z.coerce.number().positive().optional(),
 
 	/**
 	 * The URL of the application to override the default URL.
@@ -209,10 +178,37 @@ const envSchema = z.object({
 	 *
 	 * @default 30000
 	 */
-	GITHUB_REQUEST_TIMEOUT: z.coerce
-		.number()
-		.positive()
-		.default(environmentDefaults.GITHUB_REQUEST_TIMEOUT),
+	GH_REQUEST_TIMEOUT: z.coerce.number().positive().default(environmentDefaults.GH_REQUEST_TIMEOUT),
+
+	/**
+	 * Minimum success rate (0-1) required for workflow to pass.
+	 *
+	 * If the translation success rate falls below this threshold, the workflow
+	 * will exit with a non-zero code. Set to 0 to disable failure detection.
+	 *
+	 * @default 0.5 (50%)
+	 */
+	MIN_SUCCESS_RATE: z.coerce.number().min(0).max(1).default(environmentDefaults.MIN_SUCCESS_RATE),
+
+	/**
+	 * Maximum concurrent LLM API requests.
+	 *
+	 * Controls how many translation requests can run simultaneously. Higher values
+	 * improve throughput but may trigger rate limits. Adjust based on your API tier.
+	 *
+	 * @default 5
+	 */
+	LLM_MAX_CONCURRENT: z.coerce.number().positive().default(5),
+
+	/**
+	 * Minimum time between LLM API request batches in **milliseconds**.
+	 *
+	 * Enforces a delay between request batches to prevent rate limit errors.
+	 * Lower values increase throughput but may trigger API rate limits.
+	 *
+	 * @default 20000 (20 seconds)
+	 */
+	LLM_MIN_TIME_MS: z.coerce.number().positive().default(20_000),
 });
 
 /** Type definition for the environment configuration */
@@ -228,11 +224,13 @@ export type Environment = z.infer<typeof envSchema>;
  * 2. Updates `import.meta.env` with validated values
  * 3. Throws detailed error messages for invalid configurations
  *
+ * @param env Optional environment object to validate (defaults to `import.meta.env`)
+ *
  * @throws {Error} Detailed validation errors if environment variables are invalid
  */
-export function validateEnv() {
+export function validateEnv(env?: Environment): Environment {
 	try {
-		return envSchema.parse(import.meta.env);
+		return envSchema.parse(env ?? import.meta.env);
 	} catch (error) {
 		if (error instanceof z.ZodError) {
 			const issues = error.issues
