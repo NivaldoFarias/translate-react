@@ -1,6 +1,9 @@
+import type { RunnerOptions, RunnerServiceDependencies, WorkflowStatistics } from "./runner.types";
+
 import { extractErrorMessage } from "@/errors/";
-import { BaseRunnerService } from "@/services/runner/base.service";
-import { env, logger, RuntimeEnvironment } from "@/utils/";
+import { env, logger, timeOperation } from "@/utils/";
+
+import { BaseRunnerService } from "./base.service";
 
 /**
  * Main orchestrator class that manages the entire translation process workflow.
@@ -13,74 +16,74 @@ import { env, logger, RuntimeEnvironment } from "@/utils/";
  *
  * - Batch processing with configurable size
  * - Real-time progress tracking via Pino logger
- * - Development/Production mode support
- * - Snapshot-based state persistence
  * - Structured error handling
  *
  * @example
  * ```typescript
- * const runner = new RunnerService(options);
+ * const runner = new RunnerService(dependencies, options);
  * await runner.run();
  * ```
  */
-export default class RunnerService extends BaseRunnerService {
+export class RunnerService extends BaseRunnerService {
+	/**
+	 * Creates a new RunnerService with injected dependencies.
+	 *
+	 * @param services Injected service dependencies
+	 * @param options Runner configuration options
+	 */
+	constructor(services: RunnerServiceDependencies, options?: RunnerOptions) {
+		super(services, options);
+
+		this.logger = logger.child({ component: RunnerService.name });
+	}
+
 	/**
 	 * Executes the main translation workflow.
 	 *
 	 * ### Workflow
 	 *
-	 * 1. Verifies GitHub token permissions
-	 * 2. Loads or creates workflow snapshot (development only)
-	 * 3. Fetches repository tree
-	 * 4. Identifies files for translation
-	 * 5. Processes files in batches
-	 * 6. Reports results
+	 * 1. Verifies LLM connectivity
+	 * 2. Verifies GitHub token permissions
+	 * 3. Syncs fork with upstream
+	 * 4. Fetches repository tree
+	 * 5. Identifies files for translation
+	 * 6. Processes files in batches
+	 * 7. Reports results
 	 *
-	 * In production, also comments results on the specified issue.
+	 * @returns Statistics about the workflow execution (success/failure counts)
 	 */
-	public async run(): Promise<void> {
+	public async run(): Promise<WorkflowStatistics> {
 		try {
-			logger.info("Starting translation workflow");
+			this.logger.info("Starting translation workflow");
 
-			logger.info(
+			this.logger.info(
 				`Fork: ${env.REPO_FORK_OWNER}/${env.REPO_FORK_NAME} :: ` +
 					`Upstream: ${env.REPO_UPSTREAM_OWNER}/${env.REPO_UPSTREAM_NAME}`,
 			);
 
-			await this.verifyPermissions();
-			const isForkSynced = await this.syncFork();
+			await timeOperation("Verify LLM Connectivity", () => this.verifyLLMConnectivity());
+			await timeOperation("Verify GitHub Permissions", () => this.verifyPermissions());
+			await timeOperation("Sync Fork", () => this.syncFork());
 
-			if (env.NODE_ENV === RuntimeEnvironment.Development) {
-				await this.loadSnapshot(isForkSynced);
-			}
+			await timeOperation("Fetch Repository Tree", () => this.fetchRepositoryTree());
 
-			await this.fetchRepositoryTree();
+			await timeOperation("Fetch Files to Translate", () => this.fetchFilesToTranslate());
 
-			await this.fetchFilesToTranslate();
-
-			await this.processInBatches(this.state.filesToTranslate, this.options.batchSize);
+			await timeOperation("Process Files in Batches", () =>
+				this.processInBatches(this.options.batchSize),
+			);
 
 			this.state.processedResults = Array.from(this.metadata.results.values());
 
-			if (env.NODE_ENV === RuntimeEnvironment.Development) {
-				await this.services.snapshot.append("processedResults", this.state.processedResults);
-			}
+			this.logger.info("Translation workflow completed");
 
-			logger.info("Translation workflow completed successfully");
+			await timeOperation("Update Issue Comment", () => this.updateIssueWithResults());
 
-			if (this.shouldUpdateIssueComment) {
-				await this.updateIssueWithResults();
-			}
-
-			if (env.NODE_ENV === RuntimeEnvironment.Production) {
-				await this.services.snapshot.clear();
-			}
+			return this.printFinalStatistics();
 		} catch (error) {
-			logger.error({ error: extractErrorMessage(error) }, "Translation workflow failed");
+			this.logger.error({ error: extractErrorMessage(error) }, "Translation workflow failed");
 
 			throw error;
-		} finally {
-			await this.printFinalStatistics();
 		}
 	}
 }

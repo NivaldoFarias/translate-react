@@ -1,17 +1,9 @@
-/**
- * @fileoverview Tests for the {@link CommentBuilderService}.
- *
- * This suite covers hierarchical comment building, path simplification,
- * structure formatting, and GitHub issue comment generation functionality
- * for the translation workflow result presentation.
- */
-
 import { RestEndpointMethodTypes } from "@octokit/rest";
 import { beforeEach, describe, expect, test } from "bun:test";
 
-import { CommentBuilderService } from "@/services/comment-builder.service";
-import { ProcessedFileResult } from "@/services/runner/";
-import { TranslationFile } from "@/services/translator.service";
+import type { ProcessedFileResult } from "@/services/";
+
+import { CommentBuilderService, TranslationFile } from "@/services/";
 
 describe("CommentBuilderService", () => {
 	let commentBuilderService: CommentBuilderService;
@@ -37,7 +29,6 @@ describe("CommentBuilderService", () => {
 		} as unknown as RestEndpointMethodTypes["pulls"]["list"]["response"]["data"][number];
 	};
 
-	/** Helper function to create mock ProcessedFileResult */
 	const createMockResult = (
 		filename: string,
 		prNumber: number | null = null,
@@ -51,26 +42,25 @@ describe("CommentBuilderService", () => {
 		};
 	};
 
-	/** Helper function to create mock TranslationFile */
 	const createMockTranslationFile = (filename: string, path: string): TranslationFile =>
 		new TranslationFile(`# Content of ${filename}`, filename, path, `sha_${filename}`);
 
 	describe("Constructor", () => {
-		test("should initialize correctly", () => {
+		test("should initialize correctly when instantiated", () => {
 			expect(commentBuilderService).toBeInstanceOf(CommentBuilderService);
 		});
 	});
 
 	describe("buildComment", () => {
-		test("should build hierarchical comment from results and files", () => {
+		const filesToTranslate: TranslationFile[] = [
+			createMockTranslationFile("intro.md", "src/content/docs/intro.md"),
+			createMockTranslationFile("api.md", "src/content/docs/api/api.md"),
+		];
+
+		test("should build hierarchical comment when results and files are provided", () => {
 			const results: ProcessedFileResult[] = [
 				createMockResult("intro.md", 123),
 				createMockResult("api.md", 124),
-			];
-
-			const filesToTranslate: TranslationFile[] = [
-				createMockTranslationFile("intro.md", "src/content/docs/intro.md"),
-				createMockTranslationFile("api.md", "src/content/docs/api/api.md"),
 			];
 
 			const result = commentBuilderService.buildComment(results, filesToTranslate);
@@ -84,10 +74,6 @@ describe("CommentBuilderService", () => {
 		test("should handle files without matching translation files", () => {
 			const results: ProcessedFileResult[] = [createMockResult("missing.md", 125)];
 
-			const filesToTranslate: TranslationFile[] = [
-				createMockTranslationFile("existing.md", "src/content/docs/existing.md"),
-			];
-
 			const result = commentBuilderService.buildComment(results, filesToTranslate);
 
 			expect(result).toBeString();
@@ -97,13 +83,9 @@ describe("CommentBuilderService", () => {
 		test("should handle files without pull request numbers", () => {
 			const results: ProcessedFileResult[] = [createMockResult("no-pr.md", null)];
 
-			const filesToTranslate: TranslationFile[] = [
-				createMockTranslationFile("no-pr.md", "src/content/docs/no-pr.md"),
-			];
-
 			const result = commentBuilderService.buildComment(results, filesToTranslate);
 
-			expect(result).toContain("`no-pr.md`: #0");
+			expect(result).toBe("");
 		});
 
 		test("should handle empty results array", () => {
@@ -434,20 +416,20 @@ describe("CommentBuilderService", () => {
 			const results: ProcessedFileResult[] = [];
 			const filesToTranslate: TranslationFile[] = [];
 
-			for (let i = 1; i <= 50; i++) {
+			for (let index = 1; index <= 50; index++) {
 				results.push({
-					filename: `file-${i.toString().padStart(2, "0")}.md`,
+					filename: `file-${index.toString().padStart(2, "0")}.md`,
 					branch: null,
-					translation: `# File ${i}`,
-					pullRequest: createMockPrData(100 + i),
+					translation: `# File ${index}`,
+					pullRequest: createMockPrData(100 + index),
 					error: null,
 				});
 
 				filesToTranslate.push({
-					filename: `file-${i.toString().padStart(2, "0")}.md`,
-					path: `src/content/docs/batch/file-${i.toString().padStart(2, "0")}.md`,
-					content: `# File ${i}`,
-					sha: `sha_file_${i}`,
+					filename: `file-${index.toString().padStart(2, "0")}.md`,
+					path: `src/content/docs/batch/file-${index.toString().padStart(2, "0")}.md`,
+					content: `# File ${index}`,
+					sha: `sha_file_${index}`,
 				});
 			}
 

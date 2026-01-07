@@ -1,7 +1,10 @@
-import type { ProcessedFileResult } from "@/services/runner/";
+import type { ProcessedFileResult } from "./runner";
 
-import { env } from "@/utils/";
+import type { LocaleDefinition } from "@/locales";
 
+import { env, logger } from "@/utils/";
+
+import { LocaleService } from "./locale";
 import { TranslationFile } from "./translator.service";
 
 export interface FileEntry {
@@ -16,6 +19,18 @@ export interface HierarchicalStructure {
 
 /** Service for building comments based on translation results */
 export class CommentBuilderService {
+	private readonly logger = logger.child({ component: CommentBuilderService.name });
+	private readonly locale: LocaleDefinition;
+
+	/**
+	 * Creates a new CommentBuilderService instance.
+	 *
+	 * @param localeService Optional locale service for dependency injection (defaults to singleton)
+	 */
+	constructor(localeService?: LocaleService) {
+		this.locale = (localeService ?? LocaleService.get()).locale;
+	}
+
 	/**
 	 * Builds a hierarchical comment for GitHub issues based on translation results.
 	 *
@@ -50,12 +65,11 @@ export class CommentBuilderService {
 				if (!translationFile) return null;
 
 				const pathParts = translationFile.path.split("/");
-				const filename = pathParts.pop() || "";
 
 				return {
 					pathParts: this.simplifyPathParts(pathParts),
-					filename,
-					prNumber: result.pullRequest?.number || 0,
+					filename: translationFile.filename,
+					prNumber: result.pullRequest?.number ?? 0,
 				};
 			})
 			.filter(Boolean);
@@ -140,17 +154,19 @@ export class CommentBuilderService {
 	 * ```
 	 */
 	private buildHierarchicalComment(
-		data: Array<{
+		data: {
 			pathParts: string[];
 			filename: string;
 			prNumber: number;
-		}>,
+		}[],
 	): string {
-		data.sort((a, b) => {
-			const pathA = a.pathParts.join("/");
-			const pathB = b.pathParts.join("/");
+		data.sort((left, right) => {
+			const pathA = left.pathParts.join("/");
+			const pathB = right.pathParts.join("/");
 
-			return pathA === pathB ? a.filename.localeCompare(b.filename) : pathA.localeCompare(pathB);
+			return pathA === pathB ?
+					left.filename.localeCompare(right.filename)
+				:	pathA.localeCompare(pathB);
 		});
 
 		const structure: HierarchicalStructure = {};
@@ -159,10 +175,7 @@ export class CommentBuilderService {
 			let currentLevel = structure;
 
 			for (const part of item.pathParts) {
-				if (!currentLevel[part]) {
-					currentLevel[part] = { files: [] };
-				}
-
+				currentLevel[part] ??= { files: [] };
 				currentLevel = currentLevel[part] as HierarchicalStructure;
 			}
 
@@ -242,13 +255,8 @@ export class CommentBuilderService {
 	/** Comment template for issue comments */
 	public get comment() {
 		return {
-			prefix: `As seguintes páginas foram traduzidas e PRs foram criados:`,
-			suffix: `###### Observações
-	
-	- As traduções foram geradas por uma LLM e requerem revisão humana para garantir precisão técnica e fluência.
-	- Alguns arquivos podem ter PRs de tradução existentes em análise. Verifiquei duplicações, mas recomendo conferir.
-	- O fluxo de trabalho de automação completo está disponível no repositório [\`translate-react\`](https://github.com/${env.REPO_FORK_OWNER}/translate-react) para referência e contribuições.
-	- Esta implementação é um trabalho em progresso e pode apresentar inconsistências em conteúdos técnicos complexos ou formatação específica.`,
+			prefix: this.locale.comment.prefix,
+			suffix: this.locale.comment.suffix(env.REPO_FORK_OWNER),
 		};
 	}
 }

@@ -30,7 +30,7 @@ translate-react/
 │
 ├── Application Source
 │   └── src/                                  # Main application code
-│       ├── index.ts                          # Application entry point
+│       ├── main.ts                           # Application entry point
 │       ├── build.ts                          # Bun bundler build configuration
 │       ├── types.d.ts                        # Global type definitions
 │       │
@@ -46,10 +46,12 @@ translate-react/
 │       │
 │       ├── services/                         # Core business logic services
 │       │   ├── comment-builder.service.ts    # PR comment generation
-│       │   ├── database.service.ts           # SQLite state persistence
 │       │   ├── language-detector.service.ts  # Language detection (CLD)
-│       │   ├── snapshot.service.ts           # Snapshot management
 │       │   ├── translator.service.ts         # LLM translation engine
+│       │   │
+│       │   ├── cache/                        # Runtime cache services
+│       │   │   ├── cache.service.ts          # Generic in-memory cache
+│       │   │   └── language-cache.service.ts # Language detection cache
 │       │   │
 │       │   ├── github/                       # GitHub API integration
 │       │   │   ├── base.service.ts           # Base GitHub service
@@ -75,11 +77,12 @@ translate-react/
 │       ├── setup.ts                                # Test configuration
 │       ├── errors/                                 # Error handling tests
 │       ├── services/                               # Service tests
-│       │   ├── comment-builder.service.spec.ts  
-│       │   ├── database.service.spec.ts
+│       │   ├── comment-builder.service.spec.ts
 │       │   ├── language-detector.service.spec.ts
-│       │   ├── snapshot.service.spec.ts
 │       │   ├── translator.service.spec.ts
+│       │   ├── cache/                              # Cache service tests
+│       │   │   ├── cache.service.spec.ts
+│       │   │   └── language-cache.service.spec.ts
 │       │   └── github/                             # GitHub service tests
 │       │       ├── base.service.spec.ts
 │       │       ├── branch.service.spec.ts
@@ -92,7 +95,6 @@ translate-react/
     │   ├── index.js                       # Bundled application
     │   ├── index.js.map                   # Source map for debugging
     ├── logs/                              # Structured error logs (JSONL)
-    ├── snapshots.sqlite                   # SQLite state persistence database
     ├── node_modules/                      # Package dependencies
     └── bun.lockb                          # Bun lockfile
 ```
@@ -145,8 +147,8 @@ translate-react/
 | `github.service.ts`            | GitHub API integration          | Octokit REST API  |
 | `translator.service.ts`        | LLM translation engine          | OpenAI-compatible |
 | `language-detector.service.ts` | Language detection and analysis | CLD library       |
-| `database.service.ts`          | SQLite state persistence        | SQLite3           |
-| `snapshot.service.ts`          | Snapshot management             | Database service  |
+| `cache.service.ts`             | Generic in-memory cache         | None              |
+| `language-cache.service.ts`    | Language detection cache        | Cache service     |
 
 ### Error Handling Files
 
@@ -212,9 +214,8 @@ RunnerService
 │   └── ContentService
 ├── TranslatorService
 ├── LanguageDetectorService
-├── DatabaseService
-└── SnapshotService
-    └── DatabaseService
+└── LanguageCacheService
+    └── CacheService<T>
 ```
 
 ### Error Handling Flow
@@ -251,9 +252,8 @@ Service Method
 ### Debugging Workflow
 
 1. Check error logs in `logs/` directory
-3. Enable debug mode with `LOG_LEVEL=debug`
-4. Consult `docs/DEBUGGING.md` for common issues
-5. Analyze snapshots in `snapshots.sqlite`
+2. Enable debug mode with `LOG_LEVEL=debug`
+3. Consult `docs/DEBUGGING.md` for common issues
 
 ### Testing Workflow
 

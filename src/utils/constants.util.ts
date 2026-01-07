@@ -3,7 +3,7 @@ import { homepage, name, version } from "../../package.json";
 /**
  * Available runtime environments for the application.
  *
- * Maps to `NODE_ENV` and `BUN_ENV` environment variables
+ * Maps to `NODE_ENV` environment variables
  */
 export enum RuntimeEnvironment {
 	Development = "development",
@@ -33,20 +33,6 @@ export const processSignals = {
 /** Standard error messages used throughout the application */
 export const errorMessages = {
 	invalidKey: (key: string) => `Invalid key: ${key}`,
-	snapshotSaveFailed: "Failed to save snapshot",
-	snapshotAppendFailed: (key: string) => `Failed to append ${key}`,
-	snapshotLoadFailed: "Failed to load snapshot",
-	snapshotClearFailed: "Failed to clear snapshots",
-	snapshotCleanupFailed: "Failed to cleanup snapshots",
-	snapshotForceClear: "Forcefully cleared all snapshots as requested by FORCE_SNAPSHOT_CLEAR",
-} as const;
-
-/** Keys used in snapshot data structure */
-export const snapshotKeys = {
-	repositoryTree: "repositoryTree",
-	filesToTranslate: "filesToTranslate",
-	processedResults: "processedResults",
-	timestamp: "timestamp",
 } as const;
 
 /** Maximum number of tokens that can be translated in a single request */
@@ -68,7 +54,7 @@ export const MAX_FILE_SIZE = 200_000;
 export const FILE_FETCH_BATCH_SIZE = 10;
 
 /**
- * Minimum confidence threshold for language cache hits.
+ * Minimum confidence threshold for language cache hits, on a scale from 0 to 1.
  *
  * Cache entries below this confidence level are treated as cache misses,
  * triggering fresh language detection to ensure accuracy. Set to 0.8 (80%)
@@ -132,23 +118,18 @@ export type ReactLanguageCode = (typeof REACT_TRANSLATION_LANGUAGES)[number];
 
 export const environmentDefaults = {
 	NODE_ENV: RuntimeEnvironment.Development,
-	BUN_ENV: RuntimeEnvironment.Development,
 	LOG_LEVEL: LogLevel.Info,
-	FORCE_SNAPSHOT_CLEAR: false,
-	OPENAI_BASE_URL: "https://openrouter.ai/api/v1",
+	LLM_API_BASE_URL: "https://openrouter.ai/api/v1",
 	HEADER_APP_TITLE: `${name} v${version}`,
 	HEADER_APP_URL: homepage,
 	REPO_FORK_OWNER: "nivaldofarias",
 	REPO_FORK_NAME: "pt-br.react.dev",
 	REPO_UPSTREAM_OWNER: "reactjs",
 	REPO_UPSTREAM_NAME: "pt-br.react.dev",
-	LLM_MODEL: "google/gemini-2.5-flash-lite",
+	LLM_MODEL: "google/gemini-2.0-flash-exp:free",
 	BATCH_SIZE: 1,
 	TARGET_LANGUAGE: "pt-br",
 	SOURCE_LANGUAGE: "en",
-
-	/** @see {@link https://github.com/reactjs/pt-br.react.dev/issues/555|Docs Progress Issue (pt-BR)} */
-	PROGRESS_ISSUE_NUMBER: 555,
 
 	/** Maximum tokens to generate in a single LLM response */
 	MAX_TOKENS: 8192,
@@ -157,14 +138,8 @@ export const environmentDefaults = {
 	LOG_TO_CONSOLE: true,
 
 	/** Timeout for GitHub API requests in milliseconds */
-	GITHUB_REQUEST_TIMEOUT: 30_000,
-} as const;
+	GH_REQUEST_TIMEOUT: 30_000,
 
-/** Glossary of terms with exact translations to enforce */
-export const LANGUAGE_SPECIFIC_RULES = {
-	"Brazilian Portuguese": `\n# PORTUGUESE (BRAZIL) SPECIFIC RULES
-- ALWAYS translate 'deprecated' and related terms (deprecation, deprecating, deprecates) to 'descontinuado(a)', 'descontinuada', 'obsoleto(a)' or 'obsoleta' in ALL contexts (documentation text, comments, headings, lists, etc.)
-- Exception: Do NOT translate 'deprecated' in HTML comment IDs like {/*deprecated-something*/} - keep these exactly as-is
-- Exception: Do NOT translate 'deprecated' in URLs, anchor links, or code variable names
-- Use Brazilian Portuguese conventions and terminology`,
-};
+	/** Minimum success rate (0-1) required for workflow to pass */
+	MIN_SUCCESS_RATE: 0.5,
+} as const;

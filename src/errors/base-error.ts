@@ -1,18 +1,6 @@
-import type { BunFile } from "bun";
-
-/** Represents the severity level of an error */
-export enum ErrorSeverity {
-	Debug = "DEBUG",
-	Info = "INFO",
-	Warn = "WARN",
-	Error = "ERROR",
-	Fatal = "FATAL",
-	Log = "LOG",
-}
-
 /** Standardized error codes for the translation workflow */
 export enum ErrorCode {
-	// Github API Related
+	// GitHub API Related
 	GithubApiError = "GITHUB_API_ERROR",
 	GithubNotFound = "GITHUB_NOT_FOUND",
 	GithubUnauthorized = "GITHUB_UNAUTHORIZED",
@@ -45,94 +33,60 @@ export enum ErrorCode {
 	ResourceLoadError = "RESOURCE_LOAD_ERROR",
 	ValidationError = "VALIDATION_ERROR",
 	UnknownError = "UNKNOWN_ERROR",
-	MissingKey = "MISSING_KEY",
-	UnsupportedLang = "UNSUPPORTED_LANG",
-}
-
-/** Base context interface for all translation errors */
-export interface ErrorContext {
-	/** The severity level of the error */
-	sanity: ErrorSeverity;
-
-	/** The standardized error code */
-	code: ErrorCode;
-
-	/** The operation that failed */
-	operation?: string;
-
-	/** The file related to the error, if applicable */
-	file?: BunFile | string;
-
-	/** Additional metadata about the error */
-	metadata?: Record<string, unknown>;
-
-	/** The timestamp when the error occurred */
-	timestamp?: Date;
 }
 
 /**
- * Base error class for all translation-related errors
+ * Base error class for all translation-related errors.
  *
- * Extends the native Error class with additional context and tracking capabilities
+ * Provides standardized error handling with error codes and optional metadata.
+ *
+ * @template T Type of the metadata object
  */
-export class TranslationError extends Error {
+export class ApplicationError<
+	T extends Record<string, unknown> = Record<string, unknown>,
+> extends Error {
 	/** Standardized error code */
 	public readonly code: ErrorCode;
 
-	/** Timestamp when the error was created */
-	public readonly timestamp: Date;
+	/** The operation that failed */
+	public readonly operation: string;
 
-	/** Additional context about the error */
-	public readonly context: ErrorContext;
+	/** Additional metadata for debugging */
+	public readonly metadata?: T;
 
-	/**
-	 * Initializes a new instance of the `TranslationError` class.
-	 *
-	 * Uses {@link Object.setPrototypeOf} to maintain proper prototype chain for custom errors.
-	 */
 	constructor(
 		message: string,
 		code: ErrorCode = ErrorCode.UnknownError,
-		context: Partial<ErrorContext> = {},
+		operation?: string,
+		metadata?: T,
 	) {
 		super(message);
 		this.name = this.constructor.name;
 		this.code = code;
-		this.timestamp = context.timestamp ?? new Date();
-		this.context = {
-			sanity: context.sanity ?? ErrorSeverity.Error,
-			code: this.code,
-			operation: context.operation,
-			file: context.file,
-			metadata: context.metadata,
-			timestamp: this.timestamp,
-		};
+		this.operation = operation ?? "UnknownOperation";
+		this.metadata = metadata;
 
 		Object.setPrototypeOf(this, new.target.prototype);
 	}
 
 	/** Extracts a human-readable message from the error */
 	public getDisplayMessage(): string {
-		const context = this.context.operation ? ` (in ${this.context.operation})` : "";
+		const operationSuffix = this.operation ? ` (in ${this.operation})` : "";
 
-		return `${this.message}${context}`;
+		return `${this.message}${operationSuffix}`;
 	}
 }
 
 /**
- * Extracts a human-readable error message from various error types
- *
- * ### Handling
- *
- * - {@link TranslateError}: Uses the formatted message with context
- * - {@link Error}: Uses the native error message
- * - Other types: Converts to string
+ * Extracts a human-readable error message from various error types.
  *
  * @param error The error to extract a message from
+ *
+ * @returns Human-readable error message
  */
 export function extractErrorMessage(error: unknown): string {
-	if (error instanceof TranslationError) return error.getDisplayMessage();
-	else if (error instanceof Error) return error.message;
+	if (error instanceof ApplicationError) return error.getDisplayMessage();
+	if (error instanceof Error) return error.message;
 
 	return String(error);
 }

@@ -1,258 +1,196 @@
-/**
- * @fileoverview Tests for specialized error classes
- *
- * Tests for EmptyContentError, TranslationValidationError, ChunkProcessingError,
- * and other error classes to ensure proper error handling and context preservation.
- */
-
 import { describe, expect, test } from "bun:test";
 
 import {
-	APIError,
-	ChunkProcessingError,
-	EmptyContentError,
-	InitializationError,
-	MissingKeyError,
-	ResourceLoadError,
-	TranslationValidationError,
-	UnsupportedLanguageError,
-	ValidationError,
-} from "@/errors/errors";
+	ApplicationError,
+	createChunkProcessingError,
+	createEmptyContentError,
+	createInitializationError,
+	createResourceLoadError,
+	createTranslationValidationError,
+	ErrorCode,
+} from "@/errors/";
 
-describe("Specialized Error Classes", () => {
-	describe("EmptyContentError", () => {
-		test("should create error with filename", () => {
-			const error = new EmptyContentError("test.md");
+describe("Error Factory Functions", () => {
+	describe("createEmptyContentError", () => {
+		test("should create error with filename in message", () => {
+			const error = createEmptyContentError("test.md");
 
-			expect(error).toBeInstanceOf(Error);
+			expect(error).toBeInstanceOf(ApplicationError);
 			expect(error.message).toContain("test.md");
 			expect(error.message).toContain("empty");
-			// File is in message, but not explicitly set in context.file
 		});
 
-		test("should include additional context", () => {
-			const error = new EmptyContentError("test.md", {
-				metadata: { size: 0 },
-			});
+		test("should include operation and metadata when provided", () => {
+			const error = createEmptyContentError("test.md", "FileLoader.loadFile", { size: 0 });
 
-			expect(error.context.metadata).toEqual({ size: 0 });
+			expect(error.operation).toBe("FileLoader.loadFile");
+			expect(error.metadata).toEqual({ size: 0 });
 		});
 
-		test("should have correct error code", () => {
-			const error = new EmptyContentError("test.md");
+		test("should have NO_CONTENT error code", () => {
+			const error = createEmptyContentError("test.md");
 
-			expect(error.code).toBeDefined();
+			expect(error.code).toBe(ErrorCode.NoContent);
+		});
+
+		test("should handle empty filename", () => {
+			const error = createEmptyContentError("");
+
+			expect(error.message).toContain("empty");
+			expect(error.code).toBe(ErrorCode.NoContent);
+		});
+
+		test("should handle special characters in filename", () => {
+			const error = createEmptyContentError("test-file_name.with.dots.md");
+
+			expect(error.message).toContain("test-file_name.with.dots.md");
 		});
 	});
 
-	describe("TranslationValidationError", () => {
-		test("should create error with reason and filename", () => {
-			const error = new TranslationValidationError("Invalid format", "test.md");
+	describe("createTranslationValidationError", () => {
+		test("should create error with reason and filename in message", () => {
+			const error = createTranslationValidationError("Invalid format", "test.md");
 
 			expect(error.message).toContain("Invalid format");
 			expect(error.message).toContain("test.md");
 		});
 
-		test("should handle validation error with context", () => {
-			const error = new TranslationValidationError("Size mismatch", "test.md", {
-				metadata: { expected: 100, actual: 50 },
-			});
+		test("should include operation and metadata when provided", () => {
+			const error = createTranslationValidationError(
+				"Size mismatch",
+				"test.md",
+				"Translator.validateTranslation",
+				{ expected: 100, actual: 50 },
+			);
 
-			expect(error.context.metadata).toEqual({ expected: 100, actual: 50 });
+			expect(error.operation).toBe("Translator.validateTranslation");
+			expect(error.metadata).toEqual({ expected: 100, actual: 50 });
 		});
 
-		test("should have correct error code", () => {
-			const error = new TranslationValidationError("test reason", "test.md");
+		test("should have FORMAT_VALIDATION_FAILED error code", () => {
+			const error = createTranslationValidationError("test reason", "test.md");
 
-			expect(error.code).toBeDefined();
+			expect(error.code).toBe(ErrorCode.FormatValidationFailed);
+		});
+
+		test("should handle empty reason", () => {
+			const error = createTranslationValidationError("", "test.md");
+
+			expect(error.message).toContain("test.md");
 		});
 	});
 
-	describe("ChunkProcessingError", () => {
+	describe("createChunkProcessingError", () => {
 		test("should create error with message", () => {
-			const error = new ChunkProcessingError("Chunk failed at index 3");
+			const error = createChunkProcessingError("Chunk failed at index 3");
 
 			expect(error.message).toContain("Chunk failed");
 		});
 
-		test("should include chunk-specific context", () => {
-			const error = new ChunkProcessingError("test", {
-				metadata: { chunkIndex: 3, totalChunks: 10 },
+		test("should include chunk-specific metadata when provided", () => {
+			const error = createChunkProcessingError("test", "TranslatorService.processChunk", {
+				chunkIndex: 3,
+				totalChunks: 10,
 			});
 
-			expect(error.context.metadata).toEqual({ chunkIndex: 3, totalChunks: 10 });
+			expect(error.operation).toBe("TranslatorService.processChunk");
+			expect(error.metadata).toEqual({ chunkIndex: 3, totalChunks: 10 });
 		});
 
-		test("should have correct error code", () => {
-			const error = new ChunkProcessingError("test");
+		test("should have CHUNK_PROCESSING_FAILED error code", () => {
+			const error = createChunkProcessingError("test");
 
-			expect(error.code).toBeDefined();
+			expect(error.code).toBe(ErrorCode.ChunkProcessingFailed);
 		});
 	});
 
-	describe("InitializationError", () => {
+	describe("createInitializationError", () => {
 		test("should create error with message", () => {
-			const error = new InitializationError("Failed to initialize service");
+			const error = createInitializationError("Failed to initialize service");
 
 			expect(error.message).toBe("Failed to initialize service");
 		});
 
-		test("should have correct error code", () => {
-			const error = new InitializationError("test");
+		test("should have INITIALIZATION_ERROR error code", () => {
+			const error = createInitializationError("test");
 
-			expect(error.code).toBeDefined();
+			expect(error.code).toBe(ErrorCode.InitializationError);
+		});
+
+		test("should include operation and metadata when provided", () => {
+			const error = createInitializationError("test", "Service.init", { service: "test" });
+
+			expect(error.operation).toBe("Service.init");
+			expect(error.metadata).toEqual({ service: "test" });
 		});
 	});
 
-	describe("MissingKeyError", () => {
-		test("should create error with key name", () => {
-			const error = new MissingKeyError("translationKey");
-
-			expect(error.message).toContain("translationKey");
-			expect(error.message).toContain("not found");
-		});
-
-		test("should have correct error code", () => {
-			const error = new MissingKeyError("key");
-
-			expect(error.code).toBeDefined();
-		});
-	});
-
-	describe("UnsupportedLanguageError", () => {
-		test("should create error with language code", () => {
-			const error = new UnsupportedLanguageError("xyz");
-
-			expect(error.message).toContain("xyz");
-			expect(error.message).toContain("not supported");
-		});
-
-		test("should have correct error code", () => {
-			const error = new UnsupportedLanguageError("lang");
-
-			expect(error.code).toBeDefined();
-		});
-	});
-
-	describe("ResourceLoadError", () => {
-		test("should create error with resource name", () => {
-			const error = new ResourceLoadError("config.json");
+	describe("createResourceLoadError", () => {
+		test("should create error with resource name in message", () => {
+			const error = createResourceLoadError("config.json");
 
 			expect(error.message).toContain("config.json");
 			expect(error.message).toContain("Failed to load");
 		});
 
-		test("should have correct error code", () => {
-			const error = new ResourceLoadError("resource");
+		test("should have RESOURCE_LOAD_ERROR error code", () => {
+			const error = createResourceLoadError("resource");
 
-			expect(error.code).toBeDefined();
+			expect(error.code).toBe(ErrorCode.ResourceLoadError);
+		});
+
+		test("should include operation and metadata when provided", () => {
+			const error = createResourceLoadError("config.json", "Config.load", { path: "/etc" });
+
+			expect(error.operation).toBe("Config.load");
+			expect(error.metadata).toEqual({ path: "/etc" });
 		});
 	});
 
-	describe("APIError", () => {
-		test("should create error with endpoint and status code", () => {
-			const error = new APIError("/api/translate", 500);
-
-			expect(error.message).toContain("/api/translate");
-			expect(error.message).toContain("500");
-		});
-
-		test("should have correct error code", () => {
-			const error = new APIError("/test", 404);
-
-			expect(error.code).toBeDefined();
-		});
-	});
-
-	describe("ValidationError", () => {
-		test("should create error with message", () => {
-			const error = new ValidationError("Invalid input format");
-
-			expect(error.message).toBe("Invalid input format");
-		});
-
-		test("should have correct error code", () => {
-			const error = new ValidationError("test");
-
-			expect(error.code).toBeDefined();
-		});
-	});
-
-	describe("Error Inheritance", () => {
-		test("EmptyContentError inherits from TranslationError", () => {
-			const error = new EmptyContentError("test.md");
-
-			expect(error).toBeInstanceOf(Error);
-			expect(error.context).toBeDefined();
-			expect(error.timestamp).toBeDefined();
-		});
-
-		test("TranslationValidationError inherits from TranslationError", () => {
-			const error = new TranslationValidationError("Invalid", "test.md");
-
-			expect(error).toBeInstanceOf(Error);
-			expect(error.context).toBeDefined();
-		});
-
-		test("ChunkProcessingError inherits from TranslationError", () => {
-			const error = new ChunkProcessingError("test", { metadata: { chunks: 5 } });
-
-			expect(error.context.metadata).toEqual({ chunks: 5 });
-		});
-
-		test("All errors inherit from TranslationError", () => {
+	describe("Common Factory Behavior", () => {
+		test("all factories return ApplicationError instances", () => {
 			const errors = [
-				new InitializationError("test"),
-				new MissingKeyError("key"),
-				new UnsupportedLanguageError("lang"),
-				new ResourceLoadError("resource"),
-				new APIError("/endpoint", 500),
-				new ValidationError("test"),
+				createEmptyContentError("test.md"),
+				createTranslationValidationError("test", "file.md"),
+				createChunkProcessingError("test"),
+				createInitializationError("test"),
+				createResourceLoadError("resource"),
 			];
 
-			errors.forEach((error) => {
+			for (const error of errors) {
+				expect(error).toBeInstanceOf(ApplicationError);
 				expect(error).toBeInstanceOf(Error);
 				expect(error.code).toBeDefined();
-				expect(error.timestamp).toBeDefined();
-			});
-		});
-	});
-
-	describe("Error Stack Traces", () => {
-		test("should preserve stack trace in EmptyContentError", () => {
-			const error = new EmptyContentError("test.md");
-
-			expect(error.stack).toBeDefined();
-			expect(error.stack).toContain("EmptyContentError");
+			}
 		});
 
-		test("should preserve stack trace in TranslationValidationError", () => {
-			const error = new TranslationValidationError("test", "test.md");
-
-			expect(error.stack).toBeDefined();
-			expect(error.stack).toContain("TranslationValidationError");
-		});
-
-		test("should preserve stack trace in ChunkProcessingError", () => {
-			const error = new ChunkProcessingError("test");
-
-			expect(error.stack).toBeDefined();
-			expect(error.stack).toContain("ChunkProcessingError");
-		});
-
-		test("should preserve stack trace in all error types", () => {
+		test("all errors preserve stack traces", () => {
 			const errors = [
-				new InitializationError("test"),
-				new MissingKeyError("key"),
-				new UnsupportedLanguageError("lang"),
-				new ResourceLoadError("resource"),
-				new APIError("/test", 500),
-				new ValidationError("test"),
+				createEmptyContentError("test.md"),
+				createTranslationValidationError("test", "file.md"),
+				createChunkProcessingError("test"),
+				createInitializationError("test"),
+				createResourceLoadError("resource"),
 			];
 
-			errors.forEach((error) => {
+			for (const error of errors) {
 				expect(error.stack).toBeDefined();
-			});
+				expect(error.stack).toContain("ApplicationError");
+			}
+		});
+
+		test("all errors default to UnknownOperation when operation not provided", () => {
+			const errors = [
+				createEmptyContentError("test.md"),
+				createTranslationValidationError("test", "file.md"),
+				createChunkProcessingError("test"),
+				createInitializationError("test"),
+				createResourceLoadError("resource"),
+			];
+
+			for (const error of errors) {
+				expect(error.operation).toBe("UnknownOperation");
+			}
 		});
 	});
 });

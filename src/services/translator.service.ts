@@ -1,26 +1,59 @@
-/**
- * @fileoverview
- *
- * Core service for translating content using OpenAI's language models.
- *
- * Handles the entire translation workflow including content parsing, language detection,
- * model interaction, response processing, and metrics tracking.
- */
-
 import { MarkdownTextSplitter } from "@langchain/textsplitters";
 import { encodingForModel } from "js-tiktoken";
 import OpenAI from "openai";
 
+import type { RateLimiter } from "./rate-limiter";
+
 import {
-	ChunkProcessingError,
-	EmptyContentError,
-	GithubErrorHelper,
-	LLMErrorHelper,
-	TranslationValidationError,
+	createChunkProcessingError,
+	createEmptyContentError,
+	createInitializationError,
+	createTranslationValidationError,
+	mapLLMError,
 } from "@/errors/";
-import { env, LANGUAGE_SPECIFIC_RULES, logger, MAX_CHUNK_TOKENS } from "@/utils/";
+import { env, logger, MAX_CHUNK_TOKENS, withExponentialBackoff } from "@/utils/";
 
 import { LanguageDetectorService } from "./language-detector.service";
+import { LocaleService } from "./locale";
+
+/** LLM configuration for TranslatorService */
+export interface TranslatorLLMConfig {
+	/** LLM API base URL */
+	baseUrl: string;
+
+	/** LLM API key */
+	apiKey: string;
+
+	/** OpenAI project ID (optional) */
+	projectId?: string;
+
+	/** LLM model identifier */
+	model: string;
+
+	/** Application title header */
+	headerAppTitle: string;
+
+	/** Application URL header */
+	headerAppUrl: string;
+}
+
+/** Dependency injection interface for TranslatorService */
+export interface TranslatorServiceDependencies {
+	/** OpenAI client instance for LLM API calls */
+	openai: OpenAI;
+
+	/** Rate limiter for LLM API requests */
+	rateLimiter: RateLimiter;
+
+	/** LLM model identifier for chat completions */
+	model: string;
+
+	/** Optional locale service (defaults to singleton) */
+	localeService?: LocaleService;
+
+	/** Optional language detector service */
+	languageDetector?: LanguageDetectorService;
+}
 
 /**
  * Result of content chunking operation containing chunks and their separators.
@@ -73,7 +106,11 @@ export class TranslationFile {
  *
  * @example
  * ```typescript
- * const translator = new TranslatorService({ source: 'en', target: 'pt' });
+ * const translator = new TranslatorService({
+ *   openai: openaiClient,
+ *   rateLimiter: llmRateLimiter,
+ *   model: 'gpt-4',
+ * });
  * translator.setGlossary('React -> React\ncomponent -> componente');
  *
  * const result = await translator.translateContent(file);
@@ -81,25 +118,94 @@ export class TranslationFile {
  * ```
  */
 export class TranslatorService {
-	/** Language model instance for translation */
-	private readonly llm = new OpenAI({
-		baseURL: env.OPENAI_BASE_URL,
-		apiKey: env.OPENAI_API_KEY,
-		project: env.OPENAI_PROJECT_ID,
-		defaultHeaders: {
-			"X-Title": env.HEADER_APP_TITLE,
-			"HTTP-Referer": env.HEADER_APP_URL,
-		},
-	});
+	private readonly logger = logger.child({ component: TranslatorService.name });
 
-	private readonly helpers = {
-		llm: new LLMErrorHelper(),
-		github: new GithubErrorHelper(),
-	};
+	/** OpenAI client instance for LLM API calls */
+	private readonly openai: OpenAI;
 
-	public readonly languageDetector = new LanguageDetectorService();
+	/** Rate limiter for LLM API requests */
+	private readonly rateLimiter: RateLimiter;
 
+	/** LLM model identifier for chat completions */
+	private readonly model: string;
+
+	/** Locale service for language-specific rules */
+	private readonly localeService: LocaleService;
+
+	/** Language detector for content analysis */
+	public readonly languageDetector: LanguageDetectorService;
+
+	/** Glossary for consistent term translations */
 	public glossary: string | null = null;
+
+	/**
+	 * Creates a new TranslatorService instance with injected dependencies.
+	 *
+	 * @param dependencies Dependency injection container with OpenAI client, rate limiter, and configuration
+	 */
+	constructor(dependencies: TranslatorServiceDependencies) {
+		this.openai = dependencies.openai;
+		this.rateLimiter = dependencies.rateLimiter;
+		this.model = dependencies.model;
+		this.localeService = dependencies.localeService ?? LocaleService.get();
+		this.languageDetector = dependencies.languageDetector ?? new LanguageDetectorService();
+	}
+
+	/**
+	 * Tests LLM API connectivity and authentication.
+	 *
+	 * Makes a minimal API call to verify credentials and model availability
+	 * before starting the translation workflow. This prevents wasting time
+	 * on failed workflows due to API issues.
+	 *
+	 * @throws {Error} If LLM API is not accessible or credentials are invalid
+	 *
+	 * @example
+	 * ```typescript
+	 * await TranslatorService.testConnectivity();
+	 * console.log("✅ LLM API is healthy");
+	 * ```
+	 */
+	public async testConnectivity(): Promise<void> {
+		try {
+			this.logger.info("Testing LLM API connectivity");
+
+			const response = await this.openai.chat.completions.create({
+				model: this.model,
+				messages: [{ role: "user", content: "ping" }],
+				max_tokens: 5,
+				temperature: 0.1,
+			});
+
+			if (!this.isLLMResponseValid(response)) {
+				throw createInitializationError(
+					"Invalid LLM API response: missing response metadata",
+					`${TranslatorService.name}.testConnectivity`,
+					{ response },
+				);
+			}
+
+			this.logger.info(
+				{
+					model: this.model,
+					response: {
+						id: response.id,
+						usage: response.usage,
+						message: response.choices.at(0)?.message,
+					},
+				},
+				"LLM API connectivity test successful",
+			);
+		} catch (error) {
+			this.logger.fatal(error, "❌ LLM API connectivity test failed");
+
+			throw error;
+		}
+	}
+
+	private isLLMResponseValid(response: OpenAI.Chat.Completions.ChatCompletion): boolean {
+		return !!response.id || !!response.usage?.total_tokens || !!response.choices.at(0)?.message;
+	}
 
 	/**
 	 * Main translation method that processes files and manages the translation workflow.
@@ -138,15 +244,14 @@ export class TranslatorService {
 	 * ```
 	 */
 	public async translateContent(file: TranslationFile): Promise<string> {
-		if (!file.content?.length) {
-			throw new EmptyContentError(file.filename, {
-				operation: "TranslatorService.translateContent",
-				file: file.path,
-				metadata: { filename: file.filename, path: file.path },
+		if (!file.content.length) {
+			throw createEmptyContentError(file.filename, `${TranslatorService.name}.translateContent`, {
+				filename: file.filename,
+				path: file.path,
 			});
 		}
 
-		logger.debug(
+		this.logger.debug(
 			{
 				filename: file.filename,
 				contentLength: file.content.length,
@@ -161,7 +266,7 @@ export class TranslatorService {
 
 		this.validateTranslation(file, translatedContent);
 
-		logger.debug(
+		this.logger.debug(
 			{
 				filename: file.filename,
 				originalLength: file.content.length,
@@ -210,20 +315,22 @@ export class TranslatorService {
 	 */
 	private validateTranslation(file: TranslationFile, translatedContent: string): void {
 		if (!translatedContent || translatedContent.trim().length === 0) {
-			throw new TranslationValidationError("Translation produced empty content", file.filename, {
-				operation: "TranslatorService.validateTranslation",
-				file: file.path,
-				metadata: {
+			throw createTranslationValidationError(
+				"Translation produced empty content",
+				file.filename,
+				`${TranslatorService.name}.validateTranslation`,
+				{
 					filename: file.filename,
+					path: file.path,
 					originalLength: file.content.length,
 					translatedLength: translatedContent.length,
 				},
-			});
+			);
 		}
 
 		const sizeRatio = translatedContent.length / file.content.length;
 		if (sizeRatio < 0.5 || sizeRatio > 2.0) {
-			logger.warn(
+			this.logger.warn(
 				{
 					filename: file.filename,
 					sizeRatio: sizeRatio.toFixed(2),
@@ -234,26 +341,25 @@ export class TranslatorService {
 			);
 		}
 
-		const originalHeadings = (file.content.match(/^#{1,6}\s/gm) || []).length;
-		const translatedHeadings = (translatedContent.match(/^#{1,6}\s/gm) || []).length;
+		const CATCH_HEADINGS_REGEX = /^#{1,6}\s/gm;
+		const originalHeadings = (file.content.match(CATCH_HEADINGS_REGEX) ?? []).length;
+		const translatedHeadings = (translatedContent.match(CATCH_HEADINGS_REGEX) ?? []).length;
 
 		if (originalHeadings > 0 && translatedHeadings === 0) {
-			logger.error(
+			this.logger.error(
 				{ filename: file.filename, originalHeadings, translatedHeadings },
 				"Translation lost all markdown headings",
 			);
-			throw new TranslationValidationError(
+			throw createTranslationValidationError(
 				"All markdown headings lost during translation",
 				file.filename,
+				`${TranslatorService.name}.validateTranslation`,
 				{
-					operation: "TranslatorService.validateTranslation",
-					file: file.path,
-					metadata: {
-						originalHeadings,
-						translatedHeadings,
-						originalLength: file.content.length,
-						translatedLength: translatedContent.length,
-					},
+					path: file.path,
+					originalHeadings,
+					translatedHeadings,
+					originalLength: file.content.length,
+					translatedLength: translatedContent.length,
 				},
 			);
 		}
@@ -261,7 +367,7 @@ export class TranslatorService {
 		if (originalHeadings > 0) {
 			const headingRatio = translatedHeadings / originalHeadings;
 			if (headingRatio < 0.8 || headingRatio > 1.2) {
-				logger.warn(
+				this.logger.warn(
 					{
 						filename: file.filename,
 						originalHeadings,
@@ -273,7 +379,7 @@ export class TranslatorService {
 			}
 		}
 
-		logger.debug(
+		this.logger.debug(
 			{
 				filename: file.filename,
 				sizeRatio: sizeRatio.toFixed(2),
@@ -293,12 +399,12 @@ export class TranslatorService {
 	 * @returns Resolves to `true` if content is already translated
 	 */
 	public async isContentTranslated(file: TranslationFile): Promise<boolean> {
-		if (!file.content?.length) return false;
+		if (!file.content.length) return false;
 
 		try {
 			const analysis = await this.languageDetector.analyzeLanguage(file.filename, file.content);
 
-			logger.debug(
+			this.logger.debug(
 				{
 					filename: file.filename,
 					isTranslated: analysis.isTranslated,
@@ -309,11 +415,11 @@ export class TranslatorService {
 
 			return analysis.isTranslated;
 		} catch (error) {
-			logger.error(
+			this.logger.error(
 				{
 					error,
 					filename: file.filename,
-					contentLength: file.content?.length || 0,
+					contentLength: file.content.length || 0,
 				},
 				"Error checking if content is translated - assuming not translated",
 			);
@@ -330,12 +436,12 @@ export class TranslatorService {
 	 * @returns Resolves to the detailed language analysis
 	 */
 	public async getLanguageAnalysis(file: TranslationFile) {
-		if (!file.content?.length) {
-			throw new EmptyContentError(file.filename, {
-				operation: "TranslatorService.getLanguageAnalysis",
-				file: file.path,
-				metadata: { filename: file.filename, path: file.path },
-			});
+		if (!file.content.length) {
+			throw createEmptyContentError(
+				file.filename,
+				`${TranslatorService.name}.getLanguageAnalysis`,
+				{ filename: file.filename, path: file.path },
+			);
 		}
 
 		return await this.languageDetector.analyzeLanguage(file.filename, file.content);
@@ -467,9 +573,23 @@ export class TranslatorService {
 		let searchStartIndex = 0;
 
 		for (let index = 0; index < chunks.length - 1; index++) {
-			const currentChunk = chunks[index]!;
-			const nextChunk = chunks[index + 1]!;
+			const currentChunk = chunks[index];
+			const nextChunk = chunks[index + 1];
 
+			if (currentChunk === undefined || nextChunk === undefined) {
+				throw createChunkProcessingError(
+					"TranslatorService: encountered undefined chunk while computing separators",
+				);
+			}
+
+			if (!currentChunk.trim() || !nextChunk.trim()) {
+				this.logger.warn(
+					{ index, chunksLength: chunks.length },
+					"TranslatorService: encountered empty chunk while computing separators",
+				);
+				separators.push("\n\n");
+				continue;
+			}
 			const currentChunkIndex = content.indexOf(currentChunk.trim(), searchStartIndex);
 
 			if (currentChunkIndex === -1) {
@@ -551,14 +671,14 @@ export class TranslatorService {
 		const contentNeedsChunking = this.needsChunking(content);
 
 		if (!contentNeedsChunking) {
-			logger.debug({ contentLength: content.length }, "Content does not require chunking");
+			this.logger.debug({ contentLength: content.length }, "Content does not require chunking");
 			return await this.callLanguageModel(content);
 		}
 
 		const { chunks, separators } = await this.chunkContent(content);
 		const translatedChunks: string[] = [];
 
-		logger.debug(
+		this.logger.debug(
 			{
 				totalChunks: chunks.length,
 				originalContentLength: content.length,
@@ -571,7 +691,7 @@ export class TranslatorService {
 			const chunkStartTime = Date.now();
 
 			try {
-				logger.debug(
+				this.logger.debug(
 					{
 						chunkIndex: index + 1,
 						totalChunks: chunks.length,
@@ -586,7 +706,7 @@ export class TranslatorService {
 
 				const chunkDuration = Date.now() - chunkStartTime;
 
-				logger.info(
+				this.logger.info(
 					{
 						chunkIndex: index + 1,
 						totalChunks: chunks.length,
@@ -596,7 +716,7 @@ export class TranslatorService {
 					"Chunk translated successfully",
 				);
 
-				logger.debug(
+				this.logger.debug(
 					{
 						chunkIndex: index + 1,
 						originalLength: chunk.length,
@@ -606,7 +726,7 @@ export class TranslatorService {
 					"Chunk translation metrics",
 				);
 			} catch (error) {
-				logger.error(
+				this.logger.error(
 					{
 						error,
 						chunkIndex: index + 1,
@@ -616,15 +736,12 @@ export class TranslatorService {
 					"Failed to translate content chunk",
 				);
 
-				throw this.helpers.llm.mapError(error, {
-					operation: "TranslatorService.translateWithChunking",
-					metadata: {
-						chunkIndex: index,
-						totalChunks: chunks.length,
-						chunkSize: chunk.length,
-						estimatedTokens: this.estimateTokenCount(chunk),
-						translatedChunks: translatedChunks.length,
-					},
+				throw mapLLMError(error, `${TranslatorService.name}.translateWithChunking`, {
+					chunkIndex: index,
+					totalChunks: chunks.length,
+					chunkSize: chunk.length,
+					estimatedTokens: this.estimateTokenCount(chunk),
+					translatedChunks: translatedChunks.length,
 				});
 			}
 		}
@@ -638,7 +755,7 @@ export class TranslatorService {
 		 * the translation array was corrupted during processing.
 		 */
 		if (translatedChunks.length !== chunks.length) {
-			logger.error(
+			this.logger.error(
 				{
 					expectedChunks: chunks.length,
 					actualChunks: translatedChunks.length,
@@ -647,22 +764,20 @@ export class TranslatorService {
 				"Critical: Chunk count mismatch detected",
 			);
 
-			throw new ChunkProcessingError(
+			throw createChunkProcessingError(
 				`Chunk count mismatch: expected ${chunks.length} chunks, but only ${translatedChunks.length} were translated`,
+				`${TranslatorService.name}.translateWithChunking`,
 				{
-					operation: "TranslatorService.translateWithChunking",
-					metadata: {
-						expectedChunks: chunks.length,
-						actualChunks: translatedChunks.length,
-						missingChunks: chunks.length - translatedChunks.length,
-						contentLength: content.length,
-						chunkSizes: chunks.map((c) => c.length),
-					},
+					expectedChunks: chunks.length,
+					actualChunks: translatedChunks.length,
+					missingChunks: chunks.length - translatedChunks.length,
+					contentLength: content.length,
+					chunkSizes: chunks.map((c) => c.length),
 				},
 			);
 		}
 
-		logger.debug(
+		this.logger.debug(
 			{
 				totalChunks: translatedChunks.length,
 				totalTranslatedLength: translatedChunks.reduce((sum, current) => sum + current.length, 0),
@@ -683,16 +798,17 @@ export class TranslatorService {
 		const translatedEndsWithNewline = reassembledContent.endsWith("\n");
 
 		if (originalEndsWithNewline && !translatedEndsWithNewline) {
-			const originalTrailingNewlines = content.match(/\n+$/)?.[0] ?? "";
+			const TRAILING_NEWLINES_REGEX = /\n+$/;
+			const originalTrailingNewlines = TRAILING_NEWLINES_REGEX.exec(content)?.[0] ?? "";
 			reassembledContent += originalTrailingNewlines;
 
-			logger.debug(
+			this.logger.debug(
 				{ addedTrailingNewlines: originalTrailingNewlines.length },
 				"Restored trailing newlines from original content",
 			);
 		}
 
-		logger.debug(
+		this.logger.debug(
 			{
 				reassembledLength: reassembledContent.length,
 				originalLength: content.length,
@@ -706,7 +822,10 @@ export class TranslatorService {
 
 	/**
 	 * Sends content to the language model for translation.
+	 *
 	 * Constructs system and user prompts based on detected language.
+	 * Automatically applies rate limiting to prevent exceeding API limits,
+	 * especially important for free-tier LLM models with strict rate limits.
 	 *
 	 * @param content Content to translate
 	 *
@@ -716,37 +835,49 @@ export class TranslatorService {
 		const systemPrompt = await this.getSystemPrompt(content);
 
 		try {
-			logger.debug(
-				{ model: env.LLM_MODEL, contentLength: content.length, temperature: 0.1 },
+			this.logger.debug(
+				{ model: this.model, contentLength: content.length, temperature: 0.1 },
 				"Calling language model for translation",
 			);
 
-			const completion = await this.llm.chat.completions.create({
-				model: env.LLM_MODEL,
-				temperature: 0.1,
-				max_tokens: env.MAX_TOKENS,
-				messages: [
-					{ role: "system", content: systemPrompt },
-					{ role: "user", content },
-				],
-			});
+			const completion = await withExponentialBackoff(
+				() =>
+					this.rateLimiter.schedule(() =>
+						this.openai.chat.completions.create({
+							model: this.model,
+							temperature: 0.1,
+							max_tokens: env.MAX_TOKENS,
+							messages: [
+								{ role: "system", content: systemPrompt },
+								{ role: "user", content },
+							],
+						}),
+					),
+				{
+					maxRetries: 5,
+					initialDelay: 2000,
+					maxDelay: 60_000,
+				},
+			);
 
-			const translatedContent = completion.choices[0]?.message?.content;
+			const translatedContent = completion.choices[0]?.message.content;
 
 			if (!translatedContent) {
-				logger.error({ model: env.LLM_MODEL }, "No content returned from language model");
-				throw new LLMErrorHelper().mapError(new Error("No content returned from language model"), {
-					operation: "TranslatorService.callLanguageModel",
-					metadata: {
-						model: env.LLM_MODEL,
+				this.logger.error({ model: this.model }, "No content returned from language model");
+
+				throw mapLLMError(
+					new Error("No content returned from language model"),
+					`${TranslatorService.name}.callLanguageModel`,
+					{
+						model: this.model,
 						contentLength: content.length,
 					},
-				});
+				);
 			}
 
-			logger.info(
+			this.logger.info(
 				{
-					model: env.LLM_MODEL,
+					model: this.model,
 					translatedLength: translatedContent.length,
 					tokensUsed: completion.usage?.total_tokens,
 				},
@@ -755,12 +886,9 @@ export class TranslatorService {
 
 			return translatedContent;
 		} catch (error) {
-			throw this.helpers.llm.mapError(error, {
-				operation: "TranslatorService.callLanguageModel",
-				metadata: {
-					model: env.LLM_MODEL,
-					contentLength: content.length,
-				},
+			throw mapLLMError(error, `${TranslatorService.name}.callLanguageModel`, {
+				model: this.model,
+				contentLength: content.length,
 			});
 		}
 	}
@@ -830,11 +958,11 @@ export class TranslatorService {
 
 		const languages = {
 			target:
-				this.languageDetector.getLanguageName(this.languageDetector.languages.target) ||
+				this.languageDetector.getLanguageName(this.languageDetector.languages.target) ??
 				"Brazilian Portuguese",
 			source:
 				detectedSourceCode ?
-					this.languageDetector.getLanguageName(detectedSourceCode) || "English"
+					(this.languageDetector.getLanguageName(detectedSourceCode) ?? "English")
 				:	"English",
 		};
 
@@ -843,10 +971,7 @@ export class TranslatorService {
 				`\n## TERMINOLOGY GLOSSARY\nApply these exact translations for the specified terms:\n${this.glossary}\n`
 			:	"";
 
-		const langSpecificRules =
-			languages.target in LANGUAGE_SPECIFIC_RULES ?
-				LANGUAGE_SPECIFIC_RULES[languages.target as keyof typeof LANGUAGE_SPECIFIC_RULES]
-			:	"";
+		const langSpecificRules = this.localeService.locale.rules.specific;
 
 		return `# ROLE
 You are an expert technical translator specializing in React documentation.

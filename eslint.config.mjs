@@ -6,13 +6,27 @@ import tseslint from "typescript-eslint";
 
 export default defineConfig(
 	{
-		ignores: ["node_modules/**", "dist/**", "out/**", "prettier.config.mjs"],
+		ignores: [
+			"**/node_modules/**",
+			"**/out/**",
+			"**/dist/**",
+			"**/build/**",
+			"**/*.tsbuildinfo",
+			"**/logs/**",
+			"**/.env*",
+			"**/coverage/**",
+		],
 	},
 	{
-		files: ["**/*.{js,cjs,mjs,ts,mts,cts}"],
+		files: ["**/*.{js,cjs,mjs,ts,mts,cts,d.ts}"],
 		plugins: {
 			"@typescript-eslint": tseslint.plugin,
 		},
+		extends: [
+			eslint.configs.recommended,
+			tseslint.configs.strictTypeChecked,
+			tseslint.configs.stylisticTypeChecked,
+		],
 		languageOptions: {
 			globals: {
 				...globals.node,
@@ -21,26 +35,27 @@ export default defineConfig(
 			},
 			parser: tseslint.parser,
 			parserOptions: {
-				project: ["./tsconfig.json"],
+				project: true,
+				tsconfigRootDir: import.meta.dirname,
 				ecmaVersion: "latest",
 				sourceType: "module",
 			},
 		},
 		rules: {
-			...eslint.configs.recommended.rules,
-
 			/* ESLint */
 			"no-unused-vars": "off",
+			"no-unsafe-finally": "off",
 			"no-console": "error",
 
 			/* TypeScript */
 			"@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
+			"@typescript-eslint/restrict-template-expressions": ["error", { allowNumber: true }],
 		},
 	},
 	{
-		files: ["scripts/**/*.{js,ts}", "src/build.ts", "src/scripts/**/*.{js,ts}"],
+		files: ["tests/**"],
 		rules: {
-			"no-console": "off",
+			"@typescript-eslint/no-unused-vars": "off",
 		},
 	},
 	{

@@ -1,18 +1,8 @@
-/**
- * @fileoverview
- *
- * React-aware Language Detection Service using Google's CLD library.
- *
- * Provides language detection and translation status determination specifically
- * for React documentation translation workflows. Validates against the 38 official
- * React translation languages and uses {@link Intl.DisplayNames} for human-readable names.
- */
-
 import cld from "cld";
 
 import type { ReactLanguageCode } from "@/utils/";
 
-import { env, REACT_TRANSLATION_LANGUAGES } from "@/utils/";
+import { env, logger, REACT_TRANSLATION_LANGUAGES } from "@/utils/";
 
 /**
  * Configuration interface for language detection settings.
@@ -85,6 +75,8 @@ export interface LanguageAnalysis {
  * ```
  */
 export class LanguageDetectorService {
+	private readonly logger = logger.child({ component: LanguageDetectorService.name });
+
 	/** Minimum content length required for reliable language detection */
 	private readonly MIN_CONTENT_LENGTH = 10;
 
@@ -104,7 +96,7 @@ export class LanguageDetectorService {
 	 * Cache of previously detected languages to avoid redundant CLD calls.
 	 * Maps content hashes to detected language codes.
 	 */
-	public detected: Map<string, string | undefined> = new Map();
+	public detected = new Map<string, string | undefined>();
 
 	/**
 	 * Gets the human-readable display name for a React language code.
@@ -194,7 +186,7 @@ export class LanguageDetectorService {
 			const detection = await cld.detect(cleanContent);
 
 			const primaryLanguage = detection.languages[0];
-			const detectedLanguage = primaryLanguage?.code || "und";
+			const detectedLanguage = primaryLanguage?.code ?? "und";
 
 			const targetScore = this.findLanguageScore(detection.languages, this.languages.target);
 			const sourceScore = this.findLanguageScore(detection.languages, this.languages.source);
@@ -246,7 +238,7 @@ export class LanguageDetectorService {
 		try {
 			const cleanContent = this.cleanContent(text);
 			const detection = await cld.detect(cleanContent);
-			return detection.languages[0]?.code || "und";
+			return detection.languages[0]?.code ?? "und";
 		} catch {
 			return undefined;
 		}
@@ -260,20 +252,20 @@ export class LanguageDetectorService {
 	 * @returns Cleaned content suitable for language detection
 	 */
 	private cleanContent(content: string): string {
-		const regexes: Record<string, RegExp> = {
+		const regexes = {
 			codeBlock: /```[\s\S]*?```/g,
 			inlineCode: /`[^`]*`/g,
 			htmlTags: /<[^>]*>/g,
 			urls: /https?:\/\/[^\s]+/g,
 			whitespace: /\s+/g,
-		};
+		} as const;
 
 		return content
-			.replace(regexes["codeBlock"]!, " ")
-			.replace(regexes["inlineCode"]!, " ")
-			.replace(regexes["htmlTags"]!, " ")
-			.replace(regexes["urls"]!, " ")
-			.replace(regexes["whitespace"]!, " ")
+			.replace(regexes.codeBlock, " ")
+			.replace(regexes.inlineCode, " ")
+			.replace(regexes.htmlTags, " ")
+			.replace(regexes.urls, " ")
+			.replace(regexes.whitespace, " ")
 			.trim();
 	}
 
@@ -298,7 +290,7 @@ export class LanguageDetectorService {
 			"zh-hant": ["zh", "zh-tw", "zh-hant"],
 		};
 
-		return mapping[reactCode] || [reactCode];
+		return mapping[reactCode] ?? [reactCode];
 	}
 
 	/**

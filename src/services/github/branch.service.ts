@@ -1,8 +1,17 @@
 import { RestEndpointMethodTypes } from "@octokit/rest";
 import { StatusCodes } from "http-status-codes";
 
-import { BaseGitHubService, ContentService } from "@/services/github/";
+import type { BaseGitHubServiceDependencies } from "./base.service";
+
+import { mapGithubError } from "@/errors/";
 import { env, logger, setupSignalHandlers } from "@/utils/";
+
+import { BaseGitHubService } from "./base.service";
+import { ContentService } from "./content.service";
+
+export interface BranchServiceDependencies extends BaseGitHubServiceDependencies {
+	contentService: ContentService;
+}
 
 /**
  * Service responsible for Git branch operations and lifecycle management.
@@ -16,19 +25,27 @@ import { env, logger, setupSignalHandlers } from "@/utils/";
  * - Error handling and recovery
  */
 export class BranchService extends BaseGitHubService {
+	private readonly logger = logger.child({ component: BranchService.name });
+	private readonly services: {
+		content: ContentService;
+	};
+
 	/** Set of branch names currently being tracked for cleanup */
-	public activeBranches: Set<string> = new Set();
-	private readonly contentService = new ContentService();
+	public activeBranches = new Set<string>();
 
 	/**
 	 * Creates a new branch service instance.
 	 *
 	 * Initializes the GitHub client and sets up cleanup handlers.
 	 */
-	constructor() {
-		super();
+	constructor(dependencies: BranchServiceDependencies) {
+		super(dependencies);
 
-		setupSignalHandlers(async () => await this.cleanup());
+		this.services = { content: dependencies.contentService };
+
+		setupSignalHandlers(async () => {
+			await this.cleanup();
+		});
 	}
 
 	/**
@@ -44,12 +61,13 @@ export class BranchService extends BaseGitHubService {
 	private async getDefaultBranch(): Promise<string> {
 		try {
 			const response = await this.octokit.repos.get(this.repositories.fork);
-			logger.debug({ branch: response.data.default_branch }, "Retrieved default branch");
+
+			this.logger.debug({ branch: response.data.default_branch }, "Retrieved default branch");
+
 			return response.data.default_branch;
 		} catch (error) {
-			throw this.helpers.github.mapError(error, {
-				operation: "BranchService.getDefaultBranch",
-				metadata: { fork: this.repositories.fork },
+			throw mapGithubError(error, `${BranchService.name}.getDefaultBranch`, {
+				fork: this.repositories.fork,
 			});
 		}
 	}
@@ -88,7 +106,7 @@ export class BranchService extends BaseGitHubService {
 		baseBranch?: string,
 	): Promise<RestEndpointMethodTypes["git"]["createRef"]["response"]> {
 		try {
-			const actualBaseBranch = baseBranch || (await this.getDefaultBranch());
+			const actualBaseBranch = baseBranch ?? (await this.getDefaultBranch());
 
 			const mainBranchRef = await this.octokit.git.getRef({
 				...this.repositories.fork,
@@ -103,7 +121,7 @@ export class BranchService extends BaseGitHubService {
 
 			this.activeBranches.add(branchName);
 
-			logger.info(
+			this.logger.info(
 				{ branchName, baseBranch: actualBaseBranch, sha: mainBranchRef.data.object.sha },
 				"Branch created successfully",
 			);
@@ -111,9 +129,10 @@ export class BranchService extends BaseGitHubService {
 			return branchRef;
 		} catch (error) {
 			this.activeBranches.delete(branchName);
-			throw this.helpers.github.mapError(error, {
-				operation: "BranchService.createBranch",
-				metadata: { branchName, baseBranch, fork: this.repositories.fork },
+			throw mapGithubError(error, `${BranchService.name}.createBranch`, {
+				branchName,
+				baseBranch,
+				fork: this.repositories.fork,
 			});
 		}
 	}
@@ -138,18 +157,18 @@ export class BranchService extends BaseGitHubService {
 				ref: `heads/${branchName}`,
 			});
 
-			logger.debug({ branchName, sha: response.data.object.sha }, "Branch retrieved");
+			this.logger.debug({ branchName, sha: response.data.object.sha }, "Branch retrieved");
 
 			return response;
 		} catch (error) {
 			if (this.isNotFoundError(error)) {
-				logger.debug({ branchName }, "Branch not found (404)");
+				this.logger.debug({ branchName }, "Branch not found (404)");
 				return null;
 			}
 
-			throw this.helpers.github.mapError(error, {
-				operation: "BranchService.getBranch",
-				metadata: { branchName, fork: this.repositories.fork },
+			throw mapGithubError(error, `${BranchService.name}.getBranch`, {
+				branchName,
+				fork: this.repositories.fork,
 			});
 		}
 	}
@@ -176,15 +195,13 @@ export class BranchService extends BaseGitHubService {
 
 			this.activeBranches.delete(branchName);
 
-			logger.info({ branchName }, "Branch deleted successfully");
+			this.logger.info({ branchName }, "Branch deleted successfully");
 
 			return response;
 		} catch (error) {
-			this.activeBranches.delete(branchName);
-
-			throw this.helpers.github.mapError(error, {
-				operation: "BranchService.deleteBranch",
-				metadata: { branchName, fork: this.repositories.fork },
+			throw mapGithubError(error, `${BranchService.name}.deleteBranch`, {
+				branchName,
+				fork: this.repositories.fork,
 			});
 		}
 	}
@@ -221,30 +238,33 @@ export class BranchService extends BaseGitHubService {
 
 		for (const branch of branchesToCheck) {
 			try {
-				const pr = await this.contentService.findPullRequestByBranch(branch);
+				const pr = await this.services.content.findPullRequestByBranch(branch);
 
-				if (pr) {
-					const prStatus = await this.contentService.checkPullRequestStatus(pr.number);
+				if (!pr) {
+					this.logger.info({ branch }, "Cleanup: Deleting branch without PR");
 
-					if (prStatus.needsUpdate) {
-						logger.info(
-							{ branch, prNumber: pr.number, mergeableState: prStatus.mergeableState },
-							"Cleanup: Deleting branch with conflicted PR",
-						);
-
-						await this.deleteBranch(branch);
-					} else {
-						logger.info(
-							{ branch, prNumber: pr.number, mergeableState: prStatus.mergeableState },
-							"Cleanup: Preserving branch with valid PR",
-						);
-					}
-				} else {
-					logger.info({ branch }, "Cleanup: Deleting branch without PR");
 					await this.deleteBranch(branch);
+
+					continue;
+				}
+
+				const prStatus = await this.services.content.checkPullRequestStatus(pr.number);
+
+				if (prStatus.needsUpdate) {
+					this.logger.info(
+						{ branch, prNumber: pr.number, mergeableState: prStatus.mergeableState },
+						"Cleanup: Deleting branch with conflicted PR",
+					);
+
+					await this.deleteBranch(branch);
+				} else {
+					this.logger.info(
+						{ branch, prNumber: pr.number, mergeableState: prStatus.mergeableState },
+						"Cleanup: Preserving branch with valid PR",
+					);
 				}
 			} catch (error) {
-				logger.error({ branch, error }, "Cleanup: Error checking branch, skipping deletion");
+				this.logger.error({ branch, error }, "Cleanup: Error checking branch, skipping deletion");
 			}
 		}
 	}
@@ -267,7 +287,7 @@ export class BranchService extends BaseGitHubService {
 			const forkRef = await this.getBranch(branchName);
 
 			if (!forkRef) {
-				logger.debug({ branchName }, "Branch not found, no commits exist");
+				this.logger.debug({ branchName }, "Branch not found, no commits exist");
 				return false;
 			}
 
@@ -277,19 +297,20 @@ export class BranchService extends BaseGitHubService {
 			});
 
 			const hasCommits = listCommitsResponse.data.some(
-				(commit) => commit?.author?.login === env.REPO_FORK_OWNER!,
+				(commit) => commit.author?.login === env.REPO_FORK_OWNER,
 			);
 
-			logger.debug(
+			this.logger.debug(
 				{ branchName, hasCommits, commitCount: listCommitsResponse.data.length },
 				"Checked for fork commits",
 			);
 
 			return hasCommits;
 		} catch (error) {
-			throw this.helpers.github.mapError(error, {
-				operation: "BranchService.checkIfCommitExistsOnFork",
-				metadata: { branchName, fork: this.repositories.fork, expectedAuthor: env.REPO_FORK_OWNER },
+			throw mapGithubError(error, `${BranchService.name}.checkIfCommitExistsOnFork`, {
+				branchName,
+				fork: this.repositories.fork,
+				expectedAuthor: env.REPO_FORK_OWNER,
 			});
 		}
 	}

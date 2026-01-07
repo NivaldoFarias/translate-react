@@ -1,204 +1,125 @@
-/**
- * @fileoverview
- *
- * Helper utilities for mapping LLM errors to TranslationError instances.
- *
- * Provides explicit error mapping for OpenAI API errors with rate limit detection,
- * replacing the proxy-based error handling pattern with clear, maintainable code.
- */
-
-import { RequestError } from "@octokit/request-error";
 import { StatusCodes } from "http-status-codes";
 import { APIError } from "openai/error";
 
-import { ErrorCode, ErrorHelper, ErrorSeverity, TranslationError } from "@/errors/";
+import { ApplicationError, ErrorCode } from "@/errors/base-error";
 import { detectRateLimit, logger } from "@/utils/";
 
-/** Context for LLM error mapping operations */
-interface LLMErrorContext {
-	/** Operation that triggered the error (e.g., `"TranslatorService.callLanguageModel"`) */
-	operation: string;
+const helperLogger = logger.child({ component: "LLMErrorHelper" });
 
-	/** Additional metadata for debugging and logging */
-	metadata?: Record<string, unknown>;
+/** Base metadata fields added by mapLLMError for all error types */
+interface LLMErrorBaseMetadata {
+	/** Original error message */
+	originalMessage?: string;
+
+	/** Type of the error (if available) */
+	errorType?: string;
+
+	/** String representation of the error (for non-Error types) */
+	error?: string;
 }
 
-export class LLMErrorHelper implements ErrorHelper {
-	/**
-	 * Maps LLM/OpenAI errors to {@link TranslationError} with proper classification and logging.
-	 *
-	 * Handles rate limit detection, API errors, and unknown errors with structured
-	 * Pino logging for observability.
-	 *
-	 * @param error The error to map
-	 * @param context Context information for error mapping
-	 *
-	 * @returns `TranslationError` instance with appropriate code and metadata
-	 *
-	 * @example
-	 * ```typescript
-	 * try {
-	 *   await openai.chat.completions.create({ ... });
-	 * } catch (error) {
-	 *   throw new LLMErrorHelper().mapError(error, {
-	 *     operation: "TranslatorService.callLanguageModel",
-	 *     metadata: { model: "gpt-4", contentLength: 1500 }
-	 *   });
-	 * }
-	 * ```
-	 */
-	public mapError(error: unknown, context: LLMErrorContext): TranslationError {
-		const { operation, metadata = {} } = context;
+/** Additional metadata fields added for APIError instances */
+interface LLMApiErrorMetadata extends LLMErrorBaseMetadata {
+	/** HTTP status code from LLM API response */
+	statusCode: number;
 
-		/** Handle OpenAI APIError instances */
-		if (error instanceof APIError) {
-			const isRateLimit = detectRateLimit(error.message, error.status);
+	/** Specific error type from LLM API (if available) */
+	type: string | undefined;
+}
 
-			const errorCode = isRateLimit ? ErrorCode.RateLimitExceeded : ErrorCode.LLMApiError;
-			const severity = this.getSeverityFromCode(errorCode);
+/**
+ * Maps LLM/OpenAI errors to {@link ApplicationError} with proper classification.
+ *
+ * Handles rate limit detection, API errors, and unknown errors with structured logging.
+ *
+ * @param error The error to map
+ * @param operation The operation that failed
+ * @param metadata Optional additional debugging context
+ *
+ * @returns `ApplicationError` instance with appropriate code and metadata
+ *
+ * @example
+ * ```typescript
+ * try {
+ *   await openai.chat.completions.create({ ... });
+ * } catch (error) {
+ *   throw mapLLMError(error, "TranslatorService.callLanguageModel", {
+ *     model: "gpt-4",
+ *     contentLength: 1500
+ *   });
+ * }
+ * ```
+ */
+export function mapLLMError<T extends Record<string, unknown> = Record<string, never>>(
+	error: unknown,
+	operation: string,
+	metadata?: T,
+): ApplicationError<LLMErrorBaseMetadata & LLMApiErrorMetadata & T> {
+	type CombinedMetadata = LLMErrorBaseMetadata & LLMApiErrorMetadata & T;
 
-			const errorMetadata = {
-				statusCode: error.status,
-				type: error.type,
-				originalMessage: error.message,
-				...metadata,
-			};
+	if (error instanceof APIError) {
+		const isRateLimit = detectRateLimit(error.message, error.status as StatusCodes);
+		const errorCode = isRateLimit ? ErrorCode.RateLimitExceeded : ErrorCode.LLMApiError;
 
-			logger.error(
-				{
-					operation,
-					errorCode,
-					severity,
-					errorType: error.type,
-					isRateLimit,
-					...errorMetadata,
-				},
-				"LLM API error",
-			);
+		const errorMetadata = {
+			statusCode: Number(error.status),
+			type: error.type,
+			originalMessage: error.message,
+			...metadata,
+		} as CombinedMetadata;
 
-			return new TranslationError(error.message, errorCode, {
-				operation,
-				metadata: errorMetadata,
-			});
-		}
-
-		/** Handle standard Error instances with rate limit detection */
-		if (error instanceof Error) {
-			const errorType = error.constructor.name;
-
-			/** Check for known rate limit error types */
-			const isKnownRateLimitError =
-				errorType === "RateLimitError" ||
-				errorType === "QuotaExceededError" ||
-				errorType === "TooManyRequestsError";
-
-			/** Check message content for rate limit patterns */
-			const hasRateLimitPattern = detectRateLimit(error.message);
-
-			if (isKnownRateLimitError || hasRateLimitPattern) {
-				logger.error(
-					{
-						operation,
-						errorCode: ErrorCode.RateLimitExceeded,
-						severity: ErrorSeverity.Error,
-						errorType,
-						originalMessage: error.message,
-						...metadata,
-					},
-					"Rate limit exceeded",
-				);
-
-				return new TranslationError(error.message, ErrorCode.RateLimitExceeded, {
-					operation,
-					metadata: {
-						errorType,
-						originalMessage: error.message,
-						...metadata,
-					},
-				});
-			}
-
-			/** Generic error handling for unknown Error types */
-			logger.error(
-				{
-					operation,
-					errorCode: ErrorCode.UnknownError,
-					severity: ErrorSeverity.Warn,
-					errorType,
-					originalMessage: error.message,
-					...metadata,
-				},
-				"Unknown LLM error",
-			);
-
-			return new TranslationError(error.message, ErrorCode.UnknownError, {
-				operation,
-				metadata: {
-					errorType,
-					originalMessage: error.message,
-					...metadata,
-				},
-			});
-		}
-
-		/** Handle non-Error objects */
-		const errorString = String(error);
-
-		logger.error(
-			{
-				operation,
-				errorCode: ErrorCode.UnknownError,
-				severity: ErrorSeverity.Warn,
-				error: errorString,
-				...metadata,
-			},
-			"Unknown non-Error LLM exception",
+		helperLogger.error(
+			{ operation, errorCode, errorType: error.type, isRateLimit, statusCode: error.status },
+			"LLM API error",
 		);
 
-		return new TranslationError(errorString, ErrorCode.UnknownError, {
-			operation,
-			metadata: {
-				error: errorString,
+		return new ApplicationError(error.message, errorCode, operation, errorMetadata);
+	}
+
+	if (error instanceof Error) {
+		const errorType = error.constructor.name;
+
+		const isKnownRateLimitError =
+			errorType === "RateLimitError" ||
+			errorType === "QuotaExceededError" ||
+			errorType === "TooManyRequestsError";
+
+		const hasRateLimitPattern = detectRateLimit(error.message);
+
+		if (isKnownRateLimitError || hasRateLimitPattern) {
+			helperLogger.error(
+				{ operation, errorCode: ErrorCode.RateLimitExceeded, errorType },
+				"Rate limit exceeded",
+			);
+
+			return new ApplicationError(error.message, ErrorCode.RateLimitExceeded, operation, {
+				errorType,
+				originalMessage: error.message,
 				...metadata,
-			},
-		});
-	}
-
-	public getErrorCodeFromStatus(error: RequestError): ErrorCode {
-		switch (error.status) {
-			case StatusCodes.UNAUTHORIZED:
-				return ErrorCode.Unauthorized;
-			case StatusCodes.FORBIDDEN:
-				if (error.message.toLowerCase().includes("rate limit")) {
-					return ErrorCode.RateLimitExceeded;
-				}
-				return ErrorCode.Forbidden;
-			case StatusCodes.NOT_FOUND:
-				return ErrorCode.NotFound;
-			case StatusCodes.UNPROCESSABLE_ENTITY:
-				return ErrorCode.ValidationError;
-			case StatusCodes.INTERNAL_SERVER_ERROR:
-			case StatusCodes.BAD_GATEWAY:
-			case StatusCodes.SERVICE_UNAVAILABLE:
-			case StatusCodes.GATEWAY_TIMEOUT:
-				return ErrorCode.ServerError;
-			default:
-				if (!error.status) return ErrorCode.ApiError;
-
-				return ErrorCode.ApiError;
+			} as CombinedMetadata);
 		}
+
+		helperLogger.error(
+			{ operation, errorCode: ErrorCode.UnknownError, errorType },
+			"Unknown LLM error",
+		);
+
+		return new ApplicationError(error.message, ErrorCode.UnknownError, operation, {
+			errorType,
+			originalMessage: error.message,
+			...metadata,
+		} as CombinedMetadata);
 	}
 
-	public getSeverityFromCode(code: ErrorCode): ErrorSeverity {
-		switch (code) {
-			case ErrorCode.RateLimitExceeded:
-				return ErrorSeverity.Error;
-			case ErrorCode.LLMApiError:
-				return ErrorSeverity.Error;
-			case ErrorCode.UnknownError:
-				return ErrorSeverity.Warn;
-			default:
-				return ErrorSeverity.Info;
-		}
-	}
+	const errorString = String(error);
+
+	helperLogger.error(
+		{ operation, errorCode: ErrorCode.UnknownError, errorValue: errorString },
+		"Unknown non-Error LLM exception",
+	);
+
+	return new ApplicationError(errorString, ErrorCode.UnknownError, operation, {
+		error: errorString,
+		...metadata,
+	} as CombinedMetadata);
 }
