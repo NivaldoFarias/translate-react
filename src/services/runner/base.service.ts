@@ -156,16 +156,15 @@ export abstract class BaseRunnerService {
 	}
 
 	/**
-	 * Fetches the repository tree and glossary
+	 * Fetches the upstream repository tree and glossary for translation processing.
 	 *
-	 * Uses tree comparison to only fetch files that differ between fork and upstream,
-	 * significantly reducing the number of files that need processing.
+	 * Retrieves all candidate files from upstream.
 	 *
 	 * @throws {ResourceLoadError} If the repository tree or glossary fetch fails
 	 */
 	protected async fetchRepositoryTree(): Promise<void> {
 		this.logger.info("Fetching repository content");
-		const repositoryTree = await this.services.github.repository.compareRepositoryTrees();
+		const repositoryTree = await this.services.github.repository.getRepositoryTree("upstream");
 
 		this.state.repositoryTree = repositoryTree.map((item) => {
 			const filename = item.path?.split("/").pop() ?? "";
