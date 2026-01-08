@@ -72,7 +72,7 @@ export interface PatchedRepositoryItem extends RepositoryTreeItem {
 	/**
 	 * The filename extracted from the file's path
 	 *
-	 * @example homepage.md
+	 * @example "homepage.md"
 	 */
 	filename: string;
 }
