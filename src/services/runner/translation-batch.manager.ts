@@ -58,10 +58,19 @@ export class TranslationBatchManager {
 		files: TranslationFile[],
 		batchSize: number,
 	): Promise<Map<string, ProcessedFileResult>> {
-		this.logger.info("Processing files in batches");
+		const batches = this.createBatches(files, batchSize);
+
+		this.logger.info(
+			{
+				batchSize,
+				totalFiles: files.length,
+				totalBatches: batches.length,
+				parallelism: batchSize,
+			},
+			"Batch configuration initialized",
+		);
 
 		const results = new Map<ProcessedFileResult["filename"], ProcessedFileResult>();
-		const batches = this.createBatches(files, batchSize);
 
 		for (const [batchIndex, batch] of batches.entries()) {
 			const batchResults = await this.processBatch(batch, {
@@ -115,7 +124,10 @@ export class TranslationBatchManager {
 		const results = new Map<string, ProcessedFileResult>();
 
 		try {
-			this.logger.info(batchInfo, "Processing batch");
+			this.logger.info(
+				batchInfo,
+				`Processing batch ${batchInfo.currentBatch}/${batchInfo.totalBatches}`,
+			);
 
 			const fileResults = await Promise.all(
 				batch.map((file, index) => {
@@ -405,11 +417,25 @@ export class TranslationBatchManager {
 					return existingBranch.data;
 				}
 			} else {
-				this.logger.debug(
-					{ filename: file.filename, branchName },
-					"Branch exists without PR, reusing",
+				const isBehind = await this.services.github.repository.isBranchBehind(
+					branchName,
+					actualBaseBranch,
+					"fork",
 				);
-				return existingBranch.data;
+
+				if (isBehind) {
+					this.logger.info(
+						{ filename: file.filename, branchName },
+						"Branch is behind base, deleting and recreating",
+					);
+					await this.services.github.branch.deleteBranch(branchName);
+				} else {
+					this.logger.debug(
+						{ filename: file.filename, branchName },
+						"Branch exists without PR and is up-to-date, reusing",
+					);
+					return existingBranch.data;
+				}
 			}
 		}
 
