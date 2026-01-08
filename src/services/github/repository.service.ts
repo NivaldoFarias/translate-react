@@ -178,6 +178,67 @@ export class RepositoryService extends BaseGitHubService {
 	}
 
 	/**
+	 * Checks if a branch is behind its base branch.
+	 *
+	 * Compares the commit history of two branches to determine if the head branch
+	 * is missing commits from the base branch. Returns true if base has commits
+	 * that head doesn't have.
+	 *
+	 * @param headBranch Branch to check (e.g., 'translate/some-file')
+	 * @param baseBranch Base branch to compare against (e.g., 'main')
+	 * @param target Which repository to check ('fork' or 'upstream')
+	 *
+	 * @returns `true` if head is behind base, `false` if up-to-date or ahead
+	 *
+	 * @example
+	 * ```typescript
+	 * const isBehind = await repoService.isBranchBehind(
+	 *   'translate/docs/intro.md',
+	 *   'main'
+	 * );
+	 * if (isBehind) {
+	 *   // Recreate branch with latest base
+	 * }
+	 * ```
+	 */
+	public async isBranchBehind(
+		headBranch: string,
+		baseBranch: string,
+		target: "fork" | "upstream" = "fork",
+	): Promise<boolean> {
+		try {
+			const repoConfig = target === "fork" ? this.repositories.fork : this.repositories.upstream;
+
+			const comparison = await this.octokit.repos.compareCommits({
+				...repoConfig,
+				base: headBranch,
+				head: baseBranch,
+			});
+
+			const isBehind = comparison.data.ahead_by > 0;
+
+			this.logger.debug(
+				{
+					headBranch,
+					baseBranch,
+					aheadBy: comparison.data.ahead_by,
+					behindBy: comparison.data.behind_by,
+					isBehind,
+				},
+				"Branch comparison completed",
+			);
+
+			return isBehind;
+		} catch (error) {
+			this.logger.warn(
+				{ error, headBranch, baseBranch, target },
+				"Failed to compare branches, assuming not behind",
+			);
+			return false;
+		}
+	}
+
+	/**
 	 * Checks if the fork repository exists.
 	 *
 	 * If it does not exist, an error is thrown.

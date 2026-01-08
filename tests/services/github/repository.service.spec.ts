@@ -90,6 +90,108 @@ describe("RepositoryService", () => {
 		});
 	});
 
+	describe("isBranchBehind", () => {
+		test("should return false when branches are up-to-date (ahead_by = 0)", async () => {
+			reposMocks.compareCommits.mockResolvedValue({
+				data: { ahead_by: 0, behind_by: 0 },
+			});
+
+			const result = await repositoryService.isBranchBehind("feature-branch", "main", "fork");
+
+			expect(result).toBe(false);
+			expect(reposMocks.compareCommits).toHaveBeenCalledWith({
+				...testRepositories.fork,
+				base: "feature-branch",
+				head: "main",
+			});
+		});
+
+		test("should return true when head is behind base (ahead_by > 0)", async () => {
+			reposMocks.compareCommits.mockResolvedValue({
+				data: { ahead_by: 5, behind_by: 0 },
+			});
+
+			const result = await repositoryService.isBranchBehind("feature-branch", "main", "fork");
+
+			expect(result).toBe(true);
+		});
+
+		test("should return false when head is ahead of base (behind_by > 0)", async () => {
+			reposMocks.compareCommits.mockResolvedValue({
+				data: { ahead_by: 0, behind_by: 3 },
+			});
+
+			const result = await repositoryService.isBranchBehind("feature-branch", "main", "fork");
+
+			expect(result).toBe(false);
+		});
+
+		test("should use fork repository config by default", async () => {
+			reposMocks.compareCommits.mockResolvedValue({
+				data: { ahead_by: 0, behind_by: 0 },
+			});
+
+			await repositoryService.isBranchBehind("feature-branch", "main");
+
+			expect(reposMocks.compareCommits).toHaveBeenCalledWith({
+				...testRepositories.fork,
+				base: "feature-branch",
+				head: "main",
+			});
+		});
+
+		test("should use upstream repository config when specified", async () => {
+			reposMocks.compareCommits.mockResolvedValue({
+				data: { ahead_by: 0, behind_by: 0 },
+			});
+
+			await repositoryService.isBranchBehind("feature-branch", "main", "upstream");
+
+			expect(reposMocks.compareCommits).toHaveBeenCalledWith({
+				...testRepositories.upstream,
+				base: "feature-branch",
+				head: "main",
+			});
+		});
+
+		test("should return false when comparison fails", async () => {
+			reposMocks.compareCommits.mockRejectedValue(new Error("API error"));
+
+			const result = await repositoryService.isBranchBehind("feature-branch", "main", "fork");
+
+			expect(result).toBe(false);
+		});
+
+		test("should handle diverged branches (both ahead and behind)", async () => {
+			reposMocks.compareCommits.mockResolvedValue({
+				data: { ahead_by: 3, behind_by: 2 },
+			});
+
+			const result = await repositoryService.isBranchBehind("feature-branch", "main", "fork");
+
+			expect(result).toBe(true);
+		});
+
+		test("should work with translation branch naming pattern", async () => {
+			reposMocks.compareCommits.mockResolvedValue({
+				data: { ahead_by: 2, behind_by: 0 },
+			});
+
+			const result = await repositoryService.isBranchBehind(
+				"translate/docs/intro.md",
+				"main",
+				"fork",
+			);
+
+			expect(result).toBe(true);
+			expect(reposMocks.compareCommits).toHaveBeenCalledWith({
+				...testRepositories.fork,
+				base: "translate/docs/intro.md",
+				head: "main",
+			});
+		});
+	});
+
 	describe("getRepositoryTree", () => {
 		test("should return fork tree when target is fork", async () => {
 			const tree = await repositoryService.getRepositoryTree("fork", "main", false);

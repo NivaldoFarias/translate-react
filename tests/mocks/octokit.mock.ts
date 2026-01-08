@@ -77,6 +77,11 @@ export function createReposMocks() {
 				data: { message: "Successfully synced", merge_type: "fast-forward" },
 			} as PartialDeep<RestEndpointMethodTypes["repos"]["mergeUpstream"]["response"]>),
 		),
+		compareCommits: mock(() =>
+			Promise.resolve({
+				data: { ahead_by: 0, behind_by: 0 },
+			} as PartialDeep<RestEndpointMethodTypes["repos"]["compareCommits"]["response"]>),
+		),
 	};
 }
 
