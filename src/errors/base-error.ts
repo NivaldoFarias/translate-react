@@ -25,7 +25,7 @@ export enum ErrorCode {
 	FormatValidationFailed = "FORMAT_VALIDATION_FAILED",
 	ChunkProcessingFailed = "CHUNK_PROCESSING_FAILED",
 
-	// Process Related
+	// Application Process Related
 	ApiError = "API_ERROR",
 	TranslationFailed = "TRANSLATION_FAILED",
 	NoFilesFound = "NO_FILES_FOUND",
@@ -33,6 +33,7 @@ export enum ErrorCode {
 	ResourceLoadError = "RESOURCE_LOAD_ERROR",
 	ValidationError = "VALIDATION_ERROR",
 	UnknownError = "UNKNOWN_ERROR",
+	NO_FILES_TO_TRANSLATE = "NO_FILES_TO_TRANSLATE",
 }
 
 /**

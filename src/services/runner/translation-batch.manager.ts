@@ -499,7 +499,7 @@ export class TranslationBatchManager {
 	 * inform maintainers about the duplicate PR situation.
 	 *
 	 * @param file Translation file being processed with original content
-	 * @param processingResult Processing metadata including translation and timing
+	 * @param processingResult Processing metadata
 	 *
 	 * @returns Markdown-formatted PR description with all components
 	 */

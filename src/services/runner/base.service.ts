@@ -7,8 +7,13 @@ import type {
 	WorkflowStatistics,
 } from "./runner.types";
 
-import { createInitializationError, createResourceLoadError } from "@/errors/";
-import { env, logger, setupSignalHandlers, timeOperation } from "@/utils/";
+import {
+	ApplicationError,
+	createInitializationError,
+	createResourceLoadError,
+	ErrorCode,
+} from "@/errors/";
+import { env, logger, setupSignalHandlers } from "@/utils/";
 
 import { FileDiscoveryManager } from "./file-discovery.manager";
 import { PRManager } from "./pr.manager";
@@ -168,7 +173,8 @@ export abstract class BaseRunnerService {
 			return { ...item, filename };
 		}) as PatchedRepositoryItem[];
 
-		this.logger.info("Repository tree fetched, fetching glossary");
+		this.logger.info("Repository tree fetched. Fetching glossary");
+
 		const glossary = await this.services.github.repository.fetchGlossary();
 
 		if (!glossary) {
@@ -176,7 +182,7 @@ export abstract class BaseRunnerService {
 		}
 
 		this.services.translator.glossary = glossary;
-		this.logger.info("Repository content fetched successfully");
+		this.logger.info("Repository content and glossary fetched successfully");
 	}
 
 	/**
@@ -200,20 +206,36 @@ export abstract class BaseRunnerService {
 	protected async fetchFilesToTranslate(): Promise<void> {
 		if (this.state.filesToTranslate.length) {
 			this.logger.info(
-				`Found ${this.state.filesToTranslate.length} files to translate (from snapshot)`,
+				`Found ${this.state.filesToTranslate.length} files to translate (from cache)`,
 			);
 			return;
 		}
 
-		const { filesToTranslate, invalidPRsByFile } = await timeOperation(
-			"Discover Files Pipeline",
-			async () => this.fileDiscovery.discoverFiles(this.state.repositoryTree),
+		const { filesToTranslate, invalidPRsByFile } = await this.fileDiscovery.discoverFiles(
+			this.state.repositoryTree,
+		);
+
+		if (filesToTranslate.length === 0) {
+			this.logger.error({ filesToTranslate, invalidPRsByFile }, "Found no files to translate");
+
+			throw new ApplicationError(
+				"Found no files to translate",
+				ErrorCode.NO_FILES_TO_TRANSLATE,
+				`${BaseRunnerService.name}.fetchFilesToTranslate`,
+			);
+		}
+
+		this.logger.debug(
+			{
+				filesCount: filesToTranslate.length,
+				filenames: filesToTranslate.map((file) => file.filename),
+			},
+			`Discovered ${filesToTranslate.length} files to translate after filtering`,
 		);
 
 		this.state.filesToTranslate = filesToTranslate;
 		this.state.invalidPRsByFile = invalidPRsByFile;
 
-		// Reinitialize translation batch manager with invalid PRs map
 		this.translationBatch = new TranslationBatchManager(
 			this.services,
 			invalidPRsByFile,
@@ -252,7 +274,7 @@ export abstract class BaseRunnerService {
 	 *
 	 * @param batchSize Number of files to process simultaneously
 	 */
-	protected async processInBatches(batchSize = 10): Promise<void> {
+	protected async processInBatches(batchSize = env.BATCH_SIZE): Promise<void> {
 		this.metadata.results = await this.translationBatch.processBatches(
 			this.state.filesToTranslate,
 			batchSize,

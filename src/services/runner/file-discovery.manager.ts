@@ -65,7 +65,7 @@ export class FileDiscoveryManager {
 			(file, index, self) => index === self.findIndex((compare) => compare.path === file.path),
 		);
 
-		this.logger.info(`Processing ${uniqueFiles.length} files from repository tree...`);
+		this.logger.info(`Processing ${uniqueFiles.length} files from repository tree`);
 
 		const { candidateFiles, cacheHits } = this.checkCache(uniqueFiles);
 
