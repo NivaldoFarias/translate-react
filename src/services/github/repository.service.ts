@@ -1,5 +1,6 @@
-import type { BaseGitHubServiceDependencies } from "./base.service";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
+
+import type { BaseGitHubServiceDependencies } from "./base.service";
 
 import { mapGithubError } from "@/errors/";
 import { logger } from "@/utils/";

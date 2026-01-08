@@ -1,3 +1,5 @@
+import type { SetRequired } from "type-fest";
+
 import type {
 	CacheCheckResult,
 	LanguageDetectionResult,
@@ -6,7 +8,6 @@ import type {
 	PullRequestStatus,
 	RunnerServiceDependencies,
 } from "./runner.types";
-import type { SetRequired } from "type-fest";
 
 import { FILE_FETCH_BATCH_SIZE, logger, MAX_FILE_SIZE, MIN_CACHE_CONFIDENCE } from "@/utils/";
 
