@@ -1,6 +1,6 @@
-import type { ProcessedFileResult } from "./runner";
-
 import type { LocaleDefinition } from "@/locales";
+
+import type { ProcessedFileResult } from "./runner";
 
 import { env, logger } from "@/utils/";
 

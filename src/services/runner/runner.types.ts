@@ -1,7 +1,8 @@
+import type { RestEndpointMethodTypes } from "@octokit/rest";
+
 import type { LanguageCacheService } from "../cache";
 import type { BranchService, ContentService, RepositoryService } from "../github";
 import type { TranslationFile, TranslatorService } from "../translator.service";
-import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 /**
  * Configuration options for the runner service.
