@@ -10,7 +10,6 @@ translate-react/
 │   ├── README.md                             # Main project documentation
 │   ├── LICENSE                               # MIT License
 │   └── docs/                                 # Technical documentation
-│       ├── README.md                         # Documentation index
 │       ├── ARCHITECTURE.md                   # System architecture and service design
 │       ├── WORKFLOW.md                       # Execution workflow and timing analysis
 │       ├── ERROR_HANDLING.md                 # Error taxonomy and recovery mechanisms
