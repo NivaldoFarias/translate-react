@@ -1,7 +1,8 @@
+import type { RestEndpointMethodTypes } from "@octokit/rest";
+
 import type { ProcessedFileResult, PullRequestStatus } from "./../runner";
 import type { TranslationFile } from "./../translator.service";
 import type { BaseGitHubServiceDependencies } from "./base.service";
-import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 import { mapGithubError } from "@/errors/";
 import { env, logger } from "@/utils/";

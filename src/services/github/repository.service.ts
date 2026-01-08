@@ -1,13 +1,13 @@
-import type { BaseGitHubServiceDependencies } from "./base.service";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
+
+import type { BaseGitHubServiceDependencies } from "./base.service";
 
 import { mapGithubError } from "@/errors/";
 import { logger } from "@/utils/";
 
 import { BaseGitHubService } from "./base.service";
 
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export interface RepositoryServiceDependencies extends BaseGitHubServiceDependencies {}
+export type RepositoryServiceDependencies = BaseGitHubServiceDependencies;
 
 /**
  * Service responsible for repository operations and fork management.
@@ -108,6 +108,11 @@ export class RepositoryService extends BaseGitHubService {
 	/**
 	 * Verifies that the GitHub token has required permissions.
 	 *
+	 * Tests installation token access to both fork and upstream repositories
+	 * to ensure the workflow can read from and write to the necessary resources.
+	 *
+	 * @returns `true` if token has access to both repositories, `false` otherwise
+	 *
 	 * @example
 	 * ```typescript
 	 * const hasPermissions = await repoService.verifyTokenPermissions();
@@ -116,20 +121,52 @@ export class RepositoryService extends BaseGitHubService {
 	 */
 	public async verifyTokenPermissions(): Promise<boolean> {
 		try {
-			const response = await this.octokit.rest.users.getAuthenticated();
+			const results = await Promise.allSettled([
+				this.octokit.rest.repos.get(this.repositories.fork),
+				this.octokit.rest.repos.get(this.repositories.upstream),
+			]);
 
-			await this.octokit.rest.repos.get(this.repositories.upstream);
+			for (const [index, result] of results.entries()) {
+				const repoType = index === 0 ? "fork" : "upstream";
 
-			this.logger.info({ user: response.data.login }, "Token permissions verified successfully");
+				if (result.status === "rejected") {
+					this.logger.error(
+						{ reason: result.reason },
+						`Insufficient permissions for ${repoType} repository`,
+					);
+
+					throw mapGithubError(result.reason, `${RepositoryService.name}.verifyTokenPermissions`, {
+						repo: repoType === "fork" ? this.repositories.fork : this.repositories.upstream,
+						reason: result.reason as unknown,
+					});
+				}
+
+				this.logger.debug(
+					{ response: result.value },
+					`Sufficient permissions for ${repoType} repository`,
+				);
+			}
+
+			this.logger.info(
+				{
+					fork: `${this.repositories.fork.owner}/${this.repositories.fork.repo}`,
+					upstream: `${this.repositories.upstream.owner}/${this.repositories.upstream.repo}`,
+				},
+				"Token permissions verified successfully",
+			);
+
 			return true;
 		} catch (error) {
-			this.logger.error({ err: error }, "Token permission verification failed");
+			this.logger.error({ error }, "Token permission verification failed");
+
 			return false;
 		}
 	}
 
 	/**
-	 * Checks if the fork repository exists. If it does not exist, an error is thrown.
+	 * Checks if the fork repository exists.
+	 *
+	 * If it does not exist, an error is thrown.
 	 */
 	public async forkExists(): Promise<void> {
 		try {
@@ -175,6 +212,18 @@ export class RepositoryService extends BaseGitHubService {
 				}),
 			]);
 
+			if (!upstreamCommits.data.length || !forkedCommits.data.length) {
+				this.logger.warn(
+					{
+						upstreamCommits: upstreamCommits.data.length,
+						forkedCommits: forkedCommits.data.length,
+					},
+					"At least one of the repositories has no commits",
+				);
+
+				return false;
+			}
+
 			const isSynced = upstreamCommits.data[0]?.sha === forkedCommits.data[0]?.sha;
 
 			this.logger.debug(
@@ -188,7 +237,8 @@ export class RepositoryService extends BaseGitHubService {
 
 			return isSynced;
 		} catch (error) {
-			this.logger.error({ err: error }, "Failed to check fork synchronization");
+			this.logger.error({ error }, "Failed to check fork synchronization");
+
 			return false;
 		}
 	}
@@ -222,7 +272,7 @@ export class RepositoryService extends BaseGitHubService {
 
 			return true;
 		} catch (error) {
-			this.logger.error({ err: error, fork: this.repositories.fork }, "Failed to synchronize fork");
+			this.logger.error({ error, fork: this.repositories.fork }, "Failed to synchronize fork");
 			return false;
 		}
 	}
@@ -374,7 +424,7 @@ export class RepositoryService extends BaseGitHubService {
 			this.logger.warn("Glossary file exists but has no content");
 			return null;
 		} catch (error) {
-			this.logger.debug({ err: error }, "Glossary file not found or inaccessible");
+			this.logger.debug({ error }, "Glossary file not found or inaccessible");
 			return null;
 		}
 	}
