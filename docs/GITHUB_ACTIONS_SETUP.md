@@ -91,7 +91,6 @@ Go to **Settings → Secrets and variables → Actions → Variables**:
 
 | Variable                | Example Value                      | Description                 | Required |
 | :---------------------- | :--------------------------------- | :-------------------------- | :------- |
-| `TRANSLATION_ENABLED`   | `true`                             | Master switch for workflow  | ✅ Yes   |
 | `NODE_ENV`              | `production`                       | Runtime environment         | ✅ Yes   |
 | `TARGET_LANGUAGE`       | `pt-br`                            | Target language code        | ✅ Yes   |
 | `LLM_MODEL`             | `google/gemini-2.0-flash-exp:free` | LLM model identifier        | ❌ No    |
@@ -169,7 +168,6 @@ gh secret set BOT_PRIVATE_KEY --repo $REPO < private-key.pem
 gh secret set LLM_API_KEY --repo $REPO --body "sk-..."
 
 # Variables
-gh variable set TRANSLATION_ENABLED --body "true" --repo $REPO
 gh variable set NODE_ENV --body "production" --repo $REPO
 gh variable set TARGET_LANGUAGE --body "pt-br" --repo $REPO
 gh variable set LLM_MODEL --body "google/gemini-2.0-flash-exp:free" --repo $REPO
