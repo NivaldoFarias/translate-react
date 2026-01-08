@@ -176,7 +176,7 @@ describe("RepositoryService", () => {
 
 		test("should return false when token verification fails", async () => {
 			const mockOctokit = createMockOctokit();
-			mockOctokit.rest.users.getAuthenticated.mockRejectedValueOnce(new Error("Unauthorized"));
+			mockOctokit.rest.repos.get.mockRejectedValueOnce(new Error("Unauthorized"));
 
 			// @ts-expect-error - mocked octokit
 			const { service } = createTestRepositoryService({ octokit: mockOctokit });
