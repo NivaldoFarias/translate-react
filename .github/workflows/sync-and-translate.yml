@@ -19,7 +19,6 @@ concurrency:
 jobs:
   sync-and-translate:
     name: Sync & Translate
-    if: ${{ vars.TRANSLATION_ENABLED == 'true' }}
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     strategy:
