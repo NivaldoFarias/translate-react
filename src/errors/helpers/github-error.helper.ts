@@ -2,9 +2,7 @@ import { RequestError } from "@octokit/request-error";
 import { StatusCodes } from "http-status-codes";
 
 import { ApplicationError, ErrorCode } from "@/errors/base-error";
-import { detectRateLimit, logger } from "@/utils/";
-
-const helperLogger = logger.child({ component: "GithubErrorHelper" });
+import { logger as baseLogger, detectRateLimit } from "@/utils/";
 
 /** Base metadata fields added by mapGithubError for all error types */
 interface GithubErrorBaseMetadata {
@@ -20,7 +18,7 @@ interface GithubErrorBaseMetadata {
  *
  * Handles common GitHub API error scenarios:
  * - `401` Unauthorized
- * - `403` Forbidden (including rate limits)
+ * - `403` Forbidden
  * - `404` Not Found
  * - `422` Unprocessable Entity
  * - `5xx` Server Errors
@@ -29,7 +27,7 @@ interface GithubErrorBaseMetadata {
  * @param operation The operation that failed
  * @param metadata Optional additional debugging context
  *
- * @returns A `ApplicationError` with appropriate code and context
+ * @returns An `ApplicationError` with appropriate code and context
  *
  * @example
  * ```typescript
@@ -45,12 +43,14 @@ export function mapGithubError<T extends Record<string, unknown> = Record<string
 	operation: string,
 	metadata?: T,
 ): ApplicationError<GithubErrorBaseMetadata & T> {
+	const logger = baseLogger.child({ component: "GithubErrorHelper" });
+
 	type CombinedMetadata = GithubErrorBaseMetadata & T;
 
-	if (error instanceof RequestError) {
+	if (error instanceof RequestError || isUncastRequestError(error)) {
 		const errorCode = getGithubErrorCode(error);
 
-		helperLogger.error(
+		logger.error(
 			{ error, operation, statusCode: error.status, errorCode, ...metadata },
 			"GitHub API error",
 		);
@@ -64,7 +64,7 @@ export function mapGithubError<T extends Record<string, unknown> = Record<string
 
 	if (error instanceof Error) {
 		if (detectRateLimit(error.message)) {
-			helperLogger.warn({ error, operation, ...metadata }, "Rate limit detected in error message");
+			logger.warn({ error, operation, ...metadata }, "Rate limit detected in error message");
 
 			return new ApplicationError(
 				error.message,
@@ -74,7 +74,7 @@ export function mapGithubError<T extends Record<string, unknown> = Record<string
 			);
 		}
 
-		helperLogger.error({ error, operation, ...metadata }, "Unexpected error");
+		logger.error({ error, operation, ...metadata }, "Unexpected error");
 
 		return new ApplicationError(
 			error.message,
@@ -85,7 +85,7 @@ export function mapGithubError<T extends Record<string, unknown> = Record<string
 	}
 
 	const message = String(error);
-	helperLogger.error({ error: message, operation, ...metadata }, "Non-Error object thrown");
+	logger.error({ error: message, operation, ...metadata }, "Non-Error object thrown");
 
 	return new ApplicationError(
 		message,
@@ -124,4 +124,16 @@ function getGithubErrorCode(error: RequestError): ErrorCode {
 		default:
 			return ErrorCode.GithubApiError;
 	}
+}
+
+function isUncastRequestError(error: unknown): error is RequestError {
+	return (
+		typeof error === "object" &&
+		error != null &&
+		"name" in error &&
+		error.name === "HttpError" &&
+		"status" in error &&
+		typeof error.status === "number" &&
+		"request" in error
+	);
 }
