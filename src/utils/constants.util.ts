@@ -54,6 +54,15 @@ export const MAX_FILE_SIZE = 200_000;
 export const FILE_FETCH_BATCH_SIZE = 10;
 
 /**
+ * Maximum number of consecutive file processing failures before stopping the workflow.
+ *
+ * Circuit breaker mechanism to prevent wasting resources on systemic failures.
+ * When this threshold is exceeded, the workflow terminates early with a clear error message.
+ * Default: 5 consecutive failures.
+ */
+export const MAX_CONSECUTIVE_FAILURES = 5;
+
+/**
  * Minimum confidence threshold for language cache hits, on a scale from 0 to 1.
  *
  * Cache entries below this confidence level are treated as cache misses,

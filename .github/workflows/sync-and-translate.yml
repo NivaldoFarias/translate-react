@@ -92,7 +92,7 @@ jobs:
 
       - name: Run translation workflow (${{ matrix.lang }})
         run: bun run start
-        timeout-minutes: 120
+        timeout-minutes: 180
 
       - name: Upload logs
         uses: actions/upload-artifact@v4

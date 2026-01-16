@@ -8,6 +8,7 @@ import {
 import { afterAll, afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { StatusCodes } from "http-status-codes";
 
+import type { RestEndpointMethodTypes } from "@octokit/rest";
 import type { MockContentService, MockOctokitGit, MockOctokitRepos } from "@tests/mocks";
 
 import type { BranchServiceDependencies } from "@/services/";
@@ -35,16 +36,17 @@ function createTestableBranchService(
 	const repos = reposMocks ?? createReposMocks();
 	const content = contentServiceMock ?? createMockContentService();
 
-	const defaults: BranchServiceDependencies = {
-		// @ts-expect-error - mocked octokit
+	const defaults = {
 		octokit: createMockOctokit({ git, repos }),
 		repositories: testRepositories,
-		// @ts-expect-error - mocked content service
 		contentService: content,
 	};
 
 	return {
-		service: new TestableBranchService({ ...defaults, ...overrides }),
+		service: new TestableBranchService({
+			...(defaults as unknown as BranchServiceDependencies),
+			...overrides,
+		}),
 		mocks: { git, repos, content },
 	};
 }
@@ -63,16 +65,17 @@ function createTestBranchService(
 	const repos = reposMocks ?? createReposMocks();
 	const content = contentServiceMock ?? createMockContentService();
 
-	const defaults: BranchServiceDependencies = {
-		// @ts-expect-error - mocked octokit
+	const defaults = {
 		octokit: createMockOctokit({ git, repos }),
 		repositories: testRepositories,
-		// @ts-expect-error - mocked content service
 		contentService: content,
 	};
 
 	return {
-		service: new BranchService({ ...defaults, ...overrides }),
+		service: new BranchService({
+			...(defaults as unknown as BranchServiceDependencies),
+			...overrides,
+		}),
 		mocks: { git, repos, content },
 	};
 }
@@ -282,9 +285,8 @@ describe("BranchService", () => {
 
 		test("should return false when fork owner has no commits", async () => {
 			reposMocks.listCommits.mockResolvedValueOnce({
-				// @ts-expect-error - testing different user
 				data: [{ author: { login: "different-user" }, sha: "commit123" }],
-			});
+			} as RestEndpointMethodTypes["repos"]["listCommits"]["response"]);
 
 			const result = await branchService.checkIfCommitExistsOnFork("feature/test");
 
@@ -300,8 +302,9 @@ describe("BranchService", () => {
 		});
 
 		test("should handle missing author information", async () => {
-			// @ts-expect-error - testing missing author info
-			reposMocks.listCommits.mockResolvedValueOnce({ data: [{ author: null, sha: "commit123" }] });
+			reposMocks.listCommits.mockResolvedValueOnce({
+				data: [{ author: null, sha: "commit123" }],
+			} as RestEndpointMethodTypes["repos"]["listCommits"]["response"]);
 
 			const result = await branchService.checkIfCommitExistsOnFork("feature/test");
 
@@ -379,27 +382,29 @@ describe("BranchService", () => {
 	});
 
 	describe("cleanup", () => {
-		let testableBranchService: TestableBranchService;
-		let contentMocks: MockContentService;
+		let branchService: TestableBranchService;
+		let contentService: MockContentService;
 
 		beforeEach(() => {
 			const { service, mocks } = createTestableBranchService();
-			testableBranchService = service;
+			branchService = service;
 			gitMocks = mocks.git;
-			contentMocks = mocks.content;
+			contentService = mocks.content;
 		});
 
 		afterEach(() => {
-			testableBranchService.activeBranches.clear();
+			branchService.activeBranches.clear();
 		});
 
 		test("should delete branch without PR during cleanup", async () => {
-			await testableBranchService.createBranch("translate/orphan-branch");
-			contentMocks.findPullRequestByBranch.mockResolvedValue(undefined);
+			await branchService.createBranch("translate/orphan-branch");
+			contentService.findPullRequestByBranch.mockResolvedValue(undefined);
 
-			await testableBranchService.testCleanup();
+			await branchService.testCleanup();
 
-			expect(contentMocks.findPullRequestByBranch).toHaveBeenCalledWith("translate/orphan-branch");
+			expect(contentService.findPullRequestByBranch).toHaveBeenCalledWith(
+				"translate/orphan-branch",
+			);
 			expect(gitMocks.deleteRef).toHaveBeenCalledWith({
 				owner: testRepositories.fork.owner,
 				repo: testRepositories.fork.repo,
@@ -408,62 +413,68 @@ describe("BranchService", () => {
 		});
 
 		test("should delete branch with conflicted PR during cleanup", async () => {
-			await testableBranchService.createBranch("translate/conflicted-branch");
-			// @ts-expect-error - partial mock
-			contentMocks.findPullRequestByBranch.mockResolvedValue({ number: 123 });
-			contentMocks.checkPullRequestStatus.mockResolvedValue({
+			await branchService.createBranch("translate/conflicted-branch");
+			contentService.findPullRequestByBranch.mockResolvedValue({
+				number: 123,
+			} as RestEndpointMethodTypes["pulls"]["list"]["response"]["data"][number]);
+			contentService.checkPullRequestStatus.mockResolvedValue({
 				needsUpdate: true,
 				mergeableState: "dirty",
 				hasConflicts: false,
 				mergeable: null,
 			});
 
-			await testableBranchService.testCleanup();
+			await branchService.testCleanup();
 
-			expect(contentMocks.checkPullRequestStatus).toHaveBeenCalledWith(123);
+			expect(contentService.checkPullRequestStatus).toHaveBeenCalledWith(123);
 			expect(gitMocks.deleteRef).toHaveBeenCalled();
 		});
 
 		test("should preserve branch with valid PR during cleanup", async () => {
-			await testableBranchService.createBranch("translate/valid-pr-branch");
-			// @ts-expect-error - partial mock
-			contentMocks.findPullRequestByBranch.mockResolvedValue({ number: 456 });
-			contentMocks.checkPullRequestStatus.mockResolvedValue({
+			await branchService.createBranch("translate/valid-pr-branch");
+			contentService.findPullRequestByBranch.mockResolvedValue({
+				number: 456,
+			} as RestEndpointMethodTypes["pulls"]["list"]["response"]["data"][number]);
+			contentService.checkPullRequestStatus.mockResolvedValue({
 				needsUpdate: false,
 				mergeableState: "clean",
 				hasConflicts: false,
 				mergeable: null,
 			});
 
-			await testableBranchService.testCleanup();
+			await branchService.testCleanup();
 
-			expect(contentMocks.checkPullRequestStatus).toHaveBeenCalledWith(456);
+			expect(contentService.findPullRequestByBranch).toHaveBeenCalledWith(
+				"translate/valid-pr-branch",
+			);
+			expect(contentService.checkPullRequestStatus).toHaveBeenCalledWith(456);
 			expect(gitMocks.deleteRef).not.toHaveBeenCalled();
 		});
 
 		test("should handle errors gracefully during cleanup", async () => {
-			await testableBranchService.createBranch("translate/error-branch");
-			contentMocks.findPullRequestByBranch.mockRejectedValue(new Error("API Error"));
+			await branchService.createBranch("translate/error-branch");
+			contentService.findPullRequestByBranch.mockRejectedValue(new Error("API Error"));
 
-			await testableBranchService.testCleanup();
+			await branchService.testCleanup();
 
-			expect(testableBranchService.activeBranches.has("translate/error-branch")).toBe(true);
+			expect(branchService.activeBranches.has("translate/error-branch")).toBe(true);
 		});
 
 		test("should process multiple branches during cleanup", async () => {
-			await testableBranchService.createBranch("translate/branch1");
-			await testableBranchService.createBranch("translate/branch2");
-			await testableBranchService.createBranch("translate/branch3");
+			await branchService.createBranch("translate/branch1");
+			await branchService.createBranch("translate/branch2");
+			await branchService.createBranch("translate/branch3");
 
-			// Branch 1 has no PR -> delete
-			contentMocks.findPullRequestByBranch
+			contentService.findPullRequestByBranch
 				.mockResolvedValueOnce(undefined)
-				// @ts-expect-error - Branch 2 has valid PR -> preserve
-				.mockResolvedValueOnce({ data: { number: 1 } })
-				// @ts-expect-error - Branch 3 has conflicted PR -> delete
-				.mockResolvedValueOnce({ data: { number: 2 } });
+				.mockResolvedValueOnce({
+					number: 1,
+				} as RestEndpointMethodTypes["pulls"]["list"]["response"]["data"][number])
+				.mockResolvedValueOnce({
+					number: 2,
+				} as RestEndpointMethodTypes["pulls"]["list"]["response"]["data"][number]);
 
-			contentMocks.checkPullRequestStatus
+			contentService.checkPullRequestStatus
 				.mockResolvedValueOnce({
 					needsUpdate: false,
 					mergeableState: "clean",
@@ -477,26 +488,27 @@ describe("BranchService", () => {
 					mergeable: null,
 				});
 
-			await testableBranchService.testCleanup();
+			await branchService.testCleanup();
 
 			expect(gitMocks.deleteRef).toHaveBeenCalledTimes(2);
 		});
 
 		test("should not delete any branches when all have valid PRs", async () => {
-			await testableBranchService.createBranch("translate/pr-branch");
-			// @ts-expect-error - partial mock
-			contentMocks.findPullRequestByBranch.mockResolvedValue({ number: 789 });
-			contentMocks.checkPullRequestStatus.mockResolvedValue({
+			await branchService.createBranch("translate/pr-branch");
+			contentService.findPullRequestByBranch.mockResolvedValue({
+				number: 789,
+			} as RestEndpointMethodTypes["pulls"]["list"]["response"]["data"][number]);
+			contentService.checkPullRequestStatus.mockResolvedValue({
 				needsUpdate: false,
 				mergeableState: "clean",
 				hasConflicts: false,
 				mergeable: null,
 			});
 
-			await testableBranchService.testCleanup();
+			await branchService.testCleanup();
 
 			expect(gitMocks.deleteRef).not.toHaveBeenCalled();
-			expect(testableBranchService.activeBranches.has("translate/pr-branch")).toBe(true);
+			expect(branchService.activeBranches.has("translate/pr-branch")).toBe(true);
 		});
 	});
 
