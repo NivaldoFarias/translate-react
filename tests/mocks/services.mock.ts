@@ -1,11 +1,13 @@
 import { mock } from "bun:test";
 
-import type { ContentService } from "@/services/";
+import type { RestEndpointMethodTypes } from "@octokit/rest";
+
+import type { PullRequestStatus } from "@/services/";
 
 /**
  * Creates a mock CommentBuilderService for testing.
  *
- * @returns Mock CommentBuilderService instance
+ * @returns Mocked CommentBuilderService instance
  */
 export function createMockCommentBuilderService() {
 	return {
@@ -22,60 +24,53 @@ export function createMockCommentBuilderService() {
 /**
  * Creates a mock ContentService for testing.
  *
- * @returns Mock ContentService instance
+ * @returns Mocked ContentService instance
  */
 export function createMockContentService() {
 	return {
-		findPullRequestByBranch: mock(
-			() => Promise.resolve(undefined) as ReturnType<ContentService["findPullRequestByBranch"]>,
+		findPullRequestByBranch: mock(() =>
+			Promise.resolve(
+				undefined as
+					| RestEndpointMethodTypes["pulls"]["list"]["response"]["data"][number]
+					| undefined,
+			),
 		),
-		checkPullRequestStatus: mock(
-			() =>
-				Promise.resolve({ needsUpdate: false, mergeableState: "clean" }) as ReturnType<
-					ContentService["checkPullRequestStatus"]
-				>,
+		checkPullRequestStatus: mock(() =>
+			Promise.resolve({ needsUpdate: false, mergeableState: "clean" } as PullRequestStatus),
 		),
 		getFileContent: mock(() => Promise.resolve("# Test Content")),
-		getUntranslatedFiles: mock(
-			() =>
-				Promise.resolve([
-					{
-						path: "src/test/file.md",
-						content: "# Test Content",
-						sha: "abc123",
-						filename: "file.md",
-					},
-				]) as ReturnType<ContentService["getUntranslatedFiles"]>,
+		getUntranslatedFiles: mock(() =>
+			Promise.resolve([
+				{
+					path: "src/test/file.md",
+					content: "# Test Content",
+					sha: "abc123",
+					filename: "file.md",
+				},
+			]),
 		),
-		commitTranslation: mock(
-			() =>
-				Promise.resolve({
-					data: { content: { sha: "new-sha" }, commit: { sha: "commit-sha" } },
-				}) as ReturnType<ContentService["commitTranslation"]>,
+		commitTranslation: mock(() =>
+			Promise.resolve({
+				data: { content: { sha: "new-sha" }, commit: { sha: "commit-sha" } },
+			}),
 		),
-		createPullRequest: mock(
-			() =>
-				Promise.resolve({
-					number: 1,
-					title: "test: translation",
-					html_url: "https://github.com/test/test/pull/1",
-				}) as ReturnType<ContentService["createPullRequest"]>,
+		createPullRequest: mock(() =>
+			Promise.resolve({
+				number: 1,
+				title: "test: translation",
+				html_url: "https://github.com/test/test/pull/1",
+			}),
 		),
-		listOpenPullRequests: mock(
-			() => Promise.resolve([]) as ReturnType<ContentService["listOpenPullRequests"]>,
-		),
+		listOpenPullRequests: mock(() => Promise.resolve([])),
 		getPullRequestFiles: mock(() => Promise.resolve(["src/test/file.md"])),
-		commentCompiledResultsOnIssue: mock(
-			() =>
-				Promise.resolve({ id: 1 }) as ReturnType<ContentService["commentCompiledResultsOnIssue"]>,
-		),
+		commentCompiledResultsOnIssue: mock(() => Promise.resolve({ id: 1 })),
 	};
 }
 
 /**
  * Creates a mock BranchService for testing.
  *
- * @returns Mock BranchService instance
+ * @returns Mocked BranchService instance
  */
 export function createMockBranchService() {
 	return {
@@ -101,7 +96,7 @@ export function createMockBranchService() {
 /**
  * Creates a mock RepositoryService for testing.
  *
- * @returns Mock RepositoryService instance
+ * @returns Mocked RepositoryService instance
  */
 export function createMockRepositoryService() {
 	return {
@@ -120,13 +115,14 @@ export function createMockRepositoryService() {
 		isForkSynced: mock(() => Promise.resolve(true)),
 		syncFork: mock(() => Promise.resolve(true)),
 		fetchGlossary: mock(() => Promise.resolve("React - React\ncomponent - componente")),
+		isBranchBehind: mock(() => Promise.resolve(false)),
 	};
 }
 
 /**
  * Creates a mock TranslatorService for testing.
  *
- * @returns Mock TranslatorService instance
+ * @returns Mocked TranslatorService instance
  */
 export function createMockTranslatorService() {
 	return {
@@ -156,6 +152,10 @@ export function createMockTranslatorService() {
 				if (code === "pt-br") return "Brazilian Portuguese";
 				return undefined;
 			}),
+			languages: {
+				source: "en",
+				target: "pt-br",
+			},
 		},
 		glossary: null,
 	};
@@ -164,12 +164,12 @@ export function createMockTranslatorService() {
 /**
  * Creates a mock LanguageCacheService for testing.
  *
- * @returns Mock LanguageCacheService instance
+ * @returns Mocked LanguageCacheService instance
  */
 export function createMockLanguageCacheService() {
 	const cache = new Map<string, { isTranslated: boolean; confidence: number }>();
 
-	return mock(() => ({
+	return {
 		get: mock((path: string) => cache.get(path)),
 		set: mock((path: string, value: { isTranslated: boolean; confidence: number }) => {
 			cache.set(path, value);
@@ -179,7 +179,7 @@ export function createMockLanguageCacheService() {
 			cache.clear();
 		}),
 		size: () => cache.size,
-	}));
+	};
 }
 
 export type MockCommentBuilderService = ReturnType<typeof createMockCommentBuilderService>;

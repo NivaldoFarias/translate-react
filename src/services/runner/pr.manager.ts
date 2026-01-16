@@ -1,9 +1,10 @@
+import type { SetNonNullable } from "type-fest";
+
 import type {
 	ProcessedFileResult,
 	RunnerServiceDependencies,
 	WorkflowStatistics,
 } from "./runner.types";
-import type { SetNonNullable } from "type-fest";
 
 import { env, logger, RuntimeEnvironment } from "@/utils/";
 

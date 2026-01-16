@@ -5,4 +5,3 @@ export * from "./logger.util";
 export * from "./rate-limit-detector.util";
 export * from "./setup-signal-handlers.util";
 export * from "./common.util";
-export * from "./timing.util";

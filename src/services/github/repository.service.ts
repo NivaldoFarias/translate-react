@@ -1,13 +1,13 @@
-import type { BaseGitHubServiceDependencies } from "./base.service";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
+
+import type { BaseGitHubServiceDependencies } from "./base.service";
 
 import { mapGithubError } from "@/errors/";
 import { logger } from "@/utils/";
 
 import { BaseGitHubService } from "./base.service";
 
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export interface RepositoryServiceDependencies extends BaseGitHubServiceDependencies {}
+export type RepositoryServiceDependencies = BaseGitHubServiceDependencies;
 
 /**
  * Service responsible for repository operations and fork management.
@@ -58,26 +58,38 @@ export class RepositoryService extends BaseGitHubService {
 	}
 
 	/**
-	 * Retrieves the repository file tree.
+	 * Retrieves the repository file tree from fork or upstream.
 	 *
-	 * Can optionally filter out ignored paths.
+	 * For translation workflows, use `target: "upstream"` to get all candidate files
+	 * from the source repository. Translation status determination is handled by the
+	 * file discovery pipeline, not by SHA comparison.
 	 *
-	 * @param baseBranch Branch to get tree from
+	 * @param target Which repository to fetch tree from ('fork' or 'upstream')
+	 * @param baseBranch Branch to get tree from (defaults to target's default branch)
 	 * @param filterIgnored Whether to filter ignored paths
+	 *
+	 * @returns Array of repository tree items
 	 *
 	 * @example
 	 * ```typescript
-	 * const tree = await repoService.getRepositoryTree('main', true);
+	 * // Get fork tree (default)
+	 * const forkTree = await repoService.getRepositoryTree();
+	 *
+	 * // Get upstream tree for translation processing
+	 * const candidates = await repoService.getRepositoryTree('upstream');
 	 * ```
 	 */
 	public async getRepositoryTree(
+		target: "fork" | "upstream" = "fork",
 		baseBranch?: string,
 		filterIgnored = true,
 	): Promise<RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"]> {
 		try {
-			const branchName = baseBranch ?? (await this.getDefaultBranch("fork"));
+			const repoConfig = target === "fork" ? this.repositories.fork : this.repositories.upstream;
+			const branchName = baseBranch ?? (await this.getDefaultBranch(target));
+
 			const response = await this.octokit.git.getTree({
-				...this.repositories.fork,
+				...repoConfig,
 				tree_sha: branchName,
 				recursive: "true",
 			});
@@ -87,6 +99,7 @@ export class RepositoryService extends BaseGitHubService {
 
 			this.logger.info(
 				{
+					target,
 					branch: branchName,
 					totalItems: response.data.tree.length,
 					filteredItems: tree.length,
@@ -98,15 +111,21 @@ export class RepositoryService extends BaseGitHubService {
 			return tree;
 		} catch (error) {
 			throw mapGithubError(error, `${RepositoryService.name}.getRepositoryTree`, {
+				target,
 				baseBranch,
 				filterIgnored,
-				fork: this.repositories.fork,
+				repoConfig: target === "fork" ? this.repositories.fork : this.repositories.upstream,
 			});
 		}
 	}
 
 	/**
 	 * Verifies that the GitHub token has required permissions.
+	 *
+	 * Tests installation token access to both fork and upstream repositories
+	 * to ensure the workflow can read from and write to the necessary resources.
+	 *
+	 * @returns `true` if token has access to both repositories, `false` otherwise
 	 *
 	 * @example
 	 * ```typescript
@@ -116,20 +135,113 @@ export class RepositoryService extends BaseGitHubService {
 	 */
 	public async verifyTokenPermissions(): Promise<boolean> {
 		try {
-			const response = await this.octokit.rest.users.getAuthenticated();
+			const results = await Promise.allSettled([
+				this.octokit.rest.repos.get(this.repositories.fork),
+				this.octokit.rest.repos.get(this.repositories.upstream),
+			]);
 
-			await this.octokit.rest.repos.get(this.repositories.upstream);
+			for (const [index, result] of results.entries()) {
+				const repoType = index === 0 ? "fork" : "upstream";
 
-			this.logger.info({ user: response.data.login }, "Token permissions verified successfully");
+				if (result.status === "rejected") {
+					this.logger.error(
+						{ reason: result.reason },
+						`Insufficient permissions for ${repoType} repository`,
+					);
+
+					throw mapGithubError(result.reason, `${RepositoryService.name}.verifyTokenPermissions`, {
+						repo: repoType === "fork" ? this.repositories.fork : this.repositories.upstream,
+						reason: result.reason as unknown,
+					});
+				}
+
+				this.logger.debug(
+					{ response: result.value },
+					`Sufficient permissions for ${repoType} repository`,
+				);
+			}
+
+			this.logger.info(
+				{
+					fork: `${this.repositories.fork.owner}/${this.repositories.fork.repo}`,
+					upstream: `${this.repositories.upstream.owner}/${this.repositories.upstream.repo}`,
+				},
+				"Token permissions verified successfully",
+			);
+
 			return true;
 		} catch (error) {
-			this.logger.error({ err: error }, "Token permission verification failed");
+			this.logger.error({ error }, "Token permission verification failed");
+
 			return false;
 		}
 	}
 
 	/**
-	 * Checks if the fork repository exists. If it does not exist, an error is thrown.
+	 * Checks if a branch is behind its base branch.
+	 *
+	 * Compares the commit history of two branches to determine if the head branch
+	 * is missing commits from the base branch. Returns true if base has commits
+	 * that head doesn't have.
+	 *
+	 * @param headBranch Branch to check (e.g., 'translate/some-file')
+	 * @param baseBranch Base branch to compare against (e.g., 'main')
+	 * @param target Which repository to check ('fork' or 'upstream')
+	 *
+	 * @returns `true` if head is behind base, `false` if up-to-date or ahead
+	 *
+	 * @example
+	 * ```typescript
+	 * const isBehind = await repoService.isBranchBehind(
+	 *   'translate/docs/intro.md',
+	 *   'main'
+	 * );
+	 * if (isBehind) {
+	 *   // Recreate branch with latest base
+	 * }
+	 * ```
+	 */
+	public async isBranchBehind(
+		headBranch: string,
+		baseBranch: string,
+		target: "fork" | "upstream" = "fork",
+	): Promise<boolean> {
+		try {
+			const repoConfig = target === "fork" ? this.repositories.fork : this.repositories.upstream;
+
+			const comparison = await this.octokit.repos.compareCommits({
+				...repoConfig,
+				base: headBranch,
+				head: baseBranch,
+			});
+
+			const isBehind = comparison.data.ahead_by > 0;
+
+			this.logger.debug(
+				{
+					headBranch,
+					baseBranch,
+					aheadBy: comparison.data.ahead_by,
+					behindBy: comparison.data.behind_by,
+					isBehind,
+				},
+				"Branch comparison completed",
+			);
+
+			return isBehind;
+		} catch (error) {
+			this.logger.warn(
+				{ error, headBranch, baseBranch, target },
+				"Failed to compare branches, assuming not behind",
+			);
+			return false;
+		}
+	}
+
+	/**
+	 * Checks if the fork repository exists.
+	 *
+	 * If it does not exist, an error is thrown.
 	 */
 	public async forkExists(): Promise<void> {
 		try {
@@ -175,6 +287,18 @@ export class RepositoryService extends BaseGitHubService {
 				}),
 			]);
 
+			if (!upstreamCommits.data.length || !forkedCommits.data.length) {
+				this.logger.warn(
+					{
+						upstreamCommits: upstreamCommits.data.length,
+						forkedCommits: forkedCommits.data.length,
+					},
+					"At least one of the repositories has no commits",
+				);
+
+				return false;
+			}
+
 			const isSynced = upstreamCommits.data[0]?.sha === forkedCommits.data[0]?.sha;
 
 			this.logger.debug(
@@ -188,7 +312,8 @@ export class RepositoryService extends BaseGitHubService {
 
 			return isSynced;
 		} catch (error) {
-			this.logger.error({ err: error }, "Failed to check fork synchronization");
+			this.logger.error({ error }, "Failed to check fork synchronization");
+
 			return false;
 		}
 	}
@@ -222,103 +347,8 @@ export class RepositoryService extends BaseGitHubService {
 
 			return true;
 		} catch (error) {
-			this.logger.error({ err: error, fork: this.repositories.fork }, "Failed to synchronize fork");
+			this.logger.error({ error, fork: this.repositories.fork }, "Failed to synchronize fork");
 			return false;
-		}
-	}
-
-	/**
-	 * Compares fork and upstream repository trees to identify changed files.
-	 *
-	 * Fetches trees from both repositories and compares file SHAs to determine
-	 * which files have been modified in the upstream but not yet synced to the fork.
-	 * This optimization prevents unnecessary content fetching for files that haven't
-	 * changed since the last translation.
-	 *
-	 * ### Comparison Logic
-	 *
-	 * 1. Fetch trees from both fork and upstream repositories
-	 * 2. Build a map of file paths to SHAs for the fork
-	 * 3. For each file in upstream, check if:
-	 *    - File exists in fork with different SHA (changed)
-	 *    - File doesn't exist in fork (new)
-	 * 4. Return only files that differ or are new
-	 *
-	 * @param baseBranch Branch to compare (defaults to fork's default branch)
-	 * @param filterIgnored Whether to filter ignored paths
-	 *
-	 * @returns Array of files that have changed between fork and upstream
-	 *
-	 * @example
-	 * ```typescript
-	 * const changedFiles = await repoService.compareRepositoryTrees('main', true);
-	 * console.log(`${changedFiles.length} files need translation`);
-	 * ```
-	 */
-	public async compareRepositoryTrees(
-		baseBranch?: string,
-		filterIgnored = true,
-	): Promise<RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"]> {
-		try {
-			const branchName = baseBranch ?? (await this.getDefaultBranch("fork"));
-
-			const [forkResponse, upstreamResponse] = await Promise.all([
-				this.octokit.git.getTree({
-					...this.repositories.fork,
-					tree_sha: branchName,
-					recursive: "true",
-				}),
-				this.octokit.git.getTree({
-					...this.repositories.upstream,
-					tree_sha: branchName,
-					recursive: "true",
-				}),
-			]);
-
-			const forkTree =
-				filterIgnored ? this.filterRepositoryTree(forkResponse.data.tree) : forkResponse.data.tree;
-
-			const upstreamTree =
-				filterIgnored ?
-					this.filterRepositoryTree(upstreamResponse.data.tree)
-				:	upstreamResponse.data.tree;
-
-			const forkFileMap = new Map<string, string>();
-			for (const file of forkTree) {
-				if (file.path && file.sha) {
-					forkFileMap.set(file.path, file.sha);
-				}
-			}
-
-			const changedFiles = upstreamTree.filter((upstreamFile) => {
-				if (!upstreamFile.path || !upstreamFile.sha) {
-					return false;
-				}
-
-				const forkSha = forkFileMap.get(upstreamFile.path);
-
-				return !forkSha || forkSha !== upstreamFile.sha;
-			});
-
-			this.logger.info(
-				{
-					branch: branchName,
-					forkFiles: forkTree.length,
-					upstreamFiles: upstreamTree.length,
-					changedFiles: changedFiles.length,
-					filterIgnored,
-				},
-				"Compared repository trees",
-			);
-
-			return changedFiles;
-		} catch (error) {
-			throw mapGithubError(error, `${RepositoryService.name}.compareRepositoryTrees`, {
-				baseBranch,
-				filterIgnored,
-				fork: this.repositories.fork,
-				upstream: this.repositories.upstream,
-			});
 		}
 	}
 
@@ -374,7 +404,7 @@ export class RepositoryService extends BaseGitHubService {
 			this.logger.warn("Glossary file exists but has no content");
 			return null;
 		} catch (error) {
-			this.logger.debug({ err: error }, "Glossary file not found or inaccessible");
+			this.logger.debug({ error }, "Glossary file not found or inaccessible");
 			return null;
 		}
 	}

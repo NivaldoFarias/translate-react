@@ -168,7 +168,7 @@ These must be set in your `.env` file:
 | `NODE_ENV`              | `development` | Runtime environment                                                    |
 | `LOG_LEVEL`             | `info`        | Logging verbosity (`trace`\|`debug`\|`info`\|`warn`\|`error`\|`fatal`) |
 | `LOG_TO_CONSOLE`        | `true`        | Enable console logging in addition to file logs                        |
-| `PROGRESS_ISSUE_NUMBER` | `555`         | GitHub issue number for progress reports                               |
+| `PROGRESS_ISSUE_NUMBER` | —             | Optional: GitHub issue number for progress reports                     |
 
 </details>
 
