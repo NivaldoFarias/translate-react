@@ -39,14 +39,6 @@ export const errorMessages = {
 export const MAX_CHUNK_TOKENS = 4000;
 
 /**
- * Maximum file size in bytes that can be processed for translation.
- *
- * Files exceeding this limit are skipped to prevent LLM timeouts and resource exhaustion.
- * Set to 200KB based on observed LLM performance characteristics.
- */
-export const MAX_FILE_SIZE = 200_000;
-
-/**
  * Batch size for concurrent file fetching operations.
  *
  * Balances network efficiency with memory usage during repository tree traversal.
@@ -151,4 +143,7 @@ export const environmentDefaults = {
 
 	/** Minimum success rate (0-1) required for workflow to pass */
 	MIN_SUCCESS_RATE: 0.5,
+
+	LLM_MAX_CONCURRENT: 5,
+	LLM_REQUEST_TIMEOUT: 20_000,
 } as const;
