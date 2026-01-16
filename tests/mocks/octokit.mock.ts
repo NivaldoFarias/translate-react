@@ -174,25 +174,19 @@ export function createRateLimitMocks() {
 /**
  * Creates a fully-configured mock Octokit instance for testing.
  *
- * Uses Bun's mock() for all methods. The returned object satisfies the
- * MockOctokit interface, which contains only the methods we actually use
- * in our services.
- *
- * Cast to `Octokit` when passing to services - this is standard testing practice.
- *
  * @param options Override specific API mocks
  *
- * @returns Mock Octokit instance (cast to Octokit when passing to services)
+ * @returns Properly-typed mock Octokit instance ready for service injection
  *
  * @example
  * ```typescript
- * const octokit = createMockOctokit() as Octokit;
+ * const octokit = createMockOctokit();
  * const service = new BranchService({ octokit, repositories });
  *
- * // Or with custom mocks
- * const customOctokit = createMockOctokit({
+ * // With custom mocks for specific test scenarios
+ * const octokit = createMockOctokit({
  *   git: { getRef: mock(() => Promise.reject(new Error("Not found"))) },
- * }) as Octokit;
+ * });
  * ```
  */
 export function createMockOctokit(options?: {

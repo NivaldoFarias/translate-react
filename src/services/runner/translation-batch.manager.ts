@@ -5,7 +5,8 @@ import type {
 	RunnerServiceDependencies,
 } from "./runner.types";
 
-import { logger } from "@/utils/";
+import { ApplicationError, ErrorCode } from "@/errors/";
+import { logger, MAX_CONSECUTIVE_FAILURES } from "@/utils/";
 
 import { TranslationFile } from "../translator.service";
 
@@ -29,6 +30,15 @@ export class TranslationBatchManager {
 		successful: 0,
 		failed: 0,
 	};
+
+	/**
+	 * Tracks consecutive failures for circuit breaker pattern.
+	 *
+	 * Resets to 0 on any successful file processing. When this counter
+	 * reaches {@link MAX_CONSECUTIVE_FAILURES}, the workflow terminates
+	 * early to prevent wasting resources on systemic failures.
+	 */
+	private consecutiveFailures = 0;
 
 	/**
 	 * Initializes the batch manager with service dependencies.
@@ -209,6 +219,27 @@ export class TranslationBatchManager {
 		file: TranslationFile,
 		_progress: FileProcessingProgress,
 	): Promise<ProcessedFileResult> {
+		if (this.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+			this.logger.error(
+				{
+					consecutiveFailures: this.consecutiveFailures,
+					threshold: MAX_CONSECUTIVE_FAILURES,
+					filename: file.filename,
+				},
+				"Circuit breaker activated: stopping workflow due to consecutive failures",
+			);
+
+			throw new ApplicationError(
+				`Workflow terminated: ${this.consecutiveFailures} consecutive failures exceeded threshold of ${MAX_CONSECUTIVE_FAILURES}`,
+				ErrorCode.TranslationFailed,
+				`${TranslationBatchManager.name}.processFile`,
+				{
+					consecutiveFailures: this.consecutiveFailures,
+					threshold: MAX_CONSECUTIVE_FAILURES,
+				},
+			);
+		}
+
 		const metadata: ProcessedFileResult = {
 			branch: null,
 			filename: file.filename,
@@ -287,12 +318,20 @@ export class TranslationBatchManager {
 				"File processing completed successfully",
 			);
 
+			this.consecutiveFailures = 0;
 			this.updateBatchProgress("success");
 		} catch (error) {
 			const failureDuration = Date.now() - fileStartTime;
 
+			this.consecutiveFailures++;
+
 			this.logger.error(
-				{ error, filename: file.filename, durationMs: failureDuration },
+				{
+					error,
+					filename: file.filename,
+					durationMs: failureDuration,
+					consecutiveFailures: this.consecutiveFailures,
+				},
 				"File processing failed",
 			);
 

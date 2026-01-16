@@ -7,6 +7,7 @@ import {
 import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test";
 import { StatusCodes } from "http-status-codes";
 
+import type { Octokit, RestEndpointMethodTypes } from "@octokit/rest";
 import type { MockOctokitGit, MockOctokitRepos } from "@tests/mocks";
 
 import type { RepositoryServiceDependencies } from "@/services/";
@@ -25,14 +26,16 @@ function createTestRepositoryService(
 	const git = gitMocks ?? createGitMocks();
 	const repos = reposMocks ?? createReposMocks();
 
-	const defaults: RepositoryServiceDependencies = {
-		// @ts-expect-error - mocked octokit
+	const defaults = {
 		octokit: createMockOctokit({ git, repos }),
 		repositories: testRepositories,
 	};
 
 	return {
-		service: new RepositoryService({ ...defaults, ...overrides }),
+		service: new RepositoryService({
+			...(defaults as unknown as RepositoryServiceDependencies),
+			...overrides,
+		}),
 		mocks: { git, repos },
 	};
 }
@@ -332,9 +335,9 @@ describe("RepositoryService", () => {
 	describe("verifyTokenPermissions", () => {
 		test("should return true when token has valid permissions", async () => {
 			const mockOctokit = createMockOctokit();
-
-			// @ts-expect-error - mocked octokit
-			const { service } = createTestRepositoryService({ octokit: mockOctokit });
+			const { service } = createTestRepositoryService({
+				octokit: mockOctokit as unknown as Octokit,
+			});
 
 			const result = await service.verifyTokenPermissions();
 
@@ -344,9 +347,9 @@ describe("RepositoryService", () => {
 		test("should return false when token verification fails", async () => {
 			const mockOctokit = createMockOctokit();
 			mockOctokit.rest.repos.get.mockRejectedValueOnce(new Error("Unauthorized"));
-
-			// @ts-expect-error - mocked octokit
-			const { service } = createTestRepositoryService({ octokit: mockOctokit });
+			const { service } = createTestRepositoryService({
+				octokit: mockOctokit as unknown as Octokit,
+			});
 
 			const result = await service.verifyTokenPermissions();
 
@@ -372,11 +375,12 @@ describe("RepositoryService", () => {
 	describe("isForkSynced", () => {
 		test("should return true when fork and upstream have same latest commit", async () => {
 			const sharedSha = "same-commit-sha-12345";
-
-			// @ts-expect-error - partial mock data
-			reposMocks.listCommits.mockResolvedValueOnce({ data: [{ sha: sharedSha }] });
-			// @ts-expect-error - partial mock data
-			reposMocks.listCommits.mockResolvedValueOnce({ data: [{ sha: sharedSha }] });
+			reposMocks.listCommits.mockResolvedValueOnce({
+				data: [{ sha: sharedSha }],
+			} as RestEndpointMethodTypes["repos"]["listCommits"]["response"]);
+			reposMocks.listCommits.mockResolvedValueOnce({
+				data: [{ sha: sharedSha }],
+			} as RestEndpointMethodTypes["repos"]["listCommits"]["response"]);
 
 			const result = await repositoryService.isForkSynced();
 
@@ -385,8 +389,6 @@ describe("RepositoryService", () => {
 
 		test("should return false when fork and upstream have different commits", async () => {
 			let callCount = 0;
-
-			// @ts-expect-error - partial mock data
 			reposMocks.listCommits.mockImplementation(() => {
 				callCount++;
 				return Promise.resolve({
@@ -396,7 +398,7 @@ describe("RepositoryService", () => {
 							sha: callCount === 1 ? "upstream-sha" : "fork-sha",
 						},
 					],
-				});
+				} as RestEndpointMethodTypes["repos"]["listCommits"]["response"]);
 			});
 
 			const result = await repositoryService.isForkSynced();
@@ -416,9 +418,9 @@ describe("RepositoryService", () => {
 	describe("syncFork", () => {
 		test("should return true when fork is synced successfully", async () => {
 			const mockOctokit = createMockOctokit();
-
-			// @ts-expect-error - mocked octokit
-			const { service } = createTestRepositoryService({ octokit: mockOctokit });
+			const { service } = createTestRepositoryService({
+				octokit: mockOctokit as unknown as Octokit,
+			});
 
 			const result = await service.syncFork();
 
@@ -432,9 +434,9 @@ describe("RepositoryService", () => {
 		test("should return false when sync fails", async () => {
 			const mockOctokit = createMockOctokit();
 			mockOctokit.repos.mergeUpstream = mock(() => Promise.reject(new Error("Merge conflict")));
-
-			// @ts-expect-error - mocked octokit
-			const { service } = createTestRepositoryService({ octokit: mockOctokit });
+			const { service } = createTestRepositoryService({
+				octokit: mockOctokit as unknown as Octokit,
+			});
 
 			const result = await service.syncFork();
 

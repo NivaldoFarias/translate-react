@@ -19,12 +19,16 @@ const mockChatCompletionsCreate = createChatCompletionsMock();
 function createTestTranslatorService(
 	overrides?: Partial<TranslatorServiceDependencies>,
 ): TranslatorService {
-	const defaults: TranslatorServiceDependencies = {
+	const defaults = {
 		openai: createMockOpenAI(mockChatCompletionsCreate),
 		rateLimiter: createMockRateLimiter(),
 		model: "test-model",
 	};
-	return new TranslatorService({ ...defaults, ...overrides });
+
+	return new TranslatorService({
+		...(defaults as unknown as TranslatorServiceDependencies),
+		...overrides,
+	});
 }
 
 /** Mock backoff utility to execute immediately without retries */

@@ -15,7 +15,7 @@
 		"start": "bun src/main.ts",
 		"dev": "bun --watch src/main.ts",
 		"build": "bun src/build.ts",
-		"lint": "eslint .",
+		"lint": "eslint . --cache",
 		"lint:fix": "eslint . --fix",
 		"format": "prettier --write .",
 		"format:check": "prettier --check .",
