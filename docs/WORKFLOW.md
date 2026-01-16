@@ -219,9 +219,6 @@ function filterRepositoryTree(tree: GitHubTreeItem[]) {
 **Criticality**: Medium  
 **Failure Impact**: Unnecessary translations
 
-> [!WARNING]
-> This stage is the **primary performance bottleneck**. See [Timing Analysis](#timing-analysis) for optimization opportunities.
-
 ```mermaid
 flowchart TD
     A[192 Filtered Files] --> B[Batch Files by 10]

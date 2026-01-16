@@ -542,7 +542,7 @@ export class TranslatorService {
 	 * const content = '# Title\n\nContent\n\n## Section\n\nMore...';
 	 * const result = await translator.chunkContent(content);
 	 *
-	 * console.log(result.chunks.length);    // 3
+	 * console.log(result.chunks.length);    	// 3
 	 * console.log(result.separators.length); // 2
 	 * console.log(result.separators[0]);     // '\n\n'
 	 * ```

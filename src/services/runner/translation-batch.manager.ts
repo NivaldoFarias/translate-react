@@ -5,7 +5,8 @@ import type {
 	RunnerServiceDependencies,
 } from "./runner.types";
 
-import { logger } from "@/utils/";
+import { ApplicationError, ErrorCode } from "@/errors/";
+import { logger, MAX_CONSECUTIVE_FAILURES } from "@/utils/";
 
 import { TranslationFile } from "../translator.service";
 
@@ -29,6 +30,15 @@ export class TranslationBatchManager {
 		successful: 0,
 		failed: 0,
 	};
+
+	/**
+	 * Tracks consecutive failures for circuit breaker pattern.
+	 *
+	 * Resets to 0 on any successful file processing. When this counter
+	 * reaches {@link MAX_CONSECUTIVE_FAILURES}, the workflow terminates
+	 * early to prevent wasting resources on systemic failures.
+	 */
+	private consecutiveFailures = 0;
 
 	/**
 	 * Initializes the batch manager with service dependencies.
@@ -58,10 +68,19 @@ export class TranslationBatchManager {
 		files: TranslationFile[],
 		batchSize: number,
 	): Promise<Map<string, ProcessedFileResult>> {
-		this.logger.info("Processing files in batches");
+		const batches = this.createBatches(files, batchSize);
+
+		this.logger.info(
+			{
+				batchSize,
+				totalFiles: files.length,
+				totalBatches: batches.length,
+				parallelism: batchSize,
+			},
+			"Batch configuration initialized",
+		);
 
 		const results = new Map<ProcessedFileResult["filename"], ProcessedFileResult>();
-		const batches = this.createBatches(files, batchSize);
 
 		for (const [batchIndex, batch] of batches.entries()) {
 			const batchResults = await this.processBatch(batch, {
@@ -115,7 +134,10 @@ export class TranslationBatchManager {
 		const results = new Map<string, ProcessedFileResult>();
 
 		try {
-			this.logger.info(batchInfo, "Processing batch");
+			this.logger.info(
+				batchInfo,
+				`Processing batch ${batchInfo.currentBatch}/${batchInfo.totalBatches}`,
+			);
 
 			const fileResults = await Promise.all(
 				batch.map((file, index) => {
@@ -197,6 +219,27 @@ export class TranslationBatchManager {
 		file: TranslationFile,
 		_progress: FileProcessingProgress,
 	): Promise<ProcessedFileResult> {
+		if (this.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+			this.logger.error(
+				{
+					consecutiveFailures: this.consecutiveFailures,
+					threshold: MAX_CONSECUTIVE_FAILURES,
+					filename: file.filename,
+				},
+				"Circuit breaker activated: stopping workflow due to consecutive failures",
+			);
+
+			throw new ApplicationError(
+				`Workflow terminated: ${this.consecutiveFailures} consecutive failures exceeded threshold of ${MAX_CONSECUTIVE_FAILURES}`,
+				ErrorCode.TranslationFailed,
+				`${TranslationBatchManager.name}.processFile`,
+				{
+					consecutiveFailures: this.consecutiveFailures,
+					threshold: MAX_CONSECUTIVE_FAILURES,
+				},
+			);
+		}
+
 		const metadata: ProcessedFileResult = {
 			branch: null,
 			filename: file.filename,
@@ -275,12 +318,20 @@ export class TranslationBatchManager {
 				"File processing completed successfully",
 			);
 
+			this.consecutiveFailures = 0;
 			this.updateBatchProgress("success");
 		} catch (error) {
 			const failureDuration = Date.now() - fileStartTime;
 
+			this.consecutiveFailures++;
+
 			this.logger.error(
-				{ error, filename: file.filename, durationMs: failureDuration },
+				{
+					error,
+					filename: file.filename,
+					durationMs: failureDuration,
+					consecutiveFailures: this.consecutiveFailures,
+				},
 				"File processing failed",
 			);
 
@@ -405,11 +456,25 @@ export class TranslationBatchManager {
 					return existingBranch.data;
 				}
 			} else {
-				this.logger.debug(
-					{ filename: file.filename, branchName },
-					"Branch exists without PR, reusing",
+				const isBehind = await this.services.github.repository.isBranchBehind(
+					branchName,
+					actualBaseBranch,
+					"fork",
 				);
-				return existingBranch.data;
+
+				if (isBehind) {
+					this.logger.info(
+						{ filename: file.filename, branchName },
+						"Branch is behind base, deleting and recreating",
+					);
+					await this.services.github.branch.deleteBranch(branchName);
+				} else {
+					this.logger.debug(
+						{ filename: file.filename, branchName },
+						"Branch exists without PR and is up-to-date, reusing",
+					);
+					return existingBranch.data;
+				}
 			}
 		}
 
@@ -499,7 +564,7 @@ export class TranslationBatchManager {
 	 * inform maintainers about the duplicate PR situation.
 	 *
 	 * @param file Translation file being processed with original content
-	 * @param processingResult Processing metadata including translation and timing
+	 * @param processingResult Processing metadata
 	 *
 	 * @returns Markdown-formatted PR description with all components
 	 */

@@ -19,7 +19,6 @@ concurrency:
 jobs:
   sync-and-translate:
     name: Sync & Translate
-    if: ${{ vars.TRANSLATION_ENABLED == 'true' }}
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     strategy:
@@ -93,7 +92,7 @@ jobs:
 
       - name: Run translation workflow (${{ matrix.lang }})
         run: bun run start
-        timeout-minutes: 120
+        timeout-minutes: 180
 
       - name: Upload logs
         uses: actions/upload-artifact@v4

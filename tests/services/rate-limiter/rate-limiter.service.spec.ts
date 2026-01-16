@@ -294,8 +294,8 @@ describe("RateLimiter", () => {
 
 			test("should use optimized configuration for free LLM tier when CONFIGS.freeLLM is accessed", () => {
 				expect(CONFIGS.freeLLM.maxConcurrent).toBe(5);
-				expect(CONFIGS.freeLLM.minTime).toBe(20_000);
-				expect(CONFIGS.freeLLM.reservoir).toBe(5);
+				expect(CONFIGS.freeLLM.minTime).toBe(5_000);
+				expect(CONFIGS.freeLLM.reservoir).toBe(10);
 			});
 
 			test("should allow more generous limits for paid LLM tier when CONFIGS.paidLLM is accessed", () => {

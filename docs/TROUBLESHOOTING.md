@@ -130,24 +130,6 @@ Each chunk shows:
 }
 ```
 
-### Workflow Timing
-
-Complete timing breakdown for each file:
-
-```json
-{
-	"filename": "react-19-upgrade-guide.md",
-	"prNumber": 613,
-	"timing": {
-		"branchMs": 300,
-		"translationMs": 18500,
-		"commitMs": 1200,
-		"prMs": 800,
-		"totalMs": 20800
-	}
-}
-```
-
 ## Analyzing Timing Issues
 
 ### Expected Sequence
@@ -173,21 +155,6 @@ sequenceDiagram
     T-->>R: Return translated content
     R->>G: Commit operation
     R->>G: PR creation
-```
-
-### Detecting Race Conditions
-
-Look for timing anomalies in the logs:
-
-```bash
-# Search for commit operations in debug logs
-grep "Commit completed" logs/*.log
-
-# Check chunk completion times
-grep "Chunk translated successfully" logs/*.log
-
-# Verify reassembly completion
-grep "Content reassembly completed" logs/*.log
 ```
 
 ### Key Indicators of Issues
@@ -235,11 +202,9 @@ flowchart TD
 
     C --> C1[Check chunk count match]
     C --> C2[Verify size ratio]
-    C --> C3[Review commit timing]
 
     D --> D1[Enable debug logging]
     D --> D2[Check sequential processing]
-    D --> D3[Verify reassembly timing]
 
     E --> E1[Check language detection confidence]
     E --> E2[Review glossary usage]

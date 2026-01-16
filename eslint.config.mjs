@@ -15,6 +15,11 @@ export default defineConfig(
 			"**/logs/**",
 			"**/.env*",
 			"**/coverage/**",
+			"**/docs/**",
+			"**/*.md",
+			"**/*.json",
+			"**/*.yml",
+			"**/*.yaml",
 		],
 	},
 	{

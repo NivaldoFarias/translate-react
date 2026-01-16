@@ -16,6 +16,7 @@ import type {
 	MockOctokitPulls,
 	MockOctokitRepos,
 } from "@tests/mocks";
+import type { RestEndpointMethodTypes } from "node_modules/@octokit/plugin-rest-endpoint-methods/dist-types/generated/parameters-and-response-types";
 
 import type { ContentServiceDependencies, TranslationFile } from "@/services/";
 
@@ -44,17 +45,18 @@ function createTestContentService(
 	const issues = issuesMocks ?? createIssuesMocks();
 	const commentBuilder = createMockCommentBuilderService();
 
-	const defaults: ContentServiceDependencies = {
-		// @ts-expect-error - mocked octokit
+	const defaults = {
 		octokit: createMockOctokit({ git, repos, pulls, issues }),
 		repositories: testRepositories,
-		// @ts-expect-error - mocked comment builder
 		commentBuilderService: commentBuilder,
 		issueNumber: 555,
 	};
 
 	return {
-		service: new ContentService({ ...defaults, ...overrides }),
+		service: new ContentService({
+			...(defaults as unknown as ContentServiceDependencies),
+			...overrides,
+		}),
 		mocks: { git, repos, pulls, issues, commentBuilder },
 	};
 }
@@ -160,12 +162,10 @@ describe("ContentService", () => {
 		test("should return list of open pull requests when called", async () => {
 			pullsMocks.list.mockResolvedValueOnce({
 				data: [
-					// @ts-expect-error - partial pr data mock
 					{ number: 1, title: "PR 1" },
-					// @ts-expect-error - partial pr data mock
 					{ number: 2, title: "PR 2" },
 				],
-			});
+			} as RestEndpointMethodTypes["pulls"]["list"]["response"]);
 
 			const prs = await contentService.listOpenPullRequests();
 
@@ -215,9 +215,8 @@ describe("ContentService", () => {
 	describe("getPullRequestFiles", () => {
 		test("should return list of file paths when PR has files", async () => {
 			pullsMocks.listFiles.mockResolvedValueOnce({
-				// @ts-expect-error - partial pr data mock
 				data: [{ filename: "src/file1.md" }, { filename: "src/file2.md" }],
-			});
+			} as RestEndpointMethodTypes["pulls"]["listFiles"]["response"]);
 			const files = await contentService.getPullRequestFiles(123);
 
 			expect(files).toEqual(["src/file1.md", "src/file2.md"]);
@@ -341,9 +340,8 @@ describe("ContentService", () => {
 	describe("findPullRequestByBranch", () => {
 		test("should return PR when branch matches", async () => {
 			pullsMocks.list.mockResolvedValueOnce({
-				// @ts-expect-error - partial pr `head` attribute mock
 				data: [{ number: 1, head: { ref: "translate/test" }, title: "Test PR" }],
-			});
+			} as RestEndpointMethodTypes["pulls"]["list"]["response"]);
 			const pr = await contentService.findPullRequestByBranch("translate/test");
 
 			expect(pr?.number).toBe(1);
@@ -409,11 +407,7 @@ describe("ContentService", () => {
 
 		test("should return dirty status when PR has conflicts", async () => {
 			pullsMocks.get.mockResolvedValueOnce({
-				data: {
-					number: 1,
-					mergeable: false,
-					mergeable_state: "dirty",
-				},
+				data: { number: 1, mergeable: false, mergeable_state: "dirty" },
 			});
 
 			const status = await contentService.checkPullRequestStatus(1);
@@ -425,11 +419,7 @@ describe("ContentService", () => {
 
 		test("should return behind status without conflicts", async () => {
 			pullsMocks.get.mockResolvedValueOnce({
-				data: {
-					number: 1,
-					mergeable: true,
-					mergeable_state: "behind",
-				},
+				data: { number: 1, mergeable: true, mergeable_state: "behind" },
 			});
 
 			const status = await contentService.checkPullRequestStatus(1);
@@ -496,10 +486,9 @@ describe("ContentService", () => {
 			issuesMocks.get.mockResolvedValueOnce({ data: { number: 555, state: "open" } });
 			issuesMocks.listComments.mockResolvedValueOnce({
 				data: [
-					// @ts-expect-error - partial comment `user` attribute data mock
 					{ id: 888, user: { login: "test-fork-owner" }, body: "Existing comment with suffix" },
 				],
-			});
+			} as RestEndpointMethodTypes["issues"]["listComments"]["response"]);
 			issuesMocks.updateComment.mockResolvedValueOnce({
 				data: { id: 888, body: "Updated comment" },
 			});

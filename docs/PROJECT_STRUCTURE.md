@@ -10,9 +10,8 @@ translate-react/
 │   ├── README.md                             # Main project documentation
 │   ├── LICENSE                               # MIT License
 │   └── docs/                                 # Technical documentation
-│       ├── README.md                         # Documentation index
 │       ├── ARCHITECTURE.md                   # System architecture and service design
-│       ├── WORKFLOW.md                       # Execution workflow and timing analysis
+│       ├── WORKFLOW.md                       # Execution workflow analysis
 │       ├── ERROR_HANDLING.md                 # Error taxonomy and recovery mechanisms
 │       ├── TROUBLESHOOTING.md                      # Troubleshooting and diagnostics
 │       ├── PROJECT_STRUCTURE.md              # This file
@@ -92,7 +91,6 @@ translate-react/
 │           ├── logger.util.ts                # Pino logger configuration
 │           ├── backoff.util.ts               # Exponential backoff utility
 │           ├── common.util.ts                # Common utilities
-│           ├── timing.util.ts                # Timing/profiling utilities
 │           ├── rate-limit-detector.util.ts   # Rate limit detection
 │           └── setup-signal-handlers.util.ts # Process signal handlers
 │
@@ -123,7 +121,6 @@ translate-react/
 │       └── utils/                            # Utility tests
 │           ├── backoff.util.spec.ts
 │           ├── env.util.spec.ts
-│           └── timing.util.spec.ts
 │
 └── Runtime Artifacts (Auto-generated)
     ├── dist/                                 # Build output directory (gitignored)

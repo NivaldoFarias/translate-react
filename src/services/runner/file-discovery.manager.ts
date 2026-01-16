@@ -1,3 +1,5 @@
+import type { SetRequired } from "type-fest";
+
 import type {
 	CacheCheckResult,
 	LanguageDetectionResult,
@@ -6,7 +8,6 @@ import type {
 	PullRequestStatus,
 	RunnerServiceDependencies,
 } from "./runner.types";
-import type { SetRequired } from "type-fest";
 
 import { FILE_FETCH_BATCH_SIZE, logger, MAX_FILE_SIZE, MIN_CACHE_CONFIDENCE } from "@/utils/";
 
@@ -64,7 +65,7 @@ export class FileDiscoveryManager {
 			(file, index, self) => index === self.findIndex((compare) => compare.path === file.path),
 		);
 
-		this.logger.info(`Processing ${uniqueFiles.length} files from repository tree...`);
+		this.logger.info(`Processing ${uniqueFiles.length} files from repository tree`);
 
 		const { candidateFiles, cacheHits } = this.checkCache(uniqueFiles);
 
@@ -323,7 +324,7 @@ export class FileDiscoveryManager {
 	 * // ^? 45 (successfully fetched files)
 	 * ```
 	 */
-	async fetchContent(filesToFetch: PatchedRepositoryItem[]): Promise<TranslationFile[]> {
+	public async fetchContent(filesToFetch: PatchedRepositoryItem[]): Promise<TranslationFile[]> {
 		this.logger.info("Fetching file content");
 
 		const uncheckedFiles: TranslationFile[] = [];

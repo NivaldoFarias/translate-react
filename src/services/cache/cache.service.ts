@@ -18,8 +18,9 @@ export interface CacheEntry<T> {
  * @example
  * ```typescript
  * const cache = new CacheService<string>();
- * cache.set("key", "value", 3600000); // 1 hour TTL
- * const cached = cache.get("key"); // ^? "value" | null
+ * cache.set("key", "value", 3_600_000); // 1 hour TTL
+ * const cached = cache.get("key");
+ * // ^? "value" | null
  * ```
  */
 export class CacheService<T> {
