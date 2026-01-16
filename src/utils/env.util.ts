@@ -198,7 +198,7 @@ const envSchema = z.object({
 	 *
 	 * @default 5
 	 */
-	LLM_MAX_CONCURRENT: z.coerce.number().positive().default(5),
+	LLM_MAX_CONCURRENT: z.coerce.number().positive().default(environmentDefaults.LLM_MAX_CONCURRENT),
 
 	/**
 	 * Minimum time between LLM API request batches in **milliseconds**.
@@ -206,9 +206,9 @@ const envSchema = z.object({
 	 * Enforces a delay between request batches to prevent rate limit errors.
 	 * Lower values increase throughput but may trigger API rate limits.
 	 *
-	 * @default 20000 (20 seconds)
+	 * @default 20000
 	 */
-	LLM_MIN_TIME_MS: z.coerce.number().positive().default(20_000),
+	LLM_MIN_TIME_MS: z.coerce.number().positive().default(environmentDefaults.LLM_REQUEST_TIMEOUT),
 });
 
 /** Type definition for the environment configuration */

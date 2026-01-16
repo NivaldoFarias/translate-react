@@ -9,7 +9,7 @@ import type {
 	RunnerServiceDependencies,
 } from "./runner.types";
 
-import { FILE_FETCH_BATCH_SIZE, logger, MAX_FILE_SIZE, MIN_CACHE_CONFIDENCE } from "@/utils/";
+import { FILE_FETCH_BATCH_SIZE, logger, MIN_CACHE_CONFIDENCE } from "@/utils/";
 
 import { TranslationFile } from "../translator.service";
 
@@ -74,10 +74,10 @@ export class FileDiscoveryManager {
 
 		const uncheckedFiles = await this.fetchContent(filesToFetch);
 
-		const { numFilesFiltered, numFilesTooLarge, filesToTranslate } =
+		const { numFilesFiltered, filesToTranslate } =
 			await this.detectAndCacheLanguages(uncheckedFiles);
 
-		const totalFiltered = cacheHits + numFilesFiltered + numFilesWithPRs + numFilesTooLarge;
+		const totalFiltered = cacheHits + numFilesFiltered + numFilesWithPRs;
 
 		this.logger.info(
 			{
@@ -92,7 +92,6 @@ export class FileDiscoveryManager {
 					byCache: cacheHits,
 					byExistingPRs: numFilesWithPRs,
 					byLanguageDetection: numFilesFiltered,
-					bySize: numFilesTooLarge,
 					total: totalFiltered,
 				},
 			},
@@ -401,21 +400,10 @@ export class FileDiscoveryManager {
 	private async detectAndCacheLanguages(
 		uncheckedFiles: TranslationFile[],
 	): Promise<LanguageDetectionResult> {
-		let numFilesTooLarge = 0;
 		let numFilesFiltered = 0;
 		const filesToTranslate: TranslationFile[] = [];
 
 		for (const file of uncheckedFiles) {
-			if (file.content.length > MAX_FILE_SIZE) {
-				numFilesTooLarge++;
-
-				this.logger.warn(
-					{ filename: file.filename, size: file.content.length, maxSize: MAX_FILE_SIZE },
-					"Skipping file: exceeds maximum size limit",
-				);
-				continue;
-			}
-
 			const analysis = await this.services.translator.languageDetector.analyzeLanguage(
 				file.filename,
 				file.content,
@@ -436,6 +424,6 @@ export class FileDiscoveryManager {
 			}
 		}
 
-		return { numFilesFiltered, numFilesTooLarge, filesToTranslate };
+		return { numFilesFiltered, filesToTranslate };
 	}
 }
