@@ -26,10 +26,10 @@ jobs:
       matrix:
         include:
           - lang: "pt-br"
-            upstream_owner: "reactjs"
-            upstream_name: "pt-br.react.dev"
-            fork_owner: "nivaldofarias"
-            fork_name: "pt-br.react.dev"
+            upstream_owner: ${{ vars.REPO_UPSTREAM_OWNER || 'reactjs' }}
+            upstream_name: ${{ vars.REPO_UPSTREAM_NAME || 'pt-br.react.dev' }}
+            fork_owner: ${{ vars.REPO_FORK_OWNER || github.repository_owner }}
+            fork_name: ${{ vars.REPO_FORK_OWNER || 'pt-br.react.dev' }}
         # - lang: "ru"
         #   upstream_owner: "reactjs"
         #   upstream_name: "ru.react.dev"
@@ -48,7 +48,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           token: ${{ steps.generate-token.outputs.token }}
-          fetch-depth: 0
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
