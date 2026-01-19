@@ -82,13 +82,11 @@ export class ContentService extends BaseGitHubService {
 		comment: string,
 	): Promise<RestEndpointMethodTypes["issues"]["createComment"]["response"]> {
 		try {
-			const response = await this.withRateLimit(() =>
-				this.octokit.issues.createComment({
-					...this.repositories.upstream,
-					issue_number: prNumber,
-					body: comment,
-				}),
-			);
+			const response = await this.octokit.issues.createComment({
+				...this.repositories.upstream,
+				issue_number: prNumber,
+				body: comment,
+			});
 
 			this.logger.info(
 				{ prNumber, commentId: response.data.id },
@@ -113,12 +111,10 @@ export class ContentService extends BaseGitHubService {
 		RestEndpointMethodTypes["pulls"]["list"]["response"]["data"]
 	> {
 		try {
-			const response = await this.withRateLimit(() =>
-				this.octokit.pulls.list({
-					...this.repositories.upstream,
-					state: "open",
-				}),
-			);
+			const response = await this.octokit.pulls.list({
+				...this.repositories.upstream,
+				state: "open",
+			});
 
 			this.logger.debug({ count: response.data.length }, "Listed open pull requests");
 
@@ -247,12 +243,10 @@ export class ContentService extends BaseGitHubService {
 				if (!file.path) continue;
 
 				try {
-					const response = await this.withRateLimit(() =>
-						this.octokit.repos.getContent({
-							...this.repositories.fork,
-							path: file.path ?? "",
-						}),
-					);
+					const response = await this.octokit.repos.getContent({
+						...this.repositories.fork,
+						path: file.path ?? "",
+					});
 
 					if (!("content" in response.data)) continue;
 

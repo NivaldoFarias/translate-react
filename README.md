@@ -199,7 +199,6 @@ translate-react/
 │  │   ├── cache/                 # In-memory caching
 │  │   ├── github/                # GitHub API integration
 │  │   ├── locale/                # Locale management
-│  │   ├── rate-limiter/          # API rate limiting
 │  │   ├── runner/                # Workflow orchestration
 │  │   ├── service-factory.service.ts  # Dependency injection
 │  │   └── translator.service.ts  # LLM translation engine
