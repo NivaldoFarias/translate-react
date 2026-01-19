@@ -96,7 +96,7 @@ describe("LocaleService", () => {
 
 			test("should have suffix function that generates observations", () => {
 				const service = new LocaleService("pt-br");
-				const suffix = service.locale.comment.suffix("test-owner");
+				const suffix = service.locale.comment.suffix;
 
 				expect(suffix).toContain("###### Observações");
 				expect(suffix).toContain("test-owner");
