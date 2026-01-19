@@ -4,29 +4,28 @@ Configuration guide for the translation workflow's GitHub Actions.
 
 ## Table of Contents
 
-- [GitHub Actions Setup Guide](#github-actions-setup-guide)
-  - [Table of Contents](#table-of-contents)
-  - [Prerequisites](#prerequisites)
-  - [Authentication: GitHub App Bot](#authentication-github-app-bot)
-    - [Creating a GitHub App](#creating-a-github-app)
-    - [Adding App Credentials to Repository](#adding-app-credentials-to-repository)
-  - [Configuration](#configuration)
-    - [Repository Secrets](#repository-secrets)
-    - [Repository Variables](#repository-variables)
-  - [Using Environments](#using-environments)
-    - [Configuration Precedence](#configuration-precedence)
-    - [Setting Up Environments](#setting-up-environments)
-    - [Workflow Environment Selection](#workflow-environment-selection)
-  - [Quick Setup Script](#quick-setup-script)
-  - [Verify Configuration](#verify-configuration)
-  - [Testing](#testing)
-    - [Development Environment (Test First)](#development-environment-test-first)
-    - [Production Environment](#production-environment)
-  - [Troubleshooting](#troubleshooting)
-    - [Common Issues](#common-issues)
-    - [Debug Steps](#debug-steps)
-  - [Security Best Practices](#security-best-practices)
-  - [References](#references)
+- [Table of Contents](#table-of-contents)
+- [Prerequisites](#prerequisites)
+- [Authentication: GitHub App Bot](#authentication-github-app-bot)
+  - [Creating a GitHub App](#creating-a-github-app)
+  - [Adding App Credentials to Repository](#adding-app-credentials-to-repository)
+- [Configuration](#configuration)
+  - [Repository Secrets](#repository-secrets)
+  - [Repository Variables](#repository-variables)
+- [Using Environments](#using-environments)
+  - [Configuration Precedence](#configuration-precedence)
+  - [Setting Up Environments](#setting-up-environments)
+  - [Workflow Environment Selection](#workflow-environment-selection)
+- [Quick Setup Script](#quick-setup-script)
+- [Verify Configuration](#verify-configuration)
+- [Testing](#testing)
+  - [Development Environment (Test First)](#development-environment-test-first)
+  - [Production Environment](#production-environment)
+- [Troubleshooting](#troubleshooting)
+  - [Common Issues](#common-issues)
+  - [Debug Steps](#debug-steps)
+- [Security Best Practices](#security-best-practices)
+- [References](#references)
 
 ## Prerequisites
 
@@ -202,7 +201,7 @@ gh api repos/your-username/translate-react/environments --jq '.environments[].na
 
 ### Development Environment (Test First)
 
-1. Go to **Actions → Sync and Translate**
+1. Go to **Actions → Sync & Translate**
 2. Click **Run workflow**
 3. Select `development` environment
 4. Verify PRs are created in your fork
