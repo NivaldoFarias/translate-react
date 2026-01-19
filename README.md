@@ -15,10 +15,6 @@ Automated translation tool for React documentation using Large Language Models (
     - [Repository Setup](#repository-setup)
     - [Supported Repositories](#supported-repositories)
   - [Quick Start](#quick-start)
-    - [1. Clone the Repository](#1-clone-the-repository)
-    - [2. Install Dependencies](#2-install-dependencies)
-    - [3. Configure Environment](#3-configure-environment)
-    - [4. Run in Development Mode](#4-run-in-development-mode)
   - [Configuration](#configuration)
     - [Required Environment Variables](#required-environment-variables)
     - [Optional Environment Variables](#optional-environment-variables)
@@ -28,8 +24,6 @@ Automated translation tool for React documentation using Large Language Models (
   - [Project Structure](#project-structure)
   - [Documentation](#documentation)
   - [Contributing](#contributing)
-    - [Setup](#setup)
-    - [Development Standards](#development-standards)
   - [Troubleshooting](#troubleshooting)
     - [Common Issues](#common-issues)
     - [Debug Mode](#debug-mode)
@@ -55,11 +49,8 @@ Automation tool for translating React documentation repositories. Uses LLM APIs 
 
 ### Runtime Requirements
 
-- **Bun** v1.0.0+ (primary runtime and package manager)[^1]
-- **Node.js** v20+ (dependency compatibility)
-- **Git** (repository operations)
-
-[^1]: This project uses Bun exclusively. Do not use npm/yarn/pnpm.
+- [**Bun**](https://bun.sh/) v1.0.0+: _(primary runtime and package manager)_
+- [**Git**](https://git-scm.com/): _(repository operations)_
 
 ### API Access
 
@@ -70,7 +61,7 @@ Automation tool for translating React documentation repositories. Uses LLM APIs 
 
 - Fork of target React documentation repository
 - Write access to fork for branch/PR creation
-- Optional: tracking issue in fork for progress updates
+- _Optional_: tracking issue in fork for progress updates
 
 ### Supported Repositories
 
@@ -78,31 +69,11 @@ Designed for React documentation repositories but can be adapted to any markdown
 
 ## Quick Start
 
-### 1. Clone the Repository
-
-```bash
-git clone https://github.com/NivaldoFarias/translate-react.git && cd translate-react
-```
-
-### 2. Install Dependencies
-
-```bash
-bun install
-```
-
-### 3. Configure Environment
-
-```bash
-cp .env.example .env
-```
-
-Then, Edit `.env` with your API keys (see [Configuration section](#configuration)).
-
-### 4. Run in Development Mode
-
-```bash
-bun run dev
-```
+1. Clone the Repository and Navigate to Directory: `git clone https://github.com/NivaldoFarias/translate-react.git && cd translate-react`
+2. Install Dependencies: `bun install`
+3. Configure Environment: `cp .env.example .env`
+   3.1. Then, edit `.env` with your API keys _(see [Configuration section](#configuration))_
+4. Run in Development Mode: `bun run dev`
 
 ## Configuration
 
@@ -110,7 +81,7 @@ Environment variables are validated at runtime using Zod schemas. See [`src/util
 
 ### Required Environment Variables
 
-These must be set in your `.env` file:
+These **must** be set in your `.env` file:
 
 | Variable      | Description                                                |
 | ------------- | ---------------------------------------------------------- |
@@ -138,14 +109,16 @@ These must be set in your `.env` file:
 <details>
 <summary><b>LLM Configuration</b></summary>
 
-| Variable            | Default                                            | Description                              |
-| ------------------- | -------------------------------------------------- | ---------------------------------------- |
-| `LLM_MODEL`         | `google/gemini-2.0-flash-exp:free`                 | Model ID for translation                 |
-| `LLM_API_BASE_URL`  | `https://openrouter.ai/api/v1`                     | API endpoint                             |
-| `OPENAI_PROJECT_ID` | —                                                  | Optional: OpenAI project ID for tracking |
-| `MAX_TOKENS`        | `8192`                                             | Maximum tokens per LLM response          |
-| `HEADER_APP_URL`    | `https://github.com/NivaldoFarias/translate-react` | App URL for OpenRouter tracking          |
-| `HEADER_APP_TITLE`  | `translate-react v0.1.19`                          | App title for OpenRouter tracking        |
+| Variable             | Default                                            | Description                                                      |
+| -------------------- | -------------------------------------------------- | ---------------------------------------------------------------- |
+| `LLM_MODEL`          | `google/gemini-2.0-flash-exp:free`                 | Model ID for translation                                         |
+| `LLM_API_BASE_URL`   | `https://openrouter.ai/api/v1`                     | API endpoint                                                     |
+| `OPENAI_PROJECT_ID`  | —                                                  | Optional: OpenAI project ID for tracking                         |
+| `MAX_TOKENS`         | `8192`                                             | Maximum tokens per LLM response                                  |
+| `HEADER_APP_URL`     | `https://github.com/NivaldoFarias/translate-react` | App URL for OpenRouter tracking                                  |
+| `HEADER_APP_TITLE`   | `translate-react v0.1.19`                          | App title for OpenRouter tracking                                |
+| `LLM_MAX_CONCURRENT` | `5`                                                | Maximum concurrent LLM API requests                              |
+| `LLM_MIN_TIME_MS`    | `20000`                                            | Minimum time between LLM API request batches in **milliseconds** |
 
 </details>
 
@@ -193,21 +166,21 @@ bun start
 ```plaintext
 translate-react/
 ├─ src/
-│  ├── errors/                    # Error handling system
-│  ├── locales/                   # Language locale definitions
-│  ├── services/                  # Core services
-│  │   ├── cache/                 # In-memory caching
-│  │   ├── github/                # GitHub API integration
-│  │   ├── locale/                # Locale management
-│  │   ├── runner/                # Workflow orchestration
-│  │   ├── service-factory.service.ts  # Dependency injection
-│  │   └── translator.service.ts  # LLM translation engine
-│  ├── utils/                     # Utilities and constants
-│  └── main.ts                    # Entry point
+│  ├── errors/                          # Error handling system
+│  ├── locales/                         # Language locale definitions
+│  ├── services/                        # Core services
+│  │   ├── cache/                       # In-memory caching
+│  │   ├── github/                      # GitHub API integration
+│  │   ├── locale/                      # Locale management
+│  │   ├── runner/                      # Workflow orchestration
+│  │   ├── service-factory.service.ts   # Dependency injection
+│  │   └── translator.service.ts        # LLM translation engine
+│  ├── utils/                           # Utilities and constants
+│  └── main.ts                          # Entry point
 │
-├── docs/                         # Technical documentation
-├── tests/                        # Test suite
-└── logs/                         # Structured error logs (JSONL)
+├── docs/                               # Technical documentation
+├── tests/                              # Test suite
+└── logs/                               # Structured error logs (JSONL)
 ```
 
 > [!TIP]
@@ -228,17 +201,8 @@ translate-react/
 
 Contributions are welcome. Follow these guidelines:
 
-### Setup
-
-1. Fork repository and create feature branch
-2. Install dependencies: `bun install`
-3. Create `.env` with `NODE_ENV=development`
-4. Run tests: `bun test`
-
-### Development Standards
-
 - **TypeScript**: All code must be properly typed with strict mode enabled
-- **Bun Runtime**: Use Bun exclusively (not npm/yarn/pnpm)
+- **Bun Runtime**: Use Bun exclusively _(not npm/yarn/pnpm)_
 - **Error Handling**: Follow established patterns in [ERROR_HANDLING.md](./docs/ERROR_HANDLING.md)
 - **Testing**: Add tests for new features using Bun's test runner
 - **Code Style**: Follow ESLint/Prettier configuration
@@ -260,11 +224,7 @@ Contributions are welcome. Follow these guidelines:
 
 ### Debug Mode
 
-Enable verbose logging:
-
-```bash
-LOG_LEVEL="debug" bun dev
-```
+Enable verbose logging: `LOG_LEVEL="debug" bun run dev`
 
 > [!TIP]
 > For comprehensive troubleshooting guidance including diagnostic procedures and log analysis, see [TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md).
