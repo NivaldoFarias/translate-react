@@ -6,7 +6,7 @@ import type {
 	WorkflowStatistics,
 } from "./runner.types";
 
-import { env, logger, RuntimeEnvironment } from "@/utils/";
+import { env, logger } from "@/utils/";
 
 import { TranslationFile } from "../translator.service";
 
