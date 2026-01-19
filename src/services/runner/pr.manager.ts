@@ -48,6 +48,8 @@ export class PRManager {
 		filesToTranslate: TranslationFile[],
 	): Promise<void> {
 		if (!this.shouldUpdateIssueComment(processedResults)) {
+			this.logger.info("Skipping issue comment update");
+
 			return;
 		}
 
@@ -69,11 +71,7 @@ export class PRManager {
 	 * @returns `true` if the issue comment should be updated, `false` otherwise
 	 */
 	private shouldUpdateIssueComment(results: Map<string, ProcessedFileResult>): boolean {
-		return !!(
-			env.NODE_ENV === RuntimeEnvironment.Production &&
-			env.PROGRESS_ISSUE_NUMBER &&
-			results.size > 0
-		);
+		return !!(env.PROGRESS_ISSUE_NUMBER && results.size > 0);
 	}
 
 	/**
@@ -124,7 +122,7 @@ export class PRManager {
 				failureCount,
 				totalCount,
 				elapsedTime: this.formatElapsedTime(elapsedTime),
-				successRate,
+				successRate: `${(successRate * 100).toFixed(2)}%`,
 			},
 			"Final statistics",
 		);
