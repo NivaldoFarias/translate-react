@@ -155,7 +155,7 @@ describe("CacheService", () => {
 			cache.set("key2", "value2", 50);
 			cache.set("key3", "value3", 50);
 
-			await new Promise((resolve) => setTimeout(resolve, 100));
+			await new Promise((resolve) => setTimeout(resolve, 500));
 			const removed = cache.cleanupExpired();
 
 			expect(removed).toBe(2);

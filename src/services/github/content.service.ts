@@ -1,3 +1,5 @@
+import Bun from "bun";
+
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 import type { ProcessedFileResult, PullRequestStatus } from "./../runner";
@@ -82,13 +84,11 @@ export class ContentService extends BaseGitHubService {
 		comment: string,
 	): Promise<RestEndpointMethodTypes["issues"]["createComment"]["response"]> {
 		try {
-			const response = await this.withRateLimit(() =>
-				this.octokit.issues.createComment({
-					...this.repositories.upstream,
-					issue_number: prNumber,
-					body: comment,
-				}),
-			);
+			const response = await this.octokit.issues.createComment({
+				...this.repositories.upstream,
+				issue_number: prNumber,
+				body: comment,
+			});
 
 			this.logger.info(
 				{ prNumber, commentId: response.data.id },
@@ -113,12 +113,10 @@ export class ContentService extends BaseGitHubService {
 		RestEndpointMethodTypes["pulls"]["list"]["response"]["data"]
 	> {
 		try {
-			const response = await this.withRateLimit(() =>
-				this.octokit.pulls.list({
-					...this.repositories.upstream,
-					state: "open",
-				}),
-			);
+			const response = await this.octokit.pulls.list({
+				...this.repositories.upstream,
+				state: "open",
+			});
 
 			this.logger.debug({ count: response.data.length }, "Listed open pull requests");
 
@@ -247,12 +245,10 @@ export class ContentService extends BaseGitHubService {
 				if (!file.path) continue;
 
 				try {
-					const response = await this.withRateLimit(() =>
-						this.octokit.repos.getContent({
-							...this.repositories.fork,
-							path: file.path ?? "",
-						}),
-					);
+					const response = await this.octokit.repos.getContent({
+						...this.repositories.fork,
+						path: file.path ?? "",
+					});
 
 					if (!("content" in response.data)) continue;
 
@@ -431,9 +427,15 @@ export class ContentService extends BaseGitHubService {
 			| RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"][number],
 	): Promise<string> {
 		try {
-			const blobSha = file.sha;
+			if (file.path) {
+				this.logger.info({ filePath: file.path }, "file's path exists, trying local content first");
 
-			if (!blobSha) {
+				const localContent = await this.getLocalFileContent(file.path);
+
+				if (localContent) return localContent;
+			}
+
+			if (!file.sha) {
 				this.logger.warn({ file }, "Invalid blob SHA - file missing SHA property");
 				throw mapGithubError(
 					new Error("Invalid blob SHA"),
@@ -444,7 +446,7 @@ export class ContentService extends BaseGitHubService {
 
 			const response = await this.octokit.git.getBlob({
 				...this.repositories.fork,
-				file_sha: blobSha,
+				file_sha: file.sha,
 			});
 
 			const content = Buffer.from(response.data.content, "base64").toString();
@@ -452,7 +454,7 @@ export class ContentService extends BaseGitHubService {
 			this.logger.debug(
 				{
 					filePath: file.path,
-					blobSha,
+					blobSha: file.sha,
 					contentLength: content.length,
 				},
 				"Retrieved file content",
@@ -464,6 +466,23 @@ export class ContentService extends BaseGitHubService {
 				filePath: file.path,
 				blobSha: file.sha,
 			});
+		}
+	}
+
+	private async getLocalFileContent(filePath: string): Promise<string | undefined> {
+		this.logger.info({ filePath }, "Reading local file content");
+
+		try {
+			const content = await Bun.file(filePath).text();
+
+			this.logger.debug(
+				{ filePath, contentLength: content.length },
+				"Successfully read local file content",
+			);
+
+			return content;
+		} catch (error) {
+			this.logger.error({ error, filePath }, "Failed to read local file");
 		}
 	}
 

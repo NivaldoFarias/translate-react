@@ -69,12 +69,6 @@ translate-react/
 │       │   │   ├── index.ts
 │       │   │   └── locale.service.ts         # Locale service
 │       │   │
-│       │   ├── rate-limiter/                 # API rate limiting
-│       │   │   ├── index.ts
-│       │   │   ├── rate-limiter.config.ts    # Rate limiter presets
-│       │   │   ├── rate-limiter.service.ts   # Rate limiter implementation
-│       │   │   └── rate-limiter.types.ts     # Rate limiter types
-│       │   │
 │       │   └── runner/                       # Workflow orchestration
 │       │       ├── index.ts
 │       │       ├── runner.types.ts           # Runner type definitions
@@ -117,7 +111,6 @@ translate-react/
 │       │   ├── cache/
 │       │   ├── github/
 │       │   ├── locale/
-│       │   └── rate-limiter/
 │       └── utils/                            # Utility tests
 │           ├── backoff.util.spec.ts
 │           ├── env.util.spec.ts
@@ -178,7 +171,6 @@ translate-react/
 | `language-detector.service.ts` | Language detection and analysis | CLD library       |
 | `cache.service.ts`             | Generic in-memory cache         | None              |
 | `language-cache.service.ts`    | Language detection cache        | Cache service     |
-| `rate-limiter.service.ts`      | API rate limiting               | Bottleneck        |
 | `locale.service.ts`            | Locale management               | None              |
 
 ### Error Handling Files

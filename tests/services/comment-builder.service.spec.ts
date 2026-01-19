@@ -134,7 +134,6 @@ describe("CommentBuilderService", () => {
 			expect(result).toContain("As seguintes páginas foram traduzidas");
 			expect(result).toContain(content);
 			expect(result).toContain("Observações");
-			expect(result).toContain("translate-react");
 		});
 
 		test("should handle empty content", () => {
@@ -166,13 +165,6 @@ describe("CommentBuilderService", () => {
 			expect(comment).toHaveProperty("suffix");
 			expect(comment.prefix).toContain("As seguintes páginas foram traduzidas");
 			expect(comment.suffix).toContain("Observações");
-			expect(comment.suffix).toContain("translate-react");
-		});
-
-		test("should include environment variables in suffix", () => {
-			const comment = commentBuilderService.comment;
-
-			expect(comment.suffix).toContain("translate-react");
 		});
 	});
 

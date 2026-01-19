@@ -3,7 +3,6 @@ export * from "./language-detector.service";
 export * from "./service-factory.service";
 export * from "./translator.service";
 export * from "./runner/";
-export * from "./rate-limiter/";
 export * from "./locale/";
 export * from "./github/";
 export * from "./cache/";

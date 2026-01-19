@@ -2,7 +2,6 @@ import { Octokit } from "@octokit/rest";
 import OpenAI from "openai";
 
 import type { BaseRepositories } from "./github/base.service";
-import type { RateLimiterConfig } from "./rate-limiter/rate-limiter.types";
 
 import { env, logger } from "@/utils/";
 
@@ -11,7 +10,7 @@ import { CommentBuilderService } from "./comment-builder.service";
 import { BranchService } from "./github/branch.service";
 import { ContentService } from "./github/content.service";
 import { RepositoryService } from "./github/repository.service";
-import { RateLimiter } from "./rate-limiter/rate-limiter.service";
+import { LocaleService } from "./locale";
 import { RunnerService } from "./runner/runner.service";
 import { TranslatorService } from "./translator.service";
 
@@ -25,9 +24,6 @@ export interface ServiceConfig {
 
 	/** Repository metadata for fork and upstream */
 	repositories: BaseRepositories;
-
-	/** Rate limiter configuration for LLM API */
-	rateLimiter: RateLimiterConfig;
 
 	/** LLM API configuration */
 	llm: {
@@ -68,12 +64,6 @@ export function createServiceConfigFromEnv(): ServiceConfig {
 				owner: env.REPO_FORK_OWNER,
 				repo: env.REPO_FORK_NAME,
 			},
-		},
-		rateLimiter: {
-			maxConcurrent: env.LLM_MAX_CONCURRENT,
-			minTime: env.LLM_MIN_TIME_MS,
-			reservoir: env.LLM_MAX_CONCURRENT,
-			reservoirRefreshInterval: env.LLM_MIN_TIME_MS,
 		},
 		llm: {
 			apiKey: env.LLM_API_KEY,
@@ -164,14 +154,6 @@ export class ServiceFactory {
 		return this.getOrCreate("openai", () => this.createOpenAI());
 	}
 
-	/** Creates or retrieves singleton LLM rate limiter instance */
-	public getLLMRateLimiter(): RateLimiter {
-		return this.getOrCreate(
-			"llmRateLimiter",
-			() => new RateLimiter(this.config.rateLimiter, "llm"),
-		);
-	}
-
 	/** Creates TranslatorService with injected dependencies */
 	public createTranslatorService(): TranslatorService {
 		return this.getOrCreate(
@@ -179,7 +161,6 @@ export class ServiceFactory {
 			() =>
 				new TranslatorService({
 					openai: this.getOpenAI(),
-					rateLimiter: this.getLLMRateLimiter(),
 					model: this.config.llm.model,
 				}),
 		);
@@ -200,6 +181,7 @@ export class ServiceFactory {
 			},
 			translator: this.createTranslatorService(),
 			languageCache: this.createLanguageCacheService(),
+			locale: LocaleService.get(),
 		});
 	}
 

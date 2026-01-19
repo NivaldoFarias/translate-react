@@ -1,3 +1,9 @@
+import type {
+	ProcessedFileResult,
+	PullRequestDescriptionMetadata,
+	TranslationFile,
+} from "@/services";
+
 /**
  * Configuration for GitHub issue/PR comments in the target language.
  *
@@ -8,14 +14,8 @@ export interface LocaleCommentConfig {
 	/** Opening line of the PR comment summarizing translated pages */
 	prefix: string;
 
-	/**
-	 * Generates the footer/observations section of the comment.
-	 *
-	 * @param repoForkOwner Owner of the fork repository to link back to the source workflow
-	 *
-	 * @returns Formatted observations section with locale-specific content
-	 */
-	suffix: (repoForkOwner: string) => string;
+	/** Generates the footer/observations section of the comment */
+	suffix: string;
 }
 
 /**
@@ -33,6 +33,32 @@ export interface LocaleRulesConfig {
 	 * URL locale adjustments, style conventions).
 	 */
 	specific: string;
+}
+
+export interface LocalePullRequestConfig {
+	/**
+	 * Title template for the pull request in the target language
+	 *
+	 * @param file The translation file being processed
+	 *
+	 * @returns Formatted PR title string
+	 */
+	title: (file: TranslationFile) => string;
+
+	/**
+	 * Body template for the pull request in the target language
+	 *
+	 * @param file The translation file being processed
+	 * @param processingResult The result of processing the file
+	 * @param metadata Metadata about the pull request description
+	 *
+	 * @returns Formatted PR body string
+	 */
+	body: (
+		file: TranslationFile,
+		processingResult: ProcessedFileResult,
+		metadata: PullRequestDescriptionMetadata,
+	) => string;
 }
 
 /**
@@ -60,4 +86,7 @@ export interface LocaleDefinition {
 
 	/** LLM translation rules specific to this language */
 	rules: LocaleRulesConfig;
+
+	/** Pull request templates in the target language */
+	pullRequest: LocalePullRequestConfig;
 }

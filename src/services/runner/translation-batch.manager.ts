@@ -1,3 +1,5 @@
+import prettyBytes from "pretty-bytes";
+
 import type {
 	FileProcessingProgress,
 	ProcessedFileResult,
@@ -9,6 +11,25 @@ import { ApplicationError, ErrorCode } from "@/errors/";
 import { logger, MAX_CONSECUTIVE_FAILURES } from "@/utils/";
 
 import { TranslationFile } from "../translator.service";
+
+export interface InvalidFilePullRequest {
+	prNumber: number;
+	status: PullRequestStatus;
+}
+
+export interface PullRequestDescriptionMetadata {
+	languageName: string;
+	invalidFilePR: InvalidFilePullRequest | undefined;
+	content: {
+		source: string;
+		translation: string;
+		compressionRatio: number;
+	};
+	timestamps: {
+		now: number;
+		workflowStart: number;
+	};
+}
 
 /**
  * Manages batch processing and progress tracking for file translations.
@@ -45,12 +66,12 @@ export class TranslationBatchManager {
 	 *
 	 * @param services Injected service dependencies for GitHub and translation
 	 * @param invalidPRsByFile Map of files with invalid PRs for notification
-	 * @param workflowTimestamp Timestamp when workflow started for timing calculations
+	 * @param workflowStartTimestamp Timestamp when workflow started for timing calculations
 	 */
 	constructor(
 		private readonly services: RunnerServiceDependencies,
-		private readonly invalidPRsByFile: Map<string, { prNumber: number; status: PullRequestStatus }>,
-		private readonly workflowTimestamp: number,
+		private readonly invalidPRsByFile: Map<string, InvalidFilePullRequest>,
+		private readonly workflowStartTimestamp: number,
 	) {}
 
 	/**
@@ -517,7 +538,7 @@ export class TranslationBatchManager {
 
 		const prOptions = {
 			title: `Translate \`${file.filename}\` to ${languageName}`,
-			body: this.createPullRequestDescription(file, processingResult),
+			body: this.createPullRequestDescription(file, processingResult, languageName),
 			baseBranch: "main",
 		};
 
@@ -565,79 +586,47 @@ export class TranslationBatchManager {
 	 *
 	 * @param file Translation file being processed with original content
 	 * @param processingResult Processing metadata
+	 * @param languageName Human-readable name of the target translation language
 	 *
 	 * @returns Markdown-formatted PR description with all components
 	 */
 	private createPullRequestDescription(
 		file: TranslationFile,
 		processingResult: ProcessedFileResult,
+		languageName: string,
 	): string {
-		const languageName =
-			this.services.translator.languageDetector.getLanguageName(
-				this.services.translator.languageDetector.languages.target,
-			) ?? "Portuguese";
+		this.logger.info(
+			{ file: file.path, language: languageName },
+			"Creating pull request description",
+		);
 
-		const processingTime = Date.now() - this.workflowTimestamp;
-		const sourceLength = file.content.length;
-		const translationLength = processingResult.translation?.length ?? 0;
-		const compressionRatio = sourceLength > 0 ? (translationLength / sourceLength).toFixed(2) : "0";
+		const pullRequestDescriptionMetadata: PullRequestDescriptionMetadata = {
+			languageName,
+			invalidFilePR: this.invalidPRsByFile.get(file.path),
+			content: {
+				source: prettyBytes(file.content.length),
+				translation: prettyBytes(processingResult.translation?.length ?? 0),
+				compressionRatio:
+					file.content.length > 0 ?
+						(processingResult.translation?.length ?? 0) / file.content.length
+					:	0,
+			},
+			timestamps: {
+				now: Date.now(),
+				workflowStart: this.workflowStartTimestamp,
+			},
+		};
+		const generatedPullRequestDescription = this.services.locale.locale.pullRequest.body(
+			file,
+			processingResult,
+			pullRequestDescriptionMetadata,
+		);
 
-		const invalidPRInfo = this.invalidPRsByFile.get(file.path);
-		const conflictNotice =
-			invalidPRInfo ?
-				`
-> [!NOTE]
-> **Existing PR Detected**: This file already has an open pull request (#${String(invalidPRInfo.prNumber)}) with merge conflicts or unmergeable status (\`${invalidPRInfo.status.mergeableState}\`).
->
-> This new PR was automatically created with an updated translation. The decision on which PR to merge should be made by repository maintainers based on translation quality and technical requirements.
+		this.logger.info(
+			pullRequestDescriptionMetadata,
+			"Pull request description created successfully",
+		);
 
-`
-			:	"";
-
-		return `This pull request contains an automated translation of the referenced page to **${languageName}**.
-${conflictNotice}
-
-> [!IMPORTANT]
-> This translation was generated using AI/LLM and requires human review for accuracy, cultural context, and technical terminology.
-
-<details>
-<summary>Translation Details</summary>
-
-### Processing Statistics
-
-| Metric | Value |
-|--------|-------|
-| **Source File Size** | ${this.formatBytes(sourceLength)} |
-| **Translation Size** | ${this.formatBytes(translationLength)} |
-| **Content Ratio** | ${compressionRatio}x |
-| **File Path** | \`${file.path}\` |
-| **Processing Time** | ~${String(Math.ceil(processingTime / 1000))}s |
-
-###### ps.: The content ratio indicates how the translation length compares to the source (1.0x = same length, >1.0x = translation is longer). Different languages naturally have varying verbosity levels.
-
-### Technical Information
-
-- **Target Language**: ${languageName} (\`${this.services.translator.languageDetector.languages.target}\`)
-- **Generated**: ${new Date().toISOString().split("T")[0] ?? "unknown"}
-- **Branch**: \`${processingResult.branch?.ref ?? "unknown"}\`
-
-</details>`;
-	}
-
-	/**
-	 * Formats a byte count to a human-readable string with appropriate units.
-	 *
-	 * @param bytes The number of bytes to format
-	 *
-	 * @returns A formatted string with units (B, KB, MB, etc.)
-	 */
-	private formatBytes(bytes: number): string {
-		if (bytes === 0) return "0 B";
-
-		const k = 1024;
-		const sizes = ["B", "KB", "MB", "GB"];
-		const i = Math.floor(Math.log(bytes) / Math.log(k));
-
-		return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
+		return generatedPullRequestDescription;
 	}
 }
