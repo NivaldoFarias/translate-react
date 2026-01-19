@@ -2,7 +2,7 @@ import type { LocaleDefinition } from "@/locales";
 
 import type { ProcessedFileResult } from "./runner";
 
-import { env, logger } from "@/utils/";
+import { logger } from "@/utils/";
 
 import { LocaleService } from "./locale";
 import { TranslationFile } from "./translator.service";
@@ -256,7 +256,7 @@ export class CommentBuilderService {
 	public get comment() {
 		return {
 			prefix: this.locale.comment.prefix,
-			suffix: this.locale.comment.suffix(env.REPO_FORK_OWNER),
+			suffix: this.locale.comment.suffix,
 		};
 	}
 }

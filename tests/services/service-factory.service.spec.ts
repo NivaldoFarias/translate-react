@@ -14,7 +14,6 @@ import {
 	ServiceFactory,
 	TranslatorService,
 } from "@/services/";
-import { RateLimiter } from "@/services/rate-limiter/rate-limiter.service";
 import { createServiceConfigFromEnv } from "@/services/service-factory.service";
 
 /** Creates a minimal valid service configuration for testing */
@@ -25,12 +24,6 @@ function createTestConfig(overrides?: Partial<ServiceConfig>): ServiceConfig {
 		repositories: {
 			upstream: { owner: "upstream-owner", repo: "upstream-repo" },
 			fork: { owner: "fork-owner", repo: "fork-repo" },
-		},
-		rateLimiter: {
-			maxConcurrent: 5,
-			minTime: 1000,
-			reservoir: 5,
-			reservoirRefreshInterval: 1000,
 		},
 		llm: {
 			apiKey: "test-llm-api-key-12345678901234567890",
@@ -165,21 +158,6 @@ describe("ServiceFactory", () => {
 		});
 	});
 
-	describe("getLLMRateLimiter", () => {
-		test("should return RateLimiter instance when called", () => {
-			const rateLimiter = factory.getLLMRateLimiter();
-
-			expect(rateLimiter).toBeInstanceOf(RateLimiter);
-		});
-
-		test("should return same instance on subsequent calls (singleton)", () => {
-			const rateLimiter1 = factory.getLLMRateLimiter();
-			const rateLimiter2 = factory.getLLMRateLimiter();
-
-			expect(rateLimiter1).toBe(rateLimiter2);
-		});
-	});
-
 	describe("createTranslatorService", () => {
 		test("should return TranslatorService instance when called", () => {
 			const service = factory.createTranslatorService();
@@ -246,14 +224,6 @@ describe("ServiceFactory", () => {
 			const openaiAgain = factory.getOpenAI();
 			expect(openai).toBe(openaiAgain);
 		});
-
-		test("should wire same RateLimiter to TranslatorService", () => {
-			const rateLimiter = factory.getLLMRateLimiter();
-			factory.createTranslatorService();
-
-			const rateLimiterAgain = factory.getLLMRateLimiter();
-			expect(rateLimiter).toBe(rateLimiterAgain);
-		});
 	});
 
 	describe("Configuration Isolation", () => {
@@ -271,8 +241,6 @@ describe("ServiceFactory", () => {
 
 describe("createServiceConfigFromEnv", () => {
 	test("should create configuration from environment variables", () => {
-		// This test validates that the function reads from env correctly
-		// The actual env values are set in tests/setup.ts
 		const config = createServiceConfigFromEnv();
 
 		expect(config).toHaveProperty("githubToken");
@@ -280,7 +248,6 @@ describe("createServiceConfigFromEnv", () => {
 		expect(config).toHaveProperty("repositories");
 		expect(config).toHaveProperty("repositories.upstream");
 		expect(config).toHaveProperty("repositories.fork");
-		expect(config).toHaveProperty("rateLimiter");
 		expect(config).toHaveProperty("llm");
 		expect(config).toHaveProperty("llm.apiKey");
 		expect(config).toHaveProperty("llm.model");
@@ -294,15 +261,6 @@ describe("createServiceConfigFromEnv", () => {
 		expect(config.repositories.upstream).toHaveProperty("repo");
 		expect(config.repositories.fork).toHaveProperty("owner");
 		expect(config.repositories.fork).toHaveProperty("repo");
-	});
-
-	test("should include all required rate limiter configuration", () => {
-		const config = createServiceConfigFromEnv();
-
-		expect(config.rateLimiter).toHaveProperty("maxConcurrent");
-		expect(config.rateLimiter).toHaveProperty("minTime");
-		expect(typeof config.rateLimiter.maxConcurrent).toBe("number");
-		expect(typeof config.rateLimiter.minTime).toBe("number");
 	});
 
 	test("should include all required LLM configuration", () => {

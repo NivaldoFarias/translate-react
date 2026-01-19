@@ -2,8 +2,6 @@ import { MarkdownTextSplitter } from "@langchain/textsplitters";
 import { encodingForModel } from "js-tiktoken";
 import OpenAI from "openai";
 
-import type { RateLimiter } from "./rate-limiter";
-
 import {
 	createChunkProcessingError,
 	createEmptyContentError,
@@ -41,9 +39,6 @@ export interface TranslatorLLMConfig {
 export interface TranslatorServiceDependencies {
 	/** OpenAI client instance for LLM API calls */
 	openai: OpenAI;
-
-	/** Rate limiter for LLM API requests */
-	rateLimiter: RateLimiter;
 
 	/** LLM model identifier for chat completions */
 	model: string;
@@ -108,7 +103,6 @@ export class TranslationFile {
  * ```typescript
  * const translator = new TranslatorService({
  *   openai: openaiClient,
- *   rateLimiter: llmRateLimiter,
  *   model: 'gpt-4',
  * });
  * translator.setGlossary('React -> React\ncomponent -> componente');
@@ -122,9 +116,6 @@ export class TranslatorService {
 
 	/** OpenAI client instance for LLM API calls */
 	private readonly openai: OpenAI;
-
-	/** Rate limiter for LLM API requests */
-	private readonly rateLimiter: RateLimiter;
 
 	/** LLM model identifier for chat completions */
 	private readonly model: string;
@@ -145,7 +136,6 @@ export class TranslatorService {
 	 */
 	constructor(dependencies: TranslatorServiceDependencies) {
 		this.openai = dependencies.openai;
-		this.rateLimiter = dependencies.rateLimiter;
 		this.model = dependencies.model;
 		this.localeService = dependencies.localeService ?? LocaleService.get();
 		this.languageDetector = dependencies.languageDetector ?? new LanguageDetectorService();
@@ -842,17 +832,15 @@ export class TranslatorService {
 
 			const completion = await withExponentialBackoff(
 				() =>
-					this.rateLimiter.schedule(() =>
-						this.openai.chat.completions.create({
-							model: this.model,
-							temperature: 0.1,
-							max_tokens: env.MAX_TOKENS,
-							messages: [
-								{ role: "system", content: systemPrompt },
-								{ role: "user", content },
-							],
-						}),
-					),
+					this.openai.chat.completions.create({
+						model: this.model,
+						temperature: 0.1,
+						max_tokens: env.MAX_TOKENS,
+						messages: [
+							{ role: "system", content: systemPrompt },
+							{ role: "user", content },
+						],
+					}),
 				{
 					maxRetries: 5,
 					initialDelay: 2000,
