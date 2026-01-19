@@ -72,7 +72,7 @@ jobs:
           LOG_TO_CONSOLE: ${{ vars.LOG_TO_CONSOLE }}
           LLM_MODEL: ${{ vars.LLM_MODEL }}
           LLM_API_BASE_URL: ${{ vars.LLM_API_BASE_URL }}
-          OPENAI_PROJECT_ID: ${{ vars.OPENAI_PROJECT_ID }}
+          OPENAI_PROJECT_ID: ${{ secrets.OPENAI_PROJECT_ID }}
           MAX_TOKENS: ${{ vars.MAX_TOKENS }}
           BATCH_SIZE: ${{ vars.BATCH_SIZE }}
           PROGRESS_ISSUE_NUMBER: ${{ vars.PROGRESS_ISSUE_NUMBER }}
@@ -94,21 +94,21 @@ jobs:
           REPO_UPSTREAM_NAME=${{ matrix.upstream_name }}
           EOF
 
-          [ -n "$NODE_ENV" ] && echo "NODE_ENV=$NODE_ENV" >> .env
-          [ -n "$LOG_LEVEL" ] && echo "LOG_LEVEL=$LOG_LEVEL" >> .env
-          [ -n "$LOG_TO_CONSOLE" ] && echo "LOG_TO_CONSOLE=$LOG_TO_CONSOLE" >> .env
-          [ -n "$LLM_MODEL" ] && echo "LLM_MODEL=$LLM_MODEL" >> .env
-          [ -n "$LLM_API_BASE_URL" ] && echo "LLM_API_BASE_URL=$LLM_API_BASE_URL" >> .env
-          [ -n "$OPENAI_PROJECT_ID" ] && echo "OPENAI_PROJECT_ID=$OPENAI_PROJECT_ID" >> .env
-          [ -n "$MAX_TOKENS" ] && echo "MAX_TOKENS=$MAX_TOKENS" >> .env
-          [ -n "$BATCH_SIZE" ] && echo "BATCH_SIZE=$BATCH_SIZE" >> .env
-          [ -n "$PROGRESS_ISSUE_NUMBER" ] && echo "PROGRESS_ISSUE_NUMBER=$PROGRESS_ISSUE_NUMBER" >> .env
-          [ -n "$GH_REQUEST_TIMEOUT" ] && echo "GH_REQUEST_TIMEOUT=$GH_REQUEST_TIMEOUT" >> .env
-          [ -n "$MIN_SUCCESS_RATE" ] && echo "MIN_SUCCESS_RATE=$MIN_SUCCESS_RATE" >> .env
-          [ -n "$HEADER_APP_URL" ] && echo "HEADER_APP_URL=$HEADER_APP_URL" >> .env
-          [ -n "$HEADER_APP_TITLE" ] && echo "HEADER_APP_TITLE=$HEADER_APP_TITLE" >> .env
-          [ -n "$LLM_MAX_CONCURRENT" ] && echo "LLM_MAX_CONCURRENT=$LLM_MAX_CONCURRENT" >> .env
-          [ -n "$LLM_MIN_TIME_MS" ] && echo "LLM_MIN_TIME_MS=$LLM_MIN_TIME_MS" >> .env
+          [ -n "$NODE_ENV" ] && echo "NODE_ENV=$NODE_ENV" >> .env || true
+          [ -n "$LOG_LEVEL" ] && echo "LOG_LEVEL=$LOG_LEVEL" >> .env || true
+          [ -n "$LOG_TO_CONSOLE" ] && echo "LOG_TO_CONSOLE=$LOG_TO_CONSOLE" >> .env || true
+          [ -n "$LLM_MODEL" ] && echo "LLM_MODEL=$LLM_MODEL" >> .env || true
+          [ -n "$LLM_API_BASE_URL" ] && echo "LLM_API_BASE_URL=$LLM_API_BASE_URL" >> .env || true
+          [ -n "$OPENAI_PROJECT_ID" ] && echo "OPENAI_PROJECT_ID=$OPENAI_PROJECT_ID" >> .env || true
+          [ -n "$MAX_TOKENS" ] && echo "MAX_TOKENS=$MAX_TOKENS" >> .env || true
+          [ -n "$BATCH_SIZE" ] && echo "BATCH_SIZE=$BATCH_SIZE" >> .env || true
+          [ -n "$PROGRESS_ISSUE_NUMBER" ] && echo "PROGRESS_ISSUE_NUMBER=$PROGRESS_ISSUE_NUMBER" >> .env || true
+          [ -n "$GH_REQUEST_TIMEOUT" ] && echo "GH_REQUEST_TIMEOUT=$GH_REQUEST_TIMEOUT" >> .env || true
+          [ -n "$MIN_SUCCESS_RATE" ] && echo "MIN_SUCCESS_RATE=$MIN_SUCCESS_RATE" >> .env || true
+          [ -n "$HEADER_APP_URL" ] && echo "HEADER_APP_URL=$HEADER_APP_URL" >> .env || true
+          [ -n "$HEADER_APP_TITLE" ] && echo "HEADER_APP_TITLE=$HEADER_APP_TITLE" >> .env || true
+          [ -n "$LLM_MAX_CONCURRENT" ] && echo "LLM_MAX_CONCURRENT=$LLM_MAX_CONCURRENT" >> .env || true
+          [ -n "$LLM_MIN_TIME_MS" ] && echo "LLM_MIN_TIME_MS=$LLM_MIN_TIME_MS" >> .env || true
 
       - name: Run translation workflow (${{ matrix.lang }})
         run: bun run start
