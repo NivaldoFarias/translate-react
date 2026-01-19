@@ -1,8 +1,14 @@
 # translate-react
 
+<div align="center">
+
 <h3 align="center" style="color: #999;"><b>Work In Progress</b></h3>
+
+[![CI Status](https://github.com/NivaldoFarias/translate-react/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/NivaldoFarias/translate-react/actions/workflows/ci.yml)
+
+</div>
   
-Automated translation tool for React documentation using Large Language Models (LLMs). Processes markdown files, preserves formatting, and creates pull requests with translated content.
+Automated translation tool for React documentation using Large Language Models (LLMs). Processes markdown files, preserves formatting, and creates pull requests with translated content via [`translate-react` Bot](https://github.com/apps/translate-react-bot).
 
 ## Table of Contents
 

@@ -10,6 +10,7 @@ import { CommentBuilderService } from "./comment-builder.service";
 import { BranchService } from "./github/branch.service";
 import { ContentService } from "./github/content.service";
 import { RepositoryService } from "./github/repository.service";
+import { LocaleService } from "./locale";
 import { RunnerService } from "./runner/runner.service";
 import { TranslatorService } from "./translator.service";
 
@@ -180,6 +181,7 @@ export class ServiceFactory {
 			},
 			translator: this.createTranslatorService(),
 			languageCache: this.createLanguageCacheService(),
+			locale: LocaleService.get(),
 		});
 	}
 

@@ -2,6 +2,7 @@ import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 import type { LanguageCacheService } from "../cache";
 import type { BranchService, ContentService, RepositoryService } from "../github";
+import type { LocaleService } from "../locale";
 import type { TranslationFile, TranslatorService } from "../translator.service";
 
 /**
@@ -183,6 +184,9 @@ export interface RunnerServiceDependencies {
 
 	/** Language detection cache */
 	languageCache: LanguageCacheService;
+
+	/** Locale service */
+	locale: LocaleService;
 }
 
 export interface RunnerState {
