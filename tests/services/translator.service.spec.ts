@@ -21,7 +21,6 @@ function createTestTranslatorService(
 ): TranslatorService {
 	const defaults = {
 		openai: createMockOpenAI(mockChatCompletionsCreate),
-		rateLimiter: createMockRateLimiter(),
 		model: "test-model",
 	};
 
