@@ -2,6 +2,16 @@
 
 A comprehensive overview of the translate-react project organization.
 
+## Table of Contents
+
+- [Directory Structure Overview](#directory-structure-overview)
+- [Key Organization Principles](#key-organization-principles)
+- [File Type Categories](#file-type-categories)
+- [Quick Navigation](#quick-navigation)
+- [Service Architecture Patterns](#service-architecture-patterns)
+- [Benefits of This Structure](#benefits-of-this-structure)
+- [Development Workflow](#development-workflow)
+
 ## Directory Structure Overview
 
 ```plaintext
