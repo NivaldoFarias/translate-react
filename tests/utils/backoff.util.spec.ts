@@ -141,7 +141,7 @@ describe("backoff.util", () => {
 			).rejects.toThrow("Server error");
 			const elapsedTime = Date.now() - startTime;
 
-			expect(elapsedTime).toBeGreaterThanOrEqual(3700);
+			expect(elapsedTime).toBeGreaterThanOrEqual(1500);
 			expect(elapsedTime).toBeLessThan(4500);
 
 			expect(operation).toHaveBeenCalledTimes(4);

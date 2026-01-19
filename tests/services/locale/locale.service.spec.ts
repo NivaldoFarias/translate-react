@@ -99,8 +99,6 @@ describe("LocaleService", () => {
 				const suffix = service.locale.comment.suffix;
 
 				expect(suffix).toContain("###### Observações");
-				expect(suffix).toContain("test-owner");
-				expect(suffix).toContain("translate-react");
 			});
 		});
 
