@@ -141,12 +141,11 @@ These **must** be set in your `.env` file:
 <details>
 <summary><b>Development/Debug Settings</b></summary>
 
-| Variable                | Default       | Description                                                            |
-| ----------------------- | ------------- | ---------------------------------------------------------------------- |
-| `NODE_ENV`              | `development` | Runtime environment                                                    |
-| `LOG_LEVEL`             | `info`        | Logging verbosity (`trace`\|`debug`\|`info`\|`warn`\|`error`\|`fatal`) |
-| `LOG_TO_CONSOLE`        | `true`        | Enable console logging in addition to file logs                        |
-| `PROGRESS_ISSUE_NUMBER` | —             | Optional: GitHub issue number for progress reports                     |
+| Variable         | Default       | Description                                                            |
+| ---------------- | ------------- | ---------------------------------------------------------------------- |
+| `NODE_ENV`       | `development` | Runtime environment                                                    |
+| `LOG_LEVEL`      | `info`        | Logging verbosity (`trace`\|`debug`\|`info`\|`warn`\|`error`\|`fatal`) |
+| `LOG_TO_CONSOLE` | `true`        | Enable console logging in addition to file logs                        |
 
 </details>
 

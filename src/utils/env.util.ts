@@ -104,15 +104,6 @@ const envSchema = z.object({
 	OPENAI_PROJECT_ID: z.string().optional(),
 
 	/**
-	 * The issue number of the progress tracking issue.
-	 *
-	 * Used to post progress updates after a translation workflow.
-	 *
-	 * @see [CommentBuilderService](../services/comment-builder.service.ts)
-	 */
-	PROGRESS_ISSUE_NUMBER: z.coerce.number().positive().optional(),
-
-	/**
 	 * The URL of the application to override the default URL.
 	 * Used for activity tracking on {@link https://openrouter.ai/|OpenRouter}.
 	 *

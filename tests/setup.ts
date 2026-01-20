@@ -28,7 +28,6 @@ export const testEnv: Environment = {
 	LLM_MAX_CONCURRENT: 5,
 	LLM_MIN_TIME_MS: 200,
 	MIN_SUCCESS_RATE: 0.5,
-	PROGRESS_ISSUE_NUMBER: 555,
 };
 
 void mock.module("@/utils/env.util", () => {

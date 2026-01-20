@@ -1,13 +1,14 @@
 import Bun from "bun";
 
 import type { RestEndpointMethodTypes } from "@octokit/rest";
+import type { components } from "node_modules/@octokit/plugin-paginate-rest/node_modules/@octokit/types/node_modules/@octokit/openapi-types";
 
 import type { ProcessedFileResult, PullRequestStatus } from "./../runner";
 import type { TranslationFile } from "./../translator.service";
 import type { BaseGitHubServiceDependencies } from "./base.service";
 
 import { mapGithubError } from "@/errors/";
-import { env, logger } from "@/utils/";
+import { logger } from "@/utils/";
 
 import { CommentBuilderService } from "./../comment-builder.service";
 import { BaseGitHubService } from "./base.service";
@@ -44,7 +45,6 @@ export interface CommitTranslationOptions {
 
 export interface ContentServiceDependencies extends BaseGitHubServiceDependencies {
 	commentBuilderService: CommentBuilderService;
-	issueNumber?: number;
 }
 
 /**
@@ -59,7 +59,6 @@ export interface ContentServiceDependencies extends BaseGitHubServiceDependencie
  */
 export class ContentService extends BaseGitHubService {
 	private readonly logger = logger.child({ component: ContentService.name });
-	private readonly issueNumber: number | undefined;
 	private readonly services: {
 		commentBuilder: CommentBuilderService;
 	};
@@ -68,7 +67,6 @@ export class ContentService extends BaseGitHubService {
 		super(dependencies);
 
 		this.services = { commentBuilder: dependencies.commentBuilderService };
-		this.issueNumber = dependencies.issueNumber;
 	}
 
 	/**
@@ -487,6 +485,92 @@ export class ContentService extends BaseGitHubService {
 	}
 
 	/**
+	 * Finds the translation progress issue in the upstream repository.
+	 *
+	 * @returns The translation progress issue data or `undefined` if not found
+	 */
+	private async findTranslationProgressIssue(): Promise<
+		components["schemas"]["issue-search-result-item"] | undefined
+	> {
+		const queryString = `repo:${this.repositories.upstream.owner}/${this.repositories.upstream.repo} in:title "Translation Progress" is:issue is:open`;
+
+		try {
+			this.logger.info({ queryString }, "Searching for translation progress issue");
+
+			// eslint-disable-next-line @typescript-eslint/no-deprecated
+			const issueExistsResponse = await this.octokit.rest.search.issuesAndPullRequests({
+				q: queryString,
+			});
+
+			this.logger.debug(
+				{
+					totalCount: issueExistsResponse.data.total_count,
+					incompleteResults: issueExistsResponse.data.incomplete_results,
+				},
+				"Search results for translation progress issue",
+			);
+
+			if (issueExistsResponse.data.items.length > 1) {
+				this.logger.warn(
+					{ count: issueExistsResponse.data.items.length },
+					"Multiple translation progress issues found",
+				);
+
+				this.logger.debug(
+					"Trying to pinpoint the correct issue by issue's `author_association` attribute",
+				);
+
+				const correctIssue = issueExistsResponse.data.items.find((issue) => {
+					const possibleAssociations: components["schemas"]["author-association"][] = [
+						"OWNER",
+						"CONTRIBUTOR",
+						"COLLABORATOR",
+						"MEMBER",
+					];
+
+					return possibleAssociations.includes(issue.author_association);
+				});
+
+				if (!correctIssue) {
+					this.logger.error(
+						"Could not determine the correct translation progress issue from multiple candidates",
+					);
+
+					return undefined;
+				}
+
+				this.logger.info(
+					{ issueNumber: correctIssue.number },
+					"Identified correct translation progress issue",
+				);
+
+				return correctIssue;
+			}
+
+			const translationProgressIssue = issueExistsResponse.data.items[0];
+
+			if (!translationProgressIssue) {
+				this.logger.warn("No translation progress issue found");
+
+				return undefined;
+			}
+
+			this.logger.info(
+				{ issueNumber: translationProgressIssue.number },
+				"Found translation progress issue",
+			);
+
+			return translationProgressIssue;
+		} catch (error) {
+			throw mapGithubError(
+				error,
+				`${ContentService.name}.${this.findTranslationProgressIssue.name}`,
+				{ queryString },
+			);
+		}
+	}
+
+	/**
 	 * Posts translation results as comments on GitHub issues.
 	 *
 	 * ### Workflow
@@ -512,66 +596,29 @@ export class ContentService extends BaseGitHubService {
 	public async commentCompiledResultsOnIssue(
 		results: ProcessedFileResult[],
 		filesToTranslate: TranslationFile[],
-	): Promise<RestEndpointMethodTypes["issues"]["createComment"]["response"]["data"]> {
+	): Promise<RestEndpointMethodTypes["issues"]["createComment"]["response"]["data"] | undefined> {
 		try {
-			if (!this.issueNumber) throw new Error("No progress issue number configured");
+			if (results.length === 0) {
+				this.logger.info("No results. Skipping issue comment update");
 
-			const issueExistsResponse = await this.octokit.issues.get({
-				...this.repositories.upstream,
-				issue_number: this.issueNumber,
-			});
+				return;
+			} else if (filesToTranslate.length === 0) {
+				this.logger.info("No files to translate. Skipping issue comment update");
 
-			if (issueExistsResponse.data.state === "closed") {
-				this.logger.warn({ issueNumber: this.issueNumber }, "Issue closed");
-
-				throw mapGithubError(
-					new Error(`Issue ${this.issueNumber} is closed`),
-					`${ContentService.name}.commentCompiledResultsOnIssue`,
-					{ issueNumber: this.issueNumber, upstream: this.repositories.upstream },
-				);
+				return;
 			}
 
-			const listCommentsResponse = await this.octokit.issues.listComments({
-				...this.repositories.upstream,
-				issue_number: this.issueNumber,
-				since: "2025-01-20",
-			});
+			const translationProgressIssue = await this.findTranslationProgressIssue();
 
-			const userComment = listCommentsResponse.data.find((comment) => {
-				return (
-					comment.user?.login === env.REPO_FORK_OWNER &&
-					comment.body?.includes(this.services.commentBuilder.comment.suffix)
-				);
-			});
+			if (!translationProgressIssue) {
+				this.logger.error("Translation progress issue not found");
 
-			if (userComment) {
-				this.logger.debug({ commentId: userComment.id }, "Updating existing comment on issue");
-
-				const updateCommentResponse = await this.octokit.issues.updateComment({
-					...this.repositories.upstream,
-					issue_number: this.issueNumber,
-					body: this.services.commentBuilder.concatComment(
-						this.services.commentBuilder.buildComment(results, filesToTranslate),
-					),
-					comment_id: userComment.id,
-				});
-
-				this.logger.info(
-					{
-						issueNumber: this.issueNumber,
-						commentId: updateCommentResponse.data.id,
-					},
-					"Updated comment on issue with compiled results",
-				);
-
-				return updateCommentResponse.data;
+				return;
 			}
-
-			this.logger.debug("No existing comment found - creating new comment");
 
 			const createCommentResponse = await this.octokit.issues.createComment({
 				...this.repositories.upstream,
-				issue_number: this.issueNumber,
+				issue_number: translationProgressIssue.number,
 				body: this.services.commentBuilder.concatComment(
 					this.services.commentBuilder.buildComment(results, filesToTranslate),
 				),
@@ -579,7 +626,7 @@ export class ContentService extends BaseGitHubService {
 
 			this.logger.info(
 				{
-					issueNumber: this.issueNumber,
+					issueNumber: translationProgressIssue.number,
 					commentId: createCommentResponse.data.id,
 				},
 				"Created comment on issue with compiled results",
@@ -587,11 +634,14 @@ export class ContentService extends BaseGitHubService {
 
 			return createCommentResponse.data;
 		} catch (error) {
-			throw mapGithubError(error, `${ContentService.name}.commentCompiledResultsOnIssue`, {
-				issueNumber: this.issueNumber,
-				filesCount: filesToTranslate.length,
-				resultsCount: results.length,
-			});
+			throw mapGithubError(
+				error,
+				`${ContentService.name}.${this.commentCompiledResultsOnIssue.name}`,
+				{
+					filesCount: filesToTranslate.length,
+					resultsCount: results.length,
+				},
+			);
 		}
 	}
 
