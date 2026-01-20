@@ -1,55 +1,36 @@
-import {
-	createGitMocks,
-	createIssuesMocks,
-	createMockCommentBuilderService,
-	createMockOctokit,
-	createPullsMocks,
-	createReposMocks,
-	testRepositories,
-} from "@tests/mocks";
+import { createProcessedFileResultsFixture, createTranslationFilesFixture } from "@tests/fixtures";
+import { createMockCommentBuilderService, createMockOctokit, testRepositories } from "@tests/mocks";
 import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test";
 
 import type {
 	MockCommentBuilderService,
+	MockOctokit,
 	MockOctokitGit,
 	MockOctokitIssues,
 	MockOctokitPulls,
 	MockOctokitRepos,
 } from "@tests/mocks";
+import type { components } from "node_modules/@octokit/plugin-paginate-rest/node_modules/@octokit/types/node_modules/@octokit/openapi-types";
 import type { RestEndpointMethodTypes } from "node_modules/@octokit/plugin-rest-endpoint-methods/dist-types/generated/parameters-and-response-types";
 
-import type { ContentServiceDependencies, TranslationFile } from "@/services/";
+import type { ContentServiceDependencies, ProcessedFileResult, TranslationFile } from "@/services/";
 
 import { ContentService } from "@/services/";
 
 /** Creates test ContentService with dependencies */
-function createTestContentService(
-	overrides?: Partial<ContentServiceDependencies>,
-	gitMocks?: MockOctokitGit,
-	reposMocks?: MockOctokitRepos,
-	pullsMocks?: MockOctokitPulls,
-	issuesMocks?: MockOctokitIssues,
-): {
+function createTestContentService(overrides?: Partial<ContentServiceDependencies>): {
 	service: ContentService;
-	mocks: {
-		git: MockOctokitGit;
-		repos: MockOctokitRepos;
-		pulls: MockOctokitPulls;
-		issues: MockOctokitIssues;
+	mocks: MockOctokit & {
 		commentBuilder: MockCommentBuilderService;
 	};
 } {
-	const git = gitMocks ?? createGitMocks();
-	const repos = reposMocks ?? createReposMocks();
-	const pulls = pullsMocks ?? createPullsMocks();
-	const issues = issuesMocks ?? createIssuesMocks();
+	const octokit = createMockOctokit();
 	const commentBuilder = createMockCommentBuilderService();
 
 	const defaults = {
-		octokit: createMockOctokit({ git, repos, pulls, issues }),
+		octokit,
 		repositories: testRepositories,
 		commentBuilderService: commentBuilder,
-		issueNumber: 555,
 	};
 
 	return {
@@ -57,17 +38,18 @@ function createTestContentService(
 			...(defaults as unknown as ContentServiceDependencies),
 			...overrides,
 		}),
-		mocks: { git, repos, pulls, issues, commentBuilder },
+		mocks: { ...octokit, commentBuilder },
 	};
 }
 
 describe("ContentService", () => {
 	let contentService: ContentService;
-	let gitMocks: MockOctokitGit;
-	let reposMocks: MockOctokitRepos;
-	let pullsMocks: MockOctokitPulls;
-	let issuesMocks: MockOctokitIssues;
-	let commentBuilderMocks: MockCommentBuilderService;
+	let octokitMock: MockOctokit;
+	let commentBuilderMock: MockCommentBuilderService;
+	let fixtures: {
+		processedFileResults: ProcessedFileResult[];
+		translationFiles: TranslationFile[];
+	};
 
 	afterAll(() => {
 		mock.clearAllMocks();
@@ -76,11 +58,13 @@ describe("ContentService", () => {
 	beforeEach(() => {
 		const { service, mocks } = createTestContentService();
 		contentService = service;
-		gitMocks = mocks.git;
-		reposMocks = mocks.repos;
-		pullsMocks = mocks.pulls;
-		issuesMocks = mocks.issues;
-		commentBuilderMocks = mocks.commentBuilder;
+		octokitMock = mocks;
+		commentBuilderMock = mocks.commentBuilder;
+
+		fixtures = {
+			processedFileResults: createProcessedFileResultsFixture({ count: 2 }),
+			translationFiles: createTranslationFilesFixture({ count: 2 }),
+		};
 	});
 
 	test("should get untranslated files when batch size is specified", async () => {
@@ -118,7 +102,7 @@ describe("ContentService", () => {
 		});
 
 		expect(result).toBeDefined();
-		expect(reposMocks.createOrUpdateFileContents).toHaveBeenCalled();
+		expect(octokitMock.repos.createOrUpdateFileContents).toHaveBeenCalled();
 	});
 
 	test("should create pull request when valid PR data is provided", async () => {
@@ -146,7 +130,7 @@ describe("ContentService", () => {
 	});
 
 	test("should handle file content errors when file does not exist", () => {
-		gitMocks.getBlob.mockRejectedValueOnce(new Error("Not Found"));
+		octokitMock.git.getBlob.mockRejectedValueOnce(new Error("Not Found"));
 
 		const file: TranslationFile = {
 			path: "src/test/non-existent.md",
@@ -160,7 +144,7 @@ describe("ContentService", () => {
 
 	describe("listOpenPullRequests", () => {
 		test("should return list of open pull requests when called", async () => {
-			pullsMocks.list.mockResolvedValueOnce({
+			octokitMock.pulls.list.mockResolvedValueOnce({
 				data: [
 					{ number: 1, title: "PR 1" },
 					{ number: 2, title: "PR 2" },
@@ -170,14 +154,14 @@ describe("ContentService", () => {
 			const prs = await contentService.listOpenPullRequests();
 
 			expect(prs).toHaveLength(2);
-			expect(pullsMocks.list).toHaveBeenCalledWith({
+			expect(octokitMock.pulls.list).toHaveBeenCalledWith({
 				...testRepositories.upstream,
 				state: "open",
 			});
 		});
 
 		test("should return empty array when no open PRs exist", async () => {
-			pullsMocks.list.mockResolvedValueOnce({ data: [] });
+			octokitMock.pulls.list.mockResolvedValueOnce({ data: [] });
 
 			const prs = await contentService.listOpenPullRequests();
 
@@ -185,7 +169,7 @@ describe("ContentService", () => {
 		});
 
 		test("should throw mapped error when API call fails", () => {
-			pullsMocks.list.mockRejectedValueOnce(new Error("API Error"));
+			octokitMock.pulls.list.mockRejectedValueOnce(new Error("API Error"));
 
 			expect(contentService.listOpenPullRequests()).rejects.toThrow();
 		});
@@ -193,20 +177,20 @@ describe("ContentService", () => {
 
 	describe("findPullRequestByNumber", () => {
 		test("should return PR data when PR exists", async () => {
-			pullsMocks.get.mockResolvedValueOnce({
+			octokitMock.pulls.get.mockResolvedValueOnce({
 				data: { number: 42, title: "Test PR", state: "open" },
 			});
 			const response = await contentService.findPullRequestByNumber(42);
 
 			expect(response.data.number).toBe(42);
-			expect(pullsMocks.get).toHaveBeenCalledWith({
+			expect(octokitMock.pulls.get).toHaveBeenCalledWith({
 				...testRepositories.upstream,
 				pull_number: 42,
 			});
 		});
 
 		test("should throw mapped error when PR does not exist", () => {
-			pullsMocks.get.mockRejectedValueOnce(new Error("Not Found"));
+			octokitMock.pulls.get.mockRejectedValueOnce(new Error("Not Found"));
 
 			expect(contentService.findPullRequestByNumber(999)).rejects.toThrow();
 		});
@@ -214,20 +198,20 @@ describe("ContentService", () => {
 
 	describe("getPullRequestFiles", () => {
 		test("should return list of file paths when PR has files", async () => {
-			pullsMocks.listFiles.mockResolvedValueOnce({
+			octokitMock.pulls.listFiles.mockResolvedValueOnce({
 				data: [{ filename: "src/file1.md" }, { filename: "src/file2.md" }],
 			} as RestEndpointMethodTypes["pulls"]["listFiles"]["response"]);
 			const files = await contentService.getPullRequestFiles(123);
 
 			expect(files).toEqual(["src/file1.md", "src/file2.md"]);
-			expect(pullsMocks.listFiles).toHaveBeenCalledWith({
+			expect(octokitMock.pulls.listFiles).toHaveBeenCalledWith({
 				...testRepositories.upstream,
 				pull_number: 123,
 			});
 		});
 
 		test("should return empty array when PR has no files", async () => {
-			pullsMocks.listFiles.mockResolvedValueOnce({ data: [] });
+			octokitMock.pulls.listFiles.mockResolvedValueOnce({ data: [] });
 
 			const files = await contentService.getPullRequestFiles(123);
 
@@ -235,7 +219,7 @@ describe("ContentService", () => {
 		});
 
 		test("should throw mapped error when API call fails", () => {
-			pullsMocks.listFiles.mockRejectedValueOnce(new Error("API Error"));
+			octokitMock.pulls.listFiles.mockRejectedValueOnce(new Error("API Error"));
 
 			expect(contentService.getPullRequestFiles(123)).rejects.toThrow();
 		});
@@ -243,13 +227,13 @@ describe("ContentService", () => {
 
 	describe("getUntranslatedFiles", () => {
 		test("should throw error when repository tree is empty", () => {
-			gitMocks.getTree.mockResolvedValueOnce({ data: { tree: [] } });
+			octokitMock.git.getTree.mockResolvedValueOnce({ data: { tree: [] } });
 
 			expect(contentService.getUntranslatedFiles()).rejects.toThrow();
 		});
 
 		test("should skip files without path", async () => {
-			gitMocks.getTree.mockResolvedValueOnce({
+			octokitMock.git.getTree.mockResolvedValueOnce({
 				data: {
 					tree: [
 						{ path: "src/test/file.md", type: "blob", sha: "abc123", url: "" },
@@ -264,7 +248,7 @@ describe("ContentService", () => {
 		});
 
 		test("should limit files when maxFiles is specified", async () => {
-			gitMocks.getTree.mockResolvedValueOnce({
+			octokitMock.git.getTree.mockResolvedValueOnce({
 				data: {
 					tree: [
 						{ path: "src/test/file1.md", type: "blob", sha: "abc123", url: "" },
@@ -282,7 +266,9 @@ describe("ContentService", () => {
 
 	describe("commitTranslation", () => {
 		test("should throw mapped error when commit fails", () => {
-			reposMocks.createOrUpdateFileContents.mockRejectedValueOnce(new Error("Commit failed"));
+			octokitMock.repos.createOrUpdateFileContents.mockRejectedValueOnce(
+				new Error("Commit failed"),
+			);
 
 			const mockBranch = {
 				ref: "refs/heads/translate/test",
@@ -311,7 +297,7 @@ describe("ContentService", () => {
 
 	describe("createPullRequest", () => {
 		test("should use custom base branch when specified", async () => {
-			pullsMocks.create.mockResolvedValueOnce({
+			octokitMock.pulls.create.mockResolvedValueOnce({
 				data: { number: 1, title: "Test PR", html_url: "https://github.com/test/pull/1" },
 			});
 			await contentService.createPullRequest({
@@ -321,11 +307,13 @@ describe("ContentService", () => {
 				baseBranch: "develop",
 			});
 
-			expect(pullsMocks.create).toHaveBeenCalledWith(expect.objectContaining({ base: "develop" }));
+			expect(octokitMock.pulls.create).toHaveBeenCalledWith(
+				expect.objectContaining({ base: "develop" }),
+			);
 		});
 
 		test("should throw mapped error when PR creation fails", () => {
-			pullsMocks.create.mockRejectedValueOnce(new Error("PR creation failed"));
+			octokitMock.pulls.create.mockRejectedValueOnce(new Error("PR creation failed"));
 
 			expect(
 				contentService.createPullRequest({
@@ -339,20 +327,20 @@ describe("ContentService", () => {
 
 	describe("findPullRequestByBranch", () => {
 		test("should return PR when branch matches", async () => {
-			pullsMocks.list.mockResolvedValueOnce({
+			octokitMock.pulls.list.mockResolvedValueOnce({
 				data: [{ number: 1, head: { ref: "translate/test" }, title: "Test PR" }],
 			} as RestEndpointMethodTypes["pulls"]["list"]["response"]);
 			const pr = await contentService.findPullRequestByBranch("translate/test");
 
 			expect(pr?.number).toBe(1);
-			expect(pullsMocks.list).toHaveBeenCalledWith({
+			expect(octokitMock.pulls.list).toHaveBeenCalledWith({
 				...testRepositories.upstream,
 				head: `${testRepositories.fork.owner}:translate/test`,
 			});
 		});
 
 		test("should return undefined when no PR matches branch", async () => {
-			pullsMocks.list.mockResolvedValueOnce({ data: [] });
+			octokitMock.pulls.list.mockResolvedValueOnce({ data: [] });
 
 			const pr = await contentService.findPullRequestByBranch("translate/test");
 
@@ -360,7 +348,7 @@ describe("ContentService", () => {
 		});
 
 		test("should throw mapped error when API call fails", () => {
-			pullsMocks.list.mockRejectedValueOnce(new Error("API Error"));
+			octokitMock.pulls.list.mockRejectedValueOnce(new Error("API Error"));
 
 			expect(contentService.findPullRequestByBranch("translate/test")).rejects.toThrow();
 		});
@@ -368,11 +356,13 @@ describe("ContentService", () => {
 
 	describe("createCommentOnPullRequest", () => {
 		test("should create comment on PR successfully", async () => {
-			issuesMocks.createComment.mockResolvedValueOnce({ data: { id: 123, body: "Test comment" } });
+			octokitMock.issues.createComment.mockResolvedValueOnce({
+				data: { id: 123, body: "Test comment" },
+			});
 			const result = await contentService.createCommentOnPullRequest(42, "Test comment");
 
 			expect(result.data.id).toBe(123);
-			expect(issuesMocks.createComment).toHaveBeenCalledWith({
+			expect(octokitMock.issues.createComment).toHaveBeenCalledWith({
 				...testRepositories.upstream,
 				issue_number: 42,
 				body: "Test comment",
@@ -380,7 +370,7 @@ describe("ContentService", () => {
 		});
 
 		test("should throw mapped error when comment creation fails", () => {
-			issuesMocks.createComment.mockRejectedValueOnce(new Error("Comment failed"));
+			octokitMock.issues.createComment.mockRejectedValueOnce(new Error("Comment failed"));
 
 			expect(contentService.createCommentOnPullRequest(42, "Test")).rejects.toThrow();
 		});
@@ -388,7 +378,7 @@ describe("ContentService", () => {
 
 	describe("checkPullRequestStatus", () => {
 		test("should return clean status when PR is mergeable", async () => {
-			pullsMocks.get.mockImplementation(() =>
+			octokitMock.pulls.get.mockImplementation(() =>
 				Promise.resolve({
 					data: {
 						number: 1,
@@ -406,7 +396,7 @@ describe("ContentService", () => {
 		});
 
 		test("should return dirty status when PR has conflicts", async () => {
-			pullsMocks.get.mockResolvedValueOnce({
+			octokitMock.pulls.get.mockResolvedValueOnce({
 				data: { number: 1, mergeable: false, mergeable_state: "dirty" },
 			});
 
@@ -418,7 +408,7 @@ describe("ContentService", () => {
 		});
 
 		test("should return behind status without conflicts", async () => {
-			pullsMocks.get.mockResolvedValueOnce({
+			octokitMock.pulls.get.mockResolvedValueOnce({
 				data: { number: 1, mergeable: true, mergeable_state: "behind" },
 			});
 
@@ -430,7 +420,7 @@ describe("ContentService", () => {
 		});
 
 		test("should throw mapped error when API call fails", () => {
-			pullsMocks.get.mockImplementation(() => Promise.reject(new Error("API Error")));
+			octokitMock.pulls.get.mockImplementation(() => Promise.reject(new Error("API Error")));
 
 			expect(contentService.checkPullRequestStatus(1)).rejects.toThrow();
 		});
@@ -438,11 +428,11 @@ describe("ContentService", () => {
 
 	describe("closePullRequest", () => {
 		test("should close PR successfully", async () => {
-			pullsMocks.update.mockResolvedValueOnce({ data: { number: 42, state: "closed" } });
+			octokitMock.pulls.update.mockResolvedValueOnce({ data: { number: 42, state: "closed" } });
 			const result = await contentService.closePullRequest(42);
 
 			expect(result.state).toBe("closed");
-			expect(pullsMocks.update).toHaveBeenCalledWith({
+			expect(octokitMock.pulls.update).toHaveBeenCalledWith({
 				...testRepositories.upstream,
 				pull_number: 42,
 				state: "closed",
@@ -450,64 +440,113 @@ describe("ContentService", () => {
 		});
 
 		test("should throw mapped error when PR closure fails", () => {
-			pullsMocks.update.mockRejectedValueOnce(new Error("Close failed"));
+			octokitMock.pulls.update.mockRejectedValueOnce(new Error("Close failed"));
 
 			expect(contentService.closePullRequest(42)).rejects.toThrow();
 		});
 	});
 
 	describe("commentCompiledResultsOnIssue", () => {
-		test("should throw error when no issue number configured", () => {
-			const { service } = createTestContentService({ issueNumber: undefined });
-
-			expect(service.commentCompiledResultsOnIssue([], [])).rejects.toThrow(
-				"No progress issue number configured",
-			);
-		});
-
-		test("should throw error when issue is closed", () => {
-			issuesMocks.get.mockResolvedValueOnce({ data: { number: 555, state: "closed" } });
-
-			expect(contentService.commentCompiledResultsOnIssue([], [])).rejects.toThrow();
-		});
-
-		test("should create new comment when no existing user comment found", async () => {
-			issuesMocks.get.mockResolvedValueOnce({ data: { number: 555, state: "open" } });
-			issuesMocks.listComments.mockResolvedValueOnce({ data: [] });
-			issuesMocks.createComment.mockResolvedValueOnce({ data: { id: 999, body: "New comment" } });
-
-			const result = await contentService.commentCompiledResultsOnIssue([], []);
-
-			expect(result.id).toBe(999);
-			expect(issuesMocks.createComment).toHaveBeenCalled();
-		});
-
-		test("should update existing comment when user comment found", async () => {
-			issuesMocks.get.mockResolvedValueOnce({ data: { number: 555, state: "open" } });
-			issuesMocks.listComments.mockResolvedValueOnce({
-				data: [
-					{ id: 888, user: { login: "test-fork-owner" }, body: "Existing comment with suffix" },
-				],
-			} as RestEndpointMethodTypes["issues"]["listComments"]["response"]);
-			issuesMocks.updateComment.mockResolvedValueOnce({
-				data: { id: 888, body: "Updated comment" },
+		test("should log error when no progress issue is found", () => {
+			octokitMock.rest.search.issuesAndPullRequests.mockResolvedValueOnce({
+				data: { total_count: 0, items: [] },
 			});
-			commentBuilderMocks.comment.suffix = "suffix";
 
-			const result = await contentService.commentCompiledResultsOnIssue([], []);
+			expect(
+				contentService.commentCompiledResultsOnIssue(
+					fixtures.processedFileResults,
+					fixtures.translationFiles,
+				),
+			).resolves.toBeUndefined();
+		});
 
-			expect(result.id).toBe(888);
-			expect(issuesMocks.updateComment).toHaveBeenCalledWith(
+		test("should create a new comment when progress issue exists", async () => {
+			octokitMock.rest.search.issuesAndPullRequests.mockResolvedValueOnce({
+				data: {
+					items: [
+						{ number: 123, state: "open" } as components["schemas"]["issue-search-result-item"],
+					],
+					total_count: 1,
+				},
+			});
+
+			octokitMock.issues.createComment.mockResolvedValueOnce({
+				data: { id: 1, html_url: "https://github.com/test/test/issues/123#comment-1" },
+			});
+
+			const result = await contentService.commentCompiledResultsOnIssue(
+				fixtures.processedFileResults,
+				fixtures.translationFiles,
+			);
+			expect(result).toBeDefined();
+			expect(octokitMock.issues.createComment).toHaveBeenCalledWith(
 				expect.objectContaining({
-					comment_id: 888,
+					issue_number: 123,
 				}),
 			);
 		});
 
-		test("should throw mapped error when API call fails", () => {
-			issuesMocks.get.mockRejectedValueOnce(new Error("API Error"));
+		describe("Edge Cases", () => {
+			test("should pinpoint correct translation progress issue from multiple issues", async () => {
+				octokitMock.rest.search.issuesAndPullRequests.mockResolvedValueOnce({
+					data: {
+						items: [
+							{
+								number: 1,
+								state: "open",
+								title: "Translation Progress (Old)",
+								author_association: "FIRST_TIME_CONTRIBUTOR",
+							},
+							{
+								number: 2,
+								state: "open",
+								title: "Translation Progress (Current)",
+								author_association: "OWNER",
+							},
+							{
+								number: 3,
+								state: "open",
+								title: "Translation Progress (Another)",
+								author_association: "FIRST_TIMER",
+							},
+						] as components["schemas"]["issue-search-result-item"][],
+						total_count: 3,
+					},
+				});
 
-			expect(contentService.commentCompiledResultsOnIssue([], [])).rejects.toThrow();
+				octokitMock.issues.createComment.mockResolvedValueOnce({
+					data: { id: 2, html_url: "https://github.com/test/test/issues/2#comment-2" },
+				});
+
+				const result = await contentService.commentCompiledResultsOnIssue(
+					fixtures.processedFileResults,
+					fixtures.translationFiles,
+				);
+				expect(result).toBeDefined();
+				expect(octokitMock.issues.createComment).toHaveBeenCalledWith(
+					expect.objectContaining({
+						issue_number: 2,
+					}),
+				);
+			});
+
+			test("should skip commenting when no results to report", async () => {
+				const result = await contentService.commentCompiledResultsOnIssue(
+					createProcessedFileResultsFixture({ count: 0 }),
+					fixtures.translationFiles,
+				);
+
+				expect(result).toBeUndefined();
+			});
+
+			test("should skip commenting when no files to translate", async () => {
+				const result = await contentService.commentCompiledResultsOnIssue(
+					fixtures.processedFileResults,
+					createTranslationFilesFixture({ count: 0 }),
+				);
+
+				expect(result).toBeUndefined();
+			});
 		});
 	});
 });

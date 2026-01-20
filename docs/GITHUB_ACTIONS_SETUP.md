@@ -88,17 +88,16 @@ Go to **Settings → Secrets and variables → Actions → Secrets**:
 
 Go to **Settings → Secrets and variables → Actions → Variables**:
 
-| Variable                | Example Value                      | Description                 | Required |
-| :---------------------- | :--------------------------------- | :-------------------------- | :------- |
-| `NODE_ENV`              | `production`                       | Runtime environment         | ✅ Yes   |
-| `TARGET_LANGUAGE`       | `pt-br`                            | Target language code        | ✅ Yes   |
-| `LLM_MODEL`             | `google/gemini-2.0-flash-exp:free` | LLM model identifier        | ❌ No    |
-| `LLM_API_BASE_URL`      | `https://openrouter.ai/api/v1`     | API base URL                | ❌ No    |
-| `LOG_LEVEL`             | `info`                             | Logging level               | ❌ No    |
-| `LOG_TO_CONSOLE`        | `true`                             | Enable console logging      | ❌ No    |
-| `BATCH_SIZE`            | `5`                                | Files per batch             | ❌ No    |
-| `MAX_TOKENS`            | `4000`                             | Max tokens per translation  | ❌ No    |
-| `PROGRESS_ISSUE_NUMBER` | `1`                                | Issue for progress comments | ❌ No    |
+| Variable           | Example Value                      | Description                | Required |
+| :----------------- | :--------------------------------- | :------------------------- | :------- |
+| `NODE_ENV`         | `production`                       | Runtime environment        | ✅ Yes   |
+| `TARGET_LANGUAGE`  | `pt-br`                            | Target language code       | ✅ Yes   |
+| `LLM_MODEL`        | `google/gemini-2.0-flash-exp:free` | LLM model identifier       | ❌ No    |
+| `LLM_API_BASE_URL` | `https://openrouter.ai/api/v1`     | API base URL               | ❌ No    |
+| `LOG_LEVEL`        | `info`                             | Logging level              | ❌ No    |
+| `LOG_TO_CONSOLE`   | `true`                             | Enable console logging     | ❌ No    |
+| `BATCH_SIZE`       | `5`                                | Files per batch            | ❌ No    |
+| `MAX_TOKENS`       | `4000`                             | Max tokens per translation | ❌ No    |
 
 ## Using Environments
 

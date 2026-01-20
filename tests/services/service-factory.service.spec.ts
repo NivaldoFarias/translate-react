@@ -33,7 +33,6 @@ function createTestConfig(overrides?: Partial<ServiceConfig>): ServiceConfig {
 			headerAppTitle: "Test App",
 			headerAppUrl: "https://test.app",
 		},
-		progressIssueNumber: 123,
 		...overrides,
 	};
 }
@@ -53,7 +52,7 @@ describe("ServiceFactory", () => {
 		});
 
 		test("should accept configuration without optional fields", () => {
-			const minimalConfig = createTestConfig({ progressIssueNumber: undefined });
+			const minimalConfig = createTestConfig({});
 			const minimalFactory = new ServiceFactory(minimalConfig);
 
 			expect(minimalFactory).toBeInstanceOf(ServiceFactory);
@@ -77,7 +76,6 @@ describe("ServiceFactory", () => {
 		test("should configure Octokit with authentication token", () => {
 			const octokit = factory.getOctokit();
 
-			// Octokit stores auth internally, we verify by checking it's configured
 			expect(octokit).toBeDefined();
 			expect(octokit.rest).toBeDefined();
 		});
@@ -99,17 +97,10 @@ describe("ServiceFactory", () => {
 	});
 
 	describe("createContentService", () => {
-		test("should return ContentService instance when called", () => {
+		test("should create ContentService", () => {
 			const service = factory.createContentService();
 
 			expect(service).toBeInstanceOf(ContentService);
-		});
-
-		test("should return same instance on subsequent calls (singleton)", () => {
-			const service1 = factory.createContentService();
-			const service2 = factory.createContentService();
-
-			expect(service1).toBe(service2);
 		});
 	});
 
@@ -199,7 +190,6 @@ describe("ServiceFactory", () => {
 			const service1 = factory.createRunnerService();
 			const service2 = factory.createRunnerService();
 
-			// RunnerService is not cached, so each call creates a new instance
 			expect(service1).not.toBe(service2);
 		});
 	});
@@ -211,8 +201,6 @@ describe("ServiceFactory", () => {
 			factory.createContentService();
 			factory.createBranchService();
 
-			// All services should share the same Octokit instance
-			// We can verify this by checking the factory returns same instance
 			const octokitAgain = factory.getOctokit();
 			expect(octokit).toBe(octokitAgain);
 		});

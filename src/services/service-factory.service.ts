@@ -45,9 +45,6 @@ export interface ServiceConfig {
 		/** Application URL for OpenRouter request headers */
 		headerAppUrl: string;
 	};
-
-	/** Progress issue number for GitHub updates */
-	progressIssueNumber?: number;
 }
 
 /** Creates service configuration from environment variables */
@@ -73,7 +70,6 @@ export function createServiceConfigFromEnv(): ServiceConfig {
 			headerAppTitle: env.HEADER_APP_TITLE,
 			headerAppUrl: env.HEADER_APP_URL,
 		},
-		progressIssueNumber: env.PROGRESS_ISSUE_NUMBER,
 	};
 }
 
@@ -126,7 +122,6 @@ export class ServiceFactory {
 					octokit: this.getOctokit(),
 					repositories: this.config.repositories,
 					commentBuilderService: this.createCommentBuilderService(),
-					issueNumber: this.config.progressIssueNumber,
 				}),
 		);
 	}

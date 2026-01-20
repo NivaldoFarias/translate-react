@@ -6,7 +6,7 @@ import type {
 	WorkflowStatistics,
 } from "./runner.types";
 
-import { env, logger } from "@/utils/";
+import { logger } from "@/utils/";
 
 import { TranslationFile } from "../translator.service";
 
@@ -47,12 +47,6 @@ export class PRManager {
 		processedResults: Map<string, ProcessedFileResult>,
 		filesToTranslate: TranslationFile[],
 	): Promise<void> {
-		if (!this.shouldUpdateIssueComment(processedResults)) {
-			this.logger.info("Skipping issue comment update");
-
-			return;
-		}
-
 		this.logger.info("Commenting on issue");
 
 		const comment = await this.services.github.content.commentCompiledResultsOnIssue(
@@ -60,26 +54,17 @@ export class PRManager {
 			filesToTranslate,
 		);
 
+		if (!comment) {
+			this.logger.warn("No comment was created on the translation issue");
+
+			return;
+		}
+
 		this.logger.info({ commentUrl: comment.html_url }, "Commented on translation issue");
 	}
 
 	/**
-	 * Determines if the issue comment should be updated based on environment and results.
-	 *
-	 * @param results Map of processing results
-	 *
-	 * @returns `true` if the issue comment should be updated, `false` otherwise
-	 */
-	private shouldUpdateIssueComment(results: Map<string, ProcessedFileResult>): boolean {
-		return !!(env.PROGRESS_ISSUE_NUMBER && results.size > 0);
-	}
-
-	/**
 	 * Generates and displays final statistics for the translation workflow.
-	 *
-	 * Calculates success/failure counts, displays detailed error information
-	 * for failed files, and reports overall workflow statistics including
-	 * success rate and execution time.
 	 *
 	 * ### Statistics Reported
 	 *

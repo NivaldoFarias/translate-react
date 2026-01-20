@@ -75,7 +75,6 @@ jobs:
           OPENAI_PROJECT_ID: ${{ secrets.OPENAI_PROJECT_ID }}
           MAX_TOKENS: ${{ vars.MAX_TOKENS }}
           BATCH_SIZE: ${{ vars.BATCH_SIZE }}
-          PROGRESS_ISSUE_NUMBER: ${{ vars.PROGRESS_ISSUE_NUMBER }}
           GH_REQUEST_TIMEOUT: ${{ vars.GH_REQUEST_TIMEOUT }}
           MIN_SUCCESS_RATE: ${{ vars.MIN_SUCCESS_RATE }}
           HEADER_APP_URL: ${{ vars.HEADER_APP_URL }}
@@ -102,7 +101,6 @@ jobs:
           [ -n "$OPENAI_PROJECT_ID" ] && echo "OPENAI_PROJECT_ID=$OPENAI_PROJECT_ID" >> .env || true
           [ -n "$MAX_TOKENS" ] && echo "MAX_TOKENS=$MAX_TOKENS" >> .env || true
           [ -n "$BATCH_SIZE" ] && echo "BATCH_SIZE=$BATCH_SIZE" >> .env || true
-          [ -n "$PROGRESS_ISSUE_NUMBER" ] && echo "PROGRESS_ISSUE_NUMBER=$PROGRESS_ISSUE_NUMBER" >> .env || true
           [ -n "$GH_REQUEST_TIMEOUT" ] && echo "GH_REQUEST_TIMEOUT=$GH_REQUEST_TIMEOUT" >> .env || true
           [ -n "$MIN_SUCCESS_RATE" ] && echo "MIN_SUCCESS_RATE=$MIN_SUCCESS_RATE" >> .env || true
           [ -n "$HEADER_APP_URL" ] && echo "HEADER_APP_URL=$HEADER_APP_URL" >> .env || true
