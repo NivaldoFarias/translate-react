@@ -330,11 +330,7 @@ Checks that headings are preserved in translation
 
 ## Log File Locations
 
-Logs are stored in the `logs/` directory with timestamped filenames:
-
-```plaintext
-logs/YYYY-MM-DDTHH:MM:SS.sssZ.pino.log
-```
+Logs are stored in the `logs/` directory with timestamped filenames with the pattern `logs/YYYY-MM-DDTHH:MM:SS.sssZ.pino.log`
 
 Use standard UNIX tools to analyze logs:
 

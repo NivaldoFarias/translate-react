@@ -15,19 +15,19 @@
   - [createTranslationValidationError](#createtranslationvalidationerror)
   - [createChunkProcessingError](#createchunkprocessingerror)
 - [ApplicationError Class](#applicationerror-class)
-- [Error Mapping Functions](#error-mapping-functions)
-  - [mapGithubError](#mapgithuberror)
-  - [mapLLMError](#mapllmerror)
+- [Error Mapping Function](#error-mapping-function)
+  - [Examples](#examples)
+    - [Github's API Error](#githubs-api-error)
+    - [OpenAI/LLM API Error](#openaillm-api-error)
 - [Error Handling Patterns](#error-handling-patterns)
   - [Service-Level Error Handling](#service-level-error-handling)
-  - [Error Mapping](#error-mapping)
   - [Validation Error Flow](#validation-error-flow)
   - [Chunk Processing Error Flow](#chunk-processing-error-flow)
 - [Best Practices](#best-practices)
   - [1. Always Provide Operation Context](#1-always-provide-operation-context)
   - [2. Include Relevant Metadata](#2-include-relevant-metadata)
   - [3. Use Appropriate Factory Functions](#3-use-appropriate-factory-functions)
-  - [4. Use Pure Function Error Mappers](#4-use-pure-function-error-mappers)
+  - [4. Use Pure Function Error Mapper](#4-use-pure-function-error-mapper)
 - [Testing Error Handling](#testing-error-handling)
   - [Unit Tests](#unit-tests)
   - [Integration Tests](#integration-tests)
@@ -90,9 +90,8 @@ Error (Native)
 
 ### createEmptyContentError
 
-**Purpose**: Creates an error when file content is empty or missing before processing.
-
-**Usage**:
+- **Purpose**: Creates an error when file content is empty or missing before processing.
+- **Usage**:
 
 ```typescript
 import { createEmptyContentError } from "@/errors";
@@ -100,18 +99,15 @@ import { createEmptyContentError } from "@/errors";
 throw createEmptyContentError(filename, "TranslatorService.translateContent", { filename, path });
 ```
 
-**When Thrown**:
-
-- `TranslatorService.translateContent()`: Before attempting translation
-- `TranslatorService.getLanguageAnalysis()`: Before language detection
-
-**Error Code**: `NoContent`
+- **When Thrown**:
+  - `TranslatorService.translateContent()`: Before attempting translation
+  - `TranslatorService.getLanguageAnalysis()`: Before language detection
+- **Error Code**: `NoContent`
 
 ### createTranslationValidationError
 
-**Purpose**: Creates an error when translated output fails validation checks.
-
-**Usage**:
+- **Purpose**: Creates an error when translated output fails validation checks.
+- **Usage**:
 
 ```typescript
 import { createTranslationValidationError } from "@/errors";
@@ -129,18 +125,15 @@ throw createTranslationValidationError(
 );
 ```
 
-**When Thrown**:
-
-- Empty translation output
-- Complete loss of markdown headings
-
-**Error Code**: `FormatValidationFailed`
+- **When Thrown**:
+  - Empty translation output
+  - Complete loss of markdown headings
+- **Error Code**: `FormatValidationFailed`
 
 ### createChunkProcessingError
 
-**Purpose**: Creates an error when chunk processing fails during translation (critical workflow error).
-
-**Usage**:
+- **Purpose**: Creates an error when chunk processing fails during translation (critical workflow error).
+- **Usage**:
 
 ```typescript
 import { createChunkProcessingError } from "@/errors";
@@ -158,13 +151,11 @@ throw createChunkProcessingError(
 );
 ```
 
-**When Thrown**:
-
-- Chunk count mismatch after translation
-- Missing chunks before reassembly
-- Chunk array corruption
-
-**Error Code**: `ChunkProcessingFailed`
+- **When Thrown**:
+  - Chunk count mismatch after translation
+  - Missing chunks before reassembly
+  - Chunk array corruption
+- **Error Code**: `ChunkProcessingFailed`
 
 ## ApplicationError Class
 
@@ -185,33 +176,35 @@ class ApplicationError extends Error {
 }
 ```
 
-## Error Mapping Functions
+## Error Mapping Function
 
-### mapGithubError
+This helper's implementation provides an error-type agnostic mapping mechanism. It translates third-party errors into `ApplicationError` instances with relevant context. This ensures consistent error handling across different services.
 
-Maps GitHub/Octokit errors to `ApplicationError`:
+The main errors thrown in the workflow relate to octokit's `RequestError` and OpenAI's `APIError` (or `OpenAIError`), which are specifically handled by the `mapError` function.
+
+### Examples
+
+#### Github's API Error
 
 ```typescript
-import { mapGithubError } from "@/errors/helpers/github-error.helper";
+import { mapError } from "@/errors/";
 
 try {
   await octokit.rest.repos.getContent({ ... });
 } catch (error) {
-  throw mapGithubError(error, "ContentService.getFileContent", { path, owner, repo });
+  throw mapError(error, "ContentService.getFileContent", { path, owner, repo });
 }
 ```
 
-### mapLLMError
-
-Maps OpenAI/LLM errors to `ApplicationError`:
+#### OpenAI/LLM API Error
 
 ```typescript
-import { mapLLMError } from "@/errors/helpers/llm-error.helper";
+import { mapError } from "@/errors/";
 
 try {
   await openai.chat.completions.create({ ... });
 } catch (error) {
-  throw mapLLMError(error, "TranslatorService.callLanguageModel", { model, chunkIndex, chunkSize });
+  throw mapError(error, "TranslatorService.callLanguageModel", { model, chunkIndex, chunkSize });
 }
 ```
 
@@ -229,22 +222,6 @@ if (!file.content?.length) {
 	throw createEmptyContentError(file.filename, "TranslatorService.translateContent", {
 		filename: file.filename,
 		path: file.path,
-	});
-}
-```
-
-### Error Mapping
-
-LLM and GitHub errors are mapped using pure functions:
-
-```typescript
-try {
-	const translatedChunk = await this.callLanguageModel(chunk);
-} catch (error) {
-	throw mapLLMError(error, "TranslatorService.translateWithChunking", {
-		chunkIndex: i,
-		totalChunks: chunks.length,
-		chunkSize: chunk.length,
 	});
 }
 ```
@@ -314,15 +291,14 @@ metadata: {
 - **createInitializationError**: Service initialization failures
 - **createResourceLoadError**: Resource loading failures
 
-### 4. Use Pure Function Error Mappers
+### 4. Use Pure Function Error Mapper
 
 ```typescript
-import { mapGithubError } from "@/errors/helpers/github-error.helper";
-import { mapLLMError } from "@/errors/helpers/llm-error.helper";
+import { mapError } from "@/errors/";
 
 // In catch blocks
 catch (error) {
-  throw mapGithubError(error, operation, metadata);
+  throw mapError(error, operation, metadata);
 }
 ```
 
@@ -367,11 +343,10 @@ test("handles chunk count mismatch", async () => {
 
 ### Source Files
 
-| File                                                                                        | Description                            |
-| ------------------------------------------------------------------------------------------- | -------------------------------------- |
-| [`src/errors/base-error.ts`](../src/errors/base-error.ts)                                   | Base error class and error codes       |
-| [`src/errors/errors.ts`](../src/errors/errors.ts)                                           | Error factory function implementations |
-| [`src/errors/helpers/github-error.helper.ts`](../src/errors/helpers/github-error.helper.ts) | GitHub error mapping function          |
-| [`src/errors/helpers/llm-error.helper.ts`](../src/errors/helpers/llm-error.helper.ts)       | LLM error mapping function             |
-| [`src/services/translator.service.ts`](../src/services/translator.service.ts)               | Primary error usage                    |
-| [`src/services/runner/base.service.ts`](../src/services/runner/base.service.ts)             | Error handling in workflow             |
+| File                                                                            | Description                            |
+| ------------------------------------------------------------------------------- | -------------------------------------- |
+| [`src/errors/base.error.ts`](../src/errors/base.error.ts)                       | Base error class and error codes       |
+| [`src/errors/errors.ts`](../src/errors/errors.ts)                               | Error factory function implementations |
+| [`src/errors/error.helper`](../src/errors/error.helper.ts)                      | Agnostic error mapping function        |
+| [`src/services/translator.service.ts`](../src/services/translator.service.ts)   | Primary error usage                    |
+| [`src/services/runner/base.service.ts`](../src/services/runner/base.service.ts) | Error handling in workflow             |

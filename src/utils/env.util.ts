@@ -167,7 +167,7 @@ const envSchema = z.object({
 	 * Prevents indefinite hangs on slow or stuck API calls. If a request exceeds this
 	 * timeout, it will be aborted and throw an error.
 	 *
-	 * @default 30000
+	 * @default 30000 // 30 seconds
 	 */
 	GH_REQUEST_TIMEOUT: z.coerce.number().positive().default(environmentDefaults.GH_REQUEST_TIMEOUT),
 
@@ -177,7 +177,7 @@ const envSchema = z.object({
 	 * If the translation success rate falls below this threshold, the workflow
 	 * will exit with a non-zero code. Set to 0 to disable failure detection.
 	 *
-	 * @default 0.5 (50%)
+	 * @default 0.75 // 75%
 	 */
 	MIN_SUCCESS_RATE: z.coerce.number().min(0).max(1).default(environmentDefaults.MIN_SUCCESS_RATE),
 
@@ -197,7 +197,7 @@ const envSchema = z.object({
 	 * Enforces a delay between request batches to prevent rate limit errors.
 	 * Lower values increase throughput but may trigger API rate limits.
 	 *
-	 * @default 20000
+	 * @default 20000 // 20 seconds
 	 */
 	LLM_MIN_TIME_MS: z.coerce.number().positive().default(environmentDefaults.LLM_REQUEST_TIMEOUT),
 });

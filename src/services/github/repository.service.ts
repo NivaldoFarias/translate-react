@@ -2,7 +2,7 @@ import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 import type { BaseGitHubServiceDependencies } from "./base.service";
 
-import { mapGithubError } from "@/errors/";
+import { mapError } from "@/errors/";
 import { logger } from "@/utils/";
 
 import { BaseGitHubService } from "./base.service";
@@ -50,7 +50,7 @@ export class RepositoryService extends BaseGitHubService {
 
 			return response.data.default_branch;
 		} catch (error) {
-			throw mapGithubError(error, `${RepositoryService.name}.getDefaultBranch`, {
+			throw mapError(error, `${RepositoryService.name}.getDefaultBranch`, {
 				target,
 				repoConfig: target === "fork" ? this.repositories.fork : this.repositories.upstream,
 			});
@@ -110,7 +110,7 @@ export class RepositoryService extends BaseGitHubService {
 
 			return tree;
 		} catch (error) {
-			throw mapGithubError(error, `${RepositoryService.name}.getRepositoryTree`, {
+			throw mapError(error, `${RepositoryService.name}.getRepositoryTree`, {
 				target,
 				baseBranch,
 				filterIgnored,
@@ -149,7 +149,7 @@ export class RepositoryService extends BaseGitHubService {
 						`Insufficient permissions for ${repoType} repository`,
 					);
 
-					throw mapGithubError(result.reason, `${RepositoryService.name}.verifyTokenPermissions`, {
+					throw mapError(result.reason, `${RepositoryService.name}.verifyTokenPermissions`, {
 						repo: repoType === "fork" ? this.repositories.fork : this.repositories.upstream,
 						reason: result.reason as unknown,
 					});
@@ -252,7 +252,7 @@ export class RepositoryService extends BaseGitHubService {
 				"Fork repository existence checked",
 			);
 		} catch (error) {
-			throw mapGithubError(error, `${RepositoryService.name}.forkExists`, {
+			throw mapError(error, `${RepositoryService.name}.forkExists`, {
 				fork: this.repositories.fork,
 			});
 		}
