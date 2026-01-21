@@ -142,7 +142,7 @@ export const environmentDefaults = {
 	GH_REQUEST_TIMEOUT: 30_000,
 
 	/** Minimum success rate (0-1) required for workflow to pass */
-	MIN_SUCCESS_RATE: 0.5,
+	MIN_SUCCESS_RATE: 0.75,
 
 	LLM_MAX_CONCURRENT: 5,
 	LLM_REQUEST_TIMEOUT: 20_000,

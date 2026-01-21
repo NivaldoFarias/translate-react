@@ -36,7 +36,6 @@ This document provides a comprehensive overview of the `translate-react` system 
   - [Translation Phase Data Flow](#translation-phase-data-flow)
 - [Design Patterns](#design-patterns)
   - [Inheritance-Based Service Design](#inheritance-based-service-design)
-  - [Proxy Pattern for Error Handling](#proxy-pattern-for-error-handling)
 - [Dependency Injection Architecture](#dependency-injection-architecture)
   - [ServiceFactory (Composition Root)](#servicefactory-composition-root)
   - [Testing with DI](#testing-with-di)
@@ -129,7 +128,6 @@ classDiagram
     class BaseGitHubService {
         #octokit: Octokit
         #repositories: RepositoryConfig
-        #helpers: HelperServices
         +constructor(config)
     }
 
@@ -620,47 +618,20 @@ All GitHub services extend `BaseGitHubService`:
 
 ```typescript
 abstract class BaseGitHubService {
-  protected readonly octokit: Octokit;
-  protected readonly repositories: RepositoryConfig;
-  protected readonly helpers: HelperServices;
+	protected readonly octokit: Octokit;
+	protected readonly repositories: RepositoryConfig;
 
-  constructor(config?: GitHubServiceConfig) {
-    this.octokit = new Octokit({ auth: env.GH_TOKEN });
-    this.repositories = { fork: {...}, upstream: {...} };
-    this.helpers = { github: new GitHubErrorHelper(), ... };
-  }
-}
-```
-
-**Benefits**:
-
-- Shared authentication and configuration
-- Consistent error handling via helpers
-- Protected access to common utilities
-
-### Proxy Pattern for Error Handling
-
-Services are wrapped in error handling proxies:
-
-```typescript
-export function createErrorHandlingProxy<T extends object>(target: T, context: string): T {
-	return new Proxy(target, {
-		get(target, prop) {
-			const original = target[prop];
-
-			if (typeof original === "function") {
-				return async function (...args: unknown[]) {
-					try {
-						return await original.apply(target, args);
-					} catch (error) {
-						throw handleError(error, { operation: `${context}.${String(prop)}` });
-					}
-				};
-			}
-
-			return original;
-		},
-	});
+	constructor(config?: GitHubServiceConfig) {
+		this.octokit = new Octokit({ auth: env.GH_TOKEN });
+		this.repositories = {
+			fork: {
+				/* ... */
+			},
+			upstream: {
+				/* ... */
+			},
+		};
+	}
 }
 ```
 
@@ -672,7 +643,7 @@ The project uses **constructor-based dependency injection** via `ServiceFactory`
 
 `ServiceFactory` centralizes service instantiation in `main.ts`:
 
-- **Singletons**: `getOctokit()`, `getOpenAI()`, `getLLMRateLimiter()`
+- **Singletons**: `getOctokit()`, `getOpenAI()`,
 - **Service factories**: `createBranchService()`, `createContentService()`, `createRepositoryService()`, `createTranslatorService()`, `createRunnerService()`
 
 Each service declares dependencies via typed interfaces (e.g., `BranchServiceDependencies`, `TranslatorServiceDependencies`). See [src/services/](../src/services/) for interface definitions.

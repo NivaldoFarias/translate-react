@@ -33,7 +33,8 @@ export enum ErrorCode {
 	ResourceLoadError = "RESOURCE_LOAD_ERROR",
 	ValidationError = "VALIDATION_ERROR",
 	UnknownError = "UNKNOWN_ERROR",
-	NO_FILES_TO_TRANSLATE = "NO_FILES_TO_TRANSLATE",
+	NoFilesToTranslate = "NO_FILES_TO_TRANSLATE",
+	BelowMinimumSuccessRate = "BELOW_MINIMUM_SUCCESS_RATE",
 }
 
 /**
@@ -55,6 +56,14 @@ export class ApplicationError<
 	/** Additional metadata for debugging */
 	public readonly metadata?: T;
 
+	/**
+	 * Creates a new {@link ApplicationError} instance
+	 *
+	 * @param message Human-readable error message
+	 * @param code Standardized error code
+	 * @param operation The operation that failed
+	 * @param metadata Additional metadata for debugging
+	 */
 	constructor(
 		message: string,
 		code: ErrorCode = ErrorCode.UnknownError,
@@ -71,7 +80,7 @@ export class ApplicationError<
 	}
 
 	/** Extracts a human-readable message from the error */
-	public getDisplayMessage(): string {
+	public get displayMessage(): string {
 		const operationSuffix = this.operation ? ` (in ${this.operation})` : "";
 
 		return `${this.message}${operationSuffix}`;
@@ -86,7 +95,7 @@ export class ApplicationError<
  * @returns Human-readable error message
  */
 export function extractErrorMessage(error: unknown): string {
-	if (error instanceof ApplicationError) return error.getDisplayMessage();
+	if (error instanceof ApplicationError) return error.displayMessage;
 	if (error instanceof Error) return error.message;
 
 	return String(error);

@@ -7,7 +7,7 @@ import {
 	createEmptyContentError,
 	createInitializationError,
 	createTranslationValidationError,
-	mapLLMError,
+	mapError,
 } from "@/errors/";
 import { env, logger, MAX_CHUNK_TOKENS, withExponentialBackoff } from "@/utils/";
 
@@ -726,7 +726,7 @@ export class TranslatorService {
 					"Failed to translate content chunk",
 				);
 
-				throw mapLLMError(error, `${TranslatorService.name}.translateWithChunking`, {
+				throw mapError(error, `${TranslatorService.name}.translateWithChunking`, {
 					chunkIndex: index,
 					totalChunks: chunks.length,
 					chunkSize: chunk.length,
@@ -853,7 +853,7 @@ export class TranslatorService {
 			if (!translatedContent) {
 				this.logger.error({ model: this.model }, "No content returned from language model");
 
-				throw mapLLMError(
+				throw mapError(
 					new Error("No content returned from language model"),
 					`${TranslatorService.name}.callLanguageModel`,
 					{
@@ -874,7 +874,7 @@ export class TranslatorService {
 
 			return translatedContent;
 		} catch (error) {
-			throw mapLLMError(error, `${TranslatorService.name}.callLanguageModel`, {
+			throw mapError(error, `${TranslatorService.name}.callLanguageModel`, {
 				model: this.model,
 				contentLength: content.length,
 			});

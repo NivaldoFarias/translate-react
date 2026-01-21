@@ -27,7 +27,7 @@ export const testEnv: Environment = {
 	GH_REQUEST_TIMEOUT: 60_000,
 	LLM_MAX_CONCURRENT: 5,
 	LLM_MIN_TIME_MS: 200,
-	MIN_SUCCESS_RATE: 0.5,
+	MIN_SUCCESS_RATE: 0.75,
 };
 
 void mock.module("@/utils/env.util", () => {

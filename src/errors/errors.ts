@@ -1,4 +1,4 @@
-import { ApplicationError, ErrorCode } from "./base-error";
+import { ApplicationError, ErrorCode } from "./base.error";
 
 /**
  * Creates an error for service initialization failures.

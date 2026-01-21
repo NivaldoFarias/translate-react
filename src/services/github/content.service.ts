@@ -7,7 +7,7 @@ import type { ProcessedFileResult, PullRequestStatus } from "./../runner";
 import type { TranslationFile } from "./../translator.service";
 import type { BaseGitHubServiceDependencies } from "./base.service";
 
-import { mapGithubError } from "@/errors/";
+import { mapError } from "@/errors/";
 import { logger } from "@/utils/";
 
 import { CommentBuilderService } from "./../comment-builder.service";
@@ -95,7 +95,7 @@ export class ContentService extends BaseGitHubService {
 
 			return response;
 		} catch (error) {
-			throw mapGithubError(error, `${ContentService.name}.createCommentOnPullRequest`, {
+			throw mapError(error, `${ContentService.name}.createCommentOnPullRequest`, {
 				prNumber,
 				upstream: this.repositories.upstream,
 			});
@@ -120,7 +120,7 @@ export class ContentService extends BaseGitHubService {
 
 			return response.data;
 		} catch (error) {
-			throw mapGithubError(error, `${ContentService.name}.listOpenPullRequests`, {
+			throw mapError(error, `${ContentService.name}.listOpenPullRequests`, {
 				upstream: this.repositories.upstream,
 			});
 		}
@@ -149,7 +149,7 @@ export class ContentService extends BaseGitHubService {
 
 			return response;
 		} catch (error) {
-			throw mapGithubError(error, `${ContentService.name}.findPullRequestByNumber`, {
+			throw mapError(error, `${ContentService.name}.findPullRequestByNumber`, {
 				prNumber,
 				upstream: this.repositories.upstream,
 			});
@@ -188,7 +188,7 @@ export class ContentService extends BaseGitHubService {
 
 			return filePaths;
 		} catch (error) {
-			throw mapGithubError(error, `${ContentService.name}.getPullRequestFiles`, {
+			throw mapError(error, `${ContentService.name}.getPullRequestFiles`, {
 				prNumber,
 				upstream: this.repositories.upstream,
 			});
@@ -218,7 +218,7 @@ export class ContentService extends BaseGitHubService {
 
 			if (!repoTreeResponse.data.tree.length) {
 				this.logger.warn({ fork: this.repositories.fork }, "Repository tree is empty");
-				throw mapGithubError(
+				throw mapError(
 					new Error("Repository tree is empty"),
 					`${ContentService.name}.getUntranslatedFiles`,
 					{ fork: this.repositories.fork },
@@ -272,7 +272,7 @@ export class ContentService extends BaseGitHubService {
 
 			return files;
 		} catch (error) {
-			throw mapGithubError(error, `${ContentService.name}.getUntranslatedFiles`, {
+			throw mapError(error, `${ContentService.name}.getUntranslatedFiles`, {
 				maxFiles,
 				fork: this.repositories.fork,
 			});
@@ -334,7 +334,7 @@ export class ContentService extends BaseGitHubService {
 
 			return response;
 		} catch (error) {
-			throw mapGithubError(error, `${ContentService.name}.commitTranslation`, {
+			throw mapError(error, `${ContentService.name}.commitTranslation`, {
 				filePath: file.path,
 				branchRef: branch.ref,
 				commitMessage: message,
@@ -391,7 +391,7 @@ export class ContentService extends BaseGitHubService {
 
 			return createPullRequestResponse.data;
 		} catch (error) {
-			throw mapGithubError(error, `${ContentService.name}.createPullRequest`, {
+			throw mapError(error, `${ContentService.name}.createPullRequest`, {
 				branch,
 				title,
 				baseBranch,
@@ -435,11 +435,9 @@ export class ContentService extends BaseGitHubService {
 
 			if (!file.sha) {
 				this.logger.warn({ file }, "Invalid blob SHA - file missing SHA property");
-				throw mapGithubError(
-					new Error("Invalid blob SHA"),
-					`${ContentService.name}.getFileContent`,
-					{ filePath: file.path },
-				);
+				throw mapError(new Error("Invalid blob SHA"), `${ContentService.name}.getFileContent`, {
+					filePath: file.path,
+				});
 			}
 
 			const response = await this.octokit.git.getBlob({
@@ -460,7 +458,7 @@ export class ContentService extends BaseGitHubService {
 
 			return content;
 		} catch (error) {
-			throw mapGithubError(error, `${ContentService.name}.getFileContent`, {
+			throw mapError(error, `${ContentService.name}.getFileContent`, {
 				filePath: file.path,
 				blobSha: file.sha,
 			});
@@ -562,11 +560,9 @@ export class ContentService extends BaseGitHubService {
 
 			return translationProgressIssue;
 		} catch (error) {
-			throw mapGithubError(
-				error,
-				`${ContentService.name}.${this.findTranslationProgressIssue.name}`,
-				{ queryString },
-			);
+			throw mapError(error, `${ContentService.name}.${this.findTranslationProgressIssue.name}`, {
+				queryString,
+			});
 		}
 	}
 
@@ -634,14 +630,10 @@ export class ContentService extends BaseGitHubService {
 
 			return createCommentResponse.data;
 		} catch (error) {
-			throw mapGithubError(
-				error,
-				`${ContentService.name}.${this.commentCompiledResultsOnIssue.name}`,
-				{
-					filesCount: filesToTranslate.length,
-					resultsCount: results.length,
-				},
-			);
+			throw mapError(error, `${ContentService.name}.${this.commentCompiledResultsOnIssue.name}`, {
+				filesCount: filesToTranslate.length,
+				resultsCount: results.length,
+			});
 		}
 	}
 
@@ -670,7 +662,7 @@ export class ContentService extends BaseGitHubService {
 
 			return pr;
 		} catch (error) {
-			throw mapGithubError(error, `${ContentService.name}.findPullRequestByBranch`, {
+			throw mapError(error, `${ContentService.name}.findPullRequestByBranch`, {
 				branchName,
 				forkOwner: this.repositories.fork.owner,
 			});
@@ -748,7 +740,7 @@ export class ContentService extends BaseGitHubService {
 				needsUpdate,
 			};
 		} catch (error) {
-			throw mapGithubError(error, `${ContentService.name}.checkPullRequestStatus`, {
+			throw mapError(error, `${ContentService.name}.checkPullRequestStatus`, {
 				prNumber,
 				upstream: this.repositories.upstream,
 			});
@@ -776,7 +768,7 @@ export class ContentService extends BaseGitHubService {
 
 			return response.data;
 		} catch (error) {
-			throw mapGithubError(error, `${ContentService.name}.closePullRequest`, {
+			throw mapError(error, `${ContentService.name}.closePullRequest`, {
 				prNumber,
 				upstream: this.repositories.upstream,
 			});

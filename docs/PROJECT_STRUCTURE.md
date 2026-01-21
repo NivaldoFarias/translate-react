@@ -1,16 +1,27 @@
 # Project Structure
 
-A comprehensive overview of the translate-react project organization.
+A comprehensive overview of the `translate-react` project organization.
 
 ## Table of Contents
 
+- [Table of Contents](#table-of-contents)
 - [Directory Structure Overview](#directory-structure-overview)
 - [Key Organization Principles](#key-organization-principles)
+  - [1. Service-Oriented Architecture](#1-service-oriented-architecture)
+  - [2. Error-First Design](#2-error-first-design)
+  - [3. Documentation-Driven Development](#3-documentation-driven-development)
+  - [4. Developer Experience Priority](#4-developer-experience-priority)
 - [File Type Categories](#file-type-categories)
+  - [Configuration Files](#configuration-files)
+  - [Service Layer Files](#service-layer-files)
+  - [Error Handling Files](#error-handling-files)
 - [Quick Navigation](#quick-navigation)
+  - [Development Tasks](#development-tasks)
+  - [Key Directories](#key-directories)
 - [Service Architecture Patterns](#service-architecture-patterns)
+  - [Inheritance Hierarchy](#inheritance-hierarchy)
+  - [Service Dependencies](#service-dependencies)
 - [Benefits of This Structure](#benefits-of-this-structure)
-- [Development Workflow](#development-workflow)
 
 ## Directory Structure Overview
 
@@ -23,9 +34,8 @@ translate-react/
 │       ├── ARCHITECTURE.md                   # System architecture and service design
 │       ├── WORKFLOW.md                       # Execution workflow analysis
 │       ├── ERROR_HANDLING.md                 # Error taxonomy and recovery mechanisms
-│       ├── TROUBLESHOOTING.md                      # Troubleshooting and diagnostics
+│       ├── TROUBLESHOOTING.md                # Troubleshooting and diagnostics
 │       ├── PROJECT_STRUCTURE.md              # This file
-│       └── GITHUB_ACTIONS_SETUP.md           # CI/CD configuration guide
 │
 ├── Configuration Files
 │   ├── package.json                          # Dependencies, scripts, and metadata
@@ -44,12 +54,9 @@ translate-react/
 │       │
 │       ├── errors/                           # Error handling system
 │       │   ├── index.ts                      # Error exports
-│       │   ├── base-error.ts                 # Base error classes
+│       │   ├── base.error.ts                 # Base error classes
 │       │   ├── errors.ts                     # Specific error implementations
-│       │   └── helpers/                      # Error helper utilities
-│       │       ├── index.ts
-│       │       ├── github-error.helper.ts    # GitHub error mapping
-│       │       └── llm-error.helper.ts       # LLM error handling
+│       │   └── error.helper.ts               # Agnostic Error mapper
 │       │
 │       ├── locales/                          # Language locale definitions
 │       │   ├── index.ts                      # Locale exports
@@ -108,11 +115,9 @@ translate-react/
 │       │   ├── repositories.mock.ts
 │       │   └── services.mock.ts
 │       ├── errors/                           # Error handling tests
-│       │   ├── base-error.spec.ts
+│       │   ├── base.error.spec.ts
 │       │   ├── errors.spec.ts
-│       │   └── helpers/
-│       │       ├── github-error.helper.spec.ts
-│       │       └── llm-error.helper.spec.ts
+│       │   └── error.helper.spec.ts
 │       ├── services/                         # Service tests
 │       │   ├── comment-builder.service.spec.ts
 │       │   ├── language-detector.service.spec.ts
@@ -185,12 +190,11 @@ translate-react/
 
 ### Error Handling Files
 
-| File                     | Purpose                 | Pattern  |
-| ------------------------ | ----------------------- | -------- |
-| `base-error.ts`          | Base error class        | Class    |
-| `errors.ts`              | Error factory functions | Factory  |
-| `github-error.helper.ts` | GitHub error mapping    | Function |
-| `llm-error.helper.ts`    | LLM error handling      | Function |
+| File              | Purpose                 | Pattern  |
+| ----------------- | ----------------------- | -------- |
+| `base.error.ts`   | Base error class        | Class    |
+| `errors.ts`       | Error factory functions | Factory  |
+| `error.helper.ts` | Agnostic Error mapping  | Function |
 
 ## Quick Navigation
 
@@ -249,18 +253,6 @@ ServiceFactory (creates all services)
     └── LocaleService
 ```
 
-### Error Handling Flow
-
-```plaintext
-Service Method
-└── Try-Catch Block
-    └── Error Helper
-        ├── Transform to Custom Error
-        ├── Add Context
-        ├── Map HTTP Status (GitHub)
-        └── Throw Enhanced Error
-```
-
 ## Benefits of This Structure
 
 1. **Clear Separation**: Services, errors, and utilities are logically organized
@@ -269,25 +261,3 @@ Service Method
 4. **Debuggable**: Comprehensive error handling and logging
 5. **Documented**: Technical docs co-located with code
 6. **Scalable**: Easy to extend with new services or features
-
-## Development Workflow
-
-### Adding a New Feature
-
-1. Create service in `src/services/` (if needed)
-2. Add error types in `src/errors/errors.ts` (if needed)
-3. Write tests in `tests/services/`
-4. Update documentation in `docs/`
-5. Add environment variables to `env.util.ts` (if needed)
-
-### Debugging Workflow
-
-1. Check error logs in `logs/` directory
-2. Enable debug mode with `LOG_LEVEL=debug`
-3. Consult [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) for common issues
-
-### Testing Workflow
-
-1. Write tests using Bun's test runner
-2. Run tests with `bun test`
-3. Run with coverage: `bun test --coverage`

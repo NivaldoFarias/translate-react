@@ -219,7 +219,7 @@ export abstract class BaseRunnerService {
 
 			throw new ApplicationError(
 				"Found no files to translate",
-				ErrorCode.NO_FILES_TO_TRANSLATE,
+				ErrorCode.NoFilesToTranslate,
 				`${BaseRunnerService.name}.fetchFilesToTranslate`,
 			);
 		}

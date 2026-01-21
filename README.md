@@ -192,14 +192,13 @@ translate-react/
 
 ## Documentation
 
-| Document                                                  | Description                                                  |
-| --------------------------------------------------------- | ------------------------------------------------------------ |
-| [ARCHITECTURE.md](./docs/ARCHITECTURE.md)                 | System architecture, service design, and design patterns     |
-| [WORKFLOW.md](./docs/WORKFLOW.md)                         | Execution workflow with timing analysis and performance data |
-| [ERROR_HANDLING.md](./docs/ERROR_HANDLING.md)             | Error taxonomy and recovery mechanisms                       |
-| [TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md)           | Troubleshooting guide and diagnostic procedures              |
-| [PROJECT_STRUCTURE.md](./docs/PROJECT_STRUCTURE.md)       | Complete directory structure and navigation guide            |
-| [GITHUB_ACTIONS_SETUP.md](./docs/GITHUB_ACTIONS_SETUP.md) | CI/CD workflow configuration guide                           |
+| Document                                            | Description                                                  |
+| --------------------------------------------------- | ------------------------------------------------------------ |
+| [ARCHITECTURE.md](./docs/ARCHITECTURE.md)           | System architecture, service design, and design patterns     |
+| [WORKFLOW.md](./docs/WORKFLOW.md)                   | Execution workflow with timing analysis and performance data |
+| [ERROR_HANDLING.md](./docs/ERROR_HANDLING.md)       | Error taxonomy and recovery mechanisms                       |
+| [TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md)     | Troubleshooting guide and diagnostic procedures              |
+| [PROJECT_STRUCTURE.md](./docs/PROJECT_STRUCTURE.md) | Complete directory structure and navigation guide            |
 
 ## Contributing
 
