@@ -72,6 +72,7 @@ jobs:
           LOG_TO_CONSOLE: ${{ vars.LOG_TO_CONSOLE }}
           LLM_MODEL: ${{ vars.LLM_MODEL }}
           LLM_API_BASE_URL: ${{ vars.LLM_API_BASE_URL }}
+          LLM_API_MAX_RETRIES: ${{ vars.LLM_API_MAX_RETRIES }}
           OPENAI_PROJECT_ID: ${{ secrets.OPENAI_PROJECT_ID }}
           MAX_TOKENS: ${{ vars.MAX_TOKENS }}
           BATCH_SIZE: ${{ vars.BATCH_SIZE }}
@@ -79,8 +80,6 @@ jobs:
           MIN_SUCCESS_RATE: ${{ vars.MIN_SUCCESS_RATE }}
           HEADER_APP_URL: ${{ vars.HEADER_APP_URL }}
           HEADER_APP_TITLE: ${{ vars.HEADER_APP_TITLE }}
-          LLM_MAX_CONCURRENT: ${{ vars.LLM_MAX_CONCURRENT }}
-          LLM_MIN_TIME_MS: ${{ vars.LLM_MIN_TIME_MS }}
         run: |
           cat > .env << EOF
           GH_TOKEN=${{ steps.generate-token.outputs.token }}
@@ -98,6 +97,7 @@ jobs:
           [ -n "$LOG_TO_CONSOLE" ] && echo "LOG_TO_CONSOLE=$LOG_TO_CONSOLE" >> .env || true
           [ -n "$LLM_MODEL" ] && echo "LLM_MODEL=$LLM_MODEL" >> .env || true
           [ -n "$LLM_API_BASE_URL" ] && echo "LLM_API_BASE_URL=$LLM_API_BASE_URL" >> .env || true
+          [ -n "$LLM_API_MAX_RETRIES" ] && echo "LLM_API_MAX_RETRIES=$LLM_API_MAX_RETRIES" >> .env || true
           [ -n "$OPENAI_PROJECT_ID" ] && echo "OPENAI_PROJECT_ID=$OPENAI_PROJECT_ID" >> .env || true
           [ -n "$MAX_TOKENS" ] && echo "MAX_TOKENS=$MAX_TOKENS" >> .env || true
           [ -n "$BATCH_SIZE" ] && echo "BATCH_SIZE=$BATCH_SIZE" >> .env || true
@@ -105,8 +105,6 @@ jobs:
           [ -n "$MIN_SUCCESS_RATE" ] && echo "MIN_SUCCESS_RATE=$MIN_SUCCESS_RATE" >> .env || true
           [ -n "$HEADER_APP_URL" ] && echo "HEADER_APP_URL=$HEADER_APP_URL" >> .env || true
           [ -n "$HEADER_APP_TITLE" ] && echo "HEADER_APP_TITLE=$HEADER_APP_TITLE" >> .env || true
-          [ -n "$LLM_MAX_CONCURRENT" ] && echo "LLM_MAX_CONCURRENT=$LLM_MAX_CONCURRENT" >> .env || true
-          [ -n "$LLM_MIN_TIME_MS" ] && echo "LLM_MIN_TIME_MS=$LLM_MIN_TIME_MS" >> .env || true
 
       - name: Run translation workflow (${{ matrix.lang }})
         run: bun run start

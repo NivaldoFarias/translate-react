@@ -7,7 +7,7 @@ import type {
 	RunnerServiceDependencies,
 } from "./runner.types";
 
-import { ApplicationError, ErrorCode } from "@/errors/";
+import { ApplicationError, ErrorCode, mapError } from "@/errors/";
 import { logger, MAX_CONSECUTIVE_FAILURES } from "@/utils/";
 
 import { TranslationFile } from "../translator.service";
@@ -23,7 +23,7 @@ export interface PullRequestDescriptionMetadata {
 	content: {
 		source: string;
 		translation: string;
-		compressionRatio: number;
+		compressionRatio: string;
 	};
 	timestamps: {
 		now: number;
@@ -182,6 +182,8 @@ export class TranslationBatchManager {
 				"Batch processing completed",
 			);
 		} catch (error) {
+			if (error instanceof ApplicationError) throw error;
+
 			this.logger.error({ error, batchInfo }, "Error processing batch");
 			throw error;
 		}
@@ -234,33 +236,17 @@ export class TranslationBatchManager {
 	 * @param file File to process through translation workflow
 	 * @param _progress Progress tracking information for batch processing
 	 *
+	 * @throws {ApplicationError} with {@link ErrorCode.TranslationFailed} if circuit breaker
+	 *  threshold is reached due to consecutive failures
+	 *
 	 * @returns Processing result metadata including branch, translation, PR, and error info
 	 */
 	async processFile(
 		file: TranslationFile,
 		_progress: FileProcessingProgress,
 	): Promise<ProcessedFileResult> {
-		if (this.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-			this.logger.error(
-				{
-					consecutiveFailures: this.consecutiveFailures,
-					threshold: MAX_CONSECUTIVE_FAILURES,
-					filename: file.filename,
-				},
-				"Circuit breaker activated: stopping workflow due to consecutive failures",
-			);
-
-			throw new ApplicationError(
-				`Workflow terminated: ${this.consecutiveFailures} consecutive failures exceeded threshold of ${MAX_CONSECUTIVE_FAILURES}`,
-				ErrorCode.TranslationFailed,
-				`${TranslationBatchManager.name}.processFile`,
-				{
-					consecutiveFailures: this.consecutiveFailures,
-					threshold: MAX_CONSECUTIVE_FAILURES,
-				},
-			);
-		}
-
+		const fileStartTime = Date.now();
+		const logger = this.logger.child({ component: file.filename });
 		const metadata: ProcessedFileResult = {
 			branch: null,
 			filename: file.filename,
@@ -269,19 +255,42 @@ export class TranslationBatchManager {
 			error: null,
 		};
 
-		const fileStartTime = Date.now();
-
 		try {
-			this.logger.debug(
-				{ filename: file.filename, contentLength: file.content.length },
+			logger.debug(
+				{
+					filename: file.filename,
+					contentLength: file.content.length,
+					consecutiveFailures: this.consecutiveFailures,
+				},
 				"Starting file processing workflow",
 			);
+
+			if (this.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+				logger.error(
+					{
+						consecutiveFailures: this.consecutiveFailures,
+						threshold: MAX_CONSECUTIVE_FAILURES,
+						filename: file.filename,
+					},
+					"Circuit breaker activated: stopping workflow due to consecutive failures",
+				);
+
+				throw new ApplicationError(
+					`Workflow terminated: ${this.consecutiveFailures} consecutive failures exceeded threshold of ${MAX_CONSECUTIVE_FAILURES}`,
+					ErrorCode.TranslationFailed,
+					`${TranslationBatchManager.name}.${this.processFile.name}`,
+					{
+						consecutiveFailures: this.consecutiveFailures,
+						threshold: MAX_CONSECUTIVE_FAILURES,
+					},
+				);
+			}
 
 			const branchStartTime = Date.now();
 			metadata.branch = await this.createOrGetTranslationBranch(file);
 			const branchDuration = Date.now() - branchStartTime;
 
-			this.logger.debug(
+			logger.debug(
 				{ filename: file.filename, branchRef: metadata.branch.ref, durationMs: branchDuration },
 				"Branch creation completed",
 			);
@@ -290,7 +299,7 @@ export class TranslationBatchManager {
 			metadata.translation = await this.services.translator.translateContent(file);
 			const translationDuration = Date.now() - translationStartTime;
 
-			this.logger.debug(
+			logger.debug(
 				{
 					filename: file.filename,
 					translatedLength: metadata.translation.length,
@@ -299,10 +308,9 @@ export class TranslationBatchManager {
 				"Translation completed - proceeding to commit",
 			);
 
-			const languageName =
-				this.services.translator.languageDetector.getLanguageName(
-					this.services.translator.languageDetector.languages.target,
-				) ?? "Portuguese";
+			const languageName = this.services.languageDetector.getLanguageName(
+				this.services.languageDetector.languages.target,
+			);
 
 			const commitStartTime = Date.now();
 			await this.services.github.content.commitTranslation({
@@ -313,7 +321,7 @@ export class TranslationBatchManager {
 			});
 			const commitDuration = Date.now() - commitStartTime;
 
-			this.logger.debug(
+			logger.debug(
 				{ filename: file.filename, durationMs: commitDuration },
 				"Commit completed - creating pull request",
 			);
@@ -324,7 +332,7 @@ export class TranslationBatchManager {
 			const prDuration = Date.now() - prStartTime;
 			const totalDuration = Date.now() - fileStartTime;
 
-			this.logger.debug(
+			logger.debug(
 				{
 					filename: file.filename,
 					prNumber: metadata.pullRequest.number,
@@ -343,20 +351,20 @@ export class TranslationBatchManager {
 			this.updateBatchProgress("success");
 		} catch (error) {
 			const failureDuration = Date.now() - fileStartTime;
-
 			this.consecutiveFailures++;
 
-			this.logger.error(
-				{
-					error,
-					filename: file.filename,
-					durationMs: failureDuration,
-					consecutiveFailures: this.consecutiveFailures,
-				},
-				"File processing failed",
-			);
+			const mappedError =
+				error instanceof ApplicationError ? error : (
+					mapError(error, `${TranslationBatchManager.name}.${this.processFile.name}`, {
+						filename: file.filename,
+						durationMs: failureDuration,
+						consecutiveFailures: this.consecutiveFailures,
+					})
+				);
 
-			metadata.error = error instanceof Error ? error : new Error(String(error));
+			logger.error({ error: mappedError }, "File processing failed");
+
+			metadata.error = mappedError;
 			this.updateBatchProgress("error");
 
 			await this.cleanupFailedTranslation(metadata);
@@ -398,6 +406,8 @@ export class TranslationBatchManager {
 				"Cleaned up branch after failed translation",
 			);
 		} catch (error) {
+			if (error instanceof ApplicationError) throw error;
+
 			this.logger.error(
 				{ error, filename: metadata.filename, branchRef: metadata.branch.ref },
 				"Failed to cleanup branch after translation failure - non-critical",
@@ -529,51 +539,69 @@ export class TranslationBatchManager {
 		processingResult: ProcessedFileResult,
 	) {
 		const branchName = `translate/${file.path.split("/").slice(2).join("/")}`;
-		const existingPR = await this.services.github.content.findPullRequestByBranch(branchName);
-
-		const languageName =
-			this.services.translator.languageDetector.getLanguageName(
-				this.services.translator.languageDetector.languages.target,
-			) ?? "Portuguese";
-
+		const languageName = this.services.languageDetector.getLanguageName(
+			this.services.languageDetector.languages.target,
+		);
 		const prOptions = {
-			title: `Translate \`${file.filename}\` to ${languageName}`,
+			title: this.services.locale.locale.pullRequest.title(file),
 			body: this.createPullRequestDescription(file, processingResult, languageName),
 			baseBranch: "main",
 		};
 
-		if (existingPR) {
-			const prStatus = await this.services.github.content.checkPullRequestStatus(existingPR.number);
+		try {
+			this.logger.info({ branchName, title: prOptions.title }, "Creating or updating pull request");
 
-			if (prStatus.needsUpdate) {
+			const existingPR = await this.services.github.content.findPullRequestByBranch(branchName);
+
+			if (existingPR) {
+				const prStatus = await this.services.github.content.checkPullRequestStatus(
+					existingPR.number,
+				);
+
+				if (prStatus.needsUpdate) {
+					this.logger.info(
+						{ prNumber: existingPR.number, mergeableState: prStatus.mergeableState },
+						"Closing PR with merge conflicts and creating new one",
+					);
+
+					await this.services.github.content.createCommentOnPullRequest(
+						existingPR.number,
+						"This PR has merge conflicts and is being closed. A new PR with the updated translation will be created.",
+					);
+
+					await this.services.github.content.closePullRequest(existingPR.number);
+
+					return await this.services.github.content.createPullRequest({
+						branch: branchName,
+						...prOptions,
+					});
+				}
+
 				this.logger.info(
 					{ prNumber: existingPR.number, mergeableState: prStatus.mergeableState },
-					"Closing PR with merge conflicts and creating new one",
-				);
-				await this.services.github.content.createCommentOnPullRequest(
-					existingPR.number,
-					"This PR has merge conflicts and is being closed. A new PR with the updated translation will be created.",
+					"PR exists with no conflicts, reusing",
 				);
 
-				await this.services.github.content.closePullRequest(existingPR.number);
-
-				return await this.services.github.content.createPullRequest({
-					branch: branchName,
-					...prOptions,
-				});
+				return existingPR;
 			}
 
-			this.logger.debug(
-				{ prNumber: existingPR.number, mergeableState: prStatus.mergeableState },
-				"PR exists with no conflicts, reusing",
-			);
-			return existingPR;
-		}
+			return await this.services.github.content.createPullRequest({
+				branch: branchName,
+				...prOptions,
+			});
+		} catch (error) {
+			if (error instanceof ApplicationError) throw error;
 
-		return await this.services.github.content.createPullRequest({
-			branch: branchName,
-			...prOptions,
-		});
+			throw mapError(
+				error,
+				`${TranslationBatchManager.name}.${this.createOrUpdatePullRequest.name}`,
+				{
+					branch: branchName,
+					title: prOptions.title,
+					baseBranch: prOptions.baseBranch,
+				},
+			);
+		}
 	}
 
 	/**
@@ -595,38 +623,48 @@ export class TranslationBatchManager {
 		processingResult: ProcessedFileResult,
 		languageName: string,
 	): string {
-		this.logger.info(
-			{ file: file.path, language: languageName },
-			"Creating pull request description",
-		);
+		try {
+			this.logger.info(
+				{ file: file.path, language: languageName },
+				"Creating pull request description",
+			);
 
-		const pullRequestDescriptionMetadata: PullRequestDescriptionMetadata = {
-			languageName,
-			invalidFilePR: this.invalidPRsByFile.get(file.path),
-			content: {
-				source: prettyBytes(file.content.length),
-				translation: prettyBytes(processingResult.translation?.length ?? 0),
-				compressionRatio:
-					file.content.length > 0 ?
-						(processingResult.translation?.length ?? 0) / file.content.length
-					:	0,
-			},
-			timestamps: {
-				now: Date.now(),
-				workflowStart: this.workflowStartTimestamp,
-			},
-		};
-		const generatedPullRequestDescription = this.services.locale.locale.pullRequest.body(
-			file,
-			processingResult,
-			pullRequestDescriptionMetadata,
-		);
+			const pullRequestDescriptionMetadata: PullRequestDescriptionMetadata = {
+				languageName,
+				invalidFilePR: this.invalidPRsByFile.get(file.path),
+				content: {
+					source: prettyBytes(file.content.length),
+					translation: prettyBytes(processingResult.translation?.length ?? 0),
+					compressionRatio:
+						file.content.length > 0 ?
+							((processingResult.translation?.length ?? 0) / file.content.length).toFixed(2)
+						:	"unknown",
+				},
+				timestamps: {
+					now: Date.now(),
+					workflowStart: this.workflowStartTimestamp,
+				},
+			};
+			const generatedPullRequestDescription = this.services.locale.locale.pullRequest.body(
+				file,
+				processingResult,
+				pullRequestDescriptionMetadata,
+			);
 
-		this.logger.info(
-			pullRequestDescriptionMetadata,
-			"Pull request description created successfully",
-		);
+			this.logger.info(
+				pullRequestDescriptionMetadata,
+				"Pull request description created successfully",
+			);
 
-		return generatedPullRequestDescription;
+			return generatedPullRequestDescription;
+		} catch (error) {
+			if (error instanceof ApplicationError) throw error;
+
+			throw mapError(
+				error,
+				`${TranslationBatchManager.name}.${this.createPullRequestDescription.name}`,
+				{ file: file.path, languageName },
+			);
+		}
 	}
 }

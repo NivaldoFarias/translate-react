@@ -2,8 +2,9 @@ import { RequestError } from "@octokit/request-error";
 import { StatusCodes } from "http-status-codes";
 import { APIError } from "openai/error";
 
-import { ApplicationError, ErrorCode } from "@/errors/base.error";
 import { logger as baseLogger, detectRateLimit } from "@/utils/";
+
+import { ApplicationError, ErrorCode } from "./error";
 
 /** Base metadata fields added by mapError for all error types */
 export interface GithubErrorBaseMetadata {

@@ -35,6 +35,8 @@ export enum ErrorCode {
 	UnknownError = "UNKNOWN_ERROR",
 	NoFilesToTranslate = "NO_FILES_TO_TRANSLATE",
 	BelowMinimumSuccessRate = "BELOW_MINIMUM_SUCCESS_RATE",
+	InsufficientPermissions = "INSUFFICIENT_PERMISSIONS",
+	LanguageCodeNotSupported = "LANGUAGE_CODE_NOT_SUPPORTED",
 }
 
 /**

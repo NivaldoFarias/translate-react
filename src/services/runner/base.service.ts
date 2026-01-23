@@ -1,18 +1,14 @@
 import type {
 	PatchedRepositoryItem,
 	ProcessedFileResult,
+	RepositoryTreeItem,
 	RunnerOptions,
 	RunnerServiceDependencies,
 	RunnerState,
 	WorkflowStatistics,
 } from "./runner.types";
 
-import {
-	ApplicationError,
-	createInitializationError,
-	createResourceLoadError,
-	ErrorCode,
-} from "@/errors/";
+import { ApplicationError, ErrorCode, mapError } from "@/errors/";
 import { env, logger, setupSignalHandlers } from "@/utils/";
 
 import { FileDiscoveryManager } from "./file-discovery.manager";
@@ -99,9 +95,7 @@ export abstract class BaseRunnerService {
 	/**
 	 * Verifies LLM connectivity by testing the translator service.
 	 *
-	 * Calls {@link TranslatorService.testConnectivity} to verify LLM connectivity
-	 *
-	 * @throws {InitializationError} If LLM connectivity test fails
+	 * @see {@link TranslatorService.testConnectivity}
 	 */
 	protected async verifyLLMConnectivity(): Promise<void> {
 		await this.services.translator.testConnectivity();
@@ -110,78 +104,174 @@ export abstract class BaseRunnerService {
 	/**
 	 * Verifies GitHub token permissions
 	 *
-	 * @throws {InitializationError} If token permissions verification fails
+	 * @throws {ApplicationError} with {@link ErrorCode.InitializationError} If token permissions verification fails
 	 */
 	protected async verifyPermissions(): Promise<void> {
-		const hasPermissions = await this.services.github.repository.verifyTokenPermissions();
+		try {
+			this.logger.info("Verifying GitHub token permissions");
 
-		if (!hasPermissions) {
-			throw createInitializationError(
-				"Token permissions verification failed",
-				`${BaseRunnerService.name}.verifyTokenPermissions`,
-			);
+			const hasPermissions = await this.services.github.repository.verifyTokenPermissions();
+
+			if (!hasPermissions) {
+				this.logger.error("GitHub token permissions verification failed");
+
+				throw new ApplicationError(
+					"Token permissions verification failed",
+					ErrorCode.InitializationError,
+					`${BaseRunnerService.name}.${this.verifyPermissions.name}`,
+					{ hasPermissions },
+				);
+			}
+
+			this.logger.info("GitHub token permissions verified successfully");
+		} catch (error) {
+			if (error instanceof ApplicationError) throw error;
+
+			throw mapError(error, `${BaseRunnerService.name}.${this.verifyPermissions.name}`);
 		}
 	}
 
 	/**
 	 * Synchronizes the fork with the upstream repository
 	 *
-	 * @throws {InitializationError} If the fork synchronization fails
+	 * @throws {ApplicationError} with {@link ErrorCode.InitializationError} If the fork synchronization fails
 	 *
 	 * @returns `true` if the fork is up to date, `false` otherwise
 	 */
 	protected async syncFork(): Promise<boolean> {
-		this.logger.info("Checking fork existance and its status");
+		try {
+			this.logger.info("Checking fork existance and its status");
 
-		await this.services.github.repository.forkExists();
-		const isForkSynced = await this.services.github.repository.isForkSynced();
+			await this.services.github.repository.forkExists();
+			const isForkSynced = await this.services.github.repository.isForkSynced();
 
-		if (!isForkSynced) {
-			this.logger.info("Fork is out of sync, updating fork");
+			if (!isForkSynced) {
+				this.logger.info("Fork is out of sync, updating fork");
 
-			const syncSuccess = await this.services.github.repository.syncFork();
-			if (!syncSuccess) {
-				throw createInitializationError(
-					"Failed to sync fork with upstream repository",
-					`${BaseRunnerService.name}.syncFork`,
-				);
+				const syncSuccess = await this.services.github.repository.syncFork();
+				if (!syncSuccess) {
+					this.logger.error({ isForkSynced, syncSuccess }, "Fork synchronization failed");
+
+					throw new ApplicationError(
+						"Failed to sync fork with upstream repository",
+						ErrorCode.InitializationError,
+						`${BaseRunnerService.name}.${this.syncFork.name}`,
+						{ isForkSynced, syncSuccess },
+					);
+				}
+
+				this.logger.info("Fork synchronized with upstream repository");
+			} else {
+				this.logger.info("Fork is up to date");
 			}
 
-			this.logger.info("Fork synchronized with upstream repository");
-		} else {
-			this.logger.info("Fork is up to date");
-		}
+			return isForkSynced;
+		} catch (error) {
+			if (error instanceof ApplicationError) throw error;
 
-		return isForkSynced;
+			throw mapError(error, `${BaseRunnerService.name}.${this.syncFork.name}`);
+		}
 	}
 
 	/**
 	 * Fetches the upstream repository tree and glossary for translation processing.
 	 *
 	 * Retrieves all candidate files from upstream.
-	 *
-	 * @throws {ResourceLoadError} If the repository tree or glossary fetch fails
 	 */
 	protected async fetchRepositoryTree(): Promise<void> {
-		this.logger.info("Fetching repository content");
-		const repositoryTree = await this.services.github.repository.getRepositoryTree("upstream");
+		try {
+			this.logger.info("Fetching repository content");
 
-		this.state.repositoryTree = repositoryTree.map((item) => {
-			const filename = item.path?.split("/").pop() ?? "";
+			const repositoryTree = await this.services.github.repository.getRepositoryTree("upstream");
+			this.logger.info(
+				{ itemCount: repositoryTree.length },
+				"Repository tree fetched from upstream",
+			);
 
-			return { ...item, filename };
-		}) as PatchedRepositoryItem[];
+			this.state.repositoryTree = this.patchRepositoryItemFilenames(repositoryTree);
 
-		this.logger.info("Repository tree fetched. Fetching glossary");
+			this.logger.info(
+				{ before: repositoryTree.length, after: this.state.repositoryTree.length },
+				"Repository tree item's filenames patched successfully",
+			);
 
-		const glossary = await this.services.github.repository.fetchGlossary();
+			this.services.translator.glossary = await this.fetchGlossary();
 
-		if (!glossary) {
-			throw createResourceLoadError("glossary", `${BaseRunnerService.name}.fetchRepositoryTree`);
+			this.logger.info("Repository content and glossary fetched successfully");
+		} catch (error) {
+			if (error instanceof ApplicationError) throw error;
+
+			throw mapError(error, `${BaseRunnerService.name}.${this.fetchRepositoryTree.name}`);
 		}
+	}
 
-		this.services.translator.glossary = glossary;
-		this.logger.info("Repository content and glossary fetched successfully");
+	/**
+	 * Fetches the glossary file from the repository.
+	 *
+	 * @throws {ApplicationError} with {@link ErrorCode.ResourceLoadError} If the glossary fails to load
+	 */
+	private async fetchGlossary(): Promise<string> {
+		try {
+			this.logger.debug("Fetching glossary from repository");
+
+			const glossary = await this.services.github.repository.fetchGlossary();
+
+			if (!glossary) {
+				this.logger.error({ glossary }, "Glossary is empty or failed to load");
+
+				throw new ApplicationError(
+					"Glossary is empty or failed to load",
+					ErrorCode.ResourceLoadError,
+					`${BaseRunnerService.name}.${this.fetchGlossary.name}`,
+				);
+			}
+
+			this.logger.debug({ glossary }, "Repository content and glossary fetched successfully");
+
+			return glossary;
+		} catch (error) {
+			if (error instanceof ApplicationError) throw error;
+
+			throw mapError(error, `${BaseRunnerService.name}.${this.fetchGlossary.name}`);
+		}
+	}
+
+	/**
+	 * Patches repository tree item's filenames extracted from paths.
+	 *
+	 * @param repositoryTree Array of unpatched repository tree items
+	 *
+	 * @returns Array of repository items with patched filenames
+	 */
+	private patchRepositoryItemFilenames(
+		repositoryTree: RepositoryTreeItem[],
+	): PatchedRepositoryItem[] {
+		try {
+			this.logger.debug("Patching repository item filenames");
+
+			const patchedRepositoryTree = repositoryTree.map((item) => {
+				const filename = item.path?.split("/").pop() ?? "";
+
+				return { ...item, filename };
+			}) as PatchedRepositoryItem[];
+
+			this.logger.debug(
+				{
+					results: repositoryTree.map((item) => {
+						const match = patchedRepositoryTree.find((patched) => patched.sha === item.sha);
+
+						return { original: item.path, patched: match?.filename ?? "N/A" };
+					}),
+				},
+				"Repository item filenames patched successfully",
+			);
+
+			return patchedRepositoryTree;
+		} catch (error) {
+			if (error instanceof ApplicationError) throw error;
+
+			throw mapError(error, `${BaseRunnerService.name}.${this.patchRepositoryItemFilenames.name}`);
+		}
 	}
 
 	/**
@@ -201,45 +291,54 @@ export abstract class BaseRunnerService {
 	 *
 	 * Files with existing PRs that have merge conflicts are identified and stored in
 	 * {@link state.invalidPRsByFile} for notification in new PR descriptions.
+	 *
+	 * @throws {ApplicationError} with {@link ErrorCode.NoFilesToTranslate} If no files are found to translate
 	 */
 	protected async fetchFilesToTranslate(): Promise<void> {
-		if (this.state.filesToTranslate.length) {
+		try {
+			this.logger.info("Discovering files to translate");
+
+			if (this.state.filesToTranslate.length) {
+				this.logger.info(
+					`Found ${this.state.filesToTranslate.length} files to translate (from cache)`,
+				);
+				return;
+			}
+
+			const { filesToTranslate, invalidPRsByFile } = await this.fileDiscovery.discoverFiles(
+				this.state.repositoryTree,
+			);
+
+			if (filesToTranslate.length === 0) {
+				this.logger.error({ filesToTranslate, invalidPRsByFile }, "Found no files to translate");
+
+				throw new ApplicationError(
+					"Found no files to translate",
+					ErrorCode.NoFilesToTranslate,
+					`${BaseRunnerService.name}.fetchFilesToTranslate`,
+				);
+			}
+
 			this.logger.info(
-				`Found ${this.state.filesToTranslate.length} files to translate (from cache)`,
+				{ filesCount: filesToTranslate.length },
+				`Discovered ${filesToTranslate.length} files to translate after filtering`,
 			);
-			return;
-		}
 
-		const { filesToTranslate, invalidPRsByFile } = await this.fileDiscovery.discoverFiles(
-			this.state.repositoryTree,
-		);
+			this.state.filesToTranslate = filesToTranslate;
+			this.state.invalidPRsByFile = invalidPRsByFile;
 
-		if (filesToTranslate.length === 0) {
-			this.logger.error({ filesToTranslate, invalidPRsByFile }, "Found no files to translate");
-
-			throw new ApplicationError(
-				"Found no files to translate",
-				ErrorCode.NoFilesToTranslate,
-				`${BaseRunnerService.name}.fetchFilesToTranslate`,
+			this.translationBatch = new TranslationBatchManager(
+				this.services,
+				invalidPRsByFile,
+				this.metadata.timestamp,
 			);
+
+			this.logger.debug("Completed setting up translation batch manager and state update");
+		} catch (error) {
+			if (error instanceof ApplicationError) throw error;
+
+			throw mapError(error, `${BaseRunnerService.name}.${this.fetchFilesToTranslate.name}`);
 		}
-
-		this.logger.debug(
-			{
-				filesCount: filesToTranslate.length,
-				filenames: filesToTranslate.map((file) => file.filename),
-			},
-			`Discovered ${filesToTranslate.length} files to translate after filtering`,
-		);
-
-		this.state.filesToTranslate = filesToTranslate;
-		this.state.invalidPRsByFile = invalidPRsByFile;
-
-		this.translationBatch = new TranslationBatchManager(
-			this.services,
-			invalidPRsByFile,
-			this.metadata.timestamp,
-		);
 	}
 
 	/** Updates the progress issue with the translation results */
@@ -250,13 +349,9 @@ export abstract class BaseRunnerService {
 	/**
 	 * Generates and displays final statistics for the translation workflow.
 	 *
-	 * Uses {@link PRManager.printFinalStatistics} to calculate and display:
-	 * - Total files processed
-	 * - Success/failure counts
-	 * - Detailed error information for failed files
-	 * - Total execution time
-	 *
 	 * @returns Workflow statistics summary
+	 *
+	 * @see {@link PRManager.printFinalStatistics}
 	 */
 	protected printFinalStatistics(): WorkflowStatistics {
 		return this.prManager.printFinalStatistics(this.metadata.results);
@@ -265,13 +360,9 @@ export abstract class BaseRunnerService {
 	/**
 	 * Processes files in batches to manage resources and provide progress feedback.
 	 *
-	 * Uses {@link TranslationBatchManager.processBatches} to:
-	 * 1. Split files into manageable batches
-	 * 2. Process each batch concurrently
-	 * 3. Update progress in real-time
-	 * 4. Report batch completion statistics
-	 *
 	 * @param batchSize Number of files to process simultaneously
+	 *
+	 * @see {@link TranslationBatchManager.processBatches}
 	 */
 	protected async processInBatches(batchSize = env.BATCH_SIZE): Promise<void> {
 		this.metadata.results = await this.translationBatch.processBatches(

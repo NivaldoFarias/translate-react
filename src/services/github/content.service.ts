@@ -1,3 +1,5 @@
+import { Buffer } from "node:buffer";
+
 import Bun from "bun";
 
 import type { RestEndpointMethodTypes } from "@octokit/rest";
@@ -7,7 +9,7 @@ import type { ProcessedFileResult, PullRequestStatus } from "./../runner";
 import type { TranslationFile } from "./../translator.service";
 import type { BaseGitHubServiceDependencies } from "./base.service";
 
-import { mapError } from "@/errors/";
+import { ApplicationError, ErrorCode, mapError } from "@/errors/";
 import { logger } from "@/utils/";
 
 import { CommentBuilderService } from "./../comment-builder.service";
@@ -82,6 +84,8 @@ export class ContentService extends BaseGitHubService {
 		comment: string,
 	): Promise<RestEndpointMethodTypes["issues"]["createComment"]["response"]> {
 		try {
+			this.logger.info({ prNumber }, "Creating comment on pull request");
+
 			const response = await this.octokit.issues.createComment({
 				...this.repositories.upstream,
 				issue_number: prNumber,
@@ -95,7 +99,9 @@ export class ContentService extends BaseGitHubService {
 
 			return response;
 		} catch (error) {
-			throw mapError(error, `${ContentService.name}.createCommentOnPullRequest`, {
+			if (error instanceof ApplicationError) throw error;
+
+			throw mapError(error, `${ContentService.name}.${this.createCommentOnPullRequest.name}`, {
 				prNumber,
 				upstream: this.repositories.upstream,
 			});
@@ -111,16 +117,23 @@ export class ContentService extends BaseGitHubService {
 		RestEndpointMethodTypes["pulls"]["list"]["response"]["data"]
 	> {
 		try {
+			this.logger.info(
+				{ repo: this.repositories.upstream, state: "open" },
+				"Listing open pull requests",
+			);
+
 			const response = await this.octokit.pulls.list({
 				...this.repositories.upstream,
 				state: "open",
 			});
 
-			this.logger.debug({ count: response.data.length }, "Listed open pull requests");
+			this.logger.info({ count: response.data.length }, "Listed open pull requests");
 
 			return response.data;
 		} catch (error) {
-			throw mapError(error, `${ContentService.name}.listOpenPullRequests`, {
+			if (error instanceof ApplicationError) throw error;
+
+			throw mapError(error, `${ContentService.name}.${this.listOpenPullRequests.name}`, {
 				upstream: this.repositories.upstream,
 			});
 		}
@@ -137,19 +150,26 @@ export class ContentService extends BaseGitHubService {
 		prNumber: number,
 	): Promise<RestEndpointMethodTypes["pulls"]["get"]["response"]> {
 		try {
+			this.logger.info(
+				{ repo: this.repositories.upstream, prNumber },
+				"Searching for pull request by number",
+			);
+
 			const response = await this.octokit.pulls.get({
 				...this.repositories.upstream,
 				pull_number: prNumber,
 			});
 
-			this.logger.debug(
+			this.logger.info(
 				{ prNumber, title: response.data.title, state: response.data.state },
 				"Found pull request by number",
 			);
 
 			return response;
 		} catch (error) {
-			throw mapError(error, `${ContentService.name}.findPullRequestByNumber`, {
+			if (error instanceof ApplicationError) throw error;
+
+			throw mapError(error, `${ContentService.name}.${this.findPullRequestByNumber.name}`, {
 				prNumber,
 				upstream: this.repositories.upstream,
 			});
@@ -177,6 +197,11 @@ export class ContentService extends BaseGitHubService {
 	 */
 	public async getPullRequestFiles(prNumber: number): Promise<string[]> {
 		try {
+			this.logger.info(
+				{ repo: this.repositories.upstream, prNumber },
+				"Fetching pull request changed files",
+			);
+
 			const response = await this.octokit.pulls.listFiles({
 				...this.repositories.upstream,
 				pull_number: prNumber,
@@ -184,11 +209,13 @@ export class ContentService extends BaseGitHubService {
 
 			const filePaths = response.data.map((file) => file.filename);
 
-			this.logger.debug({ prNumber, fileCount: filePaths.length }, "Fetched PR changed files");
+			this.logger.info({ prNumber, fileCount: filePaths.length }, "Fetched PR changed files");
 
 			return filePaths;
 		} catch (error) {
-			throw mapError(error, `${ContentService.name}.getPullRequestFiles`, {
+			if (error instanceof ApplicationError) throw error;
+
+			throw mapError(error, `${ContentService.name}.${this.getPullRequestFiles.name}`, {
 				prNumber,
 				upstream: this.repositories.upstream,
 			});
@@ -200,16 +227,17 @@ export class ContentService extends BaseGitHubService {
 	 *
 	 * Filters and processes files based on content type.
 	 *
-	 * @param maxFiles Optional limit on number of files to retrieve
-	 * @throws {Error} If repository tree is empty or retrieval fails
+	 * @throws {ApplicationError} with {@link ErrorCode.NoContent}  If repository tree is empty
 	 *
 	 * @example
 	 * ```typescript
 	 * const files = await contentService.getUntranslatedFiles(5);
 	 * ```
 	 */
-	public async getUntranslatedFiles(maxFiles?: number): Promise<TranslationFile[]> {
+	public async getUntranslatedFiles(): Promise<TranslationFile[]> {
 		try {
+			this.logger.info({ fork: this.repositories.fork }, "Retrieving untranslated markdown files");
+
 			const repoTreeResponse = await this.octokit.git.getTree({
 				...this.repositories.fork,
 				tree_sha: "main",
@@ -218,37 +246,58 @@ export class ContentService extends BaseGitHubService {
 
 			if (!repoTreeResponse.data.tree.length) {
 				this.logger.warn({ fork: this.repositories.fork }, "Repository tree is empty");
-				throw mapError(
-					new Error("Repository tree is empty"),
-					`${ContentService.name}.getUntranslatedFiles`,
+
+				throw new ApplicationError(
+					"Repository tree is empty",
+					ErrorCode.NoContent,
+					`${ContentService.name}.${this.getUntranslatedFiles.name}`,
 					{ fork: this.repositories.fork },
 				);
 			}
 
-			const markdownFiles = this.filterMarkdownFiles(repoTreeResponse.data.tree);
-			const filesToProcess = maxFiles ? markdownFiles.slice(0, maxFiles) : markdownFiles;
+			this.logger.info(
+				{ totalFilesInRepo: repoTreeResponse.data.tree.length },
+				"Fetched repository tree",
+			);
+
+			const filesToProcess = this.filterMarkdownFiles(repoTreeResponse.data.tree);
 
 			this.logger.info(
 				{
-					totalMarkdownFiles: markdownFiles.length,
+					totalMarkdownFiles: repoTreeResponse.data.tree.length,
 					filesToProcess: filesToProcess.length,
-					maxFilesLimit: maxFiles,
 				},
-				"Processing markdown files for translation",
+				"Filtered markdown files for translation",
 			);
 
 			const files: TranslationFile[] = [];
 
-			for (const file of filesToProcess) {
-				if (!file.path) continue;
+			for (const [index, file] of filesToProcess.entries()) {
+				const logger = this.logger.child({ component: file.path ?? `file-${index}` });
 
 				try {
+					logger.debug({ filePath: file.path }, "Retrieving file content");
+
+					if (!file.path) {
+						logger.warn("Skipping file. Missing path property");
+						continue;
+					}
+
 					const response = await this.octokit.repos.getContent({
 						...this.repositories.fork,
 						path: file.path ?? "",
 					});
 
-					if (!("content" in response.data)) continue;
+					if (!("content" in response.data)) {
+						logger.warn("Skipping file. Content not found in response");
+						continue;
+					}
+
+					logger.debug({
+						content: response.data.content.length,
+						sha: response.data.sha,
+						filename: file.path.split("/").pop() ?? "",
+					});
 
 					files.push({
 						path: file.path,
@@ -257,10 +306,16 @@ export class ContentService extends BaseGitHubService {
 						filename: file.path.split("/").pop() ?? "",
 					});
 				} catch (error) {
-					this.logger.debug(
-						{ filePath: file.path, error },
-						"Skipping file - could not retrieve content",
-					);
+					const mappedError =
+						error instanceof ApplicationError ? error : (
+							mapError(error, `${ContentService.name}.${this.getUntranslatedFiles.name}`, {
+								filePath: file.path,
+								fork: this.repositories.fork,
+							})
+						);
+
+					logger.debug({ error: mappedError }, "Skipping file. Could not retrieve content");
+
 					continue;
 				}
 			}
@@ -272,8 +327,9 @@ export class ContentService extends BaseGitHubService {
 
 			return files;
 		} catch (error) {
-			throw mapError(error, `${ContentService.name}.getUntranslatedFiles`, {
-				maxFiles,
+			if (error instanceof ApplicationError) throw error;
+
+			throw mapError(error, `${ContentService.name}.${this.getUntranslatedFiles.name}`, {
 				fork: this.repositories.fork,
 			});
 		}
@@ -314,6 +370,11 @@ export class ContentService extends BaseGitHubService {
 		RestEndpointMethodTypes["repos"]["createOrUpdateFileContents"]["response"]
 	> {
 		try {
+			this.logger.info(
+				{ filePath: file.path, branch: branch.ref, commitMessage: message },
+				"Committing translated content",
+			);
+
 			const response = await this.octokit.repos.createOrUpdateFileContents({
 				...this.repositories.fork,
 				path: file.path,
@@ -334,7 +395,9 @@ export class ContentService extends BaseGitHubService {
 
 			return response;
 		} catch (error) {
-			throw mapError(error, `${ContentService.name}.commitTranslation`, {
+			if (error instanceof ApplicationError) throw error;
+
+			throw mapError(error, `${ContentService.name}.${this.commitTranslation.name}`, {
 				filePath: file.path,
 				branchRef: branch.ref,
 				commitMessage: message,
@@ -365,9 +428,19 @@ export class ContentService extends BaseGitHubService {
 		body,
 		baseBranch = "main",
 	}: PullRequestOptions): Promise<RestEndpointMethodTypes["pulls"]["create"]["response"]["data"]> {
+		const targetRepo = this.repositories.upstream;
+		const headRef = `${this.repositories.fork.owner}:${branch}`;
+
 		try {
-			const targetRepo = this.repositories.upstream;
-			const headRef = `${this.repositories.fork.owner}:${branch}`;
+			this.logger.info(
+				{
+					targetRepo: targetRepo.owner,
+					headRef,
+					baseBranch,
+					title,
+				},
+				"Creating pull request",
+			);
 
 			const createPullRequestResponse = await this.octokit.pulls.create({
 				...targetRepo,
@@ -391,7 +464,9 @@ export class ContentService extends BaseGitHubService {
 
 			return createPullRequestResponse.data;
 		} catch (error) {
-			throw mapError(error, `${ContentService.name}.createPullRequest`, {
+			if (error instanceof ApplicationError) throw error;
+
+			throw mapError(error, `${ContentService.name}.${this.createPullRequest.name}`, {
 				branch,
 				title,
 				baseBranch,
@@ -424,6 +499,8 @@ export class ContentService extends BaseGitHubService {
 			| TranslationFile
 			| RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"][number],
 	): Promise<string> {
+		this.logger.info({ filePath: file.path }, "Fetching file content");
+
 		try {
 			if (file.path) {
 				this.logger.info({ filePath: file.path }, "file's path exists, trying local content first");
@@ -458,7 +535,9 @@ export class ContentService extends BaseGitHubService {
 
 			return content;
 		} catch (error) {
-			throw mapError(error, `${ContentService.name}.getFileContent`, {
+			if (error instanceof ApplicationError) throw error;
+
+			throw mapError(error, `${ContentService.name}.${this.getFileContent.name}`, {
 				filePath: file.path,
 				blobSha: file.sha,
 			});
@@ -466,9 +545,9 @@ export class ContentService extends BaseGitHubService {
 	}
 
 	private async getLocalFileContent(filePath: string): Promise<string | undefined> {
-		this.logger.info({ filePath }, "Reading local file content");
-
 		try {
+			this.logger.info({ filePath }, "Reading local file content");
+
 			const content = await Bun.file(filePath).text();
 
 			this.logger.debug(
@@ -478,7 +557,15 @@ export class ContentService extends BaseGitHubService {
 
 			return content;
 		} catch (error) {
-			this.logger.error({ error, filePath }, "Failed to read local file");
+			if (error instanceof ApplicationError) throw error;
+
+			const mappedError = mapError(
+				error,
+				`${ContentService.name}.${this.getLocalFileContent.name}`,
+				{ filePath },
+			);
+
+			this.logger.error({ error: mappedError, filePath }, "Failed to read local file");
 		}
 	}
 
@@ -560,6 +647,8 @@ export class ContentService extends BaseGitHubService {
 
 			return translationProgressIssue;
 		} catch (error) {
+			if (error instanceof ApplicationError) throw error;
+
 			throw mapError(error, `${ContentService.name}.${this.findTranslationProgressIssue.name}`, {
 				queryString,
 			});
@@ -594,30 +683,35 @@ export class ContentService extends BaseGitHubService {
 		filesToTranslate: TranslationFile[],
 	): Promise<RestEndpointMethodTypes["issues"]["createComment"]["response"]["data"] | undefined> {
 		try {
-			if (results.length === 0) {
-				this.logger.info("No results. Skipping issue comment update");
+			this.logger.info(
+				{
+					resultsCount: results.length,
+					filesToTranslateCount: filesToTranslate.length,
+				},
+				"Commenting compiled translation results on issue",
+			);
 
-				return;
-			} else if (filesToTranslate.length === 0) {
-				this.logger.info("No files to translate. Skipping issue comment update");
-
+			if (results.length === 0 || filesToTranslate.length === 0) {
+				this.logger.warn("No results or files to translate. Skipping issue comment update");
 				return;
 			}
 
 			const translationProgressIssue = await this.findTranslationProgressIssue();
 
 			if (!translationProgressIssue) {
-				this.logger.error("Translation progress issue not found");
-
+				this.logger.warn("Translation progress issue not found");
 				return;
 			}
+
+			this.logger.info(
+				{ issueNumber: translationProgressIssue.number },
+				"Preparing to comment on translation progress issue",
+			);
 
 			const createCommentResponse = await this.octokit.issues.createComment({
 				...this.repositories.upstream,
 				issue_number: translationProgressIssue.number,
-				body: this.services.commentBuilder.concatComment(
-					this.services.commentBuilder.buildComment(results, filesToTranslate),
-				),
+				body: this.services.commentBuilder.buildComment(results, filesToTranslate),
 			});
 
 			this.logger.info(
@@ -630,6 +724,8 @@ export class ContentService extends BaseGitHubService {
 
 			return createCommentResponse.data;
 		} catch (error) {
+			if (error instanceof ApplicationError) throw error;
+
 			throw mapError(error, `${ContentService.name}.${this.commentCompiledResultsOnIssue.name}`, {
 				filesCount: filesToTranslate.length,
 				resultsCount: results.length,
@@ -648,6 +744,8 @@ export class ContentService extends BaseGitHubService {
 		branchName: string,
 	): Promise<RestEndpointMethodTypes["pulls"]["list"]["response"]["data"][number] | undefined> {
 		try {
+			this.logger.info({ branchName }, "Searching for pull request by branch");
+
 			const response = await this.octokit.pulls.list({
 				...this.repositories.upstream,
 				head: `${this.repositories.fork.owner}:${branchName}`,
@@ -662,7 +760,9 @@ export class ContentService extends BaseGitHubService {
 
 			return pr;
 		} catch (error) {
-			throw mapError(error, `${ContentService.name}.findPullRequestByBranch`, {
+			if (error instanceof ApplicationError) throw error;
+
+			throw mapError(error, `${ContentService.name}.${this.findPullRequestByBranch.name}`, {
 				branchName,
 				forkOwner: this.repositories.fork.owner,
 			});
@@ -677,30 +777,10 @@ export class ContentService extends BaseGitHubService {
 	 * (indicated by `mergeable === false` and `mergeable_state === "dirty"`). PRs that are
 	 * simply "behind" the base branch remain valid and can be updated via rebase without
 	 * requiring closure.
-	 *
-	 * ### GitHub PR Mergeable States
-	 *
-	 * - `clean`: PR can be merged cleanly (no action needed)
-	 * - `behind`: PR is behind base branch but has no conflicts (can be rebased safely)
-	 * - `dirty`: PR has merge conflicts (requires closure and recreation)
-	 * - `unstable`: PR has failing checks (not a merge conflict, no closure needed)
-	 * - `blocked`: PR is blocked by review requirements (not a merge conflict)
-	 *
-	 * ### Implementation Details
-	 *
-	 * The method sets `needsUpdate = hasConflicts` where `hasConflicts` is determined by
-	 * checking if `mergeable === false` AND `mergeable_state === "dirty"`. This ensures
-	 * that PRs are only flagged for recreation when they have true merge conflicts, not
-	 * when they're merely out of sync with the base branch.
-	 *
+	 *	 *
 	 * @param prNumber Pull request number to check
 	 *
-	 * @returns A Promise resolving to an object containing:
-	 * - `hasConflicts`: `true` only when PR has actual merge conflicts
-	 * - `mergeable`: GitHub's raw mergeable status (`true`/`false`/`null`)
-	 * - `mergeableState`: GitHub's mergeable state string (e.g., "clean", "dirty", "behind")
-	 * - `needsUpdate`: `true` only when PR has conflicts requiring closure
-	 *
+	 * @returns A Promise resolving to an object containing PR status information
 	 * @example
 	 * ```typescript
 	 * const status = await contentService.checkPullRequestStatus(123);
@@ -713,6 +793,8 @@ export class ContentService extends BaseGitHubService {
 	 */
 	public async checkPullRequestStatus(prNumber: number): Promise<PullRequestStatus> {
 		try {
+			this.logger.info({ prNumber }, "Checking pull request status");
+
 			const prResponse = await this.octokit.pulls.get({
 				...this.repositories.upstream,
 				pull_number: prNumber,
@@ -740,7 +822,9 @@ export class ContentService extends BaseGitHubService {
 				needsUpdate,
 			};
 		} catch (error) {
-			throw mapError(error, `${ContentService.name}.checkPullRequestStatus`, {
+			if (error instanceof ApplicationError) throw error;
+
+			throw mapError(error, `${ContentService.name}.${this.checkPullRequestStatus.name}`, {
 				prNumber,
 				upstream: this.repositories.upstream,
 			});
@@ -758,6 +842,8 @@ export class ContentService extends BaseGitHubService {
 		prNumber: number,
 	): Promise<RestEndpointMethodTypes["pulls"]["update"]["response"]["data"]> {
 		try {
+			this.logger.info({ prNumber }, "Closing pull request");
+
 			const response = await this.octokit.pulls.update({
 				...this.repositories.upstream,
 				pull_number: prNumber,
@@ -768,7 +854,9 @@ export class ContentService extends BaseGitHubService {
 
 			return response.data;
 		} catch (error) {
-			throw mapError(error, `${ContentService.name}.closePullRequest`, {
+			if (error instanceof ApplicationError) throw error;
+
+			throw mapError(error, `${ContentService.name}.${this.closePullRequest.name}`, {
 				prNumber,
 				upstream: this.repositories.upstream,
 			});

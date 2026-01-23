@@ -85,7 +85,8 @@ describe("CommentBuilderService", () => {
 
 			const result = commentBuilderService.buildComment(results, filesToTranslate);
 
-			expect(result).toBe("");
+			expect(result).toBeString();
+			expect(result.trim()).not.toBe("");
 		});
 
 		test("should handle empty results array", () => {
@@ -95,7 +96,7 @@ describe("CommentBuilderService", () => {
 			const result = commentBuilderService.buildComment(results, filesToTranslate);
 
 			expect(result).toBeString();
-			expect(result.trim()).toBe("");
+			expect(result.trim()).not.toBe("");
 		});
 
 		test("should handle blog posts with date paths", () => {
@@ -128,6 +129,7 @@ describe("CommentBuilderService", () => {
 		test("should concatenate prefix, content, and suffix", () => {
 			const content = "- docs\n  - `intro.md`: #123";
 
+			// @ts-expect-error - Call to private method
 			const result = commentBuilderService.concatComment(content);
 
 			expect(result).toBeString();
@@ -139,6 +141,7 @@ describe("CommentBuilderService", () => {
 		test("should handle empty content", () => {
 			const content = "";
 
+			// @ts-expect-error - Call to private method
 			const result = commentBuilderService.concatComment(content);
 
 			expect(result).toBeString();
@@ -149,6 +152,7 @@ describe("CommentBuilderService", () => {
 		test("should handle multiline content", () => {
 			const content = "Line 1\nLine 2\nLine 3";
 
+			// @ts-expect-error - Call to private method
 			const result = commentBuilderService.concatComment(content);
 
 			expect(result).toContain("Line 1");

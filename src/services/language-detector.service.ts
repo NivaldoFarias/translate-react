@@ -2,6 +2,7 @@ import cld from "cld";
 
 import type { ReactLanguageCode } from "@/utils/";
 
+import { ApplicationError, ErrorCode, mapError } from "@/errors";
 import { env, logger, REACT_TRANSLATION_LANGUAGES } from "@/utils/";
 
 /**
@@ -29,7 +30,7 @@ export interface LanguageConfig {
  * Contains confidence scores, ratios, and detection metadata for language
  * analysis operations.
  */
-export interface LanguageAnalysis {
+export interface LanguageAnalysisResult {
 	/** Confidence scores for source and target languages, on a scale from 0 to 1 */
 	languageScore: {
 		/**
@@ -90,7 +91,10 @@ export class LanguageDetectorService {
 	};
 
 	/** {@link Intl.DisplayNames} instance for human-readable language names */
-	private readonly displayNames = new Intl.DisplayNames(["en"], { type: "language" });
+	private readonly displayNames = {
+		source: new Intl.DisplayNames([env.SOURCE_LANGUAGE], { type: "language" }),
+		target: new Intl.DisplayNames([env.TARGET_LANGUAGE], { type: "language" }),
+	};
 
 	/**
 	 * Cache of previously detected languages to avoid redundant CLD calls.
@@ -99,33 +103,78 @@ export class LanguageDetectorService {
 	public detected = new Map<string, string | undefined>();
 
 	/**
-	 * Gets the human-readable display name for a React language code.
+	 * Gets the human-readable display name for a {@link REACT_TRANSLATION_LANGUAGES|React language code}.
 	 *
 	 * Uses {@link Intl.DisplayNames} for automatic localization support. Only works with
 	 * the 38 supported React translation languages.
 	 *
 	 * @param code React language code (e.g., `"en"`, `"pt-br"`, `"zh-hans"`)
+	 * @param isTargetLanguage Whether the code is for the target language (default: `true`)
 	 *
-	 * @returns Human-readable language name or `undefined` if not a supported React language
+	 * @throws {ApplicationError} with {@link ErrorCode.LanguageCodeNotSupported} If the language code is not supported
+	 *
+	 * @returns Human-readable language name or `"Unknown"` if not found/invalid
 	 *
 	 * @example
 	 * ```typescript
 	 * detector.getLanguageName('pt-br'); 	// "Brazilian Portuguese"
 	 * detector.getLanguageName('zh-hans'); // "Simplified Chinese"
-	 * detector.getLanguageName('invalid'); // undefined
+	 * detector.getLanguageName('invalid'); // "Unknown"
 	 * ```
 	 */
-	public getLanguageName(code: string): string | undefined {
-		if (!REACT_TRANSLATION_LANGUAGES.includes(code)) {
-			return undefined;
-		}
+	public getLanguageName(code: ReactLanguageCode, isTargetLanguage = true): string {
+		const displayNames = isTargetLanguage ? this.displayNames.target : this.displayNames.source;
+		const fallbackLanguageName =
+			displayNames.of(isTargetLanguage ? this.languages.target : this.languages.source) ??
+			"Unknown";
 
 		try {
-			const name = this.displayNames.of(code);
+			this.logger.info({ code }, "Getting human-readable language name");
 
-			return name !== code ? name : undefined;
-		} catch {
-			return undefined;
+			if (!REACT_TRANSLATION_LANGUAGES.includes(code)) {
+				this.logger.warn(
+					{ code, supportedReactLanguages: REACT_TRANSLATION_LANGUAGES, fallbackLanguageName },
+					"Language code is not a supported React translation language",
+				);
+
+				throw new ApplicationError(
+					`Language code '${code}' is not supported`,
+					ErrorCode.LanguageCodeNotSupported,
+					`${LanguageDetectorService.name}.${this.getLanguageName.name}`,
+					{
+						code,
+						isTargetLanguage,
+						supportedReactLanguages: REACT_TRANSLATION_LANGUAGES,
+						fallbackLanguageName,
+					},
+				);
+			}
+
+			const detectedLanguageName = displayNames.of(code);
+			const humanReadableLanguageName =
+				!!detectedLanguageName && detectedLanguageName !== code ?
+					detectedLanguageName
+				:	fallbackLanguageName;
+
+			this.logger.info({ humanReadableLanguageName }, "Obtained human-readable language name");
+
+			return humanReadableLanguageName;
+		} catch (error) {
+			const mappedError =
+				error instanceof ApplicationError ? error : (
+					mapError(error, `${LanguageDetectorService.name}.${this.getLanguageName.name}`, {
+						code,
+						isTargetLanguage,
+						fallbackLanguageName,
+					})
+				);
+
+			this.logger.error(
+				{ error: mappedError },
+				"Failed to get human-readable language name. Returning fallback name",
+			);
+
+			return fallbackLanguageName;
 		}
 	}
 
@@ -148,7 +197,7 @@ export class LanguageDetectorService {
 	 * @param filename Identifier for the content being analyzed (used for caching results)
 	 * @param content Text content to analyze for language detection and translation status
 	 *
-	 * @returns Resolves to a detailed {@link LanguageAnalysis} with confidence scores,
+	 * @returns Resolves to a detailed {@link LanguageAnalysisResult} with confidence scores,
 	 *   translation status, detected language, and raw CLD results
 	 *
 	 * @example
@@ -164,25 +213,33 @@ export class LanguageDetectorService {
 	 * @see {@link cleanContent} for content preprocessing logic
 	 * @see {@link findLanguageScore} for confidence score calculation
 	 */
-	public async analyzeLanguage(filename: string, content: string): Promise<LanguageAnalysis> {
-		if (!content || content.length < this.MIN_CONTENT_LENGTH) {
-			return {
-				languageScore: { target: 0, source: 0 },
-				ratio: 0,
-				isTranslated: false,
-				detectedLanguage: "und",
-				rawResult: {
-					reliable: false,
-					languages: [],
-					textBytes: content.length,
-					chunks: [],
-				},
-			};
-		}
-
-		const cleanContent = this.cleanContent(content);
+	public async analyzeLanguage(filename: string, content: string): Promise<LanguageAnalysisResult> {
+		const fallbackLanguageAnalysisResult: LanguageAnalysisResult = {
+			languageScore: { target: 0, source: 0 },
+			ratio: 0,
+			isTranslated: false,
+			detectedLanguage: "und",
+			rawResult: {
+				reliable: false,
+				languages: [],
+				textBytes: content.length,
+				chunks: [],
+			},
+		};
 
 		try {
+			this.logger.info({ filename }, "Starting language analysis");
+
+			if (!content || content.length < this.MIN_CONTENT_LENGTH) {
+				this.logger.warn(
+					{ contentLength: content.length, minContentLength: this.MIN_CONTENT_LENGTH },
+					"File's content length is below minimum threshold for reliable detection",
+				);
+
+				return fallbackLanguageAnalysisResult;
+			}
+
+			const cleanContent = this.cleanContent(content);
 			const detection = await cld.detect(cleanContent);
 
 			const primaryLanguage = detection.languages[0];
@@ -197,29 +254,33 @@ export class LanguageDetectorService {
 
 			this.detected.set(filename, detectedLanguage);
 
-			return {
-				languageScore: {
-					target: targetScore,
-					source: sourceScore,
-				},
+			const analysisResult: LanguageAnalysisResult = {
+				languageScore: { target: targetScore, source: sourceScore },
 				ratio,
 				isTranslated,
 				detectedLanguage,
 				rawResult: detection,
 			};
-		} catch {
-			return {
-				languageScore: { target: 0, source: 0 },
-				ratio: 0,
-				isTranslated: false,
-				detectedLanguage: "und",
-				rawResult: {
-					reliable: false,
-					languages: [],
-					textBytes: content.length,
-					chunks: [],
-				},
-			};
+
+			this.logger.info({ analysisResult, filename }, "Language analysis completed");
+
+			return analysisResult;
+		} catch (error) {
+			const mappedError =
+				error instanceof ApplicationError ? error : (
+					mapError(error, `${LanguageDetectorService.name}.${this.analyzeLanguage.name}`, {
+						filename,
+						contentLength: content.length,
+						fallbackLanguageAnalysisResult,
+					})
+				);
+
+			this.logger.error(
+				{ error: mappedError },
+				"Language analysis failed. returning fallback result",
+			);
+
+			return fallbackLanguageAnalysisResult;
 		}
 	}
 
@@ -230,17 +291,37 @@ export class LanguageDetectorService {
 	 *
 	 * @returns Resolves to the detected language code or undefined
 	 */
-	public async detectPrimaryLanguage(text: string): Promise<string | undefined> {
-		if (!text || text.length < this.MIN_CONTENT_LENGTH) {
-			return undefined;
-		}
-
+	public async detectPrimaryLanguage(text: string): Promise<ReactLanguageCode | undefined> {
 		try {
+			this.logger.info("Starting primary language detection");
+
+			if (!text || text.length < this.MIN_CONTENT_LENGTH) {
+				this.logger.warn(
+					{ textLength: text.length, minContentLength: this.MIN_CONTENT_LENGTH },
+					"Text's length is below minimum threshold for reliable detection",
+				);
+				return;
+			}
+
 			const cleanContent = this.cleanContent(text);
 			const detection = await cld.detect(cleanContent);
-			return detection.languages[0]?.code ?? "und";
-		} catch {
-			return undefined;
+			const code = detection.languages[0]?.code ?? "und";
+
+			this.logger.info(
+				{ cleanContentLength: cleanContent.length, detection, code },
+				"Detected primary language code",
+			);
+
+			return code as ReactLanguageCode;
+		} catch (error) {
+			const mappedError =
+				error instanceof ApplicationError ? error : (
+					mapError(error, `${LanguageDetectorService.name}.${this.detectPrimaryLanguage.name}`, {
+						text,
+					})
+				);
+
+			this.logger.error({ mappedError }, "Primary language detection failed");
 		}
 	}
 
@@ -252,21 +333,40 @@ export class LanguageDetectorService {
 	 * @returns Cleaned content suitable for language detection
 	 */
 	private cleanContent(content: string): string {
-		const regexes = {
-			codeBlock: /```[\s\S]*?```/g,
-			inlineCode: /`[^`]*`/g,
-			htmlTags: /<[^>]*>/g,
-			urls: /https?:\/\/[^\s]+/g,
-			whitespace: /\s+/g,
-		} as const;
+		try {
+			this.logger.debug("Cleaning content for language detection");
 
-		return content
-			.replace(regexes.codeBlock, " ")
-			.replace(regexes.inlineCode, " ")
-			.replace(regexes.htmlTags, " ")
-			.replace(regexes.urls, " ")
-			.replace(regexes.whitespace, " ")
-			.trim();
+			const regexes = {
+				codeBlock: /```[\s\S]*?```/g,
+				inlineCode: /`[^`]*`/g,
+				htmlTags: /<[^>]*>/g,
+				urls: /https?:\/\/[^\s]+/g,
+				whitespace: /\s+/g,
+			} as const;
+
+			this.logger.debug({ regexes }, "Using regex patterns for content cleaning");
+
+			const cleanedContent = content
+				.replace(regexes.codeBlock, " ")
+				.replace(regexes.inlineCode, " ")
+				.replace(regexes.htmlTags, " ")
+				.replace(regexes.urls, " ")
+				.replace(regexes.whitespace, " ")
+				.trim();
+
+			this.logger.debug(
+				{ originalLength: content.length, cleanedLength: cleanedContent.length },
+				"Cleaned content for language detection",
+			);
+
+			return cleanedContent;
+		} catch (error) {
+			if (error instanceof ApplicationError) throw error;
+
+			throw mapError(error, `${LanguageDetectorService.name}.${this.cleanContent.name}`, {
+				contentLength: content.length,
+			});
+		}
 	}
 
 	/**
@@ -284,13 +384,29 @@ export class LanguageDetectorService {
 	 * ```
 	 */
 	private mapToCldCode(reactCode: string): string[] {
-		const mapping: Record<string, string[]> = {
-			"pt-br": ["pt", "pt-br"],
-			"zh-hans": ["zh", "zh-cn", "zh-hans"],
-			"zh-hant": ["zh", "zh-tw", "zh-hant"],
-		};
+		try {
+			this.logger.debug({ reactCode }, "Mapping React language code to CLD codes");
 
-		return mapping[reactCode] ?? [reactCode];
+			const mapping: Record<string, string[]> = {
+				"pt-br": ["pt", "pt-br"],
+				"zh-hans": ["zh", "zh-cn", "zh-hans"],
+				"zh-hant": ["zh", "zh-tw", "zh-hant"],
+			};
+
+			this.logger.debug({ mapping }, "Using React to CLD language code mapping");
+
+			const mappedReactCode = mapping[reactCode] ?? [reactCode];
+
+			this.logger.debug({ reactCode, mappedReactCode }, "Mapped React code to CLD codes");
+
+			return mappedReactCode;
+		} catch (error) {
+			if (error instanceof ApplicationError) throw error;
+
+			throw mapError(error, `${LanguageDetectorService.name}.${this.mapToCldCode.name}`, {
+				reactCode,
+			});
+		}
 	}
 
 	/**
@@ -303,15 +419,33 @@ export class LanguageDetectorService {
 	 * @returns Confidence score (0-1) for the target language
 	 */
 	private findLanguageScore(detectedLanguages: cld.Language[], targetLanguageCode: string): number {
-		const possibleCodes = this.mapToCldCode(targetLanguageCode);
+		try {
+			this.logger.debug(
+				{ detectedLanguages, targetLanguageCode },
+				"Finding language score for target language",
+			);
 
-		for (const code of possibleCodes) {
-			const lang = detectedLanguages.find((lang) => lang.code === code);
-			if (lang) {
+			const possibleCodes = this.mapToCldCode(targetLanguageCode);
+
+			this.logger.debug({ possibleCodes }, "Possible CLD codes for target language");
+
+			for (const code of possibleCodes) {
+				const lang = detectedLanguages.find((lang) => lang.code === code);
+				if (!lang) continue;
+
 				return lang.percent / 100;
 			}
-		}
 
-		return 0;
+			this.logger.debug("Target language not found in detected languages, returning score 0");
+
+			return 0;
+		} catch (error) {
+			if (error instanceof ApplicationError) throw error;
+
+			throw mapError(error, `${LanguageDetectorService.name}.${this.findLanguageScore.name}`, {
+				detectedLanguages,
+				targetLanguageCode,
+			});
+		}
 	}
 }

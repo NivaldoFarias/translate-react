@@ -2,6 +2,8 @@ import type { LocaleDefinition } from "@/locales";
 
 import type { ProcessedFileResult } from "./runner";
 
+import { ApplicationError } from "@/errors";
+import { mapError } from "@/errors/error.helper";
 import { logger } from "@/utils/";
 
 import { LocaleService } from "./locale";
@@ -58,23 +60,40 @@ export class CommentBuilderService {
 	 * ```
 	 */
 	public buildComment(results: ProcessedFileResult[], filesToTranslate: TranslationFile[]) {
-		const concattedData = results
-			.map((result) => {
-				const translationFile = filesToTranslate.find((file) => file.filename === result.filename);
+		try {
+			const concattedData = results
+				.map((result) => {
+					const translationFile = filesToTranslate.find(
+						(file) => file.filename === result.filename,
+					);
 
-				if (!translationFile) return null;
+					if (!translationFile) return null;
 
-				const pathParts = translationFile.path.split("/");
+					const pathParts = translationFile.path.split("/");
 
-				return {
-					pathParts: this.simplifyPathParts(pathParts),
-					filename: translationFile.filename,
-					prNumber: result.pullRequest?.number ?? 0,
-				};
-			})
-			.filter(Boolean);
+					return {
+						pathParts: this.simplifyPathParts(pathParts),
+						filename: translationFile.filename,
+						prNumber: result.pullRequest?.number ?? 0,
+					};
+				})
+				.filter(Boolean);
 
-		return this.buildHierarchicalComment(concattedData);
+			const hierarchicalComment = this.buildHierarchicalComment(concattedData);
+
+			const finalComment = this.concatComment(hierarchicalComment);
+
+			this.logger.debug({ finalComment }, "Built comment");
+
+			return finalComment;
+		} catch (error) {
+			if (error instanceof ApplicationError) throw error;
+
+			throw mapError(error, `${CommentBuilderService.name}.${this.buildComment.name}`, {
+				results,
+				filesToTranslate,
+			});
+		}
 	}
 
 	/**
@@ -84,7 +103,7 @@ export class CommentBuilderService {
 	 *
 	 * @returns The concatenated comment
 	 */
-	public concatComment(content: string) {
+	private concatComment(content: string) {
 		return `${this.comment.prefix}\n\n${content}\n\n${this.comment.suffix}`;
 	}
 
@@ -116,13 +135,21 @@ export class CommentBuilderService {
 	 * ```
 	 */
 	private simplifyPathParts(pathParts: string[]): string[] {
-		if (pathParts[0] === "src" && pathParts[1] === "content") {
-			pathParts = pathParts.slice(2);
+		try {
+			if (pathParts[0] === "src" && pathParts[1] === "content") {
+				pathParts = pathParts.slice(2);
+			}
+
+			if (pathParts[0] === "blog") return ["blog"];
+
+			return pathParts;
+		} catch (error) {
+			if (error instanceof ApplicationError) throw error;
+
+			throw mapError(error, `${CommentBuilderService.name}.${this.simplifyPathParts.name}`, {
+				pathParts,
+			});
 		}
-
-		if (pathParts[0] === "blog") return ["blog"];
-
-		return pathParts;
 	}
 
 	/**
@@ -160,29 +187,37 @@ export class CommentBuilderService {
 			prNumber: number;
 		}[],
 	): string {
-		data.sort((left, right) => {
-			const pathA = left.pathParts.join("/");
-			const pathB = right.pathParts.join("/");
+		try {
+			data.sort((left, right) => {
+				const pathA = left.pathParts.join("/");
+				const pathB = right.pathParts.join("/");
 
-			return pathA === pathB ?
-					left.filename.localeCompare(right.filename)
-				:	pathA.localeCompare(pathB);
-		});
+				return pathA === pathB ?
+						left.filename.localeCompare(right.filename)
+					:	pathA.localeCompare(pathB);
+			});
 
-		const structure: HierarchicalStructure = {};
+			const structure: HierarchicalStructure = {};
 
-		for (const item of data) {
-			let currentLevel = structure;
+			for (const item of data) {
+				let currentLevel = structure;
 
-			for (const part of item.pathParts) {
-				currentLevel[part] ??= { files: [] };
-				currentLevel = currentLevel[part] as HierarchicalStructure;
+				for (const part of item.pathParts) {
+					currentLevel[part] ??= { files: [] };
+					currentLevel = currentLevel[part] as HierarchicalStructure;
+				}
+
+				currentLevel.files?.push({ filename: item.filename, prNumber: item.prNumber });
 			}
 
-			currentLevel.files?.push({ filename: item.filename, prNumber: item.prNumber });
-		}
+			return this.formatStructure(structure, 0);
+		} catch (error) {
+			if (error instanceof ApplicationError) throw error;
 
-		return this.formatStructure(structure, 0);
+			throw mapError(error, `${CommentBuilderService.name}.${this.buildHierarchicalComment.name}`, {
+				data,
+			});
+		}
 	}
 
 	/**
@@ -219,37 +254,46 @@ export class CommentBuilderService {
 	 * ```
 	 */
 	private formatStructure(structure: HierarchicalStructure, level: number): string {
-		const lines: string[] = [];
-		const indent = "  ".repeat(level);
+		try {
+			const lines: string[] = [];
+			const indent = "  ".repeat(level);
 
-		const dirs = Object.keys(structure)
-			.filter((key) => key !== "files")
-			.sort();
+			const dirs = Object.keys(structure)
+				.filter((key) => key !== "files")
+				.sort();
 
-		for (const dir of dirs) {
-			const currentLevel = structure[dir];
-			if (!currentLevel || !("files" in currentLevel) || !currentLevel.files) {
-				continue;
+			for (const dir of dirs) {
+				const currentLevel = structure[dir];
+				if (!currentLevel || !("files" in currentLevel) || !currentLevel.files) {
+					continue;
+				}
+
+				lines.push(`${indent}- ${dir}`);
+
+				const sortedFiles = currentLevel.files.toSorted((a, b) =>
+					a.filename.localeCompare(b.filename),
+				);
+
+				for (const file of sortedFiles) {
+					lines.push(`${indent}  - \`${file.filename}\`: #${file.prNumber}`);
+				}
+
+				const subDirs = Object.keys(currentLevel).filter((key) => key !== "files");
+
+				if (subDirs.length > 0) {
+					lines.push(this.formatStructure(currentLevel, level + 1));
+				}
 			}
 
-			lines.push(`${indent}- ${dir}`);
+			return lines.join("\n");
+		} catch (error) {
+			if (error instanceof ApplicationError) throw error;
 
-			const sortedFiles = currentLevel.files.toSorted((a, b) =>
-				a.filename.localeCompare(b.filename),
-			);
-
-			for (const file of sortedFiles) {
-				lines.push(`${indent}  - \`${file.filename}\`: #${file.prNumber}`);
-			}
-
-			const subDirs = Object.keys(currentLevel).filter((key) => key !== "files");
-
-			if (subDirs.length > 0) {
-				lines.push(this.formatStructure(currentLevel, level + 1));
-			}
+			throw mapError(error, `${CommentBuilderService.name}.${this.formatStructure.name}`, {
+				structure,
+				level,
+			});
 		}
-
-		return lines.join("\n");
 	}
 
 	/** Comment template for issue comments */

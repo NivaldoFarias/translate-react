@@ -1,9 +1,8 @@
 import { RestEndpointMethodTypes } from "@octokit/rest";
-import { StatusCodes } from "http-status-codes";
 
 import type { BaseGitHubServiceDependencies } from "./base.service";
 
-import { mapError } from "@/errors/";
+import { ApplicationError, ErrorCode, mapError } from "@/errors/";
 import { env, logger, setupSignalHandlers } from "@/utils/";
 
 import { BaseGitHubService } from "./base.service";
@@ -60,32 +59,23 @@ export class BranchService extends BaseGitHubService {
 	 */
 	private async getDefaultBranch(): Promise<string> {
 		try {
+			this.logger.info(
+				{ fork: this.repositories.fork },
+				"Retrieving default branch for fork repository",
+			);
+
 			const response = await this.octokit.repos.get(this.repositories.fork);
 
 			this.logger.debug({ branch: response.data.default_branch }, "Retrieved default branch");
 
 			return response.data.default_branch;
 		} catch (error) {
-			throw mapError(error, `${BranchService.name}.getDefaultBranch`, {
+			if (error instanceof ApplicationError) throw error;
+
+			throw mapError(error, `${BranchService.name}.${this.getDefaultBranch.name}`, {
 				fork: this.repositories.fork,
 			});
 		}
-	}
-
-	/**
-	 * Type guard to check if an error is a GitHub API 404 Not Found error.
-	 *
-	 * @param error The error to check
-	 *
-	 * @returns True if the error is a 404 Not Found error
-	 */
-	private isNotFoundError(error: unknown): boolean {
-		return (
-			typeof error === "object" &&
-			error !== null &&
-			"status" in error &&
-			error.status === StatusCodes.NOT_FOUND
-		);
 	}
 
 	/**
@@ -106,12 +96,19 @@ export class BranchService extends BaseGitHubService {
 		baseBranch?: string,
 	): Promise<RestEndpointMethodTypes["git"]["createRef"]["response"]> {
 		try {
+			this.logger.info({ branchName, baseBranch }, "Creating new branch");
+
 			const actualBaseBranch = baseBranch ?? (await this.getDefaultBranch());
+			this.logger.debug({ actualBaseBranch }, "Using base branch for new branch creation");
 
 			const mainBranchRef = await this.octokit.git.getRef({
 				...this.repositories.fork,
 				ref: `heads/${actualBaseBranch}`,
 			});
+			this.logger.debug(
+				{ baseBranch: actualBaseBranch, sha: mainBranchRef.data.object.sha },
+				"Retrieved base branch reference",
+			);
 
 			const branchRef = await this.octokit.git.createRef({
 				...this.repositories.fork,
@@ -129,7 +126,10 @@ export class BranchService extends BaseGitHubService {
 			return branchRef;
 		} catch (error) {
 			this.activeBranches.delete(branchName);
-			throw mapError(error, `${BranchService.name}.createBranch`, {
+
+			if (error instanceof ApplicationError) throw error;
+
+			throw mapError(error, `${BranchService.name}.${this.createBranch.name}`, {
 				branchName,
 				baseBranch,
 				fork: this.repositories.fork,
@@ -150,26 +150,36 @@ export class BranchService extends BaseGitHubService {
 	 */
 	public async getBranch(
 		branchName: string,
-	): Promise<RestEndpointMethodTypes["git"]["getRef"]["response"] | null> {
+	): Promise<RestEndpointMethodTypes["git"]["getRef"]["response"] | undefined> {
 		try {
+			this.logger.info({ branchName }, "Retrieving branch information");
+
 			const response = await this.octokit.git.getRef({
 				...this.repositories.fork,
 				ref: `heads/${branchName}`,
 			});
 
-			this.logger.debug({ branchName, sha: response.data.object.sha }, "Branch retrieved");
+			this.logger.info({ branchName, sha: response.data.object.sha }, "Branch retrieved");
 
 			return response;
 		} catch (error) {
-			if (this.isNotFoundError(error)) {
-				this.logger.debug({ branchName }, "Branch not found (404)");
-				return null;
+			const mappedError =
+				error instanceof ApplicationError ? error : (
+					mapError(error, `${BranchService.name}.${this.getBranch.name}`, {
+						branchName,
+						fork: this.repositories.fork,
+					})
+				);
+
+			if (
+				mappedError.code === ErrorCode.NotFound ||
+				mappedError.code === ErrorCode.GithubNotFound
+			) {
+				this.logger.info({ branchName }, "Branch not found (404)");
+				return;
 			}
 
-			throw mapError(error, `${BranchService.name}.getBranch`, {
-				branchName,
-				fork: this.repositories.fork,
-			});
+			throw mappedError;
 		}
 	}
 
@@ -188,6 +198,8 @@ export class BranchService extends BaseGitHubService {
 		branchName: string,
 	): Promise<RestEndpointMethodTypes["git"]["deleteRef"]["response"]> {
 		try {
+			this.logger.info({ branchName }, "Deleting branch");
+
 			const response = await this.octokit.git.deleteRef({
 				...this.repositories.fork,
 				ref: `heads/${branchName}`,
@@ -199,6 +211,8 @@ export class BranchService extends BaseGitHubService {
 
 			return response;
 		} catch (error) {
+			if (error instanceof ApplicationError) throw error;
+
 			throw mapError(error, `${BranchService.name}.deleteBranch`, {
 				branchName,
 				fork: this.repositories.fork,
@@ -242,9 +256,7 @@ export class BranchService extends BaseGitHubService {
 
 				if (!pr) {
 					this.logger.info({ branch }, "Cleanup: Deleting branch without PR");
-
 					await this.deleteBranch(branch);
-
 					continue;
 				}
 
@@ -257,14 +269,23 @@ export class BranchService extends BaseGitHubService {
 					);
 
 					await this.deleteBranch(branch);
-				} else {
-					this.logger.info(
-						{ branch, prNumber: pr.number, mergeableState: prStatus.mergeableState },
-						"Cleanup: Preserving branch with valid PR",
-					);
+					continue;
 				}
+
+				this.logger.info(
+					{ branch, prNumber: pr.number, mergeableState: prStatus.mergeableState },
+					"Cleanup: Preserving branch with valid PR",
+				);
 			} catch (error) {
-				this.logger.error({ branch, error }, "Cleanup: Error checking branch, skipping deletion");
+				const mappedError =
+					error instanceof ApplicationError ? error : (
+						mapError(error, `${BranchService.name}.${this.cleanup.name}`, { branch })
+					);
+
+				this.logger.error(
+					{ branch, error: mappedError },
+					"Cleanup: Error checking branch, skipping deletion",
+				);
 			}
 		}
 	}
@@ -284,10 +305,12 @@ export class BranchService extends BaseGitHubService {
 	 */
 	public async checkIfCommitExistsOnFork(branchName: string): Promise<boolean> {
 		try {
+			this.logger.info({ branchName }, "Checking for commits on fork by current user");
+
 			const forkRef = await this.getBranch(branchName);
 
 			if (!forkRef) {
-				this.logger.debug({ branchName }, "Branch not found, no commits exist");
+				this.logger.info({ branchName }, "Branch not found, no commits exist");
 				return false;
 			}
 
@@ -295,18 +318,24 @@ export class BranchService extends BaseGitHubService {
 				...this.repositories.fork,
 				sha: forkRef.data.object.sha,
 			});
+			this.logger.debug(
+				{ branchName, commitCount: listCommitsResponse.data.length },
+				"Retrieved commits from fork branch",
+			);
 
 			const hasCommits = listCommitsResponse.data.some(
 				(commit) => commit.author?.login === env.REPO_FORK_OWNER,
 			);
 
-			this.logger.debug(
+			this.logger.info(
 				{ branchName, hasCommits, commitCount: listCommitsResponse.data.length },
 				"Checked for fork commits",
 			);
 
 			return hasCommits;
 		} catch (error) {
+			if (error instanceof ApplicationError) throw error;
+
 			throw mapError(error, `${BranchService.name}.checkIfCommitExistsOnFork`, {
 				branchName,
 				fork: this.repositories.fork,

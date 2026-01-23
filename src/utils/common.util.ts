@@ -33,7 +33,7 @@ export function nftsCompatibleDateString(date = new Date()): string {
 /**
  * Validates the success rate of the workflow against the minimum threshold.
  *
- * @throws {ApplicationError} If the success rate is below the configured minimum
+ * @throws {ApplicationError} with {@link ErrorCode.BelowMinimumSuccessRate} If the success rate is below the configured minimum
  *
  * @param statistics final workflow statistics used for validation
  *
@@ -73,4 +73,31 @@ export function validateSuccessRate(statistics: WorkflowStatistics) {
 	}
 
 	logger.debug("Success rate meets minimum threshold");
+}
+
+/**
+ * Formats a time duration in milliseconds to a human-readable string.
+ *
+ * Uses the {@link Intl.RelativeTimeFormat} API for localization.
+ *
+ * @param elapsedTime The elapsed time in milliseconds
+ * @param locale The locale to use for formatting (default: "en")
+ *
+ * @returns A formatted duration string
+ */
+export function formatElapsedTime(
+	elapsedTime: number,
+	locale: Intl.LocalesArgument = "en",
+): string {
+	const formatter = new Intl.RelativeTimeFormat(locale, { numeric: "always", style: "long" });
+
+	const seconds = Math.floor(elapsedTime / 1000);
+
+	if (seconds < 60) {
+		return formatter.format(seconds, "second").replace("in ", "");
+	} else if (seconds < 3600) {
+		return formatter.format(Math.floor(seconds / 60), "minute").replace("in ", "");
+	} else {
+		return formatter.format(Math.floor(seconds / 3600), "hour").replace("in ", "");
+	}
 }
