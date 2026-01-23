@@ -114,16 +114,15 @@ These **must** be set in your `.env` file:
 <details>
 <summary><b>LLM Configuration</b></summary>
 
-| Variable             | Default                                            | Description                                                      |
-| -------------------- | -------------------------------------------------- | ---------------------------------------------------------------- |
-| `LLM_MODEL`          | `google/gemini-2.0-flash-exp:free`                 | Model ID for translation                                         |
-| `LLM_API_BASE_URL`   | `https://openrouter.ai/api/v1`                     | API endpoint                                                     |
-| `OPENAI_PROJECT_ID`  | —                                                  | Optional: OpenAI project ID for tracking                         |
-| `MAX_TOKENS`         | `8192`                                             | Maximum tokens per LLM response                                  |
-| `HEADER_APP_URL`     | `https://github.com/NivaldoFarias/translate-react` | App URL for OpenRouter tracking                                  |
-| `HEADER_APP_TITLE`   | `translate-react v0.1.19`                          | App title for OpenRouter tracking                                |
-| `LLM_MAX_CONCURRENT` | `5`                                                | Maximum concurrent LLM API requests                              |
-| `LLM_MIN_TIME_MS`    | `20000`                                            | Minimum time between LLM API request batches in **milliseconds** |
+| Variable              | Default                                            | Description                                    |
+| --------------------- | -------------------------------------------------- | ---------------------------------------------- |
+| `LLM_MODEL`           | `google/gemini-2.0-flash-exp:free`                 | Model ID for translation                       |
+| `LLM_API_BASE_URL`    | `https://openrouter.ai/api/v1`                     | API endpoint                                   |
+| `OPENAI_PROJECT_ID`   | —                                                  | Optional: OpenAI project ID for tracking       |
+| `MAX_TOKENS`          | `8192`                                             | Maximum tokens per LLM response                |
+| `HEADER_APP_URL`      | `https://github.com/NivaldoFarias/translate-react` | App URL for OpenRouter tracking                |
+| `HEADER_APP_TITLE`    | `translate-react v0.1.19`                          | App title for OpenRouter tracking              |
+| `LLM_API_MAX_RETRIES` | `5`                                                | Maximum number of retries for LLM API requests |
 
 </details>
 

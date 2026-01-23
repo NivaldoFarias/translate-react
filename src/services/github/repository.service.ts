@@ -2,7 +2,7 @@ import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 import type { BaseGitHubServiceDependencies } from "./base.service";
 
-import { mapError } from "@/errors/";
+import { ApplicationError, ErrorCode, mapError } from "@/errors/";
 import { logger } from "@/utils/";
 
 import { BaseGitHubService } from "./base.service";
@@ -50,7 +50,9 @@ export class RepositoryService extends BaseGitHubService {
 
 			return response.data.default_branch;
 		} catch (error) {
-			throw mapError(error, `${RepositoryService.name}.getDefaultBranch`, {
+			if (error instanceof ApplicationError) throw error;
+
+			throw mapError(error, `${RepositoryService.name}.${this.getDefaultBranch.name}`, {
 				target,
 				repoConfig: target === "fork" ? this.repositories.fork : this.repositories.upstream,
 			});
@@ -85,17 +87,23 @@ export class RepositoryService extends BaseGitHubService {
 		filterIgnored = true,
 	): Promise<RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"]> {
 		try {
+			this.logger.info({ target, baseBranch, filterIgnored }, "Fetching repository tree");
+
 			const repoConfig = target === "fork" ? this.repositories.fork : this.repositories.upstream;
 			const branchName = baseBranch ?? (await this.getDefaultBranch(target));
+
+			this.logger.debug({ repoConfig, branchName }, "Get repository tree parameters");
 
 			const response = await this.octokit.git.getTree({
 				...repoConfig,
 				tree_sha: branchName,
 				recursive: "true",
 			});
+			this.logger.debug({ responseData: response.data }, "Repository tree fetched from GitHub");
 
 			const tree =
 				filterIgnored ? this.filterRepositoryTree(response.data.tree) : response.data.tree;
+			this.logger.debug({ treeLength: tree.length }, "Repository tree filtered");
 
 			this.logger.info(
 				{
@@ -110,7 +118,9 @@ export class RepositoryService extends BaseGitHubService {
 
 			return tree;
 		} catch (error) {
-			throw mapError(error, `${RepositoryService.name}.getRepositoryTree`, {
+			if (error instanceof ApplicationError) throw error;
+
+			throw mapError(error, `${RepositoryService.name}.${this.getRepositoryTree.name}`, {
 				target,
 				baseBranch,
 				filterIgnored,
@@ -135,6 +145,8 @@ export class RepositoryService extends BaseGitHubService {
 	 */
 	public async verifyTokenPermissions(): Promise<boolean> {
 		try {
+			this.logger.info("Verifying token permissions for fork and upstream repositories");
+
 			const results = await Promise.allSettled([
 				this.octokit.rest.repos.get(this.repositories.fork),
 				this.octokit.rest.repos.get(this.repositories.upstream),
@@ -149,10 +161,12 @@ export class RepositoryService extends BaseGitHubService {
 						`Insufficient permissions for ${repoType} repository`,
 					);
 
-					throw mapError(result.reason, `${RepositoryService.name}.verifyTokenPermissions`, {
-						repo: repoType === "fork" ? this.repositories.fork : this.repositories.upstream,
-						reason: result.reason as unknown,
-					});
+					throw new ApplicationError(
+						`Insufficient permissions for ${repoType} repository`,
+						ErrorCode.InsufficientPermissions,
+						`${RepositoryService.name}.${this.verifyTokenPermissions.name}`,
+						{ repoType, reason: result.reason as string },
+					);
 				}
 
 				this.logger.debug(
@@ -171,7 +185,12 @@ export class RepositoryService extends BaseGitHubService {
 
 			return true;
 		} catch (error) {
-			this.logger.error({ error }, "Token permission verification failed");
+			const mappedError =
+				error instanceof ApplicationError ? error : (
+					mapError(error, `${RepositoryService.name}.${this.verifyTokenPermissions.name}`, {})
+				);
+
+			this.logger.error({ error: mappedError }, "Token permission verification failed");
 
 			return false;
 		}

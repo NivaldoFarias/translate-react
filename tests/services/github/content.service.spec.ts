@@ -2,14 +2,7 @@ import { createProcessedFileResultsFixture, createTranslationFilesFixture } from
 import { createMockCommentBuilderService, createMockOctokit, testRepositories } from "@tests/mocks";
 import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test";
 
-import type {
-	MockCommentBuilderService,
-	MockOctokit,
-	MockOctokitGit,
-	MockOctokitIssues,
-	MockOctokitPulls,
-	MockOctokitRepos,
-} from "@tests/mocks";
+import type { MockCommentBuilderService, MockOctokit } from "@tests/mocks";
 import type { components } from "node_modules/@octokit/plugin-paginate-rest/node_modules/@octokit/types/node_modules/@octokit/openapi-types";
 import type { RestEndpointMethodTypes } from "node_modules/@octokit/plugin-rest-endpoint-methods/dist-types/generated/parameters-and-response-types";
 
@@ -68,7 +61,7 @@ describe("ContentService", () => {
 	});
 
 	test("should get untranslated files when batch size is specified", async () => {
-		const files = await contentService.getUntranslatedFiles(1);
+		const files = await contentService.getUntranslatedFiles();
 
 		expect(files).toHaveLength(1);
 		expect(files[0]?.content).toBe("# Test Content");
@@ -245,22 +238,6 @@ describe("ContentService", () => {
 			const files = await contentService.getUntranslatedFiles();
 
 			expect(files).toHaveLength(1);
-		});
-
-		test("should limit files when maxFiles is specified", async () => {
-			octokitMock.git.getTree.mockResolvedValueOnce({
-				data: {
-					tree: [
-						{ path: "src/test/file1.md", type: "blob", sha: "abc123", url: "" },
-						{ path: "src/test/file2.md", type: "blob", sha: "def456", url: "" },
-						{ path: "src/test/file3.md", type: "blob", sha: "ghi789", url: "" },
-					],
-				},
-			});
-
-			const files = await contentService.getUntranslatedFiles(2);
-
-			expect(files).toHaveLength(2);
 		});
 	});
 

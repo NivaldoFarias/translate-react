@@ -25,8 +25,7 @@ export const testEnv: Environment = {
 	// @ts-expect-error - actual zod schema validation expects `stringbool`, but type expects boolean
 	LOG_TO_CONSOLE: "false",
 	GH_REQUEST_TIMEOUT: 60_000,
-	LLM_MAX_CONCURRENT: 5,
-	LLM_MIN_TIME_MS: 200,
+	LLM_API_MAX_RETRIES: 5,
 	MIN_SUCCESS_RATE: 0.75,
 };
 

@@ -10,6 +10,7 @@ import { CommentBuilderService } from "./comment-builder.service";
 import { BranchService } from "./github/branch.service";
 import { ContentService } from "./github/content.service";
 import { RepositoryService } from "./github/repository.service";
+import { LanguageDetectorService } from "./language-detector.service";
 import { LocaleService } from "./locale";
 import { RunnerService } from "./runner/runner.service";
 import { TranslatorService } from "./translator.service";
@@ -177,6 +178,7 @@ export class ServiceFactory {
 			translator: this.createTranslatorService(),
 			languageCache: this.createLanguageCacheService(),
 			locale: LocaleService.get(),
+			languageDetector: this.createLanguageDetectorService(),
 		});
 	}
 
@@ -193,6 +195,9 @@ export class ServiceFactory {
 		});
 	}
 
+	private createLanguageDetectorService(): LanguageDetectorService {
+		return this.getOrCreate("languageDetectorService", () => new LanguageDetectorService());
+	}
 	/** Creates configured Octokit instance with integrated logging */
 	private createOctokit(): Octokit {
 		/** Octokit-specific logger for GitHub API debugging */

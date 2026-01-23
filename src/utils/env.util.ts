@@ -182,24 +182,16 @@ const envSchema = z.object({
 	MIN_SUCCESS_RATE: z.coerce.number().min(0).max(1).default(environmentDefaults.MIN_SUCCESS_RATE),
 
 	/**
-	 * Maximum concurrent LLM API requests.
+	 * Maximum number of retries for LLM API requests.
 	 *
-	 * Controls how many translation requests can run simultaneously. Higher values
-	 * improve throughput but may trigger rate limits. Adjust based on your API tier.
+	 * If a request fails due to transient errors or rate limiting, it will be retried
 	 *
 	 * @default 5
 	 */
-	LLM_MAX_CONCURRENT: z.coerce.number().positive().default(environmentDefaults.LLM_MAX_CONCURRENT),
-
-	/**
-	 * Minimum time between LLM API request batches in **milliseconds**.
-	 *
-	 * Enforces a delay between request batches to prevent rate limit errors.
-	 * Lower values increase throughput but may trigger API rate limits.
-	 *
-	 * @default 20000 // 20 seconds
-	 */
-	LLM_MIN_TIME_MS: z.coerce.number().positive().default(environmentDefaults.LLM_REQUEST_TIMEOUT),
+	LLM_API_MAX_RETRIES: z.coerce
+		.number()
+		.positive()
+		.default(environmentDefaults.LLM_API_MAX_RETRIES),
 });
 
 /** Type definition for the environment configuration */
@@ -227,7 +219,7 @@ export function validateEnv(env?: Environment): Environment {
 			const issues = error.issues
 				.map((issue) => `- ${issue.path.join(".")}: ${issue.message}`)
 				.join("\n");
-			throw new Error(`❌ Invalid environment variables:\n${issues}`);
+			throw new Error(`Invalid environment variables:\n${issues}`);
 		}
 
 		throw error;

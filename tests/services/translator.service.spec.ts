@@ -1,14 +1,15 @@
 import {
 	createChatCompletionsMock,
 	createMockChatCompletion,
+	createMockLanguageDetectorService,
 	createMockOpenAI,
-	createMockRateLimiter,
 } from "@tests/mocks";
 import { beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
 
 import type { ChatCompletion } from "openai/resources";
 
 import type { TranslatorServiceDependencies } from "@/services/";
+import type { ReactLanguageCode } from "@/utils";
 
 import { TranslationFile, TranslatorService } from "@/services/";
 
@@ -22,6 +23,7 @@ function createTestTranslatorService(
 	const defaults = {
 		openai: createMockOpenAI(mockChatCompletionsCreate),
 		model: "test-model",
+		languageDetector: createMockLanguageDetectorService(),
 	};
 
 	return new TranslatorService({
@@ -49,16 +51,17 @@ describe("TranslatorService", () => {
 		mockChatCompletionsCreate.mockClear();
 
 		translatorService = createTestTranslatorService();
-
-		spyOn(translatorService.languageDetector, "detectPrimaryLanguage").mockResolvedValue("en");
-		spyOn(translatorService.languageDetector, "getLanguageName").mockImplementation(
-			(code: string) => {
+		spyOn(translatorService.services.languageDetector, "detectPrimaryLanguage").mockResolvedValue(
+			"en",
+		);
+		spyOn(translatorService.services.languageDetector, "getLanguageName").mockImplementation(
+			(code: ReactLanguageCode) => {
 				if (code === "en") return "English";
 				if (code === "pt-br") return "Brazilian Portuguese";
-				return undefined;
+				return "English";
 			},
 		);
-		spyOn(translatorService.languageDetector, "analyzeLanguage").mockResolvedValue({
+		spyOn(translatorService.services.languageDetector, "analyzeLanguage").mockResolvedValue({
 			languageScore: { target: 0.1, source: 0.9 },
 			ratio: 0.1,
 			isTranslated: false,
@@ -82,7 +85,7 @@ describe("TranslatorService", () => {
 			const service = createTestTranslatorService();
 
 			expect(service).toBeInstanceOf(TranslatorService);
-			expect(service.languageDetector).toBeDefined();
+			expect(service.services.languageDetector).toBeDefined();
 		});
 	});
 
@@ -230,7 +233,7 @@ describe("TranslatorService", () => {
 		});
 
 		test("should detect Portuguese content as translated", async () => {
-			spyOn(translatorService.languageDetector, "analyzeLanguage").mockResolvedValue({
+			spyOn(translatorService.services.languageDetector, "analyzeLanguage").mockResolvedValue({
 				languageScore: { target: 0.9, source: 0.1 },
 				ratio: 0.9,
 				isTranslated: true,

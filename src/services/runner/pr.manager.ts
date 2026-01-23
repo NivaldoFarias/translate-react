@@ -6,7 +6,9 @@ import type {
 	WorkflowStatistics,
 } from "./runner.types";
 
-import { logger } from "@/utils/";
+import { ApplicationError } from "@/errors/";
+import { mapError } from "@/errors/error.helper";
+import { formatElapsedTime, logger } from "@/utils/";
 
 import { TranslationFile } from "../translator.service";
 
@@ -43,24 +45,35 @@ export class PRManager {
 	 *
 	 * @returns A `Promise` that resolves when the issue is updated
 	 */
-	async updateIssue(
+	public async updateIssue(
 		processedResults: Map<string, ProcessedFileResult>,
 		filesToTranslate: TranslationFile[],
 	): Promise<void> {
-		this.logger.info("Commenting on issue");
+		try {
+			this.logger.info(
+				{ processedResults: processedResults.size, filesToTranslate: filesToTranslate.length },
+				"Commenting on issue",
+			);
 
-		const comment = await this.services.github.content.commentCompiledResultsOnIssue(
-			Array.from(processedResults.values()),
-			filesToTranslate,
-		);
+			const comment = await this.services.github.content.commentCompiledResultsOnIssue(
+				Array.from(processedResults.values()),
+				filesToTranslate,
+			);
 
-		if (!comment) {
-			this.logger.warn("No comment was created on the translation issue");
+			if (!comment) {
+				this.logger.warn("No comment was created on the translation issue");
+				return;
+			}
 
-			return;
+			this.logger.info({ commentUrl: comment.html_url }, "Commented on translation issue");
+		} catch (error) {
+			if (error instanceof ApplicationError) throw error;
+
+			throw mapError(error, `${PRManager.name}.${this.updateIssue.name}`, {
+				processedResults,
+				filesToTranslate,
+			});
 		}
-
-		this.logger.info({ commentUrl: comment.html_url }, "Commented on translation issue");
 	}
 
 	/**
@@ -77,64 +90,62 @@ export class PRManager {
 	 *
 	 * @returns Workflow statistics summary
 	 */
-	printFinalStatistics(processedResults: Map<string, ProcessedFileResult>): WorkflowStatistics {
-		const elapsedTime = Math.ceil(Date.now() - this.workflowTimestamp);
-		const results = Array.from(processedResults.values());
+	public printFinalStatistics(
+		processedResults: Map<string, ProcessedFileResult>,
+	): WorkflowStatistics {
+		try {
+			this.logger.info({ processedResults }, "Generating final workflow statistics from results");
 
-		const successCount = results.filter(({ error }) => !error).length;
-		const failureCount = results.filter(({ error }) => !!error).length;
+			const elapsedTime = Math.ceil(Date.now() - this.workflowTimestamp);
+			const results = Array.from(processedResults.values());
 
-		const failedFiles = results.filter(({ error }) => !!error) as SetNonNullable<
-			ProcessedFileResult,
-			"error"
-		>[];
+			const successCount = results.filter(({ error }) => !error).length;
+			const failureCount = results.filter(({ error }) => !!error).length;
 
-		if (failedFiles.length > 0) {
-			this.logger.warn(
-				{
-					failures: failedFiles.map(({ filename, error }) => ({ filename, error: error.message })),
-				},
-				`Failed files (${failedFiles.length})`,
+			const failedFiles = results.filter(({ error }) => !!error) as SetNonNullable<
+				ProcessedFileResult,
+				"error"
+			>[];
+
+			if (failedFiles.length > 0) {
+				this.logger.warn(
+					{
+						failures: failedFiles.map(({ filename, error }) => ({
+							filename,
+							error: error.message,
+						})),
+					},
+					`Failed files (${failedFiles.length})`,
+				);
+			}
+
+			this.logger.debug(
+				{ elapsedTime, results, successCount, failureCount, failedFiles },
+				"Computed workflow statistics",
 			);
-		}
 
-		const totalCount = results.length;
-		const successRate = totalCount > 0 ? successCount / totalCount : 0;
+			const totalCount = results.length;
+			const successRate = totalCount > 0 ? successCount / totalCount : 0;
 
-		this.logger.info(
-			{
+			const workflowStats: WorkflowStatistics = {
 				successCount,
 				failureCount,
 				totalCount,
-				elapsedTime: this.formatElapsedTime(elapsedTime),
-				successRate: `${(successRate * 100).toFixed(2)}%`,
-			},
-			"Final statistics",
-		);
+				successRate,
+			};
 
-		return { successCount, failureCount, totalCount, successRate };
-	}
+			this.logger.info(
+				{ ...workflowStats, elapsedTime: formatElapsedTime(elapsedTime) },
+				"Final statistics",
+			);
 
-	/**
-	 * Formats a time duration in milliseconds to a human-readable string.
-	 *
-	 * Uses the {@link Intl.RelativeTimeFormat} API for localization.
-	 *
-	 * @param elapsedTime The elapsed time in milliseconds
-	 *
-	 * @returns A formatted duration string
-	 */
-	private formatElapsedTime(elapsedTime: number): string {
-		const formatter = new Intl.RelativeTimeFormat("en", { numeric: "always", style: "long" });
+			return workflowStats;
+		} catch (error) {
+			if (error instanceof ApplicationError) throw error;
 
-		const seconds = Math.floor(elapsedTime / 1000);
-
-		if (seconds < 60) {
-			return formatter.format(seconds, "second").replace("in ", "");
-		} else if (seconds < 3600) {
-			return formatter.format(Math.floor(seconds / 60), "minute").replace("in ", "");
-		} else {
-			return formatter.format(Math.floor(seconds / 3600), "hour").replace("in ", "");
+			throw mapError(error, `${PRManager.name}.${this.printFinalStatistics.name}`, {
+				processedResults,
+			});
 		}
 	}
 }

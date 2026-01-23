@@ -138,7 +138,7 @@ export class FileDiscoveryManager {
 
 		let cacheHits = 0;
 		let cacheMisses = 0;
-		const targetLanguage = this.services.translator.languageDetector.languages.target;
+		const targetLanguage = this.services.languageDetector.languages.target;
 
 		for (const file of files) {
 			const cache = languageCaches.get(file.filename);
@@ -404,7 +404,7 @@ export class FileDiscoveryManager {
 		const filesToTranslate: TranslationFile[] = [];
 
 		for (const file of uncheckedFiles) {
-			const analysis = await this.services.translator.languageDetector.analyzeLanguage(
+			const analysis = await this.services.languageDetector.analyzeLanguage(
 				file.filename,
 				file.content,
 			);

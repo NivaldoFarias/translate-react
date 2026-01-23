@@ -4,6 +4,8 @@ import type { TranslationFile } from "@/services/translator.service";
 
 import type { LocaleDefinition } from "./types";
 
+import { formatElapsedTime } from "@/utils/common.util";
+
 /**
  * Brazilian Portuguese locale definition.
  *
@@ -63,9 +65,11 @@ ${conflictNotice}
 | **Tamanho da Tradução** | ${metadata.content.translation} |
 | **Razão de Conteúdo** | ${metadata.content.compressionRatio}x |
 | **Caminho do Arquivo** | \`${file.path}\` |
-| **Tempo de Processamento** | ~${Math.ceil(processingTime / 1000)}s |
+| **Tempo de Processamento** | ~${formatElapsedTime(processingTime, "pt-BR")} |
 
-###### ps.: A "Razão de Conteúdo" indica como o comprimento da tradução se compara à fonte (~1.0x: mesmo comprimento, >1.0x: tradução é mais longa). Diferentes idiomas naturalmente têm níveis variados de verbosidade.
+> [!NOTE] 
+> - "Razão de Conteúdo" indica como o comprimento da tradução se compara à fonte (~1.0x: mesmo comprimento, >1.0x: tradução é mais longa). Diferentes idiomas naturalmente têm níveis variados de verbosidade. 
+> - "Tempo de Processamento" baseia-se no cálculo do tempo total desde o início do fluxo até a conclusão da tradução deste arquivo específico.
 
 ### Informações Técnicas
 

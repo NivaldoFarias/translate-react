@@ -144,6 +144,6 @@ export const environmentDefaults = {
 	/** Minimum success rate (0-1) required for workflow to pass */
 	MIN_SUCCESS_RATE: 0.75,
 
-	LLM_MAX_CONCURRENT: 5,
+	LLM_API_MAX_RETRIES: 5,
 	LLM_REQUEST_TIMEOUT: 20_000,
 } as const;

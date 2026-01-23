@@ -2,7 +2,8 @@ import { mock } from "bun:test";
 
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
-import type { PullRequestStatus } from "@/services/";
+import type { LanguageAnalysisResult, PullRequestStatus } from "@/services/";
+import type { ReactLanguageCode } from "@/utils/constants.util";
 
 /**
  * Creates a mock CommentBuilderService for testing.
@@ -182,8 +183,39 @@ export function createMockLanguageCacheService() {
 	};
 }
 
+export function createMockLanguageDetectorService() {
+	return {
+		detectPrimaryLanguage: mock(() => Promise.resolve("en" satisfies ReactLanguageCode)),
+		analyzeLanguage: mock(() =>
+			Promise.resolve({
+				languageScore: { target: 0.1, source: 0.9 },
+				ratio: 0.1,
+				isTranslated: false,
+				detectedLanguage: "en",
+				rawResult: {
+					reliable: true,
+					textBytes: 1234,
+					languages: [],
+					chunks: [],
+				},
+			} satisfies LanguageAnalysisResult),
+		),
+		getLanguageName: mock((code: string) => {
+			if (code === "en") return "English";
+			if (code === "pt-br") return "Brazilian Portuguese";
+			return "Unknown";
+		}),
+		languages: {
+			source: "en",
+			target: "pt-br",
+		},
+	};
+}
+
 export type MockCommentBuilderService = ReturnType<typeof createMockCommentBuilderService>;
 export type MockContentService = ReturnType<typeof createMockContentService>;
 export type MockRepositoryService = ReturnType<typeof createMockRepositoryService>;
 export type MockTranslatorService = ReturnType<typeof createMockTranslatorService>;
 export type MockLanguageCacheService = ReturnType<typeof createMockLanguageCacheService>;
+export type MockBranchService = ReturnType<typeof createMockBranchService>;
+export type MockLanguageDetectorService = ReturnType<typeof createMockLanguageDetectorService>;

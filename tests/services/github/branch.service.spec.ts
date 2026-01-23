@@ -1,3 +1,4 @@
+import { RequestError } from "@octokit/request-error";
 import {
 	createGitMocks,
 	createMockContentService,
@@ -188,14 +189,14 @@ describe("BranchService", () => {
 		});
 
 		test("should return null for non-existent branch (404)", async () => {
-			const notFoundError = Object.assign(new Error("Not Found"), {
-				status: StatusCodes.NOT_FOUND,
+			const notFoundError = new RequestError("Not Found", StatusCodes.NOT_FOUND, {
+				request: { headers: {}, method: "GET", url: "" },
 			});
 			gitMocks.getRef.mockImplementation(() => Promise.reject(notFoundError));
 
 			const result = await branchService.getBranch("nonexistent");
 
-			expect(result).toBeNull();
+			expect(result).toBeUndefined();
 		});
 
 		test("should re-throw non-404 errors", () => {
@@ -309,6 +310,23 @@ describe("BranchService", () => {
 			const result = await branchService.checkIfCommitExistsOnFork("feature/test");
 
 			expect(result).toBe(false);
+		});
+
+		test("should return false when branch does not exist", async () => {
+			const notFoundError = new RequestError("Not Found", StatusCodes.NOT_FOUND, {
+				request: { headers: {}, method: "GET", url: "" },
+			});
+			gitMocks.getRef.mockImplementation(() => Promise.reject(notFoundError));
+
+			const result = await branchService.checkIfCommitExistsOnFork("nonexistent-branch");
+
+			expect(result).toBe(false);
+		});
+
+		test("should throw mapped error when listCommits fails", () => {
+			reposMocks.listCommits.mockRejectedValue(new Error("API Error"));
+
+			expect(branchService.checkIfCommitExistsOnFork("feature/test")).rejects.toThrow("API Error");
 		});
 	});
 
@@ -509,25 +527,6 @@ describe("BranchService", () => {
 
 			expect(gitMocks.deleteRef).not.toHaveBeenCalled();
 			expect(branchService.activeBranches.has("translate/pr-branch")).toBe(true);
-		});
-	});
-
-	describe("checkIfCommitExistsOnFork - additional edge cases", () => {
-		test("should return false when branch does not exist", async () => {
-			const notFoundError = Object.assign(new Error("Not Found"), {
-				status: StatusCodes.NOT_FOUND,
-			});
-			gitMocks.getRef.mockImplementation(() => Promise.reject(notFoundError));
-
-			const result = await branchService.checkIfCommitExistsOnFork("nonexistent-branch");
-
-			expect(result).toBe(false);
-		});
-
-		test("should throw mapped error when listCommits fails", () => {
-			reposMocks.listCommits.mockRejectedValue(new Error("API Error"));
-
-			expect(branchService.checkIfCommitExistsOnFork("feature/test")).rejects.toThrow("API Error");
 		});
 	});
 });
