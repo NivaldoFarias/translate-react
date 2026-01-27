@@ -78,14 +78,8 @@ export interface LanguageAnalysisResult {
 export class LanguageDetectorService {
 	private readonly logger = logger.child({ component: LanguageDetectorService.name });
 
-	/** Minimum content length required for reliable language detection */
-	private readonly MIN_CONTENT_LENGTH = 10;
-
-	/** Threshold ratio above which content is considered translated */
-	private readonly TRANSLATION_THRESHOLD = 0.5;
-
 	/** Current language configuration using React language codes */
-	public readonly languages: LanguageConfig = {
+	public static readonly languages: LanguageConfig = {
 		source: env.SOURCE_LANGUAGE,
 		target: env.TARGET_LANGUAGE,
 	};
@@ -101,6 +95,14 @@ export class LanguageDetectorService {
 	 * Maps content hashes to detected language codes.
 	 */
 	public detected = new Map<string, string | undefined>();
+
+	constructor(
+		/** Minimum content length required for reliable language detection */
+		private readonly MIN_CONTENT_LENGTH = 10,
+
+		/** Threshold ratio above which content is considered translated */
+		private readonly TRANSLATION_THRESHOLD = 0.5,
+	) {}
 
 	/**
 	 * Gets the human-readable display name for a {@link REACT_TRANSLATION_LANGUAGES|React language code}.
@@ -125,8 +127,11 @@ export class LanguageDetectorService {
 	public getLanguageName(code: ReactLanguageCode, isTargetLanguage = true): string {
 		const displayNames = isTargetLanguage ? this.displayNames.target : this.displayNames.source;
 		const fallbackLanguageName =
-			displayNames.of(isTargetLanguage ? this.languages.target : this.languages.source) ??
-			"Unknown";
+			displayNames.of(
+				isTargetLanguage ?
+					LanguageDetectorService.languages.target
+				:	LanguageDetectorService.languages.source,
+			) ?? "Unknown";
 
 		try {
 			this.logger.info({ code }, "Getting human-readable language name");
@@ -245,8 +250,14 @@ export class LanguageDetectorService {
 			const primaryLanguage = detection.languages[0];
 			const detectedLanguage = primaryLanguage?.code ?? "und";
 
-			const targetScore = this.findLanguageScore(detection.languages, this.languages.target);
-			const sourceScore = this.findLanguageScore(detection.languages, this.languages.source);
+			const targetScore = this.findLanguageScore(
+				detection.languages,
+				LanguageDetectorService.languages.target,
+			);
+			const sourceScore = this.findLanguageScore(
+				detection.languages,
+				LanguageDetectorService.languages.source,
+			);
 
 			const ratio = targetScore / (targetScore + sourceScore || 1);
 
@@ -449,3 +460,6 @@ export class LanguageDetectorService {
 		}
 	}
 }
+
+/** Pre-configured instance of {@link LanguageDetectorService} for application-wide use */
+export const languageDetectorService = new LanguageDetectorService();

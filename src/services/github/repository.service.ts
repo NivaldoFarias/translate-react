@@ -1,13 +1,25 @@
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
-import type { BaseGitHubServiceDependencies } from "./base.service";
+import type { BaseGitHubServiceDependencies, BaseRepositories } from "./base.service";
 
+import { octokit } from "@/clients/";
 import { ApplicationError, ErrorCode, mapError } from "@/errors/";
-import { logger } from "@/utils/";
+import { env, logger } from "@/utils/";
 
 import { BaseGitHubService } from "./base.service";
 
 export type RepositoryServiceDependencies = BaseGitHubServiceDependencies;
+
+export const DEFAULT_REPOSITORIES: BaseRepositories = {
+	upstream: {
+		owner: env.REPO_UPSTREAM_OWNER,
+		repo: env.REPO_UPSTREAM_NAME,
+	},
+	fork: {
+		owner: env.REPO_FORK_OWNER,
+		repo: env.REPO_FORK_NAME,
+	},
+};
 
 /**
  * Service responsible for repository operations and fork management.
@@ -428,3 +440,8 @@ export class RepositoryService extends BaseGitHubService {
 		}
 	}
 }
+
+export const repositoryService = new RepositoryService({
+	octokit,
+	repositories: DEFAULT_REPOSITORIES,
+});

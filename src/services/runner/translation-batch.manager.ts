@@ -10,6 +10,7 @@ import type {
 import { ApplicationError, ErrorCode, mapError } from "@/errors/";
 import { logger, MAX_CONSECUTIVE_FAILURES } from "@/utils/";
 
+import { LanguageDetectorService } from "../language-detector.service";
 import { TranslationFile } from "../translator.service";
 
 export interface InvalidFilePullRequest {
@@ -309,7 +310,7 @@ export class TranslationBatchManager {
 			);
 
 			const languageName = this.services.languageDetector.getLanguageName(
-				this.services.languageDetector.languages.target,
+				LanguageDetectorService.languages.target,
 			);
 
 			const commitStartTime = Date.now();
@@ -540,10 +541,10 @@ export class TranslationBatchManager {
 	) {
 		const branchName = `translate/${file.path.split("/").slice(2).join("/")}`;
 		const languageName = this.services.languageDetector.getLanguageName(
-			this.services.languageDetector.languages.target,
+			LanguageDetectorService.languages.target,
 		);
 		const prOptions = {
-			title: this.services.locale.locale.pullRequest.title(file),
+			title: this.services.locale.definitions.pullRequest.title(file),
 			body: this.createPullRequestDescription(file, processingResult, languageName),
 			baseBranch: "main",
 		};
@@ -645,7 +646,7 @@ export class TranslationBatchManager {
 					workflowStart: this.workflowStartTimestamp,
 				},
 			};
-			const generatedPullRequestDescription = this.services.locale.locale.pullRequest.body(
+			const generatedPullRequestDescription = this.services.locale.definitions.pullRequest.body(
 				file,
 				processingResult,
 				pullRequestDescriptionMetadata,

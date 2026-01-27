@@ -5,8 +5,11 @@ import type { BaseGitHubServiceDependencies } from "./base.service";
 import { ApplicationError, ErrorCode, mapError } from "@/errors/";
 import { env, logger, setupSignalHandlers } from "@/utils/";
 
+import { octokit } from "../../clients/octokit.client";
+
 import { BaseGitHubService } from "./base.service";
-import { ContentService } from "./content.service";
+import { contentService, ContentService } from "./content.service";
+import { DEFAULT_REPOSITORIES } from "./repository.service";
 
 export interface BranchServiceDependencies extends BaseGitHubServiceDependencies {
 	contentService: ContentService;
@@ -344,3 +347,9 @@ export class BranchService extends BaseGitHubService {
 		}
 	}
 }
+
+export const branchService = new BranchService({
+	octokit: octokit,
+	repositories: DEFAULT_REPOSITORIES,
+	contentService: contentService,
+});

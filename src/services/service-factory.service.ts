@@ -10,10 +10,10 @@ import { CommentBuilderService } from "./comment-builder.service";
 import { BranchService } from "./github/branch.service";
 import { ContentService } from "./github/content.service";
 import { RepositoryService } from "./github/repository.service";
-import { LanguageDetectorService } from "./language-detector.service";
-import { LocaleService } from "./locale";
+import { languageDetectorService, LanguageDetectorService } from "./language-detector.service";
+import { localeService } from "./locale";
 import { RunnerService } from "./runner/runner.service";
-import { TranslatorService } from "./translator.service";
+import { translatorService, TranslatorService } from "./translator.service";
 
 /** Configuration interface for service instantiation */
 export interface ServiceConfig {
@@ -152,14 +152,7 @@ export class ServiceFactory {
 
 	/** Creates TranslatorService with injected dependencies */
 	public createTranslatorService(): TranslatorService {
-		return this.getOrCreate(
-			"translatorService",
-			() =>
-				new TranslatorService({
-					openai: this.getOpenAI(),
-					model: this.config.llm.model,
-				}),
-		);
+		return this.getOrCreate("translatorService", () => translatorService);
 	}
 
 	/** Creates LanguageCacheService instance */
@@ -177,7 +170,7 @@ export class ServiceFactory {
 			},
 			translator: this.createTranslatorService(),
 			languageCache: this.createLanguageCacheService(),
-			locale: LocaleService.get(),
+			locale: localeService,
 			languageDetector: this.createLanguageDetectorService(),
 		});
 	}
@@ -196,8 +189,9 @@ export class ServiceFactory {
 	}
 
 	private createLanguageDetectorService(): LanguageDetectorService {
-		return this.getOrCreate("languageDetectorService", () => new LanguageDetectorService());
+		return this.getOrCreate("languageDetectorService", () => languageDetectorService);
 	}
+
 	/** Creates configured Octokit instance with integrated logging */
 	private createOctokit(): Octokit {
 		/** Octokit-specific logger for GitHub API debugging */

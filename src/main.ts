@@ -32,9 +32,7 @@ async function main() {
 	} catch (error) {
 		const mappedError = error instanceof ApplicationError ? error : mapError(error, main.name);
 
-		logger.fatal(mappedError, "Workflow failed with ApplicationError");
-
-		logger.debug("Exiting process with code 1");
+		logger.fatal(mappedError, "Workflow failed");
 
 		process.exit(1);
 	}

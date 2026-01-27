@@ -9,11 +9,13 @@ import type { ProcessedFileResult, PullRequestStatus } from "./../runner";
 import type { TranslationFile } from "./../translator.service";
 import type { BaseGitHubServiceDependencies } from "./base.service";
 
+import { octokit } from "@/clients/";
 import { ApplicationError, ErrorCode, mapError } from "@/errors/";
 import { logger } from "@/utils/";
 
-import { CommentBuilderService } from "./../comment-builder.service";
+import { commentBuilderService, CommentBuilderService } from "./../comment-builder.service";
 import { BaseGitHubService } from "./base.service";
+import { DEFAULT_REPOSITORIES } from "./repository.service";
 
 /** Pull request options */
 export interface PullRequestOptions {
@@ -863,3 +865,9 @@ export class ContentService extends BaseGitHubService {
 		}
 	}
 }
+
+export const contentService = new ContentService({
+	octokit,
+	repositories: DEFAULT_REPOSITORIES,
+	commentBuilderService,
+});

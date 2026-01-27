@@ -4,26 +4,26 @@ import {
 	createMockLanguageDetectorService,
 	createMockOpenAI,
 } from "@tests/mocks";
-import { beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
+import { beforeEach, describe, expect, spyOn, test } from "bun:test";
 
 import type { ChatCompletion } from "openai/resources";
 
 import type { TranslatorServiceDependencies } from "@/services/";
-import type { ReactLanguageCode } from "@/utils";
 
-import { TranslationFile, TranslatorService } from "@/services/";
+import { localeService, TranslationFile, TranslatorService } from "@/services/";
 
 /** Module-scoped mock for chat completions (can be spied/cleared per test) */
 const mockChatCompletionsCreate = createChatCompletionsMock();
 
 /** Creates test TranslatorService with optional overrides */
 function createTestTranslatorService(
-	overrides?: Partial<TranslatorServiceDependencies>,
+	overrides: Partial<TranslatorServiceDependencies> = {},
 ): TranslatorService {
 	const defaults = {
 		openai: createMockOpenAI(mockChatCompletionsCreate),
 		model: "test-model",
-		languageDetector: createMockLanguageDetectorService(),
+		localeService,
+		languageDetectorService: createMockLanguageDetectorService(),
 	};
 
 	return new TranslatorService({
@@ -32,47 +32,12 @@ function createTestTranslatorService(
 	});
 }
 
-/** Mock backoff utility to execute immediately without retries */
-void mock.module("@/utils/backoff.util", () => ({
-	withExponentialBackoff: <T>(fn: () => Promise<T>) => fn(),
-	DEFAULT_BACKOFF_CONFIG: {
-		initialDelay: 1000,
-		maxDelay: 60_000,
-		maxRetries: 5,
-		multiplier: 2,
-		jitter: true,
-	},
-}));
-
 describe("TranslatorService", () => {
 	let translatorService: TranslatorService;
 
 	beforeEach(() => {
 		mockChatCompletionsCreate.mockClear();
-
 		translatorService = createTestTranslatorService();
-		spyOn(translatorService.services.languageDetector, "detectPrimaryLanguage").mockResolvedValue(
-			"en",
-		);
-		spyOn(translatorService.services.languageDetector, "getLanguageName").mockImplementation(
-			(code: ReactLanguageCode) => {
-				if (code === "en") return "English";
-				if (code === "pt-br") return "Brazilian Portuguese";
-				return "English";
-			},
-		);
-		spyOn(translatorService.services.languageDetector, "analyzeLanguage").mockResolvedValue({
-			languageScore: { target: 0.1, source: 0.9 },
-			ratio: 0.1,
-			isTranslated: false,
-			detectedLanguage: "en",
-			rawResult: {
-				reliable: true,
-				textBytes: 1234,
-				languages: [],
-				chunks: [],
-			},
-		});
 	});
 
 	describe("Constructor", () => {
@@ -82,10 +47,10 @@ describe("TranslatorService", () => {
 		});
 
 		test("should initialize language detector with provided config", () => {
-			const service = createTestTranslatorService();
+			const translatorService = createTestTranslatorService();
 
-			expect(service).toBeInstanceOf(TranslatorService);
-			expect(service.services.languageDetector).toBeDefined();
+			expect(translatorService).toBeInstanceOf(TranslatorService);
+			expect(translatorService.services.languageDetector).toBeDefined();
 		});
 	});
 

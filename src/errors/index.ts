@@ -1,2 +1,2 @@
 export * from "./error";
-export * from "./error.helper";
+export * from "./error.helpers";

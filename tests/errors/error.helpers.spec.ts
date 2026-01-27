@@ -3,8 +3,6 @@ import { describe, expect, test } from "bun:test";
 import { StatusCodes } from "http-status-codes";
 import { APIError } from "openai/error";
 
-import type { GithubErrorBaseMetadata } from "@/errors/";
-
 import { ErrorCode, mapError } from "@/errors/";
 
 describe("mapError", () => {
