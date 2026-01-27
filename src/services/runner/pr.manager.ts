@@ -7,7 +7,7 @@ import type {
 } from "./runner.types";
 
 import { ApplicationError } from "@/errors/";
-import { mapError } from "@/errors/error.helper";
+import { mapError } from "@/errors/error.helpers";
 import { formatElapsedTime, logger } from "@/utils/";
 
 import { TranslationFile } from "../translator.service";

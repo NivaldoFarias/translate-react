@@ -183,6 +183,11 @@ export function createMockLanguageCacheService() {
 	};
 }
 
+/**
+ * Creates a mock LanguageDetectorService for testing.
+ *
+ * @returns Mocked LanguageDetectorService instance
+ */
 export function createMockLanguageDetectorService() {
 	return {
 		detectPrimaryLanguage: mock(() => Promise.resolve("en" satisfies ReactLanguageCode)),
@@ -200,7 +205,7 @@ export function createMockLanguageDetectorService() {
 				},
 			} satisfies LanguageAnalysisResult),
 		),
-		getLanguageName: mock((code: string) => {
+		getLanguageName: mock((code: string): string => {
 			if (code === "en") return "English";
 			if (code === "pt-br") return "Brazilian Portuguese";
 			return "Unknown";

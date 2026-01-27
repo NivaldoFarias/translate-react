@@ -3,10 +3,10 @@ import type { LocaleDefinition } from "@/locales";
 import type { ProcessedFileResult } from "./runner";
 
 import { ApplicationError } from "@/errors";
-import { mapError } from "@/errors/error.helper";
+import { mapError } from "@/errors/error.helpers";
 import { logger } from "@/utils/";
 
-import { LocaleService } from "./locale";
+import { localeService } from "./locale";
 import { TranslationFile } from "./translator.service";
 
 export interface FileEntry {
@@ -25,12 +25,12 @@ export class CommentBuilderService {
 	private readonly locale: LocaleDefinition;
 
 	/**
-	 * Creates a new CommentBuilderService instance.
+	 * Creates a new {@link CommentBuilderService} instance.
 	 *
-	 * @param localeService Optional locale service for dependency injection (defaults to singleton)
+	 * @param localeDefinition Optional locale service for dependency injection (defaults to singleton)
 	 */
-	constructor(localeService?: LocaleService) {
-		this.locale = (localeService ?? LocaleService.get()).locale;
+	constructor(localeDefinition: LocaleDefinition = localeService.definitions) {
+		this.locale = localeDefinition;
 	}
 
 	/**
@@ -304,3 +304,5 @@ export class CommentBuilderService {
 		};
 	}
 }
+
+export const commentBuilderService = new CommentBuilderService();

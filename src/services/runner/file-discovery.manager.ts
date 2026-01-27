@@ -11,6 +11,7 @@ import type {
 
 import { FILE_FETCH_BATCH_SIZE, logger, MIN_CACHE_CONFIDENCE } from "@/utils/";
 
+import { LanguageDetectorService } from "../language-detector.service";
 import { TranslationFile } from "../translator.service";
 
 /**
@@ -138,7 +139,7 @@ export class FileDiscoveryManager {
 
 		let cacheHits = 0;
 		let cacheMisses = 0;
-		const targetLanguage = this.services.languageDetector.languages.target;
+		const targetLanguage = LanguageDetectorService.languages.target;
 
 		for (const file of files) {
 			const cache = languageCaches.get(file.filename);

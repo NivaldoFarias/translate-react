@@ -3,6 +3,12 @@ import type { RunnerOptions, RunnerServiceDependencies, WorkflowStatistics } fro
 import { extractErrorMessage } from "@/errors/";
 import { env, logger } from "@/utils/";
 
+import { languageCacheService } from "../cache";
+import { branchService, contentService, repositoryService } from "../github";
+import { languageDetectorService } from "../language-detector.service";
+import { localeService } from "../locale/locale.service";
+import { translatorService } from "../translator.service";
+
 import { BaseRunnerService } from "./base.service";
 
 /**
@@ -84,3 +90,15 @@ export class RunnerService extends BaseRunnerService {
 		}
 	}
 }
+
+export const runnerService = new RunnerService({
+	github: {
+		branch: branchService,
+		repository: repositoryService,
+		content: contentService,
+	},
+	translator: translatorService,
+	languageCache: languageCacheService,
+	locale: localeService,
+	languageDetector: languageDetectorService,
+});

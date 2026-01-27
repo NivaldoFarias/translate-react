@@ -5,10 +5,12 @@ import OpenAI from "openai";
 import type { MarkdownTextSplitterParams } from "@langchain/textsplitters";
 
 import { ApplicationError, ErrorCode, mapError } from "@/errors/";
-import { env, logger, MAX_CHUNK_TOKENS, withExponentialBackoff } from "@/utils/";
+import { env, logger, MAX_CHUNK_TOKENS } from "@/utils/";
 
-import { LanguageDetectorService } from "./language-detector.service";
-import { LocaleService } from "./locale";
+import { openai } from "../clients/";
+
+import { LanguageDetectorService, languageDetectorService } from "./language-detector.service";
+import { localeService, LocaleService } from "./locale";
 
 /** LLM configuration for TranslatorService */
 export interface TranslatorLLMConfig {
@@ -40,10 +42,10 @@ export interface TranslatorServiceDependencies {
 	model: string;
 
 	/** Optional locale service (defaults to singleton) */
-	localeService?: LocaleService;
+	localeService: LocaleService;
 
 	/** Optional language detector service */
-	languageDetector?: LanguageDetectorService;
+	languageDetectorService: LanguageDetectorService;
 }
 
 /**
@@ -86,22 +88,14 @@ export class TranslationFile {
 }
 
 /**
- * Core service for translating content using OpenAI's language models.
- *
- * Handles the entire translation workflow including:
- * - Content parsing and block management
- * - Language model interaction with async language detection
- * - Response processing and cleanup
- * - Translation metrics tracking
- * - Language analysis and detection
+ * Core service for translating content using {@link OpenAI}.
  *
  * @example
  * ```typescript
  * const translator = new TranslatorService({
- *   openai: openaiClient,
- *   model: 'gpt-4',
+ *   openai:  new OpenAI({}),
+ *   model: 'gpt-4o',
  * });
- * translator.setGlossary('React -> React\ncomponent -> componente');
  *
  * const result = await translator.translateContent(file);
  * console.log(result); // Translated content
@@ -136,8 +130,8 @@ export class TranslatorService {
 		this.openai = dependencies.openai;
 		this.model = dependencies.model;
 		this.services = {
-			locale: dependencies.localeService ?? LocaleService.get(),
-			languageDetector: dependencies.languageDetector ?? new LanguageDetectorService(),
+			locale: dependencies.localeService,
+			languageDetector: dependencies.languageDetectorService,
 		};
 	}
 
@@ -952,19 +946,15 @@ export class TranslatorService {
 				"Calling language model for translation",
 			);
 
-			const completion = await withExponentialBackoff(
-				() =>
-					this.openai.chat.completions.create({
-						model: this.model,
-						temperature: 0.1,
-						max_tokens: env.MAX_TOKENS,
-						messages: [
-							{ role: "system", content: systemPrompt },
-							{ role: "user", content },
-						],
-					}),
-				{ maxRetries: env.LLM_API_MAX_RETRIES },
-			);
+			const completion = await this.openai.chat.completions.create({
+				model: this.model,
+				temperature: 0.1,
+				max_tokens: env.MAX_TOKENS,
+				messages: [
+					{ role: "system", content: systemPrompt },
+					{ role: "user", content },
+				],
+			});
 
 			const translatedContent = completion.choices[0]?.message.content;
 
@@ -1086,10 +1076,10 @@ export class TranslatorService {
 
 			const languages = {
 				target: this.services.languageDetector.getLanguageName(
-					this.services.languageDetector.languages.target,
+					LanguageDetectorService.languages.target,
 				),
 				source: this.services.languageDetector.getLanguageName(
-					detectedSourceCode ?? this.services.languageDetector.languages.source,
+					detectedSourceCode ?? LanguageDetectorService.languages.source,
 					false,
 				),
 			};
@@ -1139,7 +1129,7 @@ export class TranslatorService {
 				- Maintain exact whitespace patterns, including list formatting and blank lines
 				- Preserve any trailing newlines from the original content
 	
-				${this.services.locale.locale.rules.specific}
+				${this.services.locale.definitions.rules.specific}
 	
 				${glossarySection}
 			`;
@@ -1154,3 +1144,11 @@ export class TranslatorService {
 		}
 	}
 }
+
+/** Pre-configured instance of {@link TranslatorService} for application-wide use */
+export const translatorService = new TranslatorService({
+	openai,
+	model: env.LLM_MODEL,
+	localeService,
+	languageDetectorService,
+});
