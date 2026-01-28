@@ -1,5 +1,5 @@
 import type {
-	PatchedRepositoryItem,
+	PatchedRepositoryTreeItem,
 	ProcessedFileResult,
 	RepositoryTreeItem,
 	RunnerOptions,
@@ -188,7 +188,7 @@ export abstract class BaseRunnerService {
 				"Repository tree fetched from upstream",
 			);
 
-			this.state.repositoryTree = this.patchRepositoryItemFilenames(repositoryTree);
+			this.state.repositoryTree = this.patchRepositoryItem(repositoryTree);
 
 			this.logger.info(
 				{ before: repositoryTree.length, after: this.state.repositoryTree.length },
@@ -217,8 +217,6 @@ export abstract class BaseRunnerService {
 			const glossary = await this.services.github.repository.fetchGlossary();
 
 			if (!glossary) {
-				this.logger.error({ glossary }, "Glossary is empty or failed to load");
-
 				throw new ApplicationError(
 					"Glossary is empty or failed to load",
 					ErrorCode.ResourceLoadError,
@@ -239,21 +237,23 @@ export abstract class BaseRunnerService {
 	/**
 	 * Patches repository tree item's filenames extracted from paths.
 	 *
-	 * @param repositoryTree Array of unpatched repository tree items
+	 * @param repositoryTree Array of repository tree items
 	 *
 	 * @returns Array of repository items with patched filenames
 	 */
-	private patchRepositoryItemFilenames(
-		repositoryTree: RepositoryTreeItem[],
-	): PatchedRepositoryItem[] {
+	private patchRepositoryItem(repositoryTree: RepositoryTreeItem[]): PatchedRepositoryTreeItem[] {
 		try {
 			this.logger.debug("Patching repository item filenames");
 
-			const patchedRepositoryTree = repositoryTree.map((item) => {
-				const filename = item.path?.split("/").pop() ?? "";
+			const patchedRepositoryTree = repositoryTree
+				.map((item) => {
+					const filename = item.path?.split("/").pop() ?? "";
 
-				return { ...item, filename };
-			}) as PatchedRepositoryItem[];
+					return { ...item, filename };
+				})
+				.filter(
+					(item) => !!item.filename && !!item.sha && !!item.path,
+				) as PatchedRepositoryTreeItem[];
 
 			this.logger.debug(
 				{
@@ -270,7 +270,7 @@ export abstract class BaseRunnerService {
 		} catch (error) {
 			if (error instanceof ApplicationError) throw error;
 
-			throw mapError(error, `${BaseRunnerService.name}.${this.patchRepositoryItemFilenames.name}`);
+			throw mapError(error, `${BaseRunnerService.name}.${this.patchRepositoryItem.name}`);
 		}
 	}
 
@@ -310,12 +310,11 @@ export abstract class BaseRunnerService {
 			);
 
 			if (filesToTranslate.length === 0) {
-				this.logger.error({ filesToTranslate, invalidPRsByFile }, "Found no files to translate");
-
 				throw new ApplicationError(
 					"Found no files to translate",
 					ErrorCode.NoFilesToTranslate,
-					`${BaseRunnerService.name}.fetchFilesToTranslate`,
+					`${BaseRunnerService.name}.${this.fetchFilesToTranslate.name}`,
+					{ filesToTranslate, invalidPRsByFile },
 				);
 			}
 

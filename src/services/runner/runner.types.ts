@@ -1,4 +1,5 @@
 import type { RestEndpointMethodTypes } from "@octokit/rest";
+import type { SetRequired } from "type-fest";
 
 import type { LanguageCacheService } from "../cache";
 import type { BranchService, ContentService, RepositoryService } from "../github";
@@ -70,7 +71,7 @@ export interface ProcessedFileResult {
 export type RepositoryTreeItem =
 	RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"][number];
 
-export interface PatchedRepositoryItem extends RepositoryTreeItem {
+export interface PatchedRepositoryTreeItem extends SetRequired<RepositoryTreeItem, "path" | "sha"> {
 	/**
 	 * The filename extracted from the file's path
 	 *
@@ -86,7 +87,7 @@ export interface PatchedRepositoryItem extends RepositoryTreeItem {
  */
 export interface CacheCheckResult {
 	/** Files that require further processing (cache miss or invalidation) */
-	candidateFiles: PatchedRepositoryItem[];
+	candidateFiles: PatchedRepositoryTreeItem[];
 
 	/** Number of files found in cache with valid translation detection */
 	cacheHits: number;
@@ -102,7 +103,7 @@ export interface CacheCheckResult {
  */
 export interface PrFilterResult {
 	/** Files that need content fetching (no existing PR) */
-	filesToFetch: PatchedRepositoryItem[];
+	filesToFetch: PatchedRepositoryTreeItem[];
 
 	/** Number of files skipped because they have existing valid PRs */
 	numFilesWithPRs: number;
@@ -194,7 +195,7 @@ export interface RunnerServiceDependencies {
 }
 
 export interface RunnerState {
-	repositoryTree: PatchedRepositoryItem[];
+	repositoryTree: PatchedRepositoryTreeItem[];
 	filesToTranslate: TranslationFile[];
 	processedResults: ProcessedFileResult[];
 	timestamp: number;

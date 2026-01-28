@@ -1,13 +1,16 @@
 import { MarkdownTextSplitter } from "@langchain/textsplitters";
+import { StatusCodes } from "http-status-codes";
 import { encodingForModel } from "js-tiktoken";
 import OpenAI from "openai";
+import pRetry, { AbortError } from "p-retry";
 
 import type { MarkdownTextSplitterParams } from "@langchain/textsplitters";
+import type PQueue from "p-queue";
+import type { Options as RetryOptions } from "p-retry";
 
+import { llmQueue, openai } from "@/clients/";
 import { ApplicationError, ErrorCode, mapError } from "@/errors/";
 import { env, logger, MAX_CHUNK_TOKENS } from "@/utils/";
-
-import { openai } from "../clients/";
 
 import { LanguageDetectorService, languageDetectorService } from "./language-detector.service";
 import { localeService, LocaleService } from "./locale";
@@ -41,11 +44,17 @@ export interface TranslatorServiceDependencies {
 	/** LLM model identifier for chat completions */
 	model: string;
 
+	/** Rate limiting queue for LLM API calls */
+	queue: PQueue;
+
 	/** Optional locale service (defaults to singleton) */
 	localeService: LocaleService;
 
 	/** Optional language detector service */
 	languageDetectorService: LanguageDetectorService;
+
+	/** Retry configuration for LLM API calls */
+	retryConfig: RetryOptions;
 }
 
 /**
@@ -110,6 +119,12 @@ export class TranslatorService {
 	/** LLM model identifier for chat completions */
 	private readonly model: string;
 
+	/** Rate limiting queue for LLM API calls */
+	private readonly queue: PQueue;
+
+	/** Retry configuration for LLM API calls */
+	private readonly retryConfig: RetryOptions;
+
 	public readonly services: {
 		/** Locale service for language-specific rules */
 		locale: LocaleService;
@@ -129,18 +144,16 @@ export class TranslatorService {
 	constructor(dependencies: TranslatorServiceDependencies) {
 		this.openai = dependencies.openai;
 		this.model = dependencies.model;
+		this.queue = dependencies.queue;
 		this.services = {
 			locale: dependencies.localeService,
 			languageDetector: dependencies.languageDetectorService,
 		};
+		this.retryConfig = dependencies.retryConfig;
 	}
 
 	/**
 	 * Tests LLM API connectivity and authentication.
-	 *
-	 * Makes a minimal API call to verify credentials and model availability
-	 * before starting the translation workflow. This prevents wasting time
-	 * on failed workflows due to API issues.
 	 *
 	 * @throws {ApplicationError} with {@link ErrorCode.InitializationError} If LLM API is not accessible or credentials are invalid
 	 *
@@ -434,10 +447,10 @@ export class TranslatorService {
 			this.logger.info({ analysis }, "Checked translation status");
 
 			return analysis.isTranslated;
-		} catch (error) {
-			const mappedError =
-				error instanceof ApplicationError ? error : (
-					mapError(error, `${TranslatorService.name}.${this.isContentTranslated.name}`, {
+		} catch (_error) {
+			const error =
+				_error instanceof ApplicationError ? _error : (
+					mapError(_error, `${TranslatorService.name}.${this.isContentTranslated.name}`, {
 						filename: file.filename,
 						path: file.path,
 						contentLength: file.content.length,
@@ -445,7 +458,7 @@ export class TranslatorService {
 				);
 
 			this.logger.error(
-				{ mappedError },
+				{ mappedError: error },
 				"Error checking if content is translated. Assuming not translated",
 			);
 
@@ -528,17 +541,17 @@ export class TranslatorService {
 			);
 
 			return tokens.length;
-		} catch (error) {
+		} catch (_error) {
 			const fallback = Math.ceil(content.length / 3.5);
-			const mappedError =
-				error instanceof ApplicationError ? error : (
-					mapError(error, `${TranslatorService.name}.${this.estimateTokenCount.name}`, {
+			const error =
+				_error instanceof ApplicationError ? _error : (
+					mapError(_error, `${TranslatorService.name}.${this.estimateTokenCount.name}`, {
 						content,
 						fallback,
 					})
 				);
 
-			this.logger.error({ mappedError }, "Error estimating token count, using fallback");
+			this.logger.error({ mappedError: error }, "Error estimating token count, using fallback");
 
 			return fallback;
 		}
@@ -905,10 +918,10 @@ export class TranslatorService {
 			);
 
 			return translatedChunk;
-		} catch (error) {
-			const mappedError =
-				error instanceof ApplicationError ? error : (
-					mapError(error, `${TranslatorService.name}.${this.translateChunk.name}`, {
+		} catch (_error) {
+			const error =
+				_error instanceof ApplicationError ? _error : (
+					mapError(_error, `${TranslatorService.name}.${this.translateChunk.name}`, {
 						chunkIndex: index,
 						totalChunks: chunks.length,
 						chunkSize: chunk.length,
@@ -916,10 +929,31 @@ export class TranslatorService {
 					})
 				);
 
-			this.logger.error({ error: mappedError }, "Failed to translate content chunk");
+			this.logger.error({ error: error }, "Failed to translate content chunk");
 
-			throw mappedError;
+			throw error;
 		}
+	}
+
+	/**
+	 * Prepares parameters for LLM chat completion API call.
+	 *
+	 * @param content Content to translate
+	 *
+	 * @returns Chat completion parameters object
+	 */
+	private async getLLMCompletionParams(
+		content: string,
+	): Promise<OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming> {
+		return {
+			model: this.model,
+			temperature: 0.1,
+			max_tokens: env.MAX_TOKENS,
+			messages: [
+				{ role: "system", content: await this.getSystemPrompt(content) },
+				{ role: "user", content },
+			],
+		};
 	}
 
 	/**
@@ -936,57 +970,67 @@ export class TranslatorService {
 	 * @returns Resolves to the translated content
 	 */
 	private async callLanguageModel(content: string): Promise<string> {
-		try {
-			this.logger.debug({ contentLength: content.length }, "Preparing to call language model");
+		return this.queue.add(async () => {
+			return pRetry(
+				async () => {
+					try {
+						this.logger.debug({ contentLength: content.length, model: this.model }, "Calling LLM");
 
-			const systemPrompt = await this.getSystemPrompt(content);
+						const completion = await this.openai.chat.completions.create(
+							await this.getLLMCompletionParams(content),
+						);
 
-			this.logger.debug(
-				{ model: this.model, contentLength: content.length, temperature: 0.1 },
-				"Calling language model for translation",
-			);
+						const translatedContent = completion.choices[0]?.message.content;
 
-			const completion = await this.openai.chat.completions.create({
-				model: this.model,
-				temperature: 0.1,
-				max_tokens: env.MAX_TOKENS,
-				messages: [
-					{ role: "system", content: systemPrompt },
-					{ role: "user", content },
-				],
-			});
+						if (!translatedContent) {
+							throw new ApplicationError(
+								"No content returned from language model",
+								ErrorCode.NoContent,
+								`${TranslatorService.name}.${this.callLanguageModel.name}`,
+								{ model: this.model, contentLength: content.length },
+							);
+						}
 
-			const translatedContent = completion.choices[0]?.message.content;
+						this.logger.debug(
+							{
+								model: this.model,
+								translatedLength: translatedContent.length,
+								tokensUsed: completion.usage?.total_tokens,
+							},
+							"Translation completed successfully",
+						);
 
-			if (!translatedContent) {
-				this.logger.error({ model: this.model }, "No content returned from language model");
+						return translatedContent;
+					} catch (_error) {
+						const error =
+							_error instanceof ApplicationError ? _error : (
+								mapError(_error, `${TranslatorService.name}.${this.callLanguageModel.name}`, {
+									model: this.model,
+									contentLength: content.length,
+								})
+							);
 
-				throw new ApplicationError(
-					"No content returned from language model",
-					ErrorCode.NoContent,
-					`${TranslatorService.name}.${this.callLanguageModel.name}`,
-					{ model: this.model, contentLength: content.length },
-				);
-			}
+						if (
+							error.statusCode === StatusCodes.UNAUTHORIZED ||
+							error.statusCode === StatusCodes.BAD_REQUEST
+						) {
+							throw new AbortError(error);
+						}
 
-			this.logger.debug(
-				{
-					model: this.model,
-					translatedLength: translatedContent.length,
-					tokensUsed: completion.usage?.total_tokens,
+						throw error;
+					}
 				},
-				"Translation completed successfully",
+				{
+					...this.retryConfig,
+					onFailedAttempt: ({ attemptNumber: attempt, error, retriesLeft }) => {
+						this.logger.warn(
+							{ attempt, retriesLeft, error: error.message },
+							"LLM call failed, retrying",
+						);
+					},
+				},
 			);
-
-			return translatedContent;
-		} catch (error) {
-			if (error instanceof ApplicationError) throw error;
-
-			throw mapError(error, `${TranslatorService.name}.${this.callLanguageModel.name}`, {
-				model: this.model,
-				contentLength: content.length,
-			});
-		}
+		});
 	}
 
 	/**
@@ -1149,6 +1193,10 @@ export class TranslatorService {
 export const translatorService = new TranslatorService({
 	openai,
 	model: env.LLM_MODEL,
+	queue: llmQueue,
 	localeService,
 	languageDetectorService,
+	retryConfig: {
+		retries: env.MAX_RETRY_ATTEMPTS,
+	},
 });

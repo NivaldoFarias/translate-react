@@ -1,4 +1,15 @@
 import { RequestError } from "@octokit/request-error";
+import { afterAll, afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { StatusCodes } from "http-status-codes";
+
+import type { RestEndpointMethodTypes } from "@octokit/rest";
+
+import type { BranchServiceDependencies } from "@/services/";
+
+import type { MockContentService, MockOctokitGit, MockOctokitRepos } from "@tests/mocks";
+
+import { BranchService } from "@/services/";
+
 import {
 	createGitMocks,
 	createMockContentService,
@@ -6,15 +17,6 @@ import {
 	createReposMocks,
 	testRepositories,
 } from "@tests/mocks";
-import { afterAll, afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
-import { StatusCodes } from "http-status-codes";
-
-import type { RestEndpointMethodTypes } from "@octokit/rest";
-import type { MockContentService, MockOctokitGit, MockOctokitRepos } from "@tests/mocks";
-
-import type { BranchServiceDependencies } from "@/services/";
-
-import { BranchService } from "@/services/";
 
 /** Test subclass to expose protected cleanup method */
 class TestableBranchService extends BranchService {

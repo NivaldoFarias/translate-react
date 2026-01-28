@@ -1,9 +1,3 @@
-import {
-	createChatCompletionsMock,
-	createMockChatCompletion,
-	createMockLanguageDetectorService,
-	createMockOpenAI,
-} from "@tests/mocks";
 import { beforeEach, describe, expect, spyOn, test } from "bun:test";
 
 import type { ChatCompletion } from "openai/resources";
@@ -11,6 +5,14 @@ import type { ChatCompletion } from "openai/resources";
 import type { TranslatorServiceDependencies } from "@/services/";
 
 import { localeService, TranslationFile, TranslatorService } from "@/services/";
+
+import {
+	createChatCompletionsMock,
+	createMockChatCompletion,
+	createMockLanguageDetectorService,
+	createMockOpenAI,
+	createMockQueue,
+} from "@tests/mocks";
 
 /** Module-scoped mock for chat completions (can be spied/cleared per test) */
 const mockChatCompletionsCreate = createChatCompletionsMock();
@@ -24,6 +26,14 @@ function createTestTranslatorService(
 		model: "test-model",
 		localeService,
 		languageDetectorService: createMockLanguageDetectorService(),
+		queue: createMockQueue(),
+		retryConfig: {
+			retries: 0,
+			factor: 1,
+			minTimeout: 100,
+			maxTimeout: 1000,
+			randomize: false,
+		},
 	};
 
 	return new TranslatorService({

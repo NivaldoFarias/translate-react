@@ -1,14 +1,25 @@
-import { createProcessedFileResultsFixture, createTranslationFilesFixture } from "@tests/fixtures";
-import { createMockCommentBuilderService, createMockOctokit, testRepositories } from "@tests/mocks";
 import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test";
 
-import type { MockCommentBuilderService, MockOctokit } from "@tests/mocks";
 import type { components } from "node_modules/@octokit/plugin-paginate-rest/node_modules/@octokit/types/node_modules/@octokit/openapi-types";
 import type { RestEndpointMethodTypes } from "node_modules/@octokit/plugin-rest-endpoint-methods/dist-types/generated/parameters-and-response-types";
 
-import type { ContentServiceDependencies, ProcessedFileResult, TranslationFile } from "@/services/";
+import type {
+	ContentServiceDependencies,
+	PatchedRepositoryTreeItem,
+	ProcessedFileResult,
+	TranslationFile,
+} from "@/services/";
+
+import type { MockCommentBuilderService, MockOctokit } from "@tests/mocks";
 
 import { ContentService } from "@/services/";
+
+import {
+	createProcessedFileResultsFixture,
+	createRepositoryTreeItemFixture,
+	createTranslationFilesFixture,
+} from "@tests/fixtures";
+import { createMockCommentBuilderService, createMockOctokit, testRepositories } from "@tests/mocks";
 
 /** Creates test ContentService with dependencies */
 function createTestContentService(overrides?: Partial<ContentServiceDependencies>): {
@@ -60,14 +71,6 @@ describe("ContentService", () => {
 		};
 	});
 
-	test("should get untranslated files when batch size is specified", async () => {
-		const files = await contentService.getUntranslatedFiles();
-
-		expect(files).toHaveLength(1);
-		expect(files[0]?.content).toBe("# Test Content");
-		expect(files[0]?.sha).toBe("abc123");
-	});
-
 	test("should commit translation when valid translation data is provided", async () => {
 		const mockBranch = {
 			ref: "refs/heads/translate/test",
@@ -110,29 +113,30 @@ describe("ContentService", () => {
 	});
 
 	test("should get file content when file exists", async () => {
-		const file: TranslationFile = {
+		const repoTreeItem: PatchedRepositoryTreeItem = createRepositoryTreeItemFixture({
 			path: "src/test/file.md",
-			content: "# Original Content",
 			sha: "abc123",
 			filename: "file.md",
-		};
+		});
 
-		const content = await contentService.getFileContent(file);
+		const file = await contentService.getFile(repoTreeItem);
 
-		expect(content).toBe("# Test Content");
+		expect(file.content).toBe("# Test Content");
+		expect(file.sha).toBe("abc123");
+		expect(file.path).toBe("src/test/file.md");
+		expect(file.filename).toBe("file.md");
 	});
 
 	test("should handle file content errors when file does not exist", () => {
 		octokitMock.git.getBlob.mockRejectedValueOnce(new Error("Not Found"));
 
-		const file: TranslationFile = {
+		const repoTreeItem: PatchedRepositoryTreeItem = createRepositoryTreeItemFixture({
 			path: "src/test/non-existent.md",
-			content: "",
 			sha: "missing",
 			filename: "non-existent.md",
-		};
+		});
 
-		expect(contentService.getFileContent(file)).rejects.toThrow("Not Found");
+		expect(contentService.getFile(repoTreeItem)).rejects.toThrow("Not Found");
 	});
 
 	describe("listOpenPullRequests", () => {
@@ -215,29 +219,6 @@ describe("ContentService", () => {
 			octokitMock.pulls.listFiles.mockRejectedValueOnce(new Error("API Error"));
 
 			expect(contentService.getPullRequestFiles(123)).rejects.toThrow();
-		});
-	});
-
-	describe("getUntranslatedFiles", () => {
-		test("should throw error when repository tree is empty", () => {
-			octokitMock.git.getTree.mockResolvedValueOnce({ data: { tree: [] } });
-
-			expect(contentService.getUntranslatedFiles()).rejects.toThrow();
-		});
-
-		test("should skip files without path", async () => {
-			octokitMock.git.getTree.mockResolvedValueOnce({
-				data: {
-					tree: [
-						{ path: "src/test/file.md", type: "blob", sha: "abc123", url: "" },
-						{ type: "blob", sha: "def456", url: "" },
-					],
-				},
-			});
-
-			const files = await contentService.getUntranslatedFiles();
-
-			expect(files).toHaveLength(1);
 		});
 	});
 
