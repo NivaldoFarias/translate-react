@@ -86,7 +86,7 @@ export class TranslationBatchManager {
 	 *
 	 * @returns Map of filename to processing result metadata
 	 */
-	async processBatches(
+	public async processBatches(
 		files: TranslationFile[],
 		batchSize: number,
 	): Promise<Map<string, ProcessedFileResult>> {
@@ -130,8 +130,8 @@ export class TranslationBatchManager {
 	private createBatches(files: TranslationFile[], batchSize: number): TranslationFile[][] {
 		const batches: TranslationFile[][] = [];
 
-		for (let i = 0; i < files.length; i += batchSize) {
-			batches.push(files.slice(i, i + batchSize));
+		for (let index = 0; index < files.length; index += batchSize) {
+			batches.push(files.slice(index, index + batchSize));
 		}
 
 		return batches;
@@ -208,11 +208,6 @@ export class TranslationBatchManager {
 	/**
 	 * Processes a single file through the complete translation workflow.
 	 *
-	 * Handles the entire lifecycle of translating a file sequentially, from branch
-	 * creation through translation, commit, and pull request generation. Each step
-	 * is performed synchronously using `await` to ensure proper ordering and state
-	 * management. Includes comprehensive error handling and cleanup for failed translations.
-	 *
 	 * ### Workflow Steps
 	 *
 	 * 1. **Branch Creation**: Creates or retrieves translation branch for isolation
@@ -227,22 +222,15 @@ export class TranslationBatchManager {
 	 * - Commit must complete before PR creation
 	 * - Detailed timing logs track each operation's duration for debugging
 	 *
-	 * ### Error Handling
-	 *
-	 * - Captures and logs all errors with timing context
-	 * - Updates progress tracking for reporting
-	 * - Performs cleanup of created resources (branches) on failure
-	 * - Maintains file metadata even on failure for audit trail
-	 *
 	 * @param file File to process through translation workflow
 	 * @param _progress Progress tracking information for batch processing
 	 *
-	 * @throws {ApplicationError} with {@link ErrorCode.TranslationFailed} if circuit breaker
-	 *  threshold is reached due to consecutive failures
+	 * @throws {ApplicationError} with {@link ErrorCode.TranslationFailed}
+	 * If circuit breaker threshold is reached due to consecutive failures
 	 *
 	 * @returns Processing result metadata including branch, translation, PR, and error info
 	 */
-	async processFile(
+	private async processFile(
 		file: TranslationFile,
 		_progress: FileProcessingProgress,
 	): Promise<ProcessedFileResult> {
@@ -260,22 +248,12 @@ export class TranslationBatchManager {
 			logger.debug(
 				{
 					filename: file.filename,
-					contentLength: file.content.length,
 					consecutiveFailures: this.consecutiveFailures,
 				},
 				"Starting file processing workflow",
 			);
 
 			if (this.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-				logger.error(
-					{
-						consecutiveFailures: this.consecutiveFailures,
-						threshold: MAX_CONSECUTIVE_FAILURES,
-						filename: file.filename,
-					},
-					"Circuit breaker activated: stopping workflow due to consecutive failures",
-				);
-
 				throw new ApplicationError(
 					`Workflow terminated: ${this.consecutiveFailures} consecutive failures exceeded threshold of ${MAX_CONSECUTIVE_FAILURES}`,
 					ErrorCode.TranslationFailed,
@@ -318,7 +296,7 @@ export class TranslationBatchManager {
 				file,
 				branch: metadata.branch,
 				content: metadata.translation,
-				message: `Translate \`${file.filename}\` to ${languageName}`,
+				message: `docs: translate \`${file.filename}\` to ${languageName}`,
 			});
 			const commitDuration = Date.now() - commitStartTime;
 
@@ -350,22 +328,22 @@ export class TranslationBatchManager {
 
 			this.consecutiveFailures = 0;
 			this.updateBatchProgress("success");
-		} catch (error) {
+		} catch (_error) {
 			const failureDuration = Date.now() - fileStartTime;
 			this.consecutiveFailures++;
 
-			const mappedError =
-				error instanceof ApplicationError ? error : (
-					mapError(error, `${TranslationBatchManager.name}.${this.processFile.name}`, {
+			const error =
+				_error instanceof ApplicationError ? _error : (
+					mapError(_error, `${TranslationBatchManager.name}.${this.processFile.name}`, {
 						filename: file.filename,
 						durationMs: failureDuration,
 						consecutiveFailures: this.consecutiveFailures,
 					})
 				);
 
-			logger.error({ error: mappedError }, "File processing failed");
+			logger.error({ error: error }, "File processing failed");
 
-			metadata.error = mappedError;
+			metadata.error = error;
 			this.updateBatchProgress("error");
 
 			await this.cleanupFailedTranslation(metadata);

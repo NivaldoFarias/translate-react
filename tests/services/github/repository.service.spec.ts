@@ -1,18 +1,20 @@
+import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test";
+import { StatusCodes } from "http-status-codes";
+
+import type { Octokit, RestEndpointMethodTypes } from "@octokit/rest";
+
+import type { RepositoryServiceDependencies } from "@/services/";
+
+import type { MockOctokitGit, MockOctokitRepos } from "@tests/mocks";
+
+import { RepositoryService } from "@/services/";
+
 import {
 	createGitMocks,
 	createMockOctokit,
 	createReposMocks,
 	testRepositories,
 } from "@tests/mocks";
-import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test";
-import { StatusCodes } from "http-status-codes";
-
-import type { Octokit, RestEndpointMethodTypes } from "@octokit/rest";
-import type { MockOctokitGit, MockOctokitRepos } from "@tests/mocks";
-
-import type { RepositoryServiceDependencies } from "@/services/";
-
-import { RepositoryService } from "@/services/";
 
 /** Creates test RepositoryService with dependencies */
 function createTestRepositoryService(

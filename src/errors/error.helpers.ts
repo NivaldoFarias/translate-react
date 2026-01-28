@@ -100,7 +100,7 @@ export function mapError<T extends Record<string, unknown> = Record<string, unkn
 
 		logger.error({ error, operation, errorCode, errorMetadata }, "GitHub API error");
 
-		return new ApplicationError(error.message, errorCode, operation, errorMetadata);
+		return new ApplicationError(error.message, errorCode, operation, errorMetadata, error.status);
 	}
 
 	if (error instanceof APIError || isUncastAPIError(error)) {
@@ -119,7 +119,13 @@ export function mapError<T extends Record<string, unknown> = Record<string, unkn
 			"LLM API error",
 		);
 
-		return new ApplicationError(error.message, errorCode, operation, errorMetadata);
+		return new ApplicationError(
+			error.message,
+			errorCode,
+			operation,
+			errorMetadata,
+			Number(error.status),
+		);
 	}
 
 	if (error instanceof Error) {

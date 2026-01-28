@@ -1,7 +1,8 @@
-import type { WorkflowStatistics } from "@/services/";
+import type { PatchedRepositoryTreeItem, WorkflowStatistics } from "@/services/";
 
 import { ApplicationError, ErrorCode } from "@/errors/";
 
+import { processSignals } from "./constants.util";
 import { env } from "./env.util";
 import { logger as baseLogger } from "./logger.util";
 
@@ -100,4 +101,43 @@ export function formatElapsedTime(
 	} else {
 		return formatter.format(Math.floor(seconds / 3600), "hour").replace("in ", "");
 	}
+}
+
+/**
+ * Sets up process signal handlers with proper error management.
+ *
+ * @param cleanUpFn The cleanup function to execute on signal reception
+ * @param errorReporter Optional error reporter for cleanup failures (defaults to console.error)
+ */
+export function setupSignalHandlers(
+	cleanUpFn: (...args: unknown[]) => void | Promise<void>,
+	errorReporter?: (message: string, error: unknown) => void,
+): void {
+	for (const signal of Object.values(processSignals)) {
+		process.on(signal, (...args: unknown[]) => {
+			void (async () => {
+				try {
+					await cleanUpFn(...args);
+				} catch (error) {
+					if (errorReporter) errorReporter(`Cleanup failed for signal ${signal}:`, error);
+				}
+			})();
+		});
+	}
+}
+
+/**
+ * Filters repository tree for markdown files.
+ *
+ * @param tree Repository tree from GitHub API
+ */
+export function filterMarkdownFiles(
+	tree: PatchedRepositoryTreeItem[],
+): PatchedRepositoryTreeItem[] {
+	return tree.filter((item) => {
+		if (!item.path.endsWith(".md")) return false;
+		if (!item.path.includes("src/")) return false;
+
+		return true;
+	});
 }

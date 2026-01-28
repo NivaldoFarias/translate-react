@@ -1,10 +1,11 @@
 import { Octokit } from "@octokit/rest";
-import { createMockOctokit, testRepositories } from "@tests/mocks";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 
 import type { BaseGitHubServiceDependencies } from "@/services/";
 
 import { BaseGitHubService } from "@/services/";
+
+import { createMockOctokit, testRepositories } from "@tests/mocks";
 
 /** Concrete test implementation of BaseGitHubService */
 class TestGitHubService extends BaseGitHubService {

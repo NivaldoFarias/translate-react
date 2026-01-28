@@ -32,21 +32,16 @@ function isTestEnvironment(): boolean {
 	return import.meta.env.NODE_ENV === RuntimeEnvironment.Test;
 }
 
+/** The resolves default environment values, based on the current {@link process.env.NODE_ENV} */
+const envDefaults = environmentDefaults[process.env.NODE_ENV as RuntimeEnvironment];
+
 /** Environment configuration schema for runtime validation */
 const envSchema = z.object({
-	/**
-	 * Node.js's runtime environment.
-	 *
-	 * @default "development"
-	 */
-	NODE_ENV: z.enum(RuntimeEnvironment).default(environmentDefaults.NODE_ENV),
+	/** Node.js's runtime environment */
+	NODE_ENV: z.enum(RuntimeEnvironment).default(envDefaults.NODE_ENV),
 
-	/**
-	 * Logging level for the application.
-	 *
-	 * @default "info"
-	 */
-	LOG_LEVEL: z.enum(LogLevel).default(environmentDefaults.LOG_LEVEL),
+	/** Logging level for the application */
+	LOG_LEVEL: z.enum(LogLevel).default(envDefaults.LOG_LEVEL),
 
 	/** The GitHub Personal Access Token (optional in test environment) */
 	GH_TOKEN:
@@ -58,140 +53,97 @@ const envSchema = z.object({
 			createTokenSchema("LLM_API_KEY").optional()
 		:	createTokenSchema("LLM_API_KEY"),
 
-	/**
-	 * The owner _(user or organization)_ of the forked repository.
-	 *
-	 * @default "nivaldofarias"
-	 */
-	REPO_FORK_OWNER: z.string().default(environmentDefaults.REPO_FORK_OWNER),
+	/** The forked repository's owner */
+	REPO_FORK_OWNER: z.string().default(envDefaults.REPO_FORK_OWNER),
 
-	/**
-	 * The name of the forked repository.
-	 *
-	 * @default "pt-br.react.dev"
-	 */
-	REPO_FORK_NAME: z.string().default(environmentDefaults.REPO_FORK_NAME),
+	/** The name of the forked repository */
+	REPO_FORK_NAME: z.string().default(envDefaults.REPO_FORK_NAME),
 
-	/**
-	 * Original repository owner.
-	 *
-	 * @default "reactjs"
-	 */
-	REPO_UPSTREAM_OWNER: z.string().default(environmentDefaults.REPO_UPSTREAM_OWNER),
+	/** Original repository owner */
+	REPO_UPSTREAM_OWNER: z.string().default(envDefaults.REPO_UPSTREAM_OWNER),
 
-	/**
-	 * Original repository name.
-	 *
-	 * @default "pt-br.react.dev"
-	 */
-	REPO_UPSTREAM_NAME: z.string().default(environmentDefaults.REPO_UPSTREAM_NAME),
+	/** Original repository name */
+	REPO_UPSTREAM_NAME: z.string().default(envDefaults.REPO_UPSTREAM_NAME),
 
-	/**
-	 * The LLM model to use.
-	 *
-	 * @default "google/gemini-2.0-flash-exp:free"
-	 */
-	LLM_MODEL: z.string().default(environmentDefaults.LLM_MODEL),
+	/** The LLM model to use */
+	LLM_MODEL: z.string().default(envDefaults.LLM_MODEL),
 
-	/**
-	 * The OpenAI/OpenRouter/etc API base URL.
-	 *
-	 * @default "https://openrouter.ai/api/v1"
-	 */
-	LLM_API_BASE_URL: z.url().default(environmentDefaults.LLM_API_BASE_URL),
+	/** The OpenAI/OpenRouter/etc API base URL */
+	LLM_API_BASE_URL: z.url().default(envDefaults.LLM_API_BASE_URL),
 
 	/** The OpenAI project's ID. Used for activity tracking on OpenAI. */
 	OPENAI_PROJECT_ID: z.string().optional(),
 
 	/**
 	 * The URL of the application to override the default URL.
-	 * Used for activity tracking on {@link https://openrouter.ai/|OpenRouter}.
 	 *
-	 * @default `"${pkgJson.homepage}"`
+	 * Used for activity tracking on {@link https://openrouter.ai/|OpenRouter}.
 	 */
-	HEADER_APP_URL: z.url().default(environmentDefaults.HEADER_APP_URL),
+	HEADER_APP_URL: z.url().default(envDefaults.HEADER_APP_URL),
 
 	/**
 	 * The title of the application to override the default title.
+	 *
 	 * Used for activity tracking on {@link https://openrouter.ai/|OpenRouter}.
-	 *
-	 * @default `"${pkgJson.name} v${pkgJson.version}"`
 	 */
-	HEADER_APP_TITLE: z.string().default(environmentDefaults.HEADER_APP_TITLE),
+	HEADER_APP_TITLE: z.string().default(envDefaults.HEADER_APP_TITLE),
 
-	/**
-	 * The number of items to process in each batch.
-	 *
-	 * @default 10
-	 */
-	BATCH_SIZE: z.coerce.number().positive().default(environmentDefaults.BATCH_SIZE),
+	/** The number of items to process in each batch */
+	BATCH_SIZE: z.coerce.number().positive().default(envDefaults.BATCH_SIZE),
 
 	/**
 	 * The target language for translation.
+	 *
 	 * Must be one of the 38 supported React translation languages.
 	 *
-	 * @default "pt-br"
 	 * @see {@link REACT_TRANSLATION_LANGUAGES}
 	 */
-	TARGET_LANGUAGE: z.enum(REACT_TRANSLATION_LANGUAGES).default(environmentDefaults.TARGET_LANGUAGE),
+	TARGET_LANGUAGE: z.enum(REACT_TRANSLATION_LANGUAGES).default(envDefaults.TARGET_LANGUAGE),
 
 	/**
 	 * The source language for translation.
+	 *
 	 * Must be one of the 38 supported React translation languages.
 	 *
-	 * @default "en"
 	 * @see {@link REACT_TRANSLATION_LANGUAGES}
 	 */
-	SOURCE_LANGUAGE: z.enum(REACT_TRANSLATION_LANGUAGES).default(environmentDefaults.SOURCE_LANGUAGE),
+	SOURCE_LANGUAGE: z.enum(REACT_TRANSLATION_LANGUAGES).default(envDefaults.SOURCE_LANGUAGE),
 
-	/**
-	 * Maximum tokens to generate in a single LLM response.
-	 *
-	 * @default 8192
-	 */
-	MAX_TOKENS: z.coerce.number().positive().default(environmentDefaults.MAX_TOKENS),
+	/** Maximum tokens to generate in a single LLM response */
+	MAX_TOKENS: z.coerce.number().positive().default(envDefaults.MAX_TOKENS),
 
 	/**
 	 * Whether to enable console logging in addition to file logging.
 	 *
-	 * When false, logs are only written to files. Useful for reducing terminal clutter
-	 * in debug mode while preserving detailed file logs.
-	 *
-	 * @default true
+	 * When `false`, logs are only written to files.
+	 * Useful for reducing terminal clutter in debug mode while preserving detailed file logs.
 	 */
-	LOG_TO_CONSOLE: z.stringbool().default(environmentDefaults.LOG_TO_CONSOLE),
+	LOG_TO_CONSOLE: z.stringbool().default(envDefaults.LOG_TO_CONSOLE),
 
 	/**
 	 * Timeout for GitHub API requests in **milliseconds**.
 	 *
 	 * Prevents indefinite hangs on slow or stuck API calls. If a request exceeds this
 	 * timeout, it will be aborted and throw an error.
-	 *
-	 * @default 30000 // 30 seconds
 	 */
-	GH_REQUEST_TIMEOUT: z.coerce.number().positive().default(environmentDefaults.GH_REQUEST_TIMEOUT),
+	GH_REQUEST_TIMEOUT: z.coerce.number().positive().default(envDefaults.GH_REQUEST_TIMEOUT),
 
 	/**
 	 * Minimum success rate (0-1) required for workflow to pass.
 	 *
 	 * If the translation success rate falls below this threshold, the workflow
 	 * will exit with a non-zero code. Set to 0 to disable failure detection.
-	 *
-	 * @default 0.75 // 75%
 	 */
-	MIN_SUCCESS_RATE: z.coerce.number().min(0).max(1).default(environmentDefaults.MIN_SUCCESS_RATE),
+	MIN_SUCCESS_RATE: z.coerce.number().min(0).max(1).default(envDefaults.MIN_SUCCESS_RATE),
 
-	/**
-	 * Maximum number of retries for LLM API requests.
-	 *
-	 * If a request fails due to transient errors or rate limiting, it will be retried
-	 *
-	 * @default 5
-	 */
-	LLM_API_MAX_RETRIES: z.coerce
-		.number()
-		.positive()
-		.default(environmentDefaults.LLM_API_MAX_RETRIES),
+	/** Maximum retry atempts for translation errors */
+	MAX_RETRY_ATTEMPTS: z.coerce.number().positive().default(envDefaults.MAX_RETRY_ATTEMPTS),
+
+	/** Concurrency limit for LLM requests */
+	MAX_LLM_CONCURRENCY: z.coerce.number().positive().default(envDefaults.MAX_LLM_CONCURRENCY),
+
+	/** Concurrency limit for GitHub operations */
+	MAX_GITHUB_CONCURRENCY: z.coerce.number().positive().default(envDefaults.MAX_GITHUB_CONCURRENCY),
 });
 
 /** Type definition for the environment configuration */

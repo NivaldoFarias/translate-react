@@ -165,24 +165,21 @@ export class BranchService extends BaseGitHubService {
 			this.logger.info({ branchName, sha: response.data.object.sha }, "Branch retrieved");
 
 			return response;
-		} catch (error) {
-			const mappedError =
-				error instanceof ApplicationError ? error : (
-					mapError(error, `${BranchService.name}.${this.getBranch.name}`, {
+		} catch (_error) {
+			const error =
+				_error instanceof ApplicationError ? _error : (
+					mapError(_error, `${BranchService.name}.${this.getBranch.name}`, {
 						branchName,
 						fork: this.repositories.fork,
 					})
 				);
 
-			if (
-				mappedError.code === ErrorCode.NotFound ||
-				mappedError.code === ErrorCode.GithubNotFound
-			) {
+			if (error.code === ErrorCode.NotFound || error.code === ErrorCode.GithubNotFound) {
 				this.logger.info({ branchName }, "Branch not found (404)");
 				return;
 			}
 
-			throw mappedError;
+			throw error;
 		}
 	}
 
@@ -279,14 +276,14 @@ export class BranchService extends BaseGitHubService {
 					{ branch, prNumber: pr.number, mergeableState: prStatus.mergeableState },
 					"Cleanup: Preserving branch with valid PR",
 				);
-			} catch (error) {
-				const mappedError =
-					error instanceof ApplicationError ? error : (
-						mapError(error, `${BranchService.name}.${this.cleanup.name}`, { branch })
+			} catch (_error) {
+				const error =
+					_error instanceof ApplicationError ? _error : (
+						mapError(_error, `${BranchService.name}.${this.cleanup.name}`, { branch })
 					);
 
 				this.logger.error(
-					{ branch, error: mappedError },
+					{ branch, error: error },
 					"Cleanup: Error checking branch, skipping deletion",
 				);
 			}

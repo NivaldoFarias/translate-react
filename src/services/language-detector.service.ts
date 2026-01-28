@@ -164,10 +164,10 @@ export class LanguageDetectorService {
 			this.logger.info({ humanReadableLanguageName }, "Obtained human-readable language name");
 
 			return humanReadableLanguageName;
-		} catch (error) {
-			const mappedError =
-				error instanceof ApplicationError ? error : (
-					mapError(error, `${LanguageDetectorService.name}.${this.getLanguageName.name}`, {
+		} catch (_error) {
+			const error =
+				_error instanceof ApplicationError ? _error : (
+					mapError(_error, `${LanguageDetectorService.name}.${this.getLanguageName.name}`, {
 						code,
 						isTargetLanguage,
 						fallbackLanguageName,
@@ -175,7 +175,7 @@ export class LanguageDetectorService {
 				);
 
 			this.logger.error(
-				{ error: mappedError },
+				{ error: error },
 				"Failed to get human-readable language name. Returning fallback name",
 			);
 
@@ -276,20 +276,17 @@ export class LanguageDetectorService {
 			this.logger.info({ analysisResult, filename }, "Language analysis completed");
 
 			return analysisResult;
-		} catch (error) {
-			const mappedError =
-				error instanceof ApplicationError ? error : (
-					mapError(error, `${LanguageDetectorService.name}.${this.analyzeLanguage.name}`, {
+		} catch (_error) {
+			const error =
+				_error instanceof ApplicationError ? _error : (
+					mapError(_error, `${LanguageDetectorService.name}.${this.analyzeLanguage.name}`, {
 						filename,
 						contentLength: content.length,
 						fallbackLanguageAnalysisResult,
 					})
 				);
 
-			this.logger.error(
-				{ error: mappedError },
-				"Language analysis failed. returning fallback result",
-			);
+			this.logger.error({ error: error }, "Language analysis failed. returning fallback result");
 
 			return fallbackLanguageAnalysisResult;
 		}
@@ -324,15 +321,15 @@ export class LanguageDetectorService {
 			);
 
 			return code as ReactLanguageCode;
-		} catch (error) {
-			const mappedError =
-				error instanceof ApplicationError ? error : (
-					mapError(error, `${LanguageDetectorService.name}.${this.detectPrimaryLanguage.name}`, {
+		} catch (_error) {
+			const error =
+				_error instanceof ApplicationError ? _error : (
+					mapError(_error, `${LanguageDetectorService.name}.${this.detectPrimaryLanguage.name}`, {
 						text,
 					})
 				);
 
-			this.logger.error({ mappedError }, "Primary language detection failed");
+			this.logger.error({ mappedError: error }, "Primary language detection failed");
 		}
 	}
 

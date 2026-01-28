@@ -1,3 +1,5 @@
+import type { PatchedRepositoryTreeItem } from "@/services";
+
 import { ProcessedFileResult, TranslationFile } from "@/services";
 
 /**
@@ -65,4 +67,25 @@ export function createTranslationFilesFixture({ count }: { count: number }): Tra
 			`sha123file${index + 1}`,
 		);
 	});
+}
+
+/**
+ * Creates a {@link PatchedRepositoryTreeItem} fixture
+ *
+ * @param overrides Values to override the default fixture
+ *
+ * @returns PatchedRepositoryTreeItem object
+ */
+export function createRepositoryTreeItemFixture(
+	overrides?: Partial<PatchedRepositoryTreeItem>,
+): PatchedRepositoryTreeItem {
+	return {
+		path: overrides?.path ?? "src/test/file.md",
+		sha: overrides?.sha ?? "abc123",
+		filename: overrides?.filename ?? "file.md",
+		mode: overrides?.mode ?? "100644",
+		size: overrides?.size ?? 100,
+		type: overrides?.type ?? "blob",
+		url: overrides?.url ?? "https://api.github.com/repos/test/test/git/blobs/abc123",
+	};
 }

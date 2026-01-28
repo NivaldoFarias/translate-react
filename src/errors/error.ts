@@ -1,3 +1,5 @@
+import type { StatusCodes } from "http-status-codes";
+
 /** Standardized error codes for the translation workflow */
 export enum ErrorCode {
 	// GitHub API Related
@@ -58,6 +60,9 @@ export class ApplicationError<
 	/** Additional metadata for debugging */
 	public readonly metadata?: T;
 
+	/** HTTP status code associated with the error */
+	public readonly statusCode?: StatusCodes;
+
 	/**
 	 * Creates a new {@link ApplicationError} instance
 	 *
@@ -65,18 +70,21 @@ export class ApplicationError<
 	 * @param code Standardized error code
 	 * @param operation The operation that failed
 	 * @param metadata Additional metadata for debugging
+	 * @param statusCode HTTP status code associated with the error
 	 */
 	constructor(
 		message: string,
 		code: ErrorCode = ErrorCode.UnknownError,
 		operation?: string,
 		metadata?: T,
+		statusCode?: StatusCodes,
 	) {
 		super(message);
 		this.name = this.constructor.name;
 		this.code = code;
 		this.operation = operation ?? "UnknownOperation";
 		this.metadata = metadata;
+		this.statusCode = statusCode;
 
 		Object.setPrototypeOf(this, new.target.prototype);
 	}

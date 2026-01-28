@@ -1,19 +1,22 @@
 import { Buffer } from "node:buffer";
 
-import Bun from "bun";
-
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 import type { components } from "node_modules/@octokit/plugin-paginate-rest/node_modules/@octokit/types/node_modules/@octokit/openapi-types";
+import type PQueue from "p-queue";
 
-import type { ProcessedFileResult, PullRequestStatus } from "./../runner";
-import type { TranslationFile } from "./../translator.service";
+import type {
+	PatchedRepositoryTreeItem,
+	ProcessedFileResult,
+	PullRequestStatus,
+} from "./../runner";
 import type { BaseGitHubServiceDependencies } from "./base.service";
 
-import { octokit } from "@/clients/";
-import { ApplicationError, ErrorCode, mapError } from "@/errors/";
+import { githubQueue, octokit } from "@/clients/";
+import { ApplicationError, mapError } from "@/errors/";
 import { logger } from "@/utils/";
 
 import { commentBuilderService, CommentBuilderService } from "./../comment-builder.service";
+import { TranslationFile } from "./../translator.service";
 import { BaseGitHubService } from "./base.service";
 import { DEFAULT_REPOSITORIES } from "./repository.service";
 
@@ -49,6 +52,9 @@ export interface CommitTranslationOptions {
 
 export interface ContentServiceDependencies extends BaseGitHubServiceDependencies {
 	commentBuilderService: CommentBuilderService;
+
+	/** Rate limiting queue for Github API calls */
+	queue: PQueue;
 }
 
 /**
@@ -67,10 +73,14 @@ export class ContentService extends BaseGitHubService {
 		commentBuilder: CommentBuilderService;
 	};
 
+	/** Rate limiting queue for Github API calls */
+	private readonly queue: PQueue;
+
 	constructor(dependencies: ContentServiceDependencies) {
 		super(dependencies);
 
 		this.services = { commentBuilder: dependencies.commentBuilderService };
+		this.queue = dependencies.queue;
 	}
 
 	/**
@@ -225,119 +235,6 @@ export class ContentService extends BaseGitHubService {
 	}
 
 	/**
-	 * Retrieves markdown files that need translation.
-	 *
-	 * Filters and processes files based on content type.
-	 *
-	 * @throws {ApplicationError} with {@link ErrorCode.NoContent}  If repository tree is empty
-	 *
-	 * @example
-	 * ```typescript
-	 * const files = await contentService.getUntranslatedFiles(5);
-	 * ```
-	 */
-	public async getUntranslatedFiles(): Promise<TranslationFile[]> {
-		try {
-			this.logger.info({ fork: this.repositories.fork }, "Retrieving untranslated markdown files");
-
-			const repoTreeResponse = await this.octokit.git.getTree({
-				...this.repositories.fork,
-				tree_sha: "main",
-				recursive: "true",
-			});
-
-			if (!repoTreeResponse.data.tree.length) {
-				this.logger.warn({ fork: this.repositories.fork }, "Repository tree is empty");
-
-				throw new ApplicationError(
-					"Repository tree is empty",
-					ErrorCode.NoContent,
-					`${ContentService.name}.${this.getUntranslatedFiles.name}`,
-					{ fork: this.repositories.fork },
-				);
-			}
-
-			this.logger.info(
-				{ totalFilesInRepo: repoTreeResponse.data.tree.length },
-				"Fetched repository tree",
-			);
-
-			const filesToProcess = this.filterMarkdownFiles(repoTreeResponse.data.tree);
-
-			this.logger.info(
-				{
-					totalMarkdownFiles: repoTreeResponse.data.tree.length,
-					filesToProcess: filesToProcess.length,
-				},
-				"Filtered markdown files for translation",
-			);
-
-			const files: TranslationFile[] = [];
-
-			for (const [index, file] of filesToProcess.entries()) {
-				const logger = this.logger.child({ component: file.path ?? `file-${index}` });
-
-				try {
-					logger.debug({ filePath: file.path }, "Retrieving file content");
-
-					if (!file.path) {
-						logger.warn("Skipping file. Missing path property");
-						continue;
-					}
-
-					const response = await this.octokit.repos.getContent({
-						...this.repositories.fork,
-						path: file.path ?? "",
-					});
-
-					if (!("content" in response.data)) {
-						logger.warn("Skipping file. Content not found in response");
-						continue;
-					}
-
-					logger.debug({
-						content: response.data.content.length,
-						sha: response.data.sha,
-						filename: file.path.split("/").pop() ?? "",
-					});
-
-					files.push({
-						path: file.path,
-						content: Buffer.from(response.data.content, "base64").toString(),
-						sha: response.data.sha,
-						filename: file.path.split("/").pop() ?? "",
-					});
-				} catch (error) {
-					const mappedError =
-						error instanceof ApplicationError ? error : (
-							mapError(error, `${ContentService.name}.${this.getUntranslatedFiles.name}`, {
-								filePath: file.path,
-								fork: this.repositories.fork,
-							})
-						);
-
-					logger.debug({ error: mappedError }, "Skipping file. Could not retrieve content");
-
-					continue;
-				}
-			}
-
-			this.logger.info(
-				{ filesRetrieved: files.length },
-				"Successfully retrieved untranslated files",
-			);
-
-			return files;
-		} catch (error) {
-			if (error instanceof ApplicationError) throw error;
-
-			throw mapError(error, `${ContentService.name}.${this.getUntranslatedFiles.name}`, {
-				fork: this.repositories.fork,
-			});
-		}
-	}
-
-	/**
 	 * Commits translated content to a branch.
 	 *
 	 * Updates existing file or creates new one.
@@ -435,12 +332,7 @@ export class ContentService extends BaseGitHubService {
 
 		try {
 			this.logger.info(
-				{
-					targetRepo: targetRepo.owner,
-					headRef,
-					baseBranch,
-					title,
-				},
+				{ targetRepo: targetRepo.owner, headRef, baseBranch, title },
 				"Creating pull request",
 			);
 
@@ -477,48 +369,14 @@ export class ContentService extends BaseGitHubService {
 	}
 
 	/**
-	 * Filters repository tree for markdown files.
-	 *
-	 * @param tree Repository tree from GitHub API
-	 */
-	protected filterMarkdownFiles(
-		tree: RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"],
-	): RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"] {
-		return tree.filter((item) => {
-			if (!item.path?.endsWith(".md")) return false;
-			if (!item.path.includes("src/")) return false;
-			return true;
-		});
-	}
-
-	/**
 	 * Fetches raw content of a file from GitHub.
 	 *
 	 * @param file File reference to fetch
 	 */
-	public async getFileContent(
-		file:
-			| TranslationFile
-			| RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"][number],
-	): Promise<string> {
+	public async getFile(file: PatchedRepositoryTreeItem): Promise<TranslationFile> {
 		this.logger.info({ filePath: file.path }, "Fetching file content");
 
 		try {
-			if (file.path) {
-				this.logger.info({ filePath: file.path }, "file's path exists, trying local content first");
-
-				const localContent = await this.getLocalFileContent(file.path);
-
-				if (localContent) return localContent;
-			}
-
-			if (!file.sha) {
-				this.logger.warn({ file }, "Invalid blob SHA - file missing SHA property");
-				throw mapError(new Error("Invalid blob SHA"), `${ContentService.name}.getFileContent`, {
-					filePath: file.path,
-				});
-			}
-
 			const response = await this.octokit.git.getBlob({
 				...this.repositories.fork,
 				file_sha: file.sha,
@@ -527,47 +385,18 @@ export class ContentService extends BaseGitHubService {
 			const content = Buffer.from(response.data.content, "base64").toString();
 
 			this.logger.debug(
-				{
-					filePath: file.path,
-					blobSha: file.sha,
-					contentLength: content.length,
-				},
+				{ filePath: file.path, blobSha: file.sha, contentLength: content.length },
 				"Retrieved file content",
 			);
 
-			return content;
+			return new TranslationFile(content, file.filename, file.path, file.sha);
 		} catch (error) {
 			if (error instanceof ApplicationError) throw error;
 
-			throw mapError(error, `${ContentService.name}.${this.getFileContent.name}`, {
+			throw mapError(error, `${ContentService.name}.${this.getFile.name}`, {
 				filePath: file.path,
 				blobSha: file.sha,
 			});
-		}
-	}
-
-	private async getLocalFileContent(filePath: string): Promise<string | undefined> {
-		try {
-			this.logger.info({ filePath }, "Reading local file content");
-
-			const content = await Bun.file(filePath).text();
-
-			this.logger.debug(
-				{ filePath, contentLength: content.length },
-				"Successfully read local file content",
-			);
-
-			return content;
-		} catch (error) {
-			if (error instanceof ApplicationError) throw error;
-
-			const mappedError = mapError(
-				error,
-				`${ContentService.name}.${this.getLocalFileContent.name}`,
-				{ filePath },
-			);
-
-			this.logger.error({ error: mappedError, filePath }, "Failed to read local file");
 		}
 	}
 
@@ -870,4 +699,5 @@ export const contentService = new ContentService({
 	octokit,
 	repositories: DEFAULT_REPOSITORIES,
 	commentBuilderService,
+	queue: githubQueue,
 });

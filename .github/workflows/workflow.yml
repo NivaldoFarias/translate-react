@@ -72,7 +72,7 @@ jobs:
           LOG_TO_CONSOLE: ${{ vars.LOG_TO_CONSOLE }}
           LLM_MODEL: ${{ vars.LLM_MODEL }}
           LLM_API_BASE_URL: ${{ vars.LLM_API_BASE_URL }}
-          LLM_API_MAX_RETRIES: ${{ vars.LLM_API_MAX_RETRIES }}
+          MAX_RETRY_ATTEMPTS: ${{ vars.MAX_RETRY_ATTEMPTS }}
           OPENAI_PROJECT_ID: ${{ secrets.OPENAI_PROJECT_ID }}
           MAX_TOKENS: ${{ vars.MAX_TOKENS }}
           BATCH_SIZE: ${{ vars.BATCH_SIZE }}
@@ -97,7 +97,7 @@ jobs:
           [ -n "$LOG_TO_CONSOLE" ] && echo "LOG_TO_CONSOLE=$LOG_TO_CONSOLE" >> .env || true
           [ -n "$LLM_MODEL" ] && echo "LLM_MODEL=$LLM_MODEL" >> .env || true
           [ -n "$LLM_API_BASE_URL" ] && echo "LLM_API_BASE_URL=$LLM_API_BASE_URL" >> .env || true
-          [ -n "$LLM_API_MAX_RETRIES" ] && echo "LLM_API_MAX_RETRIES=$LLM_API_MAX_RETRIES" >> .env || true
+          [ -n "$MAX_RETRY_ATTEMPTS" ] && echo "MAX_RETRY_ATTEMPTS=$MAX_RETRY_ATTEMPTS" >> .env || true
           [ -n "$OPENAI_PROJECT_ID" ] && echo "OPENAI_PROJECT_ID=$OPENAI_PROJECT_ID" >> .env || true
           [ -n "$MAX_TOKENS" ] && echo "MAX_TOKENS=$MAX_TOKENS" >> .env || true
           [ -n "$BATCH_SIZE" ] && echo "BATCH_SIZE=$BATCH_SIZE" >> .env || true

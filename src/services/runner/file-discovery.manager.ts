@@ -3,13 +3,13 @@ import type { SetRequired } from "type-fest";
 import type {
 	CacheCheckResult,
 	LanguageDetectionResult,
-	PatchedRepositoryItem,
+	PatchedRepositoryTreeItem,
 	PrFilterResult as PullRequestFilterResult,
 	PullRequestStatus,
 	RunnerServiceDependencies,
 } from "./runner.types";
 
-import { FILE_FETCH_BATCH_SIZE, logger, MIN_CACHE_CONFIDENCE } from "@/utils/";
+import { FILE_FETCH_BATCH_SIZE, filterMarkdownFiles, logger, MIN_CACHE_CONFIDENCE } from "@/utils/";
 
 import { LanguageDetectorService } from "../language-detector.service";
 import { TranslationFile } from "../translator.service";
@@ -58,7 +58,7 @@ export class FileDiscoveryManager {
 	 * // ^? 2 (files with conflicted PRs)
 	 * ```
 	 */
-	async discoverFiles(repositoryTree: PatchedRepositoryItem[]): Promise<{
+	public async discoverFiles(repositoryTree: PatchedRepositoryTreeItem[]): Promise<{
 		filesToTranslate: TranslationFile[];
 		invalidPRsByFile: Map<string, { prNumber: number; status: PullRequestStatus }>;
 	}> {
@@ -73,7 +73,9 @@ export class FileDiscoveryManager {
 		const { filesToFetch, numFilesWithPRs, invalidPRsByFile } =
 			await this.filterByPRs(candidateFiles);
 
-		const uncheckedFiles = await this.fetchContent(filesToFetch);
+		const filteredMarkdownFiles = filterMarkdownFiles(repositoryTree);
+
+		const uncheckedFiles = await this.fetchContent(filteredMarkdownFiles);
 
 		const { numFilesFiltered, filesToTranslate } =
 			await this.detectAndCacheLanguages(uncheckedFiles);
@@ -120,14 +122,14 @@ export class FileDiscoveryManager {
 	 * // ^? 135 (out of 192 files)
 	 * ```
 	 */
-	checkCache(files: PatchedRepositoryItem[]): CacheCheckResult {
+	public checkCache(files: PatchedRepositoryTreeItem[]): CacheCheckResult {
 		this.logger.info("Checking language cache");
 		const startTime = Date.now();
 
 		const candidateFiles: typeof files = [];
 
 		const filesToFetchCache = files.filter((file) => !!file.sha) as SetRequired<
-			PatchedRepositoryItem,
+			PatchedRepositoryTreeItem,
 			"sha"
 		>[];
 
@@ -211,7 +213,9 @@ export class FileDiscoveryManager {
 	 * // ^? 2 (files with conflicted PRs that will be re-translated)
 	 * ```
 	 */
-	async filterByPRs(candidateFiles: PatchedRepositoryItem[]): Promise<PullRequestFilterResult> {
+	public async filterByPRs(
+		candidateFiles: PatchedRepositoryTreeItem[],
+	): Promise<PullRequestFilterResult> {
 		this.logger.info("Checking for existing open PRs with file-based filtering");
 
 		const openPRs = await this.services.github.content.listOpenPullRequests();
@@ -324,7 +328,7 @@ export class FileDiscoveryManager {
 	 * // ^? 45 (successfully fetched files)
 	 * ```
 	 */
-	public async fetchContent(filesToFetch: PatchedRepositoryItem[]): Promise<TranslationFile[]> {
+	public async fetchContent(filesToFetch: PatchedRepositoryTreeItem[]): Promise<TranslationFile[]> {
 		this.logger.info("Fetching file content");
 
 		const uncheckedFiles: TranslationFile[] = [];
@@ -361,18 +365,16 @@ export class FileDiscoveryManager {
 	 * @returns Array of translation files or null for failed fetches
 	 */
 	private async fetchBatch(
-		batch: PatchedRepositoryItem[],
+		batch: PatchedRepositoryTreeItem[],
 		updateLoggerFn: () => void,
 	): Promise<(TranslationFile | null)[]> {
 		return await Promise.all(
 			batch.map(async (file) => {
-				if (!file.filename || !file.sha || !file.path) return null;
-
-				const content = await this.services.github.content.getFileContent(file);
+				const translationFile = await this.services.github.content.getFile(file);
 
 				updateLoggerFn();
 
-				return new TranslationFile(content, file.filename, file.path, file.sha);
+				return translationFile;
 			}),
 		);
 	}

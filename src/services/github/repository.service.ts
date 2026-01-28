@@ -196,13 +196,13 @@ export class RepositoryService extends BaseGitHubService {
 			);
 
 			return true;
-		} catch (error) {
-			const mappedError =
-				error instanceof ApplicationError ? error : (
-					mapError(error, `${RepositoryService.name}.${this.verifyTokenPermissions.name}`, {})
+		} catch (_error) {
+			const error =
+				_error instanceof ApplicationError ? _error : (
+					mapError(_error, `${RepositoryService.name}.${this.verifyTokenPermissions.name}`, {})
 				);
 
-			this.logger.error({ error: mappedError }, "Token permission verification failed");
+			this.logger.error({ error: error }, "Token permission verification failed");
 
 			return false;
 		}

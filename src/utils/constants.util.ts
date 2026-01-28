@@ -117,33 +117,116 @@ export const REACT_TRANSLATION_LANGUAGES = [
 /** Type for React translation language codes */
 export type ReactLanguageCode = (typeof REACT_TRANSLATION_LANGUAGES)[number];
 
-export const environmentDefaults = {
-	NODE_ENV: RuntimeEnvironment.Development,
-	LOG_LEVEL: LogLevel.Info,
-	LLM_API_BASE_URL: "https://openrouter.ai/api/v1",
-	HEADER_APP_TITLE: `${name} v${version}`,
-	HEADER_APP_URL: homepage,
-	REPO_FORK_OWNER: "nivaldofarias",
-	REPO_FORK_NAME: "pt-br.react.dev",
-	REPO_UPSTREAM_OWNER: "reactjs",
-	REPO_UPSTREAM_NAME: "pt-br.react.dev",
-	LLM_MODEL: "google/gemini-2.0-flash-exp:free",
-	BATCH_SIZE: 1,
-	TARGET_LANGUAGE: "pt-br",
-	SOURCE_LANGUAGE: "en",
+interface EnvironmentSchemaDefaults {
+	NODE_ENV: RuntimeEnvironment;
+	LOG_LEVEL: LogLevel;
+	LLM_API_BASE_URL: string;
+	HEADER_APP_TITLE: string;
+	HEADER_APP_URL: string;
+	REPO_FORK_OWNER: string;
+	REPO_FORK_NAME: string;
+	REPO_UPSTREAM_OWNER: string;
+	REPO_UPSTREAM_NAME: string;
+	LLM_MODEL: string;
+	BATCH_SIZE: number;
+	TARGET_LANGUAGE: ReactLanguageCode;
+	SOURCE_LANGUAGE: ReactLanguageCode;
+	MAX_TOKENS: number;
+	LOG_TO_CONSOLE: boolean;
+	GH_REQUEST_TIMEOUT: number;
+	MIN_SUCCESS_RATE: number;
+	MAX_LLM_CONCURRENCY: number;
+	MAX_GITHUB_CONCURRENCY: number;
+	MAX_RETRY_ATTEMPTS: number;
+}
 
-	/** Maximum tokens to generate in a single LLM response */
-	MAX_TOKENS: 8192,
-
-	/** Whether to enable console logging in addition to file logging */
-	LOG_TO_CONSOLE: true,
-
-	/** Timeout for GitHub API requests in milliseconds */
-	GH_REQUEST_TIMEOUT: 30_000,
-
-	/** Minimum success rate (0-1) required for workflow to pass */
-	MIN_SUCCESS_RATE: 0.75,
-
-	LLM_API_MAX_RETRIES: 5,
-	LLM_REQUEST_TIMEOUT: 20_000,
-} as const;
+export const environmentDefaults: Record<RuntimeEnvironment, EnvironmentSchemaDefaults> = {
+	[RuntimeEnvironment.Development]: {
+		NODE_ENV: RuntimeEnvironment.Development,
+		LOG_LEVEL: LogLevel.Info,
+		LLM_API_BASE_URL: "https://openrouter.ai/api/v1",
+		HEADER_APP_TITLE: `${name} v${version}`,
+		HEADER_APP_URL: homepage,
+		REPO_FORK_OWNER: "nivaldofarias",
+		REPO_FORK_NAME: "pt-br.react.dev",
+		REPO_UPSTREAM_OWNER: "reactjs",
+		REPO_UPSTREAM_NAME: "pt-br.react.dev",
+		LLM_MODEL: "google/gemini-2.0-flash-exp:free",
+		BATCH_SIZE: 1,
+		TARGET_LANGUAGE: "pt-br",
+		SOURCE_LANGUAGE: "en",
+		MAX_TOKENS: 8192,
+		LOG_TO_CONSOLE: true,
+		GH_REQUEST_TIMEOUT: 30_000,
+		MIN_SUCCESS_RATE: 0.75,
+		MAX_RETRY_ATTEMPTS: 3,
+		MAX_LLM_CONCURRENCY: 4,
+		MAX_GITHUB_CONCURRENCY: 8,
+	},
+	[RuntimeEnvironment.Test]: {
+		NODE_ENV: RuntimeEnvironment.Test,
+		LOG_LEVEL: LogLevel.Fatal,
+		LLM_API_BASE_URL: "https://openrouter.ai/api/v1",
+		HEADER_APP_TITLE: `${name} v${version}`,
+		HEADER_APP_URL: homepage,
+		REPO_FORK_OWNER: "nivaldofarias",
+		REPO_FORK_NAME: "pt-br.react.dev",
+		REPO_UPSTREAM_OWNER: "reactjs",
+		REPO_UPSTREAM_NAME: "pt-br.react.dev",
+		LLM_MODEL: "google/gemini-2.0-flash-exp:free",
+		BATCH_SIZE: 1,
+		TARGET_LANGUAGE: "pt-br",
+		SOURCE_LANGUAGE: "en",
+		MAX_TOKENS: 8192,
+		LOG_TO_CONSOLE: false,
+		GH_REQUEST_TIMEOUT: 30_000,
+		MIN_SUCCESS_RATE: 0.9,
+		MAX_RETRY_ATTEMPTS: 3,
+		MAX_LLM_CONCURRENCY: 2,
+		MAX_GITHUB_CONCURRENCY: 4,
+	},
+	[RuntimeEnvironment.Staging]: {
+		NODE_ENV: RuntimeEnvironment.Staging,
+		LOG_LEVEL: LogLevel.Info,
+		LLM_API_BASE_URL: "https://openrouter.ai/api/v1",
+		HEADER_APP_TITLE: `${name} v${version}`,
+		HEADER_APP_URL: homepage,
+		REPO_FORK_OWNER: "nivaldofarias",
+		REPO_FORK_NAME: "pt-br.react.dev",
+		REPO_UPSTREAM_OWNER: "reactjs",
+		REPO_UPSTREAM_NAME: "pt-br.react.dev",
+		LLM_MODEL: "google/gemini-2.0-flash-exp:free",
+		BATCH_SIZE: 10,
+		TARGET_LANGUAGE: "pt-br",
+		SOURCE_LANGUAGE: "en",
+		MAX_TOKENS: 8192,
+		LOG_TO_CONSOLE: true,
+		GH_REQUEST_TIMEOUT: 30_000,
+		MIN_SUCCESS_RATE: 0.85,
+		MAX_RETRY_ATTEMPTS: 3,
+		MAX_LLM_CONCURRENCY: 4,
+		MAX_GITHUB_CONCURRENCY: 8,
+	},
+	[RuntimeEnvironment.Production]: {
+		NODE_ENV: RuntimeEnvironment.Production,
+		LOG_LEVEL: LogLevel.Warn,
+		LLM_API_BASE_URL: "https://openrouter.ai/api/v1",
+		HEADER_APP_TITLE: `${name} v${version}`,
+		HEADER_APP_URL: homepage,
+		REPO_FORK_OWNER: "nivaldofarias",
+		REPO_FORK_NAME: "pt-br.react.dev",
+		REPO_UPSTREAM_OWNER: "reactjs",
+		REPO_UPSTREAM_NAME: "pt-br.react.dev",
+		LLM_MODEL: "google/gemini-2.0-flash-exp:free",
+		BATCH_SIZE: 10,
+		TARGET_LANGUAGE: "pt-br",
+		SOURCE_LANGUAGE: "en",
+		MAX_TOKENS: 8192,
+		LOG_TO_CONSOLE: false,
+		GH_REQUEST_TIMEOUT: 30_000,
+		MIN_SUCCESS_RATE: 0.9,
+		MAX_RETRY_ATTEMPTS: 3,
+		MAX_LLM_CONCURRENCY: 8,
+		MAX_GITHUB_CONCURRENCY: 16,
+	},
+};
