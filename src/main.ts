@@ -1,4 +1,4 @@
-import { ApplicationError, mapError } from "@/errors/";
+import { extractErrorMessage } from "@/errors/";
 import { logger as baseLogger, env, validateSuccessRate } from "@/utils/";
 
 import { name, version } from "../package.json";
@@ -33,10 +33,8 @@ async function main() {
 		logger.debug("Exiting process with code 0");
 
 		process.exit(0);
-	} catch (_error) {
-		const error = _error instanceof ApplicationError ? _error : mapError(_error, main.name);
-
-		logger.fatal(error, "Workflow failed");
+	} catch (error) {
+		logger.fatal({ error: extractErrorMessage(error) }, "Workflow failed");
 
 		process.exit(1);
 	}

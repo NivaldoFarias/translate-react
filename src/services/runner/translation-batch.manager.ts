@@ -7,7 +7,7 @@ import type {
 	RunnerServiceDependencies,
 } from "./runner.types";
 
-import { ApplicationError, ErrorCode, mapError } from "@/errors/";
+import { ApplicationError, ErrorCode } from "@/errors/";
 import { logger, MAX_CONSECUTIVE_FAILURES } from "@/utils/";
 
 import { LanguageDetectorService } from "../language-detector.service";
@@ -328,22 +328,12 @@ export class TranslationBatchManager {
 
 			this.consecutiveFailures = 0;
 			this.updateBatchProgress("success");
-		} catch (_error) {
-			const failureDuration = Date.now() - fileStartTime;
+		} catch (error) {
 			this.consecutiveFailures++;
 
-			const error =
-				_error instanceof ApplicationError ? _error : (
-					mapError(_error, `${TranslationBatchManager.name}.${this.processFile.name}`, {
-						filename: file.filename,
-						durationMs: failureDuration,
-						consecutiveFailures: this.consecutiveFailures,
-					})
-				);
+			logger.error({ error }, "File processing failed");
 
-			logger.error({ error: error }, "File processing failed");
-
-			metadata.error = error;
+			metadata.error = error instanceof Error ? error : new Error(String(error));
 			this.updateBatchProgress("error");
 
 			await this.cleanupFailedTranslation(metadata);
@@ -570,16 +560,7 @@ export class TranslationBatchManager {
 			});
 		} catch (error) {
 			if (error instanceof ApplicationError) throw error;
-
-			throw mapError(
-				error,
-				`${TranslationBatchManager.name}.${this.createOrUpdatePullRequest.name}`,
-				{
-					branch: branchName,
-					title: prOptions.title,
-					baseBranch: prOptions.baseBranch,
-				},
-			);
+			throw error;
 		}
 	}
 
@@ -638,12 +619,7 @@ export class TranslationBatchManager {
 			return generatedPullRequestDescription;
 		} catch (error) {
 			if (error instanceof ApplicationError) throw error;
-
-			throw mapError(
-				error,
-				`${TranslationBatchManager.name}.${this.createPullRequestDescription.name}`,
-				{ file: file.path, languageName },
-			);
+			throw error;
 		}
 	}
 }

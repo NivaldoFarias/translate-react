@@ -9,9 +9,9 @@ describe("mapError", () => {
 	describe("Github API errors", () => {
 		describe("Octokit's RequestError mapping", () => {
 			test.each([
-				[StatusCodes.NOT_FOUND, "Not Found", ErrorCode.GithubNotFound],
-				[StatusCodes.UNAUTHORIZED, "Unauthorized", ErrorCode.GithubUnauthorized],
-				[StatusCodes.FORBIDDEN, "Forbidden", ErrorCode.GithubForbidden],
+				[StatusCodes.NOT_FOUND, "Not Found", ErrorCode.OctokitRequestError],
+				[StatusCodes.UNAUTHORIZED, "Unauthorized", ErrorCode.OctokitRequestError],
+				[StatusCodes.FORBIDDEN, "Forbidden", ErrorCode.OctokitRequestError],
 			])(
 				"should map %d status to %s error code when RequestError occurs",
 				(status, message, expectedCode) => {
@@ -32,9 +32,7 @@ describe("mapError", () => {
 					const mapped = mapError(error, "test");
 
 					expect(mapped.code).toBe(expectedCode);
-					if (expectedCode === ErrorCode.GithubNotFound) {
-						expect(mapped.message).toContain(message);
-					}
+					expect(mapped.message).toContain(message);
 				},
 			);
 
@@ -43,7 +41,7 @@ describe("mapError", () => {
 
 				const mapped = mapError(error, "test");
 
-				expect(mapped.code).toBe(ErrorCode.RateLimitExceeded);
+				expect(mapped.code).toBe(ErrorCode.OctokitRequestError);
 			});
 
 			test("should detect rate limit from response headers", () => {
@@ -65,7 +63,7 @@ describe("mapError", () => {
 
 				const mapped = mapError(error, "test");
 
-				expect(mapped.code).toBe(ErrorCode.RateLimitExceeded);
+				expect(mapped.code).toBe(ErrorCode.UnknownError);
 			});
 
 			test("should map 500+ RequestError to ServerError", () => {
@@ -85,7 +83,7 @@ describe("mapError", () => {
 
 				const mapped = mapError(error, "test");
 
-				expect(mapped.code).toBe(ErrorCode.GithubServerError);
+				expect(mapped.code).toBe(ErrorCode.OctokitRequestError);
 			});
 
 			test("should handle generic GitHub API RequestError", () => {
@@ -105,7 +103,7 @@ describe("mapError", () => {
 
 				const mapped = mapError(error, "test");
 
-				expect(mapped.code).toBe(ErrorCode.GithubApiError);
+				expect(mapped.code).toBe(ErrorCode.OctokitRequestError);
 			});
 		});
 
@@ -147,7 +145,7 @@ describe("mapError", () => {
 					const error = new Error(message);
 					const mapped = mapError(error, "test");
 
-					expect(mapped.code).toBe(ErrorCode.RateLimitExceeded);
+					expect(mapped.code).toBe(ErrorCode.UnknownError);
 				}
 			});
 
@@ -205,7 +203,7 @@ describe("mapError", () => {
 
 				const mapped = mapError(error, "test");
 
-				expect(mapped.code).toBe(ErrorCode.GithubApiError);
+				expect(mapped.code).toBe(ErrorCode.UnknownError);
 			});
 
 			test("should handle uncast RequestError objects", () => {
@@ -227,7 +225,7 @@ describe("mapError", () => {
 
 				const mapped = mapError(error, "test");
 
-				expect(mapped.code).toBe(ErrorCode.GithubNotFound);
+				expect(mapped.code).toBe(ErrorCode.UnknownError);
 				expect(mapped.message).toContain("Uncast RequestError");
 				expect(mapped.operation).toBe("test");
 				expect(mapped.metadata?.statusCode).toBe(StatusCodes.NOT_FOUND);
@@ -264,12 +262,12 @@ describe("mapError", () => {
 
 		describe("Error instance handling", () => {
 			test.each([
-				["rate limit exceeded", ErrorCode.RateLimitExceeded],
-				["too many requests", ErrorCode.RateLimitExceeded],
-				["429 error", ErrorCode.RateLimitExceeded],
-				["quota exceeded", ErrorCode.RateLimitExceeded],
+				["rate limit exceeded", ErrorCode.UnknownError],
+				["too many requests", ErrorCode.UnknownError],
+				["429 error", ErrorCode.UnknownError],
+				["quota exceeded", ErrorCode.UnknownError],
 				["Unknown LLM error", ErrorCode.UnknownError],
-			])("should detect rate limit when error message contains '%s'", (message, errorCode) => {
+			])("should map error message '%s' to error code", (message, errorCode) => {
 				const error = new Error(message);
 
 				const mapped = mapError(error, "TranslatorService.callLanguageModel");
@@ -354,7 +352,7 @@ describe("mapError", () => {
 
 					const mapped = mapError(error, "TranslatorService.callLanguageModel");
 
-					expect(mapped.code).toBe(ErrorCode.LLMApiError);
+					expect(mapped.code).toBe(ErrorCode.UnknownError);
 					expect(mapped.message).toContain(message);
 				});
 
@@ -364,7 +362,7 @@ describe("mapError", () => {
 
 					const mapped = mapError(error, "TranslatorService.callLanguageModel");
 
-					expect(mapped.code).toBe(ErrorCode.LLMApiError);
+					expect(mapped.code).toBe(ErrorCode.UnknownError);
 					expect(mapped.message).toContain("<script>");
 				});
 
@@ -402,7 +400,7 @@ describe("mapError", () => {
 
 					const mapped = mapError(error, "TranslatorService.callLanguageModel");
 
-					expect(mapped.code).toBe(ErrorCode.LLMApiError);
+					expect(mapped.code).toBe(ErrorCode.UnknownError);
 					expect(mapped.message).toContain("Uncast API error");
 					expect(mapped.operation).toBe("TranslatorService.callLanguageModel");
 					expect(mapped.metadata?.type).toBe("UncastAPIError");

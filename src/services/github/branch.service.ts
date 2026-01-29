@@ -1,8 +1,8 @@
+import { RequestError } from "@octokit/request-error";
 import { RestEndpointMethodTypes } from "@octokit/rest";
 
 import type { BaseGitHubServiceDependencies } from "./base.service";
 
-import { ApplicationError, ErrorCode, mapError } from "@/errors/";
 import { env, logger, setupSignalHandlers } from "@/utils/";
 
 import { octokit } from "../../clients/octokit.client";
@@ -61,24 +61,16 @@ export class BranchService extends BaseGitHubService {
 	 * ```
 	 */
 	private async getDefaultBranch(): Promise<string> {
-		try {
-			this.logger.info(
-				{ fork: this.repositories.fork },
-				"Retrieving default branch for fork repository",
-			);
+		this.logger.info(
+			{ fork: this.repositories.fork },
+			"Retrieving default branch for fork repository",
+		);
 
-			const response = await this.octokit.repos.get(this.repositories.fork);
+		const response = await this.octokit.repos.get(this.repositories.fork);
 
-			this.logger.debug({ branch: response.data.default_branch }, "Retrieved default branch");
+		this.logger.debug({ branch: response.data.default_branch }, "Retrieved default branch");
 
-			return response.data.default_branch;
-		} catch (error) {
-			if (error instanceof ApplicationError) throw error;
-
-			throw mapError(error, `${BranchService.name}.${this.getDefaultBranch.name}`, {
-				fork: this.repositories.fork,
-			});
-		}
+		return response.data.default_branch;
 	}
 
 	/**
@@ -129,14 +121,7 @@ export class BranchService extends BaseGitHubService {
 			return branchRef;
 		} catch (error) {
 			this.activeBranches.delete(branchName);
-
-			if (error instanceof ApplicationError) throw error;
-
-			throw mapError(error, `${BranchService.name}.${this.createBranch.name}`, {
-				branchName,
-				baseBranch,
-				fork: this.repositories.fork,
-			});
+			throw error;
 		}
 	}
 
@@ -165,16 +150,8 @@ export class BranchService extends BaseGitHubService {
 			this.logger.info({ branchName, sha: response.data.object.sha }, "Branch retrieved");
 
 			return response;
-		} catch (_error) {
-			const error =
-				_error instanceof ApplicationError ? _error : (
-					mapError(_error, `${BranchService.name}.${this.getBranch.name}`, {
-						branchName,
-						fork: this.repositories.fork,
-					})
-				);
-
-			if (error.code === ErrorCode.NotFound || error.code === ErrorCode.GithubNotFound) {
+		} catch (error) {
+			if (error instanceof RequestError && error.status === 404) {
 				this.logger.info({ branchName }, "Branch not found (404)");
 				return;
 			}
@@ -197,27 +174,18 @@ export class BranchService extends BaseGitHubService {
 	public async deleteBranch(
 		branchName: string,
 	): Promise<RestEndpointMethodTypes["git"]["deleteRef"]["response"]> {
-		try {
-			this.logger.info({ branchName }, "Deleting branch");
+		this.logger.info({ branchName }, "Deleting branch");
 
-			const response = await this.octokit.git.deleteRef({
-				...this.repositories.fork,
-				ref: `heads/${branchName}`,
-			});
+		const response = await this.octokit.git.deleteRef({
+			...this.repositories.fork,
+			ref: `heads/${branchName}`,
+		});
 
-			this.activeBranches.delete(branchName);
+		this.activeBranches.delete(branchName);
 
-			this.logger.info({ branchName }, "Branch deleted successfully");
+		this.logger.info({ branchName }, "Branch deleted successfully");
 
-			return response;
-		} catch (error) {
-			if (error instanceof ApplicationError) throw error;
-
-			throw mapError(error, `${BranchService.name}.deleteBranch`, {
-				branchName,
-				fork: this.repositories.fork,
-			});
-		}
+		return response;
 	}
 
 	/**
@@ -276,16 +244,8 @@ export class BranchService extends BaseGitHubService {
 					{ branch, prNumber: pr.number, mergeableState: prStatus.mergeableState },
 					"Cleanup: Preserving branch with valid PR",
 				);
-			} catch (_error) {
-				const error =
-					_error instanceof ApplicationError ? _error : (
-						mapError(_error, `${BranchService.name}.${this.cleanup.name}`, { branch })
-					);
-
-				this.logger.error(
-					{ branch, error: error },
-					"Cleanup: Error checking branch, skipping deletion",
-				);
+			} catch (error) {
+				this.logger.error({ branch, error }, "Cleanup: Error checking branch, skipping deletion");
 			}
 		}
 	}
@@ -304,44 +264,34 @@ export class BranchService extends BaseGitHubService {
 	 * ```
 	 */
 	public async checkIfCommitExistsOnFork(branchName: string): Promise<boolean> {
-		try {
-			this.logger.info({ branchName }, "Checking for commits on fork by current user");
+		this.logger.info({ branchName }, "Checking for commits on fork by current user");
 
-			const forkRef = await this.getBranch(branchName);
+		const forkRef = await this.getBranch(branchName);
 
-			if (!forkRef) {
-				this.logger.info({ branchName }, "Branch not found, no commits exist");
-				return false;
-			}
-
-			const listCommitsResponse = await this.octokit.repos.listCommits({
-				...this.repositories.fork,
-				sha: forkRef.data.object.sha,
-			});
-			this.logger.debug(
-				{ branchName, commitCount: listCommitsResponse.data.length },
-				"Retrieved commits from fork branch",
-			);
-
-			const hasCommits = listCommitsResponse.data.some(
-				(commit) => commit.author?.login === env.REPO_FORK_OWNER,
-			);
-
-			this.logger.info(
-				{ branchName, hasCommits, commitCount: listCommitsResponse.data.length },
-				"Checked for fork commits",
-			);
-
-			return hasCommits;
-		} catch (error) {
-			if (error instanceof ApplicationError) throw error;
-
-			throw mapError(error, `${BranchService.name}.checkIfCommitExistsOnFork`, {
-				branchName,
-				fork: this.repositories.fork,
-				expectedAuthor: env.REPO_FORK_OWNER,
-			});
+		if (!forkRef) {
+			this.logger.info({ branchName }, "Branch not found, no commits exist");
+			return false;
 		}
+
+		const listCommitsResponse = await this.octokit.repos.listCommits({
+			...this.repositories.fork,
+			sha: forkRef.data.object.sha,
+		});
+		this.logger.debug(
+			{ branchName, commitCount: listCommitsResponse.data.length },
+			"Retrieved commits from fork branch",
+		);
+
+		const hasCommits = listCommitsResponse.data.some(
+			(commit) => commit.author?.login === env.REPO_FORK_OWNER,
+		);
+
+		this.logger.info(
+			{ branchName, hasCommits, commitCount: listCommitsResponse.data.length },
+			"Checked for fork commits",
+		);
+
+		return hasCommits;
 	}
 }
 

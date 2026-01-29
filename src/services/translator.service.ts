@@ -2,6 +2,7 @@ import { MarkdownTextSplitter } from "@langchain/textsplitters";
 import { StatusCodes } from "http-status-codes";
 import { encodingForModel } from "js-tiktoken";
 import OpenAI from "openai";
+import { APIError } from "openai/error";
 import pRetry, { AbortError } from "p-retry";
 
 import type { MarkdownTextSplitterParams } from "@langchain/textsplitters";
@@ -9,8 +10,8 @@ import type PQueue from "p-queue";
 import type { Options as RetryOptions } from "p-retry";
 
 import { llmQueue, openai } from "@/clients/";
-import { ApplicationError, ErrorCode, mapError } from "@/errors/";
-import { env, logger, MAX_CHUNK_TOKENS } from "@/utils/";
+import { ApplicationError, ErrorCode } from "@/errors/";
+import { env, extractDocTitleFromContent, logger, MAX_CHUNK_TOKENS } from "@/utils/";
 
 import { LanguageDetectorService, languageDetectorService } from "./language-detector.service";
 import { localeService, LocaleService } from "./locale";
@@ -81,6 +82,9 @@ interface ChunkingResult {
 
 /** Represents a file that needs to be translated */
 export class TranslationFile {
+	/** The title of the document extracted from frontmatter */
+	public readonly title: string | undefined;
+
 	constructor(
 		/** The content of the file */
 		public readonly content: string,
@@ -93,7 +97,9 @@ export class TranslationFile {
 
 		/** The SHA of the file */
 		public readonly sha: string,
-	) {}
+	) {
+		this.title = extractDocTitleFromContent(content);
+	}
 }
 
 /**
@@ -102,7 +108,7 @@ export class TranslationFile {
  * @example
  * ```typescript
  * const translator = new TranslatorService({
- *   openai:  new OpenAI({}),
+ *   openai:  new OpenAI(),
  *   model: 'gpt-4o',
  * });
  *
@@ -164,43 +170,37 @@ export class TranslatorService {
 	 * ```
 	 */
 	public async testConnectivity(): Promise<void> {
-		try {
-			this.logger.info("Testing LLM API connectivity");
+		this.logger.info("Testing LLM API connectivity");
 
-			const response = await this.openai.chat.completions.create({
-				model: this.model,
-				messages: [{ role: "user", content: "ping" }],
-				max_tokens: 5,
-				temperature: 0.1,
-			});
+		const response = await this.openai.chat.completions.create({
+			model: this.model,
+			messages: [{ role: "user", content: "ping" }],
+			max_tokens: 5,
+			temperature: 0.1,
+		});
 
-			if (!this.isLLMResponseValid(response)) {
-				this.logger.error({ response }, "Invalid LLM API response. Missing expected fields");
+		if (!this.isLLMResponseValid(response)) {
+			this.logger.error({ response }, "Invalid LLM API response. Missing expected fields");
 
-				throw new ApplicationError(
-					"Invalid LLM API response. Missing expected fields",
-					ErrorCode.InitializationError,
-					`${TranslatorService.name}.${this.testConnectivity.name}`,
-					{ response },
-				);
-			}
-
-			this.logger.info(
-				{
-					model: this.model,
-					response: {
-						id: response.id,
-						usage: response.usage,
-						message: response.choices[0]?.message,
-					},
-				},
-				"LLM API connectivity test successful",
+			throw new ApplicationError(
+				"Invalid LLM API response. Missing expected fields",
+				ErrorCode.InitializationError,
+				`${TranslatorService.name}.${this.testConnectivity.name}`,
+				{ response },
 			);
-		} catch (error) {
-			if (error instanceof ApplicationError) throw error;
-
-			throw mapError(error, `${TranslatorService.name}.${this.testConnectivity.name}`);
 		}
+
+		this.logger.info(
+			{
+				model: this.model,
+				response: {
+					id: response.id,
+					usage: response.usage,
+					message: response.choices[0]?.message,
+				},
+			},
+			"LLM API connectivity test successful",
+		);
 	}
 
 	private isLLMResponseValid(response: OpenAI.Chat.Completions.ChatCompletion): boolean {
@@ -297,8 +297,7 @@ export class TranslatorService {
 			return this.cleanupTranslatedContent(translatedContent, file.content);
 		} catch (error) {
 			if (error instanceof ApplicationError) throw error;
-
-			throw mapError(error, `${TranslatorService.name}.${this.translateContent.name}`, { file });
+			throw error;
 		}
 	}
 
@@ -422,11 +421,7 @@ export class TranslatorService {
 			);
 		} catch (error) {
 			if (error instanceof ApplicationError) throw error;
-
-			throw mapError(error, `${TranslatorService.name}.${this.validateTranslation.name}`, {
-				file,
-				translatedContent,
-			});
+			throw error;
 		}
 	}
 
@@ -447,18 +442,9 @@ export class TranslatorService {
 			this.logger.info({ analysis }, "Checked translation status");
 
 			return analysis.isTranslated;
-		} catch (_error) {
-			const error =
-				_error instanceof ApplicationError ? _error : (
-					mapError(_error, `${TranslatorService.name}.${this.isContentTranslated.name}`, {
-						filename: file.filename,
-						path: file.path,
-						contentLength: file.content.length,
-					})
-				);
-
+		} catch (error) {
 			this.logger.error(
-				{ mappedError: error },
+				{ error },
 				"Error checking if content is translated. Assuming not translated",
 			);
 
@@ -501,12 +487,7 @@ export class TranslatorService {
 			return analysis;
 		} catch (error) {
 			if (error instanceof ApplicationError) throw error;
-
-			throw mapError(error, `${TranslatorService.name}.${this.getLanguageAnalysis.name}`, {
-				filename: file.filename,
-				path: file.path,
-				contentLength: file.content.length,
-			});
+			throw error;
 		}
 	}
 
@@ -541,17 +522,9 @@ export class TranslatorService {
 			);
 
 			return tokens.length;
-		} catch (_error) {
+		} catch (error) {
 			const fallback = Math.ceil(content.length / 3.5);
-			const error =
-				_error instanceof ApplicationError ? _error : (
-					mapError(_error, `${TranslatorService.name}.${this.estimateTokenCount.name}`, {
-						content,
-						fallback,
-					})
-				);
-
-			this.logger.error({ mappedError: error }, "Error estimating token count, using fallback");
+			this.logger.error({ error }, "Error estimating token count, using fallback");
 
 			return fallback;
 		}
@@ -593,8 +566,7 @@ export class TranslatorService {
 			return exceedsLimit;
 		} catch (error) {
 			if (error instanceof ApplicationError) throw error;
-
-			throw mapError(error, `${TranslatorService.name}.${this.needsChunking.name}`);
+			throw error;
 		}
 	}
 
@@ -711,11 +683,7 @@ export class TranslatorService {
 			return { chunks, separators };
 		} catch (error) {
 			if (error instanceof ApplicationError) throw error;
-
-			throw mapError(error, `${TranslatorService.name}.${this.chunkContent.name}`, {
-				contentLength: content.length,
-				maxTokens,
-			});
+			throw error;
 		}
 	}
 
@@ -768,10 +736,7 @@ export class TranslatorService {
 			});
 		} catch (error) {
 			if (error instanceof ApplicationError) throw error;
-
-			throw mapError(error, `${TranslatorService.name}.${this.translateWithChunking.name}`, {
-				contentLength: content.length,
-			});
+			throw error;
 		}
 	}
 
@@ -878,13 +843,7 @@ export class TranslatorService {
 			return reassembledContent;
 		} catch (error) {
 			if (error instanceof ApplicationError) throw error;
-
-			throw mapError(error, `${TranslatorService.name}.${this.validateAndReassembleChunks.name}`, {
-				contentLength: content.length,
-				chunkCount: chunks.original.length,
-				translatedCount: chunks.translated.length,
-				separatorCount: chunks.separators.length,
-			});
+			throw error;
 		}
 	}
 
@@ -918,18 +877,8 @@ export class TranslatorService {
 			);
 
 			return translatedChunk;
-		} catch (_error) {
-			const error =
-				_error instanceof ApplicationError ? _error : (
-					mapError(_error, `${TranslatorService.name}.${this.translateChunk.name}`, {
-						chunkIndex: index,
-						totalChunks: chunks.length,
-						chunkSize: chunk.length,
-						estimatedTokens: this.estimateTokenCount(chunk),
-					})
-				);
-
-			this.logger.error({ error: error }, "Failed to translate content chunk");
+		} catch (error) {
+			this.logger.error({ error }, "Failed to translate content chunk");
 
 			throw error;
 		}
@@ -1001,18 +950,13 @@ export class TranslatorService {
 						);
 
 						return translatedContent;
-					} catch (_error) {
-						const error =
-							_error instanceof ApplicationError ? _error : (
-								mapError(_error, `${TranslatorService.name}.${this.callLanguageModel.name}`, {
-									model: this.model,
-									contentLength: content.length,
-								})
-							);
+					} catch (error) {
+						if (error instanceof ApplicationError) throw error;
 
 						if (
-							error.statusCode === StatusCodes.UNAUTHORIZED ||
-							error.statusCode === StatusCodes.BAD_REQUEST
+							error instanceof APIError &&
+							(error.status === StatusCodes.UNAUTHORIZED ||
+								error.status === StatusCodes.BAD_REQUEST)
 						) {
 							throw new AbortError(error);
 						}
@@ -1094,11 +1038,7 @@ export class TranslatorService {
 			return cleaned;
 		} catch (error) {
 			if (error instanceof ApplicationError) throw error;
-
-			throw mapError(error, `${TranslatorService.name}.${this.cleanupTranslatedContent.name}`, {
-				translatedContentLength: translatedContent.length,
-				originalContentLength: originalContent.length,
-			});
+			throw error;
 		}
 	}
 
@@ -1183,8 +1123,7 @@ export class TranslatorService {
 			return builtSystemPrompt;
 		} catch (error) {
 			if (error instanceof ApplicationError) throw error;
-
-			throw mapError(error, `${TranslatorService.name}.${this.getSystemPrompt.name}`);
+			throw error;
 		}
 	}
 }

@@ -2,21 +2,23 @@ import type { LocaleDefinition } from "@/locales";
 
 import type { ProcessedFileResult } from "./runner";
 
-import { ApplicationError } from "@/errors";
-import { mapError } from "@/errors/error.helpers";
 import { logger } from "@/utils/";
 
 import { localeService } from "./locale";
 import { TranslationFile } from "./translator.service";
 
 export interface FileEntry {
-	filename: string;
-	prNumber: number;
+	file: TranslationFile;
+	prNumber: number | undefined;
 }
 
 export interface HierarchicalStructure {
 	files?: FileEntry[];
 	[key: string]: HierarchicalStructure | FileEntry[] | undefined;
+}
+
+export interface FileWithHierarchy extends FileEntry {
+	pathParts: string[];
 }
 
 /** Service for building comments based on translation results */
@@ -39,13 +41,6 @@ export class CommentBuilderService {
 	 * Processes translation results and file data to create a structured comment
 	 * that organizes translated files by their directory hierarchy for better readability.
 	 *
-	 * ### Processing Steps
-	 *
-	 * 1. Maps translation results to file data with simplified path structures
-	 * 2. Extracts directory paths and filenames from translation file paths
-	 * 3. Creates hierarchical data structure with path parts and PR numbers
-	 * 4. Filters out invalid results and builds organized comment structure
-	 *
 	 * @param results Translation processing results containing PR information
 	 * @param filesToTranslate Original files that were processed for translation
 	 *
@@ -60,40 +55,29 @@ export class CommentBuilderService {
 	 * ```
 	 */
 	public buildComment(results: ProcessedFileResult[], filesToTranslate: TranslationFile[]) {
-		try {
-			const concattedData = results
-				.map((result) => {
-					const translationFile = filesToTranslate.find(
-						(file) => file.filename === result.filename,
-					);
+		const concattedData = results
+			.map((result) => {
+				const translationFile = filesToTranslate.find((file) => file.filename === result.filename);
 
-					if (!translationFile) return null;
+				if (!translationFile) return null;
 
-					const pathParts = translationFile.path.split("/");
+				const pathParts = translationFile.path.split("/");
 
-					return {
-						pathParts: this.simplifyPathParts(pathParts),
-						filename: translationFile.filename,
-						prNumber: result.pullRequest?.number ?? 0,
-					};
-				})
-				.filter(Boolean);
+				return {
+					file: translationFile,
+					pathParts: this.simplifyPathParts(pathParts),
+					prNumber: result.pullRequest?.number,
+				} satisfies FileWithHierarchy;
+			})
+			.filter(Boolean);
 
-			const hierarchicalComment = this.buildHierarchicalComment(concattedData);
+		const hierarchicalComment = this.buildHierarchicalComment(concattedData);
 
-			const finalComment = this.concatComment(hierarchicalComment);
+		const finalComment = this.concatComment(hierarchicalComment);
 
-			this.logger.debug({ finalComment }, "Built comment");
+		this.logger.debug({ finalComment }, "Built comment");
 
-			return finalComment;
-		} catch (error) {
-			if (error instanceof ApplicationError) throw error;
-
-			throw mapError(error, `${CommentBuilderService.name}.${this.buildComment.name}`, {
-				results,
-				filesToTranslate,
-			});
-		}
+		return finalComment;
 	}
 
 	/**
@@ -135,21 +119,13 @@ export class CommentBuilderService {
 	 * ```
 	 */
 	private simplifyPathParts(pathParts: string[]): string[] {
-		try {
-			if (pathParts[0] === "src" && pathParts[1] === "content") {
-				pathParts = pathParts.slice(2);
-			}
-
-			if (pathParts[0] === "blog") return ["blog"];
-
-			return pathParts;
-		} catch (error) {
-			if (error instanceof ApplicationError) throw error;
-
-			throw mapError(error, `${CommentBuilderService.name}.${this.simplifyPathParts.name}`, {
-				pathParts,
-			});
+		if (pathParts[0] === "src" && pathParts[1] === "content") {
+			pathParts = pathParts.slice(2);
 		}
+
+		if (pathParts[0] === "blog") return ["blog"];
+
+		return pathParts;
 	}
 
 	/**
@@ -180,44 +156,33 @@ export class CommentBuilderService {
 	 * // ^? "- docs\n  - `intro.md`: #123\n  - api\n    - `reference.md`: #124"
 	 * ```
 	 */
-	private buildHierarchicalComment(
-		data: {
-			pathParts: string[];
-			filename: string;
-			prNumber: number;
-		}[],
-	): string {
-		try {
-			data.sort((left, right) => {
-				const pathA = left.pathParts.join("/");
-				const pathB = right.pathParts.join("/");
+	private buildHierarchicalComment(data: FileWithHierarchy[]): string {
+		data.sort((left, right) => {
+			const pathA = left.pathParts.join("/");
+			const pathB = right.pathParts.join("/");
 
-				return pathA === pathB ?
-						left.filename.localeCompare(right.filename)
-					:	pathA.localeCompare(pathB);
-			});
+			return pathA === pathB ?
+					left.file.filename.localeCompare(right.file.filename)
+				:	pathA.localeCompare(pathB);
+		});
 
-			const structure: HierarchicalStructure = {};
+		const structure: HierarchicalStructure = {};
 
-			for (const item of data) {
-				let currentLevel = structure;
+		for (const item of data) {
+			let currentLevel = structure;
 
-				for (const part of item.pathParts) {
-					currentLevel[part] ??= { files: [] };
-					currentLevel = currentLevel[part] as HierarchicalStructure;
-				}
-
-				currentLevel.files?.push({ filename: item.filename, prNumber: item.prNumber });
+			for (const part of item.pathParts) {
+				currentLevel[part] ??= { files: [] };
+				currentLevel = currentLevel[part] as HierarchicalStructure;
 			}
 
-			return this.formatStructure(structure, 0);
-		} catch (error) {
-			if (error instanceof ApplicationError) throw error;
-
-			throw mapError(error, `${CommentBuilderService.name}.${this.buildHierarchicalComment.name}`, {
-				data,
+			currentLevel.files?.push({
+				file: item.file,
+				prNumber: item.prNumber,
 			});
 		}
+
+		return this.formatStructure(structure, 0);
 	}
 
 	/**
@@ -254,46 +219,43 @@ export class CommentBuilderService {
 	 * ```
 	 */
 	private formatStructure(structure: HierarchicalStructure, level: number): string {
-		try {
-			const lines: string[] = [];
-			const indent = "  ".repeat(level);
+		const lines: string[] = [];
+		const indent = "  ".repeat(level);
 
-			const dirs = Object.keys(structure)
-				.filter((key) => key !== "files")
-				.sort();
+		const dirs = Object.keys(structure)
+			.filter((key) => key !== "files")
+			.sort();
 
-			for (const dir of dirs) {
-				const currentLevel = structure[dir];
-				if (!currentLevel || !("files" in currentLevel) || !currentLevel.files) {
-					continue;
-				}
-
-				lines.push(`${indent}- ${dir}`);
-
-				const sortedFiles = currentLevel.files.toSorted((a, b) =>
-					a.filename.localeCompare(b.filename),
-				);
-
-				for (const file of sortedFiles) {
-					lines.push(`${indent}  - \`${file.filename}\`: #${file.prNumber}`);
-				}
-
-				const subDirs = Object.keys(currentLevel).filter((key) => key !== "files");
-
-				if (subDirs.length > 0) {
-					lines.push(this.formatStructure(currentLevel, level + 1));
-				}
+		for (const dir of dirs) {
+			const currentLevel = structure[dir];
+			if (!currentLevel || !("files" in currentLevel) || !currentLevel.files) {
+				continue;
 			}
 
-			return lines.join("\n");
-		} catch (error) {
-			if (error instanceof ApplicationError) throw error;
+			const sortedEntries = currentLevel.files.toSorted((a, b) =>
+				a.file.filename.localeCompare(b.file.filename),
+			);
 
-			throw mapError(error, `${CommentBuilderService.name}.${this.formatStructure.name}`, {
-				structure,
-				level,
-			});
+			if (sortedEntries.length === 1 && sortedEntries[0]?.file.filename === dir) {
+				const entry = sortedEntries[0];
+				lines.push(`${indent}- #${entry.prNumber}`);
+				continue;
+			}
+
+			lines.push(`${indent}- ${dir}`);
+
+			for (const entry of sortedEntries) {
+				lines.push(`${indent}  - #${entry.prNumber}`);
+			}
+
+			const subDirs = Object.keys(currentLevel).filter((key) => key !== "files");
+
+			if (subDirs.length > 0) {
+				lines.push(this.formatStructure(currentLevel, level + 1));
+			}
 		}
+
+		return lines.join("\n");
 	}
 
 	/** Comment template for issue comments */

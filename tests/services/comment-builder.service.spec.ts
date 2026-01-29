@@ -67,8 +67,8 @@ describe("CommentBuilderService", () => {
 
 			expect(result).toBeString();
 			expect(result).toContain("docs");
-			expect(result).toContain("`intro.md`: #123");
-			expect(result).toContain("`api.md`: #124");
+			expect(result).toContain("#123");
+			expect(result).toContain("#124");
 		});
 
 		test("should handle files without matching translation files", () => {
@@ -117,7 +117,7 @@ describe("CommentBuilderService", () => {
 			const result = commentBuilderService.buildComment(results, filesToTranslate);
 
 			expect(result).toContain("blog");
-			expect(result).toContain("`post.md`: #126");
+			expect(result).toContain("#126");
 
 			expect(result).not.toContain("2024");
 			expect(result).not.toContain("01");
@@ -127,7 +127,7 @@ describe("CommentBuilderService", () => {
 
 	describe("concatComment", () => {
 		test("should concatenate prefix, content, and suffix", () => {
-			const content = "- docs\n  - `intro.md`: #123";
+			const content = "- docs\n  - #123";
 
 			// @ts-expect-error - Call to private method
 			const result = commentBuilderService.concatComment(content);
@@ -135,7 +135,6 @@ describe("CommentBuilderService", () => {
 			expect(result).toBeString();
 			expect(result).toContain("As seguintes páginas foram traduzidas");
 			expect(result).toContain(content);
-			expect(result).toContain("Observações");
 		});
 
 		test("should handle empty content", () => {
@@ -146,7 +145,6 @@ describe("CommentBuilderService", () => {
 
 			expect(result).toBeString();
 			expect(result).toContain("As seguintes páginas foram traduzidas");
-			expect(result).toContain("Observações");
 		});
 
 		test("should handle multiline content", () => {
@@ -168,7 +166,6 @@ describe("CommentBuilderService", () => {
 			expect(comment).toHaveProperty("prefix");
 			expect(comment).toHaveProperty("suffix");
 			expect(comment.prefix).toContain("As seguintes páginas foram traduzidas");
-			expect(comment.suffix).toContain("Observações");
 		});
 	});
 
@@ -185,12 +182,7 @@ describe("CommentBuilderService", () => {
 			];
 
 			const filesToTranslate: TranslationFile[] = [
-				{
-					filename: "test.md",
-					path: "src/content/docs/advanced/test.md",
-					content: "# Test",
-					sha: "sha_test",
-				},
+				new TranslationFile("# Test", "test.md", "src/content/docs/advanced/test.md", "sha_test"),
 			];
 
 			const result = commentBuilderService.buildComment(results, filesToTranslate);
@@ -212,12 +204,12 @@ describe("CommentBuilderService", () => {
 			];
 
 			const filesToTranslate: TranslationFile[] = [
-				{
-					filename: "article.md",
-					path: "src/content/blog/2024/03/15/some-folder/article.md",
-					content: "# Article",
-					sha: "sha_article",
-				},
+				new TranslationFile(
+					"# Article",
+					"article.md",
+					"src/content/blog/2024/03/15/some-folder/article.md",
+					"sha_article",
+				),
 			];
 
 			const result = commentBuilderService.buildComment(results, filesToTranslate);
@@ -257,24 +249,19 @@ describe("CommentBuilderService", () => {
 			];
 
 			const filesToTranslate: TranslationFile[] = [
-				{
-					filename: "intro.md",
-					path: "src/content/docs/intro.md",
-					content: "# Introduction",
-					sha: "sha_file_1",
-				},
-				{
-					filename: "advanced.md",
-					path: "src/content/docs/guides/advanced.md",
-					content: "# Advanced",
-					sha: "sha_file_2",
-				},
-				{
-					filename: "api.md",
-					path: "src/content/docs/reference/api.md",
-					content: "# API",
-					sha: "sha_file_3",
-				},
+				new TranslationFile(
+					"# Introduction",
+					"intro.md",
+					"src/content/docs/intro.md",
+					"sha_file_1",
+				),
+				new TranslationFile(
+					"# Advanced",
+					"advanced.md",
+					"src/content/docs/guides/advanced.md",
+					"sha_file_2",
+				),
+				new TranslationFile("# API", "api.md", "src/content/docs/reference/api.md", "sha_file_3"),
 			];
 
 			const result = commentBuilderService.buildComment(results, filesToTranslate);
@@ -282,9 +269,9 @@ describe("CommentBuilderService", () => {
 			expect(result).toContain("docs");
 			expect(result).toContain("guides");
 			expect(result).toContain("reference");
-			expect(result).toContain("`intro.md`: #129");
-			expect(result).toContain("`advanced.md`: #130");
-			expect(result).toContain("`api.md`: #131");
+			expect(result).toContain("#129");
+			expect(result).toContain("#130");
+			expect(result).toContain("#131");
 		});
 
 		test("should sort files and directories alphabetically", () => {
@@ -306,24 +293,14 @@ describe("CommentBuilderService", () => {
 			];
 
 			const filesToTranslate: TranslationFile[] = [
-				{
-					filename: "zebra.md",
-					path: "src/content/docs/zebra.md",
-					content: "# Zebra",
-					sha: "sha_file_zebra",
-				},
-				{
-					filename: "alpha.md",
-					path: "src/content/docs/alpha.md",
-					content: "# Alpha",
-					sha: "sha_file_alpha",
-				},
+				new TranslationFile("# Zebra", "zebra.md", "src/content/docs/zebra.md", "sha_file_zebra"),
+				new TranslationFile("# Alpha", "alpha.md", "src/content/docs/alpha.md", "sha_file_alpha"),
 			];
 
 			const result = commentBuilderService.buildComment(results, filesToTranslate);
 
-			const alphaIndex = result.indexOf("alpha.md");
-			const zebraIndex = result.indexOf("zebra.md");
+			const alphaIndex = result.indexOf("#133");
+			const zebraIndex = result.indexOf("#132");
 			expect(alphaIndex).toBeLessThan(zebraIndex);
 		});
 
@@ -339,12 +316,12 @@ describe("CommentBuilderService", () => {
 			];
 
 			const filesToTranslate: TranslationFile[] = [
-				{
-					filename: "deep.md",
-					path: "src/content/docs/level1/level2/level3/deep.md",
-					content: "# Deep",
-					sha: "sha_file_deep",
-				},
+				new TranslationFile(
+					"# Deep",
+					"deep.md",
+					"src/content/docs/level1/level2/level3/deep.md",
+					"sha_file_deep",
+				),
 			];
 
 			const result = commentBuilderService.buildComment(results, filesToTranslate);
@@ -353,7 +330,7 @@ describe("CommentBuilderService", () => {
 			expect(result).toContain("level1");
 			expect(result).toContain("level2");
 			expect(result).toContain("level3");
-			expect(result).toContain("`deep.md`: #134");
+			expect(result).toContain("#134");
 		});
 	});
 
@@ -370,12 +347,7 @@ describe("CommentBuilderService", () => {
 			];
 
 			const filesToTranslate: TranslationFile[] = [
-				{
-					filename: "",
-					path: "src/content/docs/",
-					content: "# Empty",
-					sha: "sha_empty_file",
-				},
+				new TranslationFile("# Empty", "", "src/content/docs/", "sha_empty_file"),
 			];
 
 			const result = commentBuilderService.buildComment(results, filesToTranslate);
@@ -395,17 +367,17 @@ describe("CommentBuilderService", () => {
 			];
 
 			const filesToTranslate: TranslationFile[] = [
-				{
-					filename: "special-file_name.with.dots.md",
-					path: "src/content/docs/special-file_name.with.dots.md",
-					content: "# Special",
-					sha: "sha_special_file",
-				},
+				new TranslationFile(
+					"# Special",
+					"special-file_name.with.dots.md",
+					"src/content/docs/special-file_name.with.dots.md",
+					"sha_special_file",
+				),
 			];
 
 			const result = commentBuilderService.buildComment(results, filesToTranslate);
 
-			expect(result).toContain("`special-file_name.with.dots.md`: #136");
+			expect(result).toContain("#136");
 		});
 
 		test("should handle large number of files", () => {
@@ -421,20 +393,22 @@ describe("CommentBuilderService", () => {
 					error: null,
 				});
 
-				filesToTranslate.push({
-					filename: `file-${index.toString().padStart(2, "0")}.md`,
-					path: `src/content/docs/batch/file-${index.toString().padStart(2, "0")}.md`,
-					content: `# File ${index}`,
-					sha: `sha_file_${index}`,
-				});
+				filesToTranslate.push(
+					new TranslationFile(
+						`# File ${index}`,
+						`file-${index.toString().padStart(2, "0")}.md`,
+						`src/content/docs/batch/file-${index.toString().padStart(2, "0")}.md`,
+						`sha_file_${index}`,
+					),
+				);
 			}
 
 			const result = commentBuilderService.buildComment(results, filesToTranslate);
 
 			expect(result).toBeString();
 			expect(result).toContain("batch");
-			expect(result).toContain("`file-01.md`: #101");
-			expect(result).toContain("`file-50.md`: #150");
+			expect(result).toContain("#101");
+			expect(result).toContain("#150");
 		});
 	});
 });
