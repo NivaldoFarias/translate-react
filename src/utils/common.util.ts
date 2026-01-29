@@ -141,3 +141,36 @@ export function filterMarkdownFiles(
 		return true;
 	});
 }
+
+/**
+ * Extracts the title of a document from its content by matching the `title` frontmatter key.
+ *
+ * Supports both single and double quotes around the title value.
+ *
+ * @param content The content of the document
+ *
+ * @returns The title of the document, or `undefined` if not found
+ *
+ * @example
+ * ```typescript
+ * import { extractDocTitleFromContent } from "@/utils/";
+ *
+ * const title = extractDocTitleFromContent(`
+ * ---
+ * title: 'Hello'
+ * ---
+ * # Hello
+ *
+ * Welcome to React!
+ * `);
+ * console.log(title);
+ * // 'Hello'
+ * ```
+ */
+export function extractDocTitleFromContent(content: string): string | undefined {
+	const CATCH_CONTENT_TITLE_REGEX = /---[\s\S]*?title:\s*['"](.+?)['"][\s\S]*?---/gs;
+
+	const match = CATCH_CONTENT_TITLE_REGEX.exec(content);
+
+	return match?.[1];
+}

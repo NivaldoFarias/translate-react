@@ -3,7 +3,7 @@ import type { RestEndpointMethodTypes } from "@octokit/rest";
 import type { BaseGitHubServiceDependencies, BaseRepositories } from "./base.service";
 
 import { octokit } from "@/clients/";
-import { ApplicationError, ErrorCode, mapError } from "@/errors/";
+import { ApplicationError, ErrorCode } from "@/errors/";
 import { env, logger } from "@/utils/";
 
 import { BaseGitHubService } from "./base.service";
@@ -51,24 +51,12 @@ export class RepositoryService extends BaseGitHubService {
 	 * ```
 	 */
 	public async getDefaultBranch(target: "fork" | "upstream" = "fork"): Promise<string> {
-		try {
-			const repoConfig = target === "fork" ? this.repositories.fork : this.repositories.upstream;
-			const response = await this.octokit.repos.get(repoConfig);
+		const repoConfig = target === "fork" ? this.repositories.fork : this.repositories.upstream;
+		const response = await this.octokit.repos.get(repoConfig);
 
-			this.logger.debug(
-				{ target, branch: response.data.default_branch },
-				"Retrieved default branch",
-			);
+		this.logger.debug({ target, branch: response.data.default_branch }, "Retrieved default branch");
 
-			return response.data.default_branch;
-		} catch (error) {
-			if (error instanceof ApplicationError) throw error;
-
-			throw mapError(error, `${RepositoryService.name}.${this.getDefaultBranch.name}`, {
-				target,
-				repoConfig: target === "fork" ? this.repositories.fork : this.repositories.upstream,
-			});
-		}
+		return response.data.default_branch;
 	}
 
 	/**
@@ -98,47 +86,35 @@ export class RepositoryService extends BaseGitHubService {
 		baseBranch?: string,
 		filterIgnored = true,
 	): Promise<RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"]> {
-		try {
-			this.logger.info({ target, baseBranch, filterIgnored }, "Fetching repository tree");
+		this.logger.info({ target, baseBranch, filterIgnored }, "Fetching repository tree");
 
-			const repoConfig = target === "fork" ? this.repositories.fork : this.repositories.upstream;
-			const branchName = baseBranch ?? (await this.getDefaultBranch(target));
+		const repoConfig = target === "fork" ? this.repositories.fork : this.repositories.upstream;
+		const branchName = baseBranch ?? (await this.getDefaultBranch(target));
 
-			this.logger.debug({ repoConfig, branchName }, "Get repository tree parameters");
+		this.logger.debug({ repoConfig, branchName }, "Get repository tree parameters");
 
-			const response = await this.octokit.git.getTree({
-				...repoConfig,
-				tree_sha: branchName,
-				recursive: "true",
-			});
-			this.logger.debug({ responseData: response.data }, "Repository tree fetched from GitHub");
+		const response = await this.octokit.git.getTree({
+			...repoConfig,
+			tree_sha: branchName,
+			recursive: "true",
+		});
+		this.logger.debug({ responseData: response.data }, "Repository tree fetched from GitHub");
 
-			const tree =
-				filterIgnored ? this.filterRepositoryTree(response.data.tree) : response.data.tree;
-			this.logger.debug({ treeLength: tree.length }, "Repository tree filtered");
+		const tree = filterIgnored ? this.filterRepositoryTree(response.data.tree) : response.data.tree;
+		this.logger.debug({ treeLength: tree.length }, "Repository tree filtered");
 
-			this.logger.info(
-				{
-					target,
-					branch: branchName,
-					totalItems: response.data.tree.length,
-					filteredItems: tree.length,
-					filterIgnored,
-				},
-				"Retrieved repository tree",
-			);
-
-			return tree;
-		} catch (error) {
-			if (error instanceof ApplicationError) throw error;
-
-			throw mapError(error, `${RepositoryService.name}.${this.getRepositoryTree.name}`, {
+		this.logger.info(
+			{
 				target,
-				baseBranch,
+				branch: branchName,
+				totalItems: response.data.tree.length,
+				filteredItems: tree.length,
 				filterIgnored,
-				repoConfig: target === "fork" ? this.repositories.fork : this.repositories.upstream,
-			});
-		}
+			},
+			"Retrieved repository tree",
+		);
+
+		return tree;
 	}
 
 	/**
@@ -156,56 +132,45 @@ export class RepositoryService extends BaseGitHubService {
 	 * ```
 	 */
 	public async verifyTokenPermissions(): Promise<boolean> {
-		try {
-			this.logger.info("Verifying token permissions for fork and upstream repositories");
+		this.logger.info("Verifying token permissions for fork and upstream repositories");
 
-			const results = await Promise.allSettled([
-				this.octokit.rest.repos.get(this.repositories.fork),
-				this.octokit.rest.repos.get(this.repositories.upstream),
-			]);
+		const results = await Promise.allSettled([
+			this.octokit.rest.repos.get(this.repositories.fork),
+			this.octokit.rest.repos.get(this.repositories.upstream),
+		]);
 
-			for (const [index, result] of results.entries()) {
-				const repoType = index === 0 ? "fork" : "upstream";
+		for (const [index, result] of results.entries()) {
+			const repoType = index === 0 ? "fork" : "upstream";
 
-				if (result.status === "rejected") {
-					this.logger.error(
-						{ reason: result.reason },
-						`Insufficient permissions for ${repoType} repository`,
-					);
+			if (result.status === "rejected") {
+				this.logger.error(
+					{ reason: result.reason },
+					`Insufficient permissions for ${repoType} repository`,
+				);
 
-					throw new ApplicationError(
-						`Insufficient permissions for ${repoType} repository`,
-						ErrorCode.InsufficientPermissions,
-						`${RepositoryService.name}.${this.verifyTokenPermissions.name}`,
-						{ repoType, reason: result.reason as string },
-					);
-				}
-
-				this.logger.debug(
-					{ response: result.value },
-					`Sufficient permissions for ${repoType} repository`,
+				throw new ApplicationError(
+					`Insufficient permissions for ${repoType} repository`,
+					ErrorCode.InsufficientPermissions,
+					`${RepositoryService.name}.${this.verifyTokenPermissions.name}`,
+					{ repoType, reason: result.reason as string },
 				);
 			}
 
-			this.logger.info(
-				{
-					fork: `${this.repositories.fork.owner}/${this.repositories.fork.repo}`,
-					upstream: `${this.repositories.upstream.owner}/${this.repositories.upstream.repo}`,
-				},
-				"Token permissions verified successfully",
+			this.logger.debug(
+				{ response: result.value },
+				`Sufficient permissions for ${repoType} repository`,
 			);
-
-			return true;
-		} catch (_error) {
-			const error =
-				_error instanceof ApplicationError ? _error : (
-					mapError(_error, `${RepositoryService.name}.${this.verifyTokenPermissions.name}`, {})
-				);
-
-			this.logger.error({ error: error }, "Token permission verification failed");
-
-			return false;
 		}
+
+		this.logger.info(
+			{
+				fork: `${this.repositories.fork.owner}/${this.repositories.fork.repo}`,
+				upstream: `${this.repositories.upstream.owner}/${this.repositories.upstream.repo}`,
+			},
+			"Token permissions verified successfully",
+		);
+
+		return true;
 	}
 
 	/**
@@ -275,18 +240,12 @@ export class RepositoryService extends BaseGitHubService {
 	 * If it does not exist, an error is thrown.
 	 */
 	public async forkExists(): Promise<void> {
-		try {
-			const response = await this.octokit.repos.get(this.repositories.fork);
+		const response = await this.octokit.repos.get(this.repositories.fork);
 
-			this.logger.info(
-				{ fork: this.repositories.fork, exists: !!response.data },
-				"Fork repository existence checked",
-			);
-		} catch (error) {
-			throw mapError(error, `${RepositoryService.name}.forkExists`, {
-				fork: this.repositories.fork,
-			});
-		}
+		this.logger.info(
+			{ fork: this.repositories.fork, exists: !!response.data },
+			"Fork repository existence checked",
+		);
 	}
 
 	/**

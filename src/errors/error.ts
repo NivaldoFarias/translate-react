@@ -2,43 +2,28 @@ import type { StatusCodes } from "http-status-codes";
 
 /** Standardized error codes for the translation workflow */
 export enum ErrorCode {
-	// GitHub API Related
-	GithubApiError = "GITHUB_API_ERROR",
-	GithubNotFound = "GITHUB_NOT_FOUND",
-	GithubUnauthorized = "GITHUB_UNAUTHORIZED",
-	GithubForbidden = "GITHUB_FORBIDDEN",
-	GithubRateLimited = "GITHUB_RATE_LIMITED",
-	GithubServerError = "GITHUB_SERVER_ERROR",
-
-	// LLM API Related
-	LLMApiError = "LLM_API_ERROR",
-
-	// Generic HTTP Related
-	RateLimitExceeded = "RATE_LIMIT_EXCEEDED",
-	Unauthorized = "UNAUTHORIZED",
-	Forbidden = "FORBIDDEN",
-	NotFound = "NOT_FOUND",
-	ServerError = "SERVER_ERROR",
-
-	// Content Related
-	InvalidContent = "INVALID_CONTENT",
-	ContentTooLong = "CONTENT_TOO_LONG",
-	NoContent = "NO_CONTENT",
-	FormatValidationFailed = "FORMAT_VALIDATION_FAILED",
-	ChunkProcessingFailed = "CHUNK_PROCESSING_FAILED",
-
-	// Application Process Related
-	ApiError = "API_ERROR",
+	// Domain Workflow Errors
 	TranslationFailed = "TRANSLATION_FAILED",
-	NoFilesFound = "NO_FILES_FOUND",
-	InitializationError = "INITIALIZATION_ERROR",
-	ResourceLoadError = "RESOURCE_LOAD_ERROR",
-	ValidationError = "VALIDATION_ERROR",
-	UnknownError = "UNKNOWN_ERROR",
+	ChunkProcessingFailed = "CHUNK_PROCESSING_FAILED",
 	NoFilesToTranslate = "NO_FILES_TO_TRANSLATE",
 	BelowMinimumSuccessRate = "BELOW_MINIMUM_SUCCESS_RATE",
-	InsufficientPermissions = "INSUFFICIENT_PERMISSIONS",
+	NoContent = "NO_CONTENT",
+
+	// Domain Validation Errors
+	FormatValidationFailed = "FORMAT_VALIDATION_FAILED",
 	LanguageCodeNotSupported = "LANGUAGE_CODE_NOT_SUPPORTED",
+	InsufficientPermissions = "INSUFFICIENT_PERMISSIONS",
+
+	// Domain Initialization Errors
+	InitializationError = "INITIALIZATION_ERROR",
+	ResourceLoadError = "RESOURCE_LOAD_ERROR",
+
+	// External API Errors
+	OpenAIApiError = "OPENAI_API_ERROR",
+	OctokitRequestError = "OCTOKIT_REQUEST_ERROR",
+
+	// Fallback
+	UnknownError = "UNKNOWN_ERROR",
 }
 
 /**

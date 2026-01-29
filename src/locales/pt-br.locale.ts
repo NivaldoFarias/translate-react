@@ -15,11 +15,10 @@ import { formatElapsedTime } from "@/utils/common.util";
 export const ptBrLocale: LocaleDefinition = {
 	comment: {
 		prefix: "As seguintes páginas foram traduzidas e PRs foram criados:",
-		suffix: `###### Observações
-
-- As traduções foram geradas por uma LLM e requerem revisão humana para garantir precisão técnica e fluência.
-- Alguns arquivos podem ter PRs de tradução existentes em análise. Verifiquei duplicações, mas recomendo conferir.
-- Esta implementação é um trabalho em progresso e pode apresentar inconsistências em conteúdos técnicos complexos ou formatação específica.`,
+		suffix: `> [!IMPORTANT]
+>
+> As traduções foram geradas por uma LLM e requerem revisão humana para garantir precisão técnica e fluência.
+> Esta implementação é um trabalho em progresso e pode apresentar inconsistências em conteúdos técnicos complexos ou formatação específica.`,
 	},
 	rules: {
 		specific: `
@@ -30,7 +29,8 @@ export const ptBrLocale: LocaleDefinition = {
 - When a MDN document is referenced, update the language slug to the Brazilian Portuguese version ('https://developer.mozilla.org/<slug>/*' => 'https://developer.mozilla.org/pt-BR/*')`,
 	},
 	pullRequest: {
-		title: (file: TranslationFile) => `Tradução de \`${file.filename}\` para Português (Brasil)`,
+		title: (file: TranslationFile) =>
+			`Tradução de ${file.title ? `**${file.title}**` : `\`${file.filename}\``} para Português (Brasil)`,
 		body: (
 			file: TranslationFile,
 			processingResult: ProcessedFileResult,

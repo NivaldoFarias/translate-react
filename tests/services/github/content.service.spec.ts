@@ -7,12 +7,11 @@ import type {
 	ContentServiceDependencies,
 	PatchedRepositoryTreeItem,
 	ProcessedFileResult,
-	TranslationFile,
 } from "@/services/";
 
 import type { MockCommentBuilderService, MockOctokit } from "@tests/mocks";
 
-import { ContentService } from "@/services/";
+import { ContentService, TranslationFile } from "@/services/";
 
 import {
 	createProcessedFileResultsFixture,
@@ -83,12 +82,12 @@ describe("ContentService", () => {
 			},
 		};
 
-		const mockFile = {
-			path: "src/test/file.md",
-			content: "# Original Content",
-			sha: "abc123",
-			filename: "file.md",
-		};
+		const mockFile = new TranslationFile(
+			"# Original Content",
+			"file.md",
+			"src/test/file.md",
+			"abc123",
+		);
 
 		const result = await contentService.commitTranslation({
 			branch: mockBranch,
@@ -235,12 +234,7 @@ describe("ContentService", () => {
 				object: { type: "commit", sha: "branch-sha", url: "" },
 			};
 
-			const mockFile = {
-				path: "src/test/file.md",
-				content: "# Original",
-				sha: "abc123",
-				filename: "file.md",
-			};
+			const mockFile = new TranslationFile("# Original", "file.md", "src/test/file.md", "abc123");
 
 			expect(
 				contentService.commitTranslation({

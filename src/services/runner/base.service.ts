@@ -8,7 +8,7 @@ import type {
 	WorkflowStatistics,
 } from "./runner.types";
 
-import { ApplicationError, ErrorCode, mapError } from "@/errors/";
+import { ApplicationError, ErrorCode } from "@/errors/";
 import { env, logger, setupSignalHandlers } from "@/utils/";
 
 import { FileDiscoveryManager } from "./file-discovery.manager";
@@ -126,8 +126,7 @@ export abstract class BaseRunnerService {
 			this.logger.info("GitHub token permissions verified successfully");
 		} catch (error) {
 			if (error instanceof ApplicationError) throw error;
-
-			throw mapError(error, `${BaseRunnerService.name}.${this.verifyPermissions.name}`);
+			throw error;
 		}
 	}
 
@@ -168,8 +167,7 @@ export abstract class BaseRunnerService {
 			return isForkSynced;
 		} catch (error) {
 			if (error instanceof ApplicationError) throw error;
-
-			throw mapError(error, `${BaseRunnerService.name}.${this.syncFork.name}`);
+			throw error;
 		}
 	}
 
@@ -200,8 +198,7 @@ export abstract class BaseRunnerService {
 			this.logger.info("Repository content and glossary fetched successfully");
 		} catch (error) {
 			if (error instanceof ApplicationError) throw error;
-
-			throw mapError(error, `${BaseRunnerService.name}.${this.fetchRepositoryTree.name}`);
+			throw error;
 		}
 	}
 
@@ -229,8 +226,7 @@ export abstract class BaseRunnerService {
 			return glossary;
 		} catch (error) {
 			if (error instanceof ApplicationError) throw error;
-
-			throw mapError(error, `${BaseRunnerService.name}.${this.fetchGlossary.name}`);
+			throw error;
 		}
 	}
 
@@ -269,8 +265,7 @@ export abstract class BaseRunnerService {
 			return patchedRepositoryTree;
 		} catch (error) {
 			if (error instanceof ApplicationError) throw error;
-
-			throw mapError(error, `${BaseRunnerService.name}.${this.patchRepositoryItem.name}`);
+			throw error;
 		}
 	}
 
@@ -335,8 +330,7 @@ export abstract class BaseRunnerService {
 			this.logger.debug("Completed setting up translation batch manager and state update");
 		} catch (error) {
 			if (error instanceof ApplicationError) throw error;
-
-			throw mapError(error, `${BaseRunnerService.name}.${this.fetchFilesToTranslate.name}`);
+			throw error;
 		}
 	}
 

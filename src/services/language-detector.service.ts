@@ -2,7 +2,7 @@ import cld from "cld";
 
 import type { ReactLanguageCode } from "@/utils/";
 
-import { ApplicationError, ErrorCode, mapError } from "@/errors";
+import { ApplicationError, ErrorCode } from "@/errors";
 import { env, logger, REACT_TRANSLATION_LANGUAGES } from "@/utils/";
 
 /**
@@ -164,18 +164,11 @@ export class LanguageDetectorService {
 			this.logger.info({ humanReadableLanguageName }, "Obtained human-readable language name");
 
 			return humanReadableLanguageName;
-		} catch (_error) {
-			const error =
-				_error instanceof ApplicationError ? _error : (
-					mapError(_error, `${LanguageDetectorService.name}.${this.getLanguageName.name}`, {
-						code,
-						isTargetLanguage,
-						fallbackLanguageName,
-					})
-				);
+		} catch (error) {
+			if (error instanceof ApplicationError) throw error;
 
 			this.logger.error(
-				{ error: error },
+				{ error },
 				"Failed to get human-readable language name. Returning fallback name",
 			);
 
@@ -276,17 +269,10 @@ export class LanguageDetectorService {
 			this.logger.info({ analysisResult, filename }, "Language analysis completed");
 
 			return analysisResult;
-		} catch (_error) {
-			const error =
-				_error instanceof ApplicationError ? _error : (
-					mapError(_error, `${LanguageDetectorService.name}.${this.analyzeLanguage.name}`, {
-						filename,
-						contentLength: content.length,
-						fallbackLanguageAnalysisResult,
-					})
-				);
+		} catch (error) {
+			if (error instanceof ApplicationError) throw error;
 
-			this.logger.error({ error: error }, "Language analysis failed. returning fallback result");
+			this.logger.error({ error }, "Language analysis failed. returning fallback result");
 
 			return fallbackLanguageAnalysisResult;
 		}
@@ -321,15 +307,10 @@ export class LanguageDetectorService {
 			);
 
 			return code as ReactLanguageCode;
-		} catch (_error) {
-			const error =
-				_error instanceof ApplicationError ? _error : (
-					mapError(_error, `${LanguageDetectorService.name}.${this.detectPrimaryLanguage.name}`, {
-						text,
-					})
-				);
+		} catch (error) {
+			if (error instanceof ApplicationError) throw error;
 
-			this.logger.error({ mappedError: error }, "Primary language detection failed");
+			this.logger.error({ error }, "Primary language detection failed");
 		}
 	}
 
@@ -341,40 +322,32 @@ export class LanguageDetectorService {
 	 * @returns Cleaned content suitable for language detection
 	 */
 	private cleanContent(content: string): string {
-		try {
-			this.logger.debug("Cleaning content for language detection");
+		this.logger.debug("Cleaning content for language detection");
 
-			const regexes = {
-				codeBlock: /```[\s\S]*?```/g,
-				inlineCode: /`[^`]*`/g,
-				htmlTags: /<[^>]*>/g,
-				urls: /https?:\/\/[^\s]+/g,
-				whitespace: /\s+/g,
-			} as const;
+		const regexes = {
+			codeBlock: /```[\s\S]*?```/g,
+			inlineCode: /`[^`]*`/g,
+			htmlTags: /<[^>]*>/g,
+			urls: /https?:\/\/[^\s]+/g,
+			whitespace: /\s+/g,
+		} as const;
 
-			this.logger.debug({ regexes }, "Using regex patterns for content cleaning");
+		this.logger.debug({ regexes }, "Using regex patterns for content cleaning");
 
-			const cleanedContent = content
-				.replace(regexes.codeBlock, " ")
-				.replace(regexes.inlineCode, " ")
-				.replace(regexes.htmlTags, " ")
-				.replace(regexes.urls, " ")
-				.replace(regexes.whitespace, " ")
-				.trim();
+		const cleanedContent = content
+			.replace(regexes.codeBlock, " ")
+			.replace(regexes.inlineCode, " ")
+			.replace(regexes.htmlTags, " ")
+			.replace(regexes.urls, " ")
+			.replace(regexes.whitespace, " ")
+			.trim();
 
-			this.logger.debug(
-				{ originalLength: content.length, cleanedLength: cleanedContent.length },
-				"Cleaned content for language detection",
-			);
+		this.logger.debug(
+			{ originalLength: content.length, cleanedLength: cleanedContent.length },
+			"Cleaned content for language detection",
+		);
 
-			return cleanedContent;
-		} catch (error) {
-			if (error instanceof ApplicationError) throw error;
-
-			throw mapError(error, `${LanguageDetectorService.name}.${this.cleanContent.name}`, {
-				contentLength: content.length,
-			});
-		}
+		return cleanedContent;
 	}
 
 	/**
@@ -392,29 +365,21 @@ export class LanguageDetectorService {
 	 * ```
 	 */
 	private mapToCldCode(reactCode: string): string[] {
-		try {
-			this.logger.debug({ reactCode }, "Mapping React language code to CLD codes");
+		this.logger.debug({ reactCode }, "Mapping React language code to CLD codes");
 
-			const mapping: Record<string, string[]> = {
-				"pt-br": ["pt", "pt-br"],
-				"zh-hans": ["zh", "zh-cn", "zh-hans"],
-				"zh-hant": ["zh", "zh-tw", "zh-hant"],
-			};
+		const mapping: Record<string, string[]> = {
+			"pt-br": ["pt", "pt-br"],
+			"zh-hans": ["zh", "zh-cn", "zh-hans"],
+			"zh-hant": ["zh", "zh-tw", "zh-hant"],
+		};
 
-			this.logger.debug({ mapping }, "Using React to CLD language code mapping");
+		this.logger.debug({ mapping }, "Using React to CLD language code mapping");
 
-			const mappedReactCode = mapping[reactCode] ?? [reactCode];
+		const mappedReactCode = mapping[reactCode] ?? [reactCode];
 
-			this.logger.debug({ reactCode, mappedReactCode }, "Mapped React code to CLD codes");
+		this.logger.debug({ reactCode, mappedReactCode }, "Mapped React code to CLD codes");
 
-			return mappedReactCode;
-		} catch (error) {
-			if (error instanceof ApplicationError) throw error;
-
-			throw mapError(error, `${LanguageDetectorService.name}.${this.mapToCldCode.name}`, {
-				reactCode,
-			});
-		}
+		return mappedReactCode;
 	}
 
 	/**
@@ -427,34 +392,25 @@ export class LanguageDetectorService {
 	 * @returns Confidence score (0-1) for the target language
 	 */
 	private findLanguageScore(detectedLanguages: cld.Language[], targetLanguageCode: string): number {
-		try {
-			this.logger.debug(
-				{ detectedLanguages, targetLanguageCode },
-				"Finding language score for target language",
-			);
+		this.logger.debug(
+			{ detectedLanguages, targetLanguageCode },
+			"Finding language score for target language",
+		);
 
-			const possibleCodes = this.mapToCldCode(targetLanguageCode);
+		const possibleCodes = this.mapToCldCode(targetLanguageCode);
 
-			this.logger.debug({ possibleCodes }, "Possible CLD codes for target language");
+		this.logger.debug({ possibleCodes }, "Possible CLD codes for target language");
 
-			for (const code of possibleCodes) {
-				const lang = detectedLanguages.find((lang) => lang.code === code);
-				if (!lang) continue;
+		for (const code of possibleCodes) {
+			const lang = detectedLanguages.find((lang) => lang.code === code);
+			if (!lang) continue;
 
-				return lang.percent / 100;
-			}
-
-			this.logger.debug("Target language not found in detected languages, returning score 0");
-
-			return 0;
-		} catch (error) {
-			if (error instanceof ApplicationError) throw error;
-
-			throw mapError(error, `${LanguageDetectorService.name}.${this.findLanguageScore.name}`, {
-				detectedLanguages,
-				targetLanguageCode,
-			});
+			return lang.percent / 100;
 		}
+
+		this.logger.debug("Target language not found in detected languages, returning score 0");
+
+		return 0;
 	}
 }
 

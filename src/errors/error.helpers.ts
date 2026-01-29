@@ -90,7 +90,7 @@ export function mapError<T extends Record<string, unknown> = Record<string, unkn
 	logger.debug({ error, operation, metadata }, "Mapping error to ApplicationError");
 
 	if (error instanceof RequestError || isUncastRequestError(error)) {
-		const errorCode = getGithubErrorCode(error);
+		const errorCode = ErrorCode.OctokitRequestError;
 
 		const errorMetadata = {
 			...metadata,
@@ -98,14 +98,13 @@ export function mapError<T extends Record<string, unknown> = Record<string, unkn
 			requestId: error.response?.headers["x-github-request-id"],
 		} as GithubErrorBaseMetadata & T;
 
-		logger.error({ error, operation, errorCode, errorMetadata }, "GitHub API error");
+		logger.error({ error, operation, errorCode, errorMetadata }, "Github API error");
 
 		return new ApplicationError(error.message, errorCode, operation, errorMetadata, error.status);
 	}
 
 	if (error instanceof APIError || isUncastAPIError(error)) {
-		const isRateLimit = detectRateLimit(error.message, error.status as StatusCodes);
-		const errorCode = isRateLimit ? ErrorCode.RateLimitExceeded : ErrorCode.LLMApiError;
+		const errorCode = ErrorCode.OpenAIApiError;
 
 		const errorMetadata = {
 			...metadata,
@@ -114,10 +113,7 @@ export function mapError<T extends Record<string, unknown> = Record<string, unkn
 			originalMessage: error.message,
 		} as LLMErrorBaseMetadata & LLMApiErrorMetadata & T;
 
-		logger.error(
-			{ operation, errorCode, errorType: error.type, isRateLimit, errorMetadata },
-			"LLM API error",
-		);
+		logger.error({ operation, errorCode, errorType: error.type, errorMetadata }, "LLM API error");
 
 		return new ApplicationError(
 			error.message,
@@ -129,12 +125,6 @@ export function mapError<T extends Record<string, unknown> = Record<string, unkn
 	}
 
 	if (error instanceof Error) {
-		if (detectRateLimit(error.message)) {
-			logger.warn({ error, operation, metadata }, "Rate limit detected in error message");
-
-			return new ApplicationError(error.message, ErrorCode.RateLimitExceeded, operation, metadata);
-		}
-
 		logger.error({ error, operation, metadata }, "Unexpected error");
 
 		return new ApplicationError(error.message, ErrorCode.UnknownError, operation, metadata);
@@ -143,37 +133,6 @@ export function mapError<T extends Record<string, unknown> = Record<string, unkn
 	logger.error({ error: String(error), operation, metadata }, "Unknown non-error Exception");
 
 	return new ApplicationError(String(error), ErrorCode.UnknownError, operation, metadata);
-}
-
-/**
- * Determines the appropriate {@link ErrorCode} based on GitHub status code.
- *
- * @param error The {@link RequestError} from Octokit
- *
- * @returns The appropriate {@link ErrorCode}
- */
-function getGithubErrorCode(error: RequestError): ErrorCode {
-	switch (error.status as StatusCodes) {
-		case StatusCodes.UNAUTHORIZED:
-			return ErrorCode.GithubUnauthorized;
-		case StatusCodes.FORBIDDEN:
-			if (detectRateLimit(error.message, error.status)) {
-				return ErrorCode.RateLimitExceeded;
-			}
-
-			return ErrorCode.GithubForbidden;
-		case StatusCodes.NOT_FOUND:
-			return ErrorCode.GithubNotFound;
-		case StatusCodes.UNPROCESSABLE_ENTITY:
-			return ErrorCode.ValidationError;
-		case StatusCodes.INTERNAL_SERVER_ERROR:
-		case StatusCodes.BAD_GATEWAY:
-		case StatusCodes.SERVICE_UNAVAILABLE:
-		case StatusCodes.GATEWAY_TIMEOUT:
-			return ErrorCode.GithubServerError;
-		default:
-			return ErrorCode.GithubApiError;
-	}
 }
 
 /**

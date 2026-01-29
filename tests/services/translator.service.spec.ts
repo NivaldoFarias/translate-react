@@ -64,6 +64,56 @@ describe("TranslatorService", () => {
 		});
 	});
 
+	describe("TranslationFile", () => {
+		test("should extract title from frontmatter when title is present", () => {
+			const content = `
+			---
+			title: 'Hello'
+			---
+			# Hello
+	
+			Welcome to React!
+			`;
+			const file: TranslationFile = new TranslationFile(
+				content,
+				"file.md",
+				"test/file.md",
+				"abc123",
+			);
+			expect(file.title).toBe("Hello");
+		});
+
+		test("should extract title from frontmatter when title is present with double quotes", () => {
+			const content = `
+			---
+			title: "Hello"
+			---
+			# Hello
+			`;
+			const file: TranslationFile = new TranslationFile(
+				content,
+				"file.md",
+				"test/file.md",
+				"abc123",
+			);
+			expect(file.title).toBe("Hello");
+		});
+
+		test("should not extract title from frontmatter when title is not present", () => {
+			const content = `
+			# Hello
+			Welcome to React!
+			`;
+			const file: TranslationFile = new TranslationFile(
+				content,
+				"file.md",
+				"test/file.md",
+				"abc123",
+			);
+			expect(file.title).toBeUndefined();
+		});
+	});
+
 	describe("translateContent", () => {
 		test("should translate content successfully when valid content is provided", async () => {
 			mockChatCompletionsCreate.mockResolvedValue({
@@ -90,12 +140,12 @@ describe("TranslatorService", () => {
 				},
 			} as ChatCompletion);
 
-			const file: TranslationFile = {
-				path: "test/file.md",
-				content: "Hello world",
-				sha: "abc123",
-				filename: "file.md",
-			};
+			const file: TranslationFile = new TranslationFile(
+				"Hello world",
+				"file.md",
+				"test/file.md",
+				"abc123",
+			);
 
 			const translation = await translatorService.translateContent(file);
 
@@ -104,12 +154,7 @@ describe("TranslatorService", () => {
 		});
 
 		test("should throw error when content is empty", () => {
-			const file: TranslationFile = {
-				path: "test/empty.md",
-				content: "",
-				sha: "def456",
-				filename: "empty.md",
-			};
+			const file: TranslationFile = new TranslationFile("", "empty.md", "test/empty.md", "def456");
 
 			expect(translatorService.translateContent(file)).rejects.toThrow("File content is empty");
 		});
@@ -120,12 +165,12 @@ describe("TranslatorService", () => {
 				usage: { total_tokens: 10 },
 			} as ChatCompletion);
 
-			const file: TranslationFile = {
-				path: "test/whitespace.md",
-				content: "   \n\t  \n  ",
-				sha: "wht123",
-				filename: "whitespace.md",
-			};
+			const file: TranslationFile = new TranslationFile(
+				"   \n\t  \n  ",
+				"whitespace.md",
+				"test/whitespace.md",
+				"wht123",
+			);
 
 			expect(translatorService.translateContent(file)).rejects.toThrow(
 				"Translation produced empty content",
@@ -144,12 +189,12 @@ describe("TranslatorService", () => {
 				usage: { total_tokens: 80 },
 			} as ChatCompletion);
 
-			const file: TranslationFile = {
-				path: "test/code.md",
-				content: `# Title\n\`\`\`javascript\n// Comment\nconst example = "test";\n\`\`\`\n\nText`,
-				sha: "ghi789",
-				filename: "code.md",
-			};
+			const file: TranslationFile = new TranslationFile(
+				`# Title\n\`\`\`javascript\n// Comment\nconst example = "test";\n\`\`\`\n\nText`,
+				"code.md",
+				"test/code.md",
+				"ghi789",
+			);
 
 			const translation = await translatorService.translateContent(file);
 
@@ -162,12 +207,12 @@ describe("TranslatorService", () => {
 		test("should handle API errors gracefully", () => {
 			mockChatCompletionsCreate.mockRejectedValue(new Error("API Error"));
 
-			const file: TranslationFile = {
-				path: "test/error.md",
-				content: "Error test content",
-				sha: "mno345",
-				filename: "error.md",
-			};
+			const file: TranslationFile = new TranslationFile(
+				"Error test content",
+				"error.md",
+				"test/error.md",
+				"mno345",
+			);
 
 			expect(translatorService.translateContent(file)).rejects.toThrow("API Error");
 		});
@@ -179,12 +224,12 @@ describe("TranslatorService", () => {
 				usage: { total_tokens: 500 },
 			} as ChatCompletion);
 
-			const file: TranslationFile = {
-				path: "test/large.md",
-				content: largeContent,
-				sha: "large123",
-				filename: "large.md",
-			};
+			const file: TranslationFile = new TranslationFile(
+				largeContent,
+				"large.md",
+				"test/large.md",
+				"large123",
+			);
 
 			const translation = await translatorService.translateContent(file);
 
@@ -247,7 +292,7 @@ describe("TranslatorService", () => {
 		});
 	});
 
-	describe("Edge Cases and Error Handling", () => {
+	describe("Edge Cases", () => {
 		test("should handle malformed markdown content", async () => {
 			const malformedContent = "# Incomplete header\n```\nUnclosed code block\n## Another header";
 			mockChatCompletionsCreate.mockResolvedValue({
@@ -262,12 +307,12 @@ describe("TranslatorService", () => {
 				usage: { total_tokens: 60 },
 			} as ChatCompletion);
 
-			const file: TranslationFile = {
-				path: "test/malformed.md",
-				content: malformedContent,
-				sha: "mal123",
-				filename: "malformed.md",
-			};
+			const file: TranslationFile = new TranslationFile(
+				malformedContent,
+				"malformed.md",
+				"test/malformed.md",
+				"mal123",
+			);
 
 			const translation = await translatorService.translateContent(file);
 
@@ -284,12 +329,12 @@ describe("TranslatorService", () => {
 				usage: { total_tokens: 40 },
 			} as ChatCompletion);
 
-			const file: TranslationFile = {
-				path: "test/special.md",
-				content: contentWithEmojis,
-				sha: "spc123",
-				filename: "special.md",
-			};
+			const file: TranslationFile = new TranslationFile(
+				contentWithEmojis,
+				"special.md",
+				"test/special.md",
+				"spc123",
+			);
 
 			const translation = await translatorService.translateContent(file);
 
@@ -311,12 +356,12 @@ describe("TranslatorService", () => {
 				usage: { total_tokens: 10 },
 			} as ChatCompletion);
 
-			const file: TranslationFile = {
-				path: "test/null.md",
-				content: "Test content",
-				sha: "null123",
-				filename: "null.md",
-			};
+			const file: TranslationFile = new TranslationFile(
+				"Test content",
+				"null.md",
+				"test/null.md",
+				"null123",
+			);
 
 			expect(translatorService.translateContent(file)).rejects.toThrow();
 		});
@@ -327,12 +372,12 @@ describe("TranslatorService", () => {
 				usage: { total_tokens: 10 },
 			} as ChatCompletion);
 
-			const file: TranslationFile = {
-				path: "test/undefined.md",
-				content: "Test content",
-				sha: "undef123",
-				filename: "undefined.md",
-			};
+			const file: TranslationFile = new TranslationFile(
+				"Test content",
+				"undefined.md",
+				"test/undefined.md",
+				"undef123",
+			);
 
 			expect(translatorService.translateContent(file)).rejects.toThrow();
 		});
@@ -343,12 +388,12 @@ describe("TranslatorService", () => {
 				usage: { total_tokens: 10 },
 			} as unknown as ChatCompletion);
 
-			const file: TranslationFile = {
-				path: "test/empty-choices.md",
-				content: "Test content",
-				sha: "empty123",
-				filename: "empty-choices.md",
-			};
+			const file: TranslationFile = new TranslationFile(
+				"Test content",
+				"empty-choices.md",
+				"test/empty-choices.md",
+				"empty123",
+			);
 
 			expect(translatorService.translateContent(file)).rejects.toThrow();
 		});

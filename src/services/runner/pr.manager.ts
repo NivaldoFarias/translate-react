@@ -7,7 +7,6 @@ import type {
 } from "./runner.types";
 
 import { ApplicationError } from "@/errors/";
-import { mapError } from "@/errors/error.helpers";
 import { formatElapsedTime, logger } from "@/utils/";
 
 import { TranslationFile } from "../translator.service";
@@ -68,11 +67,7 @@ export class PRManager {
 			this.logger.info({ commentUrl: comment.html_url }, "Commented on translation issue");
 		} catch (error) {
 			if (error instanceof ApplicationError) throw error;
-
-			throw mapError(error, `${PRManager.name}.${this.updateIssue.name}`, {
-				processedResults,
-				filesToTranslate,
-			});
+			throw error;
 		}
 	}
 
@@ -142,10 +137,7 @@ export class PRManager {
 			return workflowStats;
 		} catch (error) {
 			if (error instanceof ApplicationError) throw error;
-
-			throw mapError(error, `${PRManager.name}.${this.printFinalStatistics.name}`, {
-				processedResults,
-			});
+			throw error;
 		}
 	}
 }
