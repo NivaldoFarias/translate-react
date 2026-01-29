@@ -1,3 +1,5 @@
+import { StatusCodes } from "http-status-codes";
+
 import type { PatchedRepositoryTreeItem, WorkflowStatistics } from "@/services/";
 
 import { ApplicationError, ErrorCode } from "@/errors/";
@@ -173,4 +175,51 @@ export function extractDocTitleFromContent(content: string): string | undefined 
 	const match = CATCH_CONTENT_TITLE_REGEX.exec(content);
 
 	return match?.[1];
+}
+
+/**
+ * Detects if an error message indicates a rate limit has been exceeded.
+ *
+ * @param errorMessage The error message to analyze
+ * @param statusCode Optional HTTP status code to check
+ *
+ * @returns `true` if the error indicates a rate limit has been exceeded
+ *
+ * @example
+ * ```typescript
+ * import { detectRateLimit } from "@/utils/";
+ *
+ * const error = new Error("Rate limit exceeded");
+ * const isRateLimit = detectRateLimit(error.message);
+ * console.log(isRateLimit); // true
+ *
+ * const apiError = { message: "429 Too Many Requests", status: 429 };
+ * const isRateLimit2 = detectRateLimit(apiError.message, apiError.status);
+ * console.log(isRateLimit2); // true
+ * ```
+ */
+export function detectRateLimit(errorMessage: string, statusCode?: number): boolean {
+	/** Check HTTP status code first for most reliable detection */
+	if (statusCode === StatusCodes.TOO_MANY_REQUESTS) {
+		return true;
+	}
+
+	/**
+	 * Common rate limit patterns from various providers. Includes:
+	 * - Standard phrases like "rate limit" and "too many requests"
+	 * - HTTP status code as string
+	 * - Provider-specific phrases like "free-models-per-" for OpenRouter
+	 * - General quota exceeded patterns
+	 * - "requests per" patterns indicating rate limits
+	 */
+	const rateLimitPatterns = [
+		"rate limit",
+		"429",
+		"free-models-per-",
+		"quota",
+		"too many requests",
+		"requests per",
+	];
+
+	return rateLimitPatterns.some((pattern) => errorMessage.toLowerCase().includes(pattern));
 }

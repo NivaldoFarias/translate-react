@@ -1,5 +1,4 @@
 import { RequestError } from "@octokit/request-error";
-import { StatusCodes } from "http-status-codes";
 import { APIError } from "openai/error";
 
 import { logger as baseLogger } from "@/utils/";
@@ -184,49 +183,95 @@ function isUncastAPIError(error: unknown): error is APIError {
 }
 
 /**
- * Detects if an error message indicates a rate limit has been exceeded.
+ * Handles top-level errors with structured logging.
  *
- * Centralizes all rate limit detection patterns to ensure consistent behavior
- * across different error handlers and services.
+ * Provides clean, informative error logging at the application entry point.
+ * Handles different error types appropriately:
+ * - ApplicationError: Logs with code, operation, and metadata
+ * - Library errors (RequestError, APIError): Logs with status codes and context
+ * - Generic errors: Logs with message and stack trace
  *
- * @param errorMessage The error message to analyze
- * @param statusCode Optional HTTP status code to check
- *
- * @returns `true` if the error indicates a rate limit has been exceeded
+ * @param error The error to handle
+ * @param logger Logger instance to use (defaults to base logger)
  *
  * @example
  * ```typescript
- * const error = new Error("Rate limit exceeded");
- * const isRateLimit = detectRateLimit(error.message);
- * console.log(isRateLimit); // true
- *
- * const apiError = { message: "429 Too Many Requests", status: 429 };
- * const isRateLimit2 = detectRateLimit(apiError.message, apiError.status);
- * console.log(isRateLimit2); // true
+ * try {
+ *   await runWorkflow();
+ * } catch (error) {
+ *   handleTopLevelError(error);
+ *   process.exit(1);
+ * }
  * ```
  */
-export function detectRateLimit(errorMessage: string, statusCode?: number): boolean {
-	/** Check HTTP status code first for most reliable detection */
-	if (statusCode === StatusCodes.TOO_MANY_REQUESTS) {
-		return true;
+export function handleTopLevelError(
+	error: unknown,
+	logger = baseLogger.child({ component: handleTopLevelError.name }),
+): void {
+	if (error instanceof ApplicationError) {
+		const logContext: Record<string, unknown> = {
+			errorCode: error.code,
+			operation: error.operation,
+			message: error.message,
+		};
+
+		if (error.statusCode) {
+			logContext["statusCode"] = error.statusCode;
+		}
+
+		if (error.metadata) {
+			logContext["metadata"] = error.metadata;
+		}
+
+		logger.fatal(logContext, `Workflow failed: ${error.displayMessage}`);
+		return;
 	}
 
-	/**
-	 * Common rate limit patterns from various providers. Includes:
-	 * - Standard phrases like "rate limit" and "too many requests"
-	 * - HTTP status code as string
-	 * - Provider-specific phrases like "free-models-per-" for OpenRouter
-	 * - General quota exceeded patterns
-	 * - "requests per" patterns indicating rate limits
-	 */
-	const rateLimitPatterns = [
-		"rate limit",
-		"429",
-		"free-models-per-",
-		"quota",
-		"too many requests",
-		"requests per",
-	];
+	if (error instanceof RequestError) {
+		logger.fatal(
+			{
+				errorType: ErrorCode.OctokitRequestError,
+				statusCode: error.status,
+				message: error.message,
+				requestId: error.response?.headers["x-github-request-id"],
+				url: error.request.url,
+			},
+			`GitHub API error: ${error.message}`,
+		);
+		return;
+	}
 
-	return rateLimitPatterns.some((pattern) => errorMessage.toLowerCase().includes(pattern));
+	if (error instanceof APIError) {
+		logger.fatal(
+			{
+				errorType: ErrorCode.OpenAIApiError,
+				statusCode: error.status,
+				message: error.message,
+				type: error.type,
+				requestId: error.request_id,
+			},
+			`LLM API error: ${error.message}`,
+		);
+		return;
+	}
+
+	if (error instanceof Error) {
+		logger.fatal(
+			{
+				errorType: ErrorCode.UnknownError,
+				message: error.message,
+				stack: error.stack,
+			},
+			`Unexpected error: ${error.message}`,
+		);
+		return;
+	}
+
+	logger.fatal(
+		{
+			errorType: ErrorCode.UnknownError,
+			error: String(error),
+		},
+		`Unknown error: ${String(error)}`,
+	);
 }

@@ -1,4 +1,4 @@
-import { extractErrorMessage } from "@/errors/";
+import { handleTopLevelError } from "@/errors/";
 import { logger as baseLogger, env, validateSuccessRate } from "@/utils/";
 
 import { name, version } from "../package.json";
@@ -34,8 +34,7 @@ async function main() {
 
 		process.exit(0);
 	} catch (error) {
-		logger.fatal({ error: extractErrorMessage(error) }, "Workflow failed");
-
+		handleTopLevelError(error, logger);
 		process.exit(1);
 	}
 }

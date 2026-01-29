@@ -1,4 +1,6 @@
+import { RequestError } from "@octokit/request-error";
 import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test";
+import { StatusCodes } from "http-status-codes";
 
 import type { components } from "node_modules/@octokit/plugin-paginate-rest/node_modules/@octokit/types/node_modules/@octokit/openapi-types";
 import type { RestEndpointMethodTypes } from "node_modules/@octokit/plugin-rest-endpoint-methods/dist-types/generated/parameters-and-response-types";
@@ -127,7 +129,11 @@ describe("ContentService", () => {
 	});
 
 	test("should handle file content errors when file does not exist", () => {
-		octokitMock.git.getBlob.mockRejectedValueOnce(new Error("Not Found"));
+		const notFoundError = new RequestError("Not Found", StatusCodes.NOT_FOUND, {
+			request: { method: "GET", url: "", headers: {} },
+			response: { status: StatusCodes.NOT_FOUND, url: "", headers: {}, data: {} },
+		});
+		octokitMock.git.getBlob.mockRejectedValueOnce(notFoundError);
 
 		const repoTreeItem: PatchedRepositoryTreeItem = createRepositoryTreeItemFixture({
 			path: "src/test/non-existent.md",
@@ -135,7 +141,7 @@ describe("ContentService", () => {
 			filename: "non-existent.md",
 		});
 
-		expect(contentService.getFile(repoTreeItem)).rejects.toThrow("Not Found");
+		expect(contentService.getFile(repoTreeItem)).rejects.toThrow(notFoundError);
 	});
 
 	describe("listOpenPullRequests", () => {
@@ -164,10 +170,14 @@ describe("ContentService", () => {
 			expect(prs).toHaveLength(0);
 		});
 
-		test("should throw mapped error when API call fails", () => {
-			octokitMock.pulls.list.mockRejectedValueOnce(new Error("API Error"));
+		test("should throw RequestError when API call fails", () => {
+			const apiError = new RequestError("API Error", StatusCodes.INTERNAL_SERVER_ERROR, {
+				request: { method: "GET", url: "", headers: {} },
+				response: { status: StatusCodes.INTERNAL_SERVER_ERROR, url: "", headers: {}, data: {} },
+			});
+			octokitMock.pulls.list.mockRejectedValueOnce(apiError);
 
-			expect(contentService.listOpenPullRequests()).rejects.toThrow();
+			expect(contentService.listOpenPullRequests()).rejects.toThrow(apiError);
 		});
 	});
 
@@ -185,10 +195,14 @@ describe("ContentService", () => {
 			});
 		});
 
-		test("should throw mapped error when PR does not exist", () => {
-			octokitMock.pulls.get.mockRejectedValueOnce(new Error("Not Found"));
+		test("should throw RequestError when PR does not exist", () => {
+			const notFoundError = new RequestError("Not Found", StatusCodes.NOT_FOUND, {
+				request: { method: "GET", url: "", headers: {} },
+				response: { status: StatusCodes.NOT_FOUND, url: "", headers: {}, data: {} },
+			});
+			octokitMock.pulls.get.mockRejectedValueOnce(notFoundError);
 
-			expect(contentService.findPullRequestByNumber(999)).rejects.toThrow();
+			expect(contentService.findPullRequestByNumber(999)).rejects.toThrow(notFoundError);
 		});
 	});
 
@@ -214,18 +228,24 @@ describe("ContentService", () => {
 			expect(files).toEqual([]);
 		});
 
-		test("should throw mapped error when API call fails", () => {
-			octokitMock.pulls.listFiles.mockRejectedValueOnce(new Error("API Error"));
+		test("should throw RequestError when API call fails", () => {
+			const apiError = new RequestError("API Error", StatusCodes.INTERNAL_SERVER_ERROR, {
+				request: { method: "GET", url: "", headers: {} },
+				response: { status: StatusCodes.INTERNAL_SERVER_ERROR, url: "", headers: {}, data: {} },
+			});
+			octokitMock.pulls.listFiles.mockRejectedValueOnce(apiError);
 
-			expect(contentService.getPullRequestFiles(123)).rejects.toThrow();
+			expect(contentService.getPullRequestFiles(123)).rejects.toThrow(apiError);
 		});
 	});
 
 	describe("commitTranslation", () => {
-		test("should throw mapped error when commit fails", () => {
-			octokitMock.repos.createOrUpdateFileContents.mockRejectedValueOnce(
-				new Error("Commit failed"),
-			);
+		test("should throw RequestError when commit fails", () => {
+			const commitError = new RequestError("Commit failed", StatusCodes.BAD_REQUEST, {
+				request: { method: "PUT", url: "", headers: {} },
+				response: { status: StatusCodes.BAD_REQUEST, url: "", headers: {}, data: {} },
+			});
+			octokitMock.repos.createOrUpdateFileContents.mockRejectedValueOnce(commitError);
 
 			const mockBranch = {
 				ref: "refs/heads/translate/test",
@@ -243,7 +263,7 @@ describe("ContentService", () => {
 					content: "# Translated",
 					message: "translate: test",
 				}),
-			).rejects.toThrow();
+			).rejects.toThrow(commitError);
 		});
 	});
 
@@ -264,8 +284,12 @@ describe("ContentService", () => {
 			);
 		});
 
-		test("should throw mapped error when PR creation fails", () => {
-			octokitMock.pulls.create.mockRejectedValueOnce(new Error("PR creation failed"));
+		test("should throw RequestError when PR creation fails", () => {
+			const prError = new RequestError("PR creation failed", StatusCodes.UNPROCESSABLE_ENTITY, {
+				request: { method: "POST", url: "", headers: {} },
+				response: { status: StatusCodes.UNPROCESSABLE_ENTITY, url: "", headers: {}, data: {} },
+			});
+			octokitMock.pulls.create.mockRejectedValueOnce(prError);
 
 			expect(
 				contentService.createPullRequest({
@@ -273,7 +297,7 @@ describe("ContentService", () => {
 					title: "Test PR",
 					body: "Test body",
 				}),
-			).rejects.toThrow();
+			).rejects.toThrow(prError);
 		});
 	});
 
@@ -299,10 +323,14 @@ describe("ContentService", () => {
 			expect(pr).toBeUndefined();
 		});
 
-		test("should throw mapped error when API call fails", () => {
-			octokitMock.pulls.list.mockRejectedValueOnce(new Error("API Error"));
+		test("should throw RequestError when API call fails", () => {
+			const apiError = new RequestError("API Error", StatusCodes.INTERNAL_SERVER_ERROR, {
+				request: { method: "GET", url: "", headers: {} },
+				response: { status: StatusCodes.INTERNAL_SERVER_ERROR, url: "", headers: {}, data: {} },
+			});
+			octokitMock.pulls.list.mockRejectedValueOnce(apiError);
 
-			expect(contentService.findPullRequestByBranch("translate/test")).rejects.toThrow();
+			expect(contentService.findPullRequestByBranch("translate/test")).rejects.toThrow(apiError);
 		});
 	});
 
@@ -321,10 +349,14 @@ describe("ContentService", () => {
 			});
 		});
 
-		test("should throw mapped error when comment creation fails", () => {
-			octokitMock.issues.createComment.mockRejectedValueOnce(new Error("Comment failed"));
+		test("should throw RequestError when comment creation fails", () => {
+			const commentError = new RequestError("Comment failed", StatusCodes.BAD_REQUEST, {
+				request: { method: "POST", url: "", headers: {} },
+				response: { status: StatusCodes.BAD_REQUEST, url: "", headers: {}, data: {} },
+			});
+			octokitMock.issues.createComment.mockRejectedValueOnce(commentError);
 
-			expect(contentService.createCommentOnPullRequest(42, "Test")).rejects.toThrow();
+			expect(contentService.createCommentOnPullRequest(42, "Test")).rejects.toThrow(commentError);
 		});
 	});
 
@@ -371,10 +403,14 @@ describe("ContentService", () => {
 			expect(status.mergeableState).toBe("behind");
 		});
 
-		test("should throw mapped error when API call fails", () => {
-			octokitMock.pulls.get.mockImplementation(() => Promise.reject(new Error("API Error")));
+		test("should throw RequestError when API call fails", () => {
+			const apiError = new RequestError("API Error", StatusCodes.INTERNAL_SERVER_ERROR, {
+				request: { method: "GET", url: "", headers: {} },
+				response: { status: StatusCodes.INTERNAL_SERVER_ERROR, url: "", headers: {}, data: {} },
+			});
+			octokitMock.pulls.get.mockImplementation(() => Promise.reject(apiError));
 
-			expect(contentService.checkPullRequestStatus(1)).rejects.toThrow();
+			expect(contentService.checkPullRequestStatus(1)).rejects.toThrow(apiError);
 		});
 	});
 
@@ -391,10 +427,14 @@ describe("ContentService", () => {
 			});
 		});
 
-		test("should throw mapped error when PR closure fails", () => {
-			octokitMock.pulls.update.mockRejectedValueOnce(new Error("Close failed"));
+		test("should throw RequestError when PR closure fails", () => {
+			const closeError = new RequestError("Close failed", StatusCodes.BAD_REQUEST, {
+				request: { method: "PATCH", url: "", headers: {} },
+				response: { status: StatusCodes.BAD_REQUEST, url: "", headers: {}, data: {} },
+			});
+			octokitMock.pulls.update.mockRejectedValueOnce(closeError);
 
-			expect(contentService.closePullRequest(42)).rejects.toThrow();
+			expect(contentService.closePullRequest(42)).rejects.toThrow(closeError);
 		});
 	});
 
