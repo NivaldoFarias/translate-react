@@ -316,7 +316,7 @@ describe("RepositoryService", () => {
 				recursive: "true",
 			});
 			expect(candidateFiles).toHaveLength(3);
-			expect(candidateFiles.map((f) => f.path)).toEqual([
+			expect(candidateFiles.map((file) => file.path)).toEqual([
 				"src/file1.md",
 				"src/file2.md",
 				"src/file3.md",

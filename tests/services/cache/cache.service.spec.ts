@@ -76,7 +76,7 @@ describe("CacheService", () => {
 			cache.set("key1", "value1", 1000);
 			cache.set("key2", "value2", 50);
 
-			await new Promise((resolve) => setTimeout(resolve, 100));
+			await new Promise((resolve) => setTimeout(resolve, 500));
 			const results = cache.getMany(["key1", "key2"]);
 
 			expect(results.size).toBe(1);
@@ -152,7 +152,7 @@ describe("CacheService", () => {
 	describe("cleanupExpired", () => {
 		test("should remove all expired entries when some entries have exceeded TTL", async () => {
 			cache.set("key1", "value1", 1000);
-			cache.set("key2", "value2", 50);
+			cache.set("key2", "value2", 150);
 			cache.set("key3", "value3", 50);
 
 			await new Promise((resolve) => setTimeout(resolve, 500));

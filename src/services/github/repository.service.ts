@@ -3,7 +3,6 @@ import type { RestEndpointMethodTypes } from "@octokit/rest";
 import type { BaseGitHubServiceDependencies, BaseRepositories } from "./base.service";
 
 import { octokit } from "@/clients/";
-import { ApplicationError, ErrorCode } from "@/errors/";
 import { env, logger } from "@/utils/";
 
 import { BaseGitHubService } from "./base.service";
@@ -148,12 +147,7 @@ export class RepositoryService extends BaseGitHubService {
 					`Insufficient permissions for ${repoType} repository`,
 				);
 
-				throw new ApplicationError(
-					`Insufficient permissions for ${repoType} repository`,
-					ErrorCode.InsufficientPermissions,
-					`${RepositoryService.name}.${this.verifyTokenPermissions.name}`,
-					{ repoType, reason: result.reason as string },
-				);
+				return false;
 			}
 
 			this.logger.debug(

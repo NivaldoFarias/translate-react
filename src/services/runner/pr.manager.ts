@@ -6,7 +6,6 @@ import type {
 	WorkflowStatistics,
 } from "./runner.types";
 
-import { ApplicationError } from "@/errors/";
 import { formatElapsedTime, logger } from "@/utils/";
 
 import { TranslationFile } from "../translator.service";
@@ -48,27 +47,22 @@ export class PRManager {
 		processedResults: Map<string, ProcessedFileResult>,
 		filesToTranslate: TranslationFile[],
 	): Promise<void> {
-		try {
-			this.logger.info(
-				{ processedResults: processedResults.size, filesToTranslate: filesToTranslate.length },
-				"Commenting on issue",
-			);
+		this.logger.info(
+			{ processedResults: processedResults.size, filesToTranslate: filesToTranslate.length },
+			"Commenting on issue",
+		);
 
-			const comment = await this.services.github.content.commentCompiledResultsOnIssue(
-				Array.from(processedResults.values()),
-				filesToTranslate,
-			);
+		const comment = await this.services.github.content.commentCompiledResultsOnIssue(
+			Array.from(processedResults.values()),
+			filesToTranslate,
+		);
 
-			if (!comment) {
-				this.logger.warn("No comment was created on the translation issue");
-				return;
-			}
-
-			this.logger.info({ commentUrl: comment.html_url }, "Commented on translation issue");
-		} catch (error) {
-			if (error instanceof ApplicationError) throw error;
-			throw error;
+		if (!comment) {
+			this.logger.warn("No comment was created on the translation issue");
+			return;
 		}
+
+		this.logger.info({ commentUrl: comment.html_url }, "Commented on translation issue");
 	}
 
 	/**
@@ -88,56 +82,51 @@ export class PRManager {
 	public printFinalStatistics(
 		processedResults: Map<string, ProcessedFileResult>,
 	): WorkflowStatistics {
-		try {
-			this.logger.info({ processedResults }, "Generating final workflow statistics from results");
+		this.logger.info({ processedResults }, "Generating final workflow statistics from results");
 
-			const elapsedTime = Math.ceil(Date.now() - this.workflowTimestamp);
-			const results = Array.from(processedResults.values());
+		const elapsedTime = Math.ceil(Date.now() - this.workflowTimestamp);
+		const results = Array.from(processedResults.values());
 
-			const successCount = results.filter(({ error }) => !error).length;
-			const failureCount = results.filter(({ error }) => !!error).length;
+		const successCount = results.filter(({ error }) => !error).length;
+		const failureCount = results.filter(({ error }) => !!error).length;
 
-			const failedFiles = results.filter(({ error }) => !!error) as SetNonNullable<
-				ProcessedFileResult,
-				"error"
-			>[];
+		const failedFiles = results.filter(({ error }) => !!error) as SetNonNullable<
+			ProcessedFileResult,
+			"error"
+		>[];
 
-			if (failedFiles.length > 0) {
-				this.logger.warn(
-					{
-						failures: failedFiles.map(({ filename, error }) => ({
-							filename,
-							error: error.message,
-						})),
-					},
-					`Failed files (${failedFiles.length})`,
-				);
-			}
-
-			this.logger.debug(
-				{ elapsedTime, results, successCount, failureCount, failedFiles },
-				"Computed workflow statistics",
+		if (failedFiles.length > 0) {
+			this.logger.warn(
+				{
+					failures: failedFiles.map(({ filename, error }) => ({
+						filename,
+						error: error.message,
+					})),
+				},
+				`Failed files (${failedFiles.length})`,
 			);
-
-			const totalCount = results.length;
-			const successRate = totalCount > 0 ? successCount / totalCount : 0;
-
-			const workflowStats: WorkflowStatistics = {
-				successCount,
-				failureCount,
-				totalCount,
-				successRate,
-			};
-
-			this.logger.info(
-				{ ...workflowStats, elapsedTime: formatElapsedTime(elapsedTime) },
-				"Final statistics",
-			);
-
-			return workflowStats;
-		} catch (error) {
-			if (error instanceof ApplicationError) throw error;
-			throw error;
 		}
+
+		this.logger.debug(
+			{ elapsedTime, results, successCount, failureCount, failedFiles },
+			"Computed workflow statistics",
+		);
+
+		const totalCount = results.length;
+		const successRate = totalCount > 0 ? successCount / totalCount : 0;
+
+		const workflowStats: WorkflowStatistics = {
+			successCount,
+			failureCount,
+			totalCount,
+			successRate,
+		};
+
+		this.logger.info(
+			{ ...workflowStats, elapsedTime: formatElapsedTime(elapsedTime) },
+			"Final statistics",
+		);
+
+		return workflowStats;
 	}
 }
