@@ -1,41 +1,20 @@
+import { Buffer } from "node:buffer";
+
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
-import type { BaseGitHubServiceDependencies, BaseRepositories } from "./base.service";
+import type { SharedGitHubDependencies } from "./github.types";
 
-import { octokit } from "@/clients/";
-import { env, logger } from "@/utils/";
-
-import { BaseGitHubService } from "./base.service";
-
-export type RepositoryServiceDependencies = BaseGitHubServiceDependencies;
-
-export const DEFAULT_REPOSITORIES: BaseRepositories = {
-	upstream: {
-		owner: env.REPO_UPSTREAM_OWNER,
-		repo: env.REPO_UPSTREAM_NAME,
-	},
-	fork: {
-		owner: env.REPO_FORK_OWNER,
-		repo: env.REPO_FORK_NAME,
-	},
-};
+import { logger } from "@/utils/";
 
 /**
- * Service responsible for repository operations and fork management.
+ * Repository operations module for GitHub API.
  *
- * ### Responsibilities
- *
- * - Repository tree management
- * - Fork synchronization
- * - Token permission verification
- * - Repository content filtering
+ * Handles repository tree management, fork synchronization, and token verification.
  */
-export class RepositoryService extends BaseGitHubService {
-	private readonly logger = logger.child({ component: RepositoryService.name });
+export class GitHubRepository {
+	private readonly logger = logger.child({ component: GitHubRepository.name });
 
-	public constructor(dependencies: RepositoryServiceDependencies) {
-		super(dependencies);
-	}
+	constructor(private readonly deps: SharedGitHubDependencies) {}
 
 	/**
 	 * Gets the default branch name for a repository.
@@ -46,12 +25,13 @@ export class RepositoryService extends BaseGitHubService {
 	 *
 	 * @example
 	 * ```typescript
-	 * const defaultBranch = await repoService.getDefaultBranch('fork');
+	 * const defaultBranch = await repository.getDefaultBranch('fork');
 	 * ```
 	 */
 	public async getDefaultBranch(target: "fork" | "upstream" = "fork"): Promise<string> {
-		const repoConfig = target === "fork" ? this.repositories.fork : this.repositories.upstream;
-		const response = await this.octokit.repos.get(repoConfig);
+		const repoConfig =
+			target === "fork" ? this.deps.repositories.fork : this.deps.repositories.upstream;
+		const response = await this.deps.octokit.repos.get(repoConfig);
 
 		this.logger.debug({ target, branch: response.data.default_branch }, "Retrieved default branch");
 
@@ -74,10 +54,10 @@ export class RepositoryService extends BaseGitHubService {
 	 * @example
 	 * ```typescript
 	 * // Get fork tree (default)
-	 * const forkTree = await repoService.getRepositoryTree();
+	 * const forkTree = await repository.getRepositoryTree();
 	 *
 	 * // Get upstream tree for translation processing
-	 * const candidates = await repoService.getRepositoryTree('upstream');
+	 * const candidates = await repository.getRepositoryTree('upstream');
 	 * ```
 	 */
 	public async getRepositoryTree(
@@ -87,12 +67,13 @@ export class RepositoryService extends BaseGitHubService {
 	): Promise<RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"]> {
 		this.logger.info({ target, baseBranch, filterIgnored }, "Fetching repository tree");
 
-		const repoConfig = target === "fork" ? this.repositories.fork : this.repositories.upstream;
+		const repoConfig =
+			target === "fork" ? this.deps.repositories.fork : this.deps.repositories.upstream;
 		const branchName = baseBranch ?? (await this.getDefaultBranch(target));
 
 		this.logger.debug({ repoConfig, branchName }, "Get repository tree parameters");
 
-		const response = await this.octokit.git.getTree({
+		const response = await this.deps.octokit.git.getTree({
 			...repoConfig,
 			tree_sha: branchName,
 			recursive: "true",
@@ -126,7 +107,7 @@ export class RepositoryService extends BaseGitHubService {
 	 *
 	 * @example
 	 * ```typescript
-	 * const hasPermissions = await repoService.verifyTokenPermissions();
+	 * const hasPermissions = await repository.verifyTokenPermissions();
 	 * if (!hasPermissions) console.error('Invalid token permissions');
 	 * ```
 	 */
@@ -134,8 +115,8 @@ export class RepositoryService extends BaseGitHubService {
 		this.logger.info("Verifying token permissions for fork and upstream repositories");
 
 		const results = await Promise.allSettled([
-			this.octokit.rest.repos.get(this.repositories.fork),
-			this.octokit.rest.repos.get(this.repositories.upstream),
+			this.deps.octokit.rest.repos.get(this.deps.repositories.fork),
+			this.deps.octokit.rest.repos.get(this.deps.repositories.upstream),
 		]);
 
 		for (const [index, result] of results.entries()) {
@@ -158,8 +139,8 @@ export class RepositoryService extends BaseGitHubService {
 
 		this.logger.info(
 			{
-				fork: `${this.repositories.fork.owner}/${this.repositories.fork.repo}`,
-				upstream: `${this.repositories.upstream.owner}/${this.repositories.upstream.repo}`,
+				fork: `${this.deps.repositories.fork.owner}/${this.deps.repositories.fork.repo}`,
+				upstream: `${this.deps.repositories.upstream.owner}/${this.deps.repositories.upstream.repo}`,
 			},
 			"Token permissions verified successfully",
 		);
@@ -182,7 +163,7 @@ export class RepositoryService extends BaseGitHubService {
 	 *
 	 * @example
 	 * ```typescript
-	 * const isBehind = await repoService.isBranchBehind(
+	 * const isBehind = await repository.isBranchBehind(
 	 *   'translate/docs/intro.md',
 	 *   'main'
 	 * );
@@ -197,9 +178,10 @@ export class RepositoryService extends BaseGitHubService {
 		target: "fork" | "upstream" = "fork",
 	): Promise<boolean> {
 		try {
-			const repoConfig = target === "fork" ? this.repositories.fork : this.repositories.upstream;
+			const repoConfig =
+				target === "fork" ? this.deps.repositories.fork : this.deps.repositories.upstream;
 
-			const comparison = await this.octokit.repos.compareCommits({
+			const comparison = await this.deps.octokit.repos.compareCommits({
 				...repoConfig,
 				base: headBranch,
 				head: baseBranch,
@@ -234,10 +216,10 @@ export class RepositoryService extends BaseGitHubService {
 	 * If it does not exist, an error is thrown.
 	 */
 	public async forkExists(): Promise<void> {
-		const response = await this.octokit.repos.get(this.repositories.fork);
+		const response = await this.deps.octokit.repos.get(this.deps.repositories.fork);
 
 		this.logger.info(
-			{ fork: this.repositories.fork, exists: !!response.data },
+			{ fork: this.deps.repositories.fork, exists: !!response.data },
 			"Fork repository existence checked",
 		);
 	}
@@ -247,25 +229,25 @@ export class RepositoryService extends BaseGitHubService {
 	 *
 	 * @example
 	 * ```typescript
-	 * const isSynced = await repoService.isForkSynced();
-	 * if (!isSynced) await repoService.syncFork();
+	 * const isSynced = await repository.isForkSynced();
+	 * if (!isSynced) await repository.syncFork();
 	 * ```
 	 */
 	public async isForkSynced(): Promise<boolean> {
 		try {
 			const [upstreamRepo, forkedRepo] = await Promise.all([
-				this.octokit.repos.get(this.repositories.upstream),
-				this.octokit.repos.get(this.repositories.fork),
+				this.deps.octokit.repos.get(this.deps.repositories.upstream),
+				this.deps.octokit.repos.get(this.deps.repositories.fork),
 			]);
 
 			const [upstreamCommits, forkedCommits] = await Promise.all([
-				this.octokit.repos.listCommits({
-					...this.repositories.upstream,
+				this.deps.octokit.repos.listCommits({
+					...this.deps.repositories.upstream,
 					per_page: 1,
 					sha: upstreamRepo.data.default_branch,
 				}),
-				this.octokit.repos.listCommits({
-					...this.repositories.fork,
+				this.deps.octokit.repos.listCommits({
+					...this.deps.repositories.fork,
 					per_page: 1,
 					sha: forkedRepo.data.default_branch,
 				}),
@@ -309,20 +291,20 @@ export class RepositoryService extends BaseGitHubService {
 	 *
 	 * @example
 	 * ```typescript
-	 * const synced = await repoService.syncFork();
+	 * const synced = await repository.syncFork();
 	 * if (!synced) console.error('Failed to sync fork');
 	 * ```
 	 */
 	public async syncFork(): Promise<boolean> {
 		try {
-			const mergeResponse = await this.octokit.repos.mergeUpstream({
-				...this.repositories.fork,
+			const mergeResponse = await this.deps.octokit.repos.mergeUpstream({
+				...this.deps.repositories.fork,
 				branch: "main",
 			});
 
 			this.logger.info(
 				{
-					fork: this.repositories.fork,
+					fork: this.deps.repositories.fork,
 					message: mergeResponse.data.message,
 					mergeType: mergeResponse.data.merge_type,
 				},
@@ -331,7 +313,7 @@ export class RepositoryService extends BaseGitHubService {
 
 			return true;
 		} catch (error) {
-			this.logger.error({ error, fork: this.repositories.fork }, "Failed to synchronize fork");
+			this.logger.error({ error, fork: this.deps.repositories.fork }, "Failed to synchronize fork");
 			return false;
 		}
 	}
@@ -364,7 +346,7 @@ export class RepositoryService extends BaseGitHubService {
 	 *
 	 * @example
 	 * ```typescript
-	 * const glossary = await repositoryService.fetchGlossary();
+	 * const glossary = await repository.fetchGlossary();
 	 * if (glossary) {
 	 *   // Process glossary content
 	 * } else {
@@ -374,8 +356,8 @@ export class RepositoryService extends BaseGitHubService {
 	 */
 	public async fetchGlossary(): Promise<string | null> {
 		try {
-			const response = await this.octokit.repos.getContent({
-				...this.repositories.upstream,
+			const response = await this.deps.octokit.repos.getContent({
+				...this.deps.repositories.upstream,
 				path: "GLOSSARY.md",
 			});
 
@@ -393,8 +375,3 @@ export class RepositoryService extends BaseGitHubService {
 		}
 	}
 }
-
-export const repositoryService = new RepositoryService({
-	octokit,
-	repositories: DEFAULT_REPOSITORIES,
-});

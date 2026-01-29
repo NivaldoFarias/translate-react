@@ -2,22 +2,15 @@ import { Buffer } from "node:buffer";
 
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 import type { components } from "node_modules/@octokit/plugin-paginate-rest/node_modules/@octokit/types/node_modules/@octokit/openapi-types";
-import type PQueue from "p-queue";
 
-import type {
-	PatchedRepositoryTreeItem,
-	ProcessedFileResult,
-	PullRequestStatus,
-} from "./../runner";
-import type { BaseGitHubServiceDependencies } from "./base.service";
+import type { CommentBuilderService } from "../comment-builder.service";
+import type { PatchedRepositoryTreeItem, ProcessedFileResult, PullRequestStatus } from "../runner";
 
-import { githubQueue, octokit } from "@/clients/";
+import type { SharedGitHubDependencies } from "./github.types";
+
 import { logger } from "@/utils/";
 
-import { commentBuilderService, CommentBuilderService } from "./../comment-builder.service";
-import { TranslationFile } from "./../translator.service";
-import { BaseGitHubService } from "./base.service";
-import { DEFAULT_REPOSITORIES } from "./repository.service";
+import { TranslationFile } from "../translator.service";
 
 /** Pull request options */
 export interface PullRequestOptions {
@@ -49,38 +42,18 @@ export interface CommitTranslationOptions {
 	message: string;
 }
 
-export interface ContentServiceDependencies extends BaseGitHubServiceDependencies {
-	commentBuilderService: CommentBuilderService;
-
-	/** Rate limiting queue for Github API calls */
-	queue: PQueue;
-}
-
 /**
- * Service responsible for managing repository content and translations.
+ * Content and pull request operations module for GitHub API.
  *
- * ### Responsibilities
- *
- * - File content retrieval and modification
- * - Translation content management
- * - Pull request creation and management
- * - Content filtering and validation
+ * Handles file content retrieval, translation commits, and PR management.
  */
-export class ContentService extends BaseGitHubService {
-	private readonly logger = logger.child({ component: ContentService.name });
-	private readonly services: {
-		commentBuilder: CommentBuilderService;
-	};
+export class GitHubContent {
+	private readonly logger = logger.child({ component: GitHubContent.name });
 
-	/** Rate limiting queue for Github API calls */
-	private readonly queue: PQueue;
-
-	constructor(dependencies: ContentServiceDependencies) {
-		super(dependencies);
-
-		this.services = { commentBuilder: dependencies.commentBuilderService };
-		this.queue = dependencies.queue;
-	}
+	constructor(
+		private readonly deps: SharedGitHubDependencies,
+		private readonly commentBuilder: CommentBuilderService,
+	) {}
 
 	/**
 	 * Creates a comment on a pull request.
@@ -96,8 +69,8 @@ export class ContentService extends BaseGitHubService {
 	): Promise<RestEndpointMethodTypes["issues"]["createComment"]["response"]> {
 		this.logger.info({ prNumber }, "Creating comment on pull request");
 
-		const response = await this.octokit.issues.createComment({
-			...this.repositories.upstream,
+		const response = await this.deps.octokit.issues.createComment({
+			...this.deps.repositories.upstream,
 			issue_number: prNumber,
 			body: comment,
 		});
@@ -116,46 +89,18 @@ export class ContentService extends BaseGitHubService {
 		RestEndpointMethodTypes["pulls"]["list"]["response"]["data"]
 	> {
 		this.logger.info(
-			{ repo: this.repositories.upstream, state: "open" },
+			{ repo: this.deps.repositories.upstream, state: "open" },
 			"Listing open pull requests",
 		);
 
-		const response = await this.octokit.pulls.list({
-			...this.repositories.upstream,
+		const response = await this.deps.octokit.pulls.list({
+			...this.deps.repositories.upstream,
 			state: "open",
 		});
 
 		this.logger.info({ count: response.data.length }, "Listed open pull requests");
 
 		return response.data;
-	}
-
-	/**
-	 * Retrieves a pull request by number.
-	 *
-	 * @param prNumber Pull request number
-	 *
-	 * @returns The pull request data
-	 */
-	public async findPullRequestByNumber(
-		prNumber: number,
-	): Promise<RestEndpointMethodTypes["pulls"]["get"]["response"]> {
-		this.logger.info(
-			{ repo: this.repositories.upstream, prNumber },
-			"Searching for pull request by number",
-		);
-
-		const response = await this.octokit.pulls.get({
-			...this.repositories.upstream,
-			pull_number: prNumber,
-		});
-
-		this.logger.info(
-			{ prNumber, title: response.data.title, state: response.data.state },
-			"Found pull request by number",
-		);
-
-		return response;
 	}
 
 	/**
@@ -172,19 +117,19 @@ export class ContentService extends BaseGitHubService {
 	 *
 	 * @example
 	 * ```typescript
-	 * const files = await contentService.getPullRequestFiles(123);
+	 * const files = await content.getPullRequestFiles(123);
 	 * console.log(files);
 	 * // ^? ['src/content/learn/state-management.md', 'src/content/learn/hooks.md']
 	 * ```
 	 */
 	public async getPullRequestFiles(prNumber: number): Promise<string[]> {
 		this.logger.info(
-			{ repo: this.repositories.upstream, prNumber },
+			{ repo: this.deps.repositories.upstream, prNumber },
 			"Fetching pull request changed files",
 		);
 
-		const response = await this.octokit.pulls.listFiles({
-			...this.repositories.upstream,
+		const response = await this.deps.octokit.pulls.listFiles({
+			...this.deps.repositories.upstream,
 			pull_number: prNumber,
 		});
 
@@ -218,7 +163,7 @@ export class ContentService extends BaseGitHubService {
 	 *   message: 'feat(i18n): translate homepage'
 	 * };
 	 *
-	 * await contentService.commitTranslation(options);
+	 * await content.commitTranslation(options);
 	 * ```
 	 */
 	public async commitTranslation({
@@ -234,8 +179,8 @@ export class ContentService extends BaseGitHubService {
 			"Committing translated content",
 		);
 
-		const response = await this.octokit.repos.createOrUpdateFileContents({
-			...this.repositories.fork,
+		const response = await this.deps.octokit.repos.createOrUpdateFileContents({
+			...this.deps.repositories.fork,
 			path: file.path,
 			message,
 			content: Buffer.from(content).toString("base64"),
@@ -269,7 +214,7 @@ export class ContentService extends BaseGitHubService {
 	 *   baseBranch: 'main',
 	 * };
 	 *
-	 * const pr = await contentService.createPullRequest(options);
+	 * const pr = await content.createPullRequest(options);
 	 * ```
 	 */
 	public async createPullRequest({
@@ -278,15 +223,15 @@ export class ContentService extends BaseGitHubService {
 		body,
 		baseBranch = "main",
 	}: PullRequestOptions): Promise<RestEndpointMethodTypes["pulls"]["create"]["response"]["data"]> {
-		const targetRepo = this.repositories.upstream;
-		const headRef = `${this.repositories.fork.owner}:${branch}`;
+		const targetRepo = this.deps.repositories.upstream;
+		const headRef = `${this.deps.repositories.fork.owner}:${branch}`;
 
 		this.logger.info(
 			{ targetRepo: targetRepo.owner, headRef, baseBranch, title },
 			"Creating pull request",
 		);
 
-		const createPullRequestResponse = await this.octokit.pulls.create({
+		const createPullRequestResponse = await this.deps.octokit.pulls.create({
 			...targetRepo,
 			title,
 			body,
@@ -317,8 +262,8 @@ export class ContentService extends BaseGitHubService {
 	public async getFile(file: PatchedRepositoryTreeItem): Promise<TranslationFile> {
 		this.logger.info({ filePath: file.path }, "Fetching file content");
 
-		const response = await this.octokit.git.getBlob({
-			...this.repositories.fork,
+		const response = await this.deps.octokit.git.getBlob({
+			...this.deps.repositories.fork,
 			file_sha: file.sha,
 		});
 
@@ -340,12 +285,12 @@ export class ContentService extends BaseGitHubService {
 	private async findTranslationProgressIssue(): Promise<
 		components["schemas"]["issue-search-result-item"] | undefined
 	> {
-		const queryString = `repo:${this.repositories.upstream.owner}/${this.repositories.upstream.repo} in:title "Translation Progress" is:issue is:open`;
+		const queryString = `repo:${this.deps.repositories.upstream.owner}/${this.deps.repositories.upstream.repo} in:title "Translation Progress" is:issue is:open`;
 
 		this.logger.info({ queryString }, "Searching for translation progress issue");
 
 		// eslint-disable-next-line @typescript-eslint/no-deprecated
-		const issueExistsResponse = await this.octokit.rest.search.issuesAndPullRequests({
+		const issueExistsResponse = await this.deps.octokit.rest.search.issuesAndPullRequests({
 			q: queryString,
 		});
 
@@ -430,7 +375,7 @@ export class ContentService extends BaseGitHubService {
 	 *
 	 * @example
 	 * ```typescript
-	 * const comment = await contentService.commentCompiledResultsOnIssue(results, filesToTranslate);
+	 * const comment = await content.commentCompiledResultsOnIssue(results, filesToTranslate);
 	 * ```
 	 */
 	public async commentCompiledResultsOnIssue(
@@ -462,10 +407,10 @@ export class ContentService extends BaseGitHubService {
 			"Preparing to comment on translation progress issue",
 		);
 
-		const createCommentResponse = await this.octokit.issues.createComment({
-			...this.repositories.upstream,
+		const createCommentResponse = await this.deps.octokit.issues.createComment({
+			...this.deps.repositories.upstream,
 			issue_number: translationProgressIssue.number,
-			body: this.services.commentBuilder.buildComment(results, filesToTranslate),
+			body: this.commentBuilder.buildComment(results, filesToTranslate),
 		});
 
 		this.logger.info(
@@ -491,9 +436,9 @@ export class ContentService extends BaseGitHubService {
 	): Promise<RestEndpointMethodTypes["pulls"]["list"]["response"]["data"][number] | undefined> {
 		this.logger.info({ branchName }, "Searching for pull request by branch");
 
-		const response = await this.octokit.pulls.list({
-			...this.repositories.upstream,
-			head: `${this.repositories.fork.owner}:${branchName}`,
+		const response = await this.deps.octokit.pulls.list({
+			...this.deps.repositories.upstream,
+			head: `${this.deps.repositories.fork.owner}:${branchName}`,
 		});
 
 		const pr = response.data[0];
@@ -514,13 +459,13 @@ export class ContentService extends BaseGitHubService {
 	 * (indicated by `mergeable === false` and `mergeable_state === "dirty"`). PRs that are
 	 * simply "behind" the base branch remain valid and can be updated via rebase without
 	 * requiring closure.
-	 *	 *
+	 *
 	 * @param prNumber Pull request number to check
 	 *
 	 * @returns A Promise resolving to an object containing PR status information
 	 * @example
 	 * ```typescript
-	 * const status = await contentService.checkPullRequestStatus(123);
+	 * const status = await content.checkPullRequestStatus(123);
 	 * if (status.needsUpdate) {
 	 *   console.log('PR has conflicts and needs recreating');
 	 * } else if (status.mergeableState === 'behind') {
@@ -531,8 +476,8 @@ export class ContentService extends BaseGitHubService {
 	public async checkPullRequestStatus(prNumber: number): Promise<PullRequestStatus> {
 		this.logger.info({ prNumber }, "Checking pull request status");
 
-		const prResponse = await this.octokit.pulls.get({
-			...this.repositories.upstream,
+		const prResponse = await this.deps.octokit.pulls.get({
+			...this.deps.repositories.upstream,
 			pull_number: prNumber,
 		});
 
@@ -571,8 +516,8 @@ export class ContentService extends BaseGitHubService {
 	): Promise<RestEndpointMethodTypes["pulls"]["update"]["response"]["data"]> {
 		this.logger.info({ prNumber }, "Closing pull request");
 
-		const response = await this.octokit.pulls.update({
-			...this.repositories.upstream,
+		const response = await this.deps.octokit.pulls.update({
+			...this.deps.repositories.upstream,
 			pull_number: prNumber,
 			state: "closed",
 		});
@@ -582,10 +527,3 @@ export class ContentService extends BaseGitHubService {
 		return response.data;
 	}
 }
-
-export const contentService = new ContentService({
-	octokit,
-	repositories: DEFAULT_REPOSITORIES,
-	commentBuilderService,
-	queue: githubQueue,
-});

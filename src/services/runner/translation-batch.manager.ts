@@ -285,7 +285,7 @@ export class TranslationBatchManager {
 			);
 
 			const commitStartTime = Date.now();
-			await this.services.github.content.commitTranslation({
+			await this.services.github.commitTranslation({
 				file,
 				branch: metadata.branch,
 				content: metadata.translation,
@@ -362,7 +362,7 @@ export class TranslationBatchManager {
 
 		try {
 			const branchName = metadata.branch.ref.replace("refs/heads/", "");
-			await this.services.github.branch.deleteBranch(branchName);
+			await this.services.github.deleteBranch(branchName);
 			this.logger.info(
 				{ branchName, filename: metadata.filename },
 				"Cleaned up branch after failed translation",
@@ -396,15 +396,14 @@ export class TranslationBatchManager {
 	 * @returns Branch reference data containing SHA and branch name for subsequent commit operations
 	 */
 	private async createOrGetTranslationBranch(file: TranslationFile, baseBranch?: string) {
-		const actualBaseBranch =
-			baseBranch ?? (await this.services.github.repository.getDefaultBranch("fork"));
+		const actualBaseBranch = baseBranch ?? (await this.services.github.getDefaultBranch("fork"));
 		const branchName = `translate/${file.path.split("/").slice(2).join("/")}`;
 
 		this.logger.debug(
 			{ filename: file.filename, branchName },
 			"Checking for existing translation branch",
 		);
-		const existingBranch = await this.services.github.branch.getBranch(branchName);
+		const existingBranch = await this.services.github.getBranch(branchName);
 
 		if (existingBranch) {
 			this.logger.debug(
@@ -412,12 +411,10 @@ export class TranslationBatchManager {
 				"Existing branch found, checking associated PR status",
 			);
 
-			const upstreamPR = await this.services.github.content.findPullRequestByBranch(branchName);
+			const upstreamPR = await this.services.github.findPullRequestByBranch(branchName);
 
 			if (upstreamPR) {
-				const prStatus = await this.services.github.content.checkPullRequestStatus(
-					upstreamPR.number,
-				);
+				const prStatus = await this.services.github.checkPullRequestStatus(upstreamPR.number);
 
 				if (prStatus.hasConflicts) {
 					this.logger.info(
@@ -428,13 +425,13 @@ export class TranslationBatchManager {
 						},
 						"PR has merge conflicts, closing and recreating",
 					);
-					await this.services.github.content.createCommentOnPullRequest(
+					await this.services.github.createCommentOnPullRequest(
 						upstreamPR.number,
 						"This PR has merge conflicts and is being closed. A new PR with the updated translation will be created.",
 					);
 
-					await this.services.github.content.closePullRequest(upstreamPR.number);
-					await this.services.github.branch.deleteBranch(branchName);
+					await this.services.github.closePullRequest(upstreamPR.number);
+					await this.services.github.deleteBranch(branchName);
 				} else {
 					this.logger.debug(
 						{
@@ -447,7 +444,7 @@ export class TranslationBatchManager {
 					return existingBranch.data;
 				}
 			} else {
-				const isBehind = await this.services.github.repository.isBranchBehind(
+				const isBehind = await this.services.github.isBranchBehind(
 					branchName,
 					actualBaseBranch,
 					"fork",
@@ -458,7 +455,7 @@ export class TranslationBatchManager {
 						{ filename: file.filename, branchName },
 						"Branch is behind base, deleting and recreating",
 					);
-					await this.services.github.branch.deleteBranch(branchName);
+					await this.services.github.deleteBranch(branchName);
 				} else {
 					this.logger.debug(
 						{ filename: file.filename, branchName },
@@ -470,7 +467,7 @@ export class TranslationBatchManager {
 		}
 
 		this.logger.debug({ filename: file.filename, branchName }, "Creating new translation branch");
-		const newBranch = await this.services.github.branch.createBranch(branchName, actualBaseBranch);
+		const newBranch = await this.services.github.createBranch(branchName, actualBaseBranch);
 
 		return newBranch.data;
 	}
@@ -510,10 +507,10 @@ export class TranslationBatchManager {
 
 		this.logger.info({ branchName, title: prOptions.title }, "Creating or updating pull request");
 
-		const existingPR = await this.services.github.content.findPullRequestByBranch(branchName);
+		const existingPR = await this.services.github.findPullRequestByBranch(branchName);
 
 		if (existingPR) {
-			const prStatus = await this.services.github.content.checkPullRequestStatus(existingPR.number);
+			const prStatus = await this.services.github.checkPullRequestStatus(existingPR.number);
 
 			if (prStatus.needsUpdate) {
 				this.logger.info(
@@ -521,14 +518,14 @@ export class TranslationBatchManager {
 					"Closing PR with merge conflicts and creating new one",
 				);
 
-				await this.services.github.content.createCommentOnPullRequest(
+				await this.services.github.createCommentOnPullRequest(
 					existingPR.number,
 					"This PR has merge conflicts and is being closed. A new PR with the updated translation will be created.",
 				);
 
-				await this.services.github.content.closePullRequest(existingPR.number);
+				await this.services.github.closePullRequest(existingPR.number);
 
-				return await this.services.github.content.createPullRequest({
+				return await this.services.github.createPullRequest({
 					branch: branchName,
 					...prOptions,
 				});
@@ -542,7 +539,7 @@ export class TranslationBatchManager {
 			return existingPR;
 		}
 
-		return await this.services.github.content.createPullRequest({
+		return await this.services.github.createPullRequest({
 			branch: branchName,
 			...prOptions,
 		});

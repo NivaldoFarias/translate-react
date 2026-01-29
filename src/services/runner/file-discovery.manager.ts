@@ -218,13 +218,13 @@ export class FileDiscoveryManager {
 	): Promise<PullRequestFilterResult> {
 		this.logger.info("Checking for existing open PRs with file-based filtering");
 
-		const openPRs = await this.services.github.content.listOpenPullRequests();
+		const openPRs = await this.services.github.listOpenPullRequests();
 		const invalidPRsByFile = new Map<string, { prNumber: number; status: PullRequestStatus }>();
 		const prByFile = new Map<string, number>();
 
 		for (const pr of openPRs) {
 			try {
-				const changedFiles = await this.services.github.content.getPullRequestFiles(pr.number);
+				const changedFiles = await this.services.github.getPullRequestFiles(pr.number);
 
 				for (const filePath of changedFiles) {
 					prByFile.set(filePath, pr.number);
@@ -260,7 +260,7 @@ export class FileDiscoveryManager {
 
 			if (prNumber) {
 				try {
-					const prStatus = await this.services.github.content.checkPullRequestStatus(prNumber);
+					const prStatus = await this.services.github.checkPullRequestStatus(prNumber);
 
 					if (prStatus.needsUpdate || prStatus.hasConflicts) {
 						invalidPRsByFile.set(file.path, { prNumber, status: prStatus });
@@ -370,7 +370,7 @@ export class FileDiscoveryManager {
 	): Promise<(TranslationFile | null)[]> {
 		return await Promise.all(
 			batch.map(async (file) => {
-				const translationFile = await this.services.github.content.getFile(file);
+				const translationFile = await this.services.github.getFile(file);
 
 				updateLoggerFn();
 
