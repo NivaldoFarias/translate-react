@@ -12,7 +12,6 @@ import type {
 import type { BaseGitHubServiceDependencies } from "./base.service";
 
 import { githubQueue, octokit } from "@/clients/";
-import { ApplicationError } from "@/errors/";
 import { logger } from "@/utils/";
 
 import { commentBuilderService, CommentBuilderService } from "./../comment-builder.service";
@@ -438,51 +437,46 @@ export class ContentService extends BaseGitHubService {
 		results: ProcessedFileResult[],
 		filesToTranslate: TranslationFile[],
 	): Promise<RestEndpointMethodTypes["issues"]["createComment"]["response"]["data"] | undefined> {
-		try {
-			this.logger.info(
-				{
-					resultsCount: results.length,
-					filesToTranslateCount: filesToTranslate.length,
-				},
-				"Commenting compiled translation results on issue",
-			);
+		this.logger.info(
+			{
+				resultsCount: results.length,
+				filesToTranslateCount: filesToTranslate.length,
+			},
+			"Commenting compiled translation results on issue",
+		);
 
-			if (results.length === 0 || filesToTranslate.length === 0) {
-				this.logger.warn("No results or files to translate. Skipping issue comment update");
-				return;
-			}
-
-			const translationProgressIssue = await this.findTranslationProgressIssue();
-
-			if (!translationProgressIssue) {
-				this.logger.warn("Translation progress issue not found");
-				return;
-			}
-
-			this.logger.info(
-				{ issueNumber: translationProgressIssue.number },
-				"Preparing to comment on translation progress issue",
-			);
-
-			const createCommentResponse = await this.octokit.issues.createComment({
-				...this.repositories.upstream,
-				issue_number: translationProgressIssue.number,
-				body: this.services.commentBuilder.buildComment(results, filesToTranslate),
-			});
-
-			this.logger.info(
-				{
-					issueNumber: translationProgressIssue.number,
-					commentId: createCommentResponse.data.id,
-				},
-				"Created comment on issue with compiled results",
-			);
-
-			return createCommentResponse.data;
-		} catch (error) {
-			if (error instanceof ApplicationError) throw error;
-			throw error;
+		if (results.length === 0 || filesToTranslate.length === 0) {
+			this.logger.warn("No results or files to translate. Skipping issue comment update");
+			return;
 		}
+
+		const translationProgressIssue = await this.findTranslationProgressIssue();
+
+		if (!translationProgressIssue) {
+			this.logger.warn("Translation progress issue not found");
+			return;
+		}
+
+		this.logger.info(
+			{ issueNumber: translationProgressIssue.number },
+			"Preparing to comment on translation progress issue",
+		);
+
+		const createCommentResponse = await this.octokit.issues.createComment({
+			...this.repositories.upstream,
+			issue_number: translationProgressIssue.number,
+			body: this.services.commentBuilder.buildComment(results, filesToTranslate),
+		});
+
+		this.logger.info(
+			{
+				issueNumber: translationProgressIssue.number,
+				commentId: createCommentResponse.data.id,
+			},
+			"Created comment on issue with compiled results",
+		);
+
+		return createCommentResponse.data;
 	}
 
 	/**
@@ -535,39 +529,34 @@ export class ContentService extends BaseGitHubService {
 	 * ```
 	 */
 	public async checkPullRequestStatus(prNumber: number): Promise<PullRequestStatus> {
-		try {
-			this.logger.info({ prNumber }, "Checking pull request status");
+		this.logger.info({ prNumber }, "Checking pull request status");
 
-			const prResponse = await this.octokit.pulls.get({
-				...this.repositories.upstream,
-				pull_number: prNumber,
-			});
+		const prResponse = await this.octokit.pulls.get({
+			...this.repositories.upstream,
+			pull_number: prNumber,
+		});
 
-			const pr = prResponse.data;
-			const hasConflicts = pr.mergeable === false && pr.mergeable_state === "dirty";
-			const needsUpdate = hasConflicts;
+		const pr = prResponse.data;
+		const hasConflicts = pr.mergeable === false && pr.mergeable_state === "dirty";
+		const needsUpdate = hasConflicts;
 
-			this.logger.info(
-				{
-					prNumber,
-					hasConflicts,
-					mergeable: pr.mergeable,
-					mergeableState: pr.mergeable_state,
-					needsUpdate,
-				},
-				"Checked pull request status",
-			);
-
-			return {
+		this.logger.info(
+			{
+				prNumber,
 				hasConflicts,
 				mergeable: pr.mergeable,
 				mergeableState: pr.mergeable_state,
 				needsUpdate,
-			};
-		} catch (error) {
-			if (error instanceof ApplicationError) throw error;
-			throw error;
-		}
+			},
+			"Checked pull request status",
+		);
+
+		return {
+			hasConflicts,
+			mergeable: pr.mergeable,
+			mergeableState: pr.mergeable_state,
+			needsUpdate,
+		};
 	}
 
 	/**

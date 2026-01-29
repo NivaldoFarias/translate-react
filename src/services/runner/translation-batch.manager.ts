@@ -155,39 +155,32 @@ export class TranslationBatchManager {
 
 		const results = new Map<string, ProcessedFileResult>();
 
-		try {
-			this.logger.info(
-				batchInfo,
-				`Processing batch ${batchInfo.currentBatch}/${batchInfo.totalBatches}`,
-			);
+		this.logger.info(
+			batchInfo,
+			`Processing batch ${batchInfo.currentBatch}/${batchInfo.totalBatches}`,
+		);
 
-			const fileResults = await Promise.all(
-				batch.map((file, index) => {
-					const progress = {
-						batchIndex: batchInfo.currentBatch,
-						fileIndex: index,
-						totalBatches: batchInfo.totalBatches,
-						batchSize: batchInfo.batchSize,
-					};
+		const fileResults = await Promise.all(
+			batch.map((file, index) => {
+				const progress = {
+					batchIndex: batchInfo.currentBatch,
+					fileIndex: index,
+					totalBatches: batchInfo.totalBatches,
+					batchSize: batchInfo.batchSize,
+				};
 
-					return this.processFile(file, progress);
-				}),
-			);
+				return this.processFile(file, progress);
+			}),
+		);
 
-			for (const result of fileResults) {
-				results.set(result.filename, result);
-			}
-
-			this.logger.info(
-				{ batchIndex: batchInfo.currentBatch, ...this.batchProgress },
-				"Batch processing completed",
-			);
-		} catch (error) {
-			if (error instanceof ApplicationError) throw error;
-
-			this.logger.error({ error, batchInfo }, "Error processing batch");
-			throw error;
+		for (const result of fileResults) {
+			results.set(result.filename, result);
 		}
+
+		this.logger.info(
+			{ batchIndex: batchInfo.currentBatch, ...this.batchProgress },
+			"Batch processing completed",
+		);
 
 		const successRate = Math.round((this.batchProgress.successful / batch.length) * 100);
 
@@ -375,8 +368,6 @@ export class TranslationBatchManager {
 				"Cleaned up branch after failed translation",
 			);
 		} catch (error) {
-			if (error instanceof ApplicationError) throw error;
-
 			this.logger.error(
 				{ error, filename: metadata.filename, branchRef: metadata.branch.ref },
 				"Failed to cleanup branch after translation failure - non-critical",
@@ -517,51 +508,44 @@ export class TranslationBatchManager {
 			baseBranch: "main",
 		};
 
-		try {
-			this.logger.info({ branchName, title: prOptions.title }, "Creating or updating pull request");
+		this.logger.info({ branchName, title: prOptions.title }, "Creating or updating pull request");
 
-			const existingPR = await this.services.github.content.findPullRequestByBranch(branchName);
+		const existingPR = await this.services.github.content.findPullRequestByBranch(branchName);
 
-			if (existingPR) {
-				const prStatus = await this.services.github.content.checkPullRequestStatus(
-					existingPR.number,
-				);
+		if (existingPR) {
+			const prStatus = await this.services.github.content.checkPullRequestStatus(existingPR.number);
 
-				if (prStatus.needsUpdate) {
-					this.logger.info(
-						{ prNumber: existingPR.number, mergeableState: prStatus.mergeableState },
-						"Closing PR with merge conflicts and creating new one",
-					);
-
-					await this.services.github.content.createCommentOnPullRequest(
-						existingPR.number,
-						"This PR has merge conflicts and is being closed. A new PR with the updated translation will be created.",
-					);
-
-					await this.services.github.content.closePullRequest(existingPR.number);
-
-					return await this.services.github.content.createPullRequest({
-						branch: branchName,
-						...prOptions,
-					});
-				}
-
+			if (prStatus.needsUpdate) {
 				this.logger.info(
 					{ prNumber: existingPR.number, mergeableState: prStatus.mergeableState },
-					"PR exists with no conflicts, reusing",
+					"Closing PR with merge conflicts and creating new one",
 				);
 
-				return existingPR;
+				await this.services.github.content.createCommentOnPullRequest(
+					existingPR.number,
+					"This PR has merge conflicts and is being closed. A new PR with the updated translation will be created.",
+				);
+
+				await this.services.github.content.closePullRequest(existingPR.number);
+
+				return await this.services.github.content.createPullRequest({
+					branch: branchName,
+					...prOptions,
+				});
 			}
 
-			return await this.services.github.content.createPullRequest({
-				branch: branchName,
-				...prOptions,
-			});
-		} catch (error) {
-			if (error instanceof ApplicationError) throw error;
-			throw error;
+			this.logger.info(
+				{ prNumber: existingPR.number, mergeableState: prStatus.mergeableState },
+				"PR exists with no conflicts, reusing",
+			);
+
+			return existingPR;
 		}
+
+		return await this.services.github.content.createPullRequest({
+			branch: branchName,
+			...prOptions,
+		});
 	}
 
 	/**
@@ -583,43 +567,38 @@ export class TranslationBatchManager {
 		processingResult: ProcessedFileResult,
 		languageName: string,
 	): string {
-		try {
-			this.logger.info(
-				{ file: file.path, language: languageName },
-				"Creating pull request description",
-			);
+		this.logger.info(
+			{ file: file.path, language: languageName },
+			"Creating pull request description",
+		);
 
-			const pullRequestDescriptionMetadata: PullRequestDescriptionMetadata = {
-				languageName,
-				invalidFilePR: this.invalidPRsByFile.get(file.path),
-				content: {
-					source: prettyBytes(file.content.length),
-					translation: prettyBytes(processingResult.translation?.length ?? 0),
-					compressionRatio:
-						file.content.length > 0 ?
-							((processingResult.translation?.length ?? 0) / file.content.length).toFixed(2)
-						:	"unknown",
-				},
-				timestamps: {
-					now: Date.now(),
-					workflowStart: this.workflowStartTimestamp,
-				},
-			};
-			const generatedPullRequestDescription = this.services.locale.definitions.pullRequest.body(
-				file,
-				processingResult,
-				pullRequestDescriptionMetadata,
-			);
+		const pullRequestDescriptionMetadata: PullRequestDescriptionMetadata = {
+			languageName,
+			invalidFilePR: this.invalidPRsByFile.get(file.path),
+			content: {
+				source: prettyBytes(file.content.length),
+				translation: prettyBytes(processingResult.translation?.length ?? 0),
+				compressionRatio:
+					file.content.length > 0 ?
+						((processingResult.translation?.length ?? 0) / file.content.length).toFixed(2)
+					:	"unknown",
+			},
+			timestamps: {
+				now: Date.now(),
+				workflowStart: this.workflowStartTimestamp,
+			},
+		};
+		const generatedPullRequestDescription = this.services.locale.definitions.pullRequest.body(
+			file,
+			processingResult,
+			pullRequestDescriptionMetadata,
+		);
 
-			this.logger.info(
-				pullRequestDescriptionMetadata,
-				"Pull request description created successfully",
-			);
+		this.logger.info(
+			pullRequestDescriptionMetadata,
+			"Pull request description created successfully",
+		);
 
-			return generatedPullRequestDescription;
-		} catch (error) {
-			if (error instanceof ApplicationError) throw error;
-			throw error;
-		}
+		return generatedPullRequestDescription;
 	}
 }

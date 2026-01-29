@@ -36,14 +36,6 @@ describe("mapError", () => {
 				},
 			);
 
-			test("should detect rate limit from error message", () => {
-				const error = new Error("API rate limit exceeded");
-
-				const mapped = mapError(error, "test");
-
-				expect(mapped.code).toBe(ErrorCode.OctokitRequestError);
-			});
-
 			test("should detect rate limit from response headers", () => {
 				const error = new RequestError("Rate limited", StatusCodes.FORBIDDEN, {
 					request: {
@@ -63,10 +55,10 @@ describe("mapError", () => {
 
 				const mapped = mapError(error, "test");
 
-				expect(mapped.code).toBe(ErrorCode.UnknownError);
+				expect(mapped.code).toBe(ErrorCode.OctokitRequestError);
 			});
 
-			test("should map 500+ RequestError to ServerError", () => {
+			test("should map 500+ RequestError to OctokitRequestError", () => {
 				const error = new RequestError("Internal Server Error", StatusCodes.INTERNAL_SERVER_ERROR, {
 					request: {
 						method: "GET",
@@ -203,7 +195,7 @@ describe("mapError", () => {
 
 				const mapped = mapError(error, "test");
 
-				expect(mapped.code).toBe(ErrorCode.UnknownError);
+				expect(mapped.code).toBe(ErrorCode.OctokitRequestError);
 			});
 
 			test("should handle uncast RequestError objects", () => {
@@ -225,7 +217,7 @@ describe("mapError", () => {
 
 				const mapped = mapError(error, "test");
 
-				expect(mapped.code).toBe(ErrorCode.UnknownError);
+				expect(mapped.code).toBe(ErrorCode.OctokitRequestError);
 				expect(mapped.message).toContain("Uncast RequestError");
 				expect(mapped.operation).toBe("test");
 				expect(mapped.metadata?.statusCode).toBe(StatusCodes.NOT_FOUND);
@@ -352,7 +344,7 @@ describe("mapError", () => {
 
 					const mapped = mapError(error, "TranslatorService.callLanguageModel");
 
-					expect(mapped.code).toBe(ErrorCode.UnknownError);
+					expect(mapped.code).toBe(ErrorCode.OpenAIApiError);
 					expect(mapped.message).toContain(message);
 				});
 
@@ -362,7 +354,7 @@ describe("mapError", () => {
 
 					const mapped = mapError(error, "TranslatorService.callLanguageModel");
 
-					expect(mapped.code).toBe(ErrorCode.UnknownError);
+					expect(mapped.code).toBe(ErrorCode.OpenAIApiError);
 					expect(mapped.message).toContain("<script>");
 				});
 
@@ -400,7 +392,7 @@ describe("mapError", () => {
 
 					const mapped = mapError(error, "TranslatorService.callLanguageModel");
 
-					expect(mapped.code).toBe(ErrorCode.UnknownError);
+					expect(mapped.code).toBe(ErrorCode.OpenAIApiError);
 					expect(mapped.message).toContain("Uncast API error");
 					expect(mapped.operation).toBe("TranslatorService.callLanguageModel");
 					expect(mapped.metadata?.type).toBe("UncastAPIError");

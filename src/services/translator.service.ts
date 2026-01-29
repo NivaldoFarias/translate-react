@@ -244,61 +244,56 @@ export class TranslatorService {
 	 * ```
 	 */
 	public async translateContent(file: TranslationFile): Promise<string> {
-		try {
-			this.logger.info({ file }, "Translating content for file");
+		this.logger.info({ file }, "Translating content for file");
 
-			if (!file.content.length) {
-				this.logger.error({ fileContent: file.content.length }, "File content is empty");
+		if (!file.content.length) {
+			this.logger.error({ fileContent: file.content.length }, "File content is empty");
 
-				throw new ApplicationError(
-					`File content is empty: ${file.filename}`,
-					ErrorCode.NoContent,
-					`${TranslatorService.name}.${this.translateContent.name}`,
-					{ filename: file.filename, path: file.path },
-				);
-			}
-
-			this.logger.info(
-				{
-					filename: file.filename,
-					contentLength: file.content.length,
-					estimatedTokens: this.estimateTokenCount(file.content),
-				},
-				"Starting translation workflow for file",
+			throw new ApplicationError(
+				`File content is empty: ${file.filename}`,
+				ErrorCode.NoContent,
+				`${TranslatorService.name}.${this.translateContent.name}`,
+				{ filename: file.filename, path: file.path },
 			);
-
-			const translationStartTime = Date.now();
-			let translatedContent: string;
-
-			const contentNeedsChunking = this.needsChunking(file.content);
-			if (!contentNeedsChunking) {
-				this.logger.debug({ contentNeedsChunking }, "Content does not require chunking");
-				translatedContent = await this.callLanguageModel(file.content);
-			} else {
-				this.logger.debug({ contentNeedsChunking }, "Content requires chunking");
-				translatedContent = await this.translateWithChunking(file.content);
-			}
-
-			const translationDuration = Date.now() - translationStartTime;
-
-			this.validateTranslation(file, translatedContent);
-
-			this.logger.info(
-				{
-					filename: file.filename,
-					originalLength: file.content.length,
-					translatedLength: translatedContent.length,
-					durationMs: translationDuration,
-					sizeRatio: (translatedContent.length / file.content.length).toFixed(2),
-				},
-				"Translation completed successfully",
-			);
-
-			return this.cleanupTranslatedContent(translatedContent, file.content);
-		} catch (error) {
-			if (error instanceof ApplicationError) throw error;
-			throw error;
 		}
+
+		this.logger.info(
+			{
+				filename: file.filename,
+				contentLength: file.content.length,
+				estimatedTokens: this.estimateTokenCount(file.content),
+			},
+			"Starting translation workflow for file",
+		);
+
+		const translationStartTime = Date.now();
+		let translatedContent: string;
+
+		const contentNeedsChunking = this.needsChunking(file.content);
+		if (!contentNeedsChunking) {
+			this.logger.debug({ contentNeedsChunking }, "Content does not require chunking");
+			translatedContent = await this.callLanguageModel(file.content);
+		} else {
+			this.logger.debug({ contentNeedsChunking }, "Content requires chunking");
+			translatedContent = await this.translateWithChunking(file.content);
+		}
+
+		const translationDuration = Date.now() - translationStartTime;
+
+		this.validateTranslation(file, translatedContent);
+
+		this.logger.info(
+			{
+				filename: file.filename,
+				originalLength: file.content.length,
+				translatedLength: translatedContent.length,
+				durationMs: translationDuration,
+				sizeRatio: (translatedContent.length / file.content.length).toFixed(2),
+			},
+			"Translation completed successfully",
+		);
+
+		return this.cleanupTranslatedContent(translatedContent, file.content);
 	}
 
 	/**
@@ -321,108 +316,101 @@ export class TranslatorService {
 	 * ```
 	 */
 	private validateTranslation(file: TranslationFile, translatedContent: string): void {
-		try {
-			this.logger.debug({ filename: file.filename }, "Validating translated content");
+		this.logger.debug({ filename: file.filename }, "Validating translated content");
 
-			if (!translatedContent || translatedContent.trim().length === 0) {
-				this.logger.error(
-					{ filename: file.filename, translatedContent },
-					"Translated content is empty",
-				);
-
-				throw new ApplicationError(
-					"Translation produced empty content",
-					ErrorCode.FormatValidationFailed,
-					`${TranslatorService.name}.${this.validateTranslation.name}`,
-					{
-						filename: file.filename,
-						path: file.path,
-						originalLength: file.content.length,
-						translatedLength: translatedContent.length,
-					},
-				);
-			}
-
-			const sizeRatio = translatedContent.length / file.content.length;
-			if (sizeRatio < 0.5 || sizeRatio > 2.0) {
-				this.logger.warn(
-					{
-						filename: file.filename,
-						sizeRatio: sizeRatio.toFixed(2),
-						originalLength: file.content.length,
-						translatedLength: translatedContent.length,
-					},
-					"Translation size ratio outside expected range (0.5-2.0)",
-				);
-			} else {
-				this.logger.debug(
-					{ sizeRatio: sizeRatio.toFixed(2) },
-					"Translation size ratio is within acceptable range",
-				);
-			}
-
-			const CATCH_HEADINGS_REGEX = /^#{1,6}\s/gm;
-			const originalHeadings = (file.content.match(CATCH_HEADINGS_REGEX) ?? []).length;
-			const translatedHeadings = (translatedContent.match(CATCH_HEADINGS_REGEX) ?? []).length;
-			const headingRatio = translatedHeadings / originalHeadings;
-
-			this.logger.debug(
-				{ originalHeadings, translatedHeadings, headingRatio, regex: CATCH_HEADINGS_REGEX },
-				`Heading counts for ${file.filename}`,
+		if (!translatedContent || translatedContent.trim().length === 0) {
+			this.logger.error(
+				{ filename: file.filename, translatedContent },
+				"Translated content is empty",
 			);
 
-			if (originalHeadings === 0) {
-				this.logger.warn(
-					"Original file contains no markdown headings. Skipping heading validation",
-				);
-				return;
-			}
+			throw new ApplicationError(
+				"Translation produced empty content",
+				ErrorCode.FormatValidationFailed,
+				`${TranslatorService.name}.${this.validateTranslation.name}`,
+				{
+					filename: file.filename,
+					path: file.path,
+					originalLength: file.content.length,
+					translatedLength: translatedContent.length,
+				},
+			);
+		}
 
-			this.logger.debug("Checking heading preservation in translation (headings count and ratio)");
-
-			if (translatedHeadings === 0) {
-				this.logger.error(
-					{ filename: file.filename, originalHeadings, translatedHeadings },
-					"Translation lost all markdown headings",
-				);
-
-				throw new ApplicationError(
-					"All markdown headings lost during translation",
-					ErrorCode.FormatValidationFailed,
-					`${TranslatorService.name}.${this.validateTranslation.name}`,
-					{
-						path: file.path,
-						originalHeadings,
-						translatedHeadings,
-						originalLength: file.content.length,
-						translatedLength: translatedContent.length,
-					},
-				);
-			} else if (headingRatio < 0.8 || headingRatio > 1.2) {
-				this.logger.warn(
-					{
-						filename: file.filename,
-						originalHeadings,
-						translatedHeadings,
-						headingRatio: headingRatio.toFixed(2),
-					},
-					"Significant heading count mismatch detected",
-				);
-			}
-
-			this.logger.debug(
+		const sizeRatio = translatedContent.length / file.content.length;
+		if (sizeRatio < 0.5 || sizeRatio > 2.0) {
+			this.logger.warn(
 				{
 					filename: file.filename,
 					sizeRatio: sizeRatio.toFixed(2),
+					originalLength: file.content.length,
+					translatedLength: translatedContent.length,
+				},
+				"Translation size ratio outside expected range (0.5-2.0)",
+			);
+		} else {
+			this.logger.debug(
+				{ sizeRatio: sizeRatio.toFixed(2) },
+				"Translation size ratio is within acceptable range",
+			);
+		}
+
+		const CATCH_HEADINGS_REGEX = /^#{1,6}\s/gm;
+		const originalHeadings = (file.content.match(CATCH_HEADINGS_REGEX) ?? []).length;
+		const translatedHeadings = (translatedContent.match(CATCH_HEADINGS_REGEX) ?? []).length;
+		const headingRatio = translatedHeadings / originalHeadings;
+
+		this.logger.debug(
+			{ originalHeadings, translatedHeadings, headingRatio, regex: CATCH_HEADINGS_REGEX },
+			`Heading counts for ${file.filename}`,
+		);
+
+		if (originalHeadings === 0) {
+			this.logger.warn("Original file contains no markdown headings. Skipping heading validation");
+			return;
+		}
+
+		this.logger.debug("Checking heading preservation in translation (headings count and ratio)");
+
+		if (translatedHeadings === 0) {
+			this.logger.error(
+				{ filename: file.filename, originalHeadings, translatedHeadings },
+				"Translation lost all markdown headings",
+			);
+
+			throw new ApplicationError(
+				"All markdown headings lost during translation",
+				ErrorCode.FormatValidationFailed,
+				`${TranslatorService.name}.${this.validateTranslation.name}`,
+				{
+					path: file.path,
 					originalHeadings,
 					translatedHeadings,
+					originalLength: file.content.length,
+					translatedLength: translatedContent.length,
 				},
-				"Translation validation passed",
 			);
-		} catch (error) {
-			if (error instanceof ApplicationError) throw error;
-			throw error;
+		} else if (headingRatio < 0.8 || headingRatio > 1.2) {
+			this.logger.warn(
+				{
+					filename: file.filename,
+					originalHeadings,
+					translatedHeadings,
+					headingRatio: headingRatio.toFixed(2),
+				},
+				"Significant heading count mismatch detected",
+			);
 		}
+
+		this.logger.debug(
+			{
+				filename: file.filename,
+				sizeRatio: sizeRatio.toFixed(2),
+				originalHeadings,
+				translatedHeadings,
+			},
+			"Translation validation passed",
+		);
 	}
 
 	/**
@@ -460,35 +448,30 @@ export class TranslatorService {
 	 * @returns Resolves to the detailed language analysis
 	 */
 	public async getLanguageAnalysis(file: TranslationFile) {
-		try {
-			this.logger.info({ filename: file.filename }, "Analyzing language of content");
+		this.logger.info({ filename: file.filename }, "Analyzing language of content");
 
-			if (!file.content.length) {
-				this.logger.error(
-					{ filename: file.filename, path: file.path, contentLength: file.content.length },
-					"File content is empty",
-				);
-
-				throw new ApplicationError(
-					"File content is empty",
-					ErrorCode.NoContent,
-					`${TranslatorService.name}.${this.getLanguageAnalysis.name}`,
-					{ filename: file.filename, path: file.path, contentLength: file.content.length },
-				);
-			}
-
-			const analysis = await this.services.languageDetector.analyzeLanguage(
-				file.filename,
-				file.content,
+		if (!file.content.length) {
+			this.logger.error(
+				{ filename: file.filename, path: file.path, contentLength: file.content.length },
+				"File content is empty",
 			);
 
-			this.logger.info({ analysis }, "Analyzed language of content");
-
-			return analysis;
-		} catch (error) {
-			if (error instanceof ApplicationError) throw error;
-			throw error;
+			throw new ApplicationError(
+				"File content is empty",
+				ErrorCode.NoContent,
+				`${TranslatorService.name}.${this.getLanguageAnalysis.name}`,
+				{ filename: file.filename, path: file.path, contentLength: file.content.length },
+			);
 		}
+
+		const analysis = await this.services.languageDetector.analyzeLanguage(
+			file.filename,
+			file.content,
+		);
+
+		this.logger.info({ analysis }, "Analyzed language of content");
+
+		return analysis;
 	}
 
 	/**
@@ -551,23 +534,18 @@ export class TranslatorService {
 	 * ```
 	 */
 	private needsChunking(content: string): boolean {
-		try {
-			this.logger.debug("Checking if content needs chunking based on token count");
+		this.logger.debug("Checking if content needs chunking based on token count");
 
-			const estimatedTokens = this.estimateTokenCount(content);
-			const maxInputTokens = MAX_CHUNK_TOKENS - 1000;
-			const exceedsLimit = estimatedTokens > maxInputTokens;
+		const estimatedTokens = this.estimateTokenCount(content);
+		const maxInputTokens = MAX_CHUNK_TOKENS - 1000;
+		const exceedsLimit = estimatedTokens > maxInputTokens;
 
-			this.logger.debug(
-				{ estimatedTokens, maxInputTokens, exceedsLimit },
-				"Chunking requirement check result",
-			);
+		this.logger.debug(
+			{ estimatedTokens, maxInputTokens, exceedsLimit },
+			"Chunking requirement check result",
+		);
 
-			return exceedsLimit;
-		} catch (error) {
-			if (error instanceof ApplicationError) throw error;
-			throw error;
-		}
+		return exceedsLimit;
 	}
 
 	/**
@@ -602,89 +580,84 @@ export class TranslatorService {
 		content: string,
 		maxTokens = MAX_CHUNK_TOKENS - 500,
 	): Promise<ChunkingResult> {
-		try {
-			this.logger.debug({ contentLength: content.length, maxTokens }, "Chunking content");
+		this.logger.debug({ contentLength: content.length, maxTokens }, "Chunking content");
 
-			const markdownTextSplitterOptions: Partial<MarkdownTextSplitterParams> = {
-				chunkSize: maxTokens,
-				chunkOverlap: 200,
-				lengthFunction: (text: string) => this.estimateTokenCount(text),
-			};
+		const markdownTextSplitterOptions: Partial<MarkdownTextSplitterParams> = {
+			chunkSize: maxTokens,
+			chunkOverlap: 200,
+			lengthFunction: (text: string) => this.estimateTokenCount(text),
+		};
 
-			this.logger.debug(
-				{ markdownTextSplitterOptions },
-				"Initializing MarkdownTextSplitter with options",
-			);
+		this.logger.debug(
+			{ markdownTextSplitterOptions },
+			"Initializing MarkdownTextSplitter with options",
+		);
 
-			const splitter = new MarkdownTextSplitter(markdownTextSplitterOptions);
+		const splitter = new MarkdownTextSplitter(markdownTextSplitterOptions);
 
-			this.logger.debug("Splitting content into chunks using MarkdownTextSplitter");
+		this.logger.debug("Splitting content into chunks using MarkdownTextSplitter");
 
-			const rawChunks = await splitter.splitText(content);
-			const chunks = rawChunks.filter((chunk) => chunk.trim().length > 0);
+		const rawChunks = await splitter.splitText(content);
+		const chunks = rawChunks.filter((chunk) => chunk.trim().length > 0);
 
-			this.logger.debug(
-				{ rawChunksLength: rawChunks.length, totalChunks: chunks.length },
-				"Content successfully split into chunks",
-			);
+		this.logger.debug(
+			{ rawChunksLength: rawChunks.length, totalChunks: chunks.length },
+			"Content successfully split into chunks",
+		);
 
-			const separators: string[] = [];
+		const separators: string[] = [];
 
-			/**
-			 * Detect the actual separator between each pair of chunks by finding
-			 * where each chunk appears in the original content and extracting the
-			 * whitespace between them.
-			 */
-			let searchStartIndex = 0;
+		/**
+		 * Detect the actual separator between each pair of chunks by finding
+		 * where each chunk appears in the original content and extracting the
+		 * whitespace between them.
+		 */
+		let searchStartIndex = 0;
 
-			for (let index = 0; index < chunks.length - 1; index++) {
-				const currentChunk = chunks[index];
-				const nextChunk = chunks[index + 1];
+		for (let index = 0; index < chunks.length - 1; index++) {
+			const currentChunk = chunks[index];
+			const nextChunk = chunks[index + 1];
 
-				if (currentChunk == null || nextChunk == null) {
-					throw new ApplicationError(
-						"Encountered null or undefined chunk while computing separators",
-						ErrorCode.ChunkProcessingFailed,
-						`${TranslatorService.name}.${this.chunkContent.name}`,
-						{ index, chunksLength: chunks.length },
-					);
-				}
-
-				if (!currentChunk.trim() || !nextChunk.trim()) {
-					this.logger.warn(
-						{ index, chunksLength: chunks.length },
-						"TranslatorService: encountered empty chunk while computing separators",
-					);
-					separators.push("\n\n");
-					continue;
-				}
-				const currentChunkIndex = content.indexOf(currentChunk.trim(), searchStartIndex);
-
-				if (currentChunkIndex === -1) {
-					separators.push("\n\n");
-					continue;
-				}
-
-				const currentChunkEnd = currentChunkIndex + currentChunk.trim().length;
-
-				const nextChunkIndex = content.indexOf(nextChunk.trim(), currentChunkEnd);
-
-				if (nextChunkIndex === -1) {
-					separators.push("\n\n");
-					continue;
-				}
-
-				const separator = content.substring(currentChunkEnd, nextChunkIndex);
-				separators.push(separator);
-
-				searchStartIndex = nextChunkIndex;
+			if (currentChunk == null || nextChunk == null) {
+				throw new ApplicationError(
+					"Encountered null or undefined chunk while computing separators",
+					ErrorCode.ChunkProcessingFailed,
+					`${TranslatorService.name}.${this.chunkContent.name}`,
+					{ index, chunksLength: chunks.length },
+				);
 			}
 
-			return { chunks, separators };
-		} catch (error) {
-			if (error instanceof ApplicationError) throw error;
-			throw error;
+			if (!currentChunk.trim() || !nextChunk.trim()) {
+				this.logger.warn(
+					{ index, chunksLength: chunks.length },
+					"TranslatorService: encountered empty chunk while computing separators",
+				);
+				separators.push("\n\n");
+				continue;
+			}
+			const currentChunkIndex = content.indexOf(currentChunk.trim(), searchStartIndex);
+
+			if (currentChunkIndex === -1) {
+				separators.push("\n\n");
+				continue;
+			}
+
+			const currentChunkEnd = currentChunkIndex + currentChunk.trim().length;
+
+			const nextChunkIndex = content.indexOf(nextChunk.trim(), currentChunkEnd);
+
+			if (nextChunkIndex === -1) {
+				separators.push("\n\n");
+				continue;
+			}
+
+			const separator = content.substring(currentChunkEnd, nextChunkIndex);
+			separators.push(separator);
+
+			searchStartIndex = nextChunkIndex;
 		}
+
+		return { chunks, separators };
 	}
 
 	/**
@@ -711,33 +684,28 @@ export class TranslatorService {
 	 * ```
 	 */
 	private async translateWithChunking(content: string): Promise<string> {
-		try {
-			this.logger.debug("Translating content with chunking");
+		this.logger.debug("Translating content with chunking");
 
-			const { chunks, separators } = await this.chunkContent(content);
+		const { chunks, separators } = await this.chunkContent(content);
 
-			this.logger.debug(
-				{
-					totalChunks: chunks.length,
-					originalContentLength: content.length,
-					chunkSizes: chunks.map((chunk) => chunk.length),
-				},
-				"Starting chunked translation workflow",
-			);
+		this.logger.debug(
+			{
+				totalChunks: chunks.length,
+				originalContentLength: content.length,
+				chunkSizes: chunks.map((chunk) => chunk.length),
+			},
+			"Starting chunked translation workflow",
+		);
 
-			const translatedChunks = await Promise.all(
-				chunks.map((chunk, index) => this.translateChunk(chunk, index, chunks)),
-			);
+		const translatedChunks = await Promise.all(
+			chunks.map((chunk, index) => this.translateChunk(chunk, index, chunks)),
+		);
 
-			return this.validateAndReassembleChunks(content, {
-				original: chunks,
-				translated: translatedChunks,
-				separators,
-			});
-		} catch (error) {
-			if (error instanceof ApplicationError) throw error;
-			throw error;
-		}
+		return this.validateAndReassembleChunks(content, {
+			original: chunks,
+			translated: translatedChunks,
+			separators,
+		});
 	}
 
 	/**
@@ -765,123 +733,109 @@ export class TranslatorService {
 		content: string,
 		chunks: { original: string[]; translated: string[]; separators: string[] },
 	): string {
-		try {
-			this.logger.debug(
+		this.logger.debug(
+			{
+				totalTranslatedChunks: chunks.translated.length,
+				totalOriginalChunks: chunks.original.length,
+			},
+			"Validating translated chunks before reassembly",
+		);
+
+		if (chunks.translated.length !== chunks.original.length) {
+			this.logger.error(
 				{
-					totalTranslatedChunks: chunks.translated.length,
-					totalOriginalChunks: chunks.original.length,
+					expectedChunks: chunks.original.length,
+					actualChunks: chunks.translated.length,
+					missingChunks: chunks.original.length - chunks.translated.length,
 				},
-				"Validating translated chunks before reassembly",
+				"Chunk count mismatch detected",
 			);
 
-			if (chunks.translated.length !== chunks.original.length) {
-				this.logger.error(
-					{
-						expectedChunks: chunks.original.length,
-						actualChunks: chunks.translated.length,
-						missingChunks: chunks.original.length - chunks.translated.length,
-					},
-					"Chunk count mismatch detected",
-				);
-
-				throw new ApplicationError(
-					`Chunk count mismatch. Expected ${chunks.original.length} chunks, but only ${chunks.translated.length} were translated`,
-					ErrorCode.ChunkProcessingFailed,
-					`${TranslatorService.name}.${this.translateWithChunking.name}`,
-					{
-						expectedChunks: chunks.original.length,
-						actualChunks: chunks.translated.length,
-						missingChunks: chunks.original.length - chunks.translated.length,
-						contentLength: content.length,
-						chunkSizes: chunks.original.map((chunk) => chunk.length),
-					},
-				);
-			}
-
-			this.logger.debug(
+			throw new ApplicationError(
+				`Chunk count mismatch. Expected ${chunks.original.length} chunks, but only ${chunks.translated.length} were translated`,
+				ErrorCode.ChunkProcessingFailed,
+				`${TranslatorService.name}.${this.translateWithChunking.name}`,
 				{
-					totalChunks: chunks.original.length,
-					totalTranslatedLength: chunks.translated.reduce(
-						(sum, current) => sum + current.length,
-						0,
-					),
-					averageChunkSize: Math.round(
-						chunks.translated.reduce((sum, current) => sum + current.length, 0) /
-							chunks.translated.length,
-					),
+					expectedChunks: chunks.original.length,
+					actualChunks: chunks.translated.length,
+					missingChunks: chunks.original.length - chunks.translated.length,
+					contentLength: content.length,
+					chunkSizes: chunks.original.map((chunk) => chunk.length),
 				},
-				"All chunks translated successfully. Beginning reassembly",
 			);
-
-			let reassembledContent = chunks.translated.reduce((accumulator, chunk, index) => {
-				return accumulator + chunk + (chunks.separators[index] ?? "");
-			}, "");
-
-			const originalEndsWithNewline = content.endsWith("\n");
-			const translatedEndsWithNewline = reassembledContent.endsWith("\n");
-
-			if (originalEndsWithNewline && !translatedEndsWithNewline) {
-				const TRAILING_NEWLINES_REGEX = /\n+$/;
-				const originalTrailingNewlines = TRAILING_NEWLINES_REGEX.exec(content)?.[0] ?? "";
-				reassembledContent += originalTrailingNewlines;
-
-				this.logger.debug(
-					{ addedTrailingNewlines: originalTrailingNewlines.length },
-					"Restored trailing newlines from original content",
-				);
-			}
-
-			this.logger.debug(
-				{
-					originalLength: content.length,
-					reassembledLength: reassembledContent.length,
-					compressionRatio: (reassembledContent.length / content.length).toFixed(2),
-				},
-				"Content reassembly completed",
-			);
-
-			return reassembledContent;
-		} catch (error) {
-			if (error instanceof ApplicationError) throw error;
-			throw error;
 		}
+
+		this.logger.debug(
+			{
+				totalChunks: chunks.original.length,
+				totalTranslatedLength: chunks.translated.reduce((sum, current) => sum + current.length, 0),
+				averageChunkSize: Math.round(
+					chunks.translated.reduce((sum, current) => sum + current.length, 0) /
+						chunks.translated.length,
+				),
+			},
+			"All chunks translated successfully. Beginning reassembly",
+		);
+
+		let reassembledContent = chunks.translated.reduce((accumulator, chunk, index) => {
+			return accumulator + chunk + (chunks.separators[index] ?? "");
+		}, "");
+
+		const originalEndsWithNewline = content.endsWith("\n");
+		const translatedEndsWithNewline = reassembledContent.endsWith("\n");
+
+		if (originalEndsWithNewline && !translatedEndsWithNewline) {
+			const TRAILING_NEWLINES_REGEX = /\n+$/;
+			const originalTrailingNewlines = TRAILING_NEWLINES_REGEX.exec(content)?.[0] ?? "";
+			reassembledContent += originalTrailingNewlines;
+
+			this.logger.debug(
+				{ addedTrailingNewlines: originalTrailingNewlines.length },
+				"Restored trailing newlines from original content",
+			);
+		}
+
+		this.logger.debug(
+			{
+				originalLength: content.length,
+				reassembledLength: reassembledContent.length,
+				compressionRatio: (reassembledContent.length / content.length).toFixed(2),
+			},
+			"Content reassembly completed",
+		);
+
+		return reassembledContent;
 	}
 
 	private async translateChunk(chunk: string, index: number, chunks: string[]): Promise<string> {
 		const chunkStartTime = Date.now();
 
-		try {
-			this.logger.debug(
-				{
-					chunkIndex: index,
-					chunkSize: chunk.length,
-					totalChunks: chunks.length,
-					estimatedTokens: this.estimateTokenCount(chunk),
-				},
-				"Starting translation of chunk",
-			);
+		this.logger.debug(
+			{
+				chunkIndex: index,
+				chunkSize: chunk.length,
+				totalChunks: chunks.length,
+				estimatedTokens: this.estimateTokenCount(chunk),
+			},
+			"Starting translation of chunk",
+		);
 
-			const translatedChunk = await this.callLanguageModel(chunk);
+		const translatedChunk = await this.callLanguageModel(chunk);
 
-			const chunkDuration = Date.now() - chunkStartTime;
+		const chunkDuration = Date.now() - chunkStartTime;
 
-			this.logger.info(
-				{
-					chunkIndex: index,
-					totalChunks: chunks.length,
-					translatedSize: translatedChunk.length,
-					durationMs: chunkDuration,
-					sizeRatio: (translatedChunk.length / chunk.length).toFixed(2),
-				},
-				"Chunk translated successfully",
-			);
+		this.logger.info(
+			{
+				chunkIndex: index,
+				totalChunks: chunks.length,
+				translatedSize: translatedChunk.length,
+				durationMs: chunkDuration,
+				sizeRatio: (translatedChunk.length / chunk.length).toFixed(2),
+			},
+			"Chunk translated successfully",
+		);
 
-			return translatedChunk;
-		} catch (error) {
-			this.logger.error({ error }, "Failed to translate content chunk");
-
-			throw error;
-		}
+		return translatedChunk;
 	}
 
 	/**
@@ -951,8 +905,6 @@ export class TranslatorService {
 
 						return translatedContent;
 					} catch (error) {
-						if (error instanceof ApplicationError) throw error;
-
 						if (
 							error instanceof APIError &&
 							(error.status === StatusCodes.UNAUTHORIZED ||
@@ -996,50 +948,45 @@ export class TranslatorService {
 	 * ```
 	 */
 	private cleanupTranslatedContent(translatedContent: string, originalContent: string): string {
-		try {
-			this.logger.debug(
-				{ translatedContentLength: translatedContent.length },
-				"Cleaning up translated content",
-			);
+		this.logger.debug(
+			{ translatedContentLength: translatedContent.length },
+			"Cleaning up translated content",
+		);
 
-			let cleaned = translatedContent;
+		let cleaned = translatedContent;
 
-			const prefixes = [
-				"Here is the translation:",
-				"Here's the translation:",
-				"Translation:",
-				"Translated content:",
-				"Here is the translated content:",
-				"Here's the translated content:",
-			];
+		const prefixes = [
+			"Here is the translation:",
+			"Here's the translation:",
+			"Translation:",
+			"Translated content:",
+			"Here is the translated content:",
+			"Here's the translated content:",
+		];
 
-			for (const prefix of prefixes) {
-				if (cleaned.trim().toLowerCase().startsWith(prefix.toLowerCase())) {
-					cleaned = cleaned.substring(prefix.length).trim();
-				}
+		for (const prefix of prefixes) {
+			if (cleaned.trim().toLowerCase().startsWith(prefix.toLowerCase())) {
+				cleaned = cleaned.substring(prefix.length).trim();
 			}
-
-			cleaned = cleaned.trim();
-
-			this.logger.debug(
-				{ originalContentLength: originalContent.length, cleanedContentLength: cleaned.length },
-				"Adjusting line endings to match original content",
-			);
-
-			if (originalContent.includes("\r\n")) {
-				cleaned = cleaned.replace(/\n/g, "\r\n");
-			}
-
-			this.logger.debug(
-				{ cleanedContentLength: cleaned.length },
-				"Translated content cleanup completed",
-			);
-
-			return cleaned;
-		} catch (error) {
-			if (error instanceof ApplicationError) throw error;
-			throw error;
 		}
+
+		cleaned = cleaned.trim();
+
+		this.logger.debug(
+			{ originalContentLength: originalContent.length, cleanedContentLength: cleaned.length },
+			"Adjusting line endings to match original content",
+		);
+
+		if (originalContent.includes("\r\n")) {
+			cleaned = cleaned.replace(/\n/g, "\r\n");
+		}
+
+		this.logger.debug(
+			{ cleanedContentLength: cleaned.length },
+			"Translated content cleanup completed",
+		);
+
+		return cleaned;
 	}
 
 	/**
@@ -1052,33 +999,31 @@ export class TranslatorService {
 	 * @returns Resolves to the system prompt string
 	 */
 	private async getSystemPrompt(content: string): Promise<string> {
-		try {
-			this.logger.debug("Generating system prompt for translation");
+		this.logger.debug("Generating system prompt for translation");
 
-			const detectedSourceCode =
-				await this.services.languageDetector.detectPrimaryLanguage(content);
+		const detectedSourceCode = await this.services.languageDetector.detectPrimaryLanguage(content);
 
-			const languages = {
-				target: this.services.languageDetector.getLanguageName(
-					LanguageDetectorService.languages.target,
-				),
-				source: this.services.languageDetector.getLanguageName(
-					detectedSourceCode ?? LanguageDetectorService.languages.source,
-					false,
-				),
-			};
+		const languages = {
+			target: this.services.languageDetector.getLanguageName(
+				LanguageDetectorService.languages.target,
+			),
+			source: this.services.languageDetector.getLanguageName(
+				detectedSourceCode ?? LanguageDetectorService.languages.source,
+				false,
+			),
+		};
 
-			this.logger.debug(
-				{ detectedSourceCode, languages },
-				"Determined source and target languages for prompt",
-			);
+		this.logger.debug(
+			{ detectedSourceCode, languages },
+			"Determined source and target languages for prompt",
+		);
 
-			const glossarySection =
-				this.glossary ?
-					`\n## TERMINOLOGY GLOSSARY\nApply these exact translations for the specified terms:\n${this.glossary}\n`
-				:	"";
+		const glossarySection =
+			this.glossary ?
+				`\n## TERMINOLOGY GLOSSARY\nApply these exact translations for the specified terms:\n${this.glossary}\n`
+			:	"";
 
-			const builtSystemPrompt = `# ROLE
+		const builtSystemPrompt = `# ROLE
 				You are an expert technical translator specializing in React documentation.
 	
 				# TASK
@@ -1118,13 +1063,9 @@ export class TranslatorService {
 				${glossarySection}
 			`;
 
-			this.logger.debug({ builtSystemPrompt }, "System prompt generated");
+		this.logger.debug({ builtSystemPrompt }, "System prompt generated");
 
-			return builtSystemPrompt;
-		} catch (error) {
-			if (error instanceof ApplicationError) throw error;
-			throw error;
-		}
+		return builtSystemPrompt;
 	}
 }
 

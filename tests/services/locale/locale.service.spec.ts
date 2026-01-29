@@ -45,7 +45,7 @@ describe("LocaleService", () => {
 				const service = new LocaleService("pt-br");
 				const suffix = service.definitions.comment.suffix;
 
-				expect(suffix).toContain("###### Observações");
+				expect(suffix).toContain("> [!IMPORTANT]");
 			});
 		});
 
