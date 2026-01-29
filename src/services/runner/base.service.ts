@@ -109,7 +109,7 @@ export abstract class BaseRunnerService {
 	protected async verifyPermissions(): Promise<void> {
 		this.logger.info("Verifying GitHub token permissions");
 
-		const hasPermissions = await this.services.github.repository.verifyTokenPermissions();
+		const hasPermissions = await this.services.github.verifyTokenPermissions();
 
 		if (!hasPermissions) {
 			this.logger.error("GitHub token permissions verification failed");
@@ -135,13 +135,13 @@ export abstract class BaseRunnerService {
 	protected async syncFork(): Promise<boolean> {
 		this.logger.info("Checking fork existance and its status");
 
-		await this.services.github.repository.forkExists();
-		const isForkSynced = await this.services.github.repository.isForkSynced();
+		await this.services.github.forkExists();
+		const isForkSynced = await this.services.github.isForkSynced();
 
 		if (!isForkSynced) {
 			this.logger.info("Fork is out of sync, updating fork");
 
-			const syncSuccess = await this.services.github.repository.syncFork();
+			const syncSuccess = await this.services.github.syncFork();
 			if (!syncSuccess) {
 				this.logger.error({ isForkSynced, syncSuccess }, "Fork synchronization failed");
 
@@ -169,7 +169,7 @@ export abstract class BaseRunnerService {
 	protected async fetchRepositoryTree(): Promise<void> {
 		this.logger.info("Fetching repository content");
 
-		const repositoryTree = await this.services.github.repository.getRepositoryTree("upstream");
+		const repositoryTree = await this.services.github.getRepositoryTree("upstream");
 		this.logger.info({ itemCount: repositoryTree.length }, "Repository tree fetched from upstream");
 
 		this.state.repositoryTree = this.patchRepositoryItem(repositoryTree);
@@ -192,7 +192,7 @@ export abstract class BaseRunnerService {
 	private async fetchGlossary(): Promise<string> {
 		this.logger.debug("Fetching glossary from repository");
 
-		const glossary = await this.services.github.repository.fetchGlossary();
+		const glossary = await this.services.github.fetchGlossary();
 
 		if (!glossary) {
 			throw new ApplicationError(

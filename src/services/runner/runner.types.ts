@@ -2,7 +2,7 @@ import type { RestEndpointMethodTypes } from "@octokit/rest";
 import type { SetRequired } from "type-fest";
 
 import type { LanguageCacheService } from "../cache";
-import type { BranchService, ContentService, RepositoryService } from "../github";
+import type { GitHubService } from "../github";
 import type { LanguageDetectorService } from "../language-detector.service";
 import type { LocaleService } from "../locale";
 import type { TranslationFile, TranslatorService } from "../translator.service";
@@ -164,22 +164,10 @@ export interface WorkflowStatistics {
 	successRate: number;
 }
 
-/** Dependency injection interface for GitHub services */
-export interface GitHubServices {
-	/** Branch management service */
-	branch: BranchService;
-
-	/** Repository operations service */
-	repository: RepositoryService;
-
-	/** Content and PR management service */
-	content: ContentService;
-}
-
 /** Dependency injection interface for RunnerService */
 export interface RunnerServiceDependencies {
 	/** GitHub API services */
-	github: GitHubServices;
+	github: GitHubService;
 
 	/** Translation service for LLM operations */
 	translator: TranslatorService;

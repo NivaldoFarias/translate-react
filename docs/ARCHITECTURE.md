@@ -646,17 +646,17 @@ The project uses **constructor-based dependency injection** via `ServiceFactory`
 - **Singletons**: `getOctokit()`, `getOpenAI()`,
 - **Service factories**: `createBranchService()`, `createContentService()`, `createRepositoryService()`, `createTranslatorService()`, `createRunnerService()`
 
-Each service declares dependencies via typed interfaces (e.g., `BranchServiceDependencies`, `TranslatorServiceDependencies`). See [src/services/](../src/services/) for interface definitions.
+Each service declares dependencies via typed interfaces (e.g., `RunnerServiceDependencies`, `TranslatorServiceDependencies`). See [src/services/](../src/services/) for interface definitions.
 
 ### Testing with DI
 
 Tests inject mocks directly via constructor instead of using `mock.module()`:
 
 ```typescript
-const service = new BranchService({
-	octokit: createMockOctokit(),
-	repositories: testRepositories,
-	contentService: createMockContentService(),
+const service = new RunnerService({
+	github: createMockGitHubService(),
+	translator: createMockTranslatorService(),
+	// ...other mocks
 });
 ```
 

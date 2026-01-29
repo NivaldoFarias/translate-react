@@ -52,7 +52,7 @@ export class PRManager {
 			"Commenting on issue",
 		);
 
-		const comment = await this.services.github.content.commentCompiledResultsOnIssue(
+		const comment = await this.services.github.commentCompiledResultsOnIssue(
 			Array.from(processedResults.values()),
 			filesToTranslate,
 		);

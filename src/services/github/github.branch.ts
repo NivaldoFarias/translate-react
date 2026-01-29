@@ -1,72 +1,65 @@
 import { RequestError } from "@octokit/request-error";
-import { RestEndpointMethodTypes } from "@octokit/rest";
 
-import type { BaseGitHubServiceDependencies } from "./base.service";
+import type { RestEndpointMethodTypes } from "@octokit/rest";
 
-import { env, logger, setupSignalHandlers } from "@/utils/";
+import type { SharedGitHubDependencies } from "./github.types";
 
-import { octokit } from "../../clients/octokit.client";
-
-import { BaseGitHubService } from "./base.service";
-import { contentService, ContentService } from "./content.service";
-import { DEFAULT_REPOSITORIES } from "./repository.service";
-
-export interface BranchServiceDependencies extends BaseGitHubServiceDependencies {
-	contentService: ContentService;
-}
+import { logger, setupSignalHandlers } from "@/utils/";
 
 /**
- * Service responsible for Git branch operations and lifecycle management.
- * Handles branch creation, deletion, and cleanup tasks.
+ * Branch operations module for GitHub API.
  *
- * ### Responsibilities
- *
- * - Branch creation and deletion
- * - Branch state tracking
- * - Automatic cleanup on process termination
- * - Error handling and recovery
+ * Handles branch creation, deletion, and lifecycle management with cleanup support.
  */
-export class BranchService extends BaseGitHubService {
-	private readonly logger = logger.child({ component: BranchService.name });
-	private readonly services: {
-		content: ContentService;
-	};
+export class GitHubBranch {
+	private readonly logger = logger.child({ component: GitHubBranch.name });
 
 	/** Set of branch names currently being tracked for cleanup */
 	public activeBranches = new Set<string>();
 
 	/**
-	 * Creates a new branch service instance.
-	 *
-	 * Initializes the GitHub client and sets up cleanup handlers.
+	 * Callback for cleanup operations that need access to content methods.
+	 * Set by the unified service to enable cleanup functionality.
 	 */
-	constructor(dependencies: BranchServiceDependencies) {
-		super(dependencies);
+	private cleanupContentAccess?: {
+		findPullRequestByBranch: (branchName: string) => Promise<unknown>;
+		checkPullRequestStatus: (prNumber: number) => Promise<{ needsUpdate: boolean }>;
+	};
 
-		this.services = { content: dependencies.contentService };
-
+	constructor(private readonly deps: SharedGitHubDependencies) {
 		setupSignalHandlers(async () => {
 			await this.cleanup();
 		});
 	}
 
 	/**
+	 * Sets the cleanup content access callback.
+	 *
+	 * Called by the unified service to enable cleanup functionality.
+	 *
+	 * @param access The callback for cleanup operations that need access to content methods
+	 * @param access.findPullRequestByBranch The callback to find a pull request by branch name
+	 * @param access.checkPullRequestStatus The callback to check the status of a pull request
+	 */
+	public setCleanupContentAccess(access: {
+		findPullRequestByBranch: (branchName: string) => Promise<unknown>;
+		checkPullRequestStatus: (prNumber: number) => Promise<{ needsUpdate: boolean }>;
+	}): void {
+		this.cleanupContentAccess = access;
+	}
+
+	/**
 	 * Gets the default branch name for the fork repository.
 	 *
 	 * @returns The default branch name
-	 *
-	 * @example
-	 * ```typescript
-	 * const defaultBranch = await branchService.getDefaultBranch();
-	 * ```
 	 */
 	private async getDefaultBranch(): Promise<string> {
 		this.logger.info(
-			{ fork: this.repositories.fork },
+			{ fork: this.deps.repositories.fork },
 			"Retrieving default branch for fork repository",
 		);
 
-		const response = await this.octokit.repos.get(this.repositories.fork);
+		const response = await this.deps.octokit.repos.get(this.deps.repositories.fork);
 
 		this.logger.debug({ branch: response.data.default_branch }, "Retrieved default branch");
 
@@ -83,7 +76,7 @@ export class BranchService extends BaseGitHubService {
 	 *
 	 * @example
 	 * ```typescript
-	 * const branch = await branchService.createBranch('feature/new-branch');
+	 * const branch = await branch.createBranch('feature/new-branch');
 	 * ```
 	 */
 	public async createBranch(
@@ -96,8 +89,8 @@ export class BranchService extends BaseGitHubService {
 			const actualBaseBranch = baseBranch ?? (await this.getDefaultBranch());
 			this.logger.debug({ actualBaseBranch }, "Using base branch for new branch creation");
 
-			const mainBranchRef = await this.octokit.git.getRef({
-				...this.repositories.fork,
+			const mainBranchRef = await this.deps.octokit.git.getRef({
+				...this.deps.repositories.fork,
 				ref: `heads/${actualBaseBranch}`,
 			});
 			this.logger.debug(
@@ -105,8 +98,8 @@ export class BranchService extends BaseGitHubService {
 				"Retrieved base branch reference",
 			);
 
-			const branchRef = await this.octokit.git.createRef({
-				...this.repositories.fork,
+			const branchRef = await this.deps.octokit.git.createRef({
+				...this.deps.repositories.fork,
 				ref: `refs/heads/${branchName}`,
 				sha: mainBranchRef.data.object.sha,
 			});
@@ -132,7 +125,7 @@ export class BranchService extends BaseGitHubService {
 	 *
 	 * @example
 	 * ```typescript
-	 * const branch = await branchService.getBranch('main');
+	 * const branch = await branch.getBranch('main');
 	 * if (branch) console.log('Branch exists');
 	 * ```
 	 */
@@ -142,8 +135,8 @@ export class BranchService extends BaseGitHubService {
 		try {
 			this.logger.info({ branchName }, "Retrieving branch information");
 
-			const response = await this.octokit.git.getRef({
-				...this.repositories.fork,
+			const response = await this.deps.octokit.git.getRef({
+				...this.deps.repositories.fork,
 				ref: `heads/${branchName}`,
 			});
 
@@ -168,7 +161,7 @@ export class BranchService extends BaseGitHubService {
 	 *
 	 * @example
 	 * ```typescript
-	 * await branchService.deleteBranch('feature/old-branch');
+	 * await branch.deleteBranch('feature/old-branch');
 	 * ```
 	 */
 	public async deleteBranch(
@@ -176,8 +169,8 @@ export class BranchService extends BaseGitHubService {
 	): Promise<RestEndpointMethodTypes["git"]["deleteRef"]["response"]> {
 		this.logger.info({ branchName }, "Deleting branch");
 
-		const response = await this.octokit.git.deleteRef({
-			...this.repositories.fork,
+		const response = await this.deps.octokit.git.deleteRef({
+			...this.deps.repositories.fork,
 			ref: `heads/${branchName}`,
 		});
 
@@ -216,11 +209,18 @@ export class BranchService extends BaseGitHubService {
 	 * ```
 	 */
 	protected async cleanup(): Promise<void> {
+		if (!this.cleanupContentAccess) {
+			this.logger.warn("Cleanup content access not set, skipping cleanup");
+			return;
+		}
+
 		const branchesToCheck = Array.from(this.activeBranches);
 
 		for (const branch of branchesToCheck) {
 			try {
-				const pr = await this.services.content.findPullRequestByBranch(branch);
+				const pr = (await this.cleanupContentAccess.findPullRequestByBranch(branch)) as
+					| { number: number }
+					| undefined;
 
 				if (!pr) {
 					this.logger.info({ branch }, "Cleanup: Deleting branch without PR");
@@ -228,11 +228,11 @@ export class BranchService extends BaseGitHubService {
 					continue;
 				}
 
-				const prStatus = await this.services.content.checkPullRequestStatus(pr.number);
+				const prStatus = await this.cleanupContentAccess.checkPullRequestStatus(pr.number);
 
 				if (prStatus.needsUpdate) {
 					this.logger.info(
-						{ branch, prNumber: pr.number, mergeableState: prStatus.mergeableState },
+						{ branch, prNumber: pr.number, mergeableState: prStatus.needsUpdate },
 						"Cleanup: Deleting branch with conflicted PR",
 					);
 
@@ -241,7 +241,7 @@ export class BranchService extends BaseGitHubService {
 				}
 
 				this.logger.info(
-					{ branch, prNumber: pr.number, mergeableState: prStatus.mergeableState },
+					{ branch, prNumber: pr.number },
 					"Cleanup: Preserving branch with valid PR",
 				);
 			} catch (error) {
@@ -249,54 +249,4 @@ export class BranchService extends BaseGitHubService {
 			}
 		}
 	}
-
-	/**
-	 * Verifies if commits exist on the fork from the current user.
-	 *
-	 * Used to determine if translation work has already been done.
-	 *
-	 * @param branchName Branch to check for commits
-	 *
-	 * @example
-	 * ```typescript
-	 * const hasCommits = await branchService.checkIfCommitExistsOnFork('feature/translation');
-	 * if (hasCommits) console.log('Translation work already exists on fork');
-	 * ```
-	 */
-	public async checkIfCommitExistsOnFork(branchName: string): Promise<boolean> {
-		this.logger.info({ branchName }, "Checking for commits on fork by current user");
-
-		const forkRef = await this.getBranch(branchName);
-
-		if (!forkRef) {
-			this.logger.info({ branchName }, "Branch not found, no commits exist");
-			return false;
-		}
-
-		const listCommitsResponse = await this.octokit.repos.listCommits({
-			...this.repositories.fork,
-			sha: forkRef.data.object.sha,
-		});
-		this.logger.debug(
-			{ branchName, commitCount: listCommitsResponse.data.length },
-			"Retrieved commits from fork branch",
-		);
-
-		const hasCommits = listCommitsResponse.data.some(
-			(commit) => commit.author?.login === env.REPO_FORK_OWNER,
-		);
-
-		this.logger.info(
-			{ branchName, hasCommits, commitCount: listCommitsResponse.data.length },
-			"Checked for fork commits",
-		);
-
-		return hasCommits;
-	}
 }
-
-export const branchService = new BranchService({
-	octokit: octokit,
-	repositories: DEFAULT_REPOSITORIES,
-	contentService: contentService,
-});
