@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, spyOn, test } from "bun:test";
+import { StatusCodes } from "http-status-codes";
+import { APIError } from "openai/error";
 
 import type { ChatCompletion } from "openai/resources";
 
@@ -205,7 +207,13 @@ describe("TranslatorService", () => {
 		});
 
 		test("should handle API errors gracefully", () => {
-			mockChatCompletionsCreate.mockRejectedValue(new Error("API Error"));
+			const apiError = new APIError(
+				StatusCodes.INTERNAL_SERVER_ERROR,
+				{ message: "API Error" },
+				"API Error",
+				{},
+			);
+			mockChatCompletionsCreate.mockRejectedValue(apiError);
 
 			const file: TranslationFile = new TranslationFile(
 				"Error test content",
@@ -214,7 +222,7 @@ describe("TranslatorService", () => {
 				"mno345",
 			);
 
-			expect(translatorService.translateContent(file)).rejects.toThrow("API Error");
+			expect(translatorService.translateContent(file)).rejects.toThrow(apiError);
 		});
 
 		test("should handle large content with chunking", async () => {

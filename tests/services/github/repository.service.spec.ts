@@ -1,3 +1,4 @@
+import { RequestError } from "@octokit/request-error";
 import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test";
 import { StatusCodes } from "http-status-codes";
 
@@ -86,12 +87,14 @@ describe("RepositoryService", () => {
 			expect(branch).toBe("main");
 		});
 
-		test("should throw mapped error when API call fails", () => {
-			reposMocks.get.mockRejectedValueOnce(
-				Object.assign(new Error("Not Found"), { status: StatusCodes.NOT_FOUND }),
-			);
+		test("should throw RequestError when API call fails", () => {
+			const notFoundError = new RequestError("Not Found", StatusCodes.NOT_FOUND, {
+				request: { method: "GET", url: "", headers: {} },
+				response: { status: StatusCodes.NOT_FOUND, url: "", headers: {}, data: {} },
+			});
+			reposMocks.get.mockRejectedValueOnce(notFoundError);
 
-			expect(repositoryService.getDefaultBranch("fork")).rejects.toThrow();
+			expect(repositoryService.getDefaultBranch("fork")).rejects.toThrow(notFoundError);
 		});
 	});
 
@@ -288,12 +291,14 @@ describe("RepositoryService", () => {
 			expect(tree).toHaveLength(2);
 		});
 
-		test("should throw mapped error when API call fails", () => {
-			gitMocks.getTree.mockRejectedValueOnce(
-				Object.assign(new Error("Forbidden"), { status: StatusCodes.FORBIDDEN }),
-			);
+		test("should throw RequestError when API call fails", () => {
+			const forbiddenError = new RequestError("Forbidden", StatusCodes.FORBIDDEN, {
+				request: { method: "GET", url: "", headers: {} },
+				response: { status: StatusCodes.FORBIDDEN, url: "", headers: {}, data: {} },
+			});
+			gitMocks.getTree.mockRejectedValueOnce(forbiddenError);
 
-			expect(repositoryService.getRepositoryTree("fork", "main")).rejects.toThrow();
+			expect(repositoryService.getRepositoryTree("fork", "main")).rejects.toThrow(forbiddenError);
 		});
 
 		test("should return all upstream files for translation processing", async () => {
@@ -366,11 +371,13 @@ describe("RepositoryService", () => {
 		});
 
 		test("should throw mapped error when fork does not exist", () => {
-			reposMocks.get.mockRejectedValueOnce(
-				Object.assign(new Error("Not Found"), { status: StatusCodes.NOT_FOUND }),
-			);
+			const notFoundError = new RequestError("Not Found", StatusCodes.NOT_FOUND, {
+				request: { method: "GET", url: "", headers: {} },
+				response: { status: StatusCodes.NOT_FOUND, url: "", headers: {}, data: {} },
+			});
+			reposMocks.get.mockRejectedValueOnce(notFoundError);
 
-			expect(repositoryService.forkExists()).rejects.toThrow();
+			expect(repositoryService.forkExists()).rejects.toThrow(notFoundError);
 		});
 	});
 

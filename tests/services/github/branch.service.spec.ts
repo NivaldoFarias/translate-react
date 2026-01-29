@@ -202,12 +202,13 @@ describe("BranchService", () => {
 		});
 
 		test("should re-throw non-404 errors", () => {
-			const forbiddenError = Object.assign(new Error("Forbidden"), {
-				status: StatusCodes.FORBIDDEN,
+			const forbiddenError = new RequestError("Forbidden", StatusCodes.FORBIDDEN, {
+				request: { method: "GET", url: "", headers: {} },
+				response: { status: StatusCodes.FORBIDDEN, url: "", headers: {}, data: {} },
 			});
 			gitMocks.getRef.mockImplementation(() => Promise.reject(forbiddenError));
 
-			expect(branchService.getBranch("protected")).rejects.toThrow("Forbidden");
+			expect(branchService.getBranch("protected")).rejects.toThrow(forbiddenError);
 		});
 	});
 
@@ -325,10 +326,14 @@ describe("BranchService", () => {
 			expect(result).toBe(false);
 		});
 
-		test("should throw mapped error when listCommits fails", () => {
-			reposMocks.listCommits.mockRejectedValue(new Error("API Error"));
+		test("should throw RequestError when listCommits fails", () => {
+			const apiError = new RequestError("API Error", StatusCodes.INTERNAL_SERVER_ERROR, {
+				request: { method: "GET", url: "", headers: {} },
+				response: { status: StatusCodes.INTERNAL_SERVER_ERROR, url: "", headers: {}, data: {} },
+			});
+			reposMocks.listCommits.mockRejectedValue(apiError);
 
-			expect(branchService.checkIfCommitExistsOnFork("feature/test")).rejects.toThrow("API Error");
+			expect(branchService.checkIfCommitExistsOnFork("feature/test")).rejects.toThrow(apiError);
 		});
 	});
 
@@ -393,9 +398,16 @@ describe("BranchService", () => {
 
 	describe("Error Handling", () => {
 		test("should handle rate limiting errors", () => {
-			gitMocks.createRef.mockRejectedValueOnce(
-				Object.assign(new Error("API rate limit exceeded"), { status: StatusCodes.FORBIDDEN }),
-			);
+			const rateLimitError = new RequestError("API rate limit exceeded", StatusCodes.FORBIDDEN, {
+				request: { method: "POST", url: "", headers: {} },
+				response: {
+					status: StatusCodes.FORBIDDEN,
+					url: "",
+					headers: { "x-ratelimit-remaining": "0" },
+					data: {},
+				},
+			});
+			gitMocks.createRef.mockRejectedValueOnce(rateLimitError);
 
 			expect(branchService.createBranch("feature/test")).rejects.toThrow("API rate limit exceeded");
 		});
@@ -473,7 +485,11 @@ describe("BranchService", () => {
 
 		test("should handle errors gracefully during cleanup", async () => {
 			await branchService.createBranch("translate/error-branch");
-			contentService.findPullRequestByBranch.mockRejectedValue(new Error("API Error"));
+			const apiError = new RequestError("API Error", StatusCodes.INTERNAL_SERVER_ERROR, {
+				request: { method: "GET", url: "", headers: {} },
+				response: { status: StatusCodes.INTERNAL_SERVER_ERROR, url: "", headers: {}, data: {} },
+			});
+			contentService.findPullRequestByBranch.mockRejectedValue(apiError);
 
 			await branchService.testCleanup();
 

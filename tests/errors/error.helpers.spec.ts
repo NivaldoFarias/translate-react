@@ -36,7 +36,7 @@ describe("mapError", () => {
 				},
 			);
 
-			test("should detect rate limit from response headers", () => {
+			test("should map RequestError with response headers", () => {
 				const error = new RequestError("Rate limited", StatusCodes.FORBIDDEN, {
 					request: {
 						method: "GET",
@@ -56,6 +56,7 @@ describe("mapError", () => {
 				const mapped = mapError(error, "test");
 
 				expect(mapped.code).toBe(ErrorCode.OctokitRequestError);
+				expect(mapped.metadata?.requestId).toBeUndefined();
 			});
 
 			test("should map 500+ RequestError to OctokitRequestError", () => {
@@ -125,20 +126,12 @@ describe("mapError", () => {
 				expect(mapped.metadata?.repo).toBe("test/repo");
 			});
 
-			test("should detect rate limit from various error message patterns", () => {
-				const patterns = [
-					"rate limit exceeded",
-					"API rate limit",
-					"429 Too Many Requests",
-					"too many requests",
-				];
+			test("should map generic Error instances to UnknownError", () => {
+				const error = new Error("Generic error message");
+				const mapped = mapError(error, "test");
 
-				for (const message of patterns) {
-					const error = new Error(message);
-					const mapped = mapError(error, "test");
-
-					expect(mapped.code).toBe(ErrorCode.UnknownError);
-				}
+				expect(mapped.code).toBe(ErrorCode.UnknownError);
+				expect(mapped.message).toBe("Generic error message");
 			});
 
 			test("should handle errors without status code", () => {
@@ -228,12 +221,13 @@ describe("mapError", () => {
 
 	describe("Openai/LLM API errors", () => {
 		describe("APIError mapping", () => {
-			test("should map APIError to LLMApiError", () => {
+			test("should map APIError to OpenAIApiError", () => {
 				const message = "Invalid request";
 				const error = new APIError(StatusCodes.BAD_REQUEST, { message }, message, {});
 
 				const mapped = mapError(error, "TranslatorService.callLanguageModel");
 
+				expect(mapped.code).toBe(ErrorCode.OpenAIApiError);
 				expect(mapped.message).toContain("Invalid request");
 			});
 
@@ -253,19 +247,13 @@ describe("mapError", () => {
 		});
 
 		describe("Error instance handling", () => {
-			test.each([
-				["rate limit exceeded", ErrorCode.UnknownError],
-				["too many requests", ErrorCode.UnknownError],
-				["429 error", ErrorCode.UnknownError],
-				["quota exceeded", ErrorCode.UnknownError],
-				["Unknown LLM error", ErrorCode.UnknownError],
-			])("should map error message '%s' to error code", (message, errorCode) => {
-				const error = new Error(message);
+			test("should map generic Error to UnknownError", () => {
+				const error = new Error("Generic error");
 
 				const mapped = mapError(error, "TranslatorService.callLanguageModel");
 
-				expect(mapped.code).toBe(errorCode);
-				expect(mapped.message).toContain(message);
+				expect(mapped.code).toBe(ErrorCode.UnknownError);
+				expect(mapped.message).toContain("Generic error");
 			});
 
 			describe("Non-Error object handling", () => {
