@@ -248,7 +248,7 @@ export function handleTopLevelError(
 				statusCode: error.status,
 				message: error.message,
 				type: error.type,
-				requestId: error.request_id,
+				requestId: error.requestID,
 			},
 			`LLM API error: ${error.message}`,
 		);

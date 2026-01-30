@@ -1,7 +1,7 @@
 import { Buffer } from "node:buffer";
 
+import type { components } from "@octokit/openapi-types";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
-import type { components } from "node_modules/@octokit/plugin-paginate-rest/node_modules/@octokit/types/node_modules/@octokit/openapi-types";
 
 import type { CommentBuilderService } from "../comment-builder.service";
 import type { PatchedRepositoryTreeItem, ProcessedFileResult, PullRequestStatus } from "../runner";
@@ -106,11 +106,6 @@ export class GitHubContent {
 	/**
 	 * Retrieves the list of files changed in a pull request.
 	 *
-	 * Uses GitHub's PR files API to fetch the actual files modified in the PR,
-	 * rather than relying on PR title parsing. This provides accurate file-based
-	 * filtering for translation workflows by comparing actual changed file paths
-	 * against candidate files needing translation.
-	 *
 	 * @param prNumber Pull request number to fetch changed files from
 	 *
 	 * @returns A `Promise` resolving to an array of file paths changed in the PR
@@ -146,8 +141,6 @@ export class GitHubContent {
 	 * Updates existing file or creates new one.
 	 *
 	 * @param options Commit options
-	 *
-	 * @throws {Error} If commit operation fails
 	 *
 	 * @example
 	 * ```typescript
@@ -289,7 +282,6 @@ export class GitHubContent {
 
 		this.logger.info({ queryString }, "Searching for translation progress issue");
 
-		// eslint-disable-next-line @typescript-eslint/no-deprecated
 		const issueExistsResponse = await this.deps.octokit.rest.search.issuesAndPullRequests({
 			q: queryString,
 		});

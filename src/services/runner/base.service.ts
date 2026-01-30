@@ -1,3 +1,5 @@
+import { sleep } from "bun";
+
 import type {
 	PatchedRepositoryTreeItem,
 	ProcessedFileResult,
@@ -56,10 +58,12 @@ export abstract class BaseRunnerService {
 	 *
 	 * Ensures graceful shutdown and cleanup of resources
 	 */
-	protected cleanup = () => {
+	protected cleanup = async () => {
 		this.logger.info("Shutting down gracefully");
 
-		setTimeout(() => void process.exit(0), 1000);
+		await sleep(1000);
+
+		process.exit(0);
 	};
 
 	/**
@@ -219,7 +223,7 @@ export abstract class BaseRunnerService {
 
 		const patchedRepositoryTree = repositoryTree
 			.map((item) => {
-				const filename = item.path?.split("/").pop() ?? "";
+				const filename = item.path.split("/").pop() ?? "";
 
 				return { ...item, filename };
 			})

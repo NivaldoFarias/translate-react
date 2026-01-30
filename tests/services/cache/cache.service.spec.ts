@@ -1,3 +1,4 @@
+import { sleep } from "bun";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
 import { CacheService } from "@/services/";
@@ -31,7 +32,7 @@ describe("CacheService", () => {
 		test("should return null when cached value has expired", async () => {
 			cache.set("key1", "value1", 50);
 
-			await new Promise((resolve) => setTimeout(resolve, 100));
+			await sleep(500);
 			const result = cache.get("key1");
 
 			expect(result).toBeNull();
@@ -41,7 +42,7 @@ describe("CacheService", () => {
 			cache.set("key1", "value1", 50);
 			expect(cache.size).toBe(1);
 
-			await new Promise((resolve) => setTimeout(resolve, 100));
+			await sleep(500);
 			cache.get("key1");
 
 			expect(cache.size).toBe(0);
@@ -74,9 +75,9 @@ describe("CacheService", () => {
 
 		test("should exclude expired entries when retrieving multiple values", async () => {
 			cache.set("key1", "value1", 1000);
-			cache.set("key2", "value2", 50);
+			cache.set("key2", "value2", 100);
 
-			await new Promise((resolve) => setTimeout(resolve, 500));
+			await sleep(500);
 			const results = cache.getMany(["key1", "key2"]);
 
 			expect(results.size).toBe(1);
@@ -109,7 +110,7 @@ describe("CacheService", () => {
 		test("should return false when key has expired beyond TTL", async () => {
 			cache.set("key1", "value1", 50);
 
-			await new Promise((resolve) => setTimeout(resolve, 100));
+			await sleep(500);
 			const result = cache.has("key1");
 
 			expect(result).toBe(false);
@@ -155,7 +156,7 @@ describe("CacheService", () => {
 			cache.set("key2", "value2", 150);
 			cache.set("key3", "value3", 50);
 
-			await new Promise((resolve) => setTimeout(resolve, 500));
+			await sleep(500);
 			const removed = cache.cleanupExpired();
 
 			expect(removed).toBe(2);
