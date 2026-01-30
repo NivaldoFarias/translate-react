@@ -54,6 +54,15 @@ describe("LocaleService", () => {
 			expect(locales).toContain("pt-br");
 			expect(Array.isArray(locales)).toBe(true);
 		});
+
+		test("returns array that does not include unregistered language codes", () => {
+			const service = new LocaleService("pt-br");
+
+			const locales = service.getAvailableLocales();
+
+			expect(locales).not.toContain("ru");
+			expect(locales).not.toContain("en");
+		});
 	});
 
 	describe("locale property", () => {

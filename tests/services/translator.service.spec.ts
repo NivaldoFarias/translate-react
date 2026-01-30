@@ -127,18 +127,17 @@ describe("TranslatorService", () => {
 	describe("getLanguageAnalysis", () => {
 		test("returns language analysis when file has content", async () => {
 			const expectedAnalysis = createLanguageAnalysisResultFixture();
-			spyOn(translatorService.services.languageDetector, "analyzeLanguage").mockResolvedValue(
-				expectedAnalysis,
-			);
+			const analyzeSpy = spyOn(
+				translatorService.services.languageDetector,
+				"analyzeLanguage",
+			).mockResolvedValue(expectedAnalysis);
 
 			const file = createTranslationFileFixture({ content: "Conteúdo em português." });
 
 			const analysis = await translatorService.getLanguageAnalysis(file);
 
 			expect(analysis).toBe(expectedAnalysis);
-			expect(
-				spyOn(translatorService.services.languageDetector, "analyzeLanguage"),
-			).toHaveBeenCalledWith(file.filename, file.content);
+			expect(analyzeSpy).toHaveBeenCalledWith(file.filename, file.content);
 		});
 
 		test("throws ApplicationError when file content is empty", () => {
@@ -271,6 +270,18 @@ describe("TranslatorService", () => {
 			const isTranslated = await translatorService.isContentTranslated(file);
 
 			expect(typeof isTranslated).toBe("boolean");
+		});
+
+		test("returns false when language analysis throws", async () => {
+			spyOn(translatorService.services.languageDetector, "analyzeLanguage").mockRejectedValue(
+				new Error("Detection failed"),
+			);
+
+			const file = createTranslationFileFixture({ content: "Some content." });
+
+			const isTranslated = await translatorService.isContentTranslated(file);
+
+			expect(isTranslated).toBe(false);
 		});
 	});
 
