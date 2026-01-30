@@ -84,7 +84,7 @@ flowchart TD
 
 #### Description
 
-This stage validates runtime configuration, instantiates core services, and registers process signal handlers. The implementation corresponds to the environment validation and service construction logic in [`utils/env.util.ts`](../src/utils/env.util.ts) and [`services/service-factory.service.ts`](../src/services/service-factory.service.ts), and the runner initialization and signal setup implemented in [`services/runner/base.service.ts`](../src/services/runner/base.service.ts) _(see JSDoc on the runner classes for details)_.
+This stage validates runtime configuration, instantiates core services, and registers process signal handlers. The implementation corresponds to environment validation in [`utils/env.util.ts`](../src/utils/env.util.ts), runner initialization in [`services/runner/runner.service.ts`](../src/services/runner/runner.service.ts), and signal setup in [`services/runner/base.service.ts`](../src/services/runner/base.service.ts) _(see JSDoc on the runner classes for details)_.
 
 #### Workflow
 
@@ -104,7 +104,7 @@ sequenceDiagram
         Logger-->>CLI: Logger instance
         CLI->>Runner: Create RunnerService
         Runner->>Runner: Initialize services
-        Note over Runner: GitHub, Translator,<br/>Database, Language Detector
+        Note over Runner: GitHub, Translator,<br/>Locale, Language Detector, Cache
         Runner-->>CLI: Ready
     else Validation Failure
         Env-->>CLI: Throw validation error
@@ -116,14 +116,14 @@ sequenceDiagram
 
 - Environment variable validation via Zod schema
 - Logger initialization (Pino with JSON output)
-- Service instantiation (GitHub, Translator, Database, Language Detector)
+- Service instantiation (GitHub, Translator, Locale, Language Detector, Cache)
 - Signal handler setup (SIGINT, SIGTERM, uncaught exceptions)
 
 ### Stage 2: Repository Setup
 
 #### Description
 
-This stage ensures the runner can read from the upstream repository and write to the fork. It verifies the GitHub token permissions and checks/synchronizes the fork state. See [`services/github/repository.service.ts`](../src/services/github/repository.service.ts) for the repository and fork-related implementations and [`services/runner/base.service.ts`](../src/services/runner/base.service.ts) for how the runner invokes `verifyPermissions()` and `syncFork()` during startup.
+This stage ensures the runner can read from the upstream repository and write to the fork. It verifies the GitHub token permissions and checks/synchronizes the fork state. See [`services/github/github.service.ts`](../src/services/github/github.service.ts) and [`services/github/github.repository.ts`](../src/services/github/github.repository.ts) for repository and fork-related implementations, and [`services/runner/base.service.ts`](../src/services/runner/base.service.ts) for how the runner invokes `verifyPermissions()` and `syncFork()` during startup.
 
 #### Workflow
 
@@ -149,8 +149,8 @@ flowchart TD
 
 #### Key Operations
 
-- **Token verification** (`RepositoryService.verifyTokenPermissions`): validates access to fork and upstream repositories via GitHub API.
-- **Fork synchronization** (`RepositoryService.syncFork`, `RepositoryService.isForkSynced`, `RepositoryService.forkExists`): ensures the fork matches upstream and performs a merge when necessary.
+- **Token verification** (`GitHubService.verifyTokenPermissions`): validates access to fork and upstream repositories via GitHub API.
+- **Fork synchronization** (`GitHubService.syncFork`, `GitHubService.isForkSynced`, `GitHubService.forkExists`): ensures the fork matches upstream and performs a merge when necessary.
 - **GitHub API Calls** (representative):
 
 ```plaintext
@@ -170,7 +170,7 @@ POST / repos / { fork } / merge - upstream;
 
 #### Description
 
-This stage collects candidate files for translation by retrieving the upstream repository tree and applying repository-level filters and a glossary fetch. The implementation lives primarily in [`services/github/repository.service.ts`](../src/services/github/repository.service.ts) _(`getRepositoryTree`, `fetchGlossary`)_ and the file discovery pipeline in [`services/runner/file-discovery.manager.ts`](../src/services/runner/file-discovery.manager.ts) _(`discoverFiles`, `checkCache`, `filterByPRs`, `fetchContent`, `detectAndCacheLanguages`)_. Refer to those JSDoc comments for detailed behavior and pipeline stages.
+This stage collects candidate files for translation by retrieving the upstream repository tree and applying repository-level filters and a glossary fetch. The implementation lives primarily in [`services/github/github.repository.ts`](../src/services/github/github.repository.ts) _(`getRepositoryTree`, `fetchGlossary`)_ and the file discovery pipeline in [`services/runner/file-discovery.manager.ts`](../src/services/runner/file-discovery.manager.ts) _(`discoverFiles`, `checkCache`, `filterByPRs`, `fetchContent`, `detectAndCacheLanguages`)_. Refer to those JSDoc comments for detailed behavior and pipeline stages.
 
 #### Workflow
 
@@ -250,7 +250,7 @@ flowchart TD
 
 #### Description
 
-This stage processes queued files through branch creation, translation, commit, and pull request lifecycle. The implementation is rooted in [`services/runner/translation-batch.manager.ts`](../src/services/runner/translation-batch.manager.ts) (file-level lifecycle and error handling) and [`services/translator.service.ts`](../src/services/translator.service.ts) (token-based chunking and LLM interaction). Commit and PR operations are performed by [`services/github/content.service.ts`](../src/services/github/content.service.ts).
+This stage processes queued files through branch creation, translation, commit, and pull request lifecycle. The implementation is rooted in [`services/runner/translation-batch.manager.ts`](../src/services/runner/translation-batch.manager.ts) (file-level lifecycle and error handling) and [`services/translator.service.ts`](../src/services/translator.service.ts) (token-based chunking and LLM interaction). Commit and PR operations are performed by [`services/github/github.content.ts`](../src/services/github/github.content.ts).
 
 #### Workflow
 
@@ -307,21 +307,21 @@ sequenceDiagram
 
 - Branch creation and reuse logic (`TranslationBatchManager.createOrGetTranslationBranch`) — handles existing PRs and branch recreation on conflicts.
 - Token-based chunking and LLM calls (`TranslatorService.needsChunking`, `TranslatorService.translateWithChunking`, `TranslatorService.callLanguageModel`).
-- Commit and PR operations (`ContentService.commitTranslation`, `ContentService.createPullRequest`, `TranslationBatchManager.createOrUpdatePullRequest`).
+- Commit and PR operations (`GitHubService.commitTranslation`, `GitHubService.createPullRequest`, `TranslationBatchManager.createOrUpdatePullRequest`).
 - Error handling and cleanup (`TranslationBatchManager.cleanupFailedTranslation`, circuit-breaker using `MAX_CONSECUTIVE_FAILURES`).
 
 ### Stage 6: Progress Reporting
 
 #### Description
 
-This stage compiles processing results and attempts to post a summary to a configured translation progress issue. The behavior is implemented in [`services/runner/pr.manager.ts`](../src/services/runner/pr.manager.ts) (`PRManager.updateIssue`, `PRManager.printFinalStatistics`) which delegates comment creation to [`services/github/content.service.ts`](../src/services/github/content.service.ts) (`commentCompiledResultsOnIssue`). If no progress issue is found or creation fails, the runner logs final statistics and continues; updating the issue is non-blocking.
+This stage compiles processing results and attempts to post a summary to a configured translation progress issue. The behavior is implemented in [`services/runner/pr.manager.ts`](../src/services/runner/pr.manager.ts) (`PRManager.updateIssue`, `PRManager.printFinalStatistics`) which delegates comment creation to [`services/github/github.content.ts`](../src/services/github/github.content.ts) (`commentCompiledResultsOnIssue`). If no progress issue is found or creation fails, the runner logs final statistics and continues; updating the issue is non-blocking.
 
 #### Workflow
 
 ```mermaid
 flowchart LR
     A[All Files Processed] --> B{Progress Issue Found?}
-    B -->|Yes| C[Create Comment via ContentService]
+    B -->|Yes| C[Create Comment via GitHubService]
     B -->|No| D[Print Final Statistics]
 
     C --> E[Comment Created]
@@ -336,8 +336,8 @@ flowchart LR
 
 #### Key Operations
 
-- Compile results and format a comment (`PRManager.updateIssue` -> `ContentService.commentCompiledResultsOnIssue`).
-- Find the translation progress issue (`ContentService.findTranslationProgressIssue`) and post or update a comment.
+- Compile results and format a comment (`PRManager.updateIssue` -> `GitHubService.commentCompiledResultsOnIssue`).
+- Find the translation progress issue and post or update a comment (`GitHubService.commentCompiledResultsOnIssue`).
 - Always print final statistics and elapsed time (`PRManager.printFinalStatistics`) even when commenting fails.
 
 ## Detailed Stage Workflows

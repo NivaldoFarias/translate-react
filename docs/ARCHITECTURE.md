@@ -1,23 +1,23 @@
 # Architecture Documentation
 
-This document provides a comprehensive overview of the `translate-react` system architecture, including service design, data flow, and error handling mechanisms.
+Overview of the `translate-react` CLI: service design, data flow, and error handling.
 
 ## Table of Contents
 
 - [Table of Contents](#table-of-contents)
 - [System Overview](#system-overview)
 - [Service-Oriented Architecture](#service-oriented-architecture)
-  - [Service Hierarchy](#service-hierarchy)
+  - [GitHub Service Structure](#github-service-structure)
 - [Core Services](#core-services)
   - [Runner Service (`services/runner/`)](#runner-service-servicesrunner)
     - [Responsibilities](#responsibilities)
     - [Key Methods](#key-methods)
     - [State Management](#state-management)
   - [GitHub Service (`services/github/`)](#github-service-servicesgithub)
-    - [Service Composition](#service-composition)
-    - [Repository Service](#repository-service)
-    - [Content Service](#content-service)
-    - [Branch Service](#branch-service)
+    - [Unified API and Internal Composition](#unified-api-and-internal-composition)
+    - [Repository Operations](#repository-operations)
+    - [Content Operations](#content-operations)
+    - [Branch Operations](#branch-operations)
   - [Translator Service (`services/translator.service.ts`)](#translator-service-servicestranslatorservicets)
     - [Translation Pipeline](#translation-pipeline)
     - [Content Chunking Strategy](#content-chunking-strategy)
@@ -27,19 +27,14 @@ This document provides a comprehensive overview of the `translate-react` system 
     - [Confidence Scoring](#confidence-scoring)
   - [Cache Service (`services/cache/`)](#cache-service-servicescache)
     - [Components](#components)
-- [Error Handling Architecture](#error-handling-architecture)
-  - [Error Hierarchy](#error-hierarchy)
-  - [Error Transformation Pipeline](#error-transformation-pipeline)
-  - [GitHub API Error Mapping](#github-api-error-mapping)
+- [Error Handling](#error-handling)
+  - [Domain Errors](#domain-errors)
+  - [Top-Level Handler](#top-level-handler)
 - [Data Flow Architecture](#data-flow-architecture)
   - [Discovery Phase Data Flow](#discovery-phase-data-flow)
   - [Translation Phase Data Flow](#translation-phase-data-flow)
 - [Design Patterns](#design-patterns)
-  - [Inheritance-Based Service Design](#inheritance-based-service-design)
-- [Dependency Injection Architecture](#dependency-injection-architecture)
-  - [ServiceFactory (Composition Root)](#servicefactory-composition-root)
-  - [Testing with DI](#testing-with-di)
-  - [Benefits](#benefits)
+- [Dependency Injection](#dependency-injection)
 - [Performance Considerations](#performance-considerations)
   - [Batch Processing](#batch-processing)
   - [Concurrent Operations](#concurrent-operations)
@@ -67,14 +62,8 @@ graph TB
         Cache[Cache Service]
     end
 
-    subgraph "GitHub Sub-Services"
-        RepoSvc[Repository Service]
-        ContentSvc[Content Service]
-        BranchSvc[Branch Service]
-    end
-
     subgraph "Cross-Cutting Concerns"
-        ErrorHandler[Error Handler]
+        ErrorHandler[Top-Level Error Handler]
         Logger[Pino Logger]
     end
 
@@ -89,21 +78,11 @@ graph TB
     Runner --> LangDetector
     Runner --> Cache
 
-    GitHub --> RepoSvc
-    GitHub --> ContentSvc
-    GitHub --> BranchSvc
-
-    RepoSvc --> GitHubAPI
-    ContentSvc --> GitHubAPI
-    BranchSvc --> GitHubAPI
-
+    GitHub --> GitHubAPI
     Translator --> LLMAPI
     Translator --> LangDetector
 
-    Runner -.-> ErrorHandler
-    GitHub -.-> ErrorHandler
-    Translator -.-> ErrorHandler
-
+    CLI -.-> ErrorHandler
     ErrorHandler --> Logger
 
     classDef entryPoint fill:#e1f5fe,stroke:#0277bd,stroke-width:2px
@@ -121,27 +100,22 @@ graph TB
 
 ## Service-Oriented Architecture
 
-### Service Hierarchy
+### GitHub Service Structure
+
+A single **GitHubService** exposes all GitHub operations. Internally it composes three implementation classes (no shared base class):
 
 ```mermaid
 classDiagram
-    class BaseGitHubService {
-        #octokit: Octokit
-        #repositories: RepositoryConfig
-        +constructor(config)
-    }
-
-    class RepositoryService {
+    class GitHubRepository {
         +getDefaultBranch()
         +getRepositoryTree()
         +verifyTokenPermissions()
         +isForkSynced()
         +syncFork()
         +fetchGlossary()
-        -filterRepositoryTree()
     }
 
-    class ContentService {
+    class GitHubContent {
         +getFileContent()
         +listOpenPullRequests()
         +createOrUpdatePullRequest()
@@ -150,26 +124,26 @@ classDiagram
         +commentCompiledResultsOnIssue()
     }
 
-    class BranchService {
+    class GitHubBranch {
         +createOrGetTranslationBranch()
         +cleanupBranch()
         +deleteBranch()
     }
 
     class GitHubService {
-        -repository: RepositoryService
-        -content: ContentService
-        -branch: BranchService
-        +* (delegates to sub-services)
+        -repository: GitHubRepository
+        -content: GitHubContent
+        -branch: GitHubBranch
+        +getDefaultBranch()
+        +getRepositoryTree()
+        +createOrUpdatePullRequest()
+        +createOrGetTranslationBranch()
+        +* (public API delegates to internal classes)
     }
 
-    BaseGitHubService <|-- RepositoryService
-    BaseGitHubService <|-- ContentService
-    BaseGitHubService <|-- BranchService
-
-    GitHubService *-- RepositoryService
-    GitHubService *-- ContentService
-    GitHubService *-- BranchService
+    GitHubService *-- GitHubRepository
+    GitHubService *-- GitHubContent
+    GitHubService *-- GitHubBranch
 ```
 
 ## Core Services
@@ -229,97 +203,63 @@ This state is held in memory during workflow execution.
 
 ### GitHub Service (`services/github/`)
 
-Modular composition of specialized GitHub operation services.
+Single public API for all GitHub operations. Internally composes **GitHubRepository**, **GitHubContent**, and **GitHubBranch** (implementation classes, not separate services).
 
-#### Service Composition
+#### Unified API and Internal Composition
 
-The main `GitHubService` delegates to three specialized sub-services:
+`GitHubService` takes optional dependencies (Octokit, repositories config, comment builder) and instantiates the three internal classes. Public methods delegate to them:
 
 ```typescript
 class GitHubService {
-	private repository: RepositoryService;
-	private content: ContentService;
-	private branch: BranchService;
+	private readonly repository: GitHubRepository;
+	private readonly content: GitHubContent;
+	private readonly branch: GitHubBranch;
 
-	// Delegation methods expose sub-service functionality
-	public getRepositoryTree = (...args) => this.repository.getRepositoryTree(...args);
-	public createOrUpdatePullRequest = (...args) => this.content.createOrUpdatePullRequest(...args);
-	public createOrGetTranslationBranch = (...args) =>
-		this.branch.createOrGetTranslationBranch(...args);
+	// Public API delegates to internal classes
+	public getDefaultBranch(target) { return this.repository.getDefaultBranch(target); }
+	public getRepositoryTree(...) { return this.repository.getRepositoryTree(...); }
+	public createOrUpdatePullRequest(...) { return this.content.createOrUpdatePullRequest(...); }
+	public createOrGetTranslationBranch(...) { return this.branch.createOrGetTranslationBranch(...); }
+	// ... other methods
 }
 ```
 
-#### Repository Service
+#### Repository Operations
 
-Manages repository-level operations:
+Handled by **GitHubRepository** (internal):
 
 - Fork synchronization detection and execution
-- Repository tree fetching with recursive option
+- Repository tree fetching (recursive), filtered for `.md` in `src/`
 - Token permission verification
-- Default branch detection (dynamic, not hardcoded)
+- Default branch detection
 - Glossary file retrieval
 
-<details>
-<summary>Implementation Details</summary>
+#### Content Operations
 
-```typescript
-class RepositoryService extends BaseGitHubService {
-	async getRepositoryTree(baseBranch?: string, filterIgnored = true) {
-		const branchName = baseBranch || (await this.getDefaultBranch("fork"));
-		const response = await this.octokit.git.getTree({
-			...this.repositories.fork,
-			tree_sha: branchName,
-			recursive: "true",
-		});
-
-		return filterIgnored ? this.filterRepositoryTree(response.data.tree) : response.data.tree;
-	}
-
-	// Filters for .md files in src/ directory
-	protected filterRepositoryTree(tree) {
-		return tree.filter(
-			(item) =>
-				item.path &&
-				item.path.endsWith(".md") &&
-				item.path.includes("/") &&
-				item.path.includes("src/"),
-		);
-	}
-}
-```
-
-</details>
-
-#### Content Service
-
-Handles file content and pull request operations:
+Handled by **GitHubContent** (internal):
 
 - File content retrieval via blob SHA
 - Open PR listing and filtering
-- PR creation with detailed descriptions
-- Commit operations with proper messages
-- Issue commenting for progress tracking
+- PR create/update (by branch)
+- Commit translation, comments on PR/issue
 
 <details>
-<summary>PR Creation Flow</summary>
+<summary>PR create/update flow</summary>
 
 ```mermaid
 sequenceDiagram
     participant R as Runner
-    participant C as ContentService
+    participant C as GitHubContent
     participant G as GitHub API
 
     R->>C: createOrUpdatePullRequest(file, options)
     C->>G: Check if PR exists (by branch)
 
     alt PR Exists
-        G-->>C: Return existing PR
+        G-->>C: Existing PR
         C->>G: Update PR (title, body)
-        G-->>C: Updated PR
     else PR Does Not Exist
         C->>G: Create new PR
-        Note over C,G: title, body, head, base
-        G-->>C: New PR created
     end
 
     C-->>R: PR data
@@ -327,14 +267,13 @@ sequenceDiagram
 
 </details>
 
-#### Branch Service
+#### Branch Operations
 
-Manages translation branch lifecycle:
+Handled by **GitHubBranch** (internal):
 
-- Branch creation with naming convention (`translate/{file-path}`)
-- Branch existence checking
-- Failed translation branch cleanup
-- Reference resolution and validation
+- Create or get translation branch (`translate/{file-path}`)
+- Cleanup failed translation branches
+- Delete branch
 
 ### Translator Service (`services/translator.service.ts`)
 
@@ -467,76 +406,35 @@ In-memory caching for runtime-scoped data.
 - `getMany(keys)`: Batch retrieval
 - `clear()`: Remove all entries
 
-## Error Handling Architecture
+## Error Handling
 
-### Error Hierarchy
+### Domain Errors
+
+**ApplicationError** is used only for domain workflow failures (e.g. no files to translate, below minimum success rate). It carries a **ErrorCode** enum, operation name, and optional metadata.
 
 ```mermaid
 classDiagram
     class ApplicationError {
-        +code: string
-        +severity: ErrorSeverity
-        +context: ErrorContext
-        +originalError?: Error
+        +code: ErrorCode
+        +operation: string
+        +metadata?: T
+        +displayMessage: string
     }
-
-    class APIError {
-        +code: GITHUB_* | OPENAI_*
-    }
-
-    class ResourceLoadError {
-        +code: RESOURCE_LOAD_FAILED
-    }
-
-    class InitializationError {
-        +code: INITIALIZATION_FAILED
-    }
-
-    class ValidationError {
-        +code: VALIDATION_FAILED
-    }
-
-    ApplicationError <|-- APIError
-    ApplicationError <|-- ResourceLoadError
-    ApplicationError <|-- InitializationError
-    ApplicationError <|-- ValidationError
 ```
 
-### Error Transformation Pipeline
+**ErrorCode** values are domain-focused (e.g. `TranslationFailed`, `ChunkProcessingFailed`, `NoFilesToTranslate`, `BelowMinimumSuccessRate`, `FormatValidationFailed`, `LanguageCodeNotSupported`, `InsufficientPermissions`, `InitializationError`, `ResourceLoadError`, `OpenAIApiError`, `OctokitRequestError`, `UnknownError`). Library errors are not wrapped in per-method try/catch; they bubble up.
 
-```mermaid
-sequenceDiagram
-    participant S as Service Method
-    participant P as Error Proxy
-    participant H as Error Handler
-    participant M as Error Mapper
-    participant L as Logger
+### Top-Level Handler
 
-    S->>S: Operation fails
-    S->>P: Throw raw error
-    P->>H: handleError(error, context)
-    H->>M: mapError(error)
-    M->>M: Identify error type
-    M->>M: Add context
-    M-->>H: ApplicationError
-    H->>L: Log structured error
-    H->>H: Format error message
-    H-->>P: Transformed error
-    P-->>S: Throw ApplicationError
-```
+Errors are handled at the process boundary in **main.ts**:
 
-### GitHub API Error Mapping
-
-Specific error codes for different GitHub API failures:
-
-| HTTP Status      | Error Code                | Description               |
-| ---------------- | ------------------------- | ------------------------- |
-| 404              | `GITHUB_NOT_FOUND`        | Resource does not exist   |
-| 401              | `GITHUB_UNAUTHORIZED`     | Invalid or missing token  |
-| 403              | `GITHUB_FORBIDDEN`        | Insufficient permissions  |
-| 403 (rate limit) | `GITHUB_RATE_LIMITED`     | API rate limit exceeded   |
-| 422              | `GITHUB_VALIDATION_ERROR` | Request validation failed |
-| 500-599          | `GITHUB_SERVER_ERROR`     | GitHub server error       |
+1. **main** runs the workflow and catches any thrown error.
+2. **handleTopLevelError(error, logger)** logs the error and exits:
+   - **ApplicationError**: logs code, operation, message, optional statusCode/metadata.
+   - **RequestError** (Octokit): logs as GitHub API error with status, request ID, URL.
+   - **APIError** (OpenAI): logs as LLM API error with status, type, request ID.
+   - **Error** / unknown: logs message and stack or string representation.
+3. **process.exit(1)** is called after logging.
 
 ## Data Flow Architecture
 
@@ -612,45 +510,14 @@ flowchart TD
 
 ## Design Patterns
 
-### Inheritance-Based Service Design
+- **Runner**: **BaseRunnerService** holds shared workflow state and manager instances; **RunnerService** extends it and implements `run()`. Dependencies are injected via **RunnerServiceDependencies**.
+- **GitHub**: No shared base class. **GitHubService** composes **GitHubRepository**, **GitHubContent**, and **GitHubBranch**; each receives shared Octokit and repository config.
 
-All GitHub services extend `BaseGitHubService`:
+## Dependency Injection
 
-```typescript
-abstract class BaseGitHubService {
-	protected readonly octokit: Octokit;
-	protected readonly repositories: RepositoryConfig;
+Services are instantiated at module level. **main.ts** imports **runnerService** from `./services`; that singleton is built with **githubService**, **translatorService**, **languageCacheService**, **localeService**, and **languageDetectorService** (also module-level). Dependencies are passed via typed constructor arguments (e.g. **RunnerServiceDependencies**, **GitHubServiceDependencies**). See [src/services/](../src/services/) for interface definitions.
 
-	constructor(config?: GitHubServiceConfig) {
-		this.octokit = new Octokit({ auth: env.GH_TOKEN });
-		this.repositories = {
-			fork: {
-				/* ... */
-			},
-			upstream: {
-				/* ... */
-			},
-		};
-	}
-}
-```
-
-## Dependency Injection Architecture
-
-The project uses **constructor-based dependency injection** via `ServiceFactory` for testability and SOLID compliance.
-
-### ServiceFactory (Composition Root)
-
-`ServiceFactory` centralizes service instantiation in `main.ts`:
-
-- **Singletons**: `getOctokit()`, `getOpenAI()`,
-- **Service factories**: `createBranchService()`, `createContentService()`, `createRepositoryService()`, `createTranslatorService()`, `createRunnerService()`
-
-Each service declares dependencies via typed interfaces (e.g., `RunnerServiceDependencies`, `TranslatorServiceDependencies`). See [src/services/](../src/services/) for interface definitions.
-
-### Testing with DI
-
-Tests inject mocks directly via constructor instead of using `mock.module()`:
+Tests inject mocks via constructors:
 
 ```typescript
 const service = new RunnerService({
@@ -660,16 +527,7 @@ const service = new RunnerService({
 });
 ```
 
-Mock factories are centralized in `tests/mocks/` for consistent test setup.
-
-### Benefits
-
-| Aspect       | Before DI                    | After DI                 |
-| ------------ | ---------------------------- | ------------------------ |
-| Test setup   | `mock.module()` interception | Constructor injection    |
-| Dependencies | Hidden in class bodies       | Explicit in interfaces   |
-| Coupling     | Services create services     | Factory creates all      |
-| Testability  | Module interception needed   | Type-safe mocks injected |
+Mock factories live in `tests/mocks/` for consistent test setup.
 
 ## Performance Considerations
 
