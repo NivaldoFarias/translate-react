@@ -47,11 +47,6 @@ export class PRManager {
 		processedResults: Map<string, ProcessedFileResult>,
 		filesToTranslate: TranslationFile[],
 	): Promise<void> {
-		this.logger.info(
-			{ processedResults: processedResults.size, filesToTranslate: filesToTranslate.length },
-			"Commenting on issue",
-		);
-
 		const comment = await this.services.github.commentCompiledResultsOnIssue(
 			Array.from(processedResults.values()),
 			filesToTranslate,
@@ -82,8 +77,6 @@ export class PRManager {
 	public printFinalStatistics(
 		processedResults: Map<string, ProcessedFileResult>,
 	): WorkflowStatistics {
-		this.logger.info({ processedResults }, "Generating final workflow statistics from results");
-
 		const elapsedTime = Math.ceil(Date.now() - this.workflowTimestamp);
 		const results = Array.from(processedResults.values());
 
@@ -106,11 +99,6 @@ export class PRManager {
 				`Failed files (${failedFiles.length})`,
 			);
 		}
-
-		this.logger.debug(
-			{ elapsedTime, results, successCount, failureCount, failedFiles },
-			"Computed workflow statistics",
-		);
 
 		const totalCount = results.length;
 		const successRate = totalCount > 0 ? successCount / totalCount : 0;

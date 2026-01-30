@@ -170,8 +170,6 @@ export class TranslatorService {
 	 * ```
 	 */
 	public async testConnectivity(): Promise<void> {
-		this.logger.info("Testing LLM API connectivity");
-
 		const response = await this.openai.chat.completions.create({
 			model: this.model,
 			messages: [{ role: "user", content: "ping" }],
@@ -255,24 +253,13 @@ export class TranslatorService {
 			);
 		}
 
-		this.logger.info(
-			{
-				filename: file.filename,
-				contentLength: file.content.length,
-				estimatedTokens: this.estimateTokenCount(file.content),
-			},
-			"Starting translation workflow for file",
-		);
-
 		const translationStartTime = Date.now();
 		let translatedContent: string;
 
 		const contentNeedsChunking = this.needsChunking(file.content);
 		if (!contentNeedsChunking) {
-			this.logger.debug({ contentNeedsChunking }, "Content does not require chunking");
 			translatedContent = await this.callLanguageModel(file.content);
 		} else {
-			this.logger.debug({ contentNeedsChunking }, "Content requires chunking");
 			translatedContent = await this.translateWithChunking(file.content);
 		}
 
@@ -314,8 +301,6 @@ export class TranslatorService {
 	 * ```
 	 */
 	private validateTranslation(file: TranslationFile, translatedContent: string): void {
-		this.logger.debug({ filename: file.filename }, "Validating translated content");
-
 		if (!translatedContent || translatedContent.trim().length === 0) {
 			this.logger.error(
 				{ filename: file.filename, translatedContent },
@@ -346,11 +331,6 @@ export class TranslatorService {
 				},
 				"Translation size ratio outside expected range (0.5-2.0)",
 			);
-		} else {
-			this.logger.debug(
-				{ sizeRatio: sizeRatio.toFixed(2) },
-				"Translation size ratio is within acceptable range",
-			);
 		}
 
 		const CATCH_HEADINGS_REGEX = /^#{1,6}\s/gm;
@@ -367,8 +347,6 @@ export class TranslatorService {
 			this.logger.warn("Original file contains no markdown headings. Skipping heading validation");
 			return;
 		}
-
-		this.logger.debug("Checking heading preservation in translation (headings count and ratio)");
 
 		if (translatedHeadings === 0) {
 			this.logger.error(
@@ -446,8 +424,6 @@ export class TranslatorService {
 	 * @returns Resolves to the detailed language analysis
 	 */
 	public async getLanguageAnalysis(file: TranslationFile) {
-		this.logger.info({ filename: file.filename }, "Analyzing language of content");
-
 		if (!file.content.length) {
 			this.logger.error(
 				{ filename: file.filename, path: file.path, contentLength: file.content.length },
@@ -492,15 +468,8 @@ export class TranslatorService {
 	 */
 	private estimateTokenCount(content: string): number {
 		try {
-			this.logger.debug("Estimating token count for content");
-
 			const encoding = encodingForModel("gpt-4o-mini");
 			const tokens = encoding.encode(content);
-
-			this.logger.debug(
-				{ encoding, encodedLength: tokens.length },
-				"Estimated token count using tiktoken",
-			);
 
 			return tokens.length;
 		} catch (error) {
@@ -532,18 +501,10 @@ export class TranslatorService {
 	 * ```
 	 */
 	private needsChunking(content: string): boolean {
-		this.logger.debug("Checking if content needs chunking based on token count");
-
 		const estimatedTokens = this.estimateTokenCount(content);
 		const maxInputTokens = MAX_CHUNK_TOKENS - 1000;
-		const exceedsLimit = estimatedTokens > maxInputTokens;
 
-		this.logger.debug(
-			{ estimatedTokens, maxInputTokens, exceedsLimit },
-			"Chunking requirement check result",
-		);
-
-		return exceedsLimit;
+		return estimatedTokens > maxInputTokens;
 	}
 
 	/**
@@ -578,30 +539,16 @@ export class TranslatorService {
 		content: string,
 		maxTokens = MAX_CHUNK_TOKENS - 500,
 	): Promise<ChunkingResult> {
-		this.logger.debug({ contentLength: content.length, maxTokens }, "Chunking content");
-
 		const markdownTextSplitterOptions: Partial<MarkdownTextSplitterParams> = {
 			chunkSize: maxTokens,
 			chunkOverlap: 200,
 			lengthFunction: (text: string) => this.estimateTokenCount(text),
 		};
 
-		this.logger.debug(
-			{ markdownTextSplitterOptions },
-			"Initializing MarkdownTextSplitter with options",
-		);
-
 		const splitter = new MarkdownTextSplitter(markdownTextSplitterOptions);
-
-		this.logger.debug("Splitting content into chunks using MarkdownTextSplitter");
 
 		const rawChunks = await splitter.splitText(content);
 		const chunks = rawChunks.filter((chunk) => chunk.trim().length > 0);
-
-		this.logger.debug(
-			{ rawChunksLength: rawChunks.length, totalChunks: chunks.length },
-			"Content successfully split into chunks",
-		);
 
 		const separators: string[] = [];
 
@@ -682,18 +629,7 @@ export class TranslatorService {
 	 * ```
 	 */
 	private async translateWithChunking(content: string): Promise<string> {
-		this.logger.debug("Translating content with chunking");
-
 		const { chunks, separators } = await this.chunkContent(content);
-
-		this.logger.debug(
-			{
-				totalChunks: chunks.length,
-				originalContentLength: content.length,
-				chunkSizes: chunks.map((chunk) => chunk.length),
-			},
-			"Starting chunked translation workflow",
-		);
 
 		const translatedChunks = await Promise.all(
 			chunks.map((chunk, index) => this.translateChunk(chunk, index, chunks)),
@@ -731,14 +667,6 @@ export class TranslatorService {
 		content: string,
 		chunks: { original: string[]; translated: string[]; separators: string[] },
 	): string {
-		this.logger.debug(
-			{
-				totalTranslatedChunks: chunks.translated.length,
-				totalOriginalChunks: chunks.original.length,
-			},
-			"Validating translated chunks before reassembly",
-		);
-
 		if (chunks.translated.length !== chunks.original.length) {
 			this.logger.error(
 				{
@@ -762,18 +690,6 @@ export class TranslatorService {
 				},
 			);
 		}
-
-		this.logger.debug(
-			{
-				totalChunks: chunks.original.length,
-				totalTranslatedLength: chunks.translated.reduce((sum, current) => sum + current.length, 0),
-				averageChunkSize: Math.round(
-					chunks.translated.reduce((sum, current) => sum + current.length, 0) /
-						chunks.translated.length,
-				),
-			},
-			"All chunks translated successfully. Beginning reassembly",
-		);
 
 		let reassembledContent = chunks.translated.reduce((accumulator, chunk, index) => {
 			return accumulator + chunk + (chunks.separators[index] ?? "");
@@ -805,35 +721,8 @@ export class TranslatorService {
 		return reassembledContent;
 	}
 
-	private async translateChunk(chunk: string, index: number, chunks: string[]): Promise<string> {
-		const chunkStartTime = Date.now();
-
-		this.logger.debug(
-			{
-				chunkIndex: index,
-				chunkSize: chunk.length,
-				totalChunks: chunks.length,
-				estimatedTokens: this.estimateTokenCount(chunk),
-			},
-			"Starting translation of chunk",
-		);
-
-		const translatedChunk = await this.callLanguageModel(chunk);
-
-		const chunkDuration = Date.now() - chunkStartTime;
-
-		this.logger.info(
-			{
-				chunkIndex: index,
-				totalChunks: chunks.length,
-				translatedSize: translatedChunk.length,
-				durationMs: chunkDuration,
-				sizeRatio: (translatedChunk.length / chunk.length).toFixed(2),
-			},
-			"Chunk translated successfully",
-		);
-
-		return translatedChunk;
+	private async translateChunk(chunk: string, _index: number, _chunks: string[]): Promise<string> {
+		return this.callLanguageModel(chunk);
 	}
 
 	/**
@@ -891,15 +780,6 @@ export class TranslatorService {
 								{ model: this.model, contentLength: content.length },
 							);
 						}
-
-						this.logger.debug(
-							{
-								model: this.model,
-								translatedLength: translatedContent.length,
-								tokensUsed: completion.usage?.total_tokens,
-							},
-							"Translation completed successfully",
-						);
 
 						return translatedContent;
 					} catch (error) {
@@ -1060,8 +940,6 @@ export class TranslatorService {
 	
 				${glossarySection}
 			`;
-
-		this.logger.debug({ builtSystemPrompt }, "System prompt generated");
 
 		return builtSystemPrompt;
 	}

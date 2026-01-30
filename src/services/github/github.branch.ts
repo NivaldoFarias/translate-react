@@ -54,14 +54,7 @@ export class GitHubBranch {
 	 * @returns The default branch name
 	 */
 	private async getDefaultBranch(): Promise<string> {
-		this.logger.info(
-			{ fork: this.deps.repositories.fork },
-			"Retrieving default branch for fork repository",
-		);
-
 		const response = await this.deps.octokit.repos.get(this.deps.repositories.fork);
-
-		this.logger.debug({ branch: response.data.default_branch }, "Retrieved default branch");
 
 		return response.data.default_branch;
 	}
@@ -84,19 +77,12 @@ export class GitHubBranch {
 		baseBranch?: string,
 	): Promise<RestEndpointMethodTypes["git"]["createRef"]["response"]> {
 		try {
-			this.logger.info({ branchName, baseBranch }, "Creating new branch");
-
 			const actualBaseBranch = baseBranch ?? (await this.getDefaultBranch());
-			this.logger.debug({ actualBaseBranch }, "Using base branch for new branch creation");
 
 			const mainBranchRef = await this.deps.octokit.git.getRef({
 				...this.deps.repositories.fork,
 				ref: `heads/${actualBaseBranch}`,
 			});
-			this.logger.debug(
-				{ baseBranch: actualBaseBranch, sha: mainBranchRef.data.object.sha },
-				"Retrieved base branch reference",
-			);
 
 			const branchRef = await this.deps.octokit.git.createRef({
 				...this.deps.repositories.fork,
@@ -133,19 +119,14 @@ export class GitHubBranch {
 		branchName: string,
 	): Promise<RestEndpointMethodTypes["git"]["getRef"]["response"] | undefined> {
 		try {
-			this.logger.info({ branchName }, "Retrieving branch information");
-
 			const response = await this.deps.octokit.git.getRef({
 				...this.deps.repositories.fork,
 				ref: `heads/${branchName}`,
 			});
 
-			this.logger.info({ branchName, sha: response.data.object.sha }, "Branch retrieved");
-
 			return response;
 		} catch (error) {
 			if (error instanceof RequestError && error.status === 404) {
-				this.logger.info({ branchName }, "Branch not found (404)");
 				return;
 			}
 
@@ -167,8 +148,6 @@ export class GitHubBranch {
 	public async deleteBranch(
 		branchName: string,
 	): Promise<RestEndpointMethodTypes["git"]["deleteRef"]["response"]> {
-		this.logger.info({ branchName }, "Deleting branch");
-
 		const response = await this.deps.octokit.git.deleteRef({
 			...this.deps.repositories.fork,
 			ref: `heads/${branchName}`,

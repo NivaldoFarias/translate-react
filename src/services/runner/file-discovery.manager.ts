@@ -66,8 +66,6 @@ export class FileDiscoveryManager {
 			(file, index, self) => index === self.findIndex((compare) => compare.path === file.path),
 		);
 
-		this.logger.info(`Processing ${uniqueFiles.length} files from repository tree`);
-
 		const { candidateFiles, cacheHits } = this.checkCache(uniqueFiles);
 
 		const { filesToFetch, numFilesWithPRs, invalidPRsByFile } =
@@ -123,9 +121,6 @@ export class FileDiscoveryManager {
 	 * ```
 	 */
 	public checkCache(files: PatchedRepositoryTreeItem[]): CacheCheckResult {
-		this.logger.info("Checking language cache");
-		const startTime = Date.now();
-
 		const candidateFiles: typeof files = [];
 
 		const filesToFetchCache = files.filter((file) => !!file.sha) as SetRequired<
@@ -148,24 +143,12 @@ export class FileDiscoveryManager {
 
 			if (cache?.detectedLanguage === targetLanguage && cache.confidence > MIN_CACHE_CONFIDENCE) {
 				cacheHits++;
-				this.logger.debug(
-					{ filename: file.path, language: cache.detectedLanguage, confidence: cache.confidence },
-					`Skipping cached ${targetLanguage} file`,
-				);
 				continue;
 			}
 
 			cacheMisses++;
 			candidateFiles.push(file);
 		}
-
-		const elapsed = Date.now() - startTime;
-		const hitRate = `${((cacheHits / files.length) * 100).toFixed(1)}%`;
-
-		this.logger.info(
-			{ cacheHits, cacheMisses, hitRate, timeMs: elapsed },
-			`Cache check complete: ${cacheHits} hits, ${cacheMisses} candidates`,
-		);
 
 		return { candidateFiles, cacheHits, cacheMisses };
 	}
@@ -216,8 +199,6 @@ export class FileDiscoveryManager {
 	public async filterByPRs(
 		candidateFiles: PatchedRepositoryTreeItem[],
 	): Promise<PullRequestFilterResult> {
-		this.logger.info("Checking for existing open PRs with file-based filtering");
-
 		const openPRs = await this.services.github.listOpenPullRequests();
 		const invalidPRsByFile = new Map<string, { prNumber: number; status: PullRequestStatus }>();
 		const prByFile = new Map<string, number>();
@@ -229,11 +210,6 @@ export class FileDiscoveryManager {
 				for (const filePath of changedFiles) {
 					prByFile.set(filePath, pr.number);
 				}
-
-				this.logger.debug(
-					{ prNumber: pr.number, fileCount: changedFiles.length },
-					"Mapped PR to changed files",
-				);
 			} catch (error) {
 				this.logger.warn(
 					{ prNumber: pr.number, error },
@@ -241,11 +217,6 @@ export class FileDiscoveryManager {
 				);
 			}
 		}
-
-		this.logger.debug(
-			{ openPRCount: openPRs.length, mappedFiles: prByFile.size },
-			"Built file-to-PR mapping",
-		);
 
 		let numFilesWithPRs = 0;
 		const filesToFetch: typeof candidateFiles = [];
@@ -329,24 +300,11 @@ export class FileDiscoveryManager {
 	 * ```
 	 */
 	public async fetchContent(filesToFetch: PatchedRepositoryTreeItem[]): Promise<TranslationFile[]> {
-		this.logger.info("Fetching file content");
-
 		const uncheckedFiles: TranslationFile[] = [];
-		let completedFiles = 0;
-
-		const updateProgress = (): void => {
-			completedFiles++;
-			const percentage = Math.floor((completedFiles / filesToFetch.length) * 100);
-			if (completedFiles % 10 === 0 || completedFiles === filesToFetch.length) {
-				this.logger.info(
-					`Fetching files: ${completedFiles}/${filesToFetch.length} (${percentage}%)`,
-				);
-			}
-		};
 
 		for (let index = 0; index < filesToFetch.length; index += FILE_FETCH_BATCH_SIZE) {
 			const batch = filesToFetch.slice(index, index + FILE_FETCH_BATCH_SIZE);
-			const batchResults = await this.fetchBatch(batch, updateProgress);
+			const batchResults = await this.fetchBatch(batch);
 
 			uncheckedFiles.push(
 				...batchResults.filter((file): file is NonNullable<typeof file> => !!file),
@@ -360,23 +318,11 @@ export class FileDiscoveryManager {
 	 * Fetches a batch of files from GitHub API.
 	 *
 	 * @param batch Files to fetch in current batch
-	 * @param updateLoggerFn Progress update callback
 	 *
-	 * @returns Array of translation files or null for failed fetches
+	 * @returns Array of translation files or `null` for failed fetches
 	 */
-	private async fetchBatch(
-		batch: PatchedRepositoryTreeItem[],
-		updateLoggerFn: () => void,
-	): Promise<(TranslationFile | null)[]> {
-		return await Promise.all(
-			batch.map(async (file) => {
-				const translationFile = await this.services.github.getFile(file);
-
-				updateLoggerFn();
-
-				return translationFile;
-			}),
-		);
+	private fetchBatch(batch: PatchedRepositoryTreeItem[]): Promise<(TranslationFile | null)[]> {
+		return Promise.all(batch.map((file) => this.services.github.getFile(file)));
 	}
 
 	/**
