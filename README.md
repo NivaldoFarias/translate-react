@@ -168,18 +168,18 @@ bun start
 
 ```plaintext
 translate-react/
-├─ src/
-│  ├── errors/                          # Error handling system
-│  ├── locales/                         # Language locale definitions
-│  ├── services/                        # Core services
-│  │   ├── cache/                       # In-memory caching
-│  │   ├── github/                      # GitHub API integration
-│  │   ├── locale/                      # Locale management
-│  │   ├── runner/                      # Workflow orchestration
-│  │   ├── service-factory.service.ts   # Dependency injection
-│  │   └── translator.service.ts        # LLM translation engine
-│  ├── utils/                           # Utilities and constants
-│  └── main.ts                          # Entry point
+├── src/
+│   ├── clients/                        # Octokit, OpenAI, queue clients
+│   ├── errors/                         # Error handling (ApplicationError, helpers)
+│   ├── locales/                        # Language locale definitions
+│   ├── services/                      # Core services
+│   │   ├── cache/                     # In-memory caching
+│   │   ├── github/                    # GitHub API (single service)
+│   │   ├── locale/                    # Locale management
+│   │   ├── runner/                    # Workflow orchestration
+│   │   └── translator.service.ts      # LLM translation engine
+│   ├── utils/                         # Utilities and constants
+│   └── main.ts                        # Entry point
 │
 ├── docs/                               # Technical documentation
 ├── tests/                              # Test suite
@@ -218,9 +218,8 @@ Contributions are welcome. Follow these guidelines:
 | Error                                                   | Solution                                                                  |
 | ------------------------------------------------------- | ------------------------------------------------------------------------- |
 | `GH_TOKEN: String must contain at least 1 character(s)` | Set `GH_TOKEN` and `LLM_API_KEY` in `.env`                                |
-| `GITHUB_NOT_FOUND`                                      | Verify repository permissions and token scope                             |
-| `GITHUB_RATE_LIMITED`                                   | Tool auto-retries with backoff; consider GitHub App token for heavy usage |
-| `OpenAI API error: insufficient_quota`                  | Check API credits; switch providers via `LLM_API_BASE_URL`                |
+| GitHub API error (404 / 403 / 429)                      | Verify repository and token scope; tool auto-retries on rate limit        |
+| LLM API error (quota / rate limit)                      | Check API credits; switch providers via `LLM_API_BASE_URL`                |
 
 ### Debug Mode
 
