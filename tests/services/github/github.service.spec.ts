@@ -2,8 +2,8 @@ import { RequestError } from "@octokit/request-error";
 import { afterAll, afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { StatusCodes } from "http-status-codes";
 
+import type { components } from "@octokit/openapi-types";
 import type { Octokit, RestEndpointMethodTypes } from "@octokit/rest";
-import type { components } from "node_modules/@octokit/plugin-paginate-rest/node_modules/@octokit/types/node_modules/@octokit/openapi-types";
 
 import type {
 	GitHubServiceDependencies,
@@ -174,10 +174,10 @@ describe("GitHubService", () => {
 				gitMocks.getTree.mockResolvedValueOnce({
 					data: {
 						tree: [
-							{ path: "src/test/file.md", type: "blob", sha: "abc123", url: "" },
-							{ path: "README.md", type: "blob", sha: "def456", url: "" },
-							{ path: "src/component.tsx", type: "blob", sha: "ghi789", url: "" },
-							{ path: "file.md", type: "blob", sha: "jkl012", url: "" },
+							{ path: "src/test/file.md", type: "blob", sha: "abc123", url: "", mode: "100644" },
+							{ path: "README.md", type: "blob", sha: "def456", url: "", mode: "100644" },
+							{ path: "src/component.tsx", type: "blob", sha: "ghi789", url: "", mode: "100644" },
+							{ path: "file.md", type: "blob", sha: "jkl012", url: "", mode: "100644" },
 						],
 					},
 				});
@@ -192,8 +192,8 @@ describe("GitHubService", () => {
 				gitMocks.getTree.mockResolvedValueOnce({
 					data: {
 						tree: [
-							{ path: "src/test/file.md", type: "blob", sha: "abc123", url: "" },
-							{ path: "README.md", type: "blob", sha: "def456", url: "" },
+							{ path: "src/test/file.md", type: "blob", sha: "abc123", url: "", mode: "100644" },
+							{ path: "README.md", type: "blob", sha: "def456", url: "", mode: "100644" },
 						],
 					},
 				});

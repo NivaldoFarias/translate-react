@@ -5,6 +5,8 @@ import { APIError } from "openai/error";
 
 import { ErrorCode, mapError } from "@/errors/";
 
+import { createOpenAIApiErrorFixture } from "@tests/fixtures";
+
 describe("mapError", () => {
 	describe("Github API errors", () => {
 		describe("Octokit's RequestError mapping", () => {
@@ -223,7 +225,11 @@ describe("mapError", () => {
 		describe("APIError mapping", () => {
 			test("should map APIError to OpenAIApiError", () => {
 				const message = "Invalid request";
-				const error = new APIError(StatusCodes.BAD_REQUEST, { message }, message, {});
+				const error = createOpenAIApiErrorFixture({
+					status: StatusCodes.BAD_REQUEST,
+					error: { message },
+					message,
+				});
 
 				const mapped = mapError(error, "TranslatorService.callLanguageModel");
 
@@ -233,7 +239,11 @@ describe("mapError", () => {
 
 			test("should preserve error metadata", () => {
 				const message = "Bad request";
-				const error = new APIError(StatusCodes.BAD_REQUEST, { message }, message, {});
+				const error = createOpenAIApiErrorFixture({
+					status: StatusCodes.BAD_REQUEST,
+					error: { message },
+					message,
+				});
 
 				const mapped = mapError(error, "TranslatorService.callLanguageModel", {
 					model: "gpt-4",
@@ -328,7 +338,11 @@ describe("mapError", () => {
 			describe("Edge Cases", () => {
 				test("should handle APIError with empty message", () => {
 					const message = "";
-					const error = new APIError(StatusCodes.BAD_REQUEST, { message }, message, {});
+					const error = createOpenAIApiErrorFixture({
+						status: StatusCodes.BAD_REQUEST,
+						error: { message },
+						message,
+					});
 
 					const mapped = mapError(error, "TranslatorService.callLanguageModel");
 
@@ -338,7 +352,11 @@ describe("mapError", () => {
 
 				test("should handle APIError with special characters in message", () => {
 					const message = "Error: <script>alert('xss')</script>";
-					const error = new APIError(StatusCodes.BAD_REQUEST, { message }, message, {});
+					const error = createOpenAIApiErrorFixture({
+						status: StatusCodes.BAD_REQUEST,
+						error: { message },
+						message,
+					});
 
 					const mapped = mapError(error, "TranslatorService.callLanguageModel");
 

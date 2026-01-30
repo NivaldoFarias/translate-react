@@ -8,6 +8,7 @@ import type { TranslatorServiceDependencies } from "@/services/";
 
 import { localeService, TranslationFile, TranslatorService } from "@/services/";
 
+import { createOpenAIApiErrorFixture } from "@tests/fixtures";
 import {
 	createChatCompletionsMock,
 	createMockChatCompletion,
@@ -207,12 +208,10 @@ describe("TranslatorService", () => {
 		});
 
 		test("should handle API errors gracefully", () => {
-			const apiError = new APIError(
-				StatusCodes.INTERNAL_SERVER_ERROR,
-				{ message: "API Error" },
-				"API Error",
-				{},
-			);
+			const apiError = createOpenAIApiErrorFixture({
+				error: { message: "API Error" },
+				message: "API Error",
+			});
 			mockChatCompletionsCreate.mockRejectedValue(apiError);
 
 			const file: TranslationFile = new TranslationFile(
