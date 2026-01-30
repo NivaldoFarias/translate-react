@@ -422,7 +422,6 @@ If you're unable to resolve an issue:
 
 | Document                                       | Description                             |
 | ---------------------------------------------- | --------------------------------------- |
-| [ERROR_HANDLING.md](./ERROR_HANDLING.md)       | Error taxonomy and recovery mechanisms  |
 | [WORKFLOW.md](./WORKFLOW.md)                   | Execution workflow with timing analysis |
 | [ARCHITECTURE.md](./ARCHITECTURE.md)           | System architecture and service design  |
 | [PROJECT_STRUCTURE.md](./PROJECT_STRUCTURE.md) | Directory structure and file navigation |

@@ -180,10 +180,8 @@ export class TranslatorService {
 		});
 
 		if (!this.isLLMResponseValid(response)) {
-			this.logger.error({ response }, "Invalid LLM API response. Missing expected fields");
-
 			throw new ApplicationError(
-				"Invalid LLM API response. Missing expected fields",
+				"Invalid LLM API response",
 				ErrorCode.InitializationError,
 				`${TranslatorService.name}.${this.testConnectivity.name}`,
 				{ response },

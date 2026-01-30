@@ -1,11 +1,10 @@
 import { RequestError } from "@octokit/request-error";
 import { describe, expect, test } from "bun:test";
 import { StatusCodes } from "http-status-codes";
-import { APIError } from "openai/error";
 
 import { ErrorCode, mapError } from "@/errors/";
 
-import { createOpenAIApiErrorFixture } from "@tests/fixtures";
+import { createOctokitRequestErrorFixture, createOpenAIApiErrorFixture } from "@tests/fixtures";
 
 describe("mapError", () => {
 	describe("Github API errors", () => {
@@ -17,19 +16,7 @@ describe("mapError", () => {
 			])(
 				"should map %d status to %s error code when RequestError occurs",
 				(status, message, expectedCode) => {
-					const error = new RequestError(message, status, {
-						request: {
-							method: "GET",
-							url: "https://api.github.com/repos/test/test",
-							headers: {},
-						},
-						response: {
-							status,
-							url: "https://api.github.com/repos/test/test",
-							headers: {},
-							data: {},
-						},
-					});
+					const error = createOctokitRequestErrorFixture({ message, status });
 
 					const mapped = mapError(error, "test");
 
@@ -39,20 +26,10 @@ describe("mapError", () => {
 			);
 
 			test("should map RequestError with response headers", () => {
-				const error = new RequestError("Rate limited", StatusCodes.FORBIDDEN, {
-					request: {
-						method: "GET",
-						url: "https://api.github.com/repos/test/test",
-						headers: {},
-					},
-					response: {
-						status: StatusCodes.FORBIDDEN,
-						url: "https://api.github.com/repos/test/test",
-						headers: {
-							"x-ratelimit-remaining": "0",
-						},
-						data: {},
-					},
+				const error = createOctokitRequestErrorFixture({
+					message: "Rate limited",
+					status: StatusCodes.FORBIDDEN,
+					options: { response: { headers: { "x-ratelimit-remaining": "0" } } },
 				});
 
 				const mapped = mapError(error, "test");
@@ -62,19 +39,7 @@ describe("mapError", () => {
 			});
 
 			test("should map 500+ RequestError to OctokitRequestError", () => {
-				const error = new RequestError("Internal Server Error", StatusCodes.INTERNAL_SERVER_ERROR, {
-					request: {
-						method: "GET",
-						url: "https://api.github.com/repos/test/test",
-						headers: {},
-					},
-					response: {
-						status: StatusCodes.INTERNAL_SERVER_ERROR,
-						url: "https://api.github.com/repos/test/test",
-						headers: {},
-						data: {},
-					},
-				});
+				const error = createOctokitRequestErrorFixture();
 
 				const mapped = mapError(error, "test");
 
@@ -82,18 +47,9 @@ describe("mapError", () => {
 			});
 
 			test("should handle generic GitHub API RequestError", () => {
-				const error = new RequestError("Bad request", StatusCodes.BAD_REQUEST, {
-					request: {
-						method: "GET",
-						url: "https://api.github.com/repos/test/test",
-						headers: {},
-					},
-					response: {
-						status: StatusCodes.BAD_REQUEST,
-						url: "https://api.github.com/repos/test/test",
-						headers: {},
-						data: {},
-					},
+				const error = createOctokitRequestErrorFixture({
+					message: "Bad request",
+					status: StatusCodes.BAD_REQUEST,
 				});
 
 				const mapped = mapError(error, "test");
@@ -104,18 +60,10 @@ describe("mapError", () => {
 
 		describe("Error instance handling", () => {
 			test("should preserve operation and metadata", () => {
-				const error = new RequestError("Test error", StatusCodes.NOT_FOUND, {
-					request: {
-						method: "GET",
-						url: "https://api.github.com/repos/test/test",
-						headers: {},
-					},
-					response: {
-						status: StatusCodes.NOT_FOUND,
-						url: "https://api.github.com/repos/test/test",
-						headers: {},
-						data: {},
-					},
+				const error = createOctokitRequestErrorFixture({
+					message: "Test error",
+					status: StatusCodes.NOT_FOUND,
+					options: { response: { status: StatusCodes.NOT_FOUND } },
 				});
 
 				const mapped = mapError(error, "GitHub.getFile", {
@@ -145,18 +93,10 @@ describe("mapError", () => {
 			});
 
 			test("should include original error message in mapped error", () => {
-				const error = new RequestError("Specific error details", StatusCodes.BAD_REQUEST, {
-					request: {
-						method: "GET",
-						url: "https://api.github.com/repos/test/test",
-						headers: {},
-					},
-					response: {
-						status: StatusCodes.BAD_REQUEST,
-						url: "https://api.github.com/repos/test/test",
-						headers: {},
-						data: {},
-					},
+				const error = createOctokitRequestErrorFixture({
+					message: "Specific error details",
+					status: StatusCodes.BAD_REQUEST,
+					options: { response: { status: StatusCodes.BAD_REQUEST } },
 				});
 
 				const mapped = mapError(error, "test");
@@ -174,18 +114,10 @@ describe("mapError", () => {
 			});
 
 			test("should handle missing response headers in RequestError", () => {
-				const error = new RequestError("Error", StatusCodes.BAD_REQUEST, {
-					request: {
-						method: "GET",
-						url: "https://api.github.com/repos/test/test",
-						headers: {},
-					},
-					response: {
-						status: StatusCodes.BAD_REQUEST,
-						url: "https://api.github.com/repos/test/test",
-						headers: {},
-						data: {},
-					},
+				const error = createOctokitRequestErrorFixture({
+					message: "Error",
+					status: StatusCodes.BAD_REQUEST,
+					options: { response: { status: StatusCodes.BAD_REQUEST } },
 				});
 
 				const mapped = mapError(error, "test");

@@ -33,7 +33,6 @@ translate-react/
 │   └── docs/                                 # Technical documentation
 │       ├── ARCHITECTURE.md                   # System architecture and service design
 │       ├── WORKFLOW.md                       # Execution workflow analysis
-│       ├── ERROR_HANDLING.md                 # Error taxonomy and recovery mechanisms
 │       ├── TROUBLESHOOTING.md                # Troubleshooting and diagnostics
 │       ├── PROJECT_STRUCTURE.md              # This file
 │

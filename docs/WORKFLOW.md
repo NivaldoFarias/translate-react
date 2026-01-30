@@ -509,5 +509,4 @@ flowchart TD
 ## References
 
 - [Architecture Documentation](./ARCHITECTURE.md): Service design details
-- [Error Handling Documentation](./ERROR_HANDLING.md): Error taxonomy
 - [Project README](../README.md): High-level overview

@@ -31,6 +31,31 @@ describe("LocaleService", () => {
 		});
 	});
 
+	describe("hasLocale", () => {
+		test("returns true when language code is registered", () => {
+			const service = new LocaleService("pt-br");
+
+			expect(service.hasLocale("pt-br")).toBe(true);
+		});
+
+		test("returns false when language code is not registered", () => {
+			const service = new LocaleService("pt-br");
+
+			expect(service.hasLocale("ru")).toBe(false);
+		});
+	});
+
+	describe("getAvailableLocales", () => {
+		test("returns array of registered language codes", () => {
+			const service = new LocaleService("pt-br");
+
+			const locales = service.getAvailableLocales();
+
+			expect(locales).toContain("pt-br");
+			expect(Array.isArray(locales)).toBe(true);
+		});
+	});
+
 	describe("locale property", () => {
 		describe("comment", () => {
 			test("should have prefix property with translated text", () => {

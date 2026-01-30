@@ -11,54 +11,25 @@ import type {
 	ProcessedFileResult,
 } from "@/services/";
 
-import type { MockCommentBuilderService, MockOctokitGit, MockOctokitRepos } from "@tests/mocks";
+import type { MockOctokit } from "@tests/mocks";
 
 import { GitHubService, TranslationFile } from "@/services/";
 
 import {
+	createOctokitRequestErrorFixture,
 	createProcessedFileResultsFixture,
 	createRepositoryTreeItemFixture,
 	createTranslationFilesFixture,
 } from "@tests/fixtures";
-import {
-	createGitMocks,
-	createMockCommentBuilderService,
-	createMockOctokit,
-	createReposMocks,
-	testRepositories,
-} from "@tests/mocks";
+import { createMockCommentBuilderService, createMockOctokit, testRepositories } from "@tests/mocks";
 
 /** Creates test GitHubService with dependencies */
-function createTestGitHubService(
-	overrides?: Partial<GitHubServiceDependencies>,
-	gitMocks?: MockOctokitGit,
-	reposMocks?: MockOctokitRepos,
-	commentBuilderMock?: MockCommentBuilderService,
-): {
-	service: GitHubService;
-	mocks: {
-		git: MockOctokitGit;
-		repos: MockOctokitRepos;
-		commentBuilder: MockCommentBuilderService;
-	};
-} {
-	const git = gitMocks ?? createGitMocks();
-	const repos = reposMocks ?? createReposMocks();
-	const commentBuilder = commentBuilderMock ?? createMockCommentBuilderService();
-
-	const defaults = {
-		octokit: createMockOctokit({ git, repos }),
-		repositories: testRepositories,
-		commentBuilderService: commentBuilder,
-	};
-
-	return {
-		service: new GitHubService({
-			...(defaults as unknown as GitHubServiceDependencies),
-			...overrides,
-		}),
-		mocks: { git, repos, commentBuilder },
-	};
+function createTestGitHubService(overrides?: Partial<GitHubServiceDependencies>): GitHubService {
+	return new GitHubService({
+		octokit: overrides?.octokit ?? createMockOctokit(),
+		repositories: overrides?.repositories ?? testRepositories,
+		commentBuilderService: overrides?.commentBuilderService ?? createMockCommentBuilderService(),
+	} as GitHubServiceDependencies);
 }
 
 void mock.module("@/utils/setup-signal-handlers.util", () => ({
@@ -68,10 +39,8 @@ void mock.module("@/utils/setup-signal-handlers.util", () => ({
 }));
 
 describe("GitHubService", () => {
+	let octokitMock: MockOctokit;
 	let githubService: GitHubService;
-	let gitMocks: MockOctokitGit;
-	let reposMocks: MockOctokitRepos;
-	let commentBuilderMock: MockCommentBuilderService;
 
 	const mockFork = { owner: "test-fork-owner", repo: "test-fork-repo" };
 
@@ -80,44 +49,39 @@ describe("GitHubService", () => {
 	});
 
 	beforeEach(() => {
-		const { service, mocks } = createTestGitHubService();
-		githubService = service;
-		gitMocks = mocks.git;
-		reposMocks = mocks.repos;
-		commentBuilderMock = mocks.commentBuilder;
+		octokitMock = createMockOctokit();
+		githubService = createTestGitHubService({ octokit: octokitMock as unknown as Octokit });
 	});
-
-	// === Repository Methods ===
 
 	describe("Repository Operations", () => {
 		describe("getDefaultBranch", () => {
 			test("should return default branch for fork when target is fork", async () => {
 				const branch = await githubService.getDefaultBranch("fork");
 
-				expect(reposMocks.get).toHaveBeenCalledWith(testRepositories.fork);
+				expect(octokitMock.repos.get).toHaveBeenCalledWith(testRepositories.fork);
 				expect(branch).toBe("main");
 			});
 
 			test("should return default branch for upstream when target is upstream", async () => {
 				const branch = await githubService.getDefaultBranch("upstream");
 
-				expect(reposMocks.get).toHaveBeenCalledWith(testRepositories.upstream);
+				expect(octokitMock.repos.get).toHaveBeenCalledWith(testRepositories.upstream);
 				expect(branch).toBe("main");
 			});
 
 			test("should default to fork when no target is specified", async () => {
 				const branch = await githubService.getDefaultBranch();
 
-				expect(reposMocks.get).toHaveBeenCalledWith(testRepositories.fork);
+				expect(octokitMock.repos.get).toHaveBeenCalledWith(testRepositories.fork);
 				expect(branch).toBe("main");
 			});
 
 			test("should throw RequestError when API call fails", () => {
-				const notFoundError = new RequestError("Not Found", StatusCodes.NOT_FOUND, {
-					request: { method: "GET", url: "", headers: {} },
-					response: { status: StatusCodes.NOT_FOUND, url: "", headers: {}, data: {} },
+				const notFoundError = createOctokitRequestErrorFixture({
+					message: "Not Found",
+					status: StatusCodes.NOT_FOUND,
 				});
-				reposMocks.get.mockRejectedValueOnce(notFoundError);
+				octokitMock.repos.get.mockRejectedValueOnce(notFoundError);
 
 				expect(githubService.getDefaultBranch("fork")).rejects.toThrow(notFoundError);
 			});
@@ -127,7 +91,7 @@ describe("GitHubService", () => {
 			test("should return fork tree when target is fork", async () => {
 				const tree = await githubService.getRepositoryTree("fork", "main", false);
 
-				expect(gitMocks.getTree).toHaveBeenCalledWith({
+				expect(octokitMock.git.getTree).toHaveBeenCalledWith({
 					...testRepositories.fork,
 					tree_sha: "main",
 					recursive: "true",
@@ -138,7 +102,7 @@ describe("GitHubService", () => {
 			test("should return upstream tree when target is upstream", async () => {
 				const tree = await githubService.getRepositoryTree("upstream", "main", false);
 
-				expect(gitMocks.getTree).toHaveBeenCalledWith({
+				expect(octokitMock.git.getTree).toHaveBeenCalledWith({
 					...testRepositories.upstream,
 					tree_sha: "main",
 					recursive: "true",
@@ -149,7 +113,7 @@ describe("GitHubService", () => {
 			test("should default to fork when no target is specified", async () => {
 				const tree = await githubService.getRepositoryTree(undefined, "main", false);
 
-				expect(gitMocks.getTree).toHaveBeenCalledWith({
+				expect(octokitMock.git.getTree).toHaveBeenCalledWith({
 					...testRepositories.fork,
 					tree_sha: "main",
 					recursive: "true",
@@ -158,12 +122,12 @@ describe("GitHubService", () => {
 			});
 
 			test("should fetch default branch when base branch is not specified", async () => {
-				reposMocks.get.mockResolvedValueOnce({ data: { default_branch: "develop" } });
+				octokitMock.repos.get.mockResolvedValueOnce({ data: { default_branch: "develop" } });
 
 				await githubService.getRepositoryTree("fork", undefined, false);
 
-				expect(reposMocks.get).toHaveBeenCalledWith(testRepositories.fork);
-				expect(gitMocks.getTree).toHaveBeenCalledWith({
+				expect(octokitMock.repos.get).toHaveBeenCalledWith(testRepositories.fork);
+				expect(octokitMock.git.getTree).toHaveBeenCalledWith({
 					...testRepositories.fork,
 					tree_sha: "develop",
 					recursive: "true",
@@ -171,7 +135,7 @@ describe("GitHubService", () => {
 			});
 
 			test("should filter repository tree by default", async () => {
-				gitMocks.getTree.mockResolvedValueOnce({
+				octokitMock.git.getTree.mockResolvedValueOnce({
 					data: {
 						tree: [
 							{ path: "src/test/file.md", type: "blob", sha: "abc123", url: "", mode: "100644" },
@@ -189,7 +153,7 @@ describe("GitHubService", () => {
 			});
 
 			test("should not filter tree when filterIgnored is false", async () => {
-				gitMocks.getTree.mockResolvedValueOnce({
+				octokitMock.git.getTree.mockResolvedValueOnce({
 					data: {
 						tree: [
 							{ path: "src/test/file.md", type: "blob", sha: "abc123", url: "", mode: "100644" },
@@ -204,11 +168,12 @@ describe("GitHubService", () => {
 			});
 
 			test("should throw RequestError when API call fails", () => {
-				const forbiddenError = new RequestError("Forbidden", StatusCodes.FORBIDDEN, {
-					request: { method: "GET", url: "", headers: {} },
-					response: { status: StatusCodes.FORBIDDEN, url: "", headers: {}, data: {} },
+				const forbiddenError = createOctokitRequestErrorFixture({
+					message: "Forbidden",
+					status: StatusCodes.FORBIDDEN,
+					options: { response: { status: StatusCodes.FORBIDDEN } },
 				});
-				gitMocks.getTree.mockRejectedValueOnce(forbiddenError);
+				octokitMock.git.getTree.mockRejectedValueOnce(forbiddenError);
 
 				expect(githubService.getRepositoryTree("fork", "main")).rejects.toThrow(forbiddenError);
 			});
@@ -216,24 +181,15 @@ describe("GitHubService", () => {
 
 		describe("verifyTokenPermissions", () => {
 			test("should return true when token has valid permissions", async () => {
-				const mockOctokit = createMockOctokit();
-				const { service } = createTestGitHubService({
-					octokit: mockOctokit as unknown as Octokit,
-				});
-
-				const result = await service.verifyTokenPermissions();
+				const result = await githubService.verifyTokenPermissions();
 
 				expect(result).toBe(true);
 			});
 
 			test("should return false when token verification fails", async () => {
-				const mockOctokit = createMockOctokit();
-				mockOctokit.rest.repos.get.mockRejectedValueOnce(new Error("Unauthorized"));
-				const { service } = createTestGitHubService({
-					octokit: mockOctokit as unknown as Octokit,
-				});
+				octokitMock.rest.repos.get.mockRejectedValueOnce(new Error("Unauthorized"));
 
-				const result = await service.verifyTokenPermissions();
+				const result = await githubService.verifyTokenPermissions();
 
 				expect(result).toBe(false);
 			});
@@ -241,14 +197,14 @@ describe("GitHubService", () => {
 
 		describe("isBranchBehind", () => {
 			test("should return false when branches are up-to-date", async () => {
-				reposMocks.compareCommits.mockResolvedValue({
+				octokitMock.repos.compareCommits.mockResolvedValue({
 					data: { ahead_by: 0, behind_by: 0 },
 				});
 
 				const result = await githubService.isBranchBehind("feature-branch", "main", "fork");
 
 				expect(result).toBe(false);
-				expect(reposMocks.compareCommits).toHaveBeenCalledWith({
+				expect(octokitMock.repos.compareCommits).toHaveBeenCalledWith({
 					...testRepositories.fork,
 					base: "feature-branch",
 					head: "main",
@@ -256,7 +212,7 @@ describe("GitHubService", () => {
 			});
 
 			test("should return true when head is behind base", async () => {
-				reposMocks.compareCommits.mockResolvedValue({
+				octokitMock.repos.compareCommits.mockResolvedValue({
 					data: { ahead_by: 5, behind_by: 0 },
 				});
 
@@ -266,7 +222,7 @@ describe("GitHubService", () => {
 			});
 
 			test("should return false when head is ahead of base", async () => {
-				reposMocks.compareCommits.mockResolvedValue({
+				octokitMock.repos.compareCommits.mockResolvedValue({
 					data: { ahead_by: 0, behind_by: 3 },
 				});
 
@@ -276,13 +232,13 @@ describe("GitHubService", () => {
 			});
 
 			test("should use fork repository config by default", async () => {
-				reposMocks.compareCommits.mockResolvedValue({
+				octokitMock.repos.compareCommits.mockResolvedValue({
 					data: { ahead_by: 0, behind_by: 0 },
 				});
 
 				await githubService.isBranchBehind("feature-branch", "main");
 
-				expect(reposMocks.compareCommits).toHaveBeenCalledWith({
+				expect(octokitMock.repos.compareCommits).toHaveBeenCalledWith({
 					...testRepositories.fork,
 					base: "feature-branch",
 					head: "main",
@@ -290,7 +246,7 @@ describe("GitHubService", () => {
 			});
 
 			test("should return false when comparison fails", async () => {
-				reposMocks.compareCommits.mockRejectedValue(new Error("API error"));
+				octokitMock.repos.compareCommits.mockRejectedValue(new Error("API error"));
 
 				const result = await githubService.isBranchBehind("feature-branch", "main", "fork");
 
@@ -301,15 +257,16 @@ describe("GitHubService", () => {
 		describe("forkExists", () => {
 			test("should resolve when fork exists", () => {
 				expect(githubService.forkExists()).resolves.toBeUndefined();
-				expect(reposMocks.get).toHaveBeenCalledWith(testRepositories.fork);
+				expect(octokitMock.repos.get).toHaveBeenCalledWith(testRepositories.fork);
 			});
 
 			test("should throw RequestError when fork does not exist", () => {
-				const notFoundError = new RequestError("Not Found", StatusCodes.NOT_FOUND, {
-					request: { method: "GET", url: "", headers: {} },
-					response: { status: StatusCodes.NOT_FOUND, url: "", headers: {}, data: {} },
+				const notFoundError = createOctokitRequestErrorFixture({
+					message: "Not Found",
+					status: StatusCodes.NOT_FOUND,
+					options: { response: { status: StatusCodes.NOT_FOUND } },
 				});
-				reposMocks.get.mockRejectedValueOnce(notFoundError);
+				octokitMock.repos.get.mockRejectedValueOnce(notFoundError);
 
 				expect(githubService.forkExists()).rejects.toThrow(notFoundError);
 			});
@@ -318,10 +275,10 @@ describe("GitHubService", () => {
 		describe("isForkSynced", () => {
 			test("should return true when fork and upstream have same latest commit", async () => {
 				const sharedSha = "same-commit-sha-12345";
-				reposMocks.listCommits.mockResolvedValueOnce({
+				octokitMock.repos.listCommits.mockResolvedValueOnce({
 					data: [{ sha: sharedSha }],
 				} as RestEndpointMethodTypes["repos"]["listCommits"]["response"]);
-				reposMocks.listCommits.mockResolvedValueOnce({
+				octokitMock.repos.listCommits.mockResolvedValueOnce({
 					data: [{ sha: sharedSha }],
 				} as RestEndpointMethodTypes["repos"]["listCommits"]["response"]);
 
@@ -332,7 +289,7 @@ describe("GitHubService", () => {
 
 			test("should return false when fork and upstream have different commits", async () => {
 				let callCount = 0;
-				reposMocks.listCommits.mockImplementation(() => {
+				octokitMock.repos.listCommits.mockImplementation(() => {
 					callCount++;
 					return Promise.resolve({
 						data: [
@@ -350,7 +307,7 @@ describe("GitHubService", () => {
 			});
 
 			test("should return false when API call fails", async () => {
-				reposMocks.get.mockRejectedValueOnce(new Error("API Error"));
+				octokitMock.repos.get.mockRejectedValueOnce(new Error("API Error"));
 
 				const result = await githubService.isForkSynced();
 
@@ -360,28 +317,19 @@ describe("GitHubService", () => {
 
 		describe("syncFork", () => {
 			test("should return true when fork is synced successfully", async () => {
-				const mockOctokit = createMockOctokit();
-				const { service } = createTestGitHubService({
-					octokit: mockOctokit as unknown as Octokit,
-				});
-
-				const result = await service.syncFork();
+				const result = await githubService.syncFork();
 
 				expect(result).toBe(true);
-				expect(mockOctokit.repos.mergeUpstream).toHaveBeenCalledWith({
+				expect(octokitMock.repos.mergeUpstream).toHaveBeenCalledWith({
 					...testRepositories.fork,
 					branch: "main",
 				});
 			});
 
 			test("should return false when sync fails", async () => {
-				const mockOctokit = createMockOctokit();
-				mockOctokit.repos.mergeUpstream = mock(() => Promise.reject(new Error("Merge conflict")));
-				const { service } = createTestGitHubService({
-					octokit: mockOctokit as unknown as Octokit,
-				});
+				octokitMock.repos.mergeUpstream.mockRejectedValueOnce(new Error("Merge conflict"));
 
-				const result = await service.syncFork();
+				const result = await githubService.syncFork();
 
 				expect(result).toBe(false);
 			});
@@ -390,7 +338,7 @@ describe("GitHubService", () => {
 		describe("fetchGlossary", () => {
 			test("should return glossary content when file exists", async () => {
 				const glossaryContent = "React - React\ncomponent - componente";
-				reposMocks.getContent.mockResolvedValueOnce({
+				octokitMock.repos.getContent.mockResolvedValueOnce({
 					data: {
 						content: Buffer.from(glossaryContent).toString("base64"),
 						encoding: "base64",
@@ -402,14 +350,14 @@ describe("GitHubService", () => {
 				const result = await githubService.fetchGlossary();
 
 				expect(result).toBe(glossaryContent);
-				expect(reposMocks.getContent).toHaveBeenCalledWith({
+				expect(octokitMock.repos.getContent).toHaveBeenCalledWith({
 					...testRepositories.upstream,
 					path: "GLOSSARY.md",
 				});
 			});
 
 			test("should return null when glossary file has no content", async () => {
-				reposMocks.getContent.mockResolvedValueOnce({ data: {} });
+				octokitMock.repos.getContent.mockResolvedValueOnce({ data: {} });
 
 				const result = await githubService.fetchGlossary();
 
@@ -417,7 +365,7 @@ describe("GitHubService", () => {
 			});
 
 			test("should return null when glossary file does not exist", async () => {
-				reposMocks.getContent.mockRejectedValueOnce(
+				octokitMock.repos.getContent.mockRejectedValueOnce(
 					Object.assign(new Error("Not Found"), { status: StatusCodes.NOT_FOUND }),
 				);
 
@@ -428,19 +376,17 @@ describe("GitHubService", () => {
 		});
 	});
 
-	// === Branch Methods ===
-
 	describe("Branch Operations", () => {
 		describe("createBranch", () => {
 			test("should create branch from main when no base branch is specified", async () => {
 				const result = await githubService.createBranch("feature/test");
 
-				expect(gitMocks.getRef).toHaveBeenCalledWith({
+				expect(octokitMock.git.getRef).toHaveBeenCalledWith({
 					...mockFork,
 					ref: "heads/main",
 				});
 
-				expect(gitMocks.createRef).toHaveBeenCalledWith({
+				expect(octokitMock.git.createRef).toHaveBeenCalledWith({
 					...mockFork,
 					ref: "refs/heads/feature/test",
 					sha: "abc123def456",
@@ -453,14 +399,14 @@ describe("GitHubService", () => {
 			test("should create branch from specified base branch when base branch is provided", async () => {
 				await githubService.createBranch("feature/test", "develop");
 
-				expect(gitMocks.getRef).toHaveBeenCalledWith({
+				expect(octokitMock.git.getRef).toHaveBeenCalledWith({
 					...mockFork,
 					ref: "heads/develop",
 				});
 			});
 
 			test("should handle branch creation errors when error occurs", () => {
-				gitMocks.createRef.mockImplementation(() =>
+				octokitMock.git.createRef.mockImplementation(() =>
 					Promise.reject(new Error("Branch creation failed")),
 				);
 
@@ -470,7 +416,9 @@ describe("GitHubService", () => {
 			});
 
 			test("should handle base branch not found error", () => {
-				gitMocks.getRef.mockImplementation(() => Promise.reject(new Error("Reference not found")));
+				octokitMock.git.getRef.mockImplementation(() =>
+					Promise.reject(new Error("Reference not found")),
+				);
 
 				expect(githubService.createBranch("feature/test", "nonexistent")).rejects.toThrow(
 					"Reference not found",
@@ -482,7 +430,7 @@ describe("GitHubService", () => {
 			test("should retrieve branch information when branch exists", async () => {
 				const result = await githubService.getBranch("main");
 
-				expect(gitMocks.getRef).toHaveBeenCalledWith({
+				expect(octokitMock.git.getRef).toHaveBeenCalledWith({
 					...mockFork,
 					ref: "heads/main",
 				});
@@ -492,10 +440,11 @@ describe("GitHubService", () => {
 			});
 
 			test("should return undefined for non-existent branch (404)", async () => {
-				const notFoundError = new RequestError("Not Found", StatusCodes.NOT_FOUND, {
-					request: { headers: {}, method: "GET", url: "" },
+				const notFoundError = createOctokitRequestErrorFixture({
+					message: "Not Found",
+					status: StatusCodes.NOT_FOUND,
 				});
-				gitMocks.getRef.mockImplementation(() => Promise.reject(notFoundError));
+				octokitMock.git.getRef.mockImplementation(() => Promise.reject(notFoundError));
 
 				const result = await githubService.getBranch("nonexistent");
 
@@ -503,11 +452,11 @@ describe("GitHubService", () => {
 			});
 
 			test("should re-throw non-404 errors", () => {
-				const forbiddenError = new RequestError("Forbidden", StatusCodes.FORBIDDEN, {
-					request: { method: "GET", url: "", headers: {} },
-					response: { status: StatusCodes.FORBIDDEN, url: "", headers: {}, data: {} },
+				const forbiddenError = createOctokitRequestErrorFixture({
+					message: "Forbidden",
+					status: StatusCodes.FORBIDDEN,
 				});
-				gitMocks.getRef.mockImplementation(() => Promise.reject(forbiddenError));
+				octokitMock.git.getRef.mockImplementation(() => Promise.reject(forbiddenError));
 
 				expect(githubService.getBranch("protected")).rejects.toThrow(forbiddenError);
 			});
@@ -519,7 +468,7 @@ describe("GitHubService", () => {
 
 				const result = await githubService.deleteBranch("feature/test");
 
-				expect(gitMocks.deleteRef).toHaveBeenCalledWith({
+				expect(octokitMock.git.deleteRef).toHaveBeenCalledWith({
 					...mockFork,
 					ref: "heads/feature/test",
 				});
@@ -529,14 +478,14 @@ describe("GitHubService", () => {
 
 			test("should not remove branch from tracking when deletion fails", async () => {
 				await githubService.createBranch("feature/test");
-				gitMocks.deleteRef.mockImplementation(() => Promise.reject(new Error("Deletion failed")));
+				octokitMock.git.deleteRef.mockImplementation(() =>
+					Promise.reject(new Error("Deletion failed")),
+				);
 
 				expect(githubService.deleteBranch("feature/test")).rejects.toThrow("Deletion failed");
 			});
 		});
 	});
-
-	// === Content/PR Methods ===
 
 	describe("Content and Pull Request Operations", () => {
 		let fixtures: {
@@ -582,11 +531,12 @@ describe("GitHubService", () => {
 			});
 
 			test("should throw RequestError when commit fails", () => {
-				const commitError = new RequestError("Commit failed", StatusCodes.BAD_REQUEST, {
-					request: { method: "PUT", url: "", headers: {} },
-					response: { status: StatusCodes.BAD_REQUEST, url: "", headers: {}, data: {} },
+				const commitError = createOctokitRequestErrorFixture({
+					message: "Commit failed",
+					status: StatusCodes.BAD_REQUEST,
+					options: { request: { method: "PUT" }, response: { status: StatusCodes.BAD_REQUEST } },
 				});
-				reposMocks.createOrUpdateFileContents.mockRejectedValueOnce(commitError);
+				octokitMock.repos.createOrUpdateFileContents.mockRejectedValueOnce(commitError);
 
 				const mockBranch = {
 					ref: "refs/heads/translate/test",
@@ -610,12 +560,7 @@ describe("GitHubService", () => {
 
 		describe("createPullRequest", () => {
 			test("should create pull request when valid PR data is provided", async () => {
-				const mockOctokit = createMockOctokit();
-				const { service } = createTestGitHubService({
-					octokit: mockOctokit as unknown as Octokit,
-				});
-
-				const pr = await service.createPullRequest({
+				const pr = await githubService.createPullRequest({
 					branch: "translate/test",
 					title: "test: new translation",
 					body: "Adds test translation",
@@ -626,36 +571,31 @@ describe("GitHubService", () => {
 			});
 
 			test("should use custom base branch when specified", async () => {
-				const mockOctokit = createMockOctokit();
-				const { service } = createTestGitHubService({
-					octokit: mockOctokit as unknown as Octokit,
-				});
-
-				await service.createPullRequest({
+				await githubService.createPullRequest({
 					branch: "translate/test",
 					title: "Test PR",
 					body: "Test body",
 					baseBranch: "develop",
 				});
 
-				expect(mockOctokit.pulls.create).toHaveBeenCalledWith(
+				expect(octokitMock.pulls.create).toHaveBeenCalledWith(
 					expect.objectContaining({ base: "develop" }),
 				);
 			});
 
 			test("should throw RequestError when PR creation fails", () => {
-				const mockOctokit = createMockOctokit();
-				const prError = new RequestError("PR creation failed", StatusCodes.UNPROCESSABLE_ENTITY, {
-					request: { method: "POST", url: "", headers: {} },
-					response: { status: StatusCodes.UNPROCESSABLE_ENTITY, url: "", headers: {}, data: {} },
+				const prError = createOctokitRequestErrorFixture({
+					status: StatusCodes.UNPROCESSABLE_ENTITY,
+					message: "PR creation failed",
+					options: {
+						request: { method: "POST" },
+						response: { status: StatusCodes.UNPROCESSABLE_ENTITY },
+					},
 				});
-				mockOctokit.pulls.create.mockRejectedValueOnce(prError);
-				const { service } = createTestGitHubService({
-					octokit: mockOctokit as unknown as Octokit,
-				});
+				octokitMock.pulls.create.mockRejectedValueOnce(prError);
 
 				expect(
-					service.createPullRequest({
+					githubService.createPullRequest({
 						branch: "translate/test",
 						title: "Test PR",
 						body: "Test body",
@@ -681,11 +621,15 @@ describe("GitHubService", () => {
 			});
 
 			test("should handle file content errors when file does not exist", () => {
-				const notFoundError = new RequestError("Not Found", StatusCodes.NOT_FOUND, {
-					request: { method: "GET", url: "", headers: {} },
-					response: { status: StatusCodes.NOT_FOUND, url: "", headers: {}, data: {} },
+				const notFoundError = createOctokitRequestErrorFixture({
+					status: StatusCodes.NOT_FOUND,
+					message: "Not Found",
+					options: {
+						request: { method: "GET" },
+						response: { status: StatusCodes.NOT_FOUND },
+					},
 				});
-				gitMocks.getBlob.mockRejectedValueOnce(notFoundError);
+				octokitMock.git.getBlob.mockRejectedValueOnce(notFoundError);
 
 				const repoTreeItem: PatchedRepositoryTreeItem = createRepositoryTreeItemFixture({
 					path: "src/test/non-existent.md",
@@ -699,159 +643,110 @@ describe("GitHubService", () => {
 
 		describe("listOpenPullRequests", () => {
 			test("should return list of open pull requests when called", async () => {
-				const mockOctokit = createMockOctokit();
-				mockOctokit.pulls.list.mockResolvedValueOnce({
+				octokitMock.pulls.list.mockResolvedValueOnce({
 					data: [
 						{ number: 1, title: "PR 1" },
 						{ number: 2, title: "PR 2" },
 					],
 				} as RestEndpointMethodTypes["pulls"]["list"]["response"]);
-				const { service } = createTestGitHubService({
-					octokit: mockOctokit as unknown as Octokit,
-				});
 
-				const prs = await service.listOpenPullRequests();
+				const prs = await githubService.listOpenPullRequests();
 
 				expect(prs).toHaveLength(2);
-				expect(mockOctokit.pulls.list).toHaveBeenCalledWith({
+				expect(octokitMock.pulls.list).toHaveBeenCalledWith({
 					...testRepositories.upstream,
 					state: "open",
 				});
 			});
 
 			test("should return empty array when no open PRs exist", async () => {
-				const mockOctokit = createMockOctokit();
-				mockOctokit.pulls.list.mockResolvedValueOnce({ data: [] });
-				const { service } = createTestGitHubService({
-					octokit: mockOctokit as unknown as Octokit,
-				});
+				octokitMock.pulls.list.mockResolvedValueOnce({ data: [] });
 
-				const prs = await service.listOpenPullRequests();
+				const prs = await githubService.listOpenPullRequests();
 
 				expect(prs).toHaveLength(0);
 			});
 
 			test("should throw RequestError when API call fails", () => {
-				const mockOctokit = createMockOctokit();
-				const apiError = new RequestError("API Error", StatusCodes.INTERNAL_SERVER_ERROR, {
-					request: { method: "GET", url: "", headers: {} },
-					response: { status: StatusCodes.INTERNAL_SERVER_ERROR, url: "", headers: {}, data: {} },
-				});
-				mockOctokit.pulls.list.mockRejectedValueOnce(apiError);
-				const { service } = createTestGitHubService({
-					octokit: mockOctokit as unknown as Octokit,
-				});
+				const apiError = createOctokitRequestErrorFixture({ message: "API Error" });
+				octokitMock.pulls.list.mockRejectedValueOnce(apiError);
 
-				expect(service.listOpenPullRequests()).rejects.toThrow(apiError);
+				expect(githubService.listOpenPullRequests()).rejects.toThrow(apiError);
 			});
 		});
 
 		describe("getPullRequestFiles", () => {
 			test("should return list of file paths when PR has files", async () => {
-				const mockOctokit = createMockOctokit();
-				mockOctokit.pulls.listFiles.mockResolvedValueOnce({
+				octokitMock.pulls.listFiles.mockResolvedValueOnce({
 					data: [{ filename: "src/file1.md" }, { filename: "src/file2.md" }],
 				} as RestEndpointMethodTypes["pulls"]["listFiles"]["response"]);
-				const { service } = createTestGitHubService({
-					octokit: mockOctokit as unknown as Octokit,
-				});
 
-				const files = await service.getPullRequestFiles(123);
+				const files = await githubService.getPullRequestFiles(123);
 
 				expect(files).toEqual(["src/file1.md", "src/file2.md"]);
-				expect(mockOctokit.pulls.listFiles).toHaveBeenCalledWith({
+				expect(octokitMock.pulls.listFiles).toHaveBeenCalledWith({
 					...testRepositories.upstream,
 					pull_number: 123,
 				});
 			});
 
 			test("should return empty array when PR has no files", async () => {
-				const mockOctokit = createMockOctokit();
-				mockOctokit.pulls.listFiles.mockResolvedValueOnce({ data: [] });
-				const { service } = createTestGitHubService({
-					octokit: mockOctokit as unknown as Octokit,
-				});
+				octokitMock.pulls.listFiles.mockResolvedValueOnce({ data: [] });
 
-				const files = await service.getPullRequestFiles(123);
+				const files = await githubService.getPullRequestFiles(123);
 
 				expect(files).toEqual([]);
 			});
 
 			test("should throw RequestError when API call fails", () => {
-				const mockOctokit = createMockOctokit();
-				const apiError = new RequestError("API Error", StatusCodes.INTERNAL_SERVER_ERROR, {
-					request: { method: "GET", url: "", headers: {} },
-					response: { status: StatusCodes.INTERNAL_SERVER_ERROR, url: "", headers: {}, data: {} },
-				});
-				mockOctokit.pulls.listFiles.mockRejectedValueOnce(apiError);
-				const { service } = createTestGitHubService({
-					octokit: mockOctokit as unknown as Octokit,
-				});
+				const apiError = createOctokitRequestErrorFixture({ message: "API Error" });
+				octokitMock.pulls.listFiles.mockRejectedValueOnce(apiError);
 
-				expect(service.getPullRequestFiles(123)).rejects.toThrow(apiError);
+				expect(githubService.getPullRequestFiles(123)).rejects.toThrow(apiError);
 			});
 		});
 
 		describe("findPullRequestByBranch", () => {
 			test("should return PR when branch matches", async () => {
-				const mockOctokit = createMockOctokit();
-				mockOctokit.pulls.list.mockResolvedValueOnce({
+				octokitMock.pulls.list.mockResolvedValueOnce({
 					data: [{ number: 1, head: { ref: "translate/test" }, title: "Test PR" }],
 				} as RestEndpointMethodTypes["pulls"]["list"]["response"]);
-				const { service } = createTestGitHubService({
-					octokit: mockOctokit as unknown as Octokit,
-				});
 
-				const pr = await service.findPullRequestByBranch("translate/test");
+				const pr = await githubService.findPullRequestByBranch("translate/test");
 
 				expect(pr?.number).toBe(1);
-				expect(mockOctokit.pulls.list).toHaveBeenCalledWith({
+				expect(octokitMock.pulls.list).toHaveBeenCalledWith({
 					...testRepositories.upstream,
 					head: `${testRepositories.fork.owner}:translate/test`,
 				});
 			});
 
 			test("should return undefined when no PR matches branch", async () => {
-				const mockOctokit = createMockOctokit();
-				mockOctokit.pulls.list.mockResolvedValueOnce({ data: [] });
-				const { service } = createTestGitHubService({
-					octokit: mockOctokit as unknown as Octokit,
-				});
+				octokitMock.pulls.list.mockResolvedValueOnce({ data: [] });
 
-				const pr = await service.findPullRequestByBranch("translate/test");
+				const pr = await githubService.findPullRequestByBranch("translate/test");
 
 				expect(pr).toBeUndefined();
 			});
 
 			test("should throw RequestError when API call fails", () => {
-				const mockOctokit = createMockOctokit();
-				const apiError = new RequestError("API Error", StatusCodes.INTERNAL_SERVER_ERROR, {
-					request: { method: "GET", url: "", headers: {} },
-					response: { status: StatusCodes.INTERNAL_SERVER_ERROR, url: "", headers: {}, data: {} },
-				});
-				mockOctokit.pulls.list.mockRejectedValueOnce(apiError);
-				const { service } = createTestGitHubService({
-					octokit: mockOctokit as unknown as Octokit,
-				});
+				const apiError = createOctokitRequestErrorFixture({ message: "API Error" });
+				octokitMock.pulls.list.mockRejectedValueOnce(apiError);
 
-				expect(service.findPullRequestByBranch("translate/test")).rejects.toThrow(apiError);
+				expect(githubService.findPullRequestByBranch("translate/test")).rejects.toThrow(apiError);
 			});
 		});
 
 		describe("createCommentOnPullRequest", () => {
 			test("should create comment on PR successfully", async () => {
-				const mockOctokit = createMockOctokit();
-				mockOctokit.issues.createComment.mockResolvedValueOnce({
+				octokitMock.issues.createComment.mockResolvedValueOnce({
 					data: { id: 123, body: "Test comment" },
 				});
-				const { service } = createTestGitHubService({
-					octokit: mockOctokit as unknown as Octokit,
-				});
 
-				const result = await service.createCommentOnPullRequest(42, "Test comment");
+				const result = await githubService.createCommentOnPullRequest(42, "Test comment");
 
 				expect(result.data.id).toBe(123);
-				expect(mockOctokit.issues.createComment).toHaveBeenCalledWith({
+				expect(octokitMock.issues.createComment).toHaveBeenCalledWith({
 					...testRepositories.upstream,
 					issue_number: 42,
 					body: "Test comment",
@@ -859,24 +754,20 @@ describe("GitHubService", () => {
 			});
 
 			test("should throw RequestError when comment creation fails", () => {
-				const mockOctokit = createMockOctokit();
-				const commentError = new RequestError("Comment failed", StatusCodes.BAD_REQUEST, {
-					request: { method: "POST", url: "", headers: {} },
-					response: { status: StatusCodes.BAD_REQUEST, url: "", headers: {}, data: {} },
+				const commentError = createOctokitRequestErrorFixture({
+					message: "Comment failed",
+					status: StatusCodes.BAD_REQUEST,
+					options: { request: { method: "POST" }, response: { status: StatusCodes.BAD_REQUEST } },
 				});
-				mockOctokit.issues.createComment.mockRejectedValueOnce(commentError);
-				const { service } = createTestGitHubService({
-					octokit: mockOctokit as unknown as Octokit,
-				});
+				octokitMock.issues.createComment.mockRejectedValueOnce(commentError);
 
-				expect(service.createCommentOnPullRequest(42, "Test")).rejects.toThrow(commentError);
+				expect(githubService.createCommentOnPullRequest(42, "Test")).rejects.toThrow(commentError);
 			});
 		});
 
 		describe("checkPullRequestStatus", () => {
 			test("should return clean status when PR is mergeable", async () => {
-				const mockOctokit = createMockOctokit();
-				mockOctokit.pulls.get.mockImplementation(() =>
+				octokitMock.pulls.get.mockImplementation(() =>
 					Promise.resolve({
 						data: {
 							number: 1,
@@ -885,11 +776,8 @@ describe("GitHubService", () => {
 						},
 					}),
 				);
-				const { service } = createTestGitHubService({
-					octokit: mockOctokit as unknown as Octokit,
-				});
 
-				const status = await service.checkPullRequestStatus(1);
+				const status = await githubService.checkPullRequestStatus(1);
 
 				expect(status.hasConflicts).toBe(false);
 				expect(status.needsUpdate).toBe(false);
@@ -897,15 +785,11 @@ describe("GitHubService", () => {
 			});
 
 			test("should return dirty status when PR has conflicts", async () => {
-				const mockOctokit = createMockOctokit();
-				mockOctokit.pulls.get.mockResolvedValueOnce({
+				octokitMock.pulls.get.mockResolvedValueOnce({
 					data: { number: 1, mergeable: false, mergeable_state: "dirty" },
 				});
-				const { service } = createTestGitHubService({
-					octokit: mockOctokit as unknown as Octokit,
-				});
 
-				const status = await service.checkPullRequestStatus(1);
+				const status = await githubService.checkPullRequestStatus(1);
 
 				expect(status.hasConflicts).toBe(true);
 				expect(status.needsUpdate).toBe(true);
@@ -913,15 +797,11 @@ describe("GitHubService", () => {
 			});
 
 			test("should return behind status without conflicts", async () => {
-				const mockOctokit = createMockOctokit();
-				mockOctokit.pulls.get.mockResolvedValueOnce({
+				octokitMock.pulls.get.mockResolvedValueOnce({
 					data: { number: 1, mergeable: true, mergeable_state: "behind" },
 				});
-				const { service } = createTestGitHubService({
-					octokit: mockOctokit as unknown as Octokit,
-				});
 
-				const status = await service.checkPullRequestStatus(1);
+				const status = await githubService.checkPullRequestStatus(1);
 
 				expect(status.hasConflicts).toBe(false);
 				expect(status.needsUpdate).toBe(false);
@@ -929,32 +809,21 @@ describe("GitHubService", () => {
 			});
 
 			test("should throw RequestError when API call fails", () => {
-				const mockOctokit = createMockOctokit();
-				const apiError = new RequestError("API Error", StatusCodes.INTERNAL_SERVER_ERROR, {
-					request: { method: "GET", url: "", headers: {} },
-					response: { status: StatusCodes.INTERNAL_SERVER_ERROR, url: "", headers: {}, data: {} },
-				});
-				mockOctokit.pulls.get.mockImplementation(() => Promise.reject(apiError));
-				const { service } = createTestGitHubService({
-					octokit: mockOctokit as unknown as Octokit,
-				});
+				const apiError = createOctokitRequestErrorFixture({ message: "API Error" });
+				octokitMock.pulls.get.mockImplementation(() => Promise.reject(apiError));
 
-				expect(service.checkPullRequestStatus(1)).rejects.toThrow(apiError);
+				expect(githubService.checkPullRequestStatus(1)).rejects.toThrow(apiError);
 			});
 		});
 
 		describe("closePullRequest", () => {
 			test("should close PR successfully", async () => {
-				const mockOctokit = createMockOctokit();
-				mockOctokit.pulls.update.mockResolvedValueOnce({ data: { number: 42, state: "closed" } });
-				const { service } = createTestGitHubService({
-					octokit: mockOctokit as unknown as Octokit,
-				});
+				octokitMock.pulls.update.mockResolvedValueOnce({ data: { number: 42, state: "closed" } });
 
-				const result = await service.closePullRequest(42);
+				const result = await githubService.closePullRequest(42);
 
 				expect(result.state).toBe("closed");
-				expect(mockOctokit.pulls.update).toHaveBeenCalledWith({
+				expect(octokitMock.pulls.update).toHaveBeenCalledWith({
 					...testRepositories.upstream,
 					pull_number: 42,
 					state: "closed",
@@ -962,32 +831,25 @@ describe("GitHubService", () => {
 			});
 
 			test("should throw RequestError when PR closure fails", () => {
-				const mockOctokit = createMockOctokit();
-				const closeError = new RequestError("Close failed", StatusCodes.BAD_REQUEST, {
-					request: { method: "PATCH", url: "", headers: {} },
-					response: { status: StatusCodes.BAD_REQUEST, url: "", headers: {}, data: {} },
+				const closeError = createOctokitRequestErrorFixture({
+					message: "Close failed",
+					status: StatusCodes.BAD_REQUEST,
+					options: { request: { method: "PATCH" }, response: { status: StatusCodes.BAD_REQUEST } },
 				});
-				mockOctokit.pulls.update.mockRejectedValueOnce(closeError);
-				const { service } = createTestGitHubService({
-					octokit: mockOctokit as unknown as Octokit,
-				});
+				octokitMock.pulls.update.mockRejectedValueOnce(closeError);
 
-				expect(service.closePullRequest(42)).rejects.toThrow(closeError);
+				expect(githubService.closePullRequest(42)).rejects.toThrow(closeError);
 			});
 		});
 
 		describe("commentCompiledResultsOnIssue", () => {
 			test("should log error when no progress issue is found", () => {
-				const mockOctokit = createMockOctokit();
-				mockOctokit.rest.search.issuesAndPullRequests.mockResolvedValueOnce({
+				octokitMock.rest.search.issuesAndPullRequests.mockResolvedValueOnce({
 					data: { total_count: 0, items: [] },
-				});
-				const { service } = createTestGitHubService({
-					octokit: mockOctokit as unknown as Octokit,
 				});
 
 				expect(
-					service.commentCompiledResultsOnIssue(
+					githubService.commentCompiledResultsOnIssue(
 						fixtures.processedFileResults,
 						fixtures.translationFiles,
 					),
@@ -995,8 +857,7 @@ describe("GitHubService", () => {
 			});
 
 			test("should create a new comment when progress issue exists", async () => {
-				const mockOctokit = createMockOctokit();
-				mockOctokit.rest.search.issuesAndPullRequests.mockResolvedValueOnce({
+				octokitMock.rest.search.issuesAndPullRequests.mockResolvedValueOnce({
 					data: {
 						items: [
 							{ number: 123, state: "open" } as components["schemas"]["issue-search-result-item"],
@@ -1005,19 +866,16 @@ describe("GitHubService", () => {
 					},
 				});
 
-				mockOctokit.issues.createComment.mockResolvedValueOnce({
+				octokitMock.issues.createComment.mockResolvedValueOnce({
 					data: { id: 1, html_url: "https://github.com/test/test/issues/123#comment-1" },
 				});
-				const { service } = createTestGitHubService({
-					octokit: mockOctokit as unknown as Octokit,
-				});
 
-				const result = await service.commentCompiledResultsOnIssue(
+				const result = await githubService.commentCompiledResultsOnIssue(
 					fixtures.processedFileResults,
 					fixtures.translationFiles,
 				);
 				expect(result).toBeDefined();
-				expect(mockOctokit.issues.createComment).toHaveBeenCalledWith(
+				expect(octokitMock.issues.createComment).toHaveBeenCalledWith(
 					expect.objectContaining({
 						issue_number: 123,
 					}),
@@ -1025,12 +883,7 @@ describe("GitHubService", () => {
 			});
 
 			test("should skip commenting when no results to report", async () => {
-				const mockOctokit = createMockOctokit();
-				const { service } = createTestGitHubService({
-					octokit: mockOctokit as unknown as Octokit,
-				});
-
-				const result = await service.commentCompiledResultsOnIssue(
+				const result = await githubService.commentCompiledResultsOnIssue(
 					createProcessedFileResultsFixture({ count: 0 }),
 					fixtures.translationFiles,
 				);
@@ -1039,12 +892,7 @@ describe("GitHubService", () => {
 			});
 
 			test("should skip commenting when no files to translate", async () => {
-				const mockOctokit = createMockOctokit();
-				const { service } = createTestGitHubService({
-					octokit: mockOctokit as unknown as Octokit,
-				});
-
-				const result = await service.commentCompiledResultsOnIssue(
+				const result = await githubService.commentCompiledResultsOnIssue(
 					fixtures.processedFileResults,
 					createTranslationFilesFixture({ count: 0 }),
 				);

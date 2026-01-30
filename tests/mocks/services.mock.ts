@@ -5,6 +5,8 @@ import type { RestEndpointMethodTypes } from "@octokit/rest";
 import type { LanguageAnalysisResult, PullRequestStatus } from "@/services/";
 import type { ReactLanguageCode } from "@/utils/constants.util";
 
+import { createLanguageAnalysisResultFixture, createTranslationFileFixture } from "@tests/fixtures";
+
 /**
  * Creates a mock CommentBuilderService for testing.
  *
@@ -39,8 +41,9 @@ export function createMockGitHubService() {
 					path: "src/test/file.md",
 					type: "blob",
 					sha: "abc123",
+					mode: "",
 				},
-			]),
+			] satisfies RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"]),
 		),
 		verifyTokenPermissions: mock(() => Promise.resolve(true)),
 		isBranchBehind: mock(() => Promise.resolve(false)),
@@ -79,14 +82,7 @@ export function createMockGitHubService() {
 				html_url: "https://github.com/test/test/pull/1",
 			}),
 		),
-		getFile: mock(() =>
-			Promise.resolve({
-				content: "# Test Content",
-				filename: "file.md",
-				path: "src/test/file.md",
-				sha: "abc123",
-			}),
-		),
+		getFile: mock(() => Promise.resolve(createTranslationFileFixture())),
 		findPullRequestByBranch: mock(() =>
 			Promise.resolve(
 				undefined as
@@ -158,11 +154,18 @@ export function createMockLanguageCacheService() {
 	const cache = new Map<string, { isTranslated: boolean; confidence: number }>();
 
 	return {
-		get: mock((path: string) => cache.get(path)),
-		set: mock((path: string, value: { isTranslated: boolean; confidence: number }) => {
-			cache.set(path, value);
-		}),
-		has: mock((path: string) => cache.has(path)),
+		get: mock((_filename: string, _contentHash: string) => null),
+		getMany: mock(() => new Map()),
+		set: mock(
+			(
+				_filename: string,
+				_contentHash: string,
+				_value: { detectedLanguage: string; confidence: number; timestamp: number },
+			) => {
+				/* empty */
+			},
+		),
+		has: mock((_path: string) => false),
 		clear: mock(() => {
 			cache.clear();
 		}),
