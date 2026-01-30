@@ -132,53 +132,53 @@ translate-react/
 
 ### Configuration
 
-| File                | Purpose                    |
-| ------------------- | -------------------------- |
-| `package.json`      | Dependencies and scripts   |
-| `tsconfig.json`     | TypeScript config          |
-| `bunfig.toml`       | Bun config                 |
-| `eslint.config.mjs` | ESLint rules               |
+| File                  | Purpose                  |
+| --------------------- | ------------------------ |
+| `package.json`        | Dependencies and scripts |
+| `tsconfig.json`       | TypeScript config        |
+| `bunfig.toml`         | Bun config               |
+| `eslint.config.mjs`   | ESLint rules             |
 | `prettier.config.mjs` | Prettier config          |
-| `.env.example`      | Environment template       |
+| `.env.example`        | Environment template     |
 
 ### Services
 
-| File / Dir           | Responsibility                |
-| -------------------- | ----------------------------- |
-| `runner.service.ts`   | Workflow orchestration        |
-| `translator.service.ts` | LLM translation           |
-| `language-detector.service.ts` | Language detection   |
-| `comment-builder.service.ts` | PR comment building |
-| `cache/`             | Generic and language cache    |
-| `github/`            | GitHub API (single service)   |
-| `locale/`            | Locale management            |
+| File / Dir                     | Responsibility              |
+| ------------------------------ | --------------------------- |
+| `runner.service.ts`            | Workflow orchestration      |
+| `translator.service.ts`        | LLM translation             |
+| `language-detector.service.ts` | Language detection          |
+| `comment-builder.service.ts`   | PR comment building         |
+| `cache/`                       | Generic and language cache  |
+| `github/`                      | GitHub API (single service) |
+| `locale/`                      | Locale management           |
 
 ### Errors
 
-| File             | Purpose                    |
-| ---------------- | -------------------------- |
-| `error.ts`       | ApplicationError, ErrorCode |
+| File               | Purpose                       |
+| ------------------ | ----------------------------- |
+| `error.ts`         | ApplicationError, ErrorCode   |
 | `error.helpers.ts` | mapError, handleTopLevelError |
 
 ## Quick Navigation
 
-| Task        | Command                |
-| ----------- | ---------------------- |
-| Development | `bun run dev`          |
-| Run         | `bun run start`       |
-| Build       | `bun run build`       |
-| Lint        | `bun run lint`        |
-| Type check  | `bun run type-check`   |
-| Test        | `bun run test`        |
+| Task        | Command              |
+| ----------- | -------------------- |
+| Development | `bun run dev`        |
+| Run         | `bun run start`      |
+| Build       | `bun run build`      |
+| Lint        | `bun run lint`       |
+| Type check  | `bun run type-check` |
+| Test        | `bun run test`       |
 
-| Directory       | Purpose             |
-| --------------- | -------------------- |
-| `src/`          | Application source   |
-| `src/services/` | Business logic      |
-| `src/clients/`  | Octokit, OpenAI, queue |
+| Directory       | Purpose                 |
+| --------------- | ----------------------- |
+| `src/`          | Application source      |
+| `src/services/` | Business logic          |
+| `src/clients/`  | Octokit, OpenAI, queue  |
 | `src/errors/`   | Error types and helpers |
-| `tests/`        | Test suite          |
-| `docs/`         | Documentation       |
+| `tests/`        | Test suite              |
+| `docs/`         | Documentation           |
 
 ## Service Layout
 

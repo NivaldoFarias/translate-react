@@ -215,11 +215,11 @@ Contributions are welcome. Follow these guidelines:
 
 ### Common Issues
 
-| Error                                                   | Solution                                                                  |
-| ------------------------------------------------------- | ------------------------------------------------------------------------- |
-| `GH_TOKEN: String must contain at least 1 character(s)` | Set `GH_TOKEN` and `LLM_API_KEY` in `.env`                                |
-| GitHub API error (404 / 403 / 429)                      | Verify repository and token scope; tool auto-retries on rate limit        |
-| LLM API error (quota / rate limit)                      | Check API credits; switch providers via `LLM_API_BASE_URL`                |
+| Error                                                   | Solution                                                           |
+| ------------------------------------------------------- | ------------------------------------------------------------------ |
+| `GH_TOKEN: String must contain at least 1 character(s)` | Set `GH_TOKEN` and `LLM_API_KEY` in `.env`                         |
+| GitHub API error (404 / 403 / 429)                      | Verify repository and token scope; tool auto-retries on rate limit |
+| LLM API error (quota / rate limit)                      | Check API credits; switch providers via `LLM_API_BASE_URL`         |
 
 ### Debug Mode
 

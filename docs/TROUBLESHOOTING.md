@@ -55,23 +55,23 @@ This document provides comprehensive guidance for troubleshooting common issues,
 
 GitHub API errors are logged with status code and request ID. Common cases:
 
-| Symptom / Log context     | Cause                                   | Solution                                                                              |
-| ------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------- |
-| 404 / Not Found           | Repository or resource not found        | Verify repository exists and token has `repo` scope                                   |
-| 403 + rate limit message  | API rate limit exceeded                 | Tool auto-retries with backoff; consider GitHub App token for heavy usage             |
-| 403 / Forbidden           | Insufficient permissions                | Verify token has write access to fork repository                                      |
-| 422 / Conflict            | Branch already exists or merge conflict | Delete existing branch or resolve conflict manually                                   |
+| Symptom / Log context    | Cause                                   | Solution                                                                  |
+| ------------------------ | --------------------------------------- | ------------------------------------------------------------------------- |
+| 404 / Not Found          | Repository or resource not found        | Verify repository exists and token has `repo` scope                       |
+| 403 + rate limit message | API rate limit exceeded                 | Tool auto-retries with backoff; consider GitHub App token for heavy usage |
+| 403 / Forbidden          | Insufficient permissions                | Verify token has write access to fork repository                          |
+| 422 / Conflict           | Branch already exists or merge conflict | Delete existing branch or resolve conflict manually                       |
 
 ### LLM/Translation Issues
 
 LLM API errors are logged with status and type. Common cases:
 
-| Symptom / Log context              | Cause                                | Solution                                                   |
-| --------------------------------- | ------------------------------------ | ---------------------------------------------------------- |
-| `insufficient_quota` / 402        | API credits exhausted                | Check API credits; switch providers via `LLM_API_BASE_URL`   |
-| 429 / rate limit                  | Too many requests to LLM API         | Reduce `BATCH_SIZE` or wait for rate limit reset          |
-| Timeout / long-running request    | Request took too long                | Increase timeout or reduce content size                    |
-| `Translation validation failed`   | Output doesn't match expected format | Check LLM model compatibility; review prompt template     |
+| Symptom / Log context           | Cause                                | Solution                                                   |
+| ------------------------------- | ------------------------------------ | ---------------------------------------------------------- |
+| `insufficient_quota` / 402      | API credits exhausted                | Check API credits; switch providers via `LLM_API_BASE_URL` |
+| 429 / rate limit                | Too many requests to LLM API         | Reduce `BATCH_SIZE` or wait for rate limit reset           |
+| Timeout / long-running request  | Request took too long                | Increase timeout or reduce content size                    |
+| `Translation validation failed` | Output doesn't match expected format | Check LLM model compatibility; review prompt template      |
 
 ---
 
