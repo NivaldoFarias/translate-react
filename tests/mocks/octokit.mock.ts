@@ -1,7 +1,7 @@
 import { mock } from "bun:test";
 import { StatusCodes } from "http-status-codes";
 
-import type { RestEndpointMethodTypes } from "@octokit/rest";
+import type { Octokit, RestEndpointMethodTypes } from "@octokit/rest";
 import type { PartialDeep } from "type-fest";
 
 /** Factory for creating Git API mocks */
@@ -239,10 +239,11 @@ export function createMockTreeItem(overrides?: {
 	url?: string;
 }) {
 	return {
-		path: overrides?.path ?? "src/test/file.md",
-		type: overrides?.type ?? "blob",
-		sha: overrides?.sha ?? "abc123",
-		url: overrides?.url ?? "https://api.github.com/repos/test/test/git/blobs/abc123",
+		path: "src/test/file.md",
+		type: "blob",
+		sha: "abc123",
+		url: "https://api.github.com/repos/test/test/git/blobs/abc123",
+		...overrides,
 	};
 }
 
@@ -251,7 +252,8 @@ export function createMockTreeItem(overrides?: {
  */
 export function createMockCommit(overrides?: { author?: { login: string }; sha?: string }) {
 	return {
-		author: overrides?.author ?? { login: "test-fork-owner" },
-		sha: overrides?.sha ?? "commit123",
+		author: { login: "test-fork-owner" },
+		sha: "commit123",
+		...overrides,
 	};
 }

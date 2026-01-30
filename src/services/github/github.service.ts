@@ -1,4 +1,4 @@
-import type { RestEndpointMethodTypes } from "@octokit/rest";
+import type { Octokit, RestEndpointMethodTypes } from "@octokit/rest";
 
 import type { PatchedRepositoryTreeItem, ProcessedFileResult, PullRequestStatus } from "../runner";
 import type { TranslationFile } from "../translator.service";
@@ -27,7 +27,7 @@ export const DEFAULT_REPOSITORIES: BaseRepositories = {
 };
 
 export interface GitHubServiceDependencies {
-	octokit?: typeof octokit;
+	octokit?: Octokit;
 	repositories?: BaseRepositories;
 	commentBuilderService?: typeof commentBuilderService;
 }

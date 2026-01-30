@@ -74,8 +74,8 @@ describe("CacheService", () => {
 		});
 
 		test("should exclude expired entries when retrieving multiple values", async () => {
-			cache.set("key1", "value1", 1000);
-			cache.set("key2", "value2", 100);
+			cache.set("key1", "value1", 60_000);
+			cache.set("key2", "value2", 50);
 
 			await sleep(500);
 			const results = cache.getMany(["key1", "key2"]);

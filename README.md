@@ -195,7 +195,6 @@ translate-react/
 | --------------------------------------------------- | ------------------------------------------------------------ |
 | [ARCHITECTURE.md](./docs/ARCHITECTURE.md)           | System architecture, service design, and design patterns     |
 | [WORKFLOW.md](./docs/WORKFLOW.md)                   | Execution workflow with timing analysis and performance data |
-| [ERROR_HANDLING.md](./docs/ERROR_HANDLING.md)       | Error taxonomy and recovery mechanisms                       |
 | [TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md)     | Troubleshooting guide and diagnostic procedures              |
 | [PROJECT_STRUCTURE.md](./docs/PROJECT_STRUCTURE.md) | Complete directory structure and navigation guide            |
 
@@ -205,7 +204,6 @@ Contributions are welcome. Follow these guidelines:
 
 - **TypeScript**: All code must be properly typed with strict mode enabled
 - **Bun Runtime**: Use Bun exclusively _(not npm/yarn/pnpm)_
-- **Error Handling**: Follow established patterns in [ERROR_HANDLING.md](./docs/ERROR_HANDLING.md)
 - **Testing**: Add tests for new features using Bun's test runner
 - **Code Style**: Follow ESLint/Prettier configuration
 - **Commits**: Use [Conventional Commits](https://www.conventionalcommits.org/) format

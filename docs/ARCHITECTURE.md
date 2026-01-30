@@ -709,5 +709,4 @@ for (const batch of batches) {
 ## References
 
 - [Workflow Documentation](./WORKFLOW.md) - Detailed execution flow
-- [Error Handling Documentation](./ERROR_HANDLING.md) - Error taxonomy
 - [Project README](../README.md) - High-level overview

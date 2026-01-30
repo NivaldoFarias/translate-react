@@ -1,9 +1,10 @@
-import { RestEndpointMethodTypes } from "@octokit/rest";
 import { beforeEach, describe, expect, test } from "bun:test";
 
 import type { ProcessedFileResult } from "@/services/";
 
 import { CommentBuilderService, TranslationFile } from "@/services/";
+
+import { createMockPullRequestListItem } from "@tests/fixtures";
 
 describe("CommentBuilderService", () => {
 	let commentBuilderService: CommentBuilderService;
@@ -12,22 +13,7 @@ describe("CommentBuilderService", () => {
 		commentBuilderService = new CommentBuilderService();
 	});
 
-	const createMockPrData = (
-		prNumber: number,
-	): RestEndpointMethodTypes["pulls"]["list"]["response"]["data"][number] => {
-		return {
-			number: prNumber,
-			id: prNumber,
-			node_id: `PR_${prNumber}`,
-			url: `https://api.github.com/repos/test/test/pulls/${prNumber}`,
-			html_url: `https://github.com/test/test/pull/${prNumber}`,
-			diff_url: `https://github.com/test/test/pull/${prNumber}.diff`,
-			patch_url: `https://github.com/test/test/pull/${prNumber}.patch`,
-			issue_url: `https://github.com/test/test/issues/${prNumber}`,
-			commits_url: `https://api.github.com/repos/test/test/pulls/${prNumber}/commits`,
-			review_comments_url: `https://api.github.com/repos/test/test/pulls/${prNumber}/comments`,
-		} as unknown as RestEndpointMethodTypes["pulls"]["list"]["response"]["data"][number];
-	};
+	const createMockPrData = (prNumber: number) => createMockPullRequestListItem(prNumber);
 
 	const createMockResult = (
 		filename: string,
