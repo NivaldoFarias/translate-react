@@ -111,8 +111,6 @@ export abstract class BaseRunnerService {
 	 * @throws {ApplicationError} with {@link ErrorCode.InitializationError} If token permissions verification fails
 	 */
 	protected async verifyPermissions(): Promise<void> {
-		this.logger.info("Verifying GitHub token permissions");
-
 		const hasPermissions = await this.services.github.verifyTokenPermissions();
 
 		if (!hasPermissions) {
@@ -137,8 +135,6 @@ export abstract class BaseRunnerService {
 	 * @returns `true` if the fork is up to date, `false` otherwise
 	 */
 	protected async syncFork(): Promise<boolean> {
-		this.logger.info("Checking fork existance and its status");
-
 		await this.services.github.forkExists();
 		const isForkSynced = await this.services.github.isForkSynced();
 
@@ -171,17 +167,9 @@ export abstract class BaseRunnerService {
 	 * Retrieves all candidate files from upstream.
 	 */
 	protected async fetchRepositoryTree(): Promise<void> {
-		this.logger.info("Fetching repository content");
-
 		const repositoryTree = await this.services.github.getRepositoryTree("upstream");
-		this.logger.info({ itemCount: repositoryTree.length }, "Repository tree fetched from upstream");
 
 		this.state.repositoryTree = this.patchRepositoryItem(repositoryTree);
-
-		this.logger.info(
-			{ before: repositoryTree.length, after: this.state.repositoryTree.length },
-			"Repository tree item's filenames patched successfully",
-		);
 
 		this.services.translator.glossary = await this.fetchGlossary();
 
@@ -194,8 +182,6 @@ export abstract class BaseRunnerService {
 	 * @throws {ApplicationError} with {@link ErrorCode.ResourceLoadError} If the glossary fails to load
 	 */
 	private async fetchGlossary(): Promise<string> {
-		this.logger.debug("Fetching glossary from repository");
-
 		const glossary = await this.services.github.fetchGlossary();
 
 		if (!glossary) {
@@ -205,8 +191,6 @@ export abstract class BaseRunnerService {
 				`${BaseRunnerService.name}.${this.fetchGlossary.name}`,
 			);
 		}
-
-		this.logger.debug({ glossary }, "Repository content and glossary fetched successfully");
 
 		return glossary;
 	}
@@ -219,9 +203,7 @@ export abstract class BaseRunnerService {
 	 * @returns Array of repository items with patched filenames
 	 */
 	private patchRepositoryItem(repositoryTree: RepositoryTreeItem[]): PatchedRepositoryTreeItem[] {
-		this.logger.debug("Patching repository item filenames");
-
-		const patchedRepositoryTree = repositoryTree
+		return repositoryTree
 			.map((item) => {
 				const filename = item.path.split("/").pop() ?? "";
 
@@ -230,19 +212,6 @@ export abstract class BaseRunnerService {
 			.filter(
 				(item) => !!item.filename && !!item.sha && !!item.path,
 			) as PatchedRepositoryTreeItem[];
-
-		this.logger.debug(
-			{
-				results: repositoryTree.map((item) => {
-					const match = patchedRepositoryTree.find((patched) => patched.sha === item.sha);
-
-					return { original: item.path, patched: match?.filename ?? "N/A" };
-				}),
-			},
-			"Repository item filenames patched successfully",
-		);
-
-		return patchedRepositoryTree;
 	}
 
 	/**
@@ -266,8 +235,6 @@ export abstract class BaseRunnerService {
 	 * @throws {ApplicationError} with {@link ErrorCode.NoFilesToTranslate} If no files are found to translate
 	 */
 	protected async fetchFilesToTranslate(): Promise<void> {
-		this.logger.info("Discovering files to translate");
-
 		if (this.state.filesToTranslate.length) {
 			this.logger.info(
 				`Found ${this.state.filesToTranslate.length} files to translate (from cache)`,
@@ -301,8 +268,6 @@ export abstract class BaseRunnerService {
 			invalidPRsByFile,
 			this.metadata.timestamp,
 		);
-
-		this.logger.debug("Completed setting up translation batch manager and state update");
 	}
 
 	/** Updates the progress issue with the translation results */

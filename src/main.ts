@@ -24,13 +24,10 @@ async function main() {
 		);
 
 		const statistics = await runnerService.run();
-		logger.debug({ statistics }, "Workflow statistics");
 
 		validateSuccessRate(statistics);
 
 		logger.info("Workflow completed successfully");
-
-		logger.debug("Exiting process with code 0");
 
 		process.exit(0);
 	} catch (error) {

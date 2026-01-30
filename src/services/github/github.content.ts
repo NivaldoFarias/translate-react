@@ -67,8 +67,6 @@ export class GitHubContent {
 		prNumber: number,
 		comment: string,
 	): Promise<RestEndpointMethodTypes["issues"]["createComment"]["response"]> {
-		this.logger.info({ prNumber }, "Creating comment on pull request");
-
 		const response = await this.deps.octokit.issues.createComment({
 			...this.deps.repositories.upstream,
 			issue_number: prNumber,
@@ -88,17 +86,10 @@ export class GitHubContent {
 	public async listOpenPullRequests(): Promise<
 		RestEndpointMethodTypes["pulls"]["list"]["response"]["data"]
 	> {
-		this.logger.info(
-			{ repo: this.deps.repositories.upstream, state: "open" },
-			"Listing open pull requests",
-		);
-
 		const response = await this.deps.octokit.pulls.list({
 			...this.deps.repositories.upstream,
 			state: "open",
 		});
-
-		this.logger.info({ count: response.data.length }, "Listed open pull requests");
 
 		return response.data;
 	}
@@ -118,21 +109,12 @@ export class GitHubContent {
 	 * ```
 	 */
 	public async getPullRequestFiles(prNumber: number): Promise<string[]> {
-		this.logger.info(
-			{ repo: this.deps.repositories.upstream, prNumber },
-			"Fetching pull request changed files",
-		);
-
 		const response = await this.deps.octokit.pulls.listFiles({
 			...this.deps.repositories.upstream,
 			pull_number: prNumber,
 		});
 
-		const filePaths = response.data.map((file) => file.filename);
-
-		this.logger.info({ prNumber, fileCount: filePaths.length }, "Fetched PR changed files");
-
-		return filePaths;
+		return response.data.map((file) => file.filename);
 	}
 
 	/**
@@ -167,11 +149,6 @@ export class GitHubContent {
 	}: CommitTranslationOptions): Promise<
 		RestEndpointMethodTypes["repos"]["createOrUpdateFileContents"]["response"]
 	> {
-		this.logger.info(
-			{ filePath: file.path, branch: branch.ref, commitMessage: message },
-			"Committing translated content",
-		);
-
 		const response = await this.deps.octokit.repos.createOrUpdateFileContents({
 			...this.deps.repositories.fork,
 			path: file.path,
@@ -219,11 +196,6 @@ export class GitHubContent {
 		const targetRepo = this.deps.repositories.upstream;
 		const headRef = `${this.deps.repositories.fork.owner}:${branch}`;
 
-		this.logger.info(
-			{ targetRepo: targetRepo.owner, headRef, baseBranch, title },
-			"Creating pull request",
-		);
-
 		const createPullRequestResponse = await this.deps.octokit.pulls.create({
 			...targetRepo,
 			title,
@@ -253,19 +225,12 @@ export class GitHubContent {
 	 * @param file File reference to fetch
 	 */
 	public async getFile(file: PatchedRepositoryTreeItem): Promise<TranslationFile> {
-		this.logger.info({ filePath: file.path }, "Fetching file content");
-
 		const response = await this.deps.octokit.git.getBlob({
 			...this.deps.repositories.fork,
 			file_sha: file.sha,
 		});
 
 		const content = Buffer.from(response.data.content, "base64").toString();
-
-		this.logger.debug(
-			{ filePath: file.path, blobSha: file.sha, contentLength: content.length },
-			"Retrieved file content",
-		);
 
 		return new TranslationFile(content, file.filename, file.path, file.sha);
 	}
@@ -280,28 +245,14 @@ export class GitHubContent {
 	> {
 		const queryString = `repo:${this.deps.repositories.upstream.owner}/${this.deps.repositories.upstream.repo} in:title "Translation Progress" is:issue is:open`;
 
-		this.logger.info({ queryString }, "Searching for translation progress issue");
-
 		const issueExistsResponse = await this.deps.octokit.rest.search.issuesAndPullRequests({
 			q: queryString,
 		});
-
-		this.logger.debug(
-			{
-				totalCount: issueExistsResponse.data.total_count,
-				incompleteResults: issueExistsResponse.data.incomplete_results,
-			},
-			"Search results for translation progress issue",
-		);
 
 		if (issueExistsResponse.data.items.length > 1) {
 			this.logger.warn(
 				{ count: issueExistsResponse.data.items.length },
 				"Multiple translation progress issues found",
-			);
-
-			this.logger.debug(
-				"Trying to pinpoint the correct issue by issue's `author_association` attribute",
 			);
 
 			const correctIssue = issueExistsResponse.data.items.find((issue) => {
@@ -323,11 +274,6 @@ export class GitHubContent {
 				return undefined;
 			}
 
-			this.logger.info(
-				{ issueNumber: correctIssue.number },
-				"Identified correct translation progress issue",
-			);
-
 			return correctIssue;
 		}
 
@@ -338,11 +284,6 @@ export class GitHubContent {
 
 			return undefined;
 		}
-
-		this.logger.info(
-			{ issueNumber: translationProgressIssue.number },
-			"Found translation progress issue",
-		);
 
 		return translationProgressIssue;
 	}
@@ -374,14 +315,6 @@ export class GitHubContent {
 		results: ProcessedFileResult[],
 		filesToTranslate: TranslationFile[],
 	): Promise<RestEndpointMethodTypes["issues"]["createComment"]["response"]["data"] | undefined> {
-		this.logger.info(
-			{
-				resultsCount: results.length,
-				filesToTranslateCount: filesToTranslate.length,
-			},
-			"Commenting compiled translation results on issue",
-		);
-
 		if (results.length === 0 || filesToTranslate.length === 0) {
 			this.logger.warn("No results or files to translate. Skipping issue comment update");
 			return;
@@ -393,11 +326,6 @@ export class GitHubContent {
 			this.logger.warn("Translation progress issue not found");
 			return;
 		}
-
-		this.logger.info(
-			{ issueNumber: translationProgressIssue.number },
-			"Preparing to comment on translation progress issue",
-		);
 
 		const createCommentResponse = await this.deps.octokit.issues.createComment({
 			...this.deps.repositories.upstream,
@@ -426,21 +354,12 @@ export class GitHubContent {
 	public async findPullRequestByBranch(
 		branchName: string,
 	): Promise<RestEndpointMethodTypes["pulls"]["list"]["response"]["data"][number] | undefined> {
-		this.logger.info({ branchName }, "Searching for pull request by branch");
-
 		const response = await this.deps.octokit.pulls.list({
 			...this.deps.repositories.upstream,
 			head: `${this.deps.repositories.fork.owner}:${branchName}`,
 		});
 
-		const pr = response.data[0];
-
-		this.logger.debug(
-			{ branchName, found: !!pr, prNumber: pr?.number },
-			"Searched for pull request by branch",
-		);
-
-		return pr;
+		return response.data[0];
 	}
 
 	/**
@@ -466,8 +385,6 @@ export class GitHubContent {
 	 * ```
 	 */
 	public async checkPullRequestStatus(prNumber: number): Promise<PullRequestStatus> {
-		this.logger.info({ prNumber }, "Checking pull request status");
-
 		const prResponse = await this.deps.octokit.pulls.get({
 			...this.deps.repositories.upstream,
 			pull_number: prNumber,
@@ -476,17 +393,6 @@ export class GitHubContent {
 		const pr = prResponse.data;
 		const hasConflicts = pr.mergeable === false && pr.mergeable_state === "dirty";
 		const needsUpdate = hasConflicts;
-
-		this.logger.info(
-			{
-				prNumber,
-				hasConflicts,
-				mergeable: pr.mergeable,
-				mergeableState: pr.mergeable_state,
-				needsUpdate,
-			},
-			"Checked pull request status",
-		);
 
 		return {
 			hasConflicts,
@@ -506,8 +412,6 @@ export class GitHubContent {
 	public async closePullRequest(
 		prNumber: number,
 	): Promise<RestEndpointMethodTypes["pulls"]["update"]["response"]["data"]> {
-		this.logger.info({ prNumber }, "Closing pull request");
-
 		const response = await this.deps.octokit.pulls.update({
 			...this.deps.repositories.upstream,
 			pull_number: prNumber,

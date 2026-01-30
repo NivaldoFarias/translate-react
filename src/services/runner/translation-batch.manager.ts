@@ -92,16 +92,6 @@ export class TranslationBatchManager {
 	): Promise<Map<string, ProcessedFileResult>> {
 		const batches = this.createBatches(files, batchSize);
 
-		this.logger.info(
-			{
-				batchSize,
-				totalFiles: files.length,
-				totalBatches: batches.length,
-				parallelism: batchSize,
-			},
-			"Batch configuration initialized",
-		);
-
 		const results = new Map<ProcessedFileResult["filename"], ProcessedFileResult>();
 
 		for (const [batchIndex, batch] of batches.entries()) {
@@ -155,11 +145,6 @@ export class TranslationBatchManager {
 
 		const results = new Map<string, ProcessedFileResult>();
 
-		this.logger.info(
-			batchInfo,
-			`Processing batch ${batchInfo.currentBatch}/${batchInfo.totalBatches}`,
-		);
-
 		const fileResults = await Promise.all(
 			batch.map((file, index) => {
 				const progress = {
@@ -176,11 +161,6 @@ export class TranslationBatchManager {
 		for (const result of fileResults) {
 			results.set(result.filename, result);
 		}
-
-		this.logger.info(
-			{ batchIndex: batchInfo.currentBatch, ...this.batchProgress },
-			"Batch processing completed",
-		);
 
 		const successRate = Math.round((this.batchProgress.successful / batch.length) * 100);
 
@@ -227,7 +207,6 @@ export class TranslationBatchManager {
 		file: TranslationFile,
 		_progress: FileProcessingProgress,
 	): Promise<ProcessedFileResult> {
-		const fileStartTime = Date.now();
 		const logger = this.logger.child({ component: file.filename });
 		const metadata: ProcessedFileResult = {
 			branch: null,
@@ -238,14 +217,6 @@ export class TranslationBatchManager {
 		};
 
 		try {
-			logger.debug(
-				{
-					filename: file.filename,
-					consecutiveFailures: this.consecutiveFailures,
-				},
-				"Starting file processing workflow",
-			);
-
 			if (this.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
 				throw new ApplicationError(
 					`Workflow terminated: ${this.consecutiveFailures} consecutive failures exceeded threshold of ${MAX_CONSECUTIVE_FAILURES}`,
@@ -258,66 +229,22 @@ export class TranslationBatchManager {
 				);
 			}
 
-			const branchStartTime = Date.now();
 			metadata.branch = await this.createOrGetTranslationBranch(file);
-			const branchDuration = Date.now() - branchStartTime;
 
-			logger.debug(
-				{ filename: file.filename, branchRef: metadata.branch.ref, durationMs: branchDuration },
-				"Branch creation completed",
-			);
-
-			const translationStartTime = Date.now();
 			metadata.translation = await this.services.translator.translateContent(file);
-			const translationDuration = Date.now() - translationStartTime;
-
-			logger.debug(
-				{
-					filename: file.filename,
-					translatedLength: metadata.translation.length,
-					durationMs: translationDuration,
-				},
-				"Translation completed - proceeding to commit",
-			);
 
 			const languageName = this.services.languageDetector.getLanguageName(
 				LanguageDetectorService.languages.target,
 			);
 
-			const commitStartTime = Date.now();
 			await this.services.github.commitTranslation({
 				file,
 				branch: metadata.branch,
 				content: metadata.translation,
 				message: `docs: translate \`${file.filename}\` to ${languageName}`,
 			});
-			const commitDuration = Date.now() - commitStartTime;
 
-			logger.debug(
-				{ filename: file.filename, durationMs: commitDuration },
-				"Commit completed - creating pull request",
-			);
-
-			const prStartTime = Date.now();
 			metadata.pullRequest = await this.createOrUpdatePullRequest(file, metadata);
-
-			const prDuration = Date.now() - prStartTime;
-			const totalDuration = Date.now() - fileStartTime;
-
-			logger.debug(
-				{
-					filename: file.filename,
-					prNumber: metadata.pullRequest.number,
-					timing: {
-						branchMs: branchDuration,
-						translationMs: translationDuration,
-						commitMs: commitDuration,
-						prMs: prDuration,
-						totalMs: totalDuration,
-					},
-				},
-				"File processing completed successfully",
-			);
 
 			this.consecutiveFailures = 0;
 			this.updateBatchProgress("success");
@@ -399,18 +326,9 @@ export class TranslationBatchManager {
 		const actualBaseBranch = baseBranch ?? (await this.services.github.getDefaultBranch("fork"));
 		const branchName = `translate/${file.path.split("/").slice(2).join("/")}`;
 
-		this.logger.debug(
-			{ filename: file.filename, branchName },
-			"Checking for existing translation branch",
-		);
 		const existingBranch = await this.services.github.getBranch(branchName);
 
 		if (existingBranch) {
-			this.logger.debug(
-				{ filename: file.filename, branchName },
-				"Existing branch found, checking associated PR status",
-			);
-
 			const upstreamPR = await this.services.github.findPullRequestByBranch(branchName);
 
 			if (upstreamPR) {
@@ -433,14 +351,6 @@ export class TranslationBatchManager {
 					await this.services.github.closePullRequest(upstreamPR.number);
 					await this.services.github.deleteBranch(branchName);
 				} else {
-					this.logger.debug(
-						{
-							filename: file.filename,
-							prNumber: upstreamPR.number,
-							mergeableState: prStatus.mergeableState,
-						},
-						"PR exists with no conflicts, reusing existing branch",
-					);
 					return existingBranch.data;
 				}
 			} else {
@@ -457,16 +367,11 @@ export class TranslationBatchManager {
 					);
 					await this.services.github.deleteBranch(branchName);
 				} else {
-					this.logger.debug(
-						{ filename: file.filename, branchName },
-						"Branch exists without PR and is up-to-date, reusing",
-					);
 					return existingBranch.data;
 				}
 			}
 		}
 
-		this.logger.debug({ filename: file.filename, branchName }, "Creating new translation branch");
 		const newBranch = await this.services.github.createBranch(branchName, actualBaseBranch);
 
 		return newBranch.data;
@@ -531,11 +436,6 @@ export class TranslationBatchManager {
 				});
 			}
 
-			this.logger.info(
-				{ prNumber: existingPR.number, mergeableState: prStatus.mergeableState },
-				"PR exists with no conflicts, reusing",
-			);
-
 			return existingPR;
 		}
 
@@ -585,17 +485,10 @@ export class TranslationBatchManager {
 				workflowStart: this.workflowStartTimestamp,
 			},
 		};
-		const generatedPullRequestDescription = this.services.locale.definitions.pullRequest.body(
+		return this.services.locale.definitions.pullRequest.body(
 			file,
 			processingResult,
 			pullRequestDescriptionMetadata,
 		);
-
-		this.logger.info(
-			pullRequestDescriptionMetadata,
-			"Pull request description created successfully",
-		);
-
-		return generatedPullRequestDescription;
 	}
 }

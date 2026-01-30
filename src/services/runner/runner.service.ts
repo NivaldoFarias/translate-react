@@ -1,7 +1,7 @@
 import type { RunnerOptions, RunnerServiceDependencies, WorkflowStatistics } from "./runner.types";
 
 import { extractErrorMessage } from "@/errors/";
-import { env, logger } from "@/utils/";
+import { logger } from "@/utils/";
 
 import { languageCacheService } from "../cache";
 import { githubService } from "../github";
@@ -60,13 +60,6 @@ export class RunnerService extends BaseRunnerService {
 	 */
 	public async run(): Promise<WorkflowStatistics> {
 		try {
-			this.logger.info("Starting translation workflow");
-
-			this.logger.info(
-				`Fork: ${env.REPO_FORK_OWNER}/${env.REPO_FORK_NAME} :: ` +
-					`Upstream: ${env.REPO_UPSTREAM_OWNER}/${env.REPO_UPSTREAM_NAME}`,
-			);
-
 			await this.verifyLLMConnectivity();
 			await this.verifyPermissions();
 			await this.syncFork();

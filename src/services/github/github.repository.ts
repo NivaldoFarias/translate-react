@@ -33,8 +33,6 @@ export class GitHubRepository {
 			target === "fork" ? this.deps.repositories.fork : this.deps.repositories.upstream;
 		const response = await this.deps.octokit.repos.get(repoConfig);
 
-		this.logger.debug({ target, branch: response.data.default_branch }, "Retrieved default branch");
-
 		return response.data.default_branch;
 	}
 
@@ -65,36 +63,17 @@ export class GitHubRepository {
 		baseBranch?: string,
 		filterIgnored = true,
 	): Promise<RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"]> {
-		this.logger.info({ target, baseBranch, filterIgnored }, "Fetching repository tree");
-
 		const repoConfig =
 			target === "fork" ? this.deps.repositories.fork : this.deps.repositories.upstream;
 		const branchName = baseBranch ?? (await this.getDefaultBranch(target));
-
-		this.logger.debug({ repoConfig, branchName }, "Get repository tree parameters");
 
 		const response = await this.deps.octokit.git.getTree({
 			...repoConfig,
 			tree_sha: branchName,
 			recursive: "true",
 		});
-		this.logger.debug({ responseData: response.data }, "Repository tree fetched from GitHub");
 
-		const tree = filterIgnored ? this.filterRepositoryTree(response.data.tree) : response.data.tree;
-		this.logger.debug({ treeLength: tree.length }, "Repository tree filtered");
-
-		this.logger.info(
-			{
-				target,
-				branch: branchName,
-				totalItems: response.data.tree.length,
-				filteredItems: tree.length,
-				filterIgnored,
-			},
-			"Retrieved repository tree",
-		);
-
-		return tree;
+		return filterIgnored ? this.filterRepositoryTree(response.data.tree) : response.data.tree;
 	}
 
 	/**
@@ -112,8 +91,6 @@ export class GitHubRepository {
 	 * ```
 	 */
 	public async verifyTokenPermissions(): Promise<boolean> {
-		this.logger.info("Verifying token permissions for fork and upstream repositories");
-
 		const results = await Promise.allSettled([
 			this.deps.octokit.rest.repos.get(this.deps.repositories.fork),
 			this.deps.octokit.rest.repos.get(this.deps.repositories.upstream),
@@ -130,11 +107,6 @@ export class GitHubRepository {
 
 				return false;
 			}
-
-			this.logger.debug(
-				{ response: result.value },
-				`Sufficient permissions for ${repoType} repository`,
-			);
 		}
 
 		this.logger.info(
@@ -187,20 +159,7 @@ export class GitHubRepository {
 				head: baseBranch,
 			});
 
-			const isBehind = comparison.data.ahead_by > 0;
-
-			this.logger.debug(
-				{
-					headBranch,
-					baseBranch,
-					aheadBy: comparison.data.ahead_by,
-					behindBy: comparison.data.behind_by,
-					isBehind,
-				},
-				"Branch comparison completed",
-			);
-
-			return isBehind;
+			return comparison.data.ahead_by > 0;
 		} catch (error) {
 			this.logger.warn(
 				{ error, headBranch, baseBranch, target },
@@ -216,12 +175,7 @@ export class GitHubRepository {
 	 * If it does not exist, an error is thrown.
 	 */
 	public async forkExists(): Promise<void> {
-		const response = await this.deps.octokit.repos.get(this.deps.repositories.fork);
-
-		this.logger.info(
-			{ fork: this.deps.repositories.fork, exists: !!response.data },
-			"Fork repository existence checked",
-		);
+		await this.deps.octokit.repos.get(this.deps.repositories.fork);
 	}
 
 	/**
@@ -265,18 +219,7 @@ export class GitHubRepository {
 				return false;
 			}
 
-			const isSynced = upstreamCommits.data[0]?.sha === forkedCommits.data[0]?.sha;
-
-			this.logger.debug(
-				{
-					isSynced,
-					upstreamSha: upstreamCommits.data[0]?.sha,
-					forkSha: forkedCommits.data[0]?.sha,
-				},
-				"Checked fork synchronization status",
-			);
-
-			return isSynced;
+			return upstreamCommits.data[0]?.sha === forkedCommits.data[0]?.sha;
 		} catch (error) {
 			this.logger.error({ error }, "Failed to check fork synchronization");
 
@@ -369,8 +312,7 @@ export class GitHubRepository {
 
 			this.logger.warn("Glossary file exists but has no content");
 			return null;
-		} catch (error) {
-			this.logger.debug({ error }, "Glossary file not found or inaccessible");
+		} catch {
 			return null;
 		}
 	}
