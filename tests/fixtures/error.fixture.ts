@@ -26,7 +26,7 @@ export function createOpenAIApiErrorFixture<
 		overrides?.status ?? (StatusCodes.INTERNAL_SERVER_ERROR as TStatus),
 		overrides?.error ?? ({ message: "Internal server error" } as TError),
 		overrides?.message ?? "Internal server error",
-		new Headers(overrides?.headers ?? {}) as THeaders,
+		overrides?.headers ?? (new Headers() as THeaders),
 	);
 }
 

@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 
+import type { ReactLanguageCode } from "@/utils/";
+
+import { ApplicationError, ErrorCode } from "@/errors/";
 import { LanguageDetectorService } from "@/services/";
 
 describe("LanguageDetector", () => {
@@ -205,6 +208,32 @@ mesmo com a presença deste código em inglês no meio do documento.
 
 			expect(analysis.isTranslated).toBe(false);
 			expect(analysis.ratio).toBe(0);
+		});
+	});
+
+	describe("getLanguageName", () => {
+		test("returns human-readable name for valid target language code", () => {
+			const result = detector.getLanguageName("pt-br" as ReactLanguageCode);
+
+			expect(typeof result).toBe("string");
+			expect(result.length).toBeGreaterThan(0);
+		});
+
+		test("uses source displayNames when isTargetLanguage is false", () => {
+			const result = detector.getLanguageName("en" as ReactLanguageCode, false);
+
+			expect(typeof result).toBe("string");
+			expect(result.length).toBeGreaterThan(0);
+		});
+
+		test("throws ApplicationError for unsupported language code", () => {
+			try {
+				detector.getLanguageName("xx" as ReactLanguageCode);
+				throw new Error("Expected getLanguageName to throw");
+			} catch (error) {
+				expect(error).toBeInstanceOf(ApplicationError);
+				expect((error as ApplicationError).code).toBe(ErrorCode.LanguageCodeNotSupported);
+			}
 		});
 	});
 });
