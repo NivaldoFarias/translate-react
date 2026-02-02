@@ -54,6 +54,15 @@ const envSchema = z.object({
 	GH_TOKEN:
 		isTestEnvironment() ? createTokenSchema("GH_TOKEN").optional() : createTokenSchema("GH_TOKEN"),
 
+	/**
+	 * Optional GitHub Personal Access Token for fallback authentication.
+	 *
+	 * Used when the primary token (GitHub App bot) receives 403 errors due to
+	 * insufficient permissions. The fallback client automatically retries with
+	 * this PAT when configured.
+	 */
+	GH_PAT_TOKEN: createTokenSchema("GH_PAT_TOKEN").optional(),
+
 	/** The OpenAI/OpenRouter/etc API key (optional in test environment) */
 	LLM_API_KEY:
 		isTestEnvironment() ?
