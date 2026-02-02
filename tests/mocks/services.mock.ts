@@ -2,7 +2,10 @@ import { mock } from "bun:test";
 
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
-import type { PullRequestStatus } from "@/services/";
+import type { LanguageAnalysisResult, PullRequestStatus } from "@/services/";
+import type { ReactLanguageCode } from "@/utils/constants.util";
+
+import { createTranslationFileFixture } from "@tests/fixtures";
 
 /**
  * Creates a mock CommentBuilderService for testing.
@@ -22,58 +25,32 @@ export function createMockCommentBuilderService() {
 }
 
 /**
- * Creates a mock ContentService for testing.
+ * Creates a mock GitHubService for testing.
  *
- * @returns Mocked ContentService instance
+ * Mocks the unified GitHub API surface (repository, branch, content/PR operations).
+ * Use when testing consumers that depend on GitHubService (e.g. RunnerService).
+ *
+ * @returns Mocked GitHubService instance
  */
-export function createMockContentService() {
+export function createMockGitHubService() {
 	return {
-		findPullRequestByBranch: mock(() =>
-			Promise.resolve(
-				undefined as
-					| RestEndpointMethodTypes["pulls"]["list"]["response"]["data"][number]
-					| undefined,
-			),
-		),
-		checkPullRequestStatus: mock(() =>
-			Promise.resolve({ needsUpdate: false, mergeableState: "clean" } as PullRequestStatus),
-		),
-		getFileContent: mock(() => Promise.resolve("# Test Content")),
-		getUntranslatedFiles: mock(() =>
+		getDefaultBranch: mock(() => Promise.resolve("main")),
+		getRepositoryTree: mock(() =>
 			Promise.resolve([
 				{
 					path: "src/test/file.md",
-					content: "# Test Content",
+					type: "blob",
 					sha: "abc123",
-					filename: "file.md",
+					mode: "",
 				},
-			]),
+			] satisfies RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"]),
 		),
-		commitTranslation: mock(() =>
-			Promise.resolve({
-				data: { content: { sha: "new-sha" }, commit: { sha: "commit-sha" } },
-			}),
-		),
-		createPullRequest: mock(() =>
-			Promise.resolve({
-				number: 1,
-				title: "test: translation",
-				html_url: "https://github.com/test/test/pull/1",
-			}),
-		),
-		listOpenPullRequests: mock(() => Promise.resolve([])),
-		getPullRequestFiles: mock(() => Promise.resolve(["src/test/file.md"])),
-		commentCompiledResultsOnIssue: mock(() => Promise.resolve({ id: 1 })),
-	};
-}
-
-/**
- * Creates a mock BranchService for testing.
- *
- * @returns Mocked BranchService instance
- */
-export function createMockBranchService() {
-	return {
+		verifyTokenPermissions: mock(() => Promise.resolve(true)),
+		isBranchBehind: mock(() => Promise.resolve(false)),
+		forkExists: mock(() => Promise.resolve()),
+		isForkSynced: mock(() => Promise.resolve(true)),
+		syncFork: mock(() => Promise.resolve(true)),
+		fetchGlossary: mock(() => Promise.resolve("React - React\ncomponent - componente")),
 		createBranch: mock(() =>
 			Promise.resolve({
 				data: {
@@ -87,35 +64,42 @@ export function createMockBranchService() {
 				data: { object: { sha: "abc123" } },
 			}),
 		),
-		deleteBranch: mock(() => Promise.resolve({ data: {} })),
-		checkIfCommitExistsOnFork: mock(() => Promise.resolve(false)),
-		activeBranches: new Set<string>(),
-	};
-}
-
-/**
- * Creates a mock RepositoryService for testing.
- *
- * @returns Mocked RepositoryService instance
- */
-export function createMockRepositoryService() {
-	return {
-		getDefaultBranch: mock(() => Promise.resolve("main")),
-		getRepositoryTree: mock(() =>
-			Promise.resolve([
-				{
-					path: "src/test/file.md",
-					type: "blob",
-					sha: "abc123",
-				},
-			]),
+		deleteBranch: mock(() => Promise.resolve({ data: {}, status: 204 })),
+		createCommentOnPullRequest: mock(() =>
+			Promise.resolve({ data: { id: 1, body: "Mock comment" } }),
 		),
-		verifyTokenPermissions: mock(() => Promise.resolve(true)),
-		forkExists: mock(() => Promise.resolve()),
-		isForkSynced: mock(() => Promise.resolve(true)),
-		syncFork: mock(() => Promise.resolve(true)),
-		fetchGlossary: mock(() => Promise.resolve("React - React\ncomponent - componente")),
-		isBranchBehind: mock(() => Promise.resolve(false)),
+		listOpenPullRequests: mock(() => Promise.resolve([])),
+		getPullRequestFiles: mock(() => Promise.resolve(["src/test/file.md"])),
+		commitTranslation: mock(() =>
+			Promise.resolve({
+				data: { content: { sha: "new-sha" }, commit: { sha: "commit-sha" } },
+			}),
+		),
+		createPullRequest: mock(() =>
+			Promise.resolve({
+				number: 1,
+				title: "test: translation",
+				html_url: "https://github.com/test/test/pull/1",
+			}),
+		),
+		getFile: mock(() => Promise.resolve(createTranslationFileFixture())),
+		findPullRequestByBranch: mock(() =>
+			Promise.resolve(
+				undefined as
+					| RestEndpointMethodTypes["pulls"]["list"]["response"]["data"][number]
+					| undefined,
+			),
+		),
+		checkPullRequestStatus: mock(() =>
+			Promise.resolve({ needsUpdate: false, mergeableState: "clean" } as PullRequestStatus),
+		),
+		closePullRequest: mock(() =>
+			Promise.resolve({
+				number: 1,
+				state: "closed",
+			} as RestEndpointMethodTypes["pulls"]["update"]["response"]["data"]),
+		),
+		commentCompiledResultsOnIssue: mock(() => Promise.resolve({ id: 1 })),
 	};
 }
 
@@ -170,11 +154,18 @@ export function createMockLanguageCacheService() {
 	const cache = new Map<string, { isTranslated: boolean; confidence: number }>();
 
 	return {
-		get: mock((path: string) => cache.get(path)),
-		set: mock((path: string, value: { isTranslated: boolean; confidence: number }) => {
-			cache.set(path, value);
-		}),
-		has: mock((path: string) => cache.has(path)),
+		get: mock((_filename: string, _contentHash: string) => null),
+		getMany: mock(() => new Map()),
+		set: mock(
+			(
+				_filename: string,
+				_contentHash: string,
+				_value: { detectedLanguage: string; confidence: number; timestamp: number },
+			) => {
+				/* empty */
+			},
+		),
+		has: mock((_path: string) => false),
 		clear: mock(() => {
 			cache.clear();
 		}),
@@ -182,8 +173,42 @@ export function createMockLanguageCacheService() {
 	};
 }
 
+/**
+ * Creates a mock LanguageDetectorService for testing.
+ *
+ * @returns Mocked LanguageDetectorService instance
+ */
+export function createMockLanguageDetectorService() {
+	return {
+		detectPrimaryLanguage: mock(() => Promise.resolve("en" satisfies ReactLanguageCode)),
+		analyzeLanguage: mock(() =>
+			Promise.resolve({
+				languageScore: { target: 0.1, source: 0.9 },
+				ratio: 0.1,
+				isTranslated: false,
+				detectedLanguage: "en",
+				rawResult: {
+					reliable: true,
+					textBytes: 1234,
+					languages: [],
+					chunks: [],
+				},
+			} satisfies LanguageAnalysisResult),
+		),
+		getLanguageName: mock((code: string): string => {
+			if (code === "en") return "English";
+			if (code === "pt-br") return "Brazilian Portuguese";
+			return "Unknown";
+		}),
+		languages: {
+			source: "en",
+			target: "pt-br",
+		},
+	};
+}
+
 export type MockCommentBuilderService = ReturnType<typeof createMockCommentBuilderService>;
-export type MockContentService = ReturnType<typeof createMockContentService>;
-export type MockRepositoryService = ReturnType<typeof createMockRepositoryService>;
+export type MockGitHubService = ReturnType<typeof createMockGitHubService>;
 export type MockTranslatorService = ReturnType<typeof createMockTranslatorService>;
 export type MockLanguageCacheService = ReturnType<typeof createMockLanguageCacheService>;
+export type MockLanguageDetectorService = ReturnType<typeof createMockLanguageDetectorService>;

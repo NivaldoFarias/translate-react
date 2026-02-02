@@ -6,7 +6,7 @@ import type {
 	WorkflowStatistics,
 } from "./runner.types";
 
-import { env, logger } from "@/utils/";
+import { formatElapsedTime, logger } from "@/utils/";
 
 import { TranslationFile } from "../translator.service";
 
@@ -43,43 +43,25 @@ export class PRManager {
 	 *
 	 * @returns A `Promise` that resolves when the issue is updated
 	 */
-	async updateIssue(
+	public async updateIssue(
 		processedResults: Map<string, ProcessedFileResult>,
 		filesToTranslate: TranslationFile[],
 	): Promise<void> {
-		if (!this.shouldUpdateIssueComment(processedResults)) {
-			this.logger.info("Skipping issue comment update");
-
-			return;
-		}
-
-		this.logger.info("Commenting on issue");
-
-		const comment = await this.services.github.content.commentCompiledResultsOnIssue(
+		const comment = await this.services.github.commentCompiledResultsOnIssue(
 			Array.from(processedResults.values()),
 			filesToTranslate,
 		);
+
+		if (!comment) {
+			this.logger.warn("No comment was created on the translation issue");
+			return;
+		}
 
 		this.logger.info({ commentUrl: comment.html_url }, "Commented on translation issue");
 	}
 
 	/**
-	 * Determines if the issue comment should be updated based on environment and results.
-	 *
-	 * @param results Map of processing results
-	 *
-	 * @returns `true` if the issue comment should be updated, `false` otherwise
-	 */
-	private shouldUpdateIssueComment(results: Map<string, ProcessedFileResult>): boolean {
-		return !!(env.PROGRESS_ISSUE_NUMBER && results.size > 0);
-	}
-
-	/**
 	 * Generates and displays final statistics for the translation workflow.
-	 *
-	 * Calculates success/failure counts, displays detailed error information
-	 * for failed files, and reports overall workflow statistics including
-	 * success rate and execution time.
 	 *
 	 * ### Statistics Reported
 	 *
@@ -92,7 +74,9 @@ export class PRManager {
 	 *
 	 * @returns Workflow statistics summary
 	 */
-	printFinalStatistics(processedResults: Map<string, ProcessedFileResult>): WorkflowStatistics {
+	public printFinalStatistics(
+		processedResults: Map<string, ProcessedFileResult>,
+	): WorkflowStatistics {
 		const elapsedTime = Math.ceil(Date.now() - this.workflowTimestamp);
 		const results = Array.from(processedResults.values());
 
@@ -107,7 +91,10 @@ export class PRManager {
 		if (failedFiles.length > 0) {
 			this.logger.warn(
 				{
-					failures: failedFiles.map(({ filename, error }) => ({ filename, error: error.message })),
+					failures: failedFiles.map(({ filename, error }) => ({
+						filename,
+						error: error.message,
+					})),
 				},
 				`Failed files (${failedFiles.length})`,
 			);
@@ -116,40 +103,18 @@ export class PRManager {
 		const totalCount = results.length;
 		const successRate = totalCount > 0 ? successCount / totalCount : 0;
 
+		const workflowStats: WorkflowStatistics = {
+			successCount,
+			failureCount,
+			totalCount,
+			successRate,
+		};
+
 		this.logger.info(
-			{
-				successCount,
-				failureCount,
-				totalCount,
-				elapsedTime: this.formatElapsedTime(elapsedTime),
-				successRate: `${(successRate * 100).toFixed(2)}%`,
-			},
+			{ ...workflowStats, elapsedTime: formatElapsedTime(elapsedTime) },
 			"Final statistics",
 		);
 
-		return { successCount, failureCount, totalCount, successRate };
-	}
-
-	/**
-	 * Formats a time duration in milliseconds to a human-readable string.
-	 *
-	 * Uses the {@link Intl.RelativeTimeFormat} API for localization.
-	 *
-	 * @param elapsedTime The elapsed time in milliseconds
-	 *
-	 * @returns A formatted duration string
-	 */
-	private formatElapsedTime(elapsedTime: number): string {
-		const formatter = new Intl.RelativeTimeFormat("en", { numeric: "always", style: "long" });
-
-		const seconds = Math.floor(elapsedTime / 1000);
-
-		if (seconds < 60) {
-			return formatter.format(seconds, "second").replace("in ", "");
-		} else if (seconds < 3600) {
-			return formatter.format(Math.floor(seconds / 60), "minute").replace("in ", "");
-		} else {
-			return formatter.format(Math.floor(seconds / 3600), "hour").replace("in ", "");
-		}
+		return workflowStats;
 	}
 }

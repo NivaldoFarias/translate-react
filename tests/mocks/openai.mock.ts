@@ -1,63 +1,12 @@
 import { mock } from "bun:test";
 
 import type { ChatCompletion } from "openai/resources.mjs";
-import type { PartialDeep } from "type-fest";
 
-/**
- * Creates a mock ChatCompletion response.
- *
- * @param overrides Optional overrides for the ChatCompletion fields
- *
- * @returns Mock ChatCompletion object
- */
-export function createMockChatCompletion(overrides?: PartialDeep<ChatCompletion>): ChatCompletion {
-	return {
-		id: "chatcmpl-test-123",
-		created: Date.now(),
-		model: "test-model",
-		object: "chat.completion",
-		choices: [
-			{
-				message: {
-					content: "",
-					refusal: null,
-					role: "assistant",
-				},
-				finish_reason: "stop",
-				index: 0,
-				logprobs: null,
-			},
-		],
-		usage: {
-			total_tokens: 50,
-			completion_tokens: 30,
-			prompt_tokens: 20,
-		},
-		...overrides,
-	} as ChatCompletion;
-}
+import { createChatCompletionFixture } from "@tests/fixtures";
 
 /** Factory for creating chat completions mock function */
 export function createChatCompletionsMock(defaultResponse?: ChatCompletion) {
-	return mock(() =>
-		Promise.resolve(
-			defaultResponse ??
-				createMockChatCompletion({
-					choices: [
-						{
-							message: {
-								content: "Olá mundo",
-								refusal: null,
-								role: "assistant",
-							},
-							finish_reason: "length",
-							index: 0,
-							logprobs: null,
-						},
-					],
-				}),
-		),
-	);
+	return mock(() => Promise.resolve(defaultResponse ?? createChatCompletionFixture()));
 }
 
 /**

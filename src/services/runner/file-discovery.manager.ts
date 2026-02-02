@@ -3,14 +3,15 @@ import type { SetRequired } from "type-fest";
 import type {
 	CacheCheckResult,
 	LanguageDetectionResult,
-	PatchedRepositoryItem,
+	PatchedRepositoryTreeItem,
 	PrFilterResult as PullRequestFilterResult,
 	PullRequestStatus,
 	RunnerServiceDependencies,
 } from "./runner.types";
 
-import { FILE_FETCH_BATCH_SIZE, logger, MIN_CACHE_CONFIDENCE } from "@/utils/";
+import { FILE_FETCH_BATCH_SIZE, filterMarkdownFiles, logger, MIN_CACHE_CONFIDENCE } from "@/utils/";
 
+import { LanguageDetectorService } from "../language-detector.service";
 import { TranslationFile } from "../translator.service";
 
 /**
@@ -33,16 +34,18 @@ export class FileDiscoveryManager {
 	/**
 	 * Discovers and filters files requiring translation through complete pipeline.
 	 *
-	 * Executes the full file discovery workflow by coordinating cache checks, PR filtering,
-	 * content fetching, and language detection. Returns files ready for translation along
-	 * with metadata about invalid PRs for notification purposes.
+	 * Executes the full file discovery workflow by coordinating markdown filtering,
+	 * cache checks, PR filtering, content fetching, and language detection. Returns
+	 * files ready for translation along with metadata about invalid PRs for notification.
 	 *
 	 * ### Pipeline Stages
 	 *
-	 * 1. **Language cache lookup**: Queries cache to skip known translated files
-	 * 2. **PR existence check**: Validates existing PRs to skip files with valid translations
-	 * 3. **Content fetching**: Downloads file content in parallel batches from GitHub
-	 * 4. **Language detection**: Analyzes content and updates cache with detection results
+	 * 1. **Markdown filter**: Filters to markdown files in `src/` directory
+	 * 2. **Deduplication**: Removes duplicate file paths
+	 * 3. **Language cache lookup**: Queries cache to skip known translated files
+	 * 4. **PR existence check**: Validates existing PRs to skip files with valid translations
+	 * 5. **Content fetching**: Downloads file content in parallel batches from GitHub
+	 * 6. **Language detection**: Analyzes content and updates cache with detection results
 	 *
 	 * @param repositoryTree Complete repository file tree from GitHub
 	 *
@@ -57,15 +60,15 @@ export class FileDiscoveryManager {
 	 * // ^? 2 (files with conflicted PRs)
 	 * ```
 	 */
-	async discoverFiles(repositoryTree: PatchedRepositoryItem[]): Promise<{
+	public async discoverFiles(repositoryTree: PatchedRepositoryTreeItem[]): Promise<{
 		filesToTranslate: TranslationFile[];
 		invalidPRsByFile: Map<string, { prNumber: number; status: PullRequestStatus }>;
 	}> {
-		const uniqueFiles = repositoryTree.filter(
+		const markdownFiles = filterMarkdownFiles(repositoryTree);
+
+		const uniqueFiles = markdownFiles.filter(
 			(file, index, self) => index === self.findIndex((compare) => compare.path === file.path),
 		);
-
-		this.logger.info(`Processing ${uniqueFiles.length} files from repository tree`);
 
 		const { candidateFiles, cacheHits } = this.checkCache(uniqueFiles);
 
@@ -82,7 +85,9 @@ export class FileDiscoveryManager {
 		this.logger.info(
 			{
 				pipeline: {
-					initial: uniqueFiles.length,
+					initial: repositoryTree.length,
+					afterMarkdownFilter: markdownFiles.length,
+					afterDedup: uniqueFiles.length,
 					afterCache: candidateFiles.length,
 					afterPRFilter: filesToFetch.length,
 					afterContentFetch: uncheckedFiles.length,
@@ -119,14 +124,11 @@ export class FileDiscoveryManager {
 	 * // ^? 135 (out of 192 files)
 	 * ```
 	 */
-	checkCache(files: PatchedRepositoryItem[]): CacheCheckResult {
-		this.logger.info("Checking language cache");
-		const startTime = Date.now();
-
+	public checkCache(files: PatchedRepositoryTreeItem[]): CacheCheckResult {
 		const candidateFiles: typeof files = [];
 
 		const filesToFetchCache = files.filter((file) => !!file.sha) as SetRequired<
-			PatchedRepositoryItem,
+			PatchedRepositoryTreeItem,
 			"sha"
 		>[];
 
@@ -138,31 +140,19 @@ export class FileDiscoveryManager {
 
 		let cacheHits = 0;
 		let cacheMisses = 0;
-		const targetLanguage = this.services.translator.languageDetector.languages.target;
+		const targetLanguage = LanguageDetectorService.languages.target;
 
 		for (const file of files) {
 			const cache = languageCaches.get(file.filename);
 
 			if (cache?.detectedLanguage === targetLanguage && cache.confidence > MIN_CACHE_CONFIDENCE) {
 				cacheHits++;
-				this.logger.debug(
-					{ filename: file.path, language: cache.detectedLanguage, confidence: cache.confidence },
-					`Skipping cached ${targetLanguage} file`,
-				);
 				continue;
 			}
 
 			cacheMisses++;
 			candidateFiles.push(file);
 		}
-
-		const elapsed = Date.now() - startTime;
-		const hitRate = `${((cacheHits / files.length) * 100).toFixed(1)}%`;
-
-		this.logger.info(
-			{ cacheHits, cacheMisses, hitRate, timeMs: elapsed },
-			`Cache check complete: ${cacheHits} hits, ${cacheMisses} candidates`,
-		);
 
 		return { candidateFiles, cacheHits, cacheMisses };
 	}
@@ -210,25 +200,20 @@ export class FileDiscoveryManager {
 	 * // ^? 2 (files with conflicted PRs that will be re-translated)
 	 * ```
 	 */
-	async filterByPRs(candidateFiles: PatchedRepositoryItem[]): Promise<PullRequestFilterResult> {
-		this.logger.info("Checking for existing open PRs with file-based filtering");
-
-		const openPRs = await this.services.github.content.listOpenPullRequests();
+	public async filterByPRs(
+		candidateFiles: PatchedRepositoryTreeItem[],
+	): Promise<PullRequestFilterResult> {
+		const openPRs = await this.services.github.listOpenPullRequests();
 		const invalidPRsByFile = new Map<string, { prNumber: number; status: PullRequestStatus }>();
 		const prByFile = new Map<string, number>();
 
 		for (const pr of openPRs) {
 			try {
-				const changedFiles = await this.services.github.content.getPullRequestFiles(pr.number);
+				const changedFiles = await this.services.github.getPullRequestFiles(pr.number);
 
 				for (const filePath of changedFiles) {
 					prByFile.set(filePath, pr.number);
 				}
-
-				this.logger.debug(
-					{ prNumber: pr.number, fileCount: changedFiles.length },
-					"Mapped PR to changed files",
-				);
 			} catch (error) {
 				this.logger.warn(
 					{ prNumber: pr.number, error },
@@ -236,11 +221,6 @@ export class FileDiscoveryManager {
 				);
 			}
 		}
-
-		this.logger.debug(
-			{ openPRCount: openPRs.length, mappedFiles: prByFile.size },
-			"Built file-to-PR mapping",
-		);
 
 		let numFilesWithPRs = 0;
 		const filesToFetch: typeof candidateFiles = [];
@@ -255,7 +235,7 @@ export class FileDiscoveryManager {
 
 			if (prNumber) {
 				try {
-					const prStatus = await this.services.github.content.checkPullRequestStatus(prNumber);
+					const prStatus = await this.services.github.checkPullRequestStatus(prNumber);
 
 					if (prStatus.needsUpdate || prStatus.hasConflicts) {
 						invalidPRsByFile.set(file.path, { prNumber, status: prStatus });
@@ -323,25 +303,12 @@ export class FileDiscoveryManager {
 	 * // ^? 45 (successfully fetched files)
 	 * ```
 	 */
-	public async fetchContent(filesToFetch: PatchedRepositoryItem[]): Promise<TranslationFile[]> {
-		this.logger.info("Fetching file content");
-
+	public async fetchContent(filesToFetch: PatchedRepositoryTreeItem[]): Promise<TranslationFile[]> {
 		const uncheckedFiles: TranslationFile[] = [];
-		let completedFiles = 0;
-
-		const updateProgress = (): void => {
-			completedFiles++;
-			const percentage = Math.floor((completedFiles / filesToFetch.length) * 100);
-			if (completedFiles % 10 === 0 || completedFiles === filesToFetch.length) {
-				this.logger.info(
-					`Fetching files: ${completedFiles}/${filesToFetch.length} (${percentage}%)`,
-				);
-			}
-		};
 
 		for (let index = 0; index < filesToFetch.length; index += FILE_FETCH_BATCH_SIZE) {
 			const batch = filesToFetch.slice(index, index + FILE_FETCH_BATCH_SIZE);
-			const batchResults = await this.fetchBatch(batch, updateProgress);
+			const batchResults = await this.fetchBatch(batch);
 
 			uncheckedFiles.push(
 				...batchResults.filter((file): file is NonNullable<typeof file> => !!file),
@@ -355,25 +322,11 @@ export class FileDiscoveryManager {
 	 * Fetches a batch of files from GitHub API.
 	 *
 	 * @param batch Files to fetch in current batch
-	 * @param updateLoggerFn Progress update callback
 	 *
-	 * @returns Array of translation files or null for failed fetches
+	 * @returns Array of translation files or `null` for failed fetches
 	 */
-	private async fetchBatch(
-		batch: PatchedRepositoryItem[],
-		updateLoggerFn: () => void,
-	): Promise<(TranslationFile | null)[]> {
-		return await Promise.all(
-			batch.map(async (file) => {
-				if (!file.filename || !file.sha || !file.path) return null;
-
-				const content = await this.services.github.content.getFileContent(file);
-
-				updateLoggerFn();
-
-				return new TranslationFile(content, file.filename, file.path, file.sha);
-			}),
-		);
+	private fetchBatch(batch: PatchedRepositoryTreeItem[]): Promise<(TranslationFile | null)[]> {
+		return Promise.all(batch.map((file) => this.services.github.getFile(file)));
 	}
 
 	/**
@@ -404,7 +357,7 @@ export class FileDiscoveryManager {
 		const filesToTranslate: TranslationFile[] = [];
 
 		for (const file of uncheckedFiles) {
-			const analysis = await this.services.translator.languageDetector.analyzeLanguage(
+			const analysis = await this.services.languageDetector.analyzeLanguage(
 				file.filename,
 				file.content,
 			);

@@ -1,7 +1,7 @@
 import { mock } from "bun:test";
 import { StatusCodes } from "http-status-codes";
 
-import type { Octokit, RestEndpointMethodTypes } from "@octokit/rest";
+import type { RestEndpointMethodTypes } from "@octokit/rest";
 import type { PartialDeep } from "type-fest";
 
 /** Factory for creating Git API mocks */
@@ -211,11 +211,19 @@ export function createMockOctokit(options?: {
 				),
 			},
 			repos: { ...createReposMocks(), ...options?.repos },
+			search: {
+				issuesAndPullRequests: mock(() =>
+					Promise.resolve({
+						data: { total_count: 0, items: [] },
+					} as PartialDeep<RestEndpointMethodTypes["search"]["issuesAndPullRequests"]["response"]>),
+				),
+			},
 		},
 		request: mock(() => Promise.resolve({})),
 	};
 }
 
+export type MockOctokit = ReturnType<typeof createMockOctokit>;
 export type MockOctokitGit = ReturnType<typeof createGitMocks>;
 export type MockOctokitRepos = ReturnType<typeof createReposMocks>;
 export type MockOctokitPulls = ReturnType<typeof createPullsMocks>;
@@ -231,10 +239,11 @@ export function createMockTreeItem(overrides?: {
 	url?: string;
 }) {
 	return {
-		path: overrides?.path ?? "src/test/file.md",
-		type: overrides?.type ?? "blob",
-		sha: overrides?.sha ?? "abc123",
-		url: overrides?.url ?? "https://api.github.com/repos/test/test/git/blobs/abc123",
+		path: "src/test/file.md",
+		type: "blob",
+		sha: "abc123",
+		url: "https://api.github.com/repos/test/test/git/blobs/abc123",
+		...overrides,
 	};
 }
 
@@ -243,7 +252,8 @@ export function createMockTreeItem(overrides?: {
  */
 export function createMockCommit(overrides?: { author?: { login: string }; sha?: string }) {
 	return {
-		author: overrides?.author ?? { login: "test-fork-owner" },
-		sha: overrides?.sha ?? "commit123",
+		author: { login: "test-fork-owner" },
+		sha: "commit123",
+		...overrides,
 	};
 }

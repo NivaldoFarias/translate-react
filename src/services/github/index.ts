@@ -1,4 +1,3 @@
-export * from "./base.service";
-export * from "./branch.service";
-export * from "./content.service";
-export * from "./repository.service";
+export * from "./github.service";
+export * from "./github.types";
+export type { CommitTranslationOptions, PullRequestOptions } from "./github.content";

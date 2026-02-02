@@ -3,17 +3,10 @@ import { join } from "node:path";
 
 import Bun from "bun";
 
-import { logger as __logger } from "./utils";
-
-const logger = __logger.child({ component: "build" });
+import { logger as baseLogger } from "./utils";
 
 if (import.meta.main) {
-	try {
-		await build();
-	} catch (error) {
-		logger.error(error, "❌ Build failed:");
-		process.exit(1);
-	}
+	await build();
 }
 
 /**
@@ -24,43 +17,55 @@ if (import.meta.main) {
  * @throws {Error} When build process encounters an error
  */
 async function build(): Promise<Bun.BuildOutput> {
-	const ROOT_DIR = join(import.meta.dir, "..");
-	const DIST_DIR = join(ROOT_DIR, "dist");
-	const SRC_DIR = join(ROOT_DIR, "src");
+	const logger = baseLogger.child({ component: build.name });
 
-	logger.info("Building translate-react");
+	try {
+		logger.info("Starting build process");
 
-	/* Clean previous build artifacts */
-	await rm(DIST_DIR, { recursive: true, force: true });
-	logger.info("Cleaned dist directory");
+		const dirs = {
+			root: join(import.meta.dir, ".."),
+			dist: join(import.meta.dir, "..", "dist"),
+			src: join(import.meta.dir, "..", "src"),
+		};
 
-	/* Bundle application with Bun */
-	const result = await Bun.build({
-		entrypoints: [join(SRC_DIR, "main.ts")],
-		outdir: DIST_DIR,
-		target: "node",
-		format: "esm",
-		splitting: false,
-		minify: true,
-		tsconfig: join(ROOT_DIR, "tsconfig.json"),
-		sourcemap: "external",
-		external: ["cld", "@mapbox/node-pre-gyp"],
-	});
+		logger.info({ dirs }, "Building translate-react");
 
-	if (!result.success) {
-		logger.error("❌ Build failed:");
+		/* Clean previous build artifacts */
+		await rm(dirs.dist, { recursive: true, force: true });
+		logger.info("Cleaned dist directory");
 
-		for (const log of result.logs) {
-			logger.error(log);
+		/* Bundle application with Bun */
+		const result = await Bun.build({
+			entrypoints: [join(dirs.src, "main.ts")],
+			outdir: dirs.dist,
+			target: "node",
+			format: "esm",
+			splitting: false,
+			minify: true,
+			tsconfig: join(dirs.root, "tsconfig.json"),
+			sourcemap: "external",
+			external: ["cld", "@mapbox/node-pre-gyp"],
+		});
+
+		if (!result.success) {
+			logger.error("Build failed:");
+
+			for (const log of result.logs) {
+				logger.error(log);
+			}
+
+			throw new Error("Build process failed");
 		}
 
-		throw new Error("Build process failed");
+		logger.info(`Bundled application to ${dirs.dist}`);
+		logger.info(`Output file(s): ${result.outputs.length}`);
+
+		logger.info("Build complete");
+
+		return result;
+	} catch (error) {
+		logger.error(error, "Build process encountered an error");
+
+		process.exit(1);
 	}
-
-	logger.info(`✓ Bundled application to ${DIST_DIR}`);
-	logger.info(`  - ${result.outputs.length} output file(s)`);
-
-	logger.info("✅ Build complete");
-
-	return result;
 }

@@ -1,39 +1,29 @@
+import type { StatusCodes } from "http-status-codes";
+
 /** Standardized error codes for the translation workflow */
 export enum ErrorCode {
-	// GitHub API Related
-	GithubApiError = "GITHUB_API_ERROR",
-	GithubNotFound = "GITHUB_NOT_FOUND",
-	GithubUnauthorized = "GITHUB_UNAUTHORIZED",
-	GithubForbidden = "GITHUB_FORBIDDEN",
-	GithubRateLimited = "GITHUB_RATE_LIMITED",
-	GithubServerError = "GITHUB_SERVER_ERROR",
-
-	// LLM API Related
-	LLMApiError = "LLM_API_ERROR",
-
-	// Generic HTTP Related
-	RateLimitExceeded = "RATE_LIMIT_EXCEEDED",
-	Unauthorized = "UNAUTHORIZED",
-	Forbidden = "FORBIDDEN",
-	NotFound = "NOT_FOUND",
-	ServerError = "SERVER_ERROR",
-
-	// Content Related
-	InvalidContent = "INVALID_CONTENT",
-	ContentTooLong = "CONTENT_TOO_LONG",
-	NoContent = "NO_CONTENT",
-	FormatValidationFailed = "FORMAT_VALIDATION_FAILED",
-	ChunkProcessingFailed = "CHUNK_PROCESSING_FAILED",
-
-	// Application Process Related
-	ApiError = "API_ERROR",
+	// Domain Workflow Errors
 	TranslationFailed = "TRANSLATION_FAILED",
-	NoFilesFound = "NO_FILES_FOUND",
+	ChunkProcessingFailed = "CHUNK_PROCESSING_FAILED",
+	NoFilesToTranslate = "NO_FILES_TO_TRANSLATE",
+	BelowMinimumSuccessRate = "BELOW_MINIMUM_SUCCESS_RATE",
+	NoContent = "NO_CONTENT",
+
+	// Domain Validation Errors
+	FormatValidationFailed = "FORMAT_VALIDATION_FAILED",
+	LanguageCodeNotSupported = "LANGUAGE_CODE_NOT_SUPPORTED",
+	InsufficientPermissions = "INSUFFICIENT_PERMISSIONS",
+
+	// Domain Initialization Errors
 	InitializationError = "INITIALIZATION_ERROR",
 	ResourceLoadError = "RESOURCE_LOAD_ERROR",
-	ValidationError = "VALIDATION_ERROR",
+
+	// External API Errors
+	OpenAIApiError = "OPENAI_API_ERROR",
+	OctokitRequestError = "OCTOKIT_REQUEST_ERROR",
+
+	// Fallback
 	UnknownError = "UNKNOWN_ERROR",
-	NO_FILES_TO_TRANSLATE = "NO_FILES_TO_TRANSLATE",
 }
 
 /**
@@ -55,23 +45,37 @@ export class ApplicationError<
 	/** Additional metadata for debugging */
 	public readonly metadata?: T;
 
+	/** HTTP status code associated with the error */
+	public readonly statusCode?: StatusCodes;
+
+	/**
+	 * Creates a new {@link ApplicationError} instance
+	 *
+	 * @param message Human-readable error message
+	 * @param code Standardized error code
+	 * @param operation The operation that failed
+	 * @param metadata Additional metadata for debugging
+	 * @param statusCode HTTP status code associated with the error
+	 */
 	constructor(
 		message: string,
 		code: ErrorCode = ErrorCode.UnknownError,
 		operation?: string,
 		metadata?: T,
+		statusCode?: StatusCodes,
 	) {
 		super(message);
 		this.name = this.constructor.name;
 		this.code = code;
 		this.operation = operation ?? "UnknownOperation";
 		this.metadata = metadata;
+		this.statusCode = statusCode;
 
 		Object.setPrototypeOf(this, new.target.prototype);
 	}
 
 	/** Extracts a human-readable message from the error */
-	public getDisplayMessage(): string {
+	public get displayMessage(): string {
 		const operationSuffix = this.operation ? ` (in ${this.operation})` : "";
 
 		return `${this.message}${operationSuffix}`;
@@ -86,7 +90,7 @@ export class ApplicationError<
  * @returns Human-readable error message
  */
 export function extractErrorMessage(error: unknown): string {
-	if (error instanceof ApplicationError) return error.getDisplayMessage();
+	if (error instanceof ApplicationError) return error.displayMessage;
 	if (error instanceof Error) return error.message;
 
 	return String(error);
