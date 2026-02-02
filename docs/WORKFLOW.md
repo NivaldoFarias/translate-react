@@ -126,6 +126,41 @@ stateDiagram-v2
 - Commit: `commitTranslation` → `createOrUpdatePullRequest`
 - Error: `cleanupFailedTranslation`, circuit-breaker at `MAX_CONSECUTIVE_FAILURES`
 
+#### Stale PR Conflict Handling
+
+When a translation PR becomes stale due to upstream changes causing merge conflicts, the workflow automatically handles it:
+
+```mermaid
+flowchart TD
+    A[Existing PR Found] --> B{Check Status}
+    B -->|mergeable_state: clean| C[Skip - PR Valid]
+    B -->|mergeable_state: dirty| D[PR Has Conflicts]
+    D --> E[Close Stale PR with Comment]
+    E --> F[Delete Stale Branch]
+    F --> G[Create Fresh Translation]
+    G --> H[Open New PR]
+    H --> I[Reference Closed PR in Description]
+```
+
+**Conflict detection:** The workflow checks `mergeable_state` for each existing PR. A `dirty` state indicates the PR cannot be cleanly merged due to conflicts with the target branch.
+
+**Complete rewrite approach:** Instead of attempting diff-based conflict resolution, the workflow:
+
+1. Closes the conflicted PR with an explanatory comment
+2. Deletes the stale translation branch
+3. Fetches the latest source file from upstream
+4. Generates a completely new translation
+5. Creates a new PR referencing the closed one
+
+**Rationale:** Complete rewrite is preferred over diff-based resolution because:
+
+- **Translation consistency**: Partial merges can create inconsistent translations where some sections use old terminology/style
+- **Context preservation**: LLM translations benefit from processing the full document context, not isolated conflict regions
+- **Quality assurance**: A fresh translation ensures the entire document follows current translation guidelines and glossary
+- **Simplicity**: Avoids complex three-way merge logic that may produce semantically incorrect results
+
+The new PR description includes an `> [!IMPORTANT]` notice explaining that the previous PR was closed due to conflicts and that this is a completely new translation.
+
 ### Stage 6: Progress Reporting
 
 Posts summary to progress issue (non-blocking), prints final statistics.
