@@ -4,7 +4,7 @@ import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 import type { SharedGitHubDependencies } from "./github.types";
 
-import { logger } from "@/utils/";
+import { filterMarkdownFiles, logger } from "@/utils/";
 
 /**
  * Repository operations module for GitHub API.
@@ -73,7 +73,7 @@ export class GitHubRepository {
 			recursive: "true",
 		});
 
-		return filterIgnored ? this.filterRepositoryTree(response.data.tree) : response.data.tree;
+		return filterIgnored ? filterMarkdownFiles(response.data.tree) : response.data.tree;
 	}
 
 	/**
@@ -259,23 +259,6 @@ export class GitHubRepository {
 			this.logger.error({ error, fork: this.deps.repositories.fork }, "Failed to synchronize fork");
 			return false;
 		}
-	}
-
-	/**
-	 * Filters repository tree for valid markdown files.
-	 *
-	 * @param tree Repository tree from GitHub API
-	 */
-	protected filterRepositoryTree(
-		tree: RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"],
-	): RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"] {
-		return tree.filter((item) => {
-			if (!item.path) return false;
-			else if (!item.path.endsWith(".md")) return false;
-			else if (!item.path.includes("/")) return false;
-			else if (!item.path.includes("src/")) return false;
-			else return true;
-		});
 	}
 
 	/**
