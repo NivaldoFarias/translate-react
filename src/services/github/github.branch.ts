@@ -4,7 +4,7 @@ import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 import type { SharedGitHubDependencies } from "./github.types";
 
-import { logger, setupSignalHandlers } from "@/utils/";
+import { logger, registerCleanup } from "@/utils/";
 
 /**
  * Branch operations module for GitHub API.
@@ -27,7 +27,7 @@ export class GitHubBranch {
 	};
 
 	constructor(private readonly deps: SharedGitHubDependencies) {
-		setupSignalHandlers(async () => {
+		registerCleanup(async () => {
 			await this.cleanup();
 		});
 	}

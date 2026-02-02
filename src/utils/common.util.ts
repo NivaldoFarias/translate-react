@@ -1,6 +1,6 @@
 import { StatusCodes } from "http-status-codes";
 
-import type { PatchedRepositoryTreeItem, WorkflowStatistics } from "@/services/";
+import type { RepositoryTreeItem, WorkflowStatistics } from "@/services/";
 
 import { ApplicationError, ErrorCode } from "@/errors/";
 
@@ -114,25 +114,53 @@ export function formatElapsedTime(
 	}
 }
 
+/** Registry for cleanup functions to be executed on process termination */
+const cleanupRegistry = new Set<(...args: unknown[]) => void | Promise<void>>();
+
+/** Tracks whether signal handlers have been registered */
+let signalHandlersRegistered = false;
+
+/**
+ * Registers a cleanup function to be executed on process termination.
+ *
+ * @param cleanUpFn The cleanup function to register
+ */
+export function registerCleanup(cleanUpFn: (...args: unknown[]) => void | Promise<void>): void {
+	cleanupRegistry.add(cleanUpFn);
+}
+
 /**
  * Sets up process signal handlers with proper error management.
  *
- * @param cleanUpFn The cleanup function to execute on signal reception
+ * Registers handlers once at application startup. All registered cleanup functions
+ * will be executed when a termination signal is received.
+ *
  * @param errorReporter Optional error reporter for cleanup failures
  */
 export function setupSignalHandlers(
-	cleanUpFn: (...args: unknown[]) => void | Promise<void>,
 	errorReporter?: (message: string, error: unknown) => void,
 ): void {
+	if (signalHandlersRegistered) {
+		return;
+	}
+
+	signalHandlersRegistered = true;
+
+	const executeCleanups = async (...args: unknown[]) => {
+		for (const cleanUpFn of cleanupRegistry) {
+			try {
+				await cleanUpFn(...args);
+			} catch (error) {
+				if (errorReporter) {
+					errorReporter("Cleanup failed:", error);
+				}
+			}
+		}
+	};
+
 	for (const signal of Object.values(processSignals)) {
 		process.on(signal, (...args: unknown[]) => {
-			void (async () => {
-				try {
-					await cleanUpFn(...args);
-				} catch (error) {
-					if (errorReporter) errorReporter(`Cleanup failed for signal ${signal}:`, error);
-				}
-			})();
+			void executeCleanups(...args);
 		});
 	}
 }
@@ -142,11 +170,11 @@ export function setupSignalHandlers(
  *
  * @param tree Repository tree from GitHub API
  */
-export function filterMarkdownFiles(
-	tree: PatchedRepositoryTreeItem[],
-): PatchedRepositoryTreeItem[] {
+export function filterMarkdownFiles<T extends RepositoryTreeItem>(tree: T[]): T[] {
 	return tree.filter((item) => {
+		if (!item.path) return false;
 		if (!item.path.endsWith(".md")) return false;
+		if (!item.path.includes("/")) return false;
 		if (!item.path.includes("src/")) return false;
 
 		return true;

@@ -16,27 +16,6 @@ import { env, extractDocTitleFromContent, logger, MAX_CHUNK_TOKENS } from "@/uti
 import { LanguageDetectorService, languageDetectorService } from "./language-detector.service";
 import { localeService, LocaleService } from "./locale";
 
-/** LLM configuration for TranslatorService */
-export interface TranslatorLLMConfig {
-	/** LLM API base URL */
-	baseUrl: string;
-
-	/** LLM API key */
-	apiKey: string;
-
-	/** OpenAI project ID (optional) */
-	projectId?: string;
-
-	/** LLM model identifier */
-	model: string;
-
-	/** Application title header */
-	headerAppTitle: string;
-
-	/** Application URL header */
-	headerAppUrl: string;
-}
-
 /** Dependency injection interface for TranslatorService */
 export interface TranslatorServiceDependencies {
 	/** OpenAI client instance for LLM API calls */
