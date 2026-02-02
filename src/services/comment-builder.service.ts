@@ -236,15 +236,20 @@ export class CommentBuilderService {
 				a.file.filename.localeCompare(b.file.filename),
 			);
 
-			if (sortedEntries.length === 1 && sortedEntries[0]?.file.filename === dir) {
-				const entry = sortedEntries[0];
-				lines.push(`${indent}- #${entry.prNumber}`);
+			if (
+				sortedEntries.length === 1 &&
+				sortedEntries[0]?.file.filename === dir &&
+				sortedEntries[0].prNumber
+			) {
+				lines.push(`${indent}- #${sortedEntries[0].prNumber}`);
 				continue;
 			}
 
 			lines.push(`${indent}- ${dir}`);
 
 			for (const entry of sortedEntries) {
+				if (!entry.prNumber) continue;
+
 				lines.push(`${indent}  - #${entry.prNumber}`);
 			}
 

@@ -155,10 +155,10 @@ translate-react/
 
 ### Errors
 
-| File               | Purpose                       |
-| ------------------ | ----------------------------- |
-| `error.ts`         | ApplicationError, ErrorCode   |
-| `error.helpers.ts` | mapError, handleTopLevelError |
+| File               | Purpose                     |
+| ------------------ | --------------------------- |
+| `error.ts`         | ApplicationError, ErrorCode |
+| `error.helpers.ts` | handleTopLevelError         |
 
 ## Quick Navigation
 

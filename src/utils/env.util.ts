@@ -32,8 +32,15 @@ function isTestEnvironment(): boolean {
 	return import.meta.env.NODE_ENV === RuntimeEnvironment.Test;
 }
 
-/** The resolves default environment values, based on the current {@link process.env.NODE_ENV} */
-const envDefaults = environmentDefaults[process.env.NODE_ENV as RuntimeEnvironment];
+/**
+ * The resolves default environment values, based on the current {@link process.env.NODE_ENV}.
+ *
+ * If the environment variable is not set, the default is {@link RuntimeEnvironment.Development}.
+ */
+const envDefaults =
+	environmentDefaults[
+		(import.meta.env.NODE_ENV as RuntimeEnvironment | undefined) ?? RuntimeEnvironment.Development
+	];
 
 /** Environment configuration schema for runtime validation */
 const envSchema = z.object({
@@ -136,7 +143,7 @@ const envSchema = z.object({
 	 */
 	MIN_SUCCESS_RATE: z.coerce.number().min(0).max(1).default(envDefaults.MIN_SUCCESS_RATE),
 
-	/** Maximum retry atempts for translation errors */
+	/** Maximum retry attempts for translation errors */
 	MAX_RETRY_ATTEMPTS: z.coerce.number().positive().default(envDefaults.MAX_RETRY_ATTEMPTS),
 
 	/** Concurrency limit for LLM requests */
