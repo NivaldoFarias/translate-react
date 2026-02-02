@@ -61,13 +61,17 @@ These **must** be set in your `.env` file:
 <details>
 <summary><b>GitHub Configuration</b></summary>
 
-| Variable              | Default           | Description                          |
-| --------------------- | ----------------- | ------------------------------------ |
-| `REPO_FORK_OWNER`     | `nivaldofarias`   | Fork owner username/organization     |
-| `REPO_FORK_NAME`      | `pt-br.react.dev` | Fork repository name                 |
-| `REPO_UPSTREAM_OWNER` | `reactjs`         | Upstream owner username/organization |
-| `REPO_UPSTREAM_NAME`  | `pt-br.react.dev` | Upstream repository name             |
-| `GH_REQUEST_TIMEOUT`  | `30000`           | GitHub API timeout (milliseconds)    |
+| Variable              | Default           | Description                                  |
+| --------------------- | ----------------- | -------------------------------------------- |
+| `REPO_FORK_OWNER`     | `nivaldofarias`   | Fork owner username/organization             |
+| `REPO_FORK_NAME`      | `pt-br.react.dev` | Fork repository name                         |
+| `REPO_UPSTREAM_OWNER` | `reactjs`         | Upstream owner username/organization         |
+| `REPO_UPSTREAM_NAME`  | `pt-br.react.dev` | Upstream repository name                     |
+| `GH_REQUEST_TIMEOUT`  | `30000`           | GitHub API timeout (milliseconds)            |
+| `GH_PAT_TOKEN`        | —                 | Fallback PAT for 403 errors (see note below) |
+
+> [!NOTE]
+> **GH_PAT_TOKEN**: Optional fallback token for permission-related failures. When the primary `GH_TOKEN` receives a 403 (Forbidden) error, the client automatically retries with this PAT. Useful when GitHub App tokens have different permission scopes than PATs for certain operations.
 
 </details>
 
