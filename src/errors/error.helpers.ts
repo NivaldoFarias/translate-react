@@ -143,6 +143,6 @@ function isUncastAPIError(error: unknown): error is APIError {
 		"code" in error &&
 		"param" in error &&
 		"headers" in error &&
-		"request_id" in error
+		"requestID" in error
 	);
 }
