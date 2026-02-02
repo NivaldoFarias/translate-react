@@ -4,6 +4,8 @@ import type { TranslationFile } from "@/services/translator.service";
 
 import type { LocaleDefinition } from "./types";
 
+import { formatElapsedTime } from "@/utils/common.util";
+
 /**
  * Brazilian Portuguese locale definition.
  *
@@ -13,11 +15,10 @@ import type { LocaleDefinition } from "./types";
 export const ptBrLocale: LocaleDefinition = {
 	comment: {
 		prefix: "As seguintes páginas foram traduzidas e PRs foram criados:",
-		suffix: `###### Observações
-
-- As traduções foram geradas por uma LLM e requerem revisão humana para garantir precisão técnica e fluência.
-- Alguns arquivos podem ter PRs de tradução existentes em análise. Verifiquei duplicações, mas recomendo conferir.
-- Esta implementação é um trabalho em progresso e pode apresentar inconsistências em conteúdos técnicos complexos ou formatação específica.`,
+		suffix: `> [!IMPORTANT]
+>
+> As traduções foram geradas por uma LLM e requerem revisão humana para garantir precisão técnica e fluência.
+> Esta implementação é um trabalho em progresso e pode apresentar inconsistências em conteúdos técnicos complexos ou formatação específica.`,
 	},
 	rules: {
 		specific: `
@@ -28,7 +29,8 @@ export const ptBrLocale: LocaleDefinition = {
 - When a MDN document is referenced, update the language slug to the Brazilian Portuguese version ('https://developer.mozilla.org/<slug>/*' => 'https://developer.mozilla.org/pt-BR/*')`,
 	},
 	pullRequest: {
-		title: (file: TranslationFile) => `Tradução de \`${file.filename}\` para Português (Brasil)`,
+		title: (file: TranslationFile) =>
+			`Tradução de ${file.title ? `**${file.title}**` : `\`${file.filename}\``} para Português (Brasil)`,
 		body: (
 			file: TranslationFile,
 			processingResult: ProcessedFileResult,
@@ -63,9 +65,11 @@ ${conflictNotice}
 | **Tamanho da Tradução** | ${metadata.content.translation} |
 | **Razão de Conteúdo** | ${metadata.content.compressionRatio}x |
 | **Caminho do Arquivo** | \`${file.path}\` |
-| **Tempo de Processamento** | ~${Math.ceil(processingTime / 1000)}s |
+| **Tempo de Processamento** | ~${formatElapsedTime(processingTime, "pt-BR")} |
 
-###### ps.: A "Razão de Conteúdo" indica como o comprimento da tradução se compara à fonte (~1.0x: mesmo comprimento, >1.0x: tradução é mais longa). Diferentes idiomas naturalmente têm níveis variados de verbosidade.
+> [!NOTE] 
+> - "Razão de Conteúdo" indica como o comprimento da tradução se compara à fonte (~1.0x: mesmo comprimento, >1.0x: tradução é mais longa). Diferentes idiomas naturalmente têm níveis variados de verbosidade. 
+> - "Tempo de Processamento" baseia-se no cálculo do tempo total desde o início do fluxo até a conclusão da tradução deste arquivo específico.
 
 ### Informações Técnicas
 

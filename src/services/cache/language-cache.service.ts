@@ -34,7 +34,8 @@ export class LanguageCacheService {
 	private readonly logger = logger.child({ component: LanguageCacheService.name });
 	private readonly cache = new CacheService<LanguageCacheEntry>();
 
-	private static readonly DEFAULT_TTL_MS = 60 * 60 * 1000; // 1 hour
+	/** Default TTL of 1 hour for cache entries */
+	private static readonly DEFAULT_TTL_MS = 60 * 60 * 1000;
 
 	/**
 	 * Stores language detection result in cache.
@@ -123,3 +124,5 @@ export class LanguageCacheService {
 		return `${filename}:${contentHash}`;
 	}
 }
+
+export const languageCacheService = new LanguageCacheService();

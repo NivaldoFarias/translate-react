@@ -9,6 +9,12 @@ export interface CacheEntry<T> {
 	expiresAt: number;
 }
 
+/** Optional config for CacheService (e.g. injectable clock for tests) */
+export interface CacheServiceOptions {
+	/** Returns current time in ms (default: Date.now). Use in tests for deterministic TTL. */
+	getNow?: () => number;
+}
+
 /**
  * Simple in-memory cache service for runtime-scoped data.
  *
@@ -25,7 +31,12 @@ export interface CacheEntry<T> {
  */
 export class CacheService<T> {
 	private readonly logger = logger.child({ component: CacheService.name });
+	private readonly getNow: () => number;
 	private cache = new Map<string, CacheEntry<T>>();
+
+	constructor(options: CacheServiceOptions = {}) {
+		this.getNow = options.getNow ?? (() => Date.now());
+	}
 
 	/**
 	 * Stores a value in cache with TTL.
@@ -35,7 +46,7 @@ export class CacheService<T> {
 	 * @param ttlMs Time-to-live in milliseconds
 	 */
 	public set(key: string, value: T, ttlMs: number): void {
-		const expiresAt = Date.now() + ttlMs;
+		const expiresAt = this.getNow() + ttlMs;
 
 		this.cache.set(key, { value, expiresAt });
 	}
@@ -57,7 +68,7 @@ export class CacheService<T> {
 			return null;
 		}
 
-		if (Date.now() > entry.expiresAt) {
+		if (this.getNow() > entry.expiresAt) {
 			this.logger.debug({ key }, "Cache entry found expired, deleting");
 			this.cache.delete(key);
 			return null;
@@ -77,7 +88,7 @@ export class CacheService<T> {
 	 */
 	public getMany(keys: string[]): Map<string, T> {
 		const result = new Map<string, T>();
-		const now = Date.now();
+		const now = this.getNow();
 
 		for (const key of keys) {
 			const entry = this.cache.get(key);
@@ -136,7 +147,7 @@ export class CacheService<T> {
 
 	/** Removes all expired entries from cache */
 	public cleanupExpired(): number {
-		const now = Date.now();
+		const now = this.getNow();
 		let removed = 0;
 
 		this.logger.debug("Starting cleanup of expired cache entries");

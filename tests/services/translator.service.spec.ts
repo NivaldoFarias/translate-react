@@ -1,75 +1,52 @@
-import {
-	createChatCompletionsMock,
-	createMockChatCompletion,
-	createMockOpenAI,
-	createMockRateLimiter,
-} from "@tests/mocks";
-import { beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
-
-import type { ChatCompletion } from "openai/resources";
+import { beforeEach, describe, expect, spyOn, test } from "bun:test";
 
 import type { TranslatorServiceDependencies } from "@/services/";
 
-import { TranslationFile, TranslatorService } from "@/services/";
+import { localeService, TranslatorService } from "@/services/";
+
+import {
+	createChatCompletionFixture,
+	createLanguageAnalysisResultFixture,
+	createOpenAIApiErrorFixture,
+	createTranslationFileFixture,
+} from "@tests/fixtures";
+import {
+	createChatCompletionsMock,
+	createMockLanguageDetectorService,
+	createMockOpenAI,
+	createMockQueue,
+} from "@tests/mocks";
 
 /** Module-scoped mock for chat completions (can be spied/cleared per test) */
 const mockChatCompletionsCreate = createChatCompletionsMock();
 
 /** Creates test TranslatorService with optional overrides */
 function createTestTranslatorService(
-	overrides?: Partial<TranslatorServiceDependencies>,
+	overrides: Partial<TranslatorServiceDependencies> = {},
 ): TranslatorService {
-	const defaults = {
-		openai: createMockOpenAI(mockChatCompletionsCreate),
-		model: "test-model",
-	};
-
 	return new TranslatorService({
-		...(defaults as unknown as TranslatorServiceDependencies),
-		...overrides,
-	});
+		openai: overrides.openai ?? createMockOpenAI(mockChatCompletionsCreate),
+		model: overrides.model ?? "test-model",
+		localeService: overrides.localeService ?? localeService,
+		languageDetectorService:
+			overrides.languageDetectorService ?? createMockLanguageDetectorService(),
+		queue: overrides.queue ?? createMockQueue(),
+		retryConfig: {
+			retries: overrides.retryConfig?.retries ?? 0,
+			factor: overrides.retryConfig?.factor ?? 1,
+			minTimeout: overrides.retryConfig?.minTimeout ?? 100,
+			maxTimeout: overrides.retryConfig?.maxTimeout ?? 1000,
+			randomize: overrides.retryConfig?.randomize ?? false,
+		},
+	} as TranslatorServiceDependencies);
 }
-
-/** Mock backoff utility to execute immediately without retries */
-void mock.module("@/utils/backoff.util", () => ({
-	withExponentialBackoff: <T>(fn: () => Promise<T>) => fn(),
-	DEFAULT_BACKOFF_CONFIG: {
-		initialDelay: 1000,
-		maxDelay: 60_000,
-		maxRetries: 5,
-		multiplier: 2,
-		jitter: true,
-	},
-}));
 
 describe("TranslatorService", () => {
 	let translatorService: TranslatorService;
 
 	beforeEach(() => {
 		mockChatCompletionsCreate.mockClear();
-
 		translatorService = createTestTranslatorService();
-
-		spyOn(translatorService.languageDetector, "detectPrimaryLanguage").mockResolvedValue("en");
-		spyOn(translatorService.languageDetector, "getLanguageName").mockImplementation(
-			(code: string) => {
-				if (code === "en") return "English";
-				if (code === "pt-br") return "Brazilian Portuguese";
-				return undefined;
-			},
-		);
-		spyOn(translatorService.languageDetector, "analyzeLanguage").mockResolvedValue({
-			languageScore: { target: 0.1, source: 0.9 },
-			ratio: 0.1,
-			isTranslated: false,
-			detectedLanguage: "en",
-			rawResult: {
-				reliable: true,
-				textBytes: 1234,
-				languages: [],
-				chunks: [],
-			},
-		});
 	});
 
 	describe("Constructor", () => {
@@ -79,45 +56,102 @@ describe("TranslatorService", () => {
 		});
 
 		test("should initialize language detector with provided config", () => {
-			const service = createTestTranslatorService();
+			const translatorService = createTestTranslatorService();
 
-			expect(service).toBeInstanceOf(TranslatorService);
-			expect(service.languageDetector).toBeDefined();
+			expect(translatorService).toBeInstanceOf(TranslatorService);
+			expect(translatorService.services.languageDetector).toBeDefined();
+		});
+	});
+
+	describe("TranslationFile", () => {
+		test("should extract title from frontmatter when title is present", () => {
+			const content = `
+			---
+			title: 'Hello'
+			---
+			# Hello
+	
+			Welcome to React!
+			`;
+			const file = createTranslationFileFixture({ content });
+			expect(file.title).toBe("Hello");
+		});
+
+		test("should extract title from frontmatter when title is present with double quotes", () => {
+			const content = `
+			---
+			title: "Hello"
+			---
+			# Hello
+			`;
+			const file = createTranslationFileFixture({ content });
+			expect(file.title).toBe("Hello");
+		});
+
+		test("should not extract title from frontmatter when title is not present", () => {
+			const content = `
+			# Hello
+			Welcome to React!
+			`;
+			const file = createTranslationFileFixture({ content });
+			expect(file.title).toBeUndefined();
+		});
+	});
+
+	describe("testConnectivity", () => {
+		test("resolves when LLM returns valid response", async () => {
+			mockChatCompletionsCreate.mockResolvedValue(createChatCompletionFixture());
+
+			await translatorService.testConnectivity();
+
+			expect(mockChatCompletionsCreate).toHaveBeenCalledTimes(1);
+		});
+
+		test("throws ApplicationError when LLM response has no id, usage, or choices", () => {
+			mockChatCompletionsCreate.mockResolvedValue(
+				createChatCompletionFixture({
+					id: undefined,
+					created: 0,
+					model: "test",
+					choices: [],
+					usage: undefined,
+				}),
+			);
+
+			expect(translatorService.testConnectivity()).rejects.toThrow("Invalid LLM API response");
+		});
+	});
+
+	describe("getLanguageAnalysis", () => {
+		test("returns language analysis when file has content", async () => {
+			const expectedAnalysis = createLanguageAnalysisResultFixture();
+			const analyzeSpy = spyOn(
+				translatorService.services.languageDetector,
+				"analyzeLanguage",
+			).mockResolvedValue(expectedAnalysis);
+
+			const file = createTranslationFileFixture({ content: "Conteúdo em português." });
+
+			const analysis = await translatorService.getLanguageAnalysis(file);
+
+			expect(analysis).toBe(expectedAnalysis);
+			expect(analyzeSpy).toHaveBeenCalledWith(file.filename, file.content);
+		});
+
+		test("throws ApplicationError when file content is empty", () => {
+			const file = createTranslationFileFixture({ content: "" });
+
+			expect(translatorService.getLanguageAnalysis(file)).rejects.toThrow("File content is empty");
 		});
 	});
 
 	describe("translateContent", () => {
 		test("should translate content successfully when valid content is provided", async () => {
-			mockChatCompletionsCreate.mockResolvedValue({
-				id: "chatcmpl-123",
-				created: 1_701_764_769,
-				model: "gpt-4-0314",
-				object: "chat.completion",
-				choices: [
-					{
-						message: {
-							content: "Olá mundo",
-							refusal: null,
-							role: "assistant",
-						},
-						finish_reason: "stop",
-						index: 0,
-						logprobs: null,
-					},
-				],
-				usage: {
-					total_tokens: 50,
-					completion_tokens: 50,
-					prompt_tokens: 0,
-				},
-			} as ChatCompletion);
+			mockChatCompletionsCreate.mockResolvedValue(
+				createChatCompletionFixture({ choices: [{ message: { content: "Olá mundo" } }] }),
+			);
 
-			const file: TranslationFile = {
-				path: "test/file.md",
-				content: "Hello world",
-				sha: "abc123",
-				filename: "file.md",
-			};
+			const file = createTranslationFileFixture({ content: "Hello world" });
 
 			const translation = await translatorService.translateContent(file);
 
@@ -126,28 +160,17 @@ describe("TranslatorService", () => {
 		});
 
 		test("should throw error when content is empty", () => {
-			const file: TranslationFile = {
-				path: "test/empty.md",
-				content: "",
-				sha: "def456",
-				filename: "empty.md",
-			};
+			const file = createTranslationFileFixture({ content: "" });
 
 			expect(translatorService.translateContent(file)).rejects.toThrow("File content is empty");
 		});
 
 		test("should throw error when content is whitespace-only", () => {
-			mockChatCompletionsCreate.mockResolvedValue({
-				choices: [{ message: { content: "   \n\t  \n  " } }],
-				usage: { total_tokens: 10 },
-			} as ChatCompletion);
+			mockChatCompletionsCreate.mockResolvedValue(
+				createChatCompletionFixture({ choices: [{ message: { content: "   \n\t  \n  " } }] }),
+			);
 
-			const file: TranslationFile = {
-				path: "test/whitespace.md",
-				content: "   \n\t  \n  ",
-				sha: "wht123",
-				filename: "whitespace.md",
-			};
+			const file = createTranslationFileFixture({ content: "   \n\t  \n  " });
 
 			expect(translatorService.translateContent(file)).rejects.toThrow(
 				"Translation produced empty content",
@@ -155,23 +178,21 @@ describe("TranslatorService", () => {
 		});
 
 		test("should preserve code blocks in translated content", async () => {
-			mockChatCompletionsCreate.mockResolvedValue({
-				choices: [
-					{
-						message: {
-							content: `# Título\n\`\`\`javascript\n// Comentário traduzido\nconst example = "test";\n\`\`\`\n\nTexto traduzido`,
+			mockChatCompletionsCreate.mockResolvedValue(
+				createChatCompletionFixture({
+					choices: [
+						{
+							message: {
+								content: `# Título\n\`\`\`javascript\n// Comentário traduzido\nconst example = "test";\n\`\`\`\n\nTexto traduzido`,
+							},
 						},
-					},
-				],
-				usage: { total_tokens: 80 },
-			} as ChatCompletion);
+					],
+				}),
+			);
 
-			const file: TranslationFile = {
-				path: "test/code.md",
+			const file = createTranslationFileFixture({
 				content: `# Title\n\`\`\`javascript\n// Comment\nconst example = "test";\n\`\`\`\n\nText`,
-				sha: "ghi789",
-				filename: "code.md",
-			};
+			});
 
 			const translation = await translatorService.translateContent(file);
 
@@ -182,31 +203,26 @@ describe("TranslatorService", () => {
 		});
 
 		test("should handle API errors gracefully", () => {
-			mockChatCompletionsCreate.mockRejectedValue(new Error("API Error"));
+			const apiError = createOpenAIApiErrorFixture({
+				error: { message: "API Error" },
+				message: "API Error",
+			});
+			mockChatCompletionsCreate.mockRejectedValue(apiError);
 
-			const file: TranslationFile = {
-				path: "test/error.md",
-				content: "Error test content",
-				sha: "mno345",
-				filename: "error.md",
-			};
+			const file = createTranslationFileFixture({ content: "Error test content" });
 
-			expect(translatorService.translateContent(file)).rejects.toThrow("API Error");
+			expect(translatorService.translateContent(file)).rejects.toThrow(apiError);
 		});
 
 		test("should handle large content with chunking", async () => {
 			const largeContent = "Large content ".repeat(1000);
-			mockChatCompletionsCreate.mockResolvedValue({
-				choices: [{ message: { content: "Conteúdo grande traduzido" } }],
-				usage: { total_tokens: 500 },
-			} as ChatCompletion);
+			mockChatCompletionsCreate.mockResolvedValue(
+				createChatCompletionFixture({
+					choices: [{ message: { content: "Conteúdo grande traduzido" } }],
+				}),
+			);
 
-			const file: TranslationFile = {
-				path: "test/large.md",
-				content: largeContent,
-				sha: "large123",
-				filename: "large.md",
-			};
+			const file = createTranslationFileFixture({ content: largeContent });
 
 			const translation = await translatorService.translateContent(file);
 
@@ -217,12 +233,13 @@ describe("TranslatorService", () => {
 
 	describe("isFileTranslated", () => {
 		test("should detect English content as not translated", async () => {
-			const file: TranslationFile = new TranslationFile(
-				"This is English content that needs translation.",
-				"english.md",
-				"docs/english.md",
-				"eng123",
+			spyOn(translatorService.services.languageDetector, "analyzeLanguage").mockResolvedValue(
+				createLanguageAnalysisResultFixture({ isTranslated: false }),
 			);
+
+			const file = createTranslationFileFixture({
+				content: "This is English content that needs translation.",
+			});
 
 			const isTranslated = await translatorService.isContentTranslated(file);
 
@@ -230,25 +247,13 @@ describe("TranslatorService", () => {
 		});
 
 		test("should detect Portuguese content as translated", async () => {
-			spyOn(translatorService.languageDetector, "analyzeLanguage").mockResolvedValue({
-				languageScore: { target: 0.9, source: 0.1 },
-				ratio: 0.9,
-				isTranslated: true,
-				detectedLanguage: "pt",
-				rawResult: {
-					reliable: true,
-					textBytes: 1234,
-					languages: [],
-					chunks: [],
-				},
-			});
-
-			const file: TranslationFile = new TranslationFile(
-				"Este é um conteúdo em português que já foi traduzido.",
-				"portuguese.md",
-				"test/portuguese.md",
-				"pt123",
+			spyOn(translatorService.services.languageDetector, "analyzeLanguage").mockResolvedValue(
+				createLanguageAnalysisResultFixture(),
 			);
+
+			const file = createTranslationFileFixture({
+				content: "Este é um conteúdo em português que já foi traduzido.",
+			});
 
 			const isTranslated = await translatorService.isContentTranslated(file);
 
@@ -256,40 +261,45 @@ describe("TranslatorService", () => {
 		});
 
 		test("should handle mixed language content", async () => {
-			const file: TranslationFile = new TranslationFile(
-				"This has some English and também algum português.",
-				"mixed.md",
-				"test/mixed.md",
-				"mix123",
-			);
+			const file = createTranslationFileFixture({
+				content: "This has some English and também algum português.",
+			});
 
 			const isTranslated = await translatorService.isContentTranslated(file);
 
 			expect(typeof isTranslated).toBe("boolean");
 		});
+
+		test("returns false when language analysis throws", async () => {
+			spyOn(translatorService.services.languageDetector, "analyzeLanguage").mockRejectedValue(
+				new Error("Detection failed"),
+			);
+
+			const file = createTranslationFileFixture({ content: "Some content." });
+
+			const isTranslated = await translatorService.isContentTranslated(file);
+
+			expect(isTranslated).toBe(false);
+		});
 	});
 
-	describe("Edge Cases and Error Handling", () => {
+	describe("Edge Cases", () => {
 		test("should handle malformed markdown content", async () => {
 			const malformedContent = "# Incomplete header\n```\nUnclosed code block\n## Another header";
-			mockChatCompletionsCreate.mockResolvedValue({
-				choices: [
-					{
-						message: {
-							content:
-								"# Cabeçalho incompleto\n```\nBloco de código não fechado\n## Outro cabeçalho",
+			mockChatCompletionsCreate.mockResolvedValue(
+				createChatCompletionFixture({
+					choices: [
+						{
+							message: {
+								content:
+									"# Cabeçalho incompleto\n```\nBloco de código não fechado\n## Outro cabeçalho",
+							},
 						},
-					},
-				],
-				usage: { total_tokens: 60 },
-			} as ChatCompletion);
+					],
+				}),
+			);
 
-			const file: TranslationFile = {
-				path: "test/malformed.md",
-				content: malformedContent,
-				sha: "mal123",
-				filename: "malformed.md",
-			};
+			const file = createTranslationFileFixture({ content: malformedContent });
 
 			const translation = await translatorService.translateContent(file);
 
@@ -299,19 +309,15 @@ describe("TranslatorService", () => {
 
 		test("should handle special characters and emojis", async () => {
 			const contentWithEmojis = "Hello world! 🌍 This has special chars: àáâãäåæçèéêë";
-			mockChatCompletionsCreate.mockResolvedValue({
-				choices: [
-					{ message: { content: "Olá mundo! 🌍 Isto tem caracteres especiais: àáâãäåæçèéêë" } },
-				],
-				usage: { total_tokens: 40 },
-			} as ChatCompletion);
+			mockChatCompletionsCreate.mockResolvedValue(
+				createChatCompletionFixture({
+					choices: [
+						{ message: { content: "Olá mundo! 🌍 Isto tem caracteres especiais: àáâãäåæçèéêë" } },
+					],
+				}),
+			);
 
-			const file: TranslationFile = {
-				path: "test/special.md",
-				content: contentWithEmojis,
-				sha: "spc123",
-				filename: "special.md",
-			};
+			const file = createTranslationFileFixture({ content: contentWithEmojis });
 
 			const translation = await translatorService.translateContent(file);
 
@@ -328,55 +334,43 @@ describe("TranslatorService", () => {
 		});
 
 		test("should handle null response from API", () => {
-			mockChatCompletionsCreate.mockResolvedValue({
-				choices: [{ message: { content: null } }],
-				usage: { total_tokens: 10 },
-			} as ChatCompletion);
+			mockChatCompletionsCreate.mockResolvedValue(
+				createChatCompletionFixture({
+					choices: [{ message: { content: null } }],
+				}),
+			);
 
-			const file: TranslationFile = {
-				path: "test/null.md",
-				content: "Test content",
-				sha: "null123",
-				filename: "null.md",
-			};
+			const file = createTranslationFileFixture({ content: "Test content" });
 
 			expect(translatorService.translateContent(file)).rejects.toThrow();
 		});
 
 		test("should handle undefined response from API", () => {
-			mockChatCompletionsCreate.mockResolvedValue({
-				choices: [{ message: {} }],
-				usage: { total_tokens: 10 },
-			} as ChatCompletion);
+			mockChatCompletionsCreate.mockResolvedValue(
+				createChatCompletionFixture({
+					choices: [{ message: {} }],
+				}),
+			);
 
-			const file: TranslationFile = {
-				path: "test/undefined.md",
-				content: "Test content",
-				sha: "undef123",
-				filename: "undefined.md",
-			};
+			const file = createTranslationFileFixture({ content: "Test content" });
 
 			expect(translatorService.translateContent(file)).rejects.toThrow();
 		});
 
 		test("should handle empty choices array from API", () => {
-			mockChatCompletionsCreate.mockResolvedValue({
-				choices: [],
-				usage: { total_tokens: 10 },
-			} as unknown as ChatCompletion);
+			mockChatCompletionsCreate.mockResolvedValue(
+				createChatCompletionFixture({
+					choices: [],
+				}),
+			);
 
-			const file: TranslationFile = {
-				path: "test/empty-choices.md",
-				content: "Test content",
-				sha: "empty123",
-				filename: "empty-choices.md",
-			};
+			const file = createTranslationFileFixture({ content: "Test content" });
 
 			expect(translatorService.translateContent(file)).rejects.toThrow();
 		});
 
 		test("should return false for invalid LLM response", () => {
-			const invalidResponse = createMockChatCompletion({
+			const invalidResponse = createChatCompletionFixture({
 				id: undefined,
 				usage: undefined,
 				// @ts-expect-error - invalid `message` type for testing

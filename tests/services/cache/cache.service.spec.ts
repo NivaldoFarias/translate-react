@@ -2,6 +2,23 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
 import { CacheService } from "@/services/";
 
+/** Creates a cache with a fake clock for deterministic TTL tests (no sleep). */
+function createCacheWithFakeClock(): {
+	cache: CacheService<string>;
+	advanceMs: (ms: number) => void;
+} {
+	let now = 0;
+	const cache = new CacheService<string>({
+		getNow: () => now,
+	});
+	return {
+		cache,
+		advanceMs: (ms: number) => {
+			now += ms;
+		},
+	};
+}
+
 describe("CacheService", () => {
 	let cache: CacheService<string>;
 
@@ -28,23 +45,27 @@ describe("CacheService", () => {
 			expect(result).toBeNull();
 		});
 
-		test("should return null when cached value has expired", async () => {
-			cache.set("key1", "value1", 50);
+		test("should return null when cached value has expired", () => {
+			const { cache: clockedCache, advanceMs } = createCacheWithFakeClock();
 
-			await new Promise((resolve) => setTimeout(resolve, 100));
-			const result = cache.get("key1");
+			clockedCache.set("key1", "value1", 50);
+			advanceMs(100);
+
+			const result = clockedCache.get("key1");
 
 			expect(result).toBeNull();
 		});
 
-		test("should automatically remove expired entry when accessed", async () => {
-			cache.set("key1", "value1", 50);
-			expect(cache.size).toBe(1);
+		test("should automatically remove expired entry when accessed", () => {
+			const { cache: clockedCache, advanceMs } = createCacheWithFakeClock();
 
-			await new Promise((resolve) => setTimeout(resolve, 100));
-			cache.get("key1");
+			clockedCache.set("key1", "value1", 50);
+			expect(clockedCache.size).toBe(1);
 
-			expect(cache.size).toBe(0);
+			advanceMs(100);
+			clockedCache.get("key1");
+
+			expect(clockedCache.size).toBe(0);
 		});
 	});
 
@@ -72,12 +93,14 @@ describe("CacheService", () => {
 			expect(results.has("key2")).toBe(false);
 		});
 
-		test("should exclude expired entries when retrieving multiple values", async () => {
-			cache.set("key1", "value1", 1000);
-			cache.set("key2", "value2", 50);
+		test("should exclude expired entries when retrieving multiple values", () => {
+			const { cache: clockedCache, advanceMs } = createCacheWithFakeClock();
 
-			await new Promise((resolve) => setTimeout(resolve, 100));
-			const results = cache.getMany(["key1", "key2"]);
+			clockedCache.set("key1", "value1", 60_000);
+			clockedCache.set("key2", "value2", 1);
+			advanceMs(50);
+
+			const results = clockedCache.getMany(["key1", "key2"]);
 
 			expect(results.size).toBe(1);
 			expect(results.get("key1")).toBe("value1");
@@ -106,11 +129,13 @@ describe("CacheService", () => {
 			expect(result).toBe(false);
 		});
 
-		test("should return false when key has expired beyond TTL", async () => {
-			cache.set("key1", "value1", 50);
+		test("should return false when key has expired beyond TTL", () => {
+			const { cache: clockedCache, advanceMs } = createCacheWithFakeClock();
 
-			await new Promise((resolve) => setTimeout(resolve, 100));
-			const result = cache.has("key1");
+			clockedCache.set("key1", "value1", 50);
+			advanceMs(100);
+
+			const result = clockedCache.has("key1");
 
 			expect(result).toBe(false);
 		});
@@ -150,17 +175,19 @@ describe("CacheService", () => {
 	});
 
 	describe("cleanupExpired", () => {
-		test("should remove all expired entries when some entries have exceeded TTL", async () => {
-			cache.set("key1", "value1", 1000);
-			cache.set("key2", "value2", 50);
-			cache.set("key3", "value3", 50);
+		test("should remove all expired entries when some entries have exceeded TTL", () => {
+			const { cache: clockedCache, advanceMs } = createCacheWithFakeClock();
 
-			await new Promise((resolve) => setTimeout(resolve, 500));
-			const removed = cache.cleanupExpired();
+			clockedCache.set("key1", "value1", 60_000);
+			clockedCache.set("key2", "value2", 150);
+			clockedCache.set("key3", "value3", 50);
+			advanceMs(500);
+
+			const removed = clockedCache.cleanupExpired();
 
 			expect(removed).toBe(2);
-			expect(cache.size).toBe(1);
-			expect(cache.get("key1")).toBe("value1");
+			expect(clockedCache.size).toBe(1);
+			expect(clockedCache.get("key1")).toBe("value1");
 		});
 
 		test("should return zero when no entries have expired", () => {

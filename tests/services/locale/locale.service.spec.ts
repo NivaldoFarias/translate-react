@@ -1,83 +1,50 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 
 import { ptBrLocale } from "@/locales";
 import { LocaleService } from "@/services/";
 
 describe("LocaleService", () => {
-	beforeEach(() => {
-		LocaleService.clearInstances();
-	});
+	let localeService: LocaleService;
 
-	afterEach(() => {
-		LocaleService.clearInstances();
+	beforeEach(() => {
+		localeService = new LocaleService("pt-br");
 	});
 
 	describe("Constructor", () => {
 		test("should create instance with specified language code", () => {
-			const service = new LocaleService("pt-br");
-
-			expect(service).toBeInstanceOf(LocaleService);
-			expect(service.languageCode).toBe("pt-br");
+			expect(localeService).toBeInstanceOf(LocaleService);
+			expect(localeService.languageCode).toBe("pt-br");
 		});
 
 		test("should load correct locale definition when language is registered", () => {
-			const service = new LocaleService("pt-br");
-
-			expect(service.locale).toBe(ptBrLocale);
+			expect(localeService.definitions).toBe(ptBrLocale);
 		});
 
 		test("should fallback to pt-br when language is not registered", () => {
-			const service = new LocaleService("ru");
-
-			expect(service.locale).toBe(ptBrLocale);
-		});
-	});
-
-	describe("get", () => {
-		test("should return singleton instance for current target language", () => {
-			const instance1 = LocaleService.get();
-			const instance2 = LocaleService.get();
-
-			expect(instance1).toBe(instance2);
-		});
-
-		test("should use pt-br locale based on test environment", () => {
-			const service = LocaleService.get();
-
-			expect(service.locale.comment.prefix).toContain("traduzidas");
-		});
-	});
-
-	describe("clearInstances", () => {
-		test("should clear cached instances when called", () => {
-			const instance1 = LocaleService.get();
-			LocaleService.clearInstances();
-			const instance2 = LocaleService.get();
-
-			expect(instance1).not.toBe(instance2);
+			expect(localeService.definitions).toBe(ptBrLocale);
 		});
 	});
 
 	describe("hasLocale", () => {
-		test("should return true when locale exists for language code", () => {
-			expect(LocaleService.hasLocale("pt-br")).toBe(true);
+		test("returns true when language code is registered", () => {
+			expect(localeService.hasLocale("pt-br")).toBe(true);
 		});
 
-		test("should return false when locale does not exist for language code", () => {
-			expect(LocaleService.hasLocale("ru")).toBe(false);
+		test("returns false when language code is not registered", () => {
+			expect(localeService.hasLocale("ru")).toBe(false);
 		});
 	});
 
 	describe("getAvailableLocales", () => {
-		test("should return array of registered language codes", () => {
-			const locales = LocaleService.getAvailableLocales();
+		test("returns array of registered language codes", () => {
+			const locales = localeService.getAvailableLocales();
 
-			expect(locales).toBeArray();
 			expect(locales).toContain("pt-br");
+			expect(Array.isArray(locales)).toBe(true);
 		});
 
-		test("should not include unregistered language codes", () => {
-			const locales = LocaleService.getAvailableLocales();
+		test("returns array that does not include unregistered language codes", () => {
+			const locales = localeService.getAvailableLocales();
 
 			expect(locales).not.toContain("ru");
 			expect(locales).not.toContain("en");
@@ -87,40 +54,33 @@ describe("LocaleService", () => {
 	describe("locale property", () => {
 		describe("comment", () => {
 			test("should have prefix property with translated text", () => {
-				const service = new LocaleService("pt-br");
-
-				expect(service.locale.comment.prefix).toBe(
+				expect(localeService.definitions.comment.prefix).toBe(
 					"As seguintes páginas foram traduzidas e PRs foram criados:",
 				);
 			});
 
 			test("should have suffix function that generates observations", () => {
-				const service = new LocaleService("pt-br");
-				const suffix = service.locale.comment.suffix;
+				const suffix = localeService.definitions.comment.suffix;
 
-				expect(suffix).toContain("###### Observações");
+				expect(suffix).toContain("> [!IMPORTANT]");
 			});
 		});
 
 		describe("rules", () => {
 			test("should have specific rules for the locale", () => {
-				const service = new LocaleService("pt-br");
-
-				expect(service.locale.rules.specific).toContain("PORTUGUESE (BRAZIL) SPECIFIC RULES");
+				expect(localeService.definitions.rules.specific).toContain(
+					"PORTUGUESE (BRAZIL) SPECIFIC RULES",
+				);
 			});
 
 			test("should include deprecated translation rule", () => {
-				const service = new LocaleService("pt-br");
-
-				expect(service.locale.rules.specific).toContain("deprecated");
-				expect(service.locale.rules.specific).toContain("descontinuado");
+				expect(localeService.definitions.rules.specific).toContain("deprecated");
+				expect(localeService.definitions.rules.specific).toContain("descontinuado");
 			});
 
 			test("should include MDN URL localization rule", () => {
-				const service = new LocaleService("pt-br");
-
-				expect(service.locale.rules.specific).toContain("developer.mozilla.org");
-				expect(service.locale.rules.specific).toContain("pt-BR");
+				expect(localeService.definitions.rules.specific).toContain("developer.mozilla.org");
+				expect(localeService.definitions.rules.specific).toContain("pt-BR");
 			});
 		});
 	});

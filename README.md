@@ -114,16 +114,15 @@ These **must** be set in your `.env` file:
 <details>
 <summary><b>LLM Configuration</b></summary>
 
-| Variable             | Default                                            | Description                                                      |
-| -------------------- | -------------------------------------------------- | ---------------------------------------------------------------- |
-| `LLM_MODEL`          | `google/gemini-2.0-flash-exp:free`                 | Model ID for translation                                         |
-| `LLM_API_BASE_URL`   | `https://openrouter.ai/api/v1`                     | API endpoint                                                     |
-| `OPENAI_PROJECT_ID`  | —                                                  | Optional: OpenAI project ID for tracking                         |
-| `MAX_TOKENS`         | `8192`                                             | Maximum tokens per LLM response                                  |
-| `HEADER_APP_URL`     | `https://github.com/NivaldoFarias/translate-react` | App URL for OpenRouter tracking                                  |
-| `HEADER_APP_TITLE`   | `translate-react v0.1.19`                          | App title for OpenRouter tracking                                |
-| `LLM_MAX_CONCURRENT` | `5`                                                | Maximum concurrent LLM API requests                              |
-| `LLM_MIN_TIME_MS`    | `20000`                                            | Minimum time between LLM API request batches in **milliseconds** |
+| Variable             | Default                                            | Description                                    |
+| -------------------- | -------------------------------------------------- | ---------------------------------------------- |
+| `LLM_MODEL`          | `google/gemini-2.0-flash-exp:free`                 | Model ID for translation                       |
+| `LLM_API_BASE_URL`   | `https://openrouter.ai/api/v1`                     | API endpoint                                   |
+| `OPENAI_PROJECT_ID`  | —                                                  | Optional: OpenAI project ID for tracking       |
+| `MAX_TOKENS`         | `8192`                                             | Maximum tokens per LLM response                |
+| `HEADER_APP_URL`     | `https://github.com/NivaldoFarias/translate-react` | App URL for OpenRouter tracking                |
+| `HEADER_APP_TITLE`   | `translate-react v0.1.21`                          | App title for OpenRouter tracking              |
+| `MAX_RETRY_ATTEMPTS` | `5`                                                | Maximum number of retries for LLM API requests |
 
 </details>
 
@@ -141,12 +140,11 @@ These **must** be set in your `.env` file:
 <details>
 <summary><b>Development/Debug Settings</b></summary>
 
-| Variable                | Default       | Description                                                            |
-| ----------------------- | ------------- | ---------------------------------------------------------------------- |
-| `NODE_ENV`              | `development` | Runtime environment                                                    |
-| `LOG_LEVEL`             | `info`        | Logging verbosity (`trace`\|`debug`\|`info`\|`warn`\|`error`\|`fatal`) |
-| `LOG_TO_CONSOLE`        | `true`        | Enable console logging in addition to file logs                        |
-| `PROGRESS_ISSUE_NUMBER` | —             | Optional: GitHub issue number for progress reports                     |
+| Variable         | Default       | Description                                                            |
+| ---------------- | ------------- | ---------------------------------------------------------------------- |
+| `NODE_ENV`       | `development` | Runtime environment                                                    |
+| `LOG_LEVEL`      | `info`        | Logging verbosity (`trace`\|`debug`\|`info`\|`warn`\|`error`\|`fatal`) |
+| `LOG_TO_CONSOLE` | `true`        | Enable console logging in addition to file logs                        |
 
 </details>
 
@@ -170,18 +168,18 @@ bun start
 
 ```plaintext
 translate-react/
-├─ src/
-│  ├── errors/                          # Error handling system
-│  ├── locales/                         # Language locale definitions
-│  ├── services/                        # Core services
-│  │   ├── cache/                       # In-memory caching
-│  │   ├── github/                      # GitHub API integration
-│  │   ├── locale/                      # Locale management
-│  │   ├── runner/                      # Workflow orchestration
-│  │   ├── service-factory.service.ts   # Dependency injection
-│  │   └── translator.service.ts        # LLM translation engine
-│  ├── utils/                           # Utilities and constants
-│  └── main.ts                          # Entry point
+├── src/
+│   ├── clients/                        # Octokit, OpenAI, queue clients
+│   ├── errors/                         # Error handling (ApplicationError, helpers)
+│   ├── locales/                        # Language locale definitions
+│   ├── services/                      # Core services
+│   │   ├── cache/                     # In-memory caching
+│   │   ├── github/                    # GitHub API (single service)
+│   │   ├── locale/                    # Locale management
+│   │   ├── runner/                    # Workflow orchestration
+│   │   └── translator.service.ts      # LLM translation engine
+│   ├── utils/                         # Utilities and constants
+│   └── main.ts                        # Entry point
 │
 ├── docs/                               # Technical documentation
 ├── tests/                              # Test suite
@@ -193,14 +191,12 @@ translate-react/
 
 ## Documentation
 
-| Document                                                  | Description                                                  |
-| --------------------------------------------------------- | ------------------------------------------------------------ |
-| [ARCHITECTURE.md](./docs/ARCHITECTURE.md)                 | System architecture, service design, and design patterns     |
-| [WORKFLOW.md](./docs/WORKFLOW.md)                         | Execution workflow with timing analysis and performance data |
-| [ERROR_HANDLING.md](./docs/ERROR_HANDLING.md)             | Error taxonomy and recovery mechanisms                       |
-| [TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md)           | Troubleshooting guide and diagnostic procedures              |
-| [PROJECT_STRUCTURE.md](./docs/PROJECT_STRUCTURE.md)       | Complete directory structure and navigation guide            |
-| [GITHUB_ACTIONS_SETUP.md](./docs/GITHUB_ACTIONS_SETUP.md) | CI/CD workflow configuration guide                           |
+| Document                                            | Description                                                  |
+| --------------------------------------------------- | ------------------------------------------------------------ |
+| [ARCHITECTURE.md](./docs/ARCHITECTURE.md)           | System architecture, service design, and design patterns     |
+| [WORKFLOW.md](./docs/WORKFLOW.md)                   | Execution workflow with timing analysis and performance data |
+| [TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md)     | Troubleshooting guide and diagnostic procedures              |
+| [PROJECT_STRUCTURE.md](./docs/PROJECT_STRUCTURE.md) | Complete directory structure and navigation guide            |
 
 ## Contributing
 
@@ -208,7 +204,6 @@ Contributions are welcome. Follow these guidelines:
 
 - **TypeScript**: All code must be properly typed with strict mode enabled
 - **Bun Runtime**: Use Bun exclusively _(not npm/yarn/pnpm)_
-- **Error Handling**: Follow established patterns in [ERROR_HANDLING.md](./docs/ERROR_HANDLING.md)
 - **Testing**: Add tests for new features using Bun's test runner
 - **Code Style**: Follow ESLint/Prettier configuration
 - **Commits**: Use [Conventional Commits](https://www.conventionalcommits.org/) format
@@ -220,12 +215,11 @@ Contributions are welcome. Follow these guidelines:
 
 ### Common Issues
 
-| Error                                                   | Solution                                                                  |
-| ------------------------------------------------------- | ------------------------------------------------------------------------- |
-| `GH_TOKEN: String must contain at least 1 character(s)` | Set `GH_TOKEN` and `LLM_API_KEY` in `.env`                                |
-| `GITHUB_NOT_FOUND`                                      | Verify repository permissions and token scope                             |
-| `GITHUB_RATE_LIMITED`                                   | Tool auto-retries with backoff; consider GitHub App token for heavy usage |
-| `OpenAI API error: insufficient_quota`                  | Check API credits; switch providers via `LLM_API_BASE_URL`                |
+| Error                                                   | Solution                                                           |
+| ------------------------------------------------------- | ------------------------------------------------------------------ |
+| `GH_TOKEN: String must contain at least 1 character(s)` | Set `GH_TOKEN` and `LLM_API_KEY` in `.env`                         |
+| GitHub API error (404 / 403 / 429)                      | Verify repository and token scope; tool auto-retries on rate limit |
+| LLM API error (quota / rate limit)                      | Check API credits; switch providers via `LLM_API_BASE_URL`         |
 
 ### Debug Mode
 

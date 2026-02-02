@@ -10,6 +10,7 @@ import type {
 import { ApplicationError, ErrorCode } from "@/errors/";
 import { logger, MAX_CONSECUTIVE_FAILURES } from "@/utils/";
 
+import { LanguageDetectorService } from "../language-detector.service";
 import { TranslationFile } from "../translator.service";
 
 export interface InvalidFilePullRequest {
@@ -23,7 +24,7 @@ export interface PullRequestDescriptionMetadata {
 	content: {
 		source: string;
 		translation: string;
-		compressionRatio: number;
+		compressionRatio: string;
 	};
 	timestamps: {
 		now: number;
@@ -85,21 +86,11 @@ export class TranslationBatchManager {
 	 *
 	 * @returns Map of filename to processing result metadata
 	 */
-	async processBatches(
+	public async processBatches(
 		files: TranslationFile[],
 		batchSize: number,
 	): Promise<Map<string, ProcessedFileResult>> {
 		const batches = this.createBatches(files, batchSize);
-
-		this.logger.info(
-			{
-				batchSize,
-				totalFiles: files.length,
-				totalBatches: batches.length,
-				parallelism: batchSize,
-			},
-			"Batch configuration initialized",
-		);
 
 		const results = new Map<ProcessedFileResult["filename"], ProcessedFileResult>();
 
@@ -129,8 +120,8 @@ export class TranslationBatchManager {
 	private createBatches(files: TranslationFile[], batchSize: number): TranslationFile[][] {
 		const batches: TranslationFile[][] = [];
 
-		for (let i = 0; i < files.length; i += batchSize) {
-			batches.push(files.slice(i, i + batchSize));
+		for (let index = 0; index < files.length; index += batchSize) {
+			batches.push(files.slice(index, index + batchSize));
 		}
 
 		return batches;
@@ -154,36 +145,21 @@ export class TranslationBatchManager {
 
 		const results = new Map<string, ProcessedFileResult>();
 
-		try {
-			this.logger.info(
-				batchInfo,
-				`Processing batch ${batchInfo.currentBatch}/${batchInfo.totalBatches}`,
-			);
+		const fileResults = await Promise.all(
+			batch.map((file, index) => {
+				const progress = {
+					batchIndex: batchInfo.currentBatch,
+					fileIndex: index,
+					totalBatches: batchInfo.totalBatches,
+					batchSize: batchInfo.batchSize,
+				};
 
-			const fileResults = await Promise.all(
-				batch.map((file, index) => {
-					const progress = {
-						batchIndex: batchInfo.currentBatch,
-						fileIndex: index,
-						totalBatches: batchInfo.totalBatches,
-						batchSize: batchInfo.batchSize,
-					};
+				return this.processFile(file, progress);
+			}),
+		);
 
-					return this.processFile(file, progress);
-				}),
-			);
-
-			for (const result of fileResults) {
-				results.set(result.filename, result);
-			}
-
-			this.logger.info(
-				{ batchIndex: batchInfo.currentBatch, ...this.batchProgress },
-				"Batch processing completed",
-			);
-		} catch (error) {
-			this.logger.error({ error, batchInfo }, "Error processing batch");
-			throw error;
+		for (const result of fileResults) {
+			results.set(result.filename, result);
 		}
 
 		const successRate = Math.round((this.batchProgress.successful / batch.length) * 100);
@@ -205,11 +181,6 @@ export class TranslationBatchManager {
 	/**
 	 * Processes a single file through the complete translation workflow.
 	 *
-	 * Handles the entire lifecycle of translating a file sequentially, from branch
-	 * creation through translation, commit, and pull request generation. Each step
-	 * is performed synchronously using `await` to ensure proper ordering and state
-	 * management. Includes comprehensive error handling and cleanup for failed translations.
-	 *
 	 * ### Workflow Steps
 	 *
 	 * 1. **Branch Creation**: Creates or retrieves translation branch for isolation
@@ -224,43 +195,19 @@ export class TranslationBatchManager {
 	 * - Commit must complete before PR creation
 	 * - Detailed timing logs track each operation's duration for debugging
 	 *
-	 * ### Error Handling
-	 *
-	 * - Captures and logs all errors with timing context
-	 * - Updates progress tracking for reporting
-	 * - Performs cleanup of created resources (branches) on failure
-	 * - Maintains file metadata even on failure for audit trail
-	 *
 	 * @param file File to process through translation workflow
 	 * @param _progress Progress tracking information for batch processing
 	 *
+	 * @throws {ApplicationError} with {@link ErrorCode.TranslationFailed}
+	 * If circuit breaker threshold is reached due to consecutive failures
+	 *
 	 * @returns Processing result metadata including branch, translation, PR, and error info
 	 */
-	async processFile(
+	private async processFile(
 		file: TranslationFile,
 		_progress: FileProcessingProgress,
 	): Promise<ProcessedFileResult> {
-		if (this.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-			this.logger.error(
-				{
-					consecutiveFailures: this.consecutiveFailures,
-					threshold: MAX_CONSECUTIVE_FAILURES,
-					filename: file.filename,
-				},
-				"Circuit breaker activated: stopping workflow due to consecutive failures",
-			);
-
-			throw new ApplicationError(
-				`Workflow terminated: ${this.consecutiveFailures} consecutive failures exceeded threshold of ${MAX_CONSECUTIVE_FAILURES}`,
-				ErrorCode.TranslationFailed,
-				`${TranslationBatchManager.name}.processFile`,
-				{
-					consecutiveFailures: this.consecutiveFailures,
-					threshold: MAX_CONSECUTIVE_FAILURES,
-				},
-			);
-		}
-
+		const logger = this.logger.child({ component: file.filename });
 		const metadata: ProcessedFileResult = {
 			branch: null,
 			filename: file.filename,
@@ -269,92 +216,42 @@ export class TranslationBatchManager {
 			error: null,
 		};
 
-		const fileStartTime = Date.now();
-
 		try {
-			this.logger.debug(
-				{ filename: file.filename, contentLength: file.content.length },
-				"Starting file processing workflow",
-			);
+			if (this.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+				throw new ApplicationError(
+					`Workflow terminated: ${this.consecutiveFailures} consecutive failures exceeded threshold of ${MAX_CONSECUTIVE_FAILURES}`,
+					ErrorCode.TranslationFailed,
+					`${TranslationBatchManager.name}.${this.processFile.name}`,
+					{
+						consecutiveFailures: this.consecutiveFailures,
+						threshold: MAX_CONSECUTIVE_FAILURES,
+					},
+				);
+			}
 
-			const branchStartTime = Date.now();
 			metadata.branch = await this.createOrGetTranslationBranch(file);
-			const branchDuration = Date.now() - branchStartTime;
 
-			this.logger.debug(
-				{ filename: file.filename, branchRef: metadata.branch.ref, durationMs: branchDuration },
-				"Branch creation completed",
-			);
-
-			const translationStartTime = Date.now();
 			metadata.translation = await this.services.translator.translateContent(file);
-			const translationDuration = Date.now() - translationStartTime;
 
-			this.logger.debug(
-				{
-					filename: file.filename,
-					translatedLength: metadata.translation.length,
-					durationMs: translationDuration,
-				},
-				"Translation completed - proceeding to commit",
+			const languageName = this.services.languageDetector.getLanguageName(
+				LanguageDetectorService.languages.target,
 			);
 
-			const languageName =
-				this.services.translator.languageDetector.getLanguageName(
-					this.services.translator.languageDetector.languages.target,
-				) ?? "Portuguese";
-
-			const commitStartTime = Date.now();
-			await this.services.github.content.commitTranslation({
+			await this.services.github.commitTranslation({
 				file,
 				branch: metadata.branch,
 				content: metadata.translation,
-				message: `Translate \`${file.filename}\` to ${languageName}`,
+				message: `docs: translate \`${file.filename}\` to ${languageName}`,
 			});
-			const commitDuration = Date.now() - commitStartTime;
 
-			this.logger.debug(
-				{ filename: file.filename, durationMs: commitDuration },
-				"Commit completed - creating pull request",
-			);
-
-			const prStartTime = Date.now();
 			metadata.pullRequest = await this.createOrUpdatePullRequest(file, metadata);
-
-			const prDuration = Date.now() - prStartTime;
-			const totalDuration = Date.now() - fileStartTime;
-
-			this.logger.debug(
-				{
-					filename: file.filename,
-					prNumber: metadata.pullRequest.number,
-					timing: {
-						branchMs: branchDuration,
-						translationMs: translationDuration,
-						commitMs: commitDuration,
-						prMs: prDuration,
-						totalMs: totalDuration,
-					},
-				},
-				"File processing completed successfully",
-			);
 
 			this.consecutiveFailures = 0;
 			this.updateBatchProgress("success");
 		} catch (error) {
-			const failureDuration = Date.now() - fileStartTime;
-
 			this.consecutiveFailures++;
 
-			this.logger.error(
-				{
-					error,
-					filename: file.filename,
-					durationMs: failureDuration,
-					consecutiveFailures: this.consecutiveFailures,
-				},
-				"File processing failed",
-			);
+			logger.error({ error }, "File processing failed");
 
 			metadata.error = error instanceof Error ? error : new Error(String(error));
 			this.updateBatchProgress("error");
@@ -392,7 +289,7 @@ export class TranslationBatchManager {
 
 		try {
 			const branchName = metadata.branch.ref.replace("refs/heads/", "");
-			await this.services.github.branch.deleteBranch(branchName);
+			await this.services.github.deleteBranch(branchName);
 			this.logger.info(
 				{ branchName, filename: metadata.filename },
 				"Cleaned up branch after failed translation",
@@ -426,28 +323,16 @@ export class TranslationBatchManager {
 	 * @returns Branch reference data containing SHA and branch name for subsequent commit operations
 	 */
 	private async createOrGetTranslationBranch(file: TranslationFile, baseBranch?: string) {
-		const actualBaseBranch =
-			baseBranch ?? (await this.services.github.repository.getDefaultBranch("fork"));
+		const actualBaseBranch = baseBranch ?? (await this.services.github.getDefaultBranch("fork"));
 		const branchName = `translate/${file.path.split("/").slice(2).join("/")}`;
 
-		this.logger.debug(
-			{ filename: file.filename, branchName },
-			"Checking for existing translation branch",
-		);
-		const existingBranch = await this.services.github.branch.getBranch(branchName);
+		const existingBranch = await this.services.github.getBranch(branchName);
 
 		if (existingBranch) {
-			this.logger.debug(
-				{ filename: file.filename, branchName },
-				"Existing branch found, checking associated PR status",
-			);
-
-			const upstreamPR = await this.services.github.content.findPullRequestByBranch(branchName);
+			const upstreamPR = await this.services.github.findPullRequestByBranch(branchName);
 
 			if (upstreamPR) {
-				const prStatus = await this.services.github.content.checkPullRequestStatus(
-					upstreamPR.number,
-				);
+				const prStatus = await this.services.github.checkPullRequestStatus(upstreamPR.number);
 
 				if (prStatus.hasConflicts) {
 					this.logger.info(
@@ -458,26 +343,18 @@ export class TranslationBatchManager {
 						},
 						"PR has merge conflicts, closing and recreating",
 					);
-					await this.services.github.content.createCommentOnPullRequest(
+					await this.services.github.createCommentOnPullRequest(
 						upstreamPR.number,
 						"This PR has merge conflicts and is being closed. A new PR with the updated translation will be created.",
 					);
 
-					await this.services.github.content.closePullRequest(upstreamPR.number);
-					await this.services.github.branch.deleteBranch(branchName);
+					await this.services.github.closePullRequest(upstreamPR.number);
+					await this.services.github.deleteBranch(branchName);
 				} else {
-					this.logger.debug(
-						{
-							filename: file.filename,
-							prNumber: upstreamPR.number,
-							mergeableState: prStatus.mergeableState,
-						},
-						"PR exists with no conflicts, reusing existing branch",
-					);
 					return existingBranch.data;
 				}
 			} else {
-				const isBehind = await this.services.github.repository.isBranchBehind(
+				const isBehind = await this.services.github.isBranchBehind(
 					branchName,
 					actualBaseBranch,
 					"fork",
@@ -488,19 +365,14 @@ export class TranslationBatchManager {
 						{ filename: file.filename, branchName },
 						"Branch is behind base, deleting and recreating",
 					);
-					await this.services.github.branch.deleteBranch(branchName);
+					await this.services.github.deleteBranch(branchName);
 				} else {
-					this.logger.debug(
-						{ filename: file.filename, branchName },
-						"Branch exists without PR and is up-to-date, reusing",
-					);
 					return existingBranch.data;
 				}
 			}
 		}
 
-		this.logger.debug({ filename: file.filename, branchName }, "Creating new translation branch");
-		const newBranch = await this.services.github.branch.createBranch(branchName, actualBaseBranch);
+		const newBranch = await this.services.github.createBranch(branchName, actualBaseBranch);
 
 		return newBranch.data;
 	}
@@ -529,48 +401,45 @@ export class TranslationBatchManager {
 		processingResult: ProcessedFileResult,
 	) {
 		const branchName = `translate/${file.path.split("/").slice(2).join("/")}`;
-		const existingPR = await this.services.github.content.findPullRequestByBranch(branchName);
-
-		const languageName =
-			this.services.translator.languageDetector.getLanguageName(
-				this.services.translator.languageDetector.languages.target,
-			) ?? "Portuguese";
-
+		const languageName = this.services.languageDetector.getLanguageName(
+			LanguageDetectorService.languages.target,
+		);
 		const prOptions = {
-			title: `Translate \`${file.filename}\` to ${languageName}`,
+			title: this.services.locale.definitions.pullRequest.title(file),
 			body: this.createPullRequestDescription(file, processingResult, languageName),
 			baseBranch: "main",
 		};
 
+		this.logger.info({ branchName, title: prOptions.title }, "Creating or updating pull request");
+
+		const existingPR = await this.services.github.findPullRequestByBranch(branchName);
+
 		if (existingPR) {
-			const prStatus = await this.services.github.content.checkPullRequestStatus(existingPR.number);
+			const prStatus = await this.services.github.checkPullRequestStatus(existingPR.number);
 
 			if (prStatus.needsUpdate) {
 				this.logger.info(
 					{ prNumber: existingPR.number, mergeableState: prStatus.mergeableState },
 					"Closing PR with merge conflicts and creating new one",
 				);
-				await this.services.github.content.createCommentOnPullRequest(
+
+				await this.services.github.createCommentOnPullRequest(
 					existingPR.number,
 					"This PR has merge conflicts and is being closed. A new PR with the updated translation will be created.",
 				);
 
-				await this.services.github.content.closePullRequest(existingPR.number);
+				await this.services.github.closePullRequest(existingPR.number);
 
-				return await this.services.github.content.createPullRequest({
+				return await this.services.github.createPullRequest({
 					branch: branchName,
 					...prOptions,
 				});
 			}
 
-			this.logger.debug(
-				{ prNumber: existingPR.number, mergeableState: prStatus.mergeableState },
-				"PR exists with no conflicts, reusing",
-			);
 			return existingPR;
 		}
 
-		return await this.services.github.content.createPullRequest({
+		return await this.services.github.createPullRequest({
 			branch: branchName,
 			...prOptions,
 		});
@@ -608,25 +477,18 @@ export class TranslationBatchManager {
 				translation: prettyBytes(processingResult.translation?.length ?? 0),
 				compressionRatio:
 					file.content.length > 0 ?
-						(processingResult.translation?.length ?? 0) / file.content.length
-					:	0,
+						((processingResult.translation?.length ?? 0) / file.content.length).toFixed(2)
+					:	"unknown",
 			},
 			timestamps: {
 				now: Date.now(),
 				workflowStart: this.workflowStartTimestamp,
 			},
 		};
-		const generatedPullRequestDescription = this.services.locale.locale.pullRequest.body(
+		return this.services.locale.definitions.pullRequest.body(
 			file,
 			processingResult,
 			pullRequestDescriptionMetadata,
 		);
-
-		this.logger.info(
-			pullRequestDescriptionMetadata,
-			"Pull request description created successfully",
-		);
-
-		return generatedPullRequestDescription;
 	}
 }

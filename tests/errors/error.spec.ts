@@ -5,17 +5,21 @@ import { ApplicationError, ErrorCode } from "@/errors/";
 describe("ApplicationError", () => {
 	describe("Constructor", () => {
 		test("should create error with all basic properties when instantiated with valid parameters", () => {
-			const error = new ApplicationError("Test error", ErrorCode.GithubApiError, "test.operation");
+			const error = new ApplicationError(
+				"Test error",
+				ErrorCode.OctokitRequestError,
+				"test.operation",
+			);
 
 			expect(error).toBeInstanceOf(Error);
 			expect(error).toBeInstanceOf(ApplicationError);
 			expect(error.message).toBe("Test error");
-			expect(error.code).toBe(ErrorCode.GithubApiError);
+			expect(error.code).toBe(ErrorCode.OctokitRequestError);
 			expect(error.name).toBe("ApplicationError");
 		});
 
 		test("should preserve operation and metadata when both are provided", () => {
-			const error = new ApplicationError("Test error", ErrorCode.NotFound, "test.operation", {
+			const error = new ApplicationError("Test error", ErrorCode.UnknownError, "test.operation", {
 				key: "value",
 			});
 
@@ -32,27 +36,25 @@ describe("ApplicationError", () => {
 	});
 
 	describe("Error Codes", () => {
-		test.each([
-			[ErrorCode.GithubApiError],
-			[ErrorCode.NotFound],
-			[ErrorCode.UnknownError],
-			[ErrorCode.RateLimitExceeded],
-		])("should correctly assign error code %s when provided", (code) => {
-			const error = new ApplicationError("Test", code, "test");
+		test.each([Object.values(ErrorCode)])(
+			"should correctly assign error code %s when provided",
+			(code) => {
+				const error = new ApplicationError("Test", code, "test");
 
-			expect(error.code).toBe(code);
-		});
+				expect(error.code).toBe(code);
+			},
+		);
 	});
 
 	describe("toJSON", () => {
 		test("should have all error properties accessible for serialization when properties are accessed", () => {
-			const error = new ApplicationError("Test error", ErrorCode.GithubApiError, "test.operation", {
+			const error = new ApplicationError("Test error", ErrorCode.UnknownError, "test.operation", {
 				file: "test.ts",
 			});
 
 			expect(error.name).toBe("ApplicationError");
 			expect(error.message).toBe("Test error");
-			expect(error.code).toBe(ErrorCode.GithubApiError);
+			expect(error.code).toBe(ErrorCode.UnknownError);
 			expect(error.operation).toBe("test.operation");
 			expect(error.metadata).toEqual({ file: "test.ts" });
 		});

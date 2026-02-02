@@ -4,17 +4,21 @@ import type { ProcessedFileResult } from "./runner";
 
 import { logger } from "@/utils/";
 
-import { LocaleService } from "./locale";
+import { localeService } from "./locale";
 import { TranslationFile } from "./translator.service";
 
 export interface FileEntry {
-	filename: string;
-	prNumber: number;
+	file: TranslationFile;
+	prNumber: number | undefined;
 }
 
 export interface HierarchicalStructure {
 	files?: FileEntry[];
 	[key: string]: HierarchicalStructure | FileEntry[] | undefined;
+}
+
+export interface FileWithHierarchy extends FileEntry {
+	pathParts: string[];
 }
 
 /** Service for building comments based on translation results */
@@ -23,12 +27,12 @@ export class CommentBuilderService {
 	private readonly locale: LocaleDefinition;
 
 	/**
-	 * Creates a new CommentBuilderService instance.
+	 * Creates a new {@link CommentBuilderService} instance.
 	 *
-	 * @param localeService Optional locale service for dependency injection (defaults to singleton)
+	 * @param localeDefinition Optional locale service for dependency injection (defaults to singleton)
 	 */
-	constructor(localeService?: LocaleService) {
-		this.locale = (localeService ?? LocaleService.get()).locale;
+	constructor(localeDefinition: LocaleDefinition = localeService.definitions) {
+		this.locale = localeDefinition;
 	}
 
 	/**
@@ -36,13 +40,6 @@ export class CommentBuilderService {
 	 *
 	 * Processes translation results and file data to create a structured comment
 	 * that organizes translated files by their directory hierarchy for better readability.
-	 *
-	 * ### Processing Steps
-	 *
-	 * 1. Maps translation results to file data with simplified path structures
-	 * 2. Extracts directory paths and filenames from translation file paths
-	 * 3. Creates hierarchical data structure with path parts and PR numbers
-	 * 4. Filters out invalid results and builds organized comment structure
 	 *
 	 * @param results Translation processing results containing PR information
 	 * @param filesToTranslate Original files that were processed for translation
@@ -67,14 +64,20 @@ export class CommentBuilderService {
 				const pathParts = translationFile.path.split("/");
 
 				return {
+					file: translationFile,
 					pathParts: this.simplifyPathParts(pathParts),
-					filename: translationFile.filename,
-					prNumber: result.pullRequest?.number ?? 0,
-				};
+					prNumber: result.pullRequest?.number,
+				} satisfies FileWithHierarchy;
 			})
 			.filter(Boolean);
 
-		return this.buildHierarchicalComment(concattedData);
+		const hierarchicalComment = this.buildHierarchicalComment(concattedData);
+
+		const finalComment = this.concatComment(hierarchicalComment);
+
+		this.logger.debug({ finalComment }, "Built comment");
+
+		return finalComment;
 	}
 
 	/**
@@ -84,7 +87,7 @@ export class CommentBuilderService {
 	 *
 	 * @returns The concatenated comment
 	 */
-	public concatComment(content: string) {
+	private concatComment(content: string) {
 		return `${this.comment.prefix}\n\n${content}\n\n${this.comment.suffix}`;
 	}
 
@@ -153,19 +156,13 @@ export class CommentBuilderService {
 	 * // ^? "- docs\n  - `intro.md`: #123\n  - api\n    - `reference.md`: #124"
 	 * ```
 	 */
-	private buildHierarchicalComment(
-		data: {
-			pathParts: string[];
-			filename: string;
-			prNumber: number;
-		}[],
-	): string {
+	private buildHierarchicalComment(data: FileWithHierarchy[]): string {
 		data.sort((left, right) => {
 			const pathA = left.pathParts.join("/");
 			const pathB = right.pathParts.join("/");
 
 			return pathA === pathB ?
-					left.filename.localeCompare(right.filename)
+					left.file.filename.localeCompare(right.file.filename)
 				:	pathA.localeCompare(pathB);
 		});
 
@@ -179,7 +176,10 @@ export class CommentBuilderService {
 				currentLevel = currentLevel[part] as HierarchicalStructure;
 			}
 
-			currentLevel.files?.push({ filename: item.filename, prNumber: item.prNumber });
+			currentLevel.files?.push({
+				file: item.file,
+				prNumber: item.prNumber,
+			});
 		}
 
 		return this.formatStructure(structure, 0);
@@ -232,14 +232,25 @@ export class CommentBuilderService {
 				continue;
 			}
 
-			lines.push(`${indent}- ${dir}`);
-
-			const sortedFiles = currentLevel.files.toSorted((a, b) =>
-				a.filename.localeCompare(b.filename),
+			const sortedEntries = currentLevel.files.toSorted((a, b) =>
+				a.file.filename.localeCompare(b.file.filename),
 			);
 
-			for (const file of sortedFiles) {
-				lines.push(`${indent}  - \`${file.filename}\`: #${file.prNumber}`);
+			if (
+				sortedEntries.length === 1 &&
+				sortedEntries[0]?.file.filename === dir &&
+				sortedEntries[0].prNumber
+			) {
+				lines.push(`${indent}- #${sortedEntries[0].prNumber}`);
+				continue;
+			}
+
+			lines.push(`${indent}- ${dir}`);
+
+			for (const entry of sortedEntries) {
+				if (!entry.prNumber) continue;
+
+				lines.push(`${indent}  - #${entry.prNumber}`);
 			}
 
 			const subDirs = Object.keys(currentLevel).filter((key) => key !== "files");
@@ -260,3 +271,5 @@ export class CommentBuilderService {
 		};
 	}
 }
+
+export const commentBuilderService = new CommentBuilderService();
