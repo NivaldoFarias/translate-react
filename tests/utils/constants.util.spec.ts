@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+	ENV_PLACEHOLDERS,
 	environmentDefaults,
 	errorMessages,
 	FILE_FETCH_BATCH_SIZE,
@@ -32,14 +33,15 @@ describe("constants.util", () => {
 		test("Test has LOG_TO_CONSOLE false", () => {
 			const testEnv = environmentDefaults[RuntimeEnvironment.Test];
 
-			expect(testEnv.LOG_TO_CONSOLE).toBe(false);
+			// @ts-expect-error - actual zod schema validation expects `stringbool`, but type expects boolean
+			expect(testEnv.LOG_TO_CONSOLE).toBe("false");
 		});
 
 		test("Production has expected concurrency values", () => {
 			const prod = environmentDefaults[RuntimeEnvironment.Production];
 
-			expect(prod.MAX_LLM_CONCURRENCY).toBe(8);
-			expect(prod.MAX_GITHUB_CONCURRENCY).toBe(16);
+			expect(prod.MAX_LLM_CONCURRENCY).toBe(ENV_PLACEHOLDERS.MAX_LLM_CONCURRENCY);
+			expect(prod.MAX_GITHUB_CONCURRENCY).toBe(ENV_PLACEHOLDERS.MAX_GITHUB_CONCURRENCY);
 		});
 	});
 

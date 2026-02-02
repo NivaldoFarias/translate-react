@@ -34,16 +34,18 @@ export class FileDiscoveryManager {
 	/**
 	 * Discovers and filters files requiring translation through complete pipeline.
 	 *
-	 * Executes the full file discovery workflow by coordinating cache checks, PR filtering,
-	 * content fetching, and language detection. Returns files ready for translation along
-	 * with metadata about invalid PRs for notification purposes.
+	 * Executes the full file discovery workflow by coordinating markdown filtering,
+	 * cache checks, PR filtering, content fetching, and language detection. Returns
+	 * files ready for translation along with metadata about invalid PRs for notification.
 	 *
 	 * ### Pipeline Stages
 	 *
-	 * 1. **Language cache lookup**: Queries cache to skip known translated files
-	 * 2. **PR existence check**: Validates existing PRs to skip files with valid translations
-	 * 3. **Content fetching**: Downloads file content in parallel batches from GitHub
-	 * 4. **Language detection**: Analyzes content and updates cache with detection results
+	 * 1. **Markdown filter**: Filters to markdown files in `src/` directory
+	 * 2. **Deduplication**: Removes duplicate file paths
+	 * 3. **Language cache lookup**: Queries cache to skip known translated files
+	 * 4. **PR existence check**: Validates existing PRs to skip files with valid translations
+	 * 5. **Content fetching**: Downloads file content in parallel batches from GitHub
+	 * 6. **Language detection**: Analyzes content and updates cache with detection results
 	 *
 	 * @param repositoryTree Complete repository file tree from GitHub
 	 *
@@ -62,7 +64,9 @@ export class FileDiscoveryManager {
 		filesToTranslate: TranslationFile[];
 		invalidPRsByFile: Map<string, { prNumber: number; status: PullRequestStatus }>;
 	}> {
-		const uniqueFiles = repositoryTree.filter(
+		const markdownFiles = filterMarkdownFiles(repositoryTree);
+
+		const uniqueFiles = markdownFiles.filter(
 			(file, index, self) => index === self.findIndex((compare) => compare.path === file.path),
 		);
 
@@ -71,9 +75,7 @@ export class FileDiscoveryManager {
 		const { filesToFetch, numFilesWithPRs, invalidPRsByFile } =
 			await this.filterByPRs(candidateFiles);
 
-		const filteredMarkdownFiles = filterMarkdownFiles(repositoryTree);
-
-		const uncheckedFiles = await this.fetchContent(filteredMarkdownFiles);
+		const uncheckedFiles = await this.fetchContent(filesToFetch);
 
 		const { numFilesFiltered, filesToTranslate } =
 			await this.detectAndCacheLanguages(uncheckedFiles);
@@ -83,7 +85,9 @@ export class FileDiscoveryManager {
 		this.logger.info(
 			{
 				pipeline: {
-					initial: uniqueFiles.length,
+					initial: repositoryTree.length,
+					afterMarkdownFilter: markdownFiles.length,
+					afterDedup: uniqueFiles.length,
 					afterCache: candidateFiles.length,
 					afterPRFilter: filesToFetch.length,
 					afterContentFetch: uncheckedFiles.length,

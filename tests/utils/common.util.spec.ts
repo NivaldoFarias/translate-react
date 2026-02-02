@@ -113,6 +113,13 @@ describe("common.util", () => {
 			expect(result).toContain("2");
 			expect(result.toLowerCase()).toContain("hour");
 		});
+
+		test("formats duration with locale-specific unit names", () => {
+			const result = formatElapsedTime(120_000, "pt-BR");
+
+			expect(result).toContain("2");
+			expect(result.toLowerCase()).toContain("minuto");
+		});
 	});
 
 	describe("filterMarkdownFiles", () => {

@@ -81,27 +81,36 @@ export function validateSuccessRate(statistics: WorkflowStatistics) {
 /**
  * Formats a time duration in milliseconds to a human-readable string.
  *
- * Uses the {@link Intl.RelativeTimeFormat} API for localization.
+ * Uses the {@link Intl.NumberFormat} API with `style: "unit"` for proper
+ * locale-independent duration formatting.
  *
  * @param elapsedTime The elapsed time in milliseconds
  * @param locale The locale to use for formatting (default: "en")
  *
- * @returns A formatted duration string
+ * @returns A formatted duration string (e.g., "5 seconds", "2 minutes", "1 hour")
+ *
+ * @example
+ * ```typescript
+ * formatElapsedTime(5000); // "5 seconds"
+ * formatElapsedTime(120000); // "2 minutes"
+ * formatElapsedTime(3600000, "pt-BR"); // "1 hora"
+ * ```
  */
 export function formatElapsedTime(
 	elapsedTime: number,
 	locale: Intl.LocalesArgument = "en",
 ): string {
-	const formatter = new Intl.RelativeTimeFormat(locale, { numeric: "always", style: "long" });
-
 	const seconds = Math.floor(elapsedTime / 1000);
 
+	const formatUnit = (value: number, unit: "second" | "minute" | "hour") =>
+		new Intl.NumberFormat(locale, { style: "unit", unit, unitDisplay: "long" }).format(value);
+
 	if (seconds < 60) {
-		return formatter.format(seconds, "second").replace("in ", "");
+		return formatUnit(seconds, "second");
 	} else if (seconds < 3600) {
-		return formatter.format(Math.floor(seconds / 60), "minute").replace("in ", "");
+		return formatUnit(Math.floor(seconds / 60), "minute");
 	} else {
-		return formatter.format(Math.floor(seconds / 3600), "hour").replace("in ", "");
+		return formatUnit(Math.floor(seconds / 3600), "hour");
 	}
 }
 
@@ -109,7 +118,7 @@ export function formatElapsedTime(
  * Sets up process signal handlers with proper error management.
  *
  * @param cleanUpFn The cleanup function to execute on signal reception
- * @param errorReporter Optional error reporter for cleanup failures (defaults to console.error)
+ * @param errorReporter Optional error reporter for cleanup failures
  */
 export function setupSignalHandlers(
 	cleanUpFn: (...args: unknown[]) => void | Promise<void>,
