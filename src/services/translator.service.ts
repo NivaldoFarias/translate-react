@@ -11,7 +11,14 @@ import type { Options as RetryOptions } from "p-retry";
 
 import { llmQueue, openai } from "@/clients/";
 import { ApplicationError, ErrorCode } from "@/errors/";
-import { env, extractDocTitleFromContent, logger, MAX_CHUNK_TOKENS } from "@/utils/";
+import {
+	CHUNK_TOKEN_BUFFER,
+	env,
+	extractDocTitleFromContent,
+	logger,
+	MAX_CHUNK_TOKENS,
+	SYSTEM_PROMPT_TOKEN_RESERVE,
+} from "@/utils/";
 
 import { LanguageDetectorService, languageDetectorService } from "./language-detector.service";
 import { localeService, LocaleService } from "./locale";
@@ -481,7 +488,7 @@ export class TranslatorService {
 	 */
 	private needsChunking(content: string): boolean {
 		const estimatedTokens = this.estimateTokenCount(content);
-		const maxInputTokens = MAX_CHUNK_TOKENS - 1000;
+		const maxInputTokens = MAX_CHUNK_TOKENS - SYSTEM_PROMPT_TOKEN_RESERVE;
 
 		return estimatedTokens > maxInputTokens;
 	}
@@ -516,7 +523,7 @@ export class TranslatorService {
 	 */
 	private async chunkContent(
 		content: string,
-		maxTokens = MAX_CHUNK_TOKENS - 500,
+		maxTokens = MAX_CHUNK_TOKENS - CHUNK_TOKEN_BUFFER,
 	): Promise<ChunkingResult> {
 		const markdownTextSplitterOptions: Partial<MarkdownTextSplitterParams> = {
 			chunkSize: maxTokens,
