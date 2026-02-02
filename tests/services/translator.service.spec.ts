@@ -1,8 +1,6 @@
 import { beforeEach, describe, expect, spyOn, test } from "bun:test";
 
-import type { LanguageDetectorService, TranslatorServiceDependencies } from "@/services/";
-
-import type { MockLanguageDetectorService } from "@tests/mocks";
+import type { TranslatorServiceDependencies } from "@/services/";
 
 import { localeService, TranslatorService } from "@/services/";
 
