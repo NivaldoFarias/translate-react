@@ -7,26 +7,25 @@ import type { LocaleDefinition } from "./types";
 import { formatElapsedTime } from "@/utils/common.util";
 
 /**
- * Builds the conflict notice section for PR body when an invalid PR exists.
+ * Builds the conflict notice section for PR body when a stale PR was closed.
  *
- * @param invalidFilePR Metadata about the existing invalid PR
+ * When an existing translation PR has merge conflicts with the upstream branch,
+ * the workflow closes it and creates a fresh translation. This notice explains
+ * what happened to reviewers.
  *
- * @returns Markdown-formatted warning notice or empty string
+ * @param invalidFilePR Metadata about the closed stale PR
+ *
+ * @returns Markdown-formatted notice or empty string if no stale PR existed
  */
-function buildConflictNotice(
-	invalidFilePR: PullRequestDescriptionMetadata["invalidFilePR"],
-): string {
+function buildConflictNotice(invalidFilePR: PullRequestDescriptionMetadata["invalidFilePR"]) {
 	if (!invalidFilePR) {
 		return "";
 	}
 
-	return `
-> [!WARNING]
-> **PR existente detectado**: Este arquivo já possui um PR aberto (#${invalidFilePR.prNumber}) com conflitos de merge ou status não mesclável (\`${invalidFilePR.status.mergeableState}\`).
+	return `> [!IMPORTANT]
+> **PR anterior fechado**: O PR #${invalidFilePR.prNumber} foi **fechado automaticamente** devido a conflitos de merge com a branch principal (\`mergeable_state: ${invalidFilePR.status.mergeableState}\`).
 >
-> Este novo PR foi criado automaticamente com uma tradução atualizada. A decisão sobre qual PR mesclar deve ser feita pelos mantenedores do repositório com base na qualidade da tradução e nos requisitos técnicos.
-
-`;
+> Esta é uma **tradução completamente nova** baseada na versão mais atual do arquivo fonte. A abordagem de reescrita completa (ao invés de resolução de conflitos baseada em diff) garante consistência e qualidade da tradução.`;
 }
 
 /**
