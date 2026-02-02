@@ -8,69 +8,29 @@
 
 </div>
   
-Automated translation tool for React documentation using Large Language Models (LLMs). Processes markdown files, preserves formatting, and creates pull requests with translated content via [`translate-react` Bot](https://github.com/apps/translate-react-bot).
+Automated translation tool for React documentation using LLMs. Processes markdown files, preserves formatting, and creates pull requests via [`translate-react` Bot](https://github.com/apps/translate-react-bot).
+
+> [!TIP]
+> For detailed workflow analysis, see [WORKFLOW.md](./docs/WORKFLOW.md).
 
 ## Table of Contents
 
-- [Table of Contents](#table-of-contents)
-- [Overview](#overview)
 - [Prerequisites](#prerequisites)
-  - [Runtime Requirements](#runtime-requirements)
-  - [API Access](#api-access)
-  - [Repository Setup](#repository-setup)
-  - [Supported Repositories](#supported-repositories)
 - [Quick Start](#quick-start)
 - [Configuration](#configuration)
-  - [Required Environment Variables](#required-environment-variables)
-  - [Optional Environment Variables](#optional-environment-variables)
 - [Usage](#usage)
-  - [Development Mode](#development-mode)
-  - [Production Mode](#production-mode)
 - [Project Structure](#project-structure)
 - [Documentation](#documentation)
 - [Contributing](#contributing)
 - [Troubleshooting](#troubleshooting)
-  - [Common Issues](#common-issues)
-  - [Debug Mode](#debug-mode)
 - [License](#license)
-
-## Overview
-
-Automation tool for translating React documentation repositories. Uses LLM APIs to translate markdown files while preserving code blocks, formatting, and technical terminology. Integrates with GitHub to create PRs for each translated file.
-
-**Core Workflow**:
-
-1. Verifies GitHub token permissions and syncs fork with upstream
-2. Fetches repository tree and identifies markdown files requiring translation
-3. Uses language detection to determine translation necessity
-4. Processes files in configurable batches with LLM translation
-5. Creates individual branches and pull requests for each file
-6. Updates tracking issues with progress and links to PRs
-
-> [!TIP]
-> For detailed workflow analysis including timing breakdowns and bottlenecks, see [WORKFLOW.md](./docs/WORKFLOW.md).
 
 ## Prerequisites
 
-### Runtime Requirements
-
-- [**Bun**](https://bun.sh/) v1.0.0+: _(primary runtime and package manager)_
-- [**Git**](https://git-scm.com/): _(repository operations)_
-
-### API Access
-
+- [**Bun**](https://bun.sh/) v1.0.0+ and [**Git**](https://git-scm.com/)
 - **GitHub Personal Access Token** with `repo` scope
-- **LLM API Key** (OpenAI, OpenRouter, Azure OpenAI, or compatible)
-
-### Repository Setup
-
-- Fork of target React documentation repository
-- Write access to fork for branch/PR creation
-- _Optional_: tracking issue in fork for progress updates
-
-### Supported Repositories
-
-Designed for React documentation repositories but can be adapted to any markdown-based documentation with `src/` directory structure _(with some tweaks)_.
+- **LLM API Key** (OpenAI, OpenRouter, or compatible)
+- Fork of target React documentation repository with write access
 
 ## Quick Start
 
@@ -150,18 +110,9 @@ These **must** be set in your `.env` file:
 
 ## Usage
 
-### Development Mode
-
-Development mode with auto-reload on file changes:
-
 ```bash
-bun run dev
-```
-
-### Production Mode
-
-```bash
-bun start
+bun run dev   # Development mode (auto-reload)
+bun start     # Production mode
 ```
 
 ## Project Structure
