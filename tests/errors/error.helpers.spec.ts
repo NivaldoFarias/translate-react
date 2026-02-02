@@ -1,7 +1,5 @@
-import { RequestError } from "@octokit/request-error";
 import { describe, expect, mock, test } from "bun:test";
 import { StatusCodes } from "http-status-codes";
-import { APIError } from "openai/error";
 
 import { ApplicationError, ErrorCode, handleTopLevelError, mapError } from "@/errors/";
 

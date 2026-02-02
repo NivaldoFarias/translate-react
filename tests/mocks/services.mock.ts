@@ -5,7 +5,7 @@ import type { RestEndpointMethodTypes } from "@octokit/rest";
 import type { LanguageAnalysisResult, PullRequestStatus } from "@/services/";
 import type { ReactLanguageCode } from "@/utils/constants.util";
 
-import { createLanguageAnalysisResultFixture, createTranslationFileFixture } from "@tests/fixtures";
+import { createTranslationFileFixture } from "@tests/fixtures";
 
 /**
  * Creates a mock CommentBuilderService for testing.

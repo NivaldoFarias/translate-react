@@ -1,7 +1,7 @@
 import { mock } from "bun:test";
 import { StatusCodes } from "http-status-codes";
 
-import type { Octokit, RestEndpointMethodTypes } from "@octokit/rest";
+import type { RestEndpointMethodTypes } from "@octokit/rest";
 import type { PartialDeep } from "type-fest";
 
 /** Factory for creating Git API mocks */
