@@ -1,4 +1,4 @@
-import { logger } from "@/utils/";
+import { LANGUAGE_CACHE_TTL_MS, logger } from "@/utils/";
 
 import { CacheService } from "./cache.service";
 
@@ -34,9 +34,6 @@ export class LanguageCacheService {
 	private readonly logger = logger.child({ component: LanguageCacheService.name });
 	private readonly cache = new CacheService<LanguageCacheEntry>();
 
-	/** Default TTL of 1 hour for cache entries */
-	private static readonly DEFAULT_TTL_MS = 60 * 60 * 1000;
-
 	/**
 	 * Stores language detection result in cache.
 	 *
@@ -49,7 +46,7 @@ export class LanguageCacheService {
 
 		this.logger.debug({ key, entry }, "Caching language detection result");
 
-		this.cache.set(key, entry, LanguageCacheService.DEFAULT_TTL_MS);
+		this.cache.set(key, entry, LANGUAGE_CACHE_TTL_MS);
 	}
 
 	/**

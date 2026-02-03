@@ -3,7 +3,13 @@ import cld from "cld";
 import type { ReactLanguageCode } from "@/utils/";
 
 import { ApplicationError, ErrorCode } from "@/errors";
-import { env, logger, REACT_TRANSLATION_LANGUAGES } from "@/utils/";
+import {
+	env,
+	logger,
+	MIN_CONTENT_LENGTH_FOR_DETECTION,
+	REACT_TRANSLATION_LANGUAGES,
+	TRANSLATION_RATIO_THRESHOLD,
+} from "@/utils/";
 
 /**
  * Configuration interface for language detection settings.
@@ -96,13 +102,11 @@ export class LanguageDetectorService {
 	 */
 	public detected = new Map<string, string | undefined>();
 
-	constructor(
-		/** Minimum content length required for reliable language detection */
-		private readonly MIN_CONTENT_LENGTH = 10,
+	/** Minimum content length required for reliable language detection */
+	private readonly MIN_CONTENT_LENGTH = MIN_CONTENT_LENGTH_FOR_DETECTION;
 
-		/** Threshold ratio above which content is considered translated */
-		private readonly TRANSLATION_THRESHOLD = 0.5,
-	) {}
+	/** Threshold ratio above which content is considered translated */
+	private readonly TRANSLATION_THRESHOLD = TRANSLATION_RATIO_THRESHOLD;
 
 	/**
 	 * Gets the human-readable display name for a {@link REACT_TRANSLATION_LANGUAGES|React language code}.
