@@ -489,8 +489,16 @@ export class TranslatorService {
 	private needsChunking(content: string): boolean {
 		const estimatedTokens = this.estimateTokenCount(content);
 		const maxInputTokens = MAX_CHUNK_TOKENS - SYSTEM_PROMPT_TOKEN_RESERVE;
+		const needsChunking = estimatedTokens > maxInputTokens;
 
-		return estimatedTokens > maxInputTokens;
+		this.logger.debug(
+			{ estimatedTokens, maxInputTokens, needsChunking, contentLength: content.length },
+			needsChunking ?
+				"Content exceeds token limit, chunking required"
+			:	"Content within token limit, no chunking needed",
+		);
+
+		return needsChunking;
 	}
 
 	/**
@@ -615,10 +623,26 @@ export class TranslatorService {
 	 * ```
 	 */
 	private async translateWithChunking(content: string): Promise<string> {
+		this.logger.debug({ contentLength: content.length }, "Starting chunked translation");
+
 		const { chunks, separators } = await this.chunkContent(content);
+
+		this.logger.debug(
+			{
+				chunkCount: chunks.length,
+				chunkSizes: chunks.map((c) => c.length),
+				separatorCount: separators.length,
+			},
+			"Content split into chunks",
+		);
 
 		const translatedChunks = await Promise.all(
 			chunks.map((chunk, index) => this.translateChunk(chunk, index, chunks)),
+		);
+
+		this.logger.debug(
+			{ translatedChunkCount: translatedChunks.length },
+			"All chunks translated, reassembling",
 		);
 
 		return this.validateAndReassembleChunks(content, {
@@ -707,8 +731,34 @@ export class TranslatorService {
 		return reassembledContent;
 	}
 
-	private async translateChunk(chunk: string, _index: number, _chunks: string[]): Promise<string> {
-		return this.callLanguageModel(chunk);
+	private async translateChunk(chunk: string, index: number, chunks: string[]): Promise<string> {
+		const startTime = Date.now();
+		const estimatedTokens = this.estimateTokenCount(chunk);
+
+		this.logger.debug(
+			{
+				chunkIndex: index + 1,
+				totalChunks: chunks.length,
+				chunkSize: chunk.length,
+				estimatedTokens,
+			},
+			`Translating chunk ${index + 1}/${chunks.length}`,
+		);
+
+		const translatedChunk = await this.callLanguageModel(chunk);
+
+		this.logger.debug(
+			{
+				chunkIndex: index + 1,
+				totalChunks: chunks.length,
+				originalSize: chunk.length,
+				translatedSize: translatedChunk.length,
+				durationMs: Date.now() - startTime,
+			},
+			`Chunk ${index + 1}/${chunks.length} translation complete`,
+		);
+
+		return translatedChunk;
 	}
 
 	/**
@@ -747,10 +797,18 @@ export class TranslatorService {
 	 */
 	private async callLanguageModel(content: string): Promise<string> {
 		return this.queue.add(async () => {
+			const callStartTime = Date.now();
+			const estimatedInputTokens = this.estimateTokenCount(content);
+
 			return pRetry(
 				async () => {
+					const attemptStartTime = Date.now();
+
 					try {
-						this.logger.debug({ contentLength: content.length, model: this.model }, "Calling LLM");
+						this.logger.debug(
+							{ contentLength: content.length, estimatedInputTokens, model: this.model },
+							"Calling LLM API",
+						);
 
 						const completion = await this.openai.chat.completions.create(
 							await this.getLLMCompletionParams(content),
@@ -766,6 +824,18 @@ export class TranslatorService {
 								{ model: this.model, contentLength: content.length },
 							);
 						}
+
+						this.logger.debug(
+							{
+								model: this.model,
+								durationMs: Date.now() - attemptStartTime,
+								inputTokens: completion.usage?.prompt_tokens,
+								outputTokens: completion.usage?.completion_tokens,
+								totalTokens: completion.usage?.total_tokens,
+								translatedLength: translatedContent.length,
+							},
+							"LLM API call successful",
+						);
 
 						return translatedContent;
 					} catch (error) {
@@ -784,8 +854,14 @@ export class TranslatorService {
 					...this.retryConfig,
 					onFailedAttempt: ({ attemptNumber: attempt, error, retriesLeft }) => {
 						this.logger.warn(
-							{ attempt, retriesLeft, error: error.message },
-							"LLM call failed, retrying",
+							{
+								attempt,
+								retriesLeft,
+								error: error.message,
+								totalElapsedMs: Date.now() - callStartTime,
+								contentLength: content.length,
+							},
+							`LLM call attempt ${attempt} failed, ${retriesLeft} retries remaining`,
 						);
 					},
 				},
