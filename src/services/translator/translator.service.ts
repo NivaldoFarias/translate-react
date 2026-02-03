@@ -21,15 +21,24 @@ import { env, extractDocTitleFromContent, logger } from "@/utils/";
 import {
 	CHUNK_OVERLAP,
 	CHUNK_TOKEN_BUFFER,
+	CODE_BLOCK_REGEX,
 	CONNECTIVITY_TEST_MAX_TOKENS,
+	FRONTMATTER_KEY_REGEX,
+	FRONTMATTER_REGEX,
 	HEADINGS_REGEX,
 	LINE_ENDING_REGEX,
 	LLM_TEMPERATURE,
+	MARKDOWN_LINK_REGEX,
 	MAX_CHUNK_TOKENS,
+	MAX_CODE_BLOCK_RATIO,
 	MAX_HEADING_RATIO,
+	MAX_LINK_RATIO,
 	MAX_SIZE_RATIO,
+	MIN_CODE_BLOCK_RATIO,
 	MIN_HEADING_RATIO,
+	MIN_LINK_RATIO,
 	MIN_SIZE_RATIO,
+	REQUIRED_FRONTMATTER_KEYS,
 	SYSTEM_PROMPT_TOKEN_RESERVE,
 	TOKEN_ESTIMATION_FALLBACK_DIVISOR,
 	TRAILING_NEWLINES_REGEX,
@@ -391,6 +400,10 @@ export class TranslatorService {
 			);
 		}
 
+		this.validateCodeBlockPreservation(file, translatedContent);
+		this.validateLinkPreservation(file, translatedContent);
+		this.validateFrontmatterIntegrity(file, translatedContent);
+
 		file.logger.debug(
 			{
 				filename: file.filename,
@@ -400,6 +413,163 @@ export class TranslatorService {
 			},
 			"Translation validation passed",
 		);
+	}
+
+	/**
+	 * Validates that code blocks are preserved during translation.
+	 *
+	 * Compares the count of fenced code blocks (triple backticks) between source
+	 * and translated content. Logs a warning if there's a significant mismatch
+	 * (>20% difference), as this may indicate code blocks were corrupted or removed.
+	 *
+	 * @param file Original file containing source content for comparison
+	 * @param translatedContent Translated content to validate against source
+	 */
+	private validateCodeBlockPreservation(file: TranslationFile, translatedContent: string): void {
+		const originalCodeBlocks = (file.content.match(CODE_BLOCK_REGEX) ?? []).length;
+		const translatedCodeBlocks = (translatedContent.match(CODE_BLOCK_REGEX) ?? []).length;
+
+		file.logger.debug(
+			{ originalCodeBlocks, translatedCodeBlocks },
+			`Code block counts for ${file.filename}`,
+		);
+
+		if (originalCodeBlocks === 0) {
+			file.logger.debug("Original file contains no code blocks. Skipping code block validation");
+			return;
+		}
+
+		const codeBlockRatio = translatedCodeBlocks / originalCodeBlocks;
+
+		if (codeBlockRatio < MIN_CODE_BLOCK_RATIO || codeBlockRatio > MAX_CODE_BLOCK_RATIO) {
+			file.logger.warn(
+				{
+					filename: file.filename,
+					originalCodeBlocks,
+					translatedCodeBlocks,
+					codeBlockRatio: codeBlockRatio.toFixed(2),
+				},
+				"Significant code block count mismatch detected - code blocks may have been corrupted or removed",
+			);
+		}
+	}
+
+	/**
+	 * Validates that markdown links are preserved during translation.
+	 *
+	 * Compares the count of markdown links between source and translated content.
+	 * Logs a warning if there's a significant mismatch (>20% difference), as this
+	 * may indicate links were broken or removed during translation.
+	 *
+	 * @param file Original file containing source content for comparison
+	 * @param translatedContent Translated content to validate against source
+	 */
+	private validateLinkPreservation(file: TranslationFile, translatedContent: string): void {
+		const originalLinks = (file.content.match(MARKDOWN_LINK_REGEX) ?? []).length;
+		const translatedLinks = (translatedContent.match(MARKDOWN_LINK_REGEX) ?? []).length;
+
+		file.logger.debug(
+			{ originalLinks, translatedLinks },
+			`Markdown link counts for ${file.filename}`,
+		);
+
+		if (originalLinks === 0) {
+			file.logger.debug("Original file contains no markdown links. Skipping link validation");
+			return;
+		}
+
+		const linkRatio = translatedLinks / originalLinks;
+
+		if (linkRatio < MIN_LINK_RATIO || linkRatio > MAX_LINK_RATIO) {
+			file.logger.warn(
+				{
+					filename: file.filename,
+					originalLinks,
+					translatedLinks,
+					linkRatio: linkRatio.toFixed(2),
+				},
+				"Significant markdown link count mismatch detected - links may have been broken or removed",
+			);
+		}
+	}
+
+	/**
+	 * Validates that frontmatter structure and required keys are preserved during translation.
+	 *
+	 * Parses YAML frontmatter from source and translated content, then verifies that:
+	 * 1. Required keys (e.g., `title`) are preserved in translation
+	 * 2. The overall frontmatter structure remains intact
+	 *
+	 * @param file Original file containing source content for comparison
+	 * @param translatedContent Translated content to validate against source
+	 */
+	private validateFrontmatterIntegrity(file: TranslationFile, translatedContent: string): void {
+		const originalFrontmatter = FRONTMATTER_REGEX.exec(file.content)?.[1];
+		const translatedFrontmatter = FRONTMATTER_REGEX.exec(translatedContent)?.[1];
+
+		if (!originalFrontmatter) {
+			file.logger.debug("Original file contains no frontmatter. Skipping frontmatter validation");
+			return;
+		}
+
+		if (!translatedFrontmatter) {
+			file.logger.warn(
+				{ filename: file.filename },
+				"Frontmatter lost during translation - original had frontmatter but translation does not",
+			);
+			return;
+		}
+
+		const extractKeys = (content: string): Set<string> => {
+			const keys = new Set<string>();
+			let match: RegExpExecArray | null;
+
+			const regex = new RegExp(FRONTMATTER_KEY_REGEX.source, FRONTMATTER_KEY_REGEX.flags);
+			while ((match = regex.exec(content)) !== null) {
+				if (match[1]) keys.add(match[1]);
+			}
+			return keys;
+		};
+
+		const originalKeys = extractKeys(originalFrontmatter);
+		const translatedKeys = extractKeys(translatedFrontmatter);
+
+		file.logger.debug(
+			{
+				originalKeys: [...originalKeys],
+				translatedKeys: [...translatedKeys],
+			},
+			`Frontmatter keys for ${file.filename}`,
+		);
+
+		const missingRequiredKeys = REQUIRED_FRONTMATTER_KEYS.filter(
+			(key) => originalKeys.has(key) && !translatedKeys.has(key),
+		);
+
+		if (missingRequiredKeys.length > 0) {
+			file.logger.warn(
+				{
+					filename: file.filename,
+					missingRequiredKeys,
+					originalKeys: [...originalKeys],
+					translatedKeys: [...translatedKeys],
+				},
+				"Required frontmatter keys missing in translation",
+			);
+		}
+
+		const missingKeys = [...originalKeys].filter((key) => !translatedKeys.has(key));
+
+		if (missingKeys.length > 0 && missingKeys.some((key) => !missingRequiredKeys.includes(key))) {
+			const nonRequiredMissing = missingKeys.filter((key) => !missingRequiredKeys.includes(key));
+			file.logger.warn(
+				{
+					filename: file.filename,
+					missingKeys: nonRequiredMissing,
+				},
+				"Some frontmatter keys missing in translation",
+			);
+		}
 	}
 
 	/**

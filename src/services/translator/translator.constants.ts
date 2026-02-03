@@ -49,3 +49,30 @@ export const TRANSLATION_PREFIXES = [
 	"Here is the translated content:",
 	"Here's the translated content:",
 ] as const;
+
+/** Regex pattern to match fenced code blocks (triple backticks with optional language identifier) */
+export const CODE_BLOCK_REGEX = /^```[\s\S]*?^```/gm;
+
+/** Minimum acceptable code block ratio for translated content (0.8 = 80% of original, i.e., >20% difference warns) */
+export const MIN_CODE_BLOCK_RATIO = 0.8;
+
+/** Maximum acceptable code block ratio for translated content (1.2 = 120% of original) */
+export const MAX_CODE_BLOCK_RATIO = 1.2;
+
+/** Regex pattern to match markdown links: [text](url) and [text](url "title") */
+export const MARKDOWN_LINK_REGEX = /\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
+
+/** Minimum acceptable link ratio for translated content (0.8 = 80% of original, i.e., >20% difference warns) */
+export const MIN_LINK_RATIO = 0.8;
+
+/** Maximum acceptable link ratio for translated content (1.2 = 120% of original) */
+export const MAX_LINK_RATIO = 1.2;
+
+/** Regex pattern to extract YAML frontmatter block (between --- delimiters) */
+export const FRONTMATTER_REGEX = /^---\n([\s\S]*?)\n---/;
+
+/** Regex pattern to extract frontmatter keys (captures key names before colons) */
+export const FRONTMATTER_KEY_REGEX = /^([a-zA-Z_][a-zA-Z0-9_]*):/gm;
+
+/** Required frontmatter keys that should be preserved during translation */
+export const REQUIRED_FRONTMATTER_KEYS = ["title"] as const;
