@@ -2,14 +2,13 @@ import cld from "cld";
 
 import type { ReactLanguageCode } from "@/utils/";
 
-import { ApplicationError, ErrorCode } from "@/errors";
+import { ApplicationError, ErrorCode } from "@/errors/";
+import { env, logger, REACT_TRANSLATION_LANGUAGES } from "@/utils/";
+
 import {
-	env,
-	logger,
 	MIN_CONTENT_LENGTH_FOR_DETECTION,
-	REACT_TRANSLATION_LANGUAGES,
 	TRANSLATION_RATIO_THRESHOLD,
-} from "@/utils/";
+} from "./language-detector.constants";
 
 /**
  * Configuration interface for language detection settings.

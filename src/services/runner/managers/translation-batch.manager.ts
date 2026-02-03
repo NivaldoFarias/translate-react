@@ -5,13 +5,14 @@ import type {
 	ProcessedFileResult,
 	PullRequestStatus,
 	RunnerServiceDependencies,
-} from "./runner.types";
+} from "../runner.types";
 
 import { ApplicationError, ErrorCode } from "@/errors/";
-import { logger, MAX_CONSECUTIVE_FAILURES } from "@/utils/";
+import { LanguageDetectorService } from "@/services/language-detector/";
+import { TranslationFile } from "@/services/translator/";
+import { logger } from "@/utils/";
 
-import { LanguageDetectorService } from "../language-detector.service";
-import { TranslationFile } from "../translator.service";
+import { MAX_CONSECUTIVE_FAILURES } from "./managers.constants";
 
 export interface InvalidFilePullRequest {
 	prNumber: number;

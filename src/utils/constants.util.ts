@@ -35,64 +35,6 @@ export const errorMessages = {
 	invalidKey: (key: string) => `Invalid key: ${key}`,
 } as const;
 
-/** Maximum number of tokens that can be translated in a single request */
-export const MAX_CHUNK_TOKENS = 4000;
-
-/** Token buffer reserved for system prompt overhead when determining chunking needs */
-export const SYSTEM_PROMPT_TOKEN_RESERVE = 1000;
-
-/** Token buffer reserved for chunk processing overhead when splitting content */
-export const CHUNK_TOKEN_BUFFER = 500;
-
-/**
- * Batch size for concurrent file fetching operations.
- *
- * Balances network efficiency with memory usage during repository tree traversal.
- */
-export const FILE_FETCH_BATCH_SIZE = 10;
-
-/**
- * Maximum number of consecutive file processing failures before stopping the workflow.
- *
- * Circuit breaker mechanism to prevent wasting resources on systemic failures.
- * When this threshold is exceeded, the workflow terminates early with a clear error message.
- * Default: 5 consecutive failures.
- */
-export const MAX_CONSECUTIVE_FAILURES = 5;
-
-/**
- * Minimum confidence threshold for language cache hits, on a scale from 0 to 1.
- *
- * Cache entries below this confidence level are treated as cache misses,
- * triggering fresh language detection to ensure accuracy. Set to 0.8 (80%)
- * based on observed language detection reliability.
- */
-export const MIN_CACHE_CONFIDENCE = 0.8;
-
-/**
- * Minimum content length required for reliable language detection.
- *
- * Content shorter than this threshold is too small for accurate language
- * detection by CLD2, resulting in unreliable or undefined results.
- */
-export const MIN_CONTENT_LENGTH_FOR_DETECTION = 10;
-
-/**
- * Ratio threshold above which content is considered already translated.
- *
- * When the target language confidence ratio exceeds this value (0.5 = 50%),
- * the content is marked as translated and skipped from the translation workflow.
- */
-export const TRANSLATION_RATIO_THRESHOLD = 0.5;
-
-/**
- * Time-to-live for language cache entries in milliseconds.
- *
- * Default: 1 hour (3600000ms). Sufficient for single workflow runs while
- * ensuring stale entries don't persist across separate executions.
- */
-export const LANGUAGE_CACHE_TTL_MS = 60 * 60 * 1000;
-
 /** Minimum length required for a valid API token */
 export const MIN_API_TOKEN_LENGTH = 20;
 

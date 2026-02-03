@@ -13,9 +13,7 @@ import type {
 import { ApplicationError, ErrorCode } from "@/errors/";
 import { env, logger, registerCleanup } from "@/utils/";
 
-import { FileDiscoveryManager } from "./file-discovery.manager";
-import { PRManager } from "./pr.manager";
-import { TranslationBatchManager } from "./translation-batch.manager";
+import { FileDiscoveryManager, PRManager, TranslationBatchManager } from "./managers";
 
 /**
  * Base class for translation workflow runners.

@@ -1,5 +1,6 @@
-import { LANGUAGE_CACHE_TTL_MS, logger } from "@/utils/";
+import { logger } from "@/utils/";
 
+import { LANGUAGE_CACHE_TTL_MS } from "./cache.constants";
 import { CacheService } from "./cache.service";
 
 /** Language detection cache entry structure */

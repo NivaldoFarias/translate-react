@@ -1,13 +1,12 @@
 import type { RunnerOptions, RunnerServiceDependencies, WorkflowStatistics } from "./runner.types";
 
 import { extractErrorMessage } from "@/errors/";
+import { languageCacheService } from "@/services/cache/";
+import { githubService } from "@/services/github/";
+import { languageDetectorService } from "@/services/language-detector/";
+import { localeService } from "@/services/locale/";
+import { translatorService } from "@/services/translator/";
 import { logger } from "@/utils/";
-
-import { languageCacheService } from "../cache";
-import { githubService } from "../github";
-import { languageDetectorService } from "../language-detector.service";
-import { localeService } from "../locale/locale.service";
-import { translatorService } from "../translator.service";
 
 import { BaseRunnerService } from "./base.service";
 
