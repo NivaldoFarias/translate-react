@@ -4,11 +4,10 @@ import type {
 	ProcessedFileResult,
 	RunnerServiceDependencies,
 	WorkflowStatistics,
-} from "./runner.types";
+} from "../runner.types";
 
+import { TranslationFile } from "@/services/translator/";
 import { formatElapsedTime, logger } from "@/utils/";
-
-import { TranslationFile } from "../translator.service";
 
 /**
  * Manages pull request operations and workflow statistics reporting.

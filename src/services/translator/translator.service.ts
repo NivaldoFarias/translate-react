@@ -11,17 +11,15 @@ import type { Options as RetryOptions } from "p-retry";
 
 import { openai, queue } from "@/clients/";
 import { ApplicationError, ErrorCode } from "@/errors/";
+import { LanguageDetectorService, languageDetectorService } from "@/services/language-detector/";
+import { localeService, LocaleService } from "@/services/locale/";
+import { env, extractDocTitleFromContent, logger } from "@/utils/";
+
 import {
 	CHUNK_TOKEN_BUFFER,
-	env,
-	extractDocTitleFromContent,
-	logger,
 	MAX_CHUNK_TOKENS,
 	SYSTEM_PROMPT_TOKEN_RESERVE,
-} from "@/utils/";
-
-import { LanguageDetectorService, languageDetectorService } from "./language-detector.service";
-import { localeService, LocaleService } from "./locale";
+} from "./translator.constants";
 
 /** Dependency injection interface for TranslatorService */
 export interface TranslatorServiceDependencies {

@@ -1,15 +1,18 @@
 import type { Octokit, RestEndpointMethodTypes } from "@octokit/rest";
 
-import type { PatchedRepositoryTreeItem, ProcessedFileResult, PullRequestStatus } from "../runner";
-import type { TranslationFile } from "../translator.service";
+import type {
+	PatchedRepositoryTreeItem,
+	ProcessedFileResult,
+	PullRequestStatus,
+} from "@/services/runner/";
+import type { TranslationFile } from "@/services/translator/";
 
 import type { CommitTranslationOptions, PullRequestOptions } from "./github.content";
 import type { BaseRepositories, SharedGitHubDependencies } from "./github.types";
 
 import { octokit } from "@/clients/";
+import { commentBuilderService } from "@/services/comment-builder/";
 import { env } from "@/utils/";
-
-import { commentBuilderService } from "../comment-builder.service";
 
 import { GitHubBranch } from "./github.branch";
 import { GitHubContent } from "./github.content";

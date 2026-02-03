@@ -2,9 +2,9 @@ import { RequestError } from "@octokit/request-error";
 import { describe, expect, mock, test } from "bun:test";
 import { StatusCodes } from "http-status-codes";
 
-import type { OctokitMethod } from "@/clients/octokit.client";
+import type { OctokitMethod } from "@/clients";
 
-import { isForbiddenError, wrapMethodWithFallback } from "@/clients/octokit.client";
+import { isForbiddenError, withRetry, wrapMethodWithFallback } from "@/clients";
 
 /** Creates a RequestError with the specified status code */
 function createRequestError(status: number, message = "API Error") {
@@ -167,6 +167,142 @@ describe("octokit.client", () => {
 
 			expect(wrapped()).rejects.toThrow(genericError);
 			expect(fallbackMethod).not.toHaveBeenCalled();
+		});
+	});
+
+	describe("withRetry", () => {
+		test("returns result on first successful attempt", async () => {
+			const fn = mock(() => Promise.resolve({ data: "success" }));
+
+			const result = await withRetry(fn, "test.operation");
+
+			expect(result).toEqual({ data: "success" });
+			expect(fn).toHaveBeenCalledTimes(1);
+		});
+
+		test("retries on 5xx server error and succeeds", async () => {
+			const serverError = createRequestError(StatusCodes.INTERNAL_SERVER_ERROR);
+			let callCount = 0;
+			const fn = mock(() => {
+				callCount++;
+				if (callCount < 2) return Promise.reject(serverError);
+				return Promise.resolve({ data: "recovered" });
+			});
+
+			const result = await withRetry(fn, "test.operation", { retries: 3, minTimeout: 10 });
+
+			expect(result).toEqual({ data: "recovered" });
+			expect(fn).toHaveBeenCalledTimes(2);
+		});
+
+		test("retries on 429 rate limit error and succeeds", async () => {
+			const rateLimitError = createRequestError(StatusCodes.TOO_MANY_REQUESTS);
+			let callCount = 0;
+			const fn = mock(() => {
+				callCount++;
+				if (callCount < 2) return Promise.reject(rateLimitError);
+				return Promise.resolve({ data: "recovered" });
+			});
+
+			const result = await withRetry(fn, "test.operation", { retries: 3, minTimeout: 10 });
+
+			expect(result).toEqual({ data: "recovered" });
+			expect(fn).toHaveBeenCalledTimes(2);
+		});
+
+		test("retries on network error (ECONNRESET) and succeeds", async () => {
+			const networkError = new Error("connect ECONNRESET");
+			let callCount = 0;
+			const fn = mock(() => {
+				callCount++;
+				if (callCount < 2) return Promise.reject(networkError);
+				return Promise.resolve({ data: "recovered" });
+			});
+
+			const result = await withRetry(fn, "test.operation", { retries: 3, minTimeout: 10 });
+
+			expect(result).toEqual({ data: "recovered" });
+			expect(fn).toHaveBeenCalledTimes(2);
+		});
+
+		test("does not retry on 4xx client error (except 429)", () => {
+			const notFoundError = createRequestError(StatusCodes.NOT_FOUND);
+			const fn = mock(() => Promise.reject(notFoundError));
+
+			expect(withRetry(fn, "test.operation", { retries: 3, minTimeout: 10 })).rejects.toThrow();
+			expect(fn).toHaveBeenCalledTimes(1);
+		});
+
+		test("does not retry on 401 unauthorized error", () => {
+			const unauthorizedError = createRequestError(StatusCodes.UNAUTHORIZED);
+			const fn = mock(() => Promise.reject(unauthorizedError));
+
+			expect(withRetry(fn, "test.operation", { retries: 3, minTimeout: 10 })).rejects.toThrow();
+			expect(fn).toHaveBeenCalledTimes(1);
+		});
+
+		test("exhausts retries on persistent server error", () => {
+			const serverError = createRequestError(StatusCodes.INTERNAL_SERVER_ERROR);
+			const fn = mock(() => Promise.reject(serverError));
+
+			expect(withRetry(fn, "test.operation", { retries: 2, minTimeout: 10 })).rejects.toThrow();
+			expect(fn).toHaveBeenCalledTimes(3);
+		});
+
+		test.each([
+			["ECONNRESET", true],
+			["ETIMEDOUT", true],
+			["ENOTFOUND", true],
+			["ECONNREFUSED", true],
+			["EAI_AGAIN", true],
+			["EPERM", false],
+			["ENOENT", false],
+		])("handles network error pattern %s with retry=%s", async (pattern, shouldRetry) => {
+			const networkError = new Error(`connect ${pattern}`);
+			let callCount = 0;
+			const fn = mock(() => {
+				callCount++;
+				if (callCount < 2) return Promise.reject(networkError);
+				return Promise.resolve({ data: "recovered" });
+			});
+
+			if (shouldRetry) {
+				const result = await withRetry(fn, "test.operation", { retries: 3, minTimeout: 10 });
+				expect(result).toEqual({ data: "recovered" });
+				expect(fn).toHaveBeenCalledTimes(2);
+			} else {
+				expect(withRetry(fn, "test.operation", { retries: 3, minTimeout: 10 })).rejects.toThrow();
+				expect(fn).toHaveBeenCalledTimes(1);
+			}
+		});
+
+		test.each([
+			[StatusCodes.INTERNAL_SERVER_ERROR, true],
+			[StatusCodes.BAD_GATEWAY, true],
+			[StatusCodes.SERVICE_UNAVAILABLE, true],
+			[StatusCodes.GATEWAY_TIMEOUT, true],
+			[StatusCodes.TOO_MANY_REQUESTS, true],
+			[StatusCodes.BAD_REQUEST, false],
+			[StatusCodes.UNAUTHORIZED, false],
+			[StatusCodes.FORBIDDEN, false],
+			[StatusCodes.NOT_FOUND, false],
+		])("handles status code %d with retry=%s", async (status, shouldRetry) => {
+			const error = createRequestError(status);
+			let callCount = 0;
+			const fn = mock(() => {
+				callCount++;
+				if (callCount < 2) return Promise.reject(error);
+				return Promise.resolve({ data: "recovered" });
+			});
+
+			if (shouldRetry) {
+				const result = await withRetry(fn, "test.operation", { retries: 3, minTimeout: 10 });
+				expect(result).toEqual({ data: "recovered" });
+				expect(fn).toHaveBeenCalledTimes(2);
+			} else {
+				expect(withRetry(fn, "test.operation", { retries: 3, minTimeout: 10 })).rejects.toThrow();
+				expect(fn).toHaveBeenCalledTimes(1);
+			}
 		});
 	});
 });

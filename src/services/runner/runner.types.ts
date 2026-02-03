@@ -1,11 +1,11 @@
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 import type { SetRequired } from "type-fest";
 
-import type { LanguageCacheService } from "../cache";
-import type { GitHubService } from "../github";
-import type { LanguageDetectorService } from "../language-detector.service";
-import type { LocaleService } from "../locale";
-import type { TranslationFile, TranslatorService } from "../translator.service";
+import type { LanguageCacheService } from "@/services/cache/";
+import type { GitHubService } from "@/services/github/";
+import type { LanguageDetectorService } from "@/services/language-detector/";
+import type { LocaleService } from "@/services/locale/";
+import type { TranslationFile, TranslatorService } from "@/services/translator/";
 
 /**
  * Configuration options for the runner service.

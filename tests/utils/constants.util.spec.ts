@@ -4,11 +4,7 @@ import {
 	ENV_PLACEHOLDERS,
 	environmentDefaults,
 	errorMessages,
-	FILE_FETCH_BATCH_SIZE,
-	MAX_CHUNK_TOKENS,
-	MAX_CONSECUTIVE_FAILURES,
 	MIN_API_TOKEN_LENGTH,
-	MIN_CACHE_CONFIDENCE,
 	processSignals,
 	REACT_TRANSLATION_LANGUAGES,
 	RuntimeEnvironment,
@@ -65,22 +61,6 @@ describe("constants.util", () => {
 	});
 
 	describe("numeric constants", () => {
-		test("MAX_CHUNK_TOKENS is positive", () => {
-			expect(MAX_CHUNK_TOKENS).toBe(4000);
-		});
-
-		test("FILE_FETCH_BATCH_SIZE is positive", () => {
-			expect(FILE_FETCH_BATCH_SIZE).toBe(10);
-		});
-
-		test("MAX_CONSECUTIVE_FAILURES is positive", () => {
-			expect(MAX_CONSECUTIVE_FAILURES).toBe(5);
-		});
-
-		test("MIN_CACHE_CONFIDENCE is between 0 and 1", () => {
-			expect(MIN_CACHE_CONFIDENCE).toBe(0.8);
-		});
-
 		test("MIN_API_TOKEN_LENGTH is positive", () => {
 			expect(MIN_API_TOKEN_LENGTH).toBe(20);
 		});

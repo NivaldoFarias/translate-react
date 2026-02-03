@@ -7,12 +7,13 @@ import type {
 	PrFilterResult as PullRequestFilterResult,
 	PullRequestStatus,
 	RunnerServiceDependencies,
-} from "./runner.types";
+} from "../runner.types";
 
-import { FILE_FETCH_BATCH_SIZE, filterMarkdownFiles, logger, MIN_CACHE_CONFIDENCE } from "@/utils/";
+import { LanguageDetectorService } from "@/services/language-detector/";
+import { TranslationFile } from "@/services/translator/";
+import { filterMarkdownFiles, logger } from "@/utils/";
 
-import { LanguageDetectorService } from "../language-detector.service";
-import { TranslationFile } from "../translator.service";
+import { FILE_FETCH_BATCH_SIZE, MIN_CACHE_CONFIDENCE } from "./managers.constants";
 
 /**
  * Manages file discovery and filtering pipeline for translation workflow.
