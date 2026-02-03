@@ -19,9 +19,21 @@ import { localeService, LocaleService } from "@/services/locale/";
 import { env, extractDocTitleFromContent, logger } from "@/utils/";
 
 import {
+	CHUNK_OVERLAP,
 	CHUNK_TOKEN_BUFFER,
+	CONNECTIVITY_TEST_MAX_TOKENS,
+	HEADINGS_REGEX,
+	LINE_ENDING_REGEX,
+	LLM_TEMPERATURE,
 	MAX_CHUNK_TOKENS,
+	MAX_HEADING_RATIO,
+	MAX_SIZE_RATIO,
+	MIN_HEADING_RATIO,
+	MIN_SIZE_RATIO,
 	SYSTEM_PROMPT_TOKEN_RESERVE,
+	TOKEN_ESTIMATION_FALLBACK_DIVISOR,
+	TRAILING_NEWLINES_REGEX,
+	TRANSLATION_PREFIXES,
 } from "./translator.constants";
 
 /** Dependency injection interface for TranslatorService */
@@ -175,8 +187,8 @@ export class TranslatorService {
 		const response = await this.openai.chat.completions.create({
 			model: this.model,
 			messages: [{ role: "user", content: "ping" }],
-			max_tokens: 5,
-			temperature: 0.1,
+			max_tokens: CONNECTIVITY_TEST_MAX_TOKENS,
+			temperature: LLM_TEMPERATURE,
 		});
 
 		if (!this.isLLMResponseValid(response)) {
@@ -323,7 +335,7 @@ export class TranslatorService {
 		}
 
 		const sizeRatio = translatedContent.length / file.content.length;
-		if (sizeRatio < 0.5 || sizeRatio > 2.0) {
+		if (sizeRatio < MIN_SIZE_RATIO || sizeRatio > MAX_SIZE_RATIO) {
 			file.logger.warn(
 				{
 					filename: file.filename,
@@ -331,17 +343,16 @@ export class TranslatorService {
 					originalLength: file.content.length,
 					translatedLength: translatedContent.length,
 				},
-				"Translation size ratio outside expected range (0.5-2.0)",
+				`Translation size ratio outside expected range (${MIN_SIZE_RATIO}-${MAX_SIZE_RATIO})`,
 			);
 		}
 
-		const CATCH_HEADINGS_REGEX = /^#{1,6}\s/gm;
-		const originalHeadings = (file.content.match(CATCH_HEADINGS_REGEX) ?? []).length;
-		const translatedHeadings = (translatedContent.match(CATCH_HEADINGS_REGEX) ?? []).length;
+		const originalHeadings = (file.content.match(HEADINGS_REGEX) ?? []).length;
+		const translatedHeadings = (translatedContent.match(HEADINGS_REGEX) ?? []).length;
 		const headingRatio = translatedHeadings / originalHeadings;
 
 		file.logger.debug(
-			{ originalHeadings, translatedHeadings, headingRatio, regex: CATCH_HEADINGS_REGEX },
+			{ originalHeadings, translatedHeadings, headingRatio, regex: HEADINGS_REGEX },
 			`Heading counts for ${file.filename}`,
 		);
 
@@ -368,7 +379,7 @@ export class TranslatorService {
 					translatedLength: translatedContent.length,
 				},
 			);
-		} else if (headingRatio < 0.8 || headingRatio > 1.2) {
+		} else if (headingRatio < MIN_HEADING_RATIO || headingRatio > MAX_HEADING_RATIO) {
 			file.logger.warn(
 				{
 					filename: file.filename,
@@ -475,7 +486,7 @@ export class TranslatorService {
 
 			return tokens.length;
 		} catch (error) {
-			const fallback = Math.ceil(content.length / 3.5);
+			const fallback = Math.ceil(content.length / TOKEN_ESTIMATION_FALLBACK_DIVISOR);
 			this.logger.error({ error }, "Error estimating token count, using fallback");
 
 			return fallback;
@@ -551,7 +562,7 @@ export class TranslatorService {
 	): Promise<ChunkingResult> {
 		const markdownTextSplitterOptions: Partial<MarkdownTextSplitterParams> = {
 			chunkSize: maxTokens,
-			chunkOverlap: 200,
+			chunkOverlap: CHUNK_OVERLAP,
 			lengthFunction: (text: string) => this.estimateTokenCount(text),
 		};
 
@@ -725,7 +736,6 @@ export class TranslatorService {
 		const translatedEndsWithNewline = reassembledContent.endsWith("\n");
 
 		if (originalEndsWithNewline && !translatedEndsWithNewline) {
-			const TRAILING_NEWLINES_REGEX = /\n+$/;
 			const originalTrailingNewlines = TRAILING_NEWLINES_REGEX.exec(file.content)?.[0] ?? "";
 			reassembledContent += originalTrailingNewlines;
 
@@ -794,7 +804,7 @@ export class TranslatorService {
 	): Promise<OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming> {
 		return {
 			model: this.model,
-			temperature: 0.1,
+			temperature: LLM_TEMPERATURE,
 			max_tokens: env.MAX_TOKENS,
 			messages: [
 				{ role: "system", content: await this.getSystemPrompt(content) },
@@ -919,16 +929,7 @@ export class TranslatorService {
 
 		let cleaned = translatedContent;
 
-		const prefixes = [
-			"Here is the translation:",
-			"Here's the translation:",
-			"Translation:",
-			"Translated content:",
-			"Here is the translated content:",
-			"Here's the translated content:",
-		];
-
-		for (const prefix of prefixes) {
+		for (const prefix of TRANSLATION_PREFIXES) {
 			if (cleaned.trim().toLowerCase().startsWith(prefix.toLowerCase())) {
 				cleaned = cleaned.substring(prefix.length).trim();
 			}
@@ -942,7 +943,7 @@ export class TranslatorService {
 		);
 
 		if (file.content.includes("\r\n")) {
-			cleaned = cleaned.replace(/\n/g, "\r\n");
+			cleaned = cleaned.replace(LINE_ENDING_REGEX, "\r\n");
 		}
 
 		file.logger.debug(

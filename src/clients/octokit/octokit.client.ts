@@ -6,7 +6,7 @@ import pRetry, { AbortError } from "p-retry";
 import type { Options as RetryOptions } from "p-retry";
 
 import { isUncastRequestError } from "@/errors";
-import { logger as baseLogger, env } from "@/utils";
+import { logger as baseLogger, env, MS_PER_SECOND } from "@/utils";
 
 import {
 	DEFAULT_RETRY_CONFIG,
@@ -78,35 +78,31 @@ function isRetryableError(error: unknown): boolean {
 /**
  * Extracts retry delay from GitHub's rate limit headers.
  *
- * GitHub uses `Retry-After` (seconds) or `x-ratelimit-reset` (Unix timestamp)
- * to indicate when rate limits will reset.
+ * Uses `x-ratelimit-reset` (Unix timestamp) to calculate when rate limits will reset.
  *
  * @param error The RequestError containing response headers
  *
  * @returns Delay in milliseconds, or `undefined` if no header found
  */
 function getRetryAfterMs(error: RequestError): number | undefined {
-	const MS_PER_SECOND = 1000;
 	const headers = error.response?.headers;
 	if (!headers) return;
 
-	const retryAfterSeconds = String(headers["retry-after"]);
-	if (retryAfterSeconds) {
-		const seconds = Number.parseInt(retryAfterSeconds, 10);
+	const {
+		"x-ratelimit-limit": rateLimitLimit,
+		"x-ratelimit-remaining": rateLimitRemaining,
+		"x-ratelimit-reset": rateLimitReset,
+	} = headers;
 
-		if (!Number.isNaN(seconds)) {
-			logger.debug({ retryAfterSeconds: seconds }, "Using Retry-After header for delay");
-			return seconds * MS_PER_SECOND;
-		}
-	}
-
-	const rateLimitResetTimestamp = String(headers["x-ratelimit-reset"]);
-	if (rateLimitResetTimestamp) {
-		const resetTimeMs = Number.parseInt(rateLimitResetTimestamp, 10) * MS_PER_SECOND;
+	if (rateLimitReset) {
+		const resetTimeMs = Number.parseInt(rateLimitReset, 10) * MS_PER_SECOND;
 		const delayMs = Math.max(0, resetTimeMs - Date.now() + RATE_LIMIT_BUFFER_MS);
 
 		if (delayMs > 0 && delayMs < RATE_LIMIT_MAX_DELAY_MS) {
-			logger.debug({ resetTimeMs, delayMs }, "Using x-ratelimit-reset header for delay");
+			logger.debug(
+				{ rateLimitLimit, rateLimitRemaining, resetTimeMs, delayMs },
+				"Using x-ratelimit-reset header for delay",
+			);
 			return delayMs;
 		}
 	}
@@ -171,7 +167,7 @@ export async function withRetry<T>(
 								status: error.status,
 								retryAfterMs,
 							},
-							`Rate limited, waiting ${Math.ceil(retryAfterMs / 1000)}s before retry`,
+							`Rate limited, waiting ${Math.ceil(retryAfterMs / MS_PER_SECOND)}s before retry`,
 						);
 						await new Promise((resolve) => setTimeout(resolve, retryAfterMs));
 						return;

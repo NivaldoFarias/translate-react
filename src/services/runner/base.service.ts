@@ -59,7 +59,7 @@ export abstract class BaseRunnerService {
 	protected cleanup = async () => {
 		this.logger.info("Shutting down gracefully");
 
-		await sleep(1000);
+		await sleep(1_000);
 
 		process.exit(0);
 	};
