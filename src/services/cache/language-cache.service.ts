@@ -75,7 +75,7 @@ export class LanguageCacheService {
 	 *
 	 * @param files Array of file entries with filename and content hash
 	 *
-	 * @returns Map of filenames to cached language entries (only includes cache hits)
+	 * @returns Map of composite keys (`filename:contentHash`) to cached language entries (only includes cache hits)
 	 */
 	public getMany(
 		files: { filename: string; contentHash: string }[],
@@ -85,7 +85,7 @@ export class LanguageCacheService {
 		const result = new Map<string, LanguageCacheEntry>();
 
 		let keyIndex = 0;
-		for (const file of files) {
+		for (const _file of files) {
 			const key = keys[keyIndex++];
 			if (!key) continue;
 
@@ -93,7 +93,7 @@ export class LanguageCacheService {
 
 			if (!cached) continue;
 
-			result.set(file.filename, cached);
+			result.set(key, cached);
 		}
 
 		this.logger.debug(

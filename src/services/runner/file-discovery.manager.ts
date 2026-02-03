@@ -133,9 +133,7 @@ export class FileDiscoveryManager {
 		>[];
 
 		const languageCaches = this.services.languageCache.getMany(
-			filesToFetchCache.map(({ filename, sha }) => {
-				return { filename, contentHash: sha };
-			}),
+			filesToFetchCache.map(({ filename, sha }) => ({ filename, contentHash: sha })),
 		);
 
 		let cacheHits = 0;
@@ -143,7 +141,14 @@ export class FileDiscoveryManager {
 		const targetLanguage = LanguageDetectorService.languages.target;
 
 		for (const file of files) {
-			const cache = languageCaches.get(file.filename);
+			if (!file.sha) {
+				cacheMisses++;
+				candidateFiles.push(file);
+				continue;
+			}
+
+			const cacheKey = `${file.filename}:${file.sha}`;
+			const cache = languageCaches.get(cacheKey);
 
 			if (cache?.detectedLanguage === targetLanguage && cache.confidence > MIN_CACHE_CONFIDENCE) {
 				cacheHits++;
