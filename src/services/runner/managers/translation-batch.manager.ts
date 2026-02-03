@@ -227,7 +227,6 @@ export class TranslationBatchManager {
 		file: TranslationFile,
 		_progress: FileProcessingProgress,
 	): Promise<ProcessedFileResult> {
-		const fileLogger = this.logger.child({ component: file.filename });
 		const metadata: ProcessedFileResult = {
 			branch: null,
 			filename: file.filename,
@@ -237,7 +236,7 @@ export class TranslationBatchManager {
 		};
 
 		const startTime = Date.now();
-		fileLogger.debug(
+		file.logger.debug(
 			{ path: file.path, contentSize: file.content.length },
 			"Starting file processing",
 		);
@@ -257,14 +256,14 @@ export class TranslationBatchManager {
 
 			const branchStart = Date.now();
 			metadata.branch = await this.createOrGetTranslationBranch(file);
-			fileLogger.debug(
+			file.logger.debug(
 				{ branchRef: metadata.branch.ref, durationMs: Date.now() - branchStart },
 				"Step 1/4: Branch created/retrieved",
 			);
 
 			const translationStart = Date.now();
 			metadata.translation = await this.services.translator.translateContent(file);
-			fileLogger.debug(
+			file.logger.debug(
 				{ translationSize: metadata.translation.length, durationMs: Date.now() - translationStart },
 				"Step 2/4: Translation complete",
 			);
@@ -280,11 +279,11 @@ export class TranslationBatchManager {
 				content: metadata.translation,
 				message: `docs: translate \`${file.filename}\` to ${languageName}`,
 			});
-			fileLogger.debug({ durationMs: Date.now() - commitStart }, "Step 3/4: Commit complete");
+			file.logger.debug({ durationMs: Date.now() - commitStart }, "Step 3/4: Commit complete");
 
 			const prStart = Date.now();
 			metadata.pullRequest = await this.createOrUpdatePullRequest(file, metadata);
-			fileLogger.debug(
+			file.logger.debug(
 				{ prNumber: metadata.pullRequest.number, durationMs: Date.now() - prStart },
 				"Step 4/4: Pull request created/updated",
 			);
@@ -292,11 +291,11 @@ export class TranslationBatchManager {
 			this.consecutiveFailures = 0;
 			this.updateBatchProgress("success");
 
-			fileLogger.debug({ totalDurationMs: Date.now() - startTime }, "File processing complete");
+			file.logger.debug({ totalDurationMs: Date.now() - startTime }, "File processing complete");
 		} catch (error) {
 			this.consecutiveFailures++;
 
-			fileLogger.error({ error, durationMs: Date.now() - startTime }, "File processing failed");
+			file.logger.error({ error, durationMs: Date.now() - startTime }, "File processing failed");
 
 			metadata.error = error instanceof Error ? error : new Error(String(error));
 			this.updateBatchProgress("error");
