@@ -8,6 +8,7 @@ import { APIError } from "openai/error";
 import pRetry, { AbortError } from "p-retry";
 
 import type { MarkdownTextSplitterParams } from "@langchain/textsplitters";
+import type { TiktokenModel } from "js-tiktoken";
 import type PQueue from "p-queue";
 import type { Options as RetryOptions } from "p-retry";
 import type { Logger } from "pino";
@@ -649,10 +650,24 @@ export class TranslatorService {
 	 * console.log(tokenCount); // ~8 tokens
 	 * ```
 	 */
+	/** Lazily-initialized tiktoken encoder instance, cached for performance */
+	private cachedEncoder: ReturnType<typeof encodingForModel> | null = null;
+
+	/**
+	 * Gets or creates a cached tiktoken encoder instance.
+	 *
+	 * The encoder is expensive to create (~500ms) due to vocabulary loading
+	 * and regex compilation, so we cache it for reuse across all token
+	 * estimation calls.
+	 */
+	private getEncoder() {
+		this.cachedEncoder ??= encodingForModel(this.model as TiktokenModel);
+		return this.cachedEncoder;
+	}
+
 	private estimateTokenCount(content: string): number {
 		try {
-			const encoding = encodingForModel("gpt-4o-mini");
-			const tokens = encoding.encode(content);
+			const tokens = this.getEncoder().encode(content);
 
 			return tokens.length;
 		} catch (error) {
