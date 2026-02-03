@@ -13,7 +13,11 @@ import { LanguageDetectorService } from "@/services/language-detector/";
 import { TranslationFile } from "@/services/translator/";
 import { filterMarkdownFiles, logger } from "@/utils/";
 
-import { FILE_FETCH_BATCH_SIZE, MIN_CACHE_CONFIDENCE } from "./managers.constants";
+import {
+	FILE_FETCH_BATCH_SIZE,
+	LANGUAGE_CACHE_TTL_MS,
+	MIN_CACHE_CONFIDENCE,
+} from "./managers.constants";
 
 /**
  * Manages file discovery and filtering pipeline for translation workflow.
@@ -143,6 +147,22 @@ export class FileDiscoveryManager {
 	}
 
 	/**
+	 * Builds cache key from filename and content hash.
+	 *
+	 * Format: `filename:contentHash` ensures uniqueness based on both file
+	 * identity and content version.
+	 *
+	 * @param file File to build cache key for
+	 *
+	 * @returns Cache key
+	 */
+	private buildLanguageCacheKey(
+		file: SetRequired<PatchedRepositoryTreeItem, "sha"> | TranslationFile,
+	): string {
+		return `${file.filename}:${file.sha}`;
+	}
+
+	/**
 	 * Checks language cache to identify files already known to be translated.
 	 *
 	 * Queries the cache for each file using its path and content hash (SHA).
@@ -168,9 +188,8 @@ export class FileDiscoveryManager {
 			"sha"
 		>[];
 
-		const languageCaches = this.services.languageCache.getMany(
-			filesToFetchCache.map(({ filename, sha }) => ({ filename, contentHash: sha })),
-		);
+		const cacheKeys = filesToFetchCache.map((file) => this.buildLanguageCacheKey(file));
+		const languageCaches = this.services.languageCache.getMany(cacheKeys);
 
 		let cacheHits = 0;
 		let cacheMisses = 0;
@@ -183,7 +202,7 @@ export class FileDiscoveryManager {
 				continue;
 			}
 
-			const cacheKey = `${file.filename}:${file.sha}`;
+			const cacheKey = this.buildLanguageCacheKey(file);
 			const cache = languageCaches.get(cacheKey);
 
 			if (cache?.detectedLanguage === targetLanguage && cache.confidence > MIN_CACHE_CONFIDENCE) {
@@ -422,11 +441,17 @@ export class FileDiscoveryManager {
 			);
 
 			if (file.sha && analysis.detectedLanguage) {
-				this.services.languageCache.set(file.path, file.sha, {
-					detectedLanguage: analysis.detectedLanguage,
-					confidence: analysis.languageScore.target,
-					timestamp: Date.now(),
-				});
+				const cacheKey = this.buildLanguageCacheKey(file);
+
+				this.services.languageCache.set(
+					cacheKey,
+					{
+						detectedLanguage: analysis.detectedLanguage,
+						confidence: analysis.languageScore.target,
+						timestamp: Date.now(),
+					},
+					LANGUAGE_CACHE_TTL_MS,
+				);
 			}
 
 			if (analysis.isTranslated) {

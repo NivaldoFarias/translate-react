@@ -1,7 +1,7 @@
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 import type { SetRequired } from "type-fest";
 
-import type { LanguageCacheService } from "@/services/cache/";
+import type { CacheService } from "@/services/cache/";
 import type { GitHubService } from "@/services/github/";
 import type { LanguageDetectorService } from "@/services/language-detector/";
 import type { LocaleService } from "@/services/locale/";
@@ -164,6 +164,18 @@ export interface WorkflowStatistics {
 	successRate: number;
 }
 
+/** Language detection cache entry structure */
+export interface LanguageCacheEntry {
+	/** Detected language code (e.g., `"pt"`, `"en"`) */
+	detectedLanguage: string;
+
+	/** Confidence score from `0` to `1` */
+	confidence: number;
+
+	/** Timestamp when language was detected */
+	timestamp: number;
+}
+
 /** Dependency injection interface for RunnerService */
 export interface RunnerServiceDependencies {
 	/** GitHub API services */
@@ -173,7 +185,7 @@ export interface RunnerServiceDependencies {
 	translator: TranslatorService;
 
 	/** Language detection cache */
-	languageCache: LanguageCacheService;
+	languageCache: CacheService<LanguageCacheEntry>;
 
 	/** Locale service */
 	locale: LocaleService;
