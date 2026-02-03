@@ -161,7 +161,7 @@ export class GitHubContent {
 			sha: file.sha,
 		});
 
-		this.logger.info(
+		file.logger.info(
 			{
 				filePath: file.path,
 				branch: branch.ref,
