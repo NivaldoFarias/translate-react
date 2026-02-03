@@ -69,6 +69,30 @@ export const MAX_CONSECUTIVE_FAILURES = 5;
  */
 export const MIN_CACHE_CONFIDENCE = 0.8;
 
+/**
+ * Minimum content length required for reliable language detection.
+ *
+ * Content shorter than this threshold is too small for accurate language
+ * detection by CLD2, resulting in unreliable or undefined results.
+ */
+export const MIN_CONTENT_LENGTH_FOR_DETECTION = 10;
+
+/**
+ * Ratio threshold above which content is considered already translated.
+ *
+ * When the target language confidence ratio exceeds this value (0.5 = 50%),
+ * the content is marked as translated and skipped from the translation workflow.
+ */
+export const TRANSLATION_RATIO_THRESHOLD = 0.5;
+
+/**
+ * Time-to-live for language cache entries in milliseconds.
+ *
+ * Default: 1 hour (3600000ms). Sufficient for single workflow runs while
+ * ensuring stale entries don't persist across separate executions.
+ */
+export const LANGUAGE_CACHE_TTL_MS = 60 * 60 * 1000;
+
 /** Minimum length required for a valid API token */
 export const MIN_API_TOKEN_LENGTH = 20;
 
