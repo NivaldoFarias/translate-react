@@ -95,9 +95,9 @@ describe("LanguageCacheService", () => {
 			]);
 
 			expect(results.size).toBe(3);
-			expect(results.get("docs/file1.md")).toEqual(entry1);
-			expect(results.get("docs/file2.md")).toEqual(entry2);
-			expect(results.get("docs/file3.md")).toEqual(entry3);
+			expect(results.get("docs/file1.md:hash1")).toEqual(entry1);
+			expect(results.get("docs/file2.md:hash2")).toEqual(entry2);
+			expect(results.get("docs/file3.md:hash3")).toEqual(entry3);
 		});
 
 		test("should only return cache hits when some requested entries do not exist", () => {
@@ -115,9 +115,9 @@ describe("LanguageCacheService", () => {
 			]);
 
 			expect(results.size).toBe(1);
-			expect(results.get("docs/file1.md")).toEqual(entry1);
-			expect(results.has("docs/file2.md")).toBe(false);
-			expect(results.has("docs/file3.md")).toBe(false);
+			expect(results.get("docs/file1.md:hash1")).toEqual(entry1);
+			expect(results.has("docs/file2.md:hash2")).toBe(false);
+			expect(results.has("docs/file3.md:hash3")).toBe(false);
 		});
 
 		test("should return empty map when files array is empty", () => {
@@ -137,6 +137,39 @@ describe("LanguageCacheService", () => {
 			const results = cache.getMany([{ filename: "docs/file1.md", contentHash: "wrong-hash" }]);
 
 			expect(results.size).toBe(0);
+		});
+
+		test("should handle duplicate filenames in different directories correctly", () => {
+			const entryDocs = {
+				detectedLanguage: "pt",
+				confidence: 0.99,
+				timestamp: Date.now(),
+			};
+			const entryGuide = {
+				detectedLanguage: "en",
+				confidence: 0.95,
+				timestamp: Date.now(),
+			};
+			const entryTutorial = {
+				detectedLanguage: "pt",
+				confidence: 0.97,
+				timestamp: Date.now(),
+			};
+
+			cache.set("README.md", "hash-docs", entryDocs);
+			cache.set("README.md", "hash-guide", entryGuide);
+			cache.set("README.md", "hash-tutorial", entryTutorial);
+
+			const results = cache.getMany([
+				{ filename: "README.md", contentHash: "hash-docs" },
+				{ filename: "README.md", contentHash: "hash-guide" },
+				{ filename: "README.md", contentHash: "hash-tutorial" },
+			]);
+
+			expect(results.size).toBe(3);
+			expect(results.get("README.md:hash-docs")).toEqual(entryDocs);
+			expect(results.get("README.md:hash-guide")).toEqual(entryGuide);
+			expect(results.get("README.md:hash-tutorial")).toEqual(entryTutorial);
 		});
 	});
 
@@ -221,7 +254,8 @@ describe("LanguageCacheService", () => {
 			expect(cachedResults.size).toBe(3);
 
 			for (const file of files) {
-				const cached = cachedResults.get(file.path);
+				const cacheKey = `${file.path}:${file.sha}`;
+				const cached = cachedResults.get(cacheKey);
 				expect(cached?.detectedLanguage).toBe(file.detectedLanguage);
 			}
 		});

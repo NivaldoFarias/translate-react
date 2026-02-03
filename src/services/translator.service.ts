@@ -9,7 +9,7 @@ import type { MarkdownTextSplitterParams } from "@langchain/textsplitters";
 import type PQueue from "p-queue";
 import type { Options as RetryOptions } from "p-retry";
 
-import { llmQueue, openai } from "@/clients/";
+import { openai, queue } from "@/clients/";
 import { ApplicationError, ErrorCode } from "@/errors/";
 import {
 	CHUNK_TOKEN_BUFFER,
@@ -935,7 +935,7 @@ export class TranslatorService {
 export const translatorService = new TranslatorService({
 	openai,
 	model: env.LLM_MODEL,
-	queue: llmQueue,
+	queue: queue,
 	localeService,
 	languageDetectorService,
 	retryConfig: {
