@@ -146,30 +146,34 @@ export function createMockTranslatorService() {
 }
 
 /**
- * Creates a mock LanguageCacheService for testing.
+ * Creates a mock CacheService for language cache testing.
  *
- * @returns Mocked LanguageCacheService instance
+ * Matches the CacheService<LanguageCacheEntry> interface.
+ *
+ * @returns Mocked CacheService instance
  */
 export function createMockLanguageCacheService() {
-	const cache = new Map<string, { isTranslated: boolean; confidence: number }>();
-
 	return {
-		get: mock((_filename: string, _contentHash: string) => null),
-		getMany: mock(() => new Map()),
+		get: mock((_key: string) => null),
+		getMany: mock((_keys: string[]) => new Map()),
 		set: mock(
 			(
-				_filename: string,
-				_contentHash: string,
+				_key: string,
 				_value: { detectedLanguage: string; confidence: number; timestamp: number },
+				_ttlMs: number,
 			) => {
 				/* empty */
 			},
 		),
-		has: mock((_path: string) => false),
-		clear: mock(() => {
-			cache.clear();
+		has: mock((_key: string) => false),
+		delete: mock((_key: string) => {
+			/* empty */
 		}),
-		size: () => cache.size,
+		clear: mock(() => {
+			/* empty */
+		}),
+		size: 0,
+		cleanupExpired: mock(() => 0),
 	};
 }
 
