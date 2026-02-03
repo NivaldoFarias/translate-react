@@ -157,9 +157,6 @@ const envSchema = z.object({
 
 	/** Concurrency limit for LLM requests */
 	MAX_LLM_CONCURRENCY: z.coerce.number().positive().default(envDefaults.MAX_LLM_CONCURRENCY),
-
-	/** Concurrency limit for GitHub operations */
-	MAX_GITHUB_CONCURRENCY: z.coerce.number().positive().default(envDefaults.MAX_GITHUB_CONCURRENCY),
 });
 
 /** Type definition for the environment configuration */

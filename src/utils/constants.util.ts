@@ -145,7 +145,6 @@ interface EnvironmentSchemaDefaults {
 	GH_REQUEST_TIMEOUT: number;
 	MIN_SUCCESS_RATE: number;
 	MAX_LLM_CONCURRENCY: number;
-	MAX_GITHUB_CONCURRENCY: number;
 	MAX_RETRY_ATTEMPTS: number;
 }
 
@@ -171,7 +170,6 @@ export const ENV_PLACEHOLDERS = {
 	MIN_SUCCESS_RATE: 0.75,
 	MAX_RETRY_ATTEMPTS: 3,
 	MAX_LLM_CONCURRENCY: 4,
-	MAX_GITHUB_CONCURRENCY: 8,
 } satisfies Partial<EnvironmentSchemaDefaults>;
 
 export const environmentDefaults: Record<RuntimeEnvironment, EnvironmentSchemaDefaults> = {
