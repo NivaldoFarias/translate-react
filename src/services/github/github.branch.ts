@@ -76,8 +76,12 @@ export class GitHubBranch {
 		branchName: string,
 		baseBranch?: string,
 	): Promise<RestEndpointMethodTypes["git"]["createRef"]["response"]> {
+		this.logger.debug({ branchName, baseBranch: baseBranch ?? "(default)" }, "Creating new branch");
+
 		try {
 			const actualBaseBranch = baseBranch ?? (await this.getDefaultBranch());
+
+			this.logger.debug({ branchName, actualBaseBranch }, "Resolved base branch, fetching ref");
 
 			const mainBranchRef = await this.deps.octokit.git.getRef({
 				...this.deps.repositories.fork,
@@ -99,6 +103,7 @@ export class GitHubBranch {
 
 			return branchRef;
 		} catch (error) {
+			this.logger.debug({ branchName, error }, "Branch creation failed, removing from tracking");
 			this.activeBranches.delete(branchName);
 			throw error;
 		}
@@ -118,15 +123,20 @@ export class GitHubBranch {
 	public async getBranch(
 		branchName: string,
 	): Promise<RestEndpointMethodTypes["git"]["getRef"]["response"] | undefined> {
+		this.logger.debug({ branchName }, "Looking up branch");
+
 		try {
 			const response = await this.deps.octokit.git.getRef({
 				...this.deps.repositories.fork,
 				ref: `heads/${branchName}`,
 			});
 
+			this.logger.debug({ branchName, sha: response.data.object.sha }, "Branch found");
+
 			return response;
 		} catch (error) {
 			if (error instanceof RequestError && error.status === 404) {
+				this.logger.debug({ branchName }, "Branch not found (404)");
 				return;
 			}
 
@@ -148,6 +158,8 @@ export class GitHubBranch {
 	public async deleteBranch(
 		branchName: string,
 	): Promise<RestEndpointMethodTypes["git"]["deleteRef"]["response"]> {
+		this.logger.debug({ branchName }, "Deleting branch");
+
 		const response = await this.deps.octokit.git.deleteRef({
 			...this.deps.repositories.fork,
 			ref: `heads/${branchName}`,

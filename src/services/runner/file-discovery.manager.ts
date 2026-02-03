@@ -64,21 +64,56 @@ export class FileDiscoveryManager {
 		filesToTranslate: TranslationFile[];
 		invalidPRsByFile: Map<string, { prNumber: number; status: PullRequestStatus }>;
 	}> {
+		this.logger.debug({ fileCount: repositoryTree.length }, "Starting file discovery pipeline");
+
 		const markdownFiles = filterMarkdownFiles(repositoryTree);
+		this.logger.debug(
+			{ before: repositoryTree.length, after: markdownFiles.length },
+			"Stage 1/6: Markdown filter complete",
+		);
 
 		const uniqueFiles = markdownFiles.filter(
 			(file, index, self) => index === self.findIndex((compare) => compare.path === file.path),
 		);
+		this.logger.debug(
+			{ before: markdownFiles.length, after: uniqueFiles.length },
+			"Stage 2/6: Deduplication complete",
+		);
 
-		const { candidateFiles, cacheHits } = this.checkCache(uniqueFiles);
+		const { candidateFiles, cacheHits, cacheMisses } = this.checkCache(uniqueFiles);
+		this.logger.debug(
+			{ before: uniqueFiles.length, after: candidateFiles.length, cacheHits, cacheMisses },
+			"Stage 3/6: Cache lookup complete",
+		);
 
 		const { filesToFetch, numFilesWithPRs, invalidPRsByFile } =
 			await this.filterByPRs(candidateFiles);
+		this.logger.debug(
+			{
+				before: candidateFiles.length,
+				after: filesToFetch.length,
+				skippedByValidPRs: numFilesWithPRs,
+				invalidPRs: invalidPRsByFile.size,
+			},
+			"Stage 4/6: PR filter complete",
+		);
 
 		const uncheckedFiles = await this.fetchContent(filesToFetch);
+		this.logger.debug(
+			{ before: filesToFetch.length, after: uncheckedFiles.length },
+			"Stage 5/6: Content fetch complete",
+		);
 
 		const { numFilesFiltered, filesToTranslate } =
 			await this.detectAndCacheLanguages(uncheckedFiles);
+		this.logger.debug(
+			{
+				before: uncheckedFiles.length,
+				after: filesToTranslate.length,
+				detectedAsTranslated: numFilesFiltered,
+			},
+			"Stage 6/6: Language detection complete",
+		);
 
 		const totalFiltered = cacheHits + numFilesFiltered + numFilesWithPRs;
 
@@ -310,13 +345,31 @@ export class FileDiscoveryManager {
 	 */
 	public async fetchContent(filesToFetch: PatchedRepositoryTreeItem[]): Promise<TranslationFile[]> {
 		const uncheckedFiles: TranslationFile[] = [];
+		const totalBatches = Math.ceil(filesToFetch.length / FILE_FETCH_BATCH_SIZE);
 
 		for (let index = 0; index < filesToFetch.length; index += FILE_FETCH_BATCH_SIZE) {
+			const batchNumber = Math.floor(index / FILE_FETCH_BATCH_SIZE) + 1;
 			const batch = filesToFetch.slice(index, index + FILE_FETCH_BATCH_SIZE);
-			const batchResults = await this.fetchBatch(batch);
 
-			uncheckedFiles.push(
-				...batchResults.filter((file): file is NonNullable<typeof file> => !!file),
+			this.logger.debug(
+				{ batch: batchNumber, totalBatches, batchSize: batch.length },
+				`Fetching content batch ${batchNumber}/${totalBatches}`,
+			);
+
+			const batchResults = await this.fetchBatch(batch);
+			const successfulFetches = batchResults.filter(
+				(file): file is NonNullable<typeof file> => !!file,
+			);
+
+			uncheckedFiles.push(...successfulFetches);
+
+			this.logger.debug(
+				{
+					batch: batchNumber,
+					fetched: successfulFetches.length,
+					failed: batch.length - successfulFetches.length,
+				},
+				`Batch ${batchNumber}/${totalBatches} complete`,
 			);
 		}
 
