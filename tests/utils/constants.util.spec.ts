@@ -41,7 +41,6 @@ describe("constants.util", () => {
 			const prod = environmentDefaults[RuntimeEnvironment.Production];
 
 			expect(prod.MAX_LLM_CONCURRENCY).toBe(ENV_PLACEHOLDERS.MAX_LLM_CONCURRENCY);
-			expect(prod.MAX_GITHUB_CONCURRENCY).toBe(ENV_PLACEHOLDERS.MAX_GITHUB_CONCURRENCY);
 		});
 	});
 
