@@ -35,7 +35,7 @@ function createTestTranslatorService(
 			retries: overrides.retryConfig?.retries ?? 0,
 			factor: overrides.retryConfig?.factor ?? 1,
 			minTimeout: overrides.retryConfig?.minTimeout ?? 100,
-			maxTimeout: overrides.retryConfig?.maxTimeout ?? 1000,
+			maxTimeout: overrides.retryConfig?.maxTimeout ?? 1_000,
 			randomize: overrides.retryConfig?.randomize ?? false,
 		},
 	} as TranslatorServiceDependencies);
@@ -278,7 +278,7 @@ describe("TranslatorService", () => {
 		});
 
 		test("should handle large content with chunking", async () => {
-			const largeContent = "Large content ".repeat(1000);
+			const largeContent = "Large content ".repeat(1_000);
 			mockChatCompletionsCreate.mockResolvedValue(
 				createChatCompletionFixture({
 					choices: [{ message: { content: "Conteúdo grande traduzido" } }],

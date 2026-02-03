@@ -14,7 +14,7 @@ describe("octokit.constants", () => {
 		});
 
 		test("DEFAULT_RETRY_CONFIG.minTimeout is 1 second", () => {
-			expect(DEFAULT_RETRY_CONFIG.minTimeout).toBe(1000);
+			expect(DEFAULT_RETRY_CONFIG.minTimeout).toBe(1_000);
 		});
 
 		test("DEFAULT_RETRY_CONFIG.maxTimeout is 10 seconds", () => {
@@ -26,7 +26,7 @@ describe("octokit.constants", () => {
 		});
 
 		test("RATE_LIMIT_BUFFER_MS is 1 second", () => {
-			expect(RATE_LIMIT_BUFFER_MS).toBe(1000);
+			expect(RATE_LIMIT_BUFFER_MS).toBe(1_000);
 		});
 
 		test("RATE_LIMIT_MAX_DELAY_MS is 5 minutes", () => {

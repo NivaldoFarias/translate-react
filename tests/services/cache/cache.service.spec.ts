@@ -32,7 +32,7 @@ describe("CacheService", () => {
 
 	describe("set and get", () => {
 		test("should store and retrieve value when valid key is provided", () => {
-			cache.set("key1", "value1", 1000);
+			cache.set("key1", "value1", 1_000);
 
 			const result = cache.get("key1");
 
@@ -71,9 +71,9 @@ describe("CacheService", () => {
 
 	describe("getMany", () => {
 		test("should retrieve multiple cached values when all keys exist", () => {
-			cache.set("key1", "value1", 1000);
-			cache.set("key2", "value2", 1000);
-			cache.set("key3", "value3", 1000);
+			cache.set("key1", "value1", 1_000);
+			cache.set("key2", "value2", 1_000);
+			cache.set("key3", "value3", 1_000);
 
 			const results = cache.getMany(["key1", "key2", "key3"]);
 
@@ -84,7 +84,7 @@ describe("CacheService", () => {
 		});
 
 		test("should exclude non-existent keys when some keys are not cached", () => {
-			cache.set("key1", "value1", 1000);
+			cache.set("key1", "value1", 1_000);
 
 			const results = cache.getMany(["key1", "key2", "key3"]);
 
@@ -116,7 +116,7 @@ describe("CacheService", () => {
 
 	describe("has", () => {
 		test("should return true when key exists and has not expired", () => {
-			cache.set("key1", "value1", 1000);
+			cache.set("key1", "value1", 1_000);
 
 			const result = cache.has("key1");
 
@@ -143,8 +143,8 @@ describe("CacheService", () => {
 
 	describe("delete", () => {
 		test("should remove specific key when key exists in cache", () => {
-			cache.set("key1", "value1", 1000);
-			cache.set("key2", "value2", 1000);
+			cache.set("key1", "value1", 1_000);
+			cache.set("key2", "value2", 1_000);
 
 			cache.delete("key1");
 
@@ -162,9 +162,9 @@ describe("CacheService", () => {
 
 	describe("clear", () => {
 		test("should remove all entries when cache contains multiple items", () => {
-			cache.set("key1", "value1", 1000);
-			cache.set("key2", "value2", 1000);
-			cache.set("key3", "value3", 1000);
+			cache.set("key1", "value1", 1_000);
+			cache.set("key2", "value2", 1_000);
+			cache.set("key3", "value3", 1_000);
 
 			cache.clear();
 
@@ -191,8 +191,8 @@ describe("CacheService", () => {
 		});
 
 		test("should return zero when no entries have expired", () => {
-			cache.set("key1", "value1", 1000);
-			cache.set("key2", "value2", 1000);
+			cache.set("key1", "value1", 1_000);
+			cache.set("key2", "value2", 1_000);
 
 			const removed = cache.cleanupExpired();
 
@@ -204,13 +204,13 @@ describe("CacheService", () => {
 	describe("type safety", () => {
 		test("should handle different value types when using generic type parameter", () => {
 			const numberCache = new CacheService<number>();
-			numberCache.set("age", 25, 1000);
+			numberCache.set("age", 25, 1_000);
 			const numberResult = numberCache.get("age");
 
 			expect(numberResult).toBe(25);
 
 			const objectCache = new CacheService<{ name: string }>();
-			objectCache.set("user", { name: "John" }, 1000);
+			objectCache.set("user", { name: "John" }, 1_000);
 			const objectResult = objectCache.get("user");
 
 			expect(objectResult).toEqual({ name: "John" });

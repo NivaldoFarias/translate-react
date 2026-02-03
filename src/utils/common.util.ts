@@ -4,7 +4,7 @@ import type { RepositoryTreeItem, WorkflowStatistics } from "@/services/";
 
 import { ApplicationError, ErrorCode } from "@/errors/";
 
-import { processSignals } from "./constants.util";
+import { MS_PER_SECOND, processSignals, RATE_LIMIT_PATTERNS } from "./constants.util";
 import { env } from "./env.util";
 import { logger as baseLogger } from "./logger.util";
 
@@ -100,7 +100,7 @@ export function formatElapsedTime(
 	elapsedTime: number,
 	locale: Intl.LocalesArgument = "en",
 ): string {
-	const seconds = Math.floor(elapsedTime / 1000);
+	const seconds = Math.floor(elapsedTime / MS_PER_SECOND);
 
 	const formatUnit = (value: number, unit: "second" | "minute" | "hour") =>
 		new Intl.NumberFormat(locale, { style: "unit", unit, unitDisplay: "long" }).format(value);
@@ -241,22 +241,5 @@ export function detectRateLimit(errorMessage: string, statusCode?: number): bool
 		return true;
 	}
 
-	/**
-	 * Common rate limit patterns from various providers. Includes:
-	 * - Standard phrases like "rate limit" and "too many requests"
-	 * - HTTP status code as string
-	 * - Provider-specific phrases like "free-models-per-" for OpenRouter
-	 * - General quota exceeded patterns
-	 * - "requests per" patterns indicating rate limits
-	 */
-	const rateLimitPatterns = [
-		"rate limit",
-		"429",
-		"free-models-per-",
-		"quota",
-		"too many requests",
-		"requests per",
-	];
-
-	return rateLimitPatterns.some((pattern) => errorMessage.toLowerCase().includes(pattern));
+	return RATE_LIMIT_PATTERNS.some((pattern) => errorMessage.toLowerCase().includes(pattern));
 }
