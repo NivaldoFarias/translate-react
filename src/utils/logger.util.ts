@@ -1,8 +1,29 @@
 import pino from "pino";
 
 import { nftsCompatibleDateString } from "./common.util";
-import { RuntimeEnvironment } from "./constants.util";
+import { MAX_LOG_STRING_LENGTH, RuntimeEnvironment } from "./constants.util";
 import { env } from "./env.util";
+
+/**
+ * Truncates large string values to reduce log verbosity.
+ *
+ * @param value The value to serialize (string or other type)
+ * @param fieldName The name of the field being serialized (for context in truncated message)
+ * @param maxLength Maximum length before truncation (defaults to {@link MAX_LOG_STRING_LENGTH})
+ *
+ * @returns Original value if not a string or within length limit, otherwise truncated string with summary
+ */
+function truncateString(
+	value: unknown,
+	fieldName: string,
+	maxLength = MAX_LOG_STRING_LENGTH,
+): unknown {
+	if (typeof value !== "string") return value;
+
+	if (value.length <= maxLength) return value;
+
+	return `[${fieldName}: ${value.length} chars, truncated] ${value.slice(0, maxLength)}...`;
+}
 
 /**
  * Main logger instance
@@ -41,11 +62,38 @@ export const logger = pino({
 	timestamp: pino.stdTimeFunctions.isoTime,
 
 	/**
-	 * Custom error serialization.
-	 * Extracts useful fields from Error objects
+	 * Custom serializers for structured logging.
+	 * Transforms values before logging to reduce verbosity and improve readability.
 	 */
 	serializers: {
-		err: pino.stdSerializers.err,
+		error: pino.stdSerializers.err,
+
+		/**
+		 * Suppresses large content strings to reduce log verbosity.
+		 *
+		 * @param value The value to serialize
+		 *
+		 * @returns Original value if not a string or within {@link MAX_LOG_STRING_LENGTH} characters, otherwise truncated string with summary
+		 */
+		content: (value: unknown) => truncateString(value, "content", MAX_LOG_STRING_LENGTH),
+
+		/**
+		 * Suppresses large body strings to reduce log verbosity.
+		 *
+		 * @param value The value to serialize
+		 *
+		 * @returns Original value if not a string or within {@link MAX_LOG_STRING_LENGTH} characters, otherwise truncated string with summary
+		 */
+		body: (value: unknown) => truncateString(value, "body", MAX_LOG_STRING_LENGTH),
+
+		/**
+		 * Suppresses large text strings to reduce log verbosity.
+		 *
+		 * @param value The value to serialize
+		 *
+		 * @returns Original value if not a string or within {@link MAX_LOG_STRING_LENGTH} characters, otherwise truncated string with summary
+		 */
+		text: (value: unknown) => truncateString(value, "text", MAX_LOG_STRING_LENGTH),
 	},
 
 	/**

@@ -163,8 +163,8 @@ export class TranslatorService {
 		languageDetector: LanguageDetectorService;
 	};
 
-	/** Glossary for consistent term translations */
-	public glossary: string | null = null;
+	/** Translation guidelines for consistent term translations */
+	public translationGuidelines: string | null = null;
 
 	/**
 	 * Creates a new TranslatorService instance with injected dependencies.
@@ -1168,9 +1168,9 @@ export class TranslatorService {
 			"Determined source and target languages for prompt",
 		);
 
-		const glossarySection =
-			this.glossary ?
-				`\n## TERMINOLOGY GLOSSARY\nApply these exact translations for the specified terms:\n${this.glossary}\n`
+		const translationGuidelinesSection =
+			this.translationGuidelines ?
+				`\n## TRANSLATION GUIDELINES\nApply these exact translations for the specified terms:\n${this.translationGuidelines}\n`
 			:	"";
 
 		const builtSystemPrompt = `# ROLE
@@ -1193,7 +1193,7 @@ export class TranslatorService {
 	
 				## What NOT to Translate
 				- Code syntax, variable names, function names, API endpoints
-				- Technical terms not specified in the glossary
+				- Technical terms not specified in the translation guidelines
 				- URLs, file paths, or configuration values
 				- Frontmatter keys (only translate values if they're user-facing)
 	
@@ -1210,7 +1210,7 @@ export class TranslatorService {
 	
 				${this.services.locale.definitions.rules.specific}
 	
-				${glossarySection}
+				${translationGuidelinesSection}
 			`;
 
 		return builtSystemPrompt;

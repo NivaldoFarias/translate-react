@@ -52,7 +52,7 @@ describe("TranslatorService", () => {
 	describe("Constructor", () => {
 		test("should initialize with valid language configuration", () => {
 			expect(translatorService).toBeInstanceOf(TranslatorService);
-			expect(translatorService.glossary).toBeNull();
+			expect(translatorService.translationGuidelines).toBeNull();
 		});
 
 		test("should initialize language detector with provided config", () => {
@@ -722,12 +722,12 @@ describe("TranslatorService", () => {
 			expect(translation).toContain("àáâãäåæçèéêë");
 		});
 
-		test("should handle glossary integration", () => {
-			const glossary = "React - React\ncomponent - componente\nprops - propriedades";
+		test("should handle translation guidelines integration", () => {
+			const translationGuidelines = "React - React\ncomponent - componente\nprops - propriedades";
 
-			translatorService.glossary = glossary;
+			translatorService.translationGuidelines = translationGuidelines;
 
-			expect(translatorService.glossary).toBe(glossary);
+			expect(translatorService.translationGuidelines).toBe(translationGuidelines);
 		});
 
 		test("should handle null response from API", () => {

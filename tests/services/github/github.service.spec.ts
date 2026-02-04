@@ -334,41 +334,70 @@ describe("GitHubService", () => {
 			});
 		});
 
-		describe("fetchGlossary", () => {
-			test("should return glossary content when file exists", async () => {
-				const glossaryContent = "React - React\ncomponent - componente";
+		describe("fetchTranslationGuidelinesFile", () => {
+			test("should return translation guidelines content when first candidate file exists", async () => {
+				const translationGuidelinesContent = "React - React\ncomponent - componente";
 				octokitMock.repos.getContent.mockResolvedValueOnce({
 					data: {
-						content: Buffer.from(glossaryContent).toString("base64"),
+						content: Buffer.from(translationGuidelinesContent).toString("base64"),
 						encoding: "base64",
 						type: "file",
 						sha: "abc123",
 					},
 				});
 
-				const result = await githubService.fetchGlossary();
+				const result = await githubService.fetchTranslationGuidelinesFile();
 
-				expect(result).toBe(glossaryContent);
+				expect(result).toBe(translationGuidelinesContent);
 				expect(octokitMock.repos.getContent).toHaveBeenCalledWith({
 					...testRepositories.upstream,
 					path: "GLOSSARY.md",
 				});
 			});
 
-			test("should return null when glossary file has no content", async () => {
-				octokitMock.repos.getContent.mockResolvedValueOnce({ data: {} });
+			test("should try next candidate when first file does not exist", async () => {
+				const translationGuidelinesContent = "## Translation Guidelines";
+				octokitMock.repos.getContent.mockRejectedValueOnce(
+					Object.assign(new Error("Not Found"), { status: StatusCodes.NOT_FOUND }),
+				);
+				octokitMock.repos.getContent.mockResolvedValueOnce({
+					data: {
+						content: Buffer.from(translationGuidelinesContent).toString("base64"),
+						encoding: "base64",
+						type: "file",
+						sha: "def456",
+					},
+				});
 
-				const result = await githubService.fetchGlossary();
+				const result = await githubService.fetchTranslationGuidelinesFile();
+
+				expect(result).toBe(translationGuidelinesContent);
+				expect(octokitMock.repos.getContent).toHaveBeenCalledTimes(2);
+				expect(octokitMock.repos.getContent).toHaveBeenNthCalledWith(1, {
+					...testRepositories.upstream,
+					path: "GLOSSARY.md",
+				});
+				expect(octokitMock.repos.getContent).toHaveBeenNthCalledWith(2, {
+					...testRepositories.upstream,
+					path: "TRANSLATION.md",
+				});
+			});
+
+			test("should return null when translation guidelines file has no content", async () => {
+				octokitMock.repos.getContent.mockResolvedValue({ data: {} });
+
+				const result = await githubService.fetchTranslationGuidelinesFile();
 
 				expect(result).toBeNull();
 			});
 
-			test("should return null when glossary file does not exist", async () => {
-				octokitMock.repos.getContent.mockRejectedValueOnce(
-					Object.assign(new Error("Not Found"), { status: StatusCodes.NOT_FOUND }),
-				);
+			test("should return null when no candidate files exist", async () => {
+				const notFoundError = Object.assign(new Error("Not Found"), {
+					status: StatusCodes.NOT_FOUND,
+				});
+				octokitMock.repos.getContent.mockRejectedValue(notFoundError);
 
-				const result = await githubService.fetchGlossary();
+				const result = await githubService.fetchTranslationGuidelinesFile();
 
 				expect(result).toBeNull();
 			});

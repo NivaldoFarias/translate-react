@@ -164,7 +164,7 @@ export abstract class BaseRunnerService {
 	}
 
 	/**
-	 * Fetches the upstream repository tree and glossary for translation processing.
+	 * Fetches the upstream repository tree and translation guidelines for translation processing.
 	 *
 	 * Retrieves all candidate files from upstream.
 	 */
@@ -173,28 +173,39 @@ export abstract class BaseRunnerService {
 
 		this.state.repositoryTree = this.patchRepositoryItem(repositoryTree);
 
-		this.services.translator.glossary = await this.fetchGlossary();
+		this.services.translator.translationGuidelines = await this.fetchTranslationGuidelinesFile();
 
-		this.logger.info("Repository content and glossary fetched successfully");
+		const hasGuidelines = this.services.translator.translationGuidelines !== null;
+		this.logger.info(
+			{ hasGuidelines },
+			"Repository tree fetched" + (hasGuidelines ? " with translation guidelines" : ""),
+		);
 	}
 
 	/**
-	 * Fetches the glossary file from the repository.
+	 * Fetches the translation guidelines file from the repository.
 	 *
-	 * @throws {ApplicationError} with {@link ErrorCode.ResourceLoadError} If the glossary fails to load
+	 * Uses auto-discovery to find common filenames (`GLOSSARY.md`, `TRANSLATION.md`, etc.)
+	 * unless `TRANSLATION_GUIDELINES_FILE` env var is explicitly configured.
+	 *
+	 * @returns The translation guidelines file content, or `null` if not found
 	 */
-	private async fetchGlossary(): Promise<string> {
-		const glossary = await this.services.github.fetchGlossary();
+	private async fetchTranslationGuidelinesFile(): Promise<string | null> {
+		const translationGuidelines = await this.services.github.fetchTranslationGuidelinesFile();
 
-		if (!glossary) {
-			throw new ApplicationError(
-				"Glossary is empty or failed to load",
-				ErrorCode.ResourceLoadError,
-				`${BaseRunnerService.name}.${this.fetchGlossary.name}`,
+		if (!translationGuidelines) {
+			this.logger.warn(
+				"No translation guidelines file found - translations may lack terminology consistency",
 			);
+			return null;
 		}
 
-		return glossary;
+		this.logger.debug(
+			{ contentLength: translationGuidelines.length },
+			"Translation guidelines file loaded successfully",
+		);
+
+		return translationGuidelines;
 	}
 
 	/**
