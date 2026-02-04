@@ -1,7 +1,7 @@
-import type { LocaleDefinition } from "@/locales";
+import type { LocaleDefinition } from "@/locales/";
 import type { ReactLanguageCode } from "@/utils/";
 
-import { ptBrLocale } from "@/locales";
+import { ptBrLocale, ruLocale } from "@/locales/";
 import { env, logger } from "@/utils/";
 
 /**
@@ -30,6 +30,7 @@ export class LocaleService {
 	/** Registry of available locale definitions keyed by language code */
 	public readonly localeRegistry: Partial<Record<ReactLanguageCode, LocaleDefinition>> = {
 		"pt-br": ptBrLocale,
+		"ru": ruLocale,
 	};
 
 	/**

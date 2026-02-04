@@ -5,13 +5,14 @@ import type {
 	ProcessedFileResult,
 	PullRequestStatus,
 	RunnerServiceDependencies,
-} from "./runner.types";
+} from "../runner.types";
 
 import { ApplicationError, ErrorCode } from "@/errors/";
-import { logger, MAX_CONSECUTIVE_FAILURES } from "@/utils/";
+import { LanguageDetectorService } from "@/services/language-detector/";
+import { TranslationFile } from "@/services/translator/";
+import { logger } from "@/utils/";
 
-import { LanguageDetectorService } from "../language-detector.service";
-import { TranslationFile } from "../translator.service";
+import { MAX_CONSECUTIVE_FAILURES } from "./managers.constants";
 
 export interface InvalidFilePullRequest {
 	prNumber: number;
@@ -90,11 +91,21 @@ export class TranslationBatchManager {
 		files: TranslationFile[],
 		batchSize: number,
 	): Promise<Map<string, ProcessedFileResult>> {
+		this.logger.debug(
+			{ fileCount: files.length, batchSize },
+			"Starting batch processing for translation workflow",
+		);
+
 		const batches = this.createBatches(files, batchSize);
 
 		const results = new Map<ProcessedFileResult["filename"], ProcessedFileResult>();
 
 		for (const [batchIndex, batch] of batches.entries()) {
+			this.logger.debug(
+				{ batch: batchIndex + 1, totalBatches: batches.length, filesInBatch: batch.length },
+				`Starting batch ${batchIndex + 1}/${batches.length}`,
+			);
+
 			const batchResults = await this.processBatch(batch, {
 				currentBatch: batchIndex + 1,
 				totalBatches: batches.length,
@@ -105,6 +116,15 @@ export class TranslationBatchManager {
 				results.set(filename, result);
 			}
 		}
+
+		this.logger.debug(
+			{
+				totalProcessed: results.size,
+				successful: this.batchProgress.successful,
+				failed: this.batchProgress.failed,
+			},
+			"Batch processing complete",
+		);
 
 		return results;
 	}
@@ -207,7 +227,6 @@ export class TranslationBatchManager {
 		file: TranslationFile,
 		_progress: FileProcessingProgress,
 	): Promise<ProcessedFileResult> {
-		const logger = this.logger.child({ component: file.filename });
 		const metadata: ProcessedFileResult = {
 			branch: null,
 			filename: file.filename,
@@ -215,6 +234,12 @@ export class TranslationBatchManager {
 			pullRequest: null,
 			error: null,
 		};
+
+		const startTime = Date.now();
+		file.logger.debug(
+			{ path: file.path, contentSize: file.content.length },
+			"Starting file processing",
+		);
 
 		try {
 			if (this.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
@@ -229,29 +254,48 @@ export class TranslationBatchManager {
 				);
 			}
 
+			const branchStart = Date.now();
 			metadata.branch = await this.createOrGetTranslationBranch(file);
+			file.logger.debug(
+				{ branchRef: metadata.branch.ref, durationMs: Date.now() - branchStart },
+				"Step 1/4: Branch created/retrieved",
+			);
 
+			const translationStart = Date.now();
 			metadata.translation = await this.services.translator.translateContent(file);
+			file.logger.debug(
+				{ translationSize: metadata.translation.length, durationMs: Date.now() - translationStart },
+				"Step 2/4: Translation complete",
+			);
 
 			const languageName = this.services.languageDetector.getLanguageName(
 				LanguageDetectorService.languages.target,
 			);
 
+			const commitStart = Date.now();
 			await this.services.github.commitTranslation({
 				file,
 				branch: metadata.branch,
 				content: metadata.translation,
 				message: `docs: translate \`${file.filename}\` to ${languageName}`,
 			});
+			file.logger.debug({ durationMs: Date.now() - commitStart }, "Step 3/4: Commit complete");
 
+			const prStart = Date.now();
 			metadata.pullRequest = await this.createOrUpdatePullRequest(file, metadata);
+			file.logger.debug(
+				{ prNumber: metadata.pullRequest.number, durationMs: Date.now() - prStart },
+				"Step 4/4: Pull request created/updated",
+			);
 
 			this.consecutiveFailures = 0;
 			this.updateBatchProgress("success");
+
+			file.logger.debug({ totalDurationMs: Date.now() - startTime }, "File processing complete");
 		} catch (error) {
 			this.consecutiveFailures++;
 
-			logger.error({ error }, "File processing failed");
+			file.logger.error({ error, durationMs: Date.now() - startTime }, "File processing failed");
 
 			metadata.error = error instanceof Error ? error : new Error(String(error));
 			this.updateBatchProgress("error");

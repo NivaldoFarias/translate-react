@@ -3,14 +3,17 @@ import { Buffer } from "node:buffer";
 import type { components } from "@octokit/openapi-types";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
-import type { CommentBuilderService } from "../comment-builder.service";
-import type { PatchedRepositoryTreeItem, ProcessedFileResult, PullRequestStatus } from "../runner";
+import type { CommentBuilderService } from "@/services/comment-builder/";
+import type {
+	PatchedRepositoryTreeItem,
+	ProcessedFileResult,
+	PullRequestStatus,
+} from "@/services/runner/";
 
 import type { SharedGitHubDependencies } from "./github.types";
 
+import { TranslationFile } from "@/services/translator/";
 import { logger } from "@/utils/";
-
-import { TranslationFile } from "../translator.service";
 
 /** Pull request options */
 export interface PullRequestOptions {
@@ -158,7 +161,7 @@ export class GitHubContent {
 			sha: file.sha,
 		});
 
-		this.logger.info(
+		file.logger.info(
 			{
 				filePath: file.path,
 				branch: branch.ref,

@@ -162,7 +162,7 @@ export function createRateLimitMocks() {
 							limit: 5000,
 							used: 0,
 							remaining: 5000,
-							reset: Date.now() / 1000 + 3600,
+							reset: Date.now() / 1_000 + 3600,
 						},
 					},
 				},

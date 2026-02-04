@@ -11,11 +11,9 @@ import type {
 } from "./runner.types";
 
 import { ApplicationError, ErrorCode } from "@/errors/";
-import { env, logger, setupSignalHandlers } from "@/utils/";
+import { env, logger, registerCleanup } from "@/utils/";
 
-import { FileDiscoveryManager } from "./file-discovery.manager";
-import { PRManager } from "./pr.manager";
-import { TranslationBatchManager } from "./translation-batch.manager";
+import { FileDiscoveryManager, PRManager, TranslationBatchManager } from "./managers";
 
 /**
  * Base class for translation workflow runners.
@@ -61,15 +59,15 @@ export abstract class BaseRunnerService {
 	protected cleanup = async () => {
 		this.logger.info("Shutting down gracefully");
 
-		await sleep(1000);
+		await sleep(1_000);
 
 		process.exit(0);
 	};
 
 	/**
-	 * Initializes the runner with injected dependencies and signal handlers.
+	 * Initializes the runner with injected dependencies.
 	 *
-	 * Sets up process event listeners for graceful termination and initializes
+	 * Registers cleanup handler for graceful termination and initializes
 	 * manager instances for file discovery, translation batching, and PR operations.
 	 *
 	 * @param services Injected service dependencies
@@ -91,8 +89,12 @@ export abstract class BaseRunnerService {
 		);
 		this.prManager = new PRManager(services, this.metadata.timestamp);
 
-		setupSignalHandlers(this.cleanup, (message, error) => {
-			this.logger.error({ error, message }, "Signal handler triggered during cleanup");
+		registerCleanup(async () => {
+			try {
+				await this.cleanup();
+			} catch (error) {
+				this.logger.error({ error }, "Signal handler triggered during cleanup");
+			}
 		});
 	}
 

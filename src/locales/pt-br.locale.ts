@@ -1,10 +1,57 @@
-import type { ProcessedFileResult } from "@/services/runner/runner.types";
-import type { PullRequestDescriptionMetadata } from "@/services/runner/translation-batch.manager";
-import type { TranslationFile } from "@/services/translator.service";
+import type { TranslationFile } from "@/services/translator/translator.service";
 
-import type { LocaleDefinition } from "./types";
+import type { LocaleDefinition, LocalePRBodyStrings } from "./locale.types";
 
-import { formatElapsedTime } from "@/utils/common.util";
+import { createPRBodyBuilder } from "./pr-body.builder";
+
+/**
+ * Brazilian Portuguese strings for the PR body template.
+ *
+ * Contains all translated text used in the pull request description,
+ * following the data-driven approach for locale definitions.
+ */
+const ptBrPRBodyStrings: LocalePRBodyStrings = {
+	intro: (languageName) =>
+		`Este PR contém uma tradução automatizada da página referenciada para **${languageName}**.`,
+
+	conflictNotice: {
+		title: "PR anterior fechado",
+		body: (prNumber, mergeableState) =>
+			`O PR #${prNumber} foi **fechado automaticamente** devido a conflitos de merge com a branch principal (\`mergeable_state: ${mergeableState}\`).`,
+		rewriteExplanation:
+			"Esta é uma **tradução completamente nova** baseada na versão mais atual do arquivo fonte. A abordagem de reescrita completa (ao invés de resolução de conflitos baseada em diff) garante consistência e qualidade da tradução.",
+	},
+
+	humanReviewNotice:
+		"Esta tradução foi gerada usando LLMs e **requer revisão humana** para garantir precisão, contexto cultural e terminologia técnica.",
+
+	detailsSummary: "Detalhes",
+
+	stats: {
+		header: "Estatísticas de Processamento",
+		metrics: {
+			metricColumn: "Métrica",
+			valueColumn: "Valor",
+			sourceSize: "Tamanho do Arquivo Fonte",
+			translationSize: "Tamanho da Tradução",
+			contentRatio: "Razão de Conteúdo",
+			filePath: "Caminho do Arquivo",
+			processingTime: "Tempo de Processamento",
+		},
+		notes: [
+			'"Razão de Conteúdo" indica como o comprimento da tradução se compara à fonte (~1.0x: mesmo comprimento, >1.0x: tradução é mais longa). Diferentes idiomas naturalmente têm níveis variados de verbosidade.',
+			'"Tempo de Processamento" baseia-se no cálculo do tempo total desde o início do fluxo até a conclusão da tradução deste arquivo específico.',
+		],
+	},
+
+	techInfo: {
+		header: "Informações Técnicas",
+		generationDate: "Data de Geração",
+		branch: "Branch",
+	},
+
+	timeFormatLocale: "pt-BR",
+};
 
 /**
  * Brazilian Portuguese locale definition.
@@ -31,52 +78,6 @@ export const ptBrLocale: LocaleDefinition = {
 	pullRequest: {
 		title: (file: TranslationFile) =>
 			`Tradução de ${file.title ? `**${file.title}**` : `\`${file.filename}\``} para Português (Brasil)`,
-		body: (
-			file: TranslationFile,
-			processingResult: ProcessedFileResult,
-			metadata: PullRequestDescriptionMetadata,
-		) => {
-			const processingTime = metadata.timestamps.now - metadata.timestamps.workflowStart;
-			const conflictNotice =
-				metadata.invalidFilePR ?
-					`
-> [!WARNING]
-> **PR existente detectado**: Este arquivo já possui um PR aberto (#${metadata.invalidFilePR.prNumber}) com conflitos de merge ou status não mesclável (\`${metadata.invalidFilePR.status.mergeableState}\`).
->
-> Este novo PR foi criado automaticamente com uma tradução atualizada. A decisão sobre qual PR mesclar deve ser feita pelos mantenedores do repositório com base na qualidade da tradução e nos requisitos técnicos.
-
-`
-				:	"";
-
-			return `Este PR contém uma tradução automatizada da página referenciada para **${metadata.languageName}**.
-${conflictNotice}
-
-> [!IMPORTANT]
-> Esta tradução foi gerada usando LLMs e **requer revisão humana** para garantir precisão, contexto cultural e terminologia técnica.
-
-<details>
-<summary>Detalhes</summary>
-
-### Estatísticas de Processamento
-
-| Métrica | Valor |
-|--------|-------|
-| **Tamanho do Arquivo Fonte** | ${metadata.content.source} |
-| **Tamanho da Tradução** | ${metadata.content.translation} |
-| **Razão de Conteúdo** | ${metadata.content.compressionRatio}x |
-| **Caminho do Arquivo** | \`${file.path}\` |
-| **Tempo de Processamento** | ~${formatElapsedTime(processingTime, "pt-BR")} |
-
-> [!NOTE] 
-> - "Razão de Conteúdo" indica como o comprimento da tradução se compara à fonte (~1.0x: mesmo comprimento, >1.0x: tradução é mais longa). Diferentes idiomas naturalmente têm níveis variados de verbosidade. 
-> - "Tempo de Processamento" baseia-se no cálculo do tempo total desde o início do fluxo até a conclusão da tradução deste arquivo específico.
-
-### Informações Técnicas
-
-- **Data de Geração**: ${new Date(metadata.timestamps.now).toISOString().split("T")[0] ?? "unknown"}
-- **Branch**: \`${processingResult.branch?.ref ?? "unknown"}\`
-
-</details>`;
-		},
+		body: createPRBodyBuilder(ptBrPRBodyStrings),
 	},
 };

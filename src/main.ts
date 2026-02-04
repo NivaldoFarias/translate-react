@@ -1,5 +1,5 @@
 import { handleTopLevelError } from "@/errors/";
-import { logger as baseLogger, env, validateSuccessRate } from "@/utils/";
+import { logger as baseLogger, env, setupSignalHandlers, validateSuccessRate } from "@/utils/";
 
 import { name, version } from "../package.json";
 
@@ -16,6 +16,10 @@ if (import.meta.main) {
  */
 async function main() {
 	const logger = baseLogger.child({ component: main.name });
+
+	setupSignalHandlers((message, error) => {
+		logger.error({ error, message }, "Signal handler error");
+	});
 
 	try {
 		logger.info(

@@ -192,7 +192,7 @@ mesmo com a presença deste código em inglês no meio do documento.
 
 		test("should handle very long content efficiently", async () => {
 			const filename = "long.md";
-			const longText = "Este é um texto em português. ".repeat(1000);
+			const longText = "Este é um texto em português. ".repeat(1_000);
 
 			const analysis = await detector.analyzeLanguage(filename, longText);
 

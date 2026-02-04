@@ -1,3 +1,5 @@
+import crypto from "node:crypto";
+
 import { MarkdownTextSplitter } from "@langchain/textsplitters";
 import { StatusCodes } from "http-status-codes";
 import { encodingForModel } from "js-tiktoken";
@@ -6,36 +8,43 @@ import { APIError } from "openai/error";
 import pRetry, { AbortError } from "p-retry";
 
 import type { MarkdownTextSplitterParams } from "@langchain/textsplitters";
+import type { TiktokenModel } from "js-tiktoken";
 import type PQueue from "p-queue";
 import type { Options as RetryOptions } from "p-retry";
+import type { Logger } from "pino";
 
-import { llmQueue, openai } from "@/clients/";
+import { openai, queue } from "@/clients/";
 import { ApplicationError, ErrorCode } from "@/errors/";
-import { env, extractDocTitleFromContent, logger, MAX_CHUNK_TOKENS } from "@/utils/";
+import { LanguageDetectorService, languageDetectorService } from "@/services/language-detector/";
+import { localeService, LocaleService } from "@/services/locale/";
+import { env, extractDocTitleFromContent, logger } from "@/utils/";
 
-import { LanguageDetectorService, languageDetectorService } from "./language-detector.service";
-import { localeService, LocaleService } from "./locale";
-
-/** LLM configuration for TranslatorService */
-export interface TranslatorLLMConfig {
-	/** LLM API base URL */
-	baseUrl: string;
-
-	/** LLM API key */
-	apiKey: string;
-
-	/** OpenAI project ID (optional) */
-	projectId?: string;
-
-	/** LLM model identifier */
-	model: string;
-
-	/** Application title header */
-	headerAppTitle: string;
-
-	/** Application URL header */
-	headerAppUrl: string;
-}
+import {
+	CHUNK_OVERLAP,
+	CHUNK_TOKEN_BUFFER,
+	CODE_BLOCK_REGEX,
+	CONNECTIVITY_TEST_MAX_TOKENS,
+	FRONTMATTER_KEY_REGEX,
+	FRONTMATTER_REGEX,
+	HEADINGS_REGEX,
+	LINE_ENDING_REGEX,
+	LLM_TEMPERATURE,
+	MARKDOWN_LINK_REGEX,
+	MAX_CHUNK_TOKENS,
+	MAX_CODE_BLOCK_RATIO,
+	MAX_HEADING_RATIO,
+	MAX_LINK_RATIO,
+	MAX_SIZE_RATIO,
+	MIN_CODE_BLOCK_RATIO,
+	MIN_HEADING_RATIO,
+	MIN_LINK_RATIO,
+	MIN_SIZE_RATIO,
+	REQUIRED_FRONTMATTER_KEYS,
+	SYSTEM_PROMPT_TOKEN_RESERVE,
+	TOKEN_ESTIMATION_FALLBACK_DIVISOR,
+	TRAILING_NEWLINES_REGEX,
+	TRANSLATION_PREFIXES,
+} from "./translator.constants";
 
 /** Dependency injection interface for TranslatorService */
 export interface TranslatorServiceDependencies {
@@ -85,6 +94,12 @@ export class TranslationFile {
 	/** The title of the document extracted from frontmatter */
 	public readonly title: string | undefined;
 
+	/** Logger instance with file-specific context for workflow tracing */
+	public readonly logger: Logger;
+
+	/** Correlation ID for end-to-end tracing across the file's workflow */
+	public readonly correlationId: string;
+
 	constructor(
 		/** The content of the file */
 		public readonly content: string,
@@ -97,8 +112,17 @@ export class TranslationFile {
 
 		/** The SHA of the file */
 		public readonly sha: string,
+
+		/** Optional parent logger to create child logger from (defaults to root logger) */
+		parentLogger?: Logger,
 	) {
 		this.title = extractDocTitleFromContent(content);
+		this.correlationId = crypto.randomUUID();
+		this.logger = (parentLogger ?? logger).child({
+			file: this.filename,
+			path: this.path,
+			correlationId: this.correlationId,
+		});
 	}
 }
 
@@ -173,8 +197,8 @@ export class TranslatorService {
 		const response = await this.openai.chat.completions.create({
 			model: this.model,
 			messages: [{ role: "user", content: "ping" }],
-			max_tokens: 5,
-			temperature: 0.1,
+			max_tokens: CONNECTIVITY_TEST_MAX_TOKENS,
+			temperature: LLM_TEMPERATURE,
 		});
 
 		if (!this.isLLMResponseValid(response)) {
@@ -240,10 +264,10 @@ export class TranslatorService {
 	 * ```
 	 */
 	public async translateContent(file: TranslationFile): Promise<string> {
-		this.logger.info({ file }, "Translating content for file");
+		file.logger.info({ file }, "Translating content for file");
 
 		if (!file.content.length) {
-			this.logger.error({ fileContent: file.content.length }, "File content is empty");
+			file.logger.error({ fileContent: file.content.length }, "File content is empty");
 
 			throw new ApplicationError(
 				`File content is empty: ${file.filename}`,
@@ -256,18 +280,18 @@ export class TranslatorService {
 		const translationStartTime = Date.now();
 		let translatedContent: string;
 
-		const contentNeedsChunking = this.needsChunking(file.content);
+		const contentNeedsChunking = this.needsChunking(file);
 		if (!contentNeedsChunking) {
-			translatedContent = await this.callLanguageModel(file.content);
+			translatedContent = await this.callLanguageModel(file);
 		} else {
-			translatedContent = await this.translateWithChunking(file.content);
+			translatedContent = await this.translateWithChunking(file);
 		}
 
 		const translationDuration = Date.now() - translationStartTime;
 
 		this.validateTranslation(file, translatedContent);
 
-		this.logger.info(
+		file.logger.info(
 			{
 				filename: file.filename,
 				originalLength: file.content.length,
@@ -278,7 +302,7 @@ export class TranslatorService {
 			"Translation completed successfully",
 		);
 
-		return this.cleanupTranslatedContent(translatedContent, file.content);
+		return this.cleanupTranslatedContent(translatedContent, file);
 	}
 
 	/**
@@ -302,7 +326,7 @@ export class TranslatorService {
 	 */
 	private validateTranslation(file: TranslationFile, translatedContent: string): void {
 		if (!translatedContent || translatedContent.trim().length === 0) {
-			this.logger.error(
+			file.logger.error(
 				{ filename: file.filename, translatedContent },
 				"Translated content is empty",
 			);
@@ -321,35 +345,34 @@ export class TranslatorService {
 		}
 
 		const sizeRatio = translatedContent.length / file.content.length;
-		if (sizeRatio < 0.5 || sizeRatio > 2.0) {
-			this.logger.warn(
+		if (sizeRatio < MIN_SIZE_RATIO || sizeRatio > MAX_SIZE_RATIO) {
+			file.logger.warn(
 				{
 					filename: file.filename,
 					sizeRatio: sizeRatio.toFixed(2),
 					originalLength: file.content.length,
 					translatedLength: translatedContent.length,
 				},
-				"Translation size ratio outside expected range (0.5-2.0)",
+				`Translation size ratio outside expected range (${MIN_SIZE_RATIO}-${MAX_SIZE_RATIO})`,
 			);
 		}
 
-		const CATCH_HEADINGS_REGEX = /^#{1,6}\s/gm;
-		const originalHeadings = (file.content.match(CATCH_HEADINGS_REGEX) ?? []).length;
-		const translatedHeadings = (translatedContent.match(CATCH_HEADINGS_REGEX) ?? []).length;
+		const originalHeadings = (file.content.match(HEADINGS_REGEX) ?? []).length;
+		const translatedHeadings = (translatedContent.match(HEADINGS_REGEX) ?? []).length;
 		const headingRatio = translatedHeadings / originalHeadings;
 
-		this.logger.debug(
-			{ originalHeadings, translatedHeadings, headingRatio, regex: CATCH_HEADINGS_REGEX },
+		file.logger.debug(
+			{ originalHeadings, translatedHeadings, headingRatio, regex: HEADINGS_REGEX },
 			`Heading counts for ${file.filename}`,
 		);
 
 		if (originalHeadings === 0) {
-			this.logger.warn("Original file contains no markdown headings. Skipping heading validation");
+			file.logger.warn("Original file contains no markdown headings. Skipping heading validation");
 			return;
 		}
 
 		if (translatedHeadings === 0) {
-			this.logger.error(
+			file.logger.error(
 				{ filename: file.filename, originalHeadings, translatedHeadings },
 				"Translation lost all markdown headings",
 			);
@@ -366,8 +389,8 @@ export class TranslatorService {
 					translatedLength: translatedContent.length,
 				},
 			);
-		} else if (headingRatio < 0.8 || headingRatio > 1.2) {
-			this.logger.warn(
+		} else if (headingRatio < MIN_HEADING_RATIO || headingRatio > MAX_HEADING_RATIO) {
+			file.logger.warn(
 				{
 					filename: file.filename,
 					originalHeadings,
@@ -378,7 +401,11 @@ export class TranslatorService {
 			);
 		}
 
-		this.logger.debug(
+		this.validateCodeBlockPreservation(file, translatedContent);
+		this.validateLinkPreservation(file, translatedContent);
+		this.validateFrontmatterIntegrity(file, translatedContent);
+
+		file.logger.debug(
 			{
 				filename: file.filename,
 				sizeRatio: sizeRatio.toFixed(2),
@@ -387,6 +414,163 @@ export class TranslatorService {
 			},
 			"Translation validation passed",
 		);
+	}
+
+	/**
+	 * Validates that code blocks are preserved during translation.
+	 *
+	 * Compares the count of fenced code blocks (triple backticks) between source
+	 * and translated content. Logs a warning if there's a significant mismatch
+	 * (>20% difference), as this may indicate code blocks were corrupted or removed.
+	 *
+	 * @param file Original file containing source content for comparison
+	 * @param translatedContent Translated content to validate against source
+	 */
+	private validateCodeBlockPreservation(file: TranslationFile, translatedContent: string): void {
+		const originalCodeBlocks = (file.content.match(CODE_BLOCK_REGEX) ?? []).length;
+		const translatedCodeBlocks = (translatedContent.match(CODE_BLOCK_REGEX) ?? []).length;
+
+		file.logger.debug(
+			{ originalCodeBlocks, translatedCodeBlocks },
+			`Code block counts for ${file.filename}`,
+		);
+
+		if (originalCodeBlocks === 0) {
+			file.logger.debug("Original file contains no code blocks. Skipping code block validation");
+			return;
+		}
+
+		const codeBlockRatio = translatedCodeBlocks / originalCodeBlocks;
+
+		if (codeBlockRatio < MIN_CODE_BLOCK_RATIO || codeBlockRatio > MAX_CODE_BLOCK_RATIO) {
+			file.logger.warn(
+				{
+					filename: file.filename,
+					originalCodeBlocks,
+					translatedCodeBlocks,
+					codeBlockRatio: codeBlockRatio.toFixed(2),
+				},
+				"Significant code block count mismatch detected - code blocks may have been corrupted or removed",
+			);
+		}
+	}
+
+	/**
+	 * Validates that markdown links are preserved during translation.
+	 *
+	 * Compares the count of markdown links between source and translated content.
+	 * Logs a warning if there's a significant mismatch (>20% difference), as this
+	 * may indicate links were broken or removed during translation.
+	 *
+	 * @param file Original file containing source content for comparison
+	 * @param translatedContent Translated content to validate against source
+	 */
+	private validateLinkPreservation(file: TranslationFile, translatedContent: string): void {
+		const originalLinks = (file.content.match(MARKDOWN_LINK_REGEX) ?? []).length;
+		const translatedLinks = (translatedContent.match(MARKDOWN_LINK_REGEX) ?? []).length;
+
+		file.logger.debug(
+			{ originalLinks, translatedLinks },
+			`Markdown link counts for ${file.filename}`,
+		);
+
+		if (originalLinks === 0) {
+			file.logger.debug("Original file contains no markdown links. Skipping link validation");
+			return;
+		}
+
+		const linkRatio = translatedLinks / originalLinks;
+
+		if (linkRatio < MIN_LINK_RATIO || linkRatio > MAX_LINK_RATIO) {
+			file.logger.warn(
+				{
+					filename: file.filename,
+					originalLinks,
+					translatedLinks,
+					linkRatio: linkRatio.toFixed(2),
+				},
+				"Significant markdown link count mismatch detected - links may have been broken or removed",
+			);
+		}
+	}
+
+	/**
+	 * Validates that frontmatter structure and required keys are preserved during translation.
+	 *
+	 * Parses YAML frontmatter from source and translated content, then verifies that:
+	 * 1. Required keys (e.g., `title`) are preserved in translation
+	 * 2. The overall frontmatter structure remains intact
+	 *
+	 * @param file Original file containing source content for comparison
+	 * @param translatedContent Translated content to validate against source
+	 */
+	private validateFrontmatterIntegrity(file: TranslationFile, translatedContent: string): void {
+		const originalFrontmatter = FRONTMATTER_REGEX.exec(file.content)?.[1];
+		const translatedFrontmatter = FRONTMATTER_REGEX.exec(translatedContent)?.[1];
+
+		if (!originalFrontmatter) {
+			file.logger.debug("Original file contains no frontmatter. Skipping frontmatter validation");
+			return;
+		}
+
+		if (!translatedFrontmatter) {
+			file.logger.warn(
+				{ filename: file.filename },
+				"Frontmatter lost during translation - original had frontmatter but translation does not",
+			);
+			return;
+		}
+
+		const extractKeys = (content: string): Set<string> => {
+			const keys = new Set<string>();
+			let match: RegExpExecArray | null;
+
+			const regex = new RegExp(FRONTMATTER_KEY_REGEX.source, FRONTMATTER_KEY_REGEX.flags);
+			while ((match = regex.exec(content)) !== null) {
+				if (match[1]) keys.add(match[1]);
+			}
+			return keys;
+		};
+
+		const originalKeys = extractKeys(originalFrontmatter);
+		const translatedKeys = extractKeys(translatedFrontmatter);
+
+		file.logger.debug(
+			{
+				originalKeys: [...originalKeys],
+				translatedKeys: [...translatedKeys],
+			},
+			`Frontmatter keys for ${file.filename}`,
+		);
+
+		const missingRequiredKeys = REQUIRED_FRONTMATTER_KEYS.filter(
+			(key) => originalKeys.has(key) && !translatedKeys.has(key),
+		);
+
+		if (missingRequiredKeys.length > 0) {
+			file.logger.warn(
+				{
+					filename: file.filename,
+					missingRequiredKeys,
+					originalKeys: [...originalKeys],
+					translatedKeys: [...translatedKeys],
+				},
+				"Required frontmatter keys missing in translation",
+			);
+		}
+
+		const missingKeys = [...originalKeys].filter((key) => !translatedKeys.has(key));
+
+		if (missingKeys.length > 0 && missingKeys.some((key) => !missingRequiredKeys.includes(key))) {
+			const nonRequiredMissing = missingKeys.filter((key) => !missingRequiredKeys.includes(key));
+			file.logger.warn(
+				{
+					filename: file.filename,
+					missingKeys: nonRequiredMissing,
+				},
+				"Some frontmatter keys missing in translation",
+			);
+		}
 	}
 
 	/**
@@ -466,14 +650,28 @@ export class TranslatorService {
 	 * console.log(tokenCount); // ~8 tokens
 	 * ```
 	 */
+	/** Lazily-initialized tiktoken encoder instance, cached for performance */
+	private cachedEncoder: ReturnType<typeof encodingForModel> | null = null;
+
+	/**
+	 * Gets or creates a cached tiktoken encoder instance.
+	 *
+	 * The encoder is expensive to create (~500ms) due to vocabulary loading
+	 * and regex compilation, so we cache it for reuse across all token
+	 * estimation calls.
+	 */
+	private getEncoder() {
+		this.cachedEncoder ??= encodingForModel(this.model as TiktokenModel);
+		return this.cachedEncoder;
+	}
+
 	private estimateTokenCount(content: string): number {
 		try {
-			const encoding = encodingForModel("gpt-4o-mini");
-			const tokens = encoding.encode(content);
+			const tokens = this.getEncoder().encode(content);
 
 			return tokens.length;
 		} catch (error) {
-			const fallback = Math.ceil(content.length / 3.5);
+			const fallback = Math.ceil(content.length / TOKEN_ESTIMATION_FALLBACK_DIVISOR);
 			this.logger.error({ error }, "Error estimating token count, using fallback");
 
 			return fallback;
@@ -500,11 +698,19 @@ export class TranslatorService {
 	 * }
 	 * ```
 	 */
-	private needsChunking(content: string): boolean {
-		const estimatedTokens = this.estimateTokenCount(content);
-		const maxInputTokens = MAX_CHUNK_TOKENS - 1000;
+	private needsChunking(file: TranslationFile): boolean {
+		const estimatedTokens = this.estimateTokenCount(file.content);
+		const maxInputTokens = MAX_CHUNK_TOKENS - SYSTEM_PROMPT_TOKEN_RESERVE;
+		const needsChunking = estimatedTokens > maxInputTokens;
 
-		return estimatedTokens > maxInputTokens;
+		file.logger.debug(
+			{ estimatedTokens, maxInputTokens, needsChunking, contentLength: file.content.length },
+			needsChunking ?
+				"Content exceeds token limit, chunking required"
+			:	"Content within token limit, no chunking needed",
+		);
+
+		return needsChunking;
 	}
 
 	/**
@@ -537,11 +743,11 @@ export class TranslatorService {
 	 */
 	private async chunkContent(
 		content: string,
-		maxTokens = MAX_CHUNK_TOKENS - 500,
+		maxTokens = MAX_CHUNK_TOKENS - CHUNK_TOKEN_BUFFER,
 	): Promise<ChunkingResult> {
 		const markdownTextSplitterOptions: Partial<MarkdownTextSplitterParams> = {
 			chunkSize: maxTokens,
-			chunkOverlap: 200,
+			chunkOverlap: CHUNK_OVERLAP,
 			lengthFunction: (text: string) => this.estimateTokenCount(text),
 		};
 
@@ -628,14 +834,30 @@ export class TranslatorService {
 	 * console.log('Translation completed:', translated.length);
 	 * ```
 	 */
-	private async translateWithChunking(content: string): Promise<string> {
-		const { chunks, separators } = await this.chunkContent(content);
+	private async translateWithChunking(file: TranslationFile): Promise<string> {
+		file.logger.debug({ contentLength: file.content.length }, "Starting chunked translation");
 
-		const translatedChunks = await Promise.all(
-			chunks.map((chunk, index) => this.translateChunk(chunk, index, chunks)),
+		const { chunks, separators } = await this.chunkContent(file.content);
+
+		file.logger.debug(
+			{
+				chunkCount: chunks.length,
+				chunkSizes: chunks.map((c) => c.length),
+				separatorCount: separators.length,
+			},
+			"Content split into chunks",
 		);
 
-		return this.validateAndReassembleChunks(content, {
+		const translatedChunks = await Promise.all(
+			chunks.map((chunk, index) => this.translateChunk(file, chunk, index, chunks)),
+		);
+
+		file.logger.debug(
+			{ translatedChunkCount: translatedChunks.length },
+			"All chunks translated, reassembling",
+		);
+
+		return this.validateAndReassembleChunks(file, {
 			original: chunks,
 			translated: translatedChunks,
 			separators,
@@ -664,11 +886,11 @@ export class TranslatorService {
 	 * @returns Reassembled translated content
 	 */
 	private validateAndReassembleChunks(
-		content: string,
+		file: TranslationFile,
 		chunks: { original: string[]; translated: string[]; separators: string[] },
 	): string {
 		if (chunks.translated.length !== chunks.original.length) {
-			this.logger.error(
+			file.logger.error(
 				{
 					expectedChunks: chunks.original.length,
 					actualChunks: chunks.translated.length,
@@ -685,7 +907,7 @@ export class TranslatorService {
 					expectedChunks: chunks.original.length,
 					actualChunks: chunks.translated.length,
 					missingChunks: chunks.original.length - chunks.translated.length,
-					contentLength: content.length,
+					contentLength: file.content.length,
 					chunkSizes: chunks.original.map((chunk) => chunk.length),
 				},
 			);
@@ -695,25 +917,24 @@ export class TranslatorService {
 			return accumulator + chunk + (chunks.separators[index] ?? "");
 		}, "");
 
-		const originalEndsWithNewline = content.endsWith("\n");
+		const originalEndsWithNewline = file.content.endsWith("\n");
 		const translatedEndsWithNewline = reassembledContent.endsWith("\n");
 
 		if (originalEndsWithNewline && !translatedEndsWithNewline) {
-			const TRAILING_NEWLINES_REGEX = /\n+$/;
-			const originalTrailingNewlines = TRAILING_NEWLINES_REGEX.exec(content)?.[0] ?? "";
+			const originalTrailingNewlines = TRAILING_NEWLINES_REGEX.exec(file.content)?.[0] ?? "";
 			reassembledContent += originalTrailingNewlines;
 
-			this.logger.debug(
+			file.logger.debug(
 				{ addedTrailingNewlines: originalTrailingNewlines.length },
 				"Restored trailing newlines from original content",
 			);
 		}
 
-		this.logger.debug(
+		file.logger.debug(
 			{
-				originalLength: content.length,
+				originalLength: file.content.length,
 				reassembledLength: reassembledContent.length,
-				compressionRatio: (reassembledContent.length / content.length).toFixed(2),
+				compressionRatio: (reassembledContent.length / file.content.length).toFixed(2),
 			},
 			"Content reassembly completed",
 		);
@@ -721,8 +942,39 @@ export class TranslatorService {
 		return reassembledContent;
 	}
 
-	private async translateChunk(chunk: string, _index: number, _chunks: string[]): Promise<string> {
-		return this.callLanguageModel(chunk);
+	private async translateChunk(
+		file: TranslationFile,
+		chunk: string,
+		index: number,
+		chunks: string[],
+	): Promise<string> {
+		const startTime = Date.now();
+		const estimatedTokens = this.estimateTokenCount(chunk);
+
+		file.logger.debug(
+			{
+				chunkIndex: index + 1,
+				totalChunks: chunks.length,
+				chunkSize: chunk.length,
+				estimatedTokens,
+			},
+			`Translating chunk ${index + 1}/${chunks.length}`,
+		);
+
+		const translatedChunk = await this.callLanguageModel(file, chunk);
+
+		file.logger.debug(
+			{
+				chunkIndex: index + 1,
+				totalChunks: chunks.length,
+				originalSize: chunk.length,
+				translatedSize: translatedChunk.length,
+				durationMs: Date.now() - startTime,
+			},
+			`Chunk ${index + 1}/${chunks.length} translation complete`,
+		);
+
+		return translatedChunk;
 	}
 
 	/**
@@ -737,7 +989,7 @@ export class TranslatorService {
 	): Promise<OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming> {
 		return {
 			model: this.model,
-			temperature: 0.1,
+			temperature: LLM_TEMPERATURE,
 			max_tokens: env.MAX_TOKENS,
 			messages: [
 				{ role: "system", content: await this.getSystemPrompt(content) },
@@ -753,21 +1005,32 @@ export class TranslatorService {
 	 * Automatically applies rate limiting to prevent exceeding API limits,
 	 * especially important for free-tier LLM models with strict rate limits.
 	 *
-	 * @param content Content to translate
+	 * @param file File instance for logger context
+	 * @param content Content to translate (defaults to file.content if not provided)
 	 *
 	 * @throws {ApplicationError} with {@link ErrorCode.TranslationFailed} if the translation's content is missing/empty
 	 *
 	 * @returns Resolves to the translated content
 	 */
-	private async callLanguageModel(content: string): Promise<string> {
+	private async callLanguageModel(file: TranslationFile, content?: string): Promise<string> {
+		const contentToTranslate = content ?? file.content;
+
 		return this.queue.add(async () => {
+			const callStartTime = Date.now();
+			const estimatedInputTokens = this.estimateTokenCount(contentToTranslate);
+
 			return pRetry(
 				async () => {
+					const attemptStartTime = Date.now();
+
 					try {
-						this.logger.debug({ contentLength: content.length, model: this.model }, "Calling LLM");
+						file.logger.debug(
+							{ contentLength: contentToTranslate.length, estimatedInputTokens, model: this.model },
+							"Calling LLM API",
+						);
 
 						const completion = await this.openai.chat.completions.create(
-							await this.getLLMCompletionParams(content),
+							await this.getLLMCompletionParams(contentToTranslate),
 						);
 
 						const translatedContent = completion.choices[0]?.message.content;
@@ -777,9 +1040,21 @@ export class TranslatorService {
 								"No content returned from language model",
 								ErrorCode.NoContent,
 								`${TranslatorService.name}.${this.callLanguageModel.name}`,
-								{ model: this.model, contentLength: content.length },
+								{ model: this.model, contentLength: contentToTranslate.length },
 							);
 						}
+
+						file.logger.debug(
+							{
+								model: this.model,
+								durationMs: Date.now() - attemptStartTime,
+								inputTokens: completion.usage?.prompt_tokens,
+								outputTokens: completion.usage?.completion_tokens,
+								totalTokens: completion.usage?.total_tokens,
+								translatedLength: translatedContent.length,
+							},
+							"LLM API call successful",
+						);
 
 						return translatedContent;
 					} catch (error) {
@@ -797,9 +1072,15 @@ export class TranslatorService {
 				{
 					...this.retryConfig,
 					onFailedAttempt: ({ attemptNumber: attempt, error, retriesLeft }) => {
-						this.logger.warn(
-							{ attempt, retriesLeft, error: error.message },
-							"LLM call failed, retrying",
+						file.logger.warn(
+							{
+								attempt,
+								retriesLeft,
+								error: error.message,
+								totalElapsedMs: Date.now() - callStartTime,
+								contentLength: contentToTranslate.length,
+							},
+							`LLM call attempt ${attempt} failed, ${retriesLeft} retries remaining`,
 						);
 					},
 				},
@@ -814,35 +1095,26 @@ export class TranslatorService {
 	 * and converts line endings to match original content format
 	 *
 	 * @param translatedContent Content returned from the language model
-	 * @param originalContent Original content before translation (used for line ending detection)
+	 * @param file File instance for logger context
 	 *
 	 * @returns Cleaned translated content with artifacts removed
 	 *
 	 * @example
 	 * ```typescript
 	 * const translated = 'Here is the translation:\n\nActual content...';
-	 * const cleaned = cleanupTranslatedContent(translated, original);
+	 * const cleaned = cleanupTranslatedContent(translated, file);
 	 * console.log(cleaned); // 'Actual content...'
 	 * ```
 	 */
-	private cleanupTranslatedContent(translatedContent: string, originalContent: string): string {
-		this.logger.debug(
+	private cleanupTranslatedContent(translatedContent: string, file: TranslationFile): string {
+		file.logger.debug(
 			{ translatedContentLength: translatedContent.length },
 			"Cleaning up translated content",
 		);
 
 		let cleaned = translatedContent;
 
-		const prefixes = [
-			"Here is the translation:",
-			"Here's the translation:",
-			"Translation:",
-			"Translated content:",
-			"Here is the translated content:",
-			"Here's the translated content:",
-		];
-
-		for (const prefix of prefixes) {
+		for (const prefix of TRANSLATION_PREFIXES) {
 			if (cleaned.trim().toLowerCase().startsWith(prefix.toLowerCase())) {
 				cleaned = cleaned.substring(prefix.length).trim();
 			}
@@ -850,16 +1122,16 @@ export class TranslatorService {
 
 		cleaned = cleaned.trim();
 
-		this.logger.debug(
-			{ originalContentLength: originalContent.length, cleanedContentLength: cleaned.length },
+		file.logger.debug(
+			{ originalContentLength: file.content.length, cleanedContentLength: cleaned.length },
 			"Adjusting line endings to match original content",
 		);
 
-		if (originalContent.includes("\r\n")) {
-			cleaned = cleaned.replace(/\n/g, "\r\n");
+		if (file.content.includes("\r\n")) {
+			cleaned = cleaned.replace(LINE_ENDING_REGEX, "\r\n");
 		}
 
-		this.logger.debug(
+		file.logger.debug(
 			{ cleanedContentLength: cleaned.length },
 			"Translated content cleanup completed",
 		);
@@ -949,7 +1221,7 @@ export class TranslatorService {
 export const translatorService = new TranslatorService({
 	openai,
 	model: env.LLM_MODEL,
-	queue: llmQueue,
+	queue: queue,
 	localeService,
 	languageDetectorService,
 	retryConfig: {
