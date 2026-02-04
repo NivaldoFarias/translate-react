@@ -7,12 +7,17 @@ import type {
 	PrFilterResult as PullRequestFilterResult,
 	PullRequestStatus,
 	RunnerServiceDependencies,
-} from "./runner.types";
+} from "../runner.types";
 
-import { FILE_FETCH_BATCH_SIZE, filterMarkdownFiles, logger, MIN_CACHE_CONFIDENCE } from "@/utils/";
+import { LanguageDetectorService } from "@/services/language-detector/";
+import { TranslationFile } from "@/services/translator/";
+import { filterMarkdownFiles, logger } from "@/utils/";
 
-import { LanguageDetectorService } from "../language-detector.service";
-import { TranslationFile } from "../translator.service";
+import {
+	FILE_FETCH_BATCH_SIZE,
+	LANGUAGE_CACHE_TTL_MS,
+	MIN_CACHE_CONFIDENCE,
+} from "./managers.constants";
 
 /**
  * Manages file discovery and filtering pipeline for translation workflow.
@@ -64,21 +69,56 @@ export class FileDiscoveryManager {
 		filesToTranslate: TranslationFile[];
 		invalidPRsByFile: Map<string, { prNumber: number; status: PullRequestStatus }>;
 	}> {
+		this.logger.debug({ fileCount: repositoryTree.length }, "Starting file discovery pipeline");
+
 		const markdownFiles = filterMarkdownFiles(repositoryTree);
+		this.logger.debug(
+			{ before: repositoryTree.length, after: markdownFiles.length },
+			"Stage 1/6: Markdown filter complete",
+		);
 
 		const uniqueFiles = markdownFiles.filter(
 			(file, index, self) => index === self.findIndex((compare) => compare.path === file.path),
 		);
+		this.logger.debug(
+			{ before: markdownFiles.length, after: uniqueFiles.length },
+			"Stage 2/6: Deduplication complete",
+		);
 
-		const { candidateFiles, cacheHits } = this.checkCache(uniqueFiles);
+		const { candidateFiles, cacheHits, cacheMisses } = this.checkCache(uniqueFiles);
+		this.logger.debug(
+			{ before: uniqueFiles.length, after: candidateFiles.length, cacheHits, cacheMisses },
+			"Stage 3/6: Cache lookup complete",
+		);
 
 		const { filesToFetch, numFilesWithPRs, invalidPRsByFile } =
 			await this.filterByPRs(candidateFiles);
+		this.logger.debug(
+			{
+				before: candidateFiles.length,
+				after: filesToFetch.length,
+				skippedByValidPRs: numFilesWithPRs,
+				invalidPRs: invalidPRsByFile.size,
+			},
+			"Stage 4/6: PR filter complete",
+		);
 
 		const uncheckedFiles = await this.fetchContent(filesToFetch);
+		this.logger.debug(
+			{ before: filesToFetch.length, after: uncheckedFiles.length },
+			"Stage 5/6: Content fetch complete",
+		);
 
 		const { numFilesFiltered, filesToTranslate } =
 			await this.detectAndCacheLanguages(uncheckedFiles);
+		this.logger.debug(
+			{
+				before: uncheckedFiles.length,
+				after: filesToTranslate.length,
+				detectedAsTranslated: numFilesFiltered,
+			},
+			"Stage 6/6: Language detection complete",
+		);
 
 		const totalFiltered = cacheHits + numFilesFiltered + numFilesWithPRs;
 
@@ -107,6 +147,22 @@ export class FileDiscoveryManager {
 	}
 
 	/**
+	 * Builds cache key from filename and content hash.
+	 *
+	 * Format: `filename:contentHash` ensures uniqueness based on both file
+	 * identity and content version.
+	 *
+	 * @param file File to build cache key for
+	 *
+	 * @returns Cache key
+	 */
+	private buildLanguageCacheKey(
+		file: SetRequired<PatchedRepositoryTreeItem, "sha"> | TranslationFile,
+	): string {
+		return `${file.filename}:${file.sha}`;
+	}
+
+	/**
 	 * Checks language cache to identify files already known to be translated.
 	 *
 	 * Queries the cache for each file using its path and content hash (SHA).
@@ -132,18 +188,22 @@ export class FileDiscoveryManager {
 			"sha"
 		>[];
 
-		const languageCaches = this.services.languageCache.getMany(
-			filesToFetchCache.map(({ filename, sha }) => {
-				return { filename, contentHash: sha };
-			}),
-		);
+		const cacheKeys = filesToFetchCache.map((file) => this.buildLanguageCacheKey(file));
+		const languageCaches = this.services.languageCache.getMany(cacheKeys);
 
 		let cacheHits = 0;
 		let cacheMisses = 0;
 		const targetLanguage = LanguageDetectorService.languages.target;
 
 		for (const file of files) {
-			const cache = languageCaches.get(file.filename);
+			if (!file.sha) {
+				cacheMisses++;
+				candidateFiles.push(file);
+				continue;
+			}
+
+			const cacheKey = this.buildLanguageCacheKey(file);
+			const cache = languageCaches.get(cacheKey);
 
 			if (cache?.detectedLanguage === targetLanguage && cache.confidence > MIN_CACHE_CONFIDENCE) {
 				cacheHits++;
@@ -305,13 +365,31 @@ export class FileDiscoveryManager {
 	 */
 	public async fetchContent(filesToFetch: PatchedRepositoryTreeItem[]): Promise<TranslationFile[]> {
 		const uncheckedFiles: TranslationFile[] = [];
+		const totalBatches = Math.ceil(filesToFetch.length / FILE_FETCH_BATCH_SIZE);
 
 		for (let index = 0; index < filesToFetch.length; index += FILE_FETCH_BATCH_SIZE) {
+			const batchNumber = Math.floor(index / FILE_FETCH_BATCH_SIZE) + 1;
 			const batch = filesToFetch.slice(index, index + FILE_FETCH_BATCH_SIZE);
-			const batchResults = await this.fetchBatch(batch);
 
-			uncheckedFiles.push(
-				...batchResults.filter((file): file is NonNullable<typeof file> => !!file),
+			this.logger.debug(
+				{ batch: batchNumber, totalBatches, batchSize: batch.length },
+				`Fetching content batch ${batchNumber}/${totalBatches}`,
+			);
+
+			const batchResults = await this.fetchBatch(batch);
+			const successfulFetches = batchResults.filter(
+				(file): file is NonNullable<typeof file> => !!file,
+			);
+
+			uncheckedFiles.push(...successfulFetches);
+
+			this.logger.debug(
+				{
+					batch: batchNumber,
+					fetched: successfulFetches.length,
+					failed: batch.length - successfulFetches.length,
+				},
+				`Batch ${batchNumber}/${totalBatches} complete`,
 			);
 		}
 
@@ -363,11 +441,17 @@ export class FileDiscoveryManager {
 			);
 
 			if (file.sha && analysis.detectedLanguage) {
-				this.services.languageCache.set(file.path, file.sha, {
-					detectedLanguage: analysis.detectedLanguage,
-					confidence: analysis.languageScore.target,
-					timestamp: Date.now(),
-				});
+				const cacheKey = this.buildLanguageCacheKey(file);
+
+				this.services.languageCache.set(
+					cacheKey,
+					{
+						detectedLanguage: analysis.detectedLanguage,
+						confidence: analysis.languageScore.target,
+						timestamp: Date.now(),
+					},
+					LANGUAGE_CACHE_TTL_MS,
+				);
 			}
 
 			if (analysis.isTranslated) {

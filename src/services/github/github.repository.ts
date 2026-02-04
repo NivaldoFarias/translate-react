@@ -4,7 +4,7 @@ import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 import type { SharedGitHubDependencies } from "./github.types";
 
-import { logger } from "@/utils/";
+import { filterMarkdownFiles, logger } from "@/utils/";
 
 /**
  * Repository operations module for GitHub API.
@@ -67,13 +67,27 @@ export class GitHubRepository {
 			target === "fork" ? this.deps.repositories.fork : this.deps.repositories.upstream;
 		const branchName = baseBranch ?? (await this.getDefaultBranch(target));
 
+		this.logger.debug({ target, branch: branchName, filterIgnored }, "Fetching repository tree");
+
 		const response = await this.deps.octokit.git.getTree({
 			...repoConfig,
 			tree_sha: branchName,
 			recursive: "true",
 		});
 
-		return filterIgnored ? this.filterRepositoryTree(response.data.tree) : response.data.tree;
+		const result = filterIgnored ? filterMarkdownFiles(response.data.tree) : response.data.tree;
+
+		this.logger.debug(
+			{
+				target,
+				branch: branchName,
+				totalItems: response.data.tree.length,
+				filteredItems: result.length,
+			},
+			"Repository tree fetched",
+		);
+
+		return result;
 	}
 
 	/**
@@ -188,11 +202,21 @@ export class GitHubRepository {
 	 * ```
 	 */
 	public async isForkSynced(): Promise<boolean> {
+		this.logger.debug("Checking if fork is synced with upstream");
+
 		try {
 			const [upstreamRepo, forkedRepo] = await Promise.all([
 				this.deps.octokit.repos.get(this.deps.repositories.upstream),
 				this.deps.octokit.repos.get(this.deps.repositories.fork),
 			]);
+
+			this.logger.debug(
+				{
+					upstreamBranch: upstreamRepo.data.default_branch,
+					forkBranch: forkedRepo.data.default_branch,
+				},
+				"Fetching latest commits from both repositories",
+			);
 
 			const [upstreamCommits, forkedCommits] = await Promise.all([
 				this.deps.octokit.repos.listCommits({
@@ -219,7 +243,16 @@ export class GitHubRepository {
 				return false;
 			}
 
-			return upstreamCommits.data[0]?.sha === forkedCommits.data[0]?.sha;
+			const upstreamSha = upstreamCommits.data[0]?.sha;
+			const forkSha = forkedCommits.data[0]?.sha;
+			const isSynced = upstreamSha === forkSha;
+
+			this.logger.debug(
+				{ upstreamSha, forkSha, isSynced },
+				isSynced ? "Fork is in sync with upstream" : "Fork is behind upstream",
+			);
+
+			return isSynced;
 		} catch (error) {
 			this.logger.error({ error }, "Failed to check fork synchronization");
 
@@ -239,6 +272,11 @@ export class GitHubRepository {
 	 * ```
 	 */
 	public async syncFork(): Promise<boolean> {
+		this.logger.debug(
+			{ fork: this.deps.repositories.fork },
+			"Starting fork synchronization with upstream",
+		);
+
 		try {
 			const mergeResponse = await this.deps.octokit.repos.mergeUpstream({
 				...this.deps.repositories.fork,
@@ -259,23 +297,6 @@ export class GitHubRepository {
 			this.logger.error({ error, fork: this.deps.repositories.fork }, "Failed to synchronize fork");
 			return false;
 		}
-	}
-
-	/**
-	 * Filters repository tree for valid markdown files.
-	 *
-	 * @param tree Repository tree from GitHub API
-	 */
-	protected filterRepositoryTree(
-		tree: RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"],
-	): RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"] {
-		return tree.filter((item) => {
-			if (!item.path) return false;
-			else if (!item.path.endsWith(".md")) return false;
-			else if (!item.path.includes("/")) return false;
-			else if (!item.path.includes("src/")) return false;
-			else return true;
-		});
 	}
 
 	/**

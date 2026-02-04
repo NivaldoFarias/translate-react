@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, spyOn, test } from "bun:test";
 
 import type { TranslatorServiceDependencies } from "@/services/";
 
-import { localeService, TranslatorService } from "@/services/";
+import { localeService, TranslationFile, TranslatorService } from "@/services/";
 
 import {
 	createChatCompletionFixture,
@@ -35,7 +35,7 @@ function createTestTranslatorService(
 			retries: overrides.retryConfig?.retries ?? 0,
 			factor: overrides.retryConfig?.factor ?? 1,
 			minTimeout: overrides.retryConfig?.minTimeout ?? 100,
-			maxTimeout: overrides.retryConfig?.maxTimeout ?? 1000,
+			maxTimeout: overrides.retryConfig?.maxTimeout ?? 1_000,
 			randomize: overrides.retryConfig?.randomize ?? false,
 		},
 	} as TranslatorServiceDependencies);
@@ -95,6 +95,69 @@ describe("TranslatorService", () => {
 			`;
 			const file = createTranslationFileFixture({ content });
 			expect(file.title).toBeUndefined();
+		});
+
+		describe("logger", () => {
+			test("should create logger with file context when no parent logger provided", () => {
+				const file = createTranslationFileFixture({
+					filename: "test.md",
+					path: "src/test.md",
+				});
+
+				expect(file.logger).toBeDefined();
+				expect(file.correlationId).toBeDefined();
+				expect(typeof file.correlationId).toBe("string");
+				expect(file.correlationId.length).toBeGreaterThan(0);
+			});
+
+			test("should create logger with file context properties", () => {
+				const file = createTranslationFileFixture({
+					filename: "example.md",
+					path: "docs/example.md",
+				});
+
+				expect(file.logger).toBeDefined();
+				expect(file.correlationId).toBeDefined();
+				expect(typeof file.correlationId).toBe("string");
+				expect(file.correlationId.length).toBeGreaterThan(0);
+
+				const logSpy = spyOn(file.logger, "debug");
+				file.logger.debug({ additional: "data" }, "test message");
+
+				expect(logSpy).toHaveBeenCalled();
+			});
+
+			test("should generate unique correlation ID for each file instance", () => {
+				const file1 = createTranslationFileFixture({ filename: "file1.md" });
+				const file2 = createTranslationFileFixture({ filename: "file2.md" });
+
+				expect(file1.correlationId).not.toBe(file2.correlationId);
+			});
+
+			test("should maintain same correlation ID across file lifecycle", () => {
+				const file = createTranslationFileFixture({ filename: "test.md" });
+
+				const correlationId1 = file.correlationId;
+				const correlationId2 = file.correlationId;
+
+				expect(correlationId1).toBe(correlationId2);
+				expect(correlationId1).toBe(file.correlationId);
+			});
+
+			test("should use parent logger when provided", () => {
+				const parentLogger = createTranslationFileFixture({ filename: "parent.md" }).logger;
+
+				const file = new TranslationFile(
+					"# Content",
+					"child.md",
+					"src/child.md",
+					"sha123",
+					parentLogger,
+				);
+
+				expect(file.logger).toBeDefined();
+				expect(file.correlationId).toBeDefined();
+			});
 		});
 	});
 
@@ -215,7 +278,7 @@ describe("TranslatorService", () => {
 		});
 
 		test("should handle large content with chunking", async () => {
-			const largeContent = "Large content ".repeat(1000);
+			const largeContent = "Large content ".repeat(1_000);
 			mockChatCompletionsCreate.mockResolvedValue(
 				createChatCompletionFixture({
 					choices: [{ message: { content: "Conteúdo grande traduzido" } }],
@@ -280,6 +343,340 @@ describe("TranslatorService", () => {
 			const isTranslated = await translatorService.isContentTranslated(file);
 
 			expect(isTranslated).toBe(false);
+		});
+	});
+
+	describe("Code Block Preservation Validation", () => {
+		test("should pass validation when code block count matches between source and translation", async () => {
+			const sourceContent = `# Title\n\n\`\`\`javascript\nconst x = 1;\n\`\`\`\n\nText\n\n\`\`\`python\nprint("hello")\n\`\`\``;
+			const translatedContent = `# Título\n\n\`\`\`javascript\nconst x = 1;\n\`\`\`\n\nTexto\n\n\`\`\`python\nprint("hello")\n\`\`\``;
+
+			mockChatCompletionsCreate.mockResolvedValue(
+				createChatCompletionFixture({ choices: [{ message: { content: translatedContent } }] }),
+			);
+
+			const file = createTranslationFileFixture({ content: sourceContent });
+
+			const translation = await translatorService.translateContent(file);
+
+			expect(translation).toBe(translatedContent);
+		});
+
+		test("should warn when code blocks are lost during translation", async () => {
+			const sourceContent = `# Title\n\n\`\`\`javascript\nconst x = 1;\n\`\`\`\n\nText\n\n\`\`\`python\nprint("hello")\n\`\`\``;
+			const translatedContent = `# Título\n\nTexto traduzido sem blocos de código`;
+
+			mockChatCompletionsCreate.mockResolvedValue(
+				createChatCompletionFixture({ choices: [{ message: { content: translatedContent } }] }),
+			);
+
+			const file = createTranslationFileFixture({ content: sourceContent });
+			const warnSpy = spyOn(file.logger, "warn");
+
+			await translatorService.translateContent(file);
+
+			expect(warnSpy).toHaveBeenCalledWith(
+				expect.objectContaining({
+					originalCodeBlocks: 2,
+					translatedCodeBlocks: 0,
+				}),
+				expect.stringContaining("code block count mismatch"),
+			);
+		});
+
+		test("should warn when code block count differs significantly (>20%)", async () => {
+			const sourceContent = `# Title\n\n\`\`\`js\n1\n\`\`\`\n\n\`\`\`js\n2\n\`\`\`\n\n\`\`\`js\n3\n\`\`\`\n\n\`\`\`js\n4\n\`\`\`\n\n\`\`\`js\n5\n\`\`\``;
+			const translatedContent = `# Título\n\n\`\`\`js\n1\n\`\`\`\n\n\`\`\`js\n2\n\`\`\`\n\n\`\`\`js\n3\n\`\`\``;
+
+			mockChatCompletionsCreate.mockResolvedValue(
+				createChatCompletionFixture({ choices: [{ message: { content: translatedContent } }] }),
+			);
+
+			const file = createTranslationFileFixture({ content: sourceContent });
+			const warnSpy = spyOn(file.logger, "warn");
+
+			await translatorService.translateContent(file);
+
+			expect(warnSpy).toHaveBeenCalledWith(
+				expect.objectContaining({
+					originalCodeBlocks: 5,
+					translatedCodeBlocks: 3,
+				}),
+				expect.stringContaining("code block count mismatch"),
+			);
+		});
+
+		test("should skip code block validation when source has no code blocks", async () => {
+			const sourceContent = `# Title\n\nText without code blocks`;
+			const translatedContent = `# Título\n\nTexto sem blocos de código`;
+
+			mockChatCompletionsCreate.mockResolvedValue(
+				createChatCompletionFixture({ choices: [{ message: { content: translatedContent } }] }),
+			);
+
+			const file = createTranslationFileFixture({ content: sourceContent });
+			const debugSpy = spyOn(file.logger, "debug");
+
+			await translatorService.translateContent(file);
+
+			expect(debugSpy).toHaveBeenCalledWith(
+				"Original file contains no code blocks. Skipping code block validation",
+			);
+		});
+
+		test("should not warn when code block ratio is within acceptable range", async () => {
+			const sourceContent = `# Title\n\n\`\`\`js\ncode1\n\`\`\`\n\n\`\`\`js\ncode2\n\`\`\`\n\n\`\`\`js\ncode3\n\`\`\`\n\n\`\`\`js\ncode4\n\`\`\`\n\n\`\`\`js\ncode5\n\`\`\``;
+			const translatedContent = `# Título\n\n\`\`\`js\ncode1\n\`\`\`\n\n\`\`\`js\ncode2\n\`\`\`\n\n\`\`\`js\ncode3\n\`\`\`\n\n\`\`\`js\ncode4\n\`\`\``;
+
+			mockChatCompletionsCreate.mockResolvedValue(
+				createChatCompletionFixture({ choices: [{ message: { content: translatedContent } }] }),
+			);
+
+			const file = createTranslationFileFixture({ content: sourceContent });
+			const warnSpy = spyOn(file.logger, "warn");
+
+			await translatorService.translateContent(file);
+
+			const codeBlockWarnCalls = warnSpy.mock.calls.filter(
+				(call) => typeof call[1] === "string" && call[1].includes("code block count mismatch"),
+			);
+			expect(codeBlockWarnCalls.length).toBe(0);
+		});
+	});
+
+	describe("Link Preservation Validation", () => {
+		test("should pass validation when link count matches between source and translation", async () => {
+			const sourceContent = `# Title\n\nCheck [React docs](https://react.dev) and [MDN](https://developer.mozilla.org).`;
+			const translatedContent = `# Título\n\nVeja [documentação React](https://react.dev) e [MDN](https://developer.mozilla.org).`;
+
+			mockChatCompletionsCreate.mockResolvedValue(
+				createChatCompletionFixture({ choices: [{ message: { content: translatedContent } }] }),
+			);
+
+			const file = createTranslationFileFixture({ content: sourceContent });
+
+			const translation = await translatorService.translateContent(file);
+
+			expect(translation).toBe(translatedContent);
+		});
+
+		test("should warn when links are lost during translation", async () => {
+			const sourceContent = `# Title\n\n[Link 1](https://example.com/1)\n[Link 2](https://example.com/2)\n[Link 3](https://example.com/3)`;
+			const translatedContent = `# Título\n\nTexto traduzido sem links`;
+
+			mockChatCompletionsCreate.mockResolvedValue(
+				createChatCompletionFixture({ choices: [{ message: { content: translatedContent } }] }),
+			);
+
+			const file = createTranslationFileFixture({ content: sourceContent });
+			const warnSpy = spyOn(file.logger, "warn");
+
+			await translatorService.translateContent(file);
+
+			expect(warnSpy).toHaveBeenCalledWith(
+				expect.objectContaining({
+					originalLinks: 3,
+					translatedLinks: 0,
+				}),
+				expect.stringContaining("link count mismatch"),
+			);
+		});
+
+		test("should warn when link count differs significantly (>20%)", async () => {
+			const sourceContent = `# Title\n\n[1](u1) [2](u2) [3](u3) [4](u4) [5](u5)`;
+			const translatedContent = `# Título\n\n[1](u1) [2](u2) [3](u3)`;
+
+			mockChatCompletionsCreate.mockResolvedValue(
+				createChatCompletionFixture({ choices: [{ message: { content: translatedContent } }] }),
+			);
+
+			const file = createTranslationFileFixture({ content: sourceContent });
+			const warnSpy = spyOn(file.logger, "warn");
+
+			await translatorService.translateContent(file);
+
+			expect(warnSpy).toHaveBeenCalledWith(
+				expect.objectContaining({
+					originalLinks: 5,
+					translatedLinks: 3,
+				}),
+				expect.stringContaining("link count mismatch"),
+			);
+		});
+
+		test("should skip link validation when source has no links", async () => {
+			const sourceContent = `# Title\n\nText without links`;
+			const translatedContent = `# Título\n\nTexto sem links`;
+
+			mockChatCompletionsCreate.mockResolvedValue(
+				createChatCompletionFixture({ choices: [{ message: { content: translatedContent } }] }),
+			);
+
+			const file = createTranslationFileFixture({ content: sourceContent });
+			const debugSpy = spyOn(file.logger, "debug");
+
+			await translatorService.translateContent(file);
+
+			expect(debugSpy).toHaveBeenCalledWith(
+				"Original file contains no markdown links. Skipping link validation",
+			);
+		});
+
+		test("should not warn when link ratio is within acceptable range", async () => {
+			const sourceContent = `# Title\n\n[1](u1) [2](u2) [3](u3) [4](u4) [5](u5)`;
+			const translatedContent = `# Título\n\n[1](u1) [2](u2) [3](u3) [4](u4)`;
+
+			mockChatCompletionsCreate.mockResolvedValue(
+				createChatCompletionFixture({ choices: [{ message: { content: translatedContent } }] }),
+			);
+
+			const file = createTranslationFileFixture({ content: sourceContent });
+			const warnSpy = spyOn(file.logger, "warn");
+
+			await translatorService.translateContent(file);
+
+			const linkWarnCalls = warnSpy.mock.calls.filter(
+				(call) => typeof call[1] === "string" && call[1].includes("link count mismatch"),
+			);
+			expect(linkWarnCalls.length).toBe(0);
+		});
+
+		test("should handle links with titles", async () => {
+			const sourceContent = `# Title\n\n[React](https://react.dev "React docs") and [MDN](https://mdn.dev "MDN Web Docs")`;
+			const translatedContent = `# Título\n\n[React](https://react.dev "Docs React") e [MDN](https://mdn.dev "MDN Web Docs")`;
+
+			mockChatCompletionsCreate.mockResolvedValue(
+				createChatCompletionFixture({ choices: [{ message: { content: translatedContent } }] }),
+			);
+
+			const file = createTranslationFileFixture({ content: sourceContent });
+			const warnSpy = spyOn(file.logger, "warn");
+
+			await translatorService.translateContent(file);
+
+			const linkWarnCalls = warnSpy.mock.calls.filter(
+				(call) => typeof call[1] === "string" && call[1].includes("link count mismatch"),
+			);
+			expect(linkWarnCalls.length).toBe(0);
+		});
+	});
+
+	describe("Frontmatter Validation", () => {
+		test("should pass validation when frontmatter keys match between source and translation", async () => {
+			const sourceContent = `---\ntitle: 'Hello'\ndescription: 'Welcome'\n---\n\n# Content`;
+			const translatedContent = `---\ntitle: 'Olá'\ndescription: 'Bem-vindo'\n---\n\n# Conteúdo`;
+
+			mockChatCompletionsCreate.mockResolvedValue(
+				createChatCompletionFixture({ choices: [{ message: { content: translatedContent } }] }),
+			);
+
+			const file = createTranslationFileFixture({ content: sourceContent });
+			const warnSpy = spyOn(file.logger, "warn");
+
+			await translatorService.translateContent(file);
+
+			const frontmatterWarnCalls = warnSpy.mock.calls.filter(
+				(call) => typeof call[1] === "string" && call[1].includes("frontmatter"),
+			);
+			expect(frontmatterWarnCalls.length).toBe(0);
+		});
+
+		test("should warn when frontmatter is completely lost during translation", async () => {
+			const sourceContent = `---\ntitle: 'Hello'\n---\n\n# Content`;
+			const translatedContent = `# Conteúdo sem frontmatter`;
+
+			mockChatCompletionsCreate.mockResolvedValue(
+				createChatCompletionFixture({ choices: [{ message: { content: translatedContent } }] }),
+			);
+
+			const file = createTranslationFileFixture({ content: sourceContent });
+			const warnSpy = spyOn(file.logger, "warn");
+
+			await translatorService.translateContent(file);
+
+			expect(warnSpy).toHaveBeenCalledWith(
+				expect.objectContaining({ filename: file.filename }),
+				expect.stringContaining("Frontmatter lost during translation"),
+			);
+		});
+
+		test("should warn when required key 'title' is missing in translation", async () => {
+			const sourceContent = `---\ntitle: 'Hello'\ndescription: 'Test'\n---\n\n# Content`;
+			const translatedContent = `---\ndescription: 'Teste'\n---\n\n# Conteúdo`;
+
+			mockChatCompletionsCreate.mockResolvedValue(
+				createChatCompletionFixture({ choices: [{ message: { content: translatedContent } }] }),
+			);
+
+			const file = createTranslationFileFixture({ content: sourceContent });
+			const warnSpy = spyOn(file.logger, "warn");
+
+			await translatorService.translateContent(file);
+
+			expect(warnSpy).toHaveBeenCalledWith(
+				expect.objectContaining({
+					missingRequiredKeys: expect.arrayContaining(["title"]),
+				} as Record<string, unknown>),
+				expect.stringContaining("Required frontmatter keys missing"),
+			);
+		});
+
+		test("should warn when non-required keys are missing in translation", async () => {
+			const sourceContent = `---\ntitle: 'Hello'\ncustom_key: 'value'\nauthor: 'John'\n---\n\n# Content`;
+			const translatedContent = `---\ntitle: 'Olá'\n---\n\n# Conteúdo`;
+
+			mockChatCompletionsCreate.mockResolvedValue(
+				createChatCompletionFixture({ choices: [{ message: { content: translatedContent } }] }),
+			);
+
+			const file = createTranslationFileFixture({ content: sourceContent });
+			const warnSpy = spyOn(file.logger, "warn");
+
+			await translatorService.translateContent(file);
+
+			expect(warnSpy).toHaveBeenCalledWith(
+				expect.objectContaining({
+					missingKeys: expect.arrayContaining(["custom_key", "author"]),
+				} as Record<string, unknown>),
+				expect.stringContaining("Some frontmatter keys missing"),
+			);
+		});
+
+		test("should skip frontmatter validation when source has no frontmatter", async () => {
+			const sourceContent = `# Content without frontmatter`;
+			const translatedContent = `# Conteúdo sem frontmatter`;
+
+			mockChatCompletionsCreate.mockResolvedValue(
+				createChatCompletionFixture({ choices: [{ message: { content: translatedContent } }] }),
+			);
+
+			const file = createTranslationFileFixture({ content: sourceContent });
+			const debugSpy = spyOn(file.logger, "debug");
+
+			await translatorService.translateContent(file);
+
+			expect(debugSpy).toHaveBeenCalledWith(
+				"Original file contains no frontmatter. Skipping frontmatter validation",
+			);
+		});
+
+		test("should handle frontmatter with various key formats", async () => {
+			const sourceContent = `---\ntitle: 'Test'\nsnake_case_key: 'value'\ncamelCaseKey: 'value2'\nKEY123: 'value3'\n---\n\n# Content`;
+			const translatedContent = `---\ntitle: 'Teste'\nsnake_case_key: 'valor'\ncamelCaseKey: 'valor2'\nKEY123: 'valor3'\n---\n\n# Conteúdo`;
+
+			mockChatCompletionsCreate.mockResolvedValue(
+				createChatCompletionFixture({ choices: [{ message: { content: translatedContent } }] }),
+			);
+
+			const file = createTranslationFileFixture({ content: sourceContent });
+			const warnSpy = spyOn(file.logger, "warn");
+
+			await translatorService.translateContent(file);
+
+			const frontmatterWarnCalls = warnSpy.mock.calls.filter(
+				(call) => typeof call[1] === "string" && call[1].includes("frontmatter"),
+			);
+			expect(frontmatterWarnCalls.length).toBe(0);
 		});
 	});
 

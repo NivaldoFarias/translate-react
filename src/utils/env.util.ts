@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import type { EnvironmentSchemaDefaults } from "./constants.util";
+
 import {
 	environmentDefaults,
 	LogLevel,
@@ -8,39 +10,7 @@ import {
 	RuntimeEnvironment,
 } from "./constants.util";
 
-/**
- * Creates a secure token validation schema with common security checks.
- *
- * @param envName The name of the environment variable (for error messages)
- *
- * @returns A Zod schema that validates API tokens/keys
- */
-function createTokenSchema(envName: string) {
-	return z
-		.string()
-		.min(MIN_API_TOKEN_LENGTH, `${envName} looks too short; ensure your API key is set`)
-		.refine((value) => !/\s/.test(value), `${envName} must not contain whitespace`)
-		.refine(
-			(value) =>
-				!["CHANGE_ME", "dev-token", "dev-key", "your-token-here", "your-key-here"].includes(value),
-			`${envName} appears to be a placeholder. Set a real token`,
-		);
-}
-
-/** Detects if running in test environment */
-function isTestEnvironment(): boolean {
-	return import.meta.env.NODE_ENV === RuntimeEnvironment.Test;
-}
-
-/**
- * The resolves default environment values, based on the current {@link process.env.NODE_ENV}.
- *
- * If the environment variable is not set, the default is {@link RuntimeEnvironment.Development}.
- */
-const envDefaults =
-	environmentDefaults[
-		(import.meta.env.NODE_ENV as RuntimeEnvironment | undefined) ?? RuntimeEnvironment.Development
-	];
+const envDefaults = resolveEnvDefaults();
 
 /** Environment configuration schema for runtime validation */
 const envSchema = z.object({
@@ -53,6 +23,15 @@ const envSchema = z.object({
 	/** The GitHub Personal Access Token (optional in test environment) */
 	GH_TOKEN:
 		isTestEnvironment() ? createTokenSchema("GH_TOKEN").optional() : createTokenSchema("GH_TOKEN"),
+
+	/**
+	 * Optional GitHub Personal Access Token for fallback authentication.
+	 *
+	 * Used when the primary token (GitHub App bot) receives 403 errors due to
+	 * insufficient permissions. The fallback client automatically retries with
+	 * this PAT when configured.
+	 */
+	GH_PAT_TOKEN: createTokenSchema("GH_PAT_TOKEN").optional(),
 
 	/** The OpenAI/OpenRouter/etc API key (optional in test environment) */
 	LLM_API_KEY:
@@ -148,13 +127,12 @@ const envSchema = z.object({
 
 	/** Concurrency limit for LLM requests */
 	MAX_LLM_CONCURRENCY: z.coerce.number().positive().default(envDefaults.MAX_LLM_CONCURRENCY),
-
-	/** Concurrency limit for GitHub operations */
-	MAX_GITHUB_CONCURRENCY: z.coerce.number().positive().default(envDefaults.MAX_GITHUB_CONCURRENCY),
 });
 
 /** Type definition for the environment configuration */
 export type Environment = z.infer<typeof envSchema>;
+
+export const env = validateEnv();
 
 /**
  * Validates all environment variables against the defined schema.
@@ -185,4 +163,41 @@ export function validateEnv(env?: Environment): Environment {
 	}
 }
 
-export const env = validateEnv();
+/**
+ * Resolves the environment defaults based on the current {@link import.meta.env.NODE_ENV}.
+ *
+ * If the environment variable is not set or is invalid, defaults to {@link RuntimeEnvironment.Development}.
+ */
+function resolveEnvDefaults(): EnvironmentSchemaDefaults {
+	const nodeEnv = import.meta.env.NODE_ENV as RuntimeEnvironment | undefined;
+
+	if (nodeEnv && Object.values(RuntimeEnvironment).includes(nodeEnv)) {
+		return environmentDefaults[nodeEnv];
+	}
+
+	return environmentDefaults[RuntimeEnvironment.Development];
+}
+
+/**
+ * Creates a secure token validation schema with common security checks.
+ *
+ * @param envName The name of the environment variable (for error messages)
+ *
+ * @returns A Zod schema that validates API tokens/keys
+ */
+function createTokenSchema(envName: string) {
+	return z
+		.string()
+		.min(MIN_API_TOKEN_LENGTH, `${envName} looks too short; ensure your API key is set`)
+		.refine((value) => !/\s/.test(value), `${envName} must not contain whitespace`)
+		.refine(
+			(value) =>
+				!["CHANGE_ME", "dev-token", "dev-key", "your-token-here", "your-key-here"].includes(value),
+			`${envName} appears to be a placeholder. Set a real token`,
+		);
+}
+
+/** Detects if running in test environment */
+function isTestEnvironment(): boolean {
+	return import.meta.env.NODE_ENV === RuntimeEnvironment.Test;
+}

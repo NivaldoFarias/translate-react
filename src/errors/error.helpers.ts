@@ -106,7 +106,7 @@ export function handleTopLevelError(
  *
  * @returns `true` if the error matches {@link RequestError}'s shape, `false` otherwise
  */
-function isUncastRequestError(error: unknown): error is RequestError {
+export function isUncastRequestError(error: unknown): error is RequestError {
 	return (
 		typeof error === "object" &&
 		error != null &&
@@ -130,7 +130,7 @@ function isUncastRequestError(error: unknown): error is RequestError {
  *
  * @returns `true` if the error matches {@link APIError}'s shape, `false` otherwise
  */
-function isUncastAPIError(error: unknown): error is APIError {
+export function isUncastAPIError(error: unknown): error is APIError {
 	return (
 		typeof error === "object" &&
 		error != null &&

@@ -53,7 +53,10 @@ export default defineConfig(
 			"no-console": "error",
 
 			/* TypeScript */
-			"@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
+			"@typescript-eslint/no-unused-vars": [
+				"error",
+				{ argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+			],
 			"@typescript-eslint/restrict-template-expressions": ["error", { allowNumber: true }],
 		},
 	},

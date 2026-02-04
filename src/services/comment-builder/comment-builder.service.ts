@@ -1,11 +1,11 @@
 import type { LocaleDefinition } from "@/locales";
 
-import type { ProcessedFileResult } from "./runner";
+import type { ProcessedFileResult } from "../runner";
 
 import { logger } from "@/utils/";
 
-import { localeService } from "./locale";
-import { TranslationFile } from "./translator.service";
+import { localeService } from "../locale";
+import { TranslationFile } from "../translator/translator.service";
 
 export interface FileEntry {
 	file: TranslationFile;
@@ -232,8 +232,8 @@ export class CommentBuilderService {
 				continue;
 			}
 
-			const sortedEntries = currentLevel.files.toSorted((a, b) =>
-				a.file.filename.localeCompare(b.file.filename),
+			const sortedEntries = currentLevel.files.toSorted((left, right) =>
+				left.file.filename.localeCompare(right.file.filename),
 			);
 
 			if (
