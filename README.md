@@ -36,9 +36,13 @@ Automated translation tool for React documentation using LLMs. Processes markdow
 
 1. Clone the Repository and Navigate to Directory: `git clone https://github.com/NivaldoFarias/translate-react.git && cd translate-react`
 2. Install Dependencies: `bun install`
-3. Configure Environment: `cp .env.example .env`
-   3.1. Then, edit `.env` with your API keys _(see [Configuration section](#configuration))_
-4. Run in Development Mode: `bun run dev`
+3. Setup the forks of the target React documentation repositories:
+   3.1. For the Portuguese (Brazil) repository, fork [`reactjs/pt-br.react.dev`](https://github.com/reactjs/pt-br.react.dev/) to your GitHub account
+   3.2. (Optional) For the Russian repository, fork [`reactjs/ru.react.dev`](https://github.com/reactjs/ru.react.dev/) to your GitHub account
+4. Install the `translate-react-bot` GitHub App on the forks of the target React documentation repositories:
+5. Configure Environment: `cp .env.example .env`
+   5.1. Then, edit `.env` with your API keys _(see [Configuration section](#configuration))_
+6. Run in Development Mode: `bun run dev`
 
 ## Configuration
 
@@ -124,21 +128,23 @@ bun start     # Production mode
 ```plaintext
 translate-react/
 ├── src/
-│   ├── clients/                        # Octokit, OpenAI, queue clients
-│   ├── errors/                         # Error handling (ApplicationError, helpers)
-│   ├── locales/                        # Language locale definitions
-│   ├── services/                      # Core services
-│   │   ├── cache/                     # In-memory caching
-│   │   ├── github/                    # GitHub API (single service)
-│   │   ├── locale/                    # Locale management
-│   │   ├── runner/                    # Workflow orchestration
-│   │   └── translator.service.ts      # LLM translation engine
-│   ├── utils/                         # Utilities and constants
-│   └── main.ts                        # Entry point
+│   ├── clients/                          # Octokit, OpenAI, queue clients
+│   ├── errors/                           # Error handling (ApplicationError, helpers)
+│   ├── locales/                          # Language locale definitions
+│   ├── services/                         # Core services
+│   │   ├── cache/                        # In-memory caching
+│   │   ├── github/                       # GitHub API (single service)
+│   │   ├── locale/                       # Locale management
+│   │   ├── comment-builder/              # Comment builder
+│   │   ├── language-detector/            # Language detector
+│   │   ├── runner/                       # Workflow orchestration
+│   │   └── translator/                   # LLM translation engine
+│   ├── utils/                            # Utilities and constants
+│   └── main.ts                           # Entry point
 │
-├── docs/                               # Technical documentation
-├── tests/                              # Test suite
-└── logs/                               # Structured error logs (JSONL)
+├── docs/                                 # Technical documentation
+├── tests/                                # Test suite
+└── logs/                                 # Structured error logs (JSONL)
 ```
 
 > [!TIP]
@@ -150,7 +156,6 @@ translate-react/
 | --------------------------------------------------- | ------------------------------------------------------------ |
 | [ARCHITECTURE.md](./docs/ARCHITECTURE.md)           | System architecture, service design, and design patterns     |
 | [WORKFLOW.md](./docs/WORKFLOW.md)                   | Execution workflow with timing analysis and performance data |
-| [TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md)     | Troubleshooting guide and diagnostic procedures              |
 | [PROJECT_STRUCTURE.md](./docs/PROJECT_STRUCTURE.md) | Complete directory structure and navigation guide            |
 
 ## Contributing
@@ -179,9 +184,6 @@ Contributions are welcome. Follow these guidelines:
 ### Debug Mode
 
 Enable verbose logging: `LOG_LEVEL="debug" bun run dev`
-
-> [!TIP]
-> For comprehensive troubleshooting guidance including diagnostic procedures and log analysis, see [TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md).
 
 ## License
 

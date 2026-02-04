@@ -37,6 +37,7 @@ graph TB
         Translator[Translator Service]
         LangDetector[Language Detector]
         Cache[Cache Service]
+        CommentBuilder[Comment Builder]
     end
 
     subgraph "Cross-Cutting Concerns"
@@ -70,7 +71,7 @@ graph TB
 
     class CLI entryPoint
     class Runner orchestration
-    class GitHub,Translator,LangDetector,Cache domain
+    class GitHub,Translator,LangDetector,Cache,CommentBuilder domain
     class GitHubAPI,LLMAPI external
     class ErrorHandler,Logger crossCutting
 ```
@@ -132,7 +133,7 @@ Public methods delegate to the appropriate internal class.
 
 ### Translator Service
 
-Core translation engine (`services/translator.service.ts`) interfacing with LLM APIs.
+Core translation engine (`services/translator/translator.service.ts`) interfacing with LLM APIs.
 
 ```mermaid
 graph LR
@@ -156,7 +157,7 @@ graph LR
 
 ### Language Detector Service
 
-Statistical language detection (`services/language-detector.service.ts`) using Compact Language Detector (CLD).
+Statistical language detection (`services/language-detector/language-detector.service.ts`) using Compact Language Detector (CLD).
 
 **Detection Flow:**
 
@@ -172,8 +173,7 @@ This ratio-based approach handles mixed-language content (code examples, technic
 
 In-memory caching (`services/cache/`) for runtime-scoped data.
 
-- **CacheService**: Generic TTL cache with O(1) lookups, batch operations
-- **LanguageCacheService**: Language detection cache with composite keys (`filename:contentHash`), 1-hour TTL
+- **CacheService**: Generic TTL cache with O(1) lookups, batch operations, composite key support (`filename:contentHash`)
 
 ## Error Handling
 

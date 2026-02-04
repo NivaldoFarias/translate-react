@@ -111,7 +111,7 @@ export const REACT_TRANSLATION_LANGUAGES = [
 /** Type for React translation language codes */
 export type ReactLanguageCode = (typeof REACT_TRANSLATION_LANGUAGES)[number];
 
-interface EnvironmentSchemaDefaults {
+export interface EnvironmentSchemaDefaults {
 	NODE_ENV: RuntimeEnvironment;
 	LOG_LEVEL: LogLevel;
 	GH_TOKEN: string;

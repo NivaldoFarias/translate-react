@@ -14,72 +14,89 @@ Overview of the `translate-react` project organization.
 ## Directory Structure
 
 ```plaintext
-translate-react/
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── PROJECT_STRUCTURE.md
-│   ├── roadmap.md
-│   ├── TROUBLESHOOTING.md
-│   └── WORKFLOW.md
+translate-react/                                                                # Project root
+├── docs/                                                                       # Technical documentation
+│   ├── ARCHITECTURE.md                                                         # System architecture, service design, and design patterns
+│   ├── PROJECT_STRUCTURE.md                                                    # Complete directory structure and navigation guide
+│   └── WORKFLOW.md                                                             # Execution workflow with timing analysis and performance data
 │
 ├── src/
-│   ├── main.ts
-│   ├── build.ts
-│   ├── types.d.ts
+│   ├── main.ts                                                                 # Entry point
+│   ├── build.ts                                                                # Build script
+│   ├── types.d.ts                                                              # TypeScript declarations
 │   │
 │   ├── clients/
-│   │   ├── index.ts
-│   │   ├── octokit.client.ts
-│   │   ├── openai.client.ts
-│   │   └── queue.client.ts
-│   │
-│   ├── errors/
-│   │   ├── index.ts
-│   │   ├── error.ts
-│   │   └── error.helpers.ts
-│   │
-│   ├── locales/
-│   │   ├── index.ts
-│   │   ├── types.ts
-│   │   └── pt-br.locale.ts
-│   │
-│   ├── services/
-│   │   ├── index.ts
-│   │   ├── comment-builder.service.ts
-│   │   ├── language-detector.service.ts
-│   │   ├── translator.service.ts
-│   │   ├── cache/
+│   │   ├── index.ts                                                            # Barrel export for all clients
+│   │   ├── octokit/                                                            # Octokit client constants and implementation
 │   │   │   ├── index.ts
-│   │   │   ├── cache.service.ts
-│   │   │   └── language-cache.service.ts
-│   │   ├── github/
+│   │   │   ├── octokit.client.ts
+│   │   │   └── octokit.constants.ts
+│   │   ├── openai.client.ts                                                    # OpenAI client implementation
+│   │   └── queue.client.ts                                                     # Queue client implementation
+│   │
+│   ├── errors/                                                                 # Error handling (ApplicationError, helpers)
+│   │   ├── index.ts
+│   │   ├── error.ts                                                            # ApplicationError implementation
+│   │   └── error.helpers.ts                                                    # Error helpers
+│   │
+│   ├── locales/                                                                # Language locale definitions
+│   │   ├── index.ts                                                            # Barrel export for all locales
+│   │   ├── locale.types.ts                                                     # Locale types and interfaces
+│   │   ├── pr-body.builder.ts                                                  # Shared PR body template builder
+│   │   ├── pt-br.locale.ts                                                     # Portuguese (Brazil) locale definition
+│   │   └── ru.locale.ts                                                        # Russian locale definition
+│   │
+│   ├── services/                                                               # Core services
+│   │   ├── index.ts                                                            # Barrel export for all services
+│   │   ├── cache/                                                              # In-memory caching service
 │   │   │   ├── index.ts
-│   │   │   ├── github.service.ts
-│   │   │   ├── github.types.ts
-│   │   │   ├── github.repository.ts
-│   │   │   ├── github.content.ts
-│   │   │   └── github.branch.ts
-│   │   ├── locale/
+│   │   │   └── cache.service.ts                                                # Cache service implementation
+│   │   ├── comment-builder/                                                    # Comment builder service
 │   │   │   ├── index.ts
-│   │   │   └── locale.service.ts
-│   │   └── runner/
+│   │   │   └── comment-builder.service.ts                                      # Comment builder service implementation
+│   │   ├── github/                                                             # GitHub API service
+│   │   │   ├── index.ts
+│   │   │   ├── github.service.ts                                               # GitHub API service implementation
+│   │   │   ├── github.types.ts                                                 # GitHub API types
+│   │   │   ├── github.repository.ts                                            # GitHub repository service
+│   │   │   ├── github.content.ts                                               # GitHub content service
+│   │   │   └── github.branch.ts                                                # GitHub branch service
+│   │   ├── language-detector/                                                  # Language detector service
+│   │   │   ├── index.ts
+│   │   │   ├── language-detector.constants.ts                                  # Language detector constants
+│   │   │   └── language-detector.service.ts                                    # Language detector service implementation
+│   │   ├── locale/                                                             # Locale service
+│   │   │   ├── index.ts
+│   │   │   └── locale.service.ts                                               # Locale service implementation
+│   │   ├── runner/                                                             # Workflow orchestration service
+│   │   │   ├── index.ts
+│   │   │   ├── runner.types.ts                                                 # Workflow orchestration types
+│   │   │   ├── base.service.ts                                                 # Workflow orchestration base service
+│   │   │   ├── runner.service.ts                                               # Workflow orchestration service implementation
+│   │   │   └── managers/                                                       # Workflow orchestration managers
+│   │   │       ├── index.ts
+│   │   │       ├── managers.constants.ts                                       # Workflow orchestration managers constants
+│   │   │       ├── file-discovery.manager.ts                                   # Workflow orchestration file discovery manager
+│   │   │       ├── translation-batch.manager.ts                                # Workflow orchestration translation batch manager
+│   │   │       └── pr.manager.ts                                               # Workflow orchestration PR manager
+│   │   └── translator/                                                         # LLM translation service
 │   │       ├── index.ts
-│   │       ├── runner.types.ts
-│   │       ├── base.service.ts
-│   │       ├── runner.service.ts
-│   │       ├── file-discovery.manager.ts
-│   │       ├── translation-batch.manager.ts
-│   │       └── pr.manager.ts
+│   │       ├── translator.constants.ts                                         # LLM translation constants
+│   │       └── translator.service.ts                                           # LLM translation service implementation
 │   │
-│   └── utils/
-│       ├── index.ts
-│       ├── constants.util.ts
-│       ├── env.util.ts
-│       ├── logger.util.ts
-│       └── common.util.ts
+│   └── utils/                                                                  # Utilities and constants
+│       ├── index.ts                                                            # Barrel export for all utils
+│       ├── constants.util.ts                                                   # Utilities constants
+│       ├── env.util.ts                                                         # Environment utilities
+│       ├── logger.util.ts                                                      # Logger utilities
+│       └── common.util.ts                                                      # Common utilities
 │
 ├── tests/
 │   ├── setup.ts
+│   ├── clients/
+│   │   └── octokit/
+│   │       ├── octokit.client.spec.ts
+│   │       └── octokit.constants.spec.ts
 │   ├── fixtures/
 │   │   ├── index.ts
 │   │   ├── data.fixture.ts
@@ -100,30 +117,38 @@ translate-react/
 │   │   ├── language-detector.service.spec.ts
 │   │   ├── translator.service.spec.ts
 │   │   ├── cache/
+│   │   │   └── cache.service.spec.ts
 │   │   ├── github/
+│   │   │   ├── github.branch.spec.ts
+│   │   │   └── github.service.spec.ts
 │   │   ├── locale/
+│   │   │   └── locale.service.spec.ts
 │   │   └── runner/
+│   │       └── runner.service.spec.ts
 │   └── utils/
 │       ├── common.util.spec.ts
 │       ├── constants.util.spec.ts
 │       └── env.util.spec.ts
 │
-├── .github/workflows/
-├── package.json
-├── tsconfig.json
-├── bunfig.toml
-├── eslint.config.mjs
-├── prettier.config.mjs
-├── .env.example
-├── .gitignore
-├── LICENSE
-├── README.md
-└── bun.lock
+├── .github/workflows/                                                          # GitHub Actions workflows
+│   ├── ci.yml                                                                  # CI workflow
+│   └── workflow.yml                                                            # Translation workflow
+├── package.json                                                                # Package dependencies and scripts
+├── tsconfig.json                                                               # TypeScript configuration
+├── bunfig.toml                                                                 # Bun configuration
+├── eslint.config.mjs                                                           # ESLint configuration
+├── prettier.config.mjs                                                         # Prettier configuration
+├── .env.example                                                                # Environment template
+├── .gitignore                                                                  # Git ignore
+├── LICENSE                                                                     # License
+├── README.md                                                                   # Project README
+└── bun.lock                                                                    # Bun lockfile
 ```
 
 ## Key Principles
 
-- **Services**: Business logic in `src/services/`; single **GitHubService** (internally **GitHubRepository**, **GitHubContent**, **GitHubBranch**); **RunnerService** extends **BaseRunnerService** and uses managers.
+- **Services**: Business logic in `src/services/`; each service in its own subfolder with `index.ts` barrel export; single **GitHubService** (internally **GitHubRepository**, **GitHubContent**, **GitHubBranch**); **RunnerService** extends **BaseRunnerService** and uses managers in `runner/managers/`.
+- **Clients**: External API clients in `src/clients/`; **Octokit** client in dedicated subfolder with constants.
 - **Errors**: **ApplicationError** and **ErrorCode** in `src/errors/`; top-level handler in `main.ts`; library errors bubble up.
 - **DI**: Module-level singletons; dependencies injected via constructors (e.g. **RunnerServiceDependencies**); tests use mocks from `tests/mocks/`.
 - **Runtime**: Bun (package manager and runtime). TypeScript, ESLint, Prettier.
@@ -132,26 +157,26 @@ translate-react/
 
 ### Configuration
 
-| File                  | Purpose                  |
-| --------------------- | ------------------------ |
-| `package.json`        | Dependencies and scripts |
-| `tsconfig.json`       | TypeScript config        |
-| `bunfig.toml`         | Bun config               |
-| `eslint.config.mjs`   | ESLint rules             |
-| `prettier.config.mjs` | Prettier config          |
-| `.env.example`        | Environment template     |
+| File                                            | Purpose                  |
+| ----------------------------------------------- | ------------------------ |
+| [`package.json`](../package.json)               | Dependencies and scripts |
+| [`tsconfig.json`](../tsconfig.json)             | TypeScript config        |
+| [`bunfig.toml`](../bunfig.toml)                 | Bun config               |
+| [`eslint.config.mjs`](../eslint.config.mjs)     | ESLint rules             |
+| [`prettier.config.mjs`](../prettier.config.mjs) | Prettier config          |
+| [`.env.example`](../.env.example)               | Environment template     |
 
 ### Services
 
-| File / Dir                     | Responsibility              |
-| ------------------------------ | --------------------------- |
-| `runner.service.ts`            | Workflow orchestration      |
-| `translator.service.ts`        | LLM translation             |
-| `language-detector.service.ts` | Language detection          |
-| `comment-builder.service.ts`   | PR comment building         |
-| `cache/`                       | Generic and language cache  |
-| `github/`                      | GitHub API (single service) |
-| `locale/`                      | Locale management           |
+| Directory                                                          | Responsibility                                |
+| ------------------------------------------------------------------ | --------------------------------------------- |
+| [`runner/`](../src/services/runner/index.ts)                       | Workflow orchestration and manager components |
+| [`translator/`](../src/services/translator/index.ts)               | LLM translation with constants                |
+| [`language-detector/`](../src/services/language-detector/index.ts) | Language detection with CLD                   |
+| [`comment-builder/`](../src/services/comment-builder/index.ts)     | PR comment building                           |
+| [`cache/`](../src/services/cache/index.ts)                         | Generic in-memory TTL cache                   |
+| [`github/`](../src/services/github/index.ts)                       | GitHub API (single service)                   |
+| [`locale/`](../src/services/locale/index.ts)                       | Locale management                             |
 
 ### Errors
 
@@ -187,11 +212,13 @@ RunnerService (extends BaseRunnerService)
 ├── GitHubService (composes GitHubRepository, GitHubContent, GitHubBranch)
 ├── TranslatorService
 ├── LanguageDetectorService
-├── LanguageCacheService → CacheService
+├── CacheService
 ├── LocaleService
-├── FileDiscoveryManager
-├── TranslationBatchManager
-└── PRManager
+├── CommentBuilderService
+└── managers/
+    ├── FileDiscoveryManager
+    ├── TranslationBatchManager
+    └── PRManager
 ```
 
-Services are created at module level; **main.ts** imports **runnerService** from `./services`.
+Services are created at module level; `main.ts` imports `runnerService` from [`src/services/`](../src/services/index.ts).
