@@ -30,11 +30,13 @@ jobs:
             upstream_name: "pt-br.react.dev"
             fork_owner: ${{ github.repository_owner }}
             fork_name: "pt-br.react.dev"
+            translation_guidelines_file: "GLOSSARY.md"
           - lang: "ru"
             upstream_owner: ${{ vars.REPO_UPSTREAM_OWNER_RU || 'reactjs' }}
             upstream_name: "ru.react.dev"
             fork_owner: ${{ github.repository_owner }}
             fork_name: "ru.react.dev"
+            translation_guidelines_file: "TRANSLATION.md"
     steps:
       - name: Generate Bot Token
         id: generate-token
@@ -109,6 +111,7 @@ jobs:
           [ -n "$MIN_SUCCESS_RATE" ] && echo "MIN_SUCCESS_RATE=$MIN_SUCCESS_RATE" >> .env || true
           [ -n "$HEADER_APP_URL" ] && echo "HEADER_APP_URL=$HEADER_APP_URL" >> .env || true
           [ -n "$HEADER_APP_TITLE" ] && echo "HEADER_APP_TITLE=$HEADER_APP_TITLE" >> .env || true
+          [ -n "${{ matrix.translation_guidelines_file }}" ] && echo "TRANSLATION_GUIDELINES_FILE=${{ matrix.translation_guidelines_file }}" >> .env || true
 
       - name: Run translation workflow (${{ matrix.lang }})
         run: bun run start

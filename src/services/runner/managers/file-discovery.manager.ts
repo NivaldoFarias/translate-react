@@ -229,10 +229,12 @@ export class FileDiscoveryManager {
 	 *
 	 * 1. Fetch all open PRs and their changed files using file-based detection (not title parsing)
 	 * 2. Build a map of file paths to PR numbers for efficient lookup
-	 * 3. For each candidate file, check if it appears in any PR's changed files
-	 * 4. If PR exists, validate its merge status
-	 * 5. Skip files with valid, mergeable PRs (no conflicts)
-	 * 6. Track invalid PRs (with conflicts) for later notification in new PR descriptions
+	 * 3. Build a map of branch names to PR numbers for additional detection reliability
+	 * 4. For each candidate file, check if it appears in any PR's changed files (by file path)
+	 * 5. If not found by file path, check by branch name (format: `translate/${file.path}`)
+	 * 6. If PR exists, validate its merge status
+	 * 7. Skip files with valid, mergeable PRs (no conflicts)
+	 * 8. Track invalid PRs (with conflicts) for later notification in new PR descriptions
 	 *
 	 * ### PR Status Validation
 	 *
@@ -266,6 +268,7 @@ export class FileDiscoveryManager {
 		const openPRs = await this.services.github.listOpenPullRequests();
 		const invalidPRsByFile = new Map<string, { prNumber: number; status: PullRequestStatus }>();
 		const prByFile = new Map<string, number>();
+		const prByBranch = new Map<string, number>();
 
 		for (const pr of openPRs) {
 			try {
@@ -274,6 +277,8 @@ export class FileDiscoveryManager {
 				for (const filePath of changedFiles) {
 					prByFile.set(filePath, pr.number);
 				}
+
+				if (pr.head.ref) prByBranch.set(pr.head.ref, pr.number);
 			} catch (error) {
 				this.logger.warn(
 					{ prNumber: pr.number, error },
@@ -291,7 +296,12 @@ export class FileDiscoveryManager {
 				continue;
 			}
 
-			const prNumber = prByFile.get(file.path);
+			let prNumber = prByFile.get(file.path);
+
+			if (!prNumber) {
+				const branchName = `translate/${file.path.split("/").slice(2).join("/")}`;
+				prNumber = prByBranch.get(branchName);
+			}
 
 			if (prNumber) {
 				try {

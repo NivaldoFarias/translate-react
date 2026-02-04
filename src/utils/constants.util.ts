@@ -41,6 +41,9 @@ export const MIN_API_TOKEN_LENGTH = 20;
 /** Number of milliseconds in a second (for converting Unix timestamps to milliseconds) */
 export const MS_PER_SECOND = 1_000;
 
+/** Maximum length for string values in logs before truncation */
+export const MAX_LOG_STRING_LENGTH = 500;
+
 /**
  * Common rate limit patterns from various providers.
  *
@@ -58,6 +61,22 @@ export const RATE_LIMIT_PATTERNS = [
 	"quota",
 	"too many requests",
 	"requests per",
+] as const;
+
+/**
+ * Common filenames for translation guidelines in React documentation repos.
+ *
+ * Used by auto-discovery to locate the translation guidelines file when no
+ * explicit filename is provided. Files are checked in priority order.
+ *
+ * @see {@link https://github.com/reactjs/pt-br.react.dev/blob/main/GLOSSARY.md|pt-br uses GLOSSARY.md}
+ * @see {@link https://github.com/reactjs/ru.react.dev/blob/main/TRANSLATION.md|ru uses TRANSLATION.md}
+ */
+export const TRANSLATION_GUIDELINES_CANDIDATES = [
+	"GLOSSARY.md",
+	"TRANSLATION.md",
+	"TRANSLATING.md",
+	"translation-glossary.md",
 ] as const;
 
 /**

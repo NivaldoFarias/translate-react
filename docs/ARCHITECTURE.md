@@ -125,7 +125,7 @@ The Runner maintains workflow state (`RunnerState`) in memory during execution, 
 
 Single public API (`services/github/`) for all GitHub operations. Internally composes three classes:
 
-- **GitHubRepository**: Fork sync, tree fetching (`.md` in `src/`), token verification, glossary retrieval
+- **GitHubRepository**: Fork sync, tree fetching (`.md` in `src/`), token verification, translation guidelines retrieval
 - **GitHubContent**: File content retrieval, PR listing/create/update, commits, comments
 - **GitHubBranch**: Translation branch creation (`translate/{file-path}`), cleanup, deletion
 
@@ -153,7 +153,7 @@ graph LR
 2. Translate sequentially, passing previous context
 3. Reassemble with original formatting
 
-**Glossary**: Loaded from upstream `GLOSSARY.md`, passed to LLM as system instruction.
+**Translation guidelines**: Loaded from upstream `GLOSSARY.md`, passed to LLM as system instruction.
 
 ### Language Detector Service
 
@@ -219,7 +219,7 @@ Mock factories live in `tests/mocks/`.
 | Translation           | Sequential (rate-limited)    |
 | PR creation           | Sequential (avoid conflicts) |
 
-**Memory**: Streaming content processing, GC after each batch, lazy glossary loading.
+**Memory**: Streaming content processing, GC after each batch, lazy translation guidelines loading.
 
 ## References
 
