@@ -8,7 +8,7 @@ import { APIError } from "openai/error";
 import pRetry, { AbortError } from "p-retry";
 
 import type { MarkdownTextSplitterParams } from "@langchain/textsplitters";
-import type { TiktokenModel } from "js-tiktoken";
+import type { Tiktoken, TiktokenModel } from "js-tiktoken";
 import type PQueue from "p-queue";
 import type { Options as RetryOptions } from "p-retry";
 import type { Logger } from "pino";
@@ -19,32 +19,7 @@ import { LanguageDetectorService, languageDetectorService } from "@/services/lan
 import { localeService, LocaleService } from "@/services/locale/";
 import { env, extractDocTitleFromContent, logger } from "@/utils/";
 
-import {
-	CHUNK_OVERLAP,
-	CHUNK_TOKEN_BUFFER,
-	CODE_BLOCK_REGEX,
-	CONNECTIVITY_TEST_MAX_TOKENS,
-	FRONTMATTER_KEY_REGEX,
-	FRONTMATTER_REGEX,
-	HEADINGS_REGEX,
-	LINE_ENDING_REGEX,
-	LLM_TEMPERATURE,
-	MARKDOWN_LINK_REGEX,
-	MAX_CHUNK_TOKENS,
-	MAX_CODE_BLOCK_RATIO,
-	MAX_HEADING_RATIO,
-	MAX_LINK_RATIO,
-	MAX_SIZE_RATIO,
-	MIN_CODE_BLOCK_RATIO,
-	MIN_HEADING_RATIO,
-	MIN_LINK_RATIO,
-	MIN_SIZE_RATIO,
-	REQUIRED_FRONTMATTER_KEYS,
-	SYSTEM_PROMPT_TOKEN_RESERVE,
-	TOKEN_ESTIMATION_FALLBACK_DIVISOR,
-	TRAILING_NEWLINES_REGEX,
-	TRANSLATION_PREFIXES,
-} from "./translator.constants";
+import * as constants from "./translator.constants";
 
 /** Dependency injection interface for TranslatorService */
 export interface TranslatorServiceDependencies {
@@ -197,8 +172,8 @@ export class TranslatorService {
 		const response = await this.openai.chat.completions.create({
 			model: this.model,
 			messages: [{ role: "user", content: "ping" }],
-			max_tokens: CONNECTIVITY_TEST_MAX_TOKENS,
-			temperature: LLM_TEMPERATURE,
+			max_tokens: constants.CONNECTIVITY_TEST_MAX_TOKENS,
+			temperature: constants.LLM_TEMPERATURE,
 		});
 
 		if (!this.isLLMResponseValid(response)) {
@@ -345,7 +320,7 @@ export class TranslatorService {
 		}
 
 		const sizeRatio = translatedContent.length / file.content.length;
-		if (sizeRatio < MIN_SIZE_RATIO || sizeRatio > MAX_SIZE_RATIO) {
+		if (sizeRatio < constants.MIN_SIZE_RATIO || sizeRatio > constants.MAX_SIZE_RATIO) {
 			file.logger.warn(
 				{
 					filename: file.filename,
@@ -353,16 +328,16 @@ export class TranslatorService {
 					originalLength: file.content.length,
 					translatedLength: translatedContent.length,
 				},
-				`Translation size ratio outside expected range (${MIN_SIZE_RATIO}-${MAX_SIZE_RATIO})`,
+				`Translation size ratio outside expected range (${constants.MIN_SIZE_RATIO}-${constants.MAX_SIZE_RATIO})`,
 			);
 		}
 
-		const originalHeadings = (file.content.match(HEADINGS_REGEX) ?? []).length;
-		const translatedHeadings = (translatedContent.match(HEADINGS_REGEX) ?? []).length;
+		const originalHeadings = (file.content.match(constants.HEADINGS_REGEX) ?? []).length;
+		const translatedHeadings = (translatedContent.match(constants.HEADINGS_REGEX) ?? []).length;
 		const headingRatio = translatedHeadings / originalHeadings;
 
 		file.logger.debug(
-			{ originalHeadings, translatedHeadings, headingRatio, regex: HEADINGS_REGEX },
+			{ originalHeadings, translatedHeadings, headingRatio, regex: constants.HEADINGS_REGEX },
 			`Heading counts for ${file.filename}`,
 		);
 
@@ -389,7 +364,10 @@ export class TranslatorService {
 					translatedLength: translatedContent.length,
 				},
 			);
-		} else if (headingRatio < MIN_HEADING_RATIO || headingRatio > MAX_HEADING_RATIO) {
+		} else if (
+			headingRatio < constants.MIN_HEADING_RATIO ||
+			headingRatio > constants.MAX_HEADING_RATIO
+		) {
 			file.logger.warn(
 				{
 					filename: file.filename,
@@ -427,8 +405,8 @@ export class TranslatorService {
 	 * @param translatedContent Translated content to validate against source
 	 */
 	private validateCodeBlockPreservation(file: TranslationFile, translatedContent: string): void {
-		const originalCodeBlocks = (file.content.match(CODE_BLOCK_REGEX) ?? []).length;
-		const translatedCodeBlocks = (translatedContent.match(CODE_BLOCK_REGEX) ?? []).length;
+		const originalCodeBlocks = (file.content.match(constants.CODE_BLOCK_REGEX) ?? []).length;
+		const translatedCodeBlocks = (translatedContent.match(constants.CODE_BLOCK_REGEX) ?? []).length;
 
 		file.logger.debug(
 			{ originalCodeBlocks, translatedCodeBlocks },
@@ -442,7 +420,10 @@ export class TranslatorService {
 
 		const codeBlockRatio = translatedCodeBlocks / originalCodeBlocks;
 
-		if (codeBlockRatio < MIN_CODE_BLOCK_RATIO || codeBlockRatio > MAX_CODE_BLOCK_RATIO) {
+		if (
+			codeBlockRatio < constants.MIN_CODE_BLOCK_RATIO ||
+			codeBlockRatio > constants.MAX_CODE_BLOCK_RATIO
+		) {
 			file.logger.warn(
 				{
 					filename: file.filename,
@@ -466,8 +447,8 @@ export class TranslatorService {
 	 * @param translatedContent Translated content to validate against source
 	 */
 	private validateLinkPreservation(file: TranslationFile, translatedContent: string): void {
-		const originalLinks = (file.content.match(MARKDOWN_LINK_REGEX) ?? []).length;
-		const translatedLinks = (translatedContent.match(MARKDOWN_LINK_REGEX) ?? []).length;
+		const originalLinks = (file.content.match(constants.MARKDOWN_LINK_REGEX) ?? []).length;
+		const translatedLinks = (translatedContent.match(constants.MARKDOWN_LINK_REGEX) ?? []).length;
 
 		file.logger.debug(
 			{ originalLinks, translatedLinks },
@@ -481,7 +462,7 @@ export class TranslatorService {
 
 		const linkRatio = translatedLinks / originalLinks;
 
-		if (linkRatio < MIN_LINK_RATIO || linkRatio > MAX_LINK_RATIO) {
+		if (linkRatio < constants.MIN_LINK_RATIO || linkRatio > constants.MAX_LINK_RATIO) {
 			file.logger.warn(
 				{
 					filename: file.filename,
@@ -505,8 +486,8 @@ export class TranslatorService {
 	 * @param translatedContent Translated content to validate against source
 	 */
 	private validateFrontmatterIntegrity(file: TranslationFile, translatedContent: string): void {
-		const originalFrontmatter = FRONTMATTER_REGEX.exec(file.content)?.[1];
-		const translatedFrontmatter = FRONTMATTER_REGEX.exec(translatedContent)?.[1];
+		const originalFrontmatter = constants.FRONTMATTER_REGEX.exec(file.content)?.[1];
+		const translatedFrontmatter = constants.FRONTMATTER_REGEX.exec(translatedContent)?.[1];
 
 		if (!originalFrontmatter) {
 			file.logger.debug("Original file contains no frontmatter. Skipping frontmatter validation");
@@ -525,7 +506,10 @@ export class TranslatorService {
 			const keys = new Set<string>();
 			let match: RegExpExecArray | null;
 
-			const regex = new RegExp(FRONTMATTER_KEY_REGEX.source, FRONTMATTER_KEY_REGEX.flags);
+			const regex = new RegExp(
+				constants.FRONTMATTER_KEY_REGEX.source,
+				constants.FRONTMATTER_KEY_REGEX.flags,
+			);
 			while ((match = regex.exec(content)) !== null) {
 				if (match[1]) keys.add(match[1]);
 			}
@@ -543,7 +527,7 @@ export class TranslatorService {
 			`Frontmatter keys for ${file.filename}`,
 		);
 
-		const missingRequiredKeys = REQUIRED_FRONTMATTER_KEYS.filter(
+		const missingRequiredKeys = constants.REQUIRED_FRONTMATTER_KEYS.filter(
 			(key) => originalKeys.has(key) && !translatedKeys.has(key),
 		);
 
@@ -632,6 +616,47 @@ export class TranslatorService {
 		return analysis;
 	}
 
+	/** Lazily-initialized tiktoken encoder instance, cached for performance */
+	private cachedEncoder: ReturnType<typeof encodingForModel> | null = null;
+
+	/**
+	 * Maps the configured LLM model to a compatible `tiktoken` model for token counting.
+	 *
+	 * Since `tiktoken` only supports OpenAI models, non-OpenAI models (e.g., Gemini)
+	 * are mapped to a compatible fallback model. The token counts will be approximate
+	 * but sufficient for chunking purposes.
+	 *
+	 * @param model The configured LLM model identifier
+	 *
+	 * @returns A compatible `tiktoken` model identifier
+	 */
+	private getTiktokenModel(model: string): TiktokenModel {
+		const supportedModel = constants.SUPPORTED_TIKTOKEN_MODELS.find((supportedModel) =>
+			model.includes(supportedModel),
+		);
+		if (supportedModel) return supportedModel;
+
+		this.logger.debug(
+			{ model, fallback: constants.DEFAULT_TIKTOKEN_MODEL },
+			"Model not supported by tiktoken, using fallback for token counting",
+		);
+
+		return constants.DEFAULT_TIKTOKEN_MODEL;
+	}
+
+	/**
+	 * Gets or creates a cached tiktoken encoder instance.
+	 *
+	 * The encoder is expensive to create (~500ms) due to vocabulary loading
+	 * and regex compilation, so we cache it for reuse across all token
+	 * estimation calls.
+	 */
+	private encoder(): Tiktoken {
+		const tiktokenModel = this.getTiktokenModel(this.model);
+		this.cachedEncoder ??= encodingForModel(tiktokenModel);
+		return this.cachedEncoder;
+	}
+
 	/**
 	 * Estimates token count for content using tiktoken encoding.
 	 *
@@ -650,28 +675,13 @@ export class TranslatorService {
 	 * console.log(tokenCount); // ~8 tokens
 	 * ```
 	 */
-	/** Lazily-initialized tiktoken encoder instance, cached for performance */
-	private cachedEncoder: ReturnType<typeof encodingForModel> | null = null;
-
-	/**
-	 * Gets or creates a cached tiktoken encoder instance.
-	 *
-	 * The encoder is expensive to create (~500ms) due to vocabulary loading
-	 * and regex compilation, so we cache it for reuse across all token
-	 * estimation calls.
-	 */
-	private getEncoder() {
-		this.cachedEncoder ??= encodingForModel(this.model as TiktokenModel);
-		return this.cachedEncoder;
-	}
-
 	private estimateTokenCount(content: string): number {
 		try {
-			const tokens = this.getEncoder().encode(content);
+			const tokens = this.encoder().encode(content);
 
 			return tokens.length;
 		} catch (error) {
-			const fallback = Math.ceil(content.length / TOKEN_ESTIMATION_FALLBACK_DIVISOR);
+			const fallback = Math.ceil(content.length / constants.TOKEN_ESTIMATION_FALLBACK_DIVISOR);
 			this.logger.error({ error }, "Error estimating token count, using fallback");
 
 			return fallback;
@@ -700,7 +710,7 @@ export class TranslatorService {
 	 */
 	private needsChunking(file: TranslationFile): boolean {
 		const estimatedTokens = this.estimateTokenCount(file.content);
-		const maxInputTokens = MAX_CHUNK_TOKENS - SYSTEM_PROMPT_TOKEN_RESERVE;
+		const maxInputTokens = constants.MAX_CHUNK_TOKENS - constants.SYSTEM_PROMPT_TOKEN_RESERVE;
 		const needsChunking = estimatedTokens > maxInputTokens;
 
 		file.logger.debug(
@@ -743,11 +753,11 @@ export class TranslatorService {
 	 */
 	private async chunkContent(
 		content: string,
-		maxTokens = MAX_CHUNK_TOKENS - CHUNK_TOKEN_BUFFER,
+		maxTokens = constants.MAX_CHUNK_TOKENS - constants.CHUNK_TOKEN_BUFFER,
 	): Promise<ChunkingResult> {
 		const markdownTextSplitterOptions: Partial<MarkdownTextSplitterParams> = {
 			chunkSize: maxTokens,
-			chunkOverlap: CHUNK_OVERLAP,
+			chunkOverlap: constants.CHUNK_OVERLAP,
 			lengthFunction: (text: string) => this.estimateTokenCount(text),
 		};
 
@@ -921,7 +931,8 @@ export class TranslatorService {
 		const translatedEndsWithNewline = reassembledContent.endsWith("\n");
 
 		if (originalEndsWithNewline && !translatedEndsWithNewline) {
-			const originalTrailingNewlines = TRAILING_NEWLINES_REGEX.exec(file.content)?.[0] ?? "";
+			const originalTrailingNewlines =
+				constants.TRAILING_NEWLINES_REGEX.exec(file.content)?.[0] ?? "";
 			reassembledContent += originalTrailingNewlines;
 
 			file.logger.debug(
@@ -989,7 +1000,7 @@ export class TranslatorService {
 	): Promise<OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming> {
 		return {
 			model: this.model,
-			temperature: LLM_TEMPERATURE,
+			temperature: constants.LLM_TEMPERATURE,
 			max_tokens: env.MAX_TOKENS,
 			messages: [
 				{ role: "system", content: await this.getSystemPrompt(content) },
@@ -1114,7 +1125,7 @@ export class TranslatorService {
 
 		let cleaned = translatedContent;
 
-		for (const prefix of TRANSLATION_PREFIXES) {
+		for (const prefix of constants.TRANSLATION_PREFIXES) {
 			if (cleaned.trim().toLowerCase().startsWith(prefix.toLowerCase())) {
 				cleaned = cleaned.substring(prefix.length).trim();
 			}
@@ -1128,7 +1139,7 @@ export class TranslatorService {
 		);
 
 		if (file.content.includes("\r\n")) {
-			cleaned = cleaned.replace(LINE_ENDING_REGEX, "\r\n");
+			cleaned = cleaned.replace(constants.LINE_ENDING_REGEX, "\r\n");
 		}
 
 		file.logger.debug(
