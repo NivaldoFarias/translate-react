@@ -1,97 +1,57 @@
-import type { PullRequestDescriptionMetadata } from "@/services/runner/managers/translation-batch.manager";
-import type { ProcessedFileResult } from "@/services/runner/runner.types";
 import type { TranslationFile } from "@/services/translator/translator.service";
 
-import type { LocaleDefinition } from "./types";
+import type { LocaleDefinition, LocalePRBodyStrings } from "./locale.types";
 
-import { formatElapsedTime } from "@/utils/common.util";
-
-/**
- * Builds the conflict notice section for PR body when a stale PR was closed.
- *
- * When an existing translation PR has merge conflicts with the upstream branch,
- * the workflow closes it and creates a fresh translation. This notice explains
- * what happened to reviewers.
- *
- * @param invalidFilePR Metadata about the closed stale PR
- *
- * @returns Markdown-formatted notice or empty string if no stale PR existed
- */
-function buildConflictNotice(invalidFilePR: PullRequestDescriptionMetadata["invalidFilePR"]) {
-	if (!invalidFilePR) {
-		return "";
-	}
-
-	return `> [!IMPORTANT]
-> **PR anterior fechado**: O PR #${invalidFilePR.prNumber} foi **fechado automaticamente** devido a conflitos de merge com a branch principal (\`mergeable_state: ${invalidFilePR.status.mergeableState}\`).
->
-> Esta é uma **tradução completamente nova** baseada na versão mais atual do arquivo fonte. A abordagem de reescrita completa (ao invés de resolução de conflitos baseada em diff) garante consistência e qualidade da tradução.`;
-}
+import { createPRBodyBuilder } from "./pr-body.builder";
 
 /**
- * Formats the generation date from timestamp.
+ * Brazilian Portuguese strings for the PR body template.
  *
- * @param timestamp Unix timestamp in milliseconds
- *
- * @returns ISO date string (YYYY-MM-DD) or "unknown"
+ * Contains all translated text used in the pull request description,
+ * following the data-driven approach for locale definitions.
  */
-function formatGenerationDate(timestamp: number): string {
-	const dateString = new Date(timestamp).toISOString().split("T")[0];
-	return dateString ?? "unknown";
-}
+const ptBrPRBodyStrings: LocalePRBodyStrings = {
+	intro: (languageName) =>
+		`Este PR contém uma tradução automatizada da página referenciada para **${languageName}**.`,
 
-/**
- * Builds the pull request body template for Brazilian Portuguese locale.
- *
- * Generates a comprehensive PR description including translation metadata,
- * processing statistics, conflict notices, and technical information.
- *
- * @param file Translation file being processed
- * @param processingResult Result of processing the file
- * @param metadata Metadata about the pull request description
- *
- * @returns Formatted PR body string in markdown
- */
-export function buildPullRequestBody(
-	file: TranslationFile,
-	processingResult: ProcessedFileResult,
-	metadata: PullRequestDescriptionMetadata,
-): string {
-	const processingTime = metadata.timestamps.now - metadata.timestamps.workflowStart;
-	const conflictNotice = buildConflictNotice(metadata.invalidFilePR);
-	const generationDate = formatGenerationDate(metadata.timestamps.now);
-	const branchRef = processingResult.branch?.ref ?? "unknown";
+	conflictNotice: {
+		title: "PR anterior fechado",
+		body: (prNumber, mergeableState) =>
+			`O PR #${prNumber} foi **fechado automaticamente** devido a conflitos de merge com a branch principal (\`mergeable_state: ${mergeableState}\`).`,
+		rewriteExplanation:
+			"Esta é uma **tradução completamente nova** baseada na versão mais atual do arquivo fonte. A abordagem de reescrita completa (ao invés de resolução de conflitos baseada em diff) garante consistência e qualidade da tradução.",
+	},
 
-	return `Este PR contém uma tradução automatizada da página referenciada para **${metadata.languageName}**.
-${conflictNotice}
+	humanReviewNotice:
+		"Esta tradução foi gerada usando LLMs e **requer revisão humana** para garantir precisão, contexto cultural e terminologia técnica.",
 
-> [!IMPORTANT]
-> Esta tradução foi gerada usando LLMs e **requer revisão humana** para garantir precisão, contexto cultural e terminologia técnica.
+	detailsSummary: "Detalhes",
 
-<details>
-<summary>Detalhes</summary>
+	stats: {
+		header: "Estatísticas de Processamento",
+		metrics: {
+			metricColumn: "Métrica",
+			valueColumn: "Valor",
+			sourceSize: "Tamanho do Arquivo Fonte",
+			translationSize: "Tamanho da Tradução",
+			contentRatio: "Razão de Conteúdo",
+			filePath: "Caminho do Arquivo",
+			processingTime: "Tempo de Processamento",
+		},
+		notes: [
+			'"Razão de Conteúdo" indica como o comprimento da tradução se compara à fonte (~1.0x: mesmo comprimento, >1.0x: tradução é mais longa). Diferentes idiomas naturalmente têm níveis variados de verbosidade.',
+			'"Tempo de Processamento" baseia-se no cálculo do tempo total desde o início do fluxo até a conclusão da tradução deste arquivo específico.',
+		],
+	},
 
-### Estatísticas de Processamento
+	techInfo: {
+		header: "Informações Técnicas",
+		generationDate: "Data de Geração",
+		branch: "Branch",
+	},
 
-| Métrica | Valor |
-|--------|-------|
-| **Tamanho do Arquivo Fonte** | ${metadata.content.source} |
-| **Tamanho da Tradução** | ${metadata.content.translation} |
-| **Razão de Conteúdo** | ${metadata.content.compressionRatio}x |
-| **Caminho do Arquivo** | \`${file.path}\` |
-| **Tempo de Processamento** | ~${formatElapsedTime(processingTime, "pt-BR")} |
-
-> [!NOTE] 
-> - "Razão de Conteúdo" indica como o comprimento da tradução se compara à fonte (~1.0x: mesmo comprimento, >1.0x: tradução é mais longa). Diferentes idiomas naturalmente têm níveis variados de verbosidade. 
-> - "Tempo de Processamento" baseia-se no cálculo do tempo total desde o início do fluxo até a conclusão da tradução deste arquivo específico.
-
-### Informações Técnicas
-
-- **Data de Geração**: ${generationDate}
-- **Branch**: \`${branchRef}\`
-
-</details>`;
-}
+	timeFormatLocale: "pt-BR",
+};
 
 /**
  * Brazilian Portuguese locale definition.
@@ -118,6 +78,6 @@ export const ptBrLocale: LocaleDefinition = {
 	pullRequest: {
 		title: (file: TranslationFile) =>
 			`Tradução de ${file.title ? `**${file.title}**` : `\`${file.filename}\``} para Português (Brasil)`,
-		body: buildPullRequestBody,
+		body: createPRBodyBuilder(ptBrPRBodyStrings),
 	},
 };

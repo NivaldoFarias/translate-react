@@ -215,7 +215,7 @@ flowchart TD
 | `ProcessedFileResult` | Processing outcome per file    | `filename`, `branch`, `translation`, `pullRequest`, `error`           |
 | `RunnerState`         | Workflow state (in-memory)     | `repositoryTree`, `filesToTranslate`, `processedResults`, `timestamp` |
 
-See [`services/runner/runner.types.ts`](../src/services/runner/runner.types.ts) for type definitions.
+See [`runner.types.ts`](../src/services/runner/runner.types.ts) for type definitions.
 
 ## Error Recovery
 

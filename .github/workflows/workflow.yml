@@ -27,14 +27,14 @@ jobs:
         include:
           - lang: "pt-br"
             upstream_owner: ${{ vars.REPO_UPSTREAM_OWNER || 'reactjs' }}
-            upstream_name: ${{ vars.REPO_UPSTREAM_NAME || 'pt-br.react.dev' }}
-            fork_owner: ${{ vars.REPO_FORK_OWNER || github.repository_owner }}
-            fork_name: ${{ vars.REPO_FORK_OWNER || 'pt-br.react.dev' }}
-        # - lang: "ru"
-        #   upstream_owner: "reactjs"
-        #   upstream_name: "ru.react.dev"
-        #   fork_owner: "nivaldofarias"
-        #   fork_name: "ru.react.dev"
+            upstream_name: "pt-br.react.dev"
+            fork_owner: ${{ github.repository_owner }}
+            fork_name: "pt-br.react.dev"
+          - lang: "ru"
+            upstream_owner: ${{ vars.REPO_UPSTREAM_OWNER_RU || 'reactjs' }}
+            upstream_name: "ru.react.dev"
+            fork_owner: ${{ github.repository_owner }}
+            fork_name: "ru.react.dev"
     steps:
       - name: Generate Bot Token
         id: generate-token
@@ -73,7 +73,9 @@ jobs:
           LLM_MODEL: ${{ vars.LLM_MODEL }}
           LLM_API_BASE_URL: ${{ vars.LLM_API_BASE_URL }}
           MAX_RETRY_ATTEMPTS: ${{ vars.MAX_RETRY_ATTEMPTS }}
+          MAX_LLM_CONCURRENCY: ${{ vars.MAX_LLM_CONCURRENCY }}
           OPENAI_PROJECT_ID: ${{ secrets.OPENAI_PROJECT_ID }}
+          GH_PAT_TOKEN: ${{ secrets.GH_PAT_TOKEN }}
           MAX_TOKENS: ${{ vars.MAX_TOKENS }}
           BATCH_SIZE: ${{ vars.BATCH_SIZE }}
           GH_REQUEST_TIMEOUT: ${{ vars.GH_REQUEST_TIMEOUT }}
@@ -98,7 +100,9 @@ jobs:
           [ -n "$LLM_MODEL" ] && echo "LLM_MODEL=$LLM_MODEL" >> .env || true
           [ -n "$LLM_API_BASE_URL" ] && echo "LLM_API_BASE_URL=$LLM_API_BASE_URL" >> .env || true
           [ -n "$MAX_RETRY_ATTEMPTS" ] && echo "MAX_RETRY_ATTEMPTS=$MAX_RETRY_ATTEMPTS" >> .env || true
+          [ -n "$MAX_LLM_CONCURRENCY" ] && echo "MAX_LLM_CONCURRENCY=$MAX_LLM_CONCURRENCY" >> .env || true
           [ -n "$OPENAI_PROJECT_ID" ] && echo "OPENAI_PROJECT_ID=$OPENAI_PROJECT_ID" >> .env || true
+          [ -n "$GH_PAT_TOKEN" ] && echo "GH_PAT_TOKEN=$GH_PAT_TOKEN" >> .env || true
           [ -n "$MAX_TOKENS" ] && echo "MAX_TOKENS=$MAX_TOKENS" >> .env || true
           [ -n "$BATCH_SIZE" ] && echo "BATCH_SIZE=$BATCH_SIZE" >> .env || true
           [ -n "$GH_REQUEST_TIMEOUT" ] && echo "GH_REQUEST_TIMEOUT=$GH_REQUEST_TIMEOUT" >> .env || true

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test } from "bun:test";
 
 import type { PullRequestDescriptionMetadata } from "@/services";
 
-import { buildPullRequestBody, ptBrLocale } from "@/locales";
+import { ptBrLocale, ruLocale } from "@/locales";
 import { LocaleService, TranslationFile } from "@/services/";
 
 import { createProcessedFileResultsFixture } from "@tests/fixtures";
@@ -53,8 +53,13 @@ describe("LocaleService", () => {
 			expect(localeService.hasLocale("pt-br")).toBe(true);
 		});
 
+		test("returns true for Russian locale", () => {
+			expect(localeService.hasLocale("ru")).toBe(true);
+		});
+
 		test("returns false when language code is not registered", () => {
-			expect(localeService.hasLocale("ru")).toBe(false);
+			// @ts-expect-error - testing invalid language code
+			expect(localeService.hasLocale("es")).toBe(false);
 		});
 	});
 
@@ -63,13 +68,14 @@ describe("LocaleService", () => {
 			const locales = localeService.getAvailableLocales();
 
 			expect(locales).toContain("pt-br");
+			expect(locales).toContain("ru");
 			expect(Array.isArray(locales)).toBe(true);
 		});
 
 		test("returns array that does not include unregistered language codes", () => {
 			const locales = localeService.getAvailableLocales();
 
-			expect(locales).not.toContain("ru");
+			expect(locales).not.toContain("es");
 			expect(locales).not.toContain("en");
 		});
 	});
@@ -109,7 +115,9 @@ describe("LocaleService", () => {
 	});
 });
 
-describe("buildPullRequestBody", () => {
+describe("ptBrLocale.pullRequest.body", () => {
+	const buildPullRequestBody = ptBrLocale.pullRequest.body;
+
 	const file = new TranslationFile(
 		"# Test Content\n\nSome markdown content.",
 		"test-file.md",
@@ -242,6 +250,90 @@ describe("buildPullRequestBody", () => {
 			const body = buildPullRequestBody(file, processingResult, metadata);
 
 			expect(body).toContain("requer revisão humana");
+		});
+	});
+});
+
+describe("ruLocale.pullRequest.body", () => {
+	const buildPullRequestBody = ruLocale.pullRequest.body;
+
+	const file = new TranslationFile(
+		"# Test Content\n\nSome markdown content.",
+		"test-file.md",
+		"src/content/test-file.md",
+		"abc123sha",
+	);
+
+	const [processingResult] = createProcessedFileResultsFixture({ count: 1 });
+
+	if (!processingResult) throw new Error("Failed to create processing result");
+
+	describe("conflict notice generation", () => {
+		test("should not include conflict notice when invalidFilePR is undefined", () => {
+			const metadata = createPullRequestDescriptionMetadata({
+				languageName: "Русский",
+				invalidFilePR: undefined,
+			});
+
+			const body = buildPullRequestBody(file, processingResult, metadata);
+
+			expect(body).not.toContain("Предыдущий PR закрыт");
+			expect(body).not.toContain("автоматически закрыт");
+		});
+
+		test("should include conflict notice with PR number when invalidFilePR exists", () => {
+			const metadata = createPullRequestDescriptionMetadata({
+				languageName: "Русский",
+				invalidFilePR: {
+					prNumber: 42,
+					status: {
+						needsUpdate: true,
+						hasConflicts: true,
+						mergeable: false,
+						mergeableState: "dirty",
+					},
+				},
+			});
+
+			const body = buildPullRequestBody(file, processingResult, metadata);
+
+			expect(body).toContain("> [!IMPORTANT]");
+			expect(body).toContain("**Предыдущий PR закрыт**");
+			expect(body).toContain("#42");
+			expect(body).toContain("автоматически закрыт");
+		});
+	});
+
+	describe("PR body structure", () => {
+		test("should include language name in PR body", () => {
+			const metadata = createPullRequestDescriptionMetadata({
+				languageName: "Русский",
+			});
+
+			const body = buildPullRequestBody(file, processingResult, metadata);
+
+			expect(body).toContain("Русский");
+		});
+
+		test("should include human review notice in Russian", () => {
+			const metadata = createPullRequestDescriptionMetadata({
+				languageName: "Русский",
+			});
+
+			const body = buildPullRequestBody(file, processingResult, metadata);
+
+			expect(body).toContain("требует проверки человеком");
+		});
+
+		test("should include Russian section headers", () => {
+			const metadata = createPullRequestDescriptionMetadata({
+				languageName: "Русский",
+			});
+
+			const body = buildPullRequestBody(file, processingResult, metadata);
+
+			expect(body).toContain("Статистика обработки");
+			expect(body).toContain("Техническая информация");
 		});
 	});
 });
