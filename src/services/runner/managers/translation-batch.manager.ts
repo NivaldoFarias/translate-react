@@ -377,15 +377,18 @@ export class TranslationBatchManager {
 
 			if (upstreamPR) {
 				const prStatus = await this.services.github.checkPullRequestStatus(upstreamPR.number);
+				const forkOwner = this.services.github.getForkOwner();
+				const isCreatedByBotOrUser = prStatus.createdBy === forkOwner;
 
-				if (prStatus.hasConflicts) {
+				if (prStatus.hasConflicts && !isCreatedByBotOrUser) {
 					this.logger.info(
 						{
 							filename: file.filename,
 							prNumber: upstreamPR.number,
 							mergeableState: prStatus.mergeableState,
+							createdBy: prStatus.createdBy,
 						},
-						"PR has merge conflicts, closing and recreating",
+						"PR has merge conflicts created by someone else, closing and recreating",
 					);
 					await this.services.github.createCommentOnPullRequest(
 						upstreamPR.number,
@@ -394,6 +397,17 @@ export class TranslationBatchManager {
 
 					await this.services.github.closePullRequest(upstreamPR.number);
 					await this.services.github.deleteBranch(branchName);
+				} else if (prStatus.hasConflicts && isCreatedByBotOrUser) {
+					this.logger.info(
+						{
+							filename: file.filename,
+							prNumber: upstreamPR.number,
+							mergeableState: prStatus.mergeableState,
+							createdBy: prStatus.createdBy,
+						},
+						"PR has conflicts but was created by bot/user - preserving branch",
+					);
+					return existingBranch.data;
 				} else {
 					return existingBranch.data;
 				}
@@ -460,11 +474,17 @@ export class TranslationBatchManager {
 
 		if (existingPR) {
 			const prStatus = await this.services.github.checkPullRequestStatus(existingPR.number);
+			const forkOwner = this.services.github.getForkOwner();
+			const isCreatedByBotOrUser = prStatus.createdBy === forkOwner;
 
-			if (prStatus.needsUpdate) {
+			if (prStatus.needsUpdate && !isCreatedByBotOrUser) {
 				this.logger.info(
-					{ prNumber: existingPR.number, mergeableState: prStatus.mergeableState },
-					"Closing PR with merge conflicts and creating new one",
+					{
+						prNumber: existingPR.number,
+						mergeableState: prStatus.mergeableState,
+						createdBy: prStatus.createdBy,
+					},
+					"Closing PR with merge conflicts created by someone else and creating new one",
 				);
 
 				await this.services.github.createCommentOnPullRequest(
@@ -478,6 +498,17 @@ export class TranslationBatchManager {
 					branch: branchName,
 					...prOptions,
 				});
+			}
+
+			if (prStatus.needsUpdate && isCreatedByBotOrUser) {
+				this.logger.info(
+					{
+						prNumber: existingPR.number,
+						mergeableState: prStatus.mergeableState,
+						createdBy: prStatus.createdBy,
+					},
+					"PR has conflicts but was created by bot/user - preserving existing PR",
+				);
 			}
 
 			return existingPR;

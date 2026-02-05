@@ -11,7 +11,7 @@ import type {
 
 import { LanguageDetectorService } from "@/services/language-detector/";
 import { TranslationFile } from "@/services/translator/";
-import { filterMarkdownFiles, logger } from "@/utils/";
+import { logger } from "@/utils/";
 
 import {
 	FILE_FETCH_BATCH_SIZE,
@@ -71,24 +71,18 @@ export class FileDiscoveryManager {
 	}> {
 		this.logger.debug({ fileCount: repositoryTree.length }, "Starting file discovery pipeline");
 
-		const markdownFiles = filterMarkdownFiles(repositoryTree);
-		this.logger.debug(
-			{ before: repositoryTree.length, after: markdownFiles.length },
-			"Stage 1/6: Markdown filter complete",
-		);
-
-		const uniqueFiles = markdownFiles.filter(
+		const uniqueFiles = repositoryTree.filter(
 			(file, index, self) => index === self.findIndex((compare) => compare.path === file.path),
 		);
 		this.logger.debug(
-			{ before: markdownFiles.length, after: uniqueFiles.length },
-			"Stage 2/6: Deduplication complete",
+			{ before: repositoryTree.length, after: uniqueFiles.length },
+			"Stage 1/5: Deduplication complete",
 		);
 
 		const { candidateFiles, cacheHits, cacheMisses } = this.checkCache(uniqueFiles);
 		this.logger.debug(
 			{ before: uniqueFiles.length, after: candidateFiles.length, cacheHits, cacheMisses },
-			"Stage 3/6: Cache lookup complete",
+			"Stage 2/5: Cache lookup complete",
 		);
 
 		const { filesToFetch, numFilesWithPRs, invalidPRsByFile } =
@@ -100,13 +94,13 @@ export class FileDiscoveryManager {
 				skippedByValidPRs: numFilesWithPRs,
 				invalidPRs: invalidPRsByFile.size,
 			},
-			"Stage 4/6: PR filter complete",
+			"Stage 3/5: PR filter complete",
 		);
 
 		const uncheckedFiles = await this.fetchContent(filesToFetch);
 		this.logger.debug(
 			{ before: filesToFetch.length, after: uncheckedFiles.length },
-			"Stage 5/6: Content fetch complete",
+			"Stage 4/5: Content fetch complete",
 		);
 
 		const { numFilesFiltered, filesToTranslate } =
@@ -117,7 +111,7 @@ export class FileDiscoveryManager {
 				after: filesToTranslate.length,
 				detectedAsTranslated: numFilesFiltered,
 			},
-			"Stage 6/6: Language detection complete",
+			"Stage 5/5: Language detection complete",
 		);
 
 		const totalFiltered = cacheHits + numFilesFiltered + numFilesWithPRs;
@@ -126,7 +120,6 @@ export class FileDiscoveryManager {
 			{
 				pipeline: {
 					initial: repositoryTree.length,
-					afterMarkdownFilter: markdownFiles.length,
 					afterDedup: uniqueFiles.length,
 					afterCache: candidateFiles.length,
 					afterPRFilter: filesToFetch.length,
@@ -229,12 +222,11 @@ export class FileDiscoveryManager {
 	 *
 	 * 1. Fetch all open PRs and their changed files using file-based detection (not title parsing)
 	 * 2. Build a map of file paths to PR numbers for efficient lookup
-	 * 3. Build a map of branch names to PR numbers for additional detection reliability
-	 * 4. For each candidate file, check if it appears in any PR's changed files (by file path)
-	 * 5. If not found by file path, check by branch name (format: `translate/${file.path}`)
-	 * 6. If PR exists, validate its merge status
-	 * 7. Skip files with valid, mergeable PRs (no conflicts)
-	 * 8. Track invalid PRs (with conflicts) for later notification in new PR descriptions
+	 * 3. For each candidate file, check if it appears in any PR's changed files
+	 * 4. If PR exists, validate its merge status
+	 * 5. Skip files with valid, mergeable PRs (no conflicts)
+	 * 6. Track invalid PRs (with conflicts) for later notification in new PR descriptions
+	 *
 	 *
 	 * ### PR Status Validation
 	 *
@@ -242,6 +234,8 @@ export class FileDiscoveryManager {
 	 * - PR is open
 	 * - PR is mergeable (`needsUpdate === false`)
 	 * - PR has no conflicts (`hasConflicts === false`)
+	 * - PR was not created by the bot or the current user
+	 * - PR's last commit author is not the bot or the current user
 	 *
 	 * Files with invalid PRs are included for translation, and the invalid PR information
 	 * is stored in `invalidPRsByFile` for use in PR descriptions.
@@ -268,7 +262,6 @@ export class FileDiscoveryManager {
 		const openPRs = await this.services.github.listOpenPullRequests();
 		const invalidPRsByFile = new Map<string, { prNumber: number; status: PullRequestStatus }>();
 		const prByFile = new Map<string, number>();
-		const prByBranch = new Map<string, number>();
 
 		for (const pr of openPRs) {
 			try {
@@ -277,8 +270,6 @@ export class FileDiscoveryManager {
 				for (const filePath of changedFiles) {
 					prByFile.set(filePath, pr.number);
 				}
-
-				if (pr.head.ref) prByBranch.set(pr.head.ref, pr.number);
 			} catch (error) {
 				this.logger.warn(
 					{ prNumber: pr.number, error },
@@ -291,54 +282,68 @@ export class FileDiscoveryManager {
 		const filesToFetch: typeof candidateFiles = [];
 
 		for (const file of candidateFiles) {
-			if (!file.path) {
+			const prNumber = prByFile.get(file.path);
+
+			if (!prNumber) {
 				filesToFetch.push(file);
 				continue;
 			}
 
-			let prNumber = prByFile.get(file.path);
+			try {
+				const prStatus = await this.services.github.checkPullRequestStatus(prNumber);
+				const forkOwner = this.services.github.getForkOwner();
+				const currentUser = await this.services.github.getCurrentUser();
+				const isCreatedByBotOrUser =
+					prStatus.createdBy === forkOwner || prStatus.createdBy === currentUser;
+				const isLastCommitAuthorBotOrUser =
+					prStatus.lastCommitAuthor === forkOwner || prStatus.lastCommitAuthor === currentUser;
 
-			if (!prNumber) {
-				const branchName = `translate/${file.path.split("/").slice(2).join("/")}`;
-				prNumber = prByBranch.get(branchName);
-			}
-
-			if (prNumber) {
-				try {
-					const prStatus = await this.services.github.checkPullRequestStatus(prNumber);
-
-					if (prStatus.needsUpdate || prStatus.hasConflicts) {
-						invalidPRsByFile.set(file.path, { prNumber, status: prStatus });
-						filesToFetch.push(file);
-
-						this.logger.debug(
-							{
-								path: file.path,
-								prNumber,
-								mergeableState: prStatus.mergeableState,
-								hasConflicts: prStatus.hasConflicts,
-							},
-							"File has invalid PR - will create new translation",
-						);
-					} else {
-						numFilesWithPRs++;
-						this.logger.debug(
-							{
-								path: file.path,
-								prNumber,
-								mergeableState: prStatus.mergeableState,
-							},
-							"Skipping file with valid existing PR",
-						);
-					}
-				} catch (error) {
-					this.logger.warn(
-						{ path: file.path, prNumber, error },
-						"Failed to check PR status, including file for processing",
-					);
+				if (
+					(prStatus.needsUpdate || prStatus.hasConflicts) &&
+					!isCreatedByBotOrUser &&
+					!isLastCommitAuthorBotOrUser
+				) {
+					invalidPRsByFile.set(file.path, { prNumber, status: prStatus });
 					filesToFetch.push(file);
+
+					this.logger.debug(
+						{
+							path: file.path,
+							prNumber,
+							mergeableState: prStatus.mergeableState,
+							hasConflicts: prStatus.hasConflicts,
+							createdBy: prStatus.createdBy,
+						},
+						"File has invalid PR created by someone else. Will create new translation",
+					);
+				} else if (prStatus.needsUpdate || prStatus.hasConflicts) {
+					numFilesWithPRs++;
+					this.logger.debug(
+						{
+							path: file.path,
+							prNumber,
+							mergeableState: prStatus.mergeableState,
+							hasConflicts: prStatus.hasConflicts,
+							createdBy: prStatus.createdBy,
+						},
+						"Skipping file with conflicted PR created by bot/user. Will not recreate",
+					);
+				} else {
+					numFilesWithPRs++;
+					this.logger.debug(
+						{
+							path: file.path,
+							prNumber,
+							mergeableState: prStatus.mergeableState,
+						},
+						"Skipping file with valid existing PR",
+					);
 				}
-			} else {
+			} catch (error) {
+				this.logger.warn(
+					{ path: file.path, prNumber, error },
+					"Failed to check PR status, including file for processing",
+				);
 				filesToFetch.push(file);
 			}
 		}

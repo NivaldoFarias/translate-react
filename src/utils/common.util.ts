@@ -170,7 +170,7 @@ export function setupSignalHandlers(
  *
  * @param tree Repository tree from GitHub API
  */
-export function filterMarkdownFiles<T extends RepositoryTreeItem>(tree: T[]): T[] {
+export function filterMarkdownFiles(tree: RepositoryTreeItem[]): RepositoryTreeItem[] {
 	return tree.filter((item) => {
 		if (!item.path) return false;
 		if (!item.path.endsWith(".md")) return false;

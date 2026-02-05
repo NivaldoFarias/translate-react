@@ -45,7 +45,6 @@ export class GitHubRepository {
 	 *
 	 * @param target Which repository to fetch tree from ('fork' or 'upstream')
 	 * @param baseBranch Branch to get tree from (defaults to target's default branch)
-	 * @param filterIgnored Whether to filter ignored paths
 	 *
 	 * @returns Array of repository tree items
 	 *
@@ -61,13 +60,12 @@ export class GitHubRepository {
 	public async getRepositoryTree(
 		target: "fork" | "upstream" = "fork",
 		baseBranch?: string,
-		filterIgnored = true,
 	): Promise<RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"]> {
 		const repoConfig =
 			target === "fork" ? this.deps.repositories.fork : this.deps.repositories.upstream;
 		const branchName = baseBranch ?? (await this.getDefaultBranch(target));
 
-		this.logger.debug({ target, branch: branchName, filterIgnored }, "Fetching repository tree");
+		this.logger.debug({ target, branch: branchName }, "Fetching repository tree");
 
 		const response = await this.deps.octokit.git.getTree({
 			...repoConfig,
@@ -75,14 +73,15 @@ export class GitHubRepository {
 			recursive: "true",
 		});
 
-		const result = filterIgnored ? filterMarkdownFiles(response.data.tree) : response.data.tree;
+		const result = filterMarkdownFiles(response.data.tree);
 
 		this.logger.debug(
 			{
 				target,
 				branch: branchName,
 				totalItems: response.data.tree.length,
-				filteredItems: result.length,
+				uniqueItems: result.length,
+				filteredItems: response.data.tree.length - result.length,
 			},
 			"Repository tree fetched",
 		);

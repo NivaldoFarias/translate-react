@@ -122,6 +122,11 @@ export function createPullsMocks() {
 				RestEndpointMethodTypes["pulls"]["listFiles"]["response"]
 			>),
 		),
+		listCommits: mock(() =>
+			Promise.resolve({
+				data: [{ author: { login: "test-fork-owner" }, sha: "commit123" }],
+			} as PartialDeep<RestEndpointMethodTypes["pulls"]["listCommits"]["response"]>),
+		),
 	};
 }
 
@@ -220,6 +225,8 @@ export function createMockOctokit(options?: {
 			},
 		},
 		request: mock(() => Promise.resolve({})),
+		auth: mock(() => Promise.resolve({ token: "test-token" })),
+		paginate: mock(() => Promise.resolve([] as unknown[])),
 	};
 }
 

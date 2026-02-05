@@ -93,7 +93,11 @@ export function createMockGitHubService() {
 			),
 		),
 		checkPullRequestStatus: mock(() =>
-			Promise.resolve({ needsUpdate: false, mergeableState: "clean" } as PullRequestStatus),
+			Promise.resolve({
+				needsUpdate: false,
+				mergeableState: "clean",
+				createdBy: "test-fork-owner",
+			} as PullRequestStatus),
 		),
 		closePullRequest: mock(() =>
 			Promise.resolve({

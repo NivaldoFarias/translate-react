@@ -32,7 +32,16 @@ describe("GitHubBranch", () => {
 
 		test("deletes branch when no PR exists", async () => {
 			const findPullRequestByBranch = mock(() => Promise.resolve(undefined));
-			const checkPullRequestStatus = mock(() => Promise.resolve({ needsUpdate: false }));
+			const checkPullRequestStatus = mock(() =>
+				Promise.resolve({
+					needsUpdate: false,
+					hasConflicts: false,
+					mergeable: true,
+					mergeableState: "clean",
+					createdBy: "other-user",
+					lastCommitAuthor: "other-user",
+				}),
+			);
 
 			branch.setCleanupContentAccess({
 				findPullRequestByBranch,
@@ -51,7 +60,16 @@ describe("GitHubBranch", () => {
 
 		test("deletes branch when PR has needsUpdate", async () => {
 			const findPullRequestByBranch = mock(() => Promise.resolve({ number: 42 }));
-			const checkPullRequestStatus = mock(() => Promise.resolve({ needsUpdate: true }));
+			const checkPullRequestStatus = mock(() =>
+				Promise.resolve({
+					needsUpdate: true,
+					hasConflicts: false,
+					mergeable: true,
+					mergeableState: "clean",
+					createdBy: "other-user",
+					lastCommitAuthor: "other-user",
+				}),
+			);
 
 			branch.setCleanupContentAccess({
 				findPullRequestByBranch,
@@ -70,7 +88,16 @@ describe("GitHubBranch", () => {
 
 		test("preserves branch when PR exists and does not need update", async () => {
 			const findPullRequestByBranch = mock(() => Promise.resolve({ number: 123 }));
-			const checkPullRequestStatus = mock(() => Promise.resolve({ needsUpdate: false }));
+			const checkPullRequestStatus = mock(() =>
+				Promise.resolve({
+					needsUpdate: false,
+					hasConflicts: false,
+					mergeable: true,
+					mergeableState: "clean",
+					createdBy: "other-user",
+					lastCommitAuthor: "other-user",
+				}),
+			);
 
 			branch.setCleanupContentAccess({
 				findPullRequestByBranch,
@@ -86,7 +113,16 @@ describe("GitHubBranch", () => {
 
 		test("skips deletion when findPullRequestByBranch throws", async () => {
 			const findPullRequestByBranch = mock(() => Promise.reject(new Error("API error")));
-			const checkPullRequestStatus = mock(() => Promise.resolve({ needsUpdate: false }));
+			const checkPullRequestStatus = mock(() =>
+				Promise.resolve({
+					needsUpdate: false,
+					hasConflicts: false,
+					mergeable: true,
+					mergeableState: "clean",
+					createdBy: "other-user",
+					lastCommitAuthor: "other-user",
+				}),
+			);
 
 			branch.setCleanupContentAccess({
 				findPullRequestByBranch,
