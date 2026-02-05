@@ -45,6 +45,7 @@ export class GitHubService {
 	private readonly repository: GitHubRepository;
 	private readonly branch: GitHubBranch;
 	private readonly content: GitHubContent;
+	private readonly repositories: BaseRepositories;
 
 	constructor(dependencies: GitHubServiceDependencies = {}) {
 		const shared: SharedGitHubDependencies = {
@@ -52,6 +53,7 @@ export class GitHubService {
 			repositories: dependencies.repositories ?? DEFAULT_REPOSITORIES,
 		};
 
+		this.repositories = shared.repositories;
 		this.content = new GitHubContent(
 			shared,
 			dependencies.commentBuilderService ?? commentBuilderService,
@@ -79,20 +81,38 @@ export class GitHubService {
 	}
 
 	/**
+	 * Gets the fork repository owner username.
+	 *
+	 * Used to identify PRs created by the bot or user.
+	 *
+	 * @returns The fork owner username
+	 */
+	public getForkOwner(): string {
+		return this.repositories.fork.owner;
+	}
+
+	/**
+	 * Gets the current user username.
+	 *
+	 * @returns The current user username
+	 */
+	public getCurrentUser(): Promise<string> {
+		return this.content.getCurrentUser();
+	}
+
+	/**
 	 * Retrieves the repository file tree from fork or upstream.
 	 *
 	 * @param target Which repository to fetch tree from ('fork' or 'upstream')
 	 * @param baseBranch Branch to get tree from (defaults to target's default branch)
-	 * @param filterIgnored Whether to filter ignored paths
 	 *
 	 * @returns Array of repository tree items
 	 */
 	public async getRepositoryTree(
 		target: "fork" | "upstream" = "fork",
 		baseBranch?: string,
-		filterIgnored = true,
 	): Promise<RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"]> {
-		return this.repository.getRepositoryTree(target, baseBranch, filterIgnored);
+		return this.repository.getRepositoryTree(target, baseBranch);
 	}
 
 	/**

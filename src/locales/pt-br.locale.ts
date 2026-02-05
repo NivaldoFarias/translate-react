@@ -76,8 +76,7 @@ export const ptBrLocale: LocaleDefinition = {
 - When a MDN document is referenced, update the language slug to the Brazilian Portuguese version ('https://developer.mozilla.org/<slug>/*' => 'https://developer.mozilla.org/pt-BR/*')`,
 	},
 	pullRequest: {
-		title: (file: TranslationFile) =>
-			`Tradução de ${file.title ? `**${file.title}**` : `\`${file.filename}\``} para Português (Brasil)`,
+		title: (file: TranslationFile) => `Tradução de \`${file.filename}\` para Português (Brasil)`,
 		body: createPRBodyBuilder(ptBrPRBodyStrings),
 	},
 };

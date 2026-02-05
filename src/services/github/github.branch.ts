@@ -2,6 +2,8 @@ import { RequestError } from "@octokit/request-error";
 
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
+import type { PullRequestStatus } from "../runner";
+
 import type { SharedGitHubDependencies } from "./github.types";
 
 import { logger, registerCleanup } from "@/utils/";
@@ -43,7 +45,7 @@ export class GitHubBranch {
 	 */
 	public setCleanupContentAccess(access: {
 		findPullRequestByBranch: (branchName: string) => Promise<unknown>;
-		checkPullRequestStatus: (prNumber: number) => Promise<{ needsUpdate: boolean }>;
+		checkPullRequestStatus: (prNumber: number) => Promise<PullRequestStatus>;
 	}): void {
 		this.cleanupContentAccess = access;
 	}

@@ -82,23 +82,39 @@ export class GitHubContent {
 	}
 
 	/**
-	 * Lists all open pull requests.
+	 * Lists all open pull requests. uses `octokit.paginate` to fetch all PRs.
 	 *
 	 * @returns A list of open pull requests
 	 */
 	public async listOpenPullRequests(): Promise<
 		RestEndpointMethodTypes["pulls"]["list"]["response"]["data"]
 	> {
-		const response = await this.deps.octokit.pulls.list({
+		const response = await this.deps.octokit.paginate("GET /repos/{owner}/{repo}/pulls", {
 			...this.deps.repositories.upstream,
 			state: "open",
+			per_page: 100,
 		});
 
-		return response.data;
+		this.logger.debug({ count: response.length }, "Listed open pull requests");
+
+		return response;
 	}
 
 	/**
-	 * Retrieves the list of files changed in a pull request.
+	 * Gets the current user username.
+	 *
+	 * @returns The current user username
+	 */
+	public async getCurrentUser(): Promise<string> {
+		const response = await this.deps.octokit.users.getAuthenticated();
+
+		this.logger.debug({ login: response.data.login }, "Retrieved current user");
+
+		return response.data.login;
+	}
+
+	/**
+	 * Retrieves the list of files changed in a pull request. uses `octokit.paginate` to fetch all files.
 	 *
 	 * @param prNumber Pull request number to fetch changed files from
 	 *
@@ -112,12 +128,18 @@ export class GitHubContent {
 	 * ```
 	 */
 	public async getPullRequestFiles(prNumber: number): Promise<string[]> {
-		const response = await this.deps.octokit.pulls.listFiles({
-			...this.deps.repositories.upstream,
-			pull_number: prNumber,
-		});
+		const response = await this.deps.octokit.paginate(
+			"GET /repos/{owner}/{repo}/pulls/{pull_number}/files",
+			{
+				...this.deps.repositories.upstream,
+				pull_number: prNumber,
+				per_page: 100,
+			},
+		);
 
-		return response.data.map((file) => file.filename);
+		this.logger.debug({ count: response.length }, "Retrieved pull request files");
+
+		return response.map((file) => file.filename);
 	}
 
 	/**
@@ -396,13 +418,27 @@ export class GitHubContent {
 		const pr = prResponse.data;
 		const hasConflicts = pr.mergeable === false && pr.mergeable_state === "dirty";
 		const needsUpdate = hasConflicts;
+		const createdBy = pr.user.login;
 
 		return {
 			hasConflicts,
 			mergeable: pr.mergeable,
 			mergeableState: pr.mergeable_state,
 			needsUpdate,
+			createdBy,
+			lastCommitAuthor: await this.getLastCommitAuthor(prNumber),
 		};
+	}
+
+	private async getLastCommitAuthor(prNumber: number): Promise<string | undefined> {
+		const commitsResponse = await this.deps.octokit.pulls.listCommits({
+			...this.deps.repositories.upstream,
+			pull_number: prNumber,
+		});
+
+		const lastCommit = commitsResponse.data.at(-1);
+
+		return lastCommit?.author?.login;
 	}
 
 	/**
