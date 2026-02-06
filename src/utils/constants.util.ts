@@ -1,4 +1,4 @@
-import { homepage, name, version } from "../../package.json";
+import { homepage, name } from "../../package.json";
 
 /**
  * Available runtime environments for the application.
@@ -163,7 +163,7 @@ export const ENV_PLACEHOLDERS = {
 	REPO_UPSTREAM_NAME: "pt-br.react.dev",
 	LLM_MODEL: "google/gemini-2.0-flash-exp:free",
 	LLM_API_BASE_URL: "https://openrouter.ai/api/v1",
-	HEADER_APP_TITLE: `${name} v${version}`,
+	HEADER_APP_TITLE: name,
 	HEADER_APP_URL: homepage,
 	TARGET_LANGUAGE: "pt-br",
 	SOURCE_LANGUAGE: "en",
