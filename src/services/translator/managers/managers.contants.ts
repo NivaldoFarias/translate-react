@@ -1,3 +1,5 @@
+import { regex } from "arkregex";
+
 import type { TiktokenModel } from "js-tiktoken";
 
 /** Common LLM response prefixes that should be removed from translated content */
@@ -10,114 +12,105 @@ export const TRANSLATION_PREFIXES = [
 	"Here's the translated content:",
 ] as const;
 
-/** Required frontmatter keys that should be preserved during translation */
-export const REQUIRED_FRONTMATTER_KEYS = ["title"] as const;
-
 /** Token buffer reserved for system prompt overhead when determining chunking needs */
 export const SYSTEM_PROMPT_TOKEN_RESERVE = 1_000;
 
 /** Divisor used for fallback token estimation when encoding fails (chars per token estimate) */
 export const TOKEN_ESTIMATION_FALLBACK_DIVISOR = 3.5;
 
-/** Regex pattern to match trailing newlines */
-const TRAILING_NEWLINES_REGEX = /\n+$/;
-
-/** Regex pattern to extract frontmatter keys (captures key names before colons) */
-const FRONTMATTER_KEY_REGEX = /^([a-zA-Z_][a-zA-Z0-9_]*):/gm;
-
-/** Regex pattern to extract YAML frontmatter block (between --- delimiters) */
-const FRONTMATTER_REGEX = /^---\n([\s\S]*?)\n---/;
-
-/** Regex pattern to match markdown links: [text](url) and [text](url "title") */
-const MARKDOWN_LINK_REGEX = /\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
-
-/** Regex pattern to match fenced code blocks (triple backticks with optional language identifier) */
-const CODE_BLOCK_REGEX = /^```[\s\S]*?^```/gm;
-
-/** Regex pattern to match markdown headings (h1-h6) */
-const HEADINGS_REGEX = /^#{1,6}\s/gm;
-
-/** Regex pattern to match all newline characters for line ending replacement */
-const LINE_ENDING_REGEX = /\n/g;
-
 /** Regular expressions used in the translation validator manager */
 export const REGEXES = {
-	trailingNewlines: TRAILING_NEWLINES_REGEX,
-	frontmatterKey: FRONTMATTER_KEY_REGEX,
-	frontmatter: FRONTMATTER_REGEX,
-	markdownLink: MARKDOWN_LINK_REGEX,
-	codeBlock: CODE_BLOCK_REGEX,
-	headings: HEADINGS_REGEX,
-	lineEnding: LINE_ENDING_REGEX,
+	/** Regex pattern to match trailing newlines */
+	trailingNewlines: regex("\n+$"),
+
+	/** Regex pattern to extract YAML frontmatter block (between --- delimiters) */
+	frontmatter: regex("^---(?<content>[\\s\\S]*?)---", "m"),
+
+	/** Regex pattern to match markdown links: [text](url) and [text](url "title") */
+	markdownLink: regex('\\[(?<text>[^\\]]*)\\]\\((?<url>[^)\\s]+)(?:\\s+"[^"]*")?\\)', "g"),
+
+	/** Regex pattern to match fenced code blocks (triple backticks with optional language identifier) */
+	codeBlock: regex("^```[\\s\\S]*?```", "gm"),
+
+	/** Regex pattern to match markdown headings (h1-h6) */
+	headings: regex("^#{1,6}\\s", "gm"),
+
+	/** Regex pattern to match all newline characters for line ending replacement */
+	lineEnding: regex("\n", "g"),
 } as const;
-
-/**
- * Minimum acceptable link ratio for translated content
- * (0.8 = 80% of original, i.e., >20% difference warns)
- */
-const MIN_LINK_RATIO = 0.8;
-
-/**
- * Maximum acceptable link ratio for translated content
- * (1.2 = 120% of original)
- */
-const MAX_LINK_RATIO = 1.2;
-
-/** Minimum acceptable code block ratio for translated content (0.8 = 80% of original, i.e., >20% difference warns) */
-const MIN_CODE_BLOCK_RATIO = 0.8;
-
-/** Maximum acceptable code block ratio for translated content (1.2 = 120% of original) */
-const MAX_CODE_BLOCK_RATIO = 1.2;
-
-/** Minimum acceptable size ratio for translated content (0.5 = 50% of original) */
-const MIN_SIZE_RATIO = 0.5;
-
-/** Maximum acceptable size ratio for translated content (2.0 = 200% of original) */
-const MAX_SIZE_RATIO = 2.0;
-
-/** Minimum acceptable heading ratio for translated content (0.8 = 80% of original) */
-const MIN_HEADING_RATIO = 0.8;
-
-/** Maximum acceptable heading ratio for translated content (1.2 = 120% of original) */
-const MAX_HEADING_RATIO = 1.2;
 
 /** Ratios used in the translation validator manager */
 export const RATIOS = {
-	/** Minimum acceptable link ratio for translated content (0.8 = 80% of original, i.e., >20% difference warns) */
+	/** Minimum acceptable link ratio for translated content */
 	link: {
-		min: MIN_LINK_RATIO,
-		max: MAX_LINK_RATIO,
+		/**
+		 * Minimum acceptable link ratio for translated content
+		 * (0.8 = 80% of original, i.e., >20% difference warns)
+		 */
+		min: 0.8,
+
+		/**
+		 * Maximum acceptable link ratio for translated content
+		 * (1.2 = 120% of original)
+		 */
+		max: 1.2,
 	},
-	/** Minimum acceptable code block ratio for translated content (0.8 = 80% of original, i.e., >20% difference warns) */
+
+	/** Minimum acceptable code block ratio for translated content */
 	codeBlock: {
-		min: MIN_CODE_BLOCK_RATIO,
-		max: MAX_CODE_BLOCK_RATIO,
+		/**
+		 * Minimum acceptable code block ratio for translated content
+		 * (0.8 = 80% of original, i.e., >20% difference warns)
+		 */
+		min: 0.8,
+
+		/**
+		 * Maximum acceptable code block ratio for translated content
+		 * (1.2 = 120% of original)
+		 */
+		max: 1.2,
 	},
-	/** Minimum acceptable heading ratio for translated content (0.8 = 80% of original) */
+
+	/** Minimum acceptable heading ratio for translated content */
 	heading: {
-		min: MIN_HEADING_RATIO,
-		max: MAX_HEADING_RATIO,
+		/**
+		 * Minimum acceptable heading ratio for translated content
+		 * (0.8 = 80% of original)
+		 */
+		min: 0.8,
+
+		/**
+		 * Maximum acceptable heading ratio for translated content
+		 * (1.2 = 120% of original)
+		 */
+		max: 1.2,
 	},
-	/** Minimum acceptable size ratio for translated content (0.5 = 50% of original) */
+
+	/** Minimum acceptable size ratio for translated content */
 	size: {
-		min: MIN_SIZE_RATIO,
-		max: MAX_SIZE_RATIO,
+		/**
+		 * Minimum acceptable size ratio for translated content
+		 * (0.5 = 50% of original)
+		 */
+		min: 0.5,
+
+		/**
+		 * Maximum acceptable size ratio for translated content
+		 * (2.0 = 200% of original)
+		 */
+		max: 2.0,
 	},
 } as const;
 
-/** Number of overlapping tokens between chunks when splitting content */
-const CHUNK_OVERLAP = 200;
-
-/** Token buffer reserved for chunk processing overhead when splitting content */
-const CHUNK_TOKEN_BUFFER = 500;
-
-/** Maximum number of tokens that can be translated in a single request */
-const MAX_CHUNK_TOKENS = 4_000;
-
 export const CHUNKS = {
-	overlap: CHUNK_OVERLAP,
-	tokenBuffer: CHUNK_TOKEN_BUFFER,
-	maxTokens: MAX_CHUNK_TOKENS,
+	/** Number of overlapping tokens between chunks when splitting content */
+	overlap: 200,
+
+	/** Token buffer reserved for chunk processing overhead when splitting content */
+	tokenBuffer: 500,
+
+	/** Maximum number of tokens that can be translated in a single request */
+	maxTokens: 4_000,
 } as const;
 
 /** Default tiktoken model to use for token counting */

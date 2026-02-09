@@ -13,7 +13,7 @@ import { openai, queue } from "@/clients/";
 import { ApplicationError, ErrorCode } from "@/errors/";
 import { LanguageDetectorService, languageDetectorService } from "@/services/language-detector/";
 import { localeService, LocaleService } from "@/services/locale/";
-import { env, extractDocTitleFromContent, logger } from "@/utils/";
+import { env, logger } from "@/utils/";
 
 import { ChunksManager, TranslationValidatorManager } from "./managers";
 import { CONNECTIVITY_TEST_MAX_TOKENS, LLM_TEMPERATURE } from "./translator.constants";
@@ -66,13 +66,28 @@ export class TranslationFile {
 		/** Optional parent logger to create child logger from (defaults to root logger) */
 		parentLogger?: Logger,
 	) {
-		this.title = extractDocTitleFromContent(content);
+		this.title = this.extractDocTitleFromContent(content);
 		this.correlationId = crypto.randomUUID();
 		this.logger = (parentLogger ?? logger).child({
 			file: this.filename,
 			path: this.path,
 			correlationId: this.correlationId,
 		});
+	}
+
+	/**
+	 * Extracts the title of a document from its content by matching the `title` frontmatter key.
+	 *
+	 * Supports both single and double quotes around the title value.
+	 *
+	 * @param content The content of the document
+	 *
+	 * @returns The title of the document, or `undefined` if not found
+	 */
+	private extractDocTitleFromContent(content: string): string | undefined {
+		const frontmatterContentOnly = content.split("---")[1];
+
+		return frontmatterContentOnly?.split("title:")[1]?.trim().replace(/['"]/g, "");
 	}
 }
 

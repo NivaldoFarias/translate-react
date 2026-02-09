@@ -105,18 +105,34 @@ export function createTranslationFilesFixture({ count }: { count: number }): Tra
  * Creates a {@link TranslationFile} fixture
  *
  * @param overrides Values to override the default fixture
+ * @param title The title to use in the frontmatter (defaults to "Untitled")
  *
  * @returns TranslationFile object
  */
 export function createTranslationFileFixture(
 	overrides?: Partial<TranslationFile>,
+	title?: string,
 ): TranslationFile {
+	const content = overrides?.content ?? "# Content of file";
+
 	return new TranslationFile(
-		overrides?.content ?? "# Content of file",
+		wrapContentInFrontmatter(content, title),
 		overrides?.filename ?? "file.md",
 		overrides?.path ?? "src/test/file.md",
 		overrides?.sha ?? "abc123",
 	);
+}
+
+/**
+ * Wraps content in YAML frontmatter
+ *
+ * @param content The content to wrap in frontmatter
+ * @param title The title to use in the frontmatter
+ *
+ * @returns Content wrapped in YAML frontmatter
+ */
+export function wrapContentInFrontmatter(content: string, title?: string): string {
+	return !content.startsWith("---") && title ? `---\ntitle: '${title}'\n---\n${content}` : content;
 }
 
 /**
@@ -148,8 +164,11 @@ export function createRepositoryTreeItemFixture(
  *
  * @returns ChatCompletion object
  */
-export function createChatCompletionFixture(overrides?: PartialChatCompletion): ChatCompletion {
-	return {
+export function createChatCompletionFixture(
+	overrides?: string | PartialChatCompletion,
+	title?: string,
+): ChatCompletion {
+	const defaults = {
 		id: "chatcmpl-test-123",
 		created: Date.now(),
 		model: "test-model",
@@ -167,8 +186,18 @@ export function createChatCompletionFixture(overrides?: PartialChatCompletion): 
 			completion_tokens: 30,
 			prompt_tokens: 20,
 		},
-		...overrides,
-	} as ChatCompletion;
+	} satisfies ChatCompletion;
+
+	if (typeof overrides === "string") {
+		if (title) overrides = wrapContentInFrontmatter(overrides, title);
+
+		return {
+			...defaults,
+			choices: [{ message: { ...(defaults.choices[0]?.message ?? {}), content: overrides } }],
+		} as ChatCompletion;
+	}
+
+	return { ...defaults, ...overrides } as ChatCompletion;
 }
 
 /**

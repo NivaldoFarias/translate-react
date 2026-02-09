@@ -1,3 +1,4 @@
+import { regex } from "arkregex";
 import cld from "cld";
 
 import type { ReactLanguageCode } from "@/utils/";
@@ -328,11 +329,11 @@ export class LanguageDetectorService {
 		this.logger.debug("Cleaning content for language detection");
 
 		const regexes = {
-			codeBlock: /```[\s\S]*?```/g,
-			inlineCode: /`[^`]*`/g,
-			htmlTags: /<[^>]*>/g,
-			urls: /https?:\/\/[^\s]+/g,
-			whitespace: /\s+/g,
+			codeBlock: regex("```[\\s\\S]*?```", "g"),
+			inlineCode: regex("`[^`]*`", "g"),
+			htmlTags: regex("<[^>]*>", "g"),
+			urls: regex("https?://[^\\s]+", "g"),
+			whitespace: regex("\\s+", "g"),
 		} as const;
 
 		this.logger.debug({ regexes }, "Using regex patterns for content cleaning");
