@@ -1,3 +1,4 @@
+import { regex } from "arkregex";
 import { z } from "zod";
 
 import type { EnvironmentSchemaDefaults } from "./constants.util";
@@ -198,10 +199,11 @@ function resolveEnvDefaults(): EnvironmentSchemaDefaults {
  * @returns A Zod schema that validates API tokens/keys
  */
 function createTokenSchema(envName: string) {
+	const whitespaceRegex = regex("\\s");
 	return z
 		.string()
 		.min(MIN_API_TOKEN_LENGTH, `${envName} looks too short; ensure your API key is set`)
-		.refine((value) => !/\s/.test(value), `${envName} must not contain whitespace`)
+		.refine((value) => !whitespaceRegex.test(value), `${envName} must not contain whitespace`)
 		.refine(
 			(value) =>
 				!["CHANGE_ME", "dev-token", "dev-key", "your-token-here", "your-key-here"].includes(value),

@@ -7,12 +7,7 @@ import type { ChunksToReassemble } from "./chunks.manager";
 import { ApplicationError, ErrorCode } from "@/errors";
 import { logger } from "@/utils";
 
-import {
-	RATIOS,
-	REGEXES,
-	REQUIRED_FRONTMATTER_KEYS,
-	TRANSLATION_PREFIXES,
-} from "./managers.contants";
+import { RATIOS, REGEXES, TRANSLATION_PREFIXES } from "./managers.contants";
 
 export class TranslationValidatorManager {
 	private readonly logger = logger.child({ component: TranslationValidatorManager.name });
@@ -29,7 +24,8 @@ export class TranslationValidatorManager {
 	 * @param file Original file containing source content for comparison
 	 * @param translatedContent Translated content to validate against source
 	 *
-	 * @throws {ApplicationError} with {@link ErrorCode.FormatValidationFailed} if validation checks fail (empty content, complete heading loss)
+	 * @throws {ApplicationError} with {@link ErrorCode.FormatValidationFailed}
+	 * if validation checks fail (empty content, complete heading loss)
 	 *
 	 * @example
 	 * ```typescript
@@ -40,21 +36,11 @@ export class TranslationValidatorManager {
 	 */
 	public validateTranslation(file: TranslationFile, translatedContent: string): void {
 		if (!translatedContent || translatedContent.trim().length === 0) {
-			file.logger.error(
-				{ filename: file.filename, translatedContent },
-				"Translated content is empty",
-			);
-
 			throw new ApplicationError(
 				"Translation produced empty content",
 				ErrorCode.FormatValidationFailed,
 				`${TranslationValidatorManager.name}.${this.validateTranslation.name}`,
-				{
-					filename: file.filename,
-					path: file.path,
-					originalLength: file.content.length,
-					translatedLength: translatedContent.length,
-				},
+				{ originalLength: file.content.length, translatedLength: translatedContent.length },
 			);
 		}
 
@@ -62,7 +48,6 @@ export class TranslationValidatorManager {
 		if (sizeRatio < RATIOS.size.min || sizeRatio > RATIOS.size.max) {
 			file.logger.warn(
 				{
-					filename: file.filename,
 					sizeRatio: sizeRatio.toFixed(2),
 					originalLength: file.content.length,
 					translatedLength: translatedContent.length,
@@ -77,7 +62,7 @@ export class TranslationValidatorManager {
 
 		file.logger.debug(
 			{ originalHeadings, translatedHeadings, headingRatio, regex: REGEXES.headings },
-			`Heading counts for ${file.filename}`,
+			"Heading counts for translation",
 		);
 
 		if (originalHeadings === 0) {
@@ -91,7 +76,6 @@ export class TranslationValidatorManager {
 				ErrorCode.FormatValidationFailed,
 				`${TranslationValidatorManager.name}.${this.validateTranslation.name}`,
 				{
-					path: file.path,
 					originalHeadings,
 					translatedHeadings,
 					originalLength: file.content.length,
@@ -100,12 +84,7 @@ export class TranslationValidatorManager {
 			);
 		} else if (headingRatio < RATIOS.heading.min || headingRatio > RATIOS.heading.max) {
 			file.logger.warn(
-				{
-					filename: file.filename,
-					originalHeadings,
-					translatedHeadings,
-					headingRatio: headingRatio.toFixed(2),
-				},
+				{ originalHeadings, translatedHeadings, headingRatio: headingRatio.toFixed(2) },
 				"Significant heading count mismatch detected",
 			);
 		}
@@ -115,12 +94,7 @@ export class TranslationValidatorManager {
 		this.validateFrontmatterIntegrity(file, translatedContent);
 
 		file.logger.debug(
-			{
-				filename: file.filename,
-				sizeRatio: sizeRatio.toFixed(2),
-				originalHeadings,
-				translatedHeadings,
-			},
+			{ sizeRatio: sizeRatio.toFixed(2), originalHeadings, translatedHeadings },
 			"Translation validation passed",
 		);
 	}
@@ -134,6 +108,9 @@ export class TranslationValidatorManager {
 	 *
 	 * @param file Original file containing source content for comparison
 	 * @param translatedContent Translated content to validate against source
+	 *
+	 * @throws {ApplicationError} with {@link ErrorCode.FormatValidationFailed}
+	 * if validation checks fail (significant code block count mismatch or code blocks lost during translation)
 	 */
 	private validateCodeBlockPreservation(file: TranslationFile, translatedContent: string): void {
 		const originalCodeBlocks = (file.content.match(REGEXES.codeBlock) ?? []).length;
@@ -141,7 +118,7 @@ export class TranslationValidatorManager {
 
 		file.logger.debug(
 			{ originalCodeBlocks, translatedCodeBlocks },
-			`Code block counts for ${file.filename}`,
+			"Code block counts for translation",
 		);
 
 		if (originalCodeBlocks === 0) {
@@ -152,14 +129,15 @@ export class TranslationValidatorManager {
 		const codeBlockRatio = translatedCodeBlocks / originalCodeBlocks;
 
 		if (codeBlockRatio < RATIOS.codeBlock.min || codeBlockRatio > RATIOS.codeBlock.max) {
-			file.logger.warn(
+			throw new ApplicationError(
+				"Significant code block count mismatch detected",
+				ErrorCode.FormatValidationFailed,
+				`${TranslationValidatorManager.name}.${this.validateCodeBlockPreservation.name}`,
 				{
-					filename: file.filename,
 					originalCodeBlocks,
 					translatedCodeBlocks,
 					codeBlockRatio: codeBlockRatio.toFixed(2),
 				},
-				"Significant code block count mismatch detected - code blocks may have been corrupted or removed",
 			);
 		}
 	}
@@ -173,15 +151,15 @@ export class TranslationValidatorManager {
 	 *
 	 * @param file Original file containing source content for comparison
 	 * @param translatedContent Translated content to validate against source
+	 *
+	 * @throws {ApplicationError} with {@link ErrorCode.FormatValidationFailed}
+	 * if validation checks fail (significant markdown link count mismatch or links lost during translation)
 	 */
 	private validateLinkPreservation(file: TranslationFile, translatedContent: string): void {
 		const originalLinks = (file.content.match(REGEXES.markdownLink) ?? []).length;
 		const translatedLinks = (translatedContent.match(REGEXES.markdownLink) ?? []).length;
 
-		file.logger.debug(
-			{ originalLinks, translatedLinks },
-			`Markdown link counts for ${file.filename}`,
-		);
+		file.logger.debug({ originalLinks, translatedLinks }, "Markdown link counts for translation");
 
 		if (originalLinks === 0) {
 			file.logger.debug("Original file contains no markdown links. Skipping link validation");
@@ -191,14 +169,11 @@ export class TranslationValidatorManager {
 		const linkRatio = translatedLinks / originalLinks;
 
 		if (linkRatio < RATIOS.link.min || linkRatio > RATIOS.link.max) {
-			file.logger.warn(
-				{
-					filename: file.filename,
-					originalLinks,
-					translatedLinks,
-					linkRatio: linkRatio.toFixed(2),
-				},
-				"Significant markdown link count mismatch detected - links may have been broken or removed",
+			throw new ApplicationError(
+				"Significant markdown link count mismatch detected",
+				ErrorCode.FormatValidationFailed,
+				`${TranslationValidatorManager.name}.${this.validateLinkPreservation.name}`,
+				{ originalLinks, translatedLinks, linkRatio: linkRatio.toFixed(2) },
 			);
 		}
 	}
@@ -212,10 +187,15 @@ export class TranslationValidatorManager {
 	 *
 	 * @param file Original file containing source content for comparison
 	 * @param translatedContent Translated content to validate against source
+	 *
+	 * @throws {ApplicationError} with {@link ErrorCode.FormatValidationFailed}
+	 * if validation checks fail (frontmatter keys missing in translation or frontmatter lost during translation)
 	 */
 	private validateFrontmatterIntegrity(file: TranslationFile, translatedContent: string): void {
-		const originalFrontmatter = REGEXES.frontmatter.exec(file.content)?.[1];
-		const translatedFrontmatter = REGEXES.frontmatter.exec(translatedContent)?.[1];
+		const originalMatch = REGEXES.frontmatter.exec(file.content);
+		const translatedMatch = REGEXES.frontmatter.exec(translatedContent);
+		const originalFrontmatter = originalMatch?.groups.content;
+		const translatedFrontmatter = translatedMatch?.groups.content;
 
 		if (!originalFrontmatter) {
 			file.logger.debug("Original file contains no frontmatter. Skipping frontmatter validation");
@@ -223,63 +203,53 @@ export class TranslationValidatorManager {
 		}
 
 		if (!translatedFrontmatter) {
-			file.logger.warn(
-				{ filename: file.filename },
-				"Frontmatter lost during translation - original had frontmatter but translation does not",
+			throw new ApplicationError(
+				"Frontmatter lost during translation",
+				ErrorCode.FormatValidationFailed,
+				`${TranslationValidatorManager.name}.${this.validateFrontmatterIntegrity.name}`,
+				{ originalFrontmatter, translatedFrontmatter },
 			);
-			return;
 		}
 
-		const extractKeys = (content: string): Set<string> => {
-			const keys = new Set<string>();
-			let match: RegExpExecArray | null;
-
-			const regex = new RegExp(REGEXES.frontmatterKey.source, REGEXES.frontmatterKey.flags);
-			while ((match = regex.exec(content)) !== null) {
-				if (match[1]) keys.add(match[1]);
-			}
-			return keys;
-		};
-
-		const originalKeys = extractKeys(originalFrontmatter);
-		const translatedKeys = extractKeys(translatedFrontmatter);
+		const originalKeys = this.extractKeys(originalFrontmatter);
+		const translatedKeys = this.extractKeys(translatedFrontmatter);
 
 		file.logger.debug(
-			{
-				originalKeys: [...originalKeys],
-				translatedKeys: [...translatedKeys],
-			},
-			`Frontmatter keys for ${file.filename}`,
+			{ originalKeys: [...originalKeys], translatedKeys: [...translatedKeys] },
+			"Frontmatter keys for translation",
 		);
-
-		const missingRequiredKeys = REQUIRED_FRONTMATTER_KEYS.filter(
-			(key) => originalKeys.has(key) && !translatedKeys.has(key),
-		);
-
-		if (missingRequiredKeys.length > 0) {
-			file.logger.warn(
-				{
-					filename: file.filename,
-					missingRequiredKeys,
-					originalKeys: [...originalKeys],
-					translatedKeys: [...translatedKeys],
-				},
-				"Required frontmatter keys missing in translation",
-			);
-		}
 
 		const missingKeys = [...originalKeys].filter((key) => !translatedKeys.has(key));
 
-		if (missingKeys.length > 0 && missingKeys.some((key) => !missingRequiredKeys.includes(key))) {
-			const nonRequiredMissing = missingKeys.filter((key) => !missingRequiredKeys.includes(key));
-			file.logger.warn(
-				{
-					filename: file.filename,
-					missingKeys: nonRequiredMissing,
-				},
-				"Some frontmatter keys missing in translation",
+		if (missingKeys.length > 0) {
+			throw new ApplicationError(
+				"Frontmatter keys missing in translation",
+				ErrorCode.FormatValidationFailed,
+				`${TranslationValidatorManager.name}.${this.validateFrontmatterIntegrity.name}`,
+				{ missingKeys },
 			);
 		}
+	}
+
+	private extractKeys(frontmatterContent: string): Set<string> {
+		const keys = new Set<string>();
+		if (!frontmatterContent) return keys;
+
+		const lines = frontmatterContent.split("\n").filter(Boolean);
+		for (const line of lines) {
+			const trimmedLine = line.trim();
+			if (!trimmedLine) continue;
+
+			const [key] = trimmedLine
+				.split(":")
+				.map((s) => s.trim())
+				.filter(Boolean);
+			if (!key) continue;
+
+			keys.add(key);
+		}
+
+		return keys;
 	}
 
 	/**
@@ -325,7 +295,8 @@ export class TranslationValidatorManager {
 		const translatedEndsWithNewline = reassembledContent.endsWith("\n");
 
 		if (originalEndsWithNewline && !translatedEndsWithNewline) {
-			const originalTrailingNewlines = REGEXES.trailingNewlines.exec(file.content)?.[0] ?? "";
+			const originalMatch = REGEXES.trailingNewlines.exec(file.content);
+			const originalTrailingNewlines = originalMatch?.[0] ?? "";
 			reassembledContent += originalTrailingNewlines;
 
 			file.logger.debug(
@@ -356,6 +327,9 @@ export class TranslationValidatorManager {
 	 * @param file File instance for logger context
 	 *
 	 * @returns Cleaned translated content with artifacts removed
+	 *
+	 * @throws {ApplicationError} with {@link ErrorCode.FormatValidationFailed}
+	 * if validation checks fail (line endings do not match original content)
 	 *
 	 * @example
 	 * ```typescript
@@ -402,6 +376,9 @@ export class TranslationValidatorManager {
 	 *
 	 * @param file File to analyze
 	 *
+	 * @throws {ApplicationError} with {@link ErrorCode.NoContent}
+	 * if file content is empty
+	 *
 	 * @returns Resolves to the detailed language analysis
 	 */
 	public async getLanguageAnalysis(file: TranslationFile) {
@@ -410,7 +387,7 @@ export class TranslationValidatorManager {
 				"File content is empty",
 				ErrorCode.NoContent,
 				`${TranslationValidatorManager.name}.${this.getLanguageAnalysis.name}`,
-				{ filename: file.filename, path: file.path, contentLength: file.content.length },
+				{ contentLength: file.content.length },
 			);
 		}
 
@@ -419,7 +396,7 @@ export class TranslationValidatorManager {
 			file.content,
 		);
 
-		this.logger.info({ analysis }, "Analyzed language of content");
+		file.logger.info({ analysis }, "Analyzed language of content");
 
 		return analysis;
 	}
@@ -434,15 +411,15 @@ export class TranslationValidatorManager {
 	 */
 	public async isContentTranslated(file: TranslationFile): Promise<boolean> {
 		try {
-			this.logger.info({ filename: file.filename }, "Checking if content is already translated");
+			file.logger.info("Checking if content is already translated");
 
 			const analysis = await this.getLanguageAnalysis(file);
 
-			this.logger.info({ analysis }, "Checked translation status");
+			file.logger.info({ analysis }, "Checked translation status");
 
 			return analysis.isTranslated;
 		} catch (error) {
-			this.logger.error(
+			file.logger.error(
 				{ error },
 				"Error checking if content is translated. Assuming not translated",
 			);
