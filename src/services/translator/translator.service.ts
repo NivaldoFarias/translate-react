@@ -16,9 +16,10 @@ import { localeService, LocaleService } from "@/services/locale/";
 import { env, logger } from "@/utils/";
 
 import { ChunksManager, TranslationValidatorManager } from "./managers";
+import { REGEXES } from "./managers/managers.constants";
 import { CONNECTIVITY_TEST_MAX_TOKENS, LLM_TEMPERATURE } from "./translator.constants";
 
-/** Dependency injection interface for TranslatorService */
+/** Dependency injection interface for {@link TranslatorService} */
 export interface TranslatorServiceDependencies {
 	/** OpenAI client instance for LLM API calls */
 	openai: OpenAI;
@@ -85,9 +86,11 @@ export class TranslationFile {
 	 * @returns The title of the document, or `undefined` if not found
 	 */
 	private extractDocTitleFromContent(content: string): string | undefined {
-		const frontmatterContentOnly = content.split("---")[1];
+		const frontmatterContentOnly = REGEXES.frontmatter.exec(content)?.groups.content;
 
-		return frontmatterContentOnly?.split("title:")[1]?.trim().replace(/['"]/g, "");
+		if (!frontmatterContentOnly) return;
+
+		return frontmatterContentOnly.split("title:")[1]?.trim().replace(/['"]/g, "");
 	}
 }
 
@@ -206,7 +209,11 @@ export class TranslatorService {
 	 * @returns `true` if the response is valid, `false` otherwise
 	 */
 	private isLLMResponseValid(response: OpenAI.Chat.Completions.ChatCompletion): boolean {
-		return !!response.id || !!response.usage?.total_tokens || !!response.choices.at(0)?.message;
+		return Boolean(
+			response.id &&
+			typeof response.usage?.total_tokens === "number" &&
+			response.choices.at(0)?.message,
+		);
 	}
 
 	/**

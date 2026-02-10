@@ -80,8 +80,8 @@ export class GitHubRepository {
 				target,
 				branch: branchName,
 				totalItems: response.data.tree.length,
-				uniqueItems: result.length,
-				filteredItems: response.data.tree.length - result.length,
+				filteredItems: result.length,
+				excludedItems: response.data.tree.length - result.length,
 			},
 			"Repository tree fetched",
 		);

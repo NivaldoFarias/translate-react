@@ -15,7 +15,7 @@ import {
 	SUPPORTED_TIKTOKEN_MODELS,
 	SYSTEM_PROMPT_TOKEN_RESERVE,
 	TOKEN_ESTIMATION_FALLBACK_DIVISOR,
-} from "./managers.contants";
+} from "./managers.constants";
 
 /**
  * Result of content chunking operation containing chunks and their separators.
