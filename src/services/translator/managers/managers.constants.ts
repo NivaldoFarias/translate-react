@@ -21,7 +21,7 @@ export const TOKEN_ESTIMATION_FALLBACK_DIVISOR = 3.5;
 /** Regular expressions used in the translation validator manager */
 export const REGEXES = {
 	/** Regex pattern to match trailing newlines */
-	trailingNewlines: regex("\n+$"),
+	trailingNewlines: regex("\r?\n+$"),
 
 	/** Regex pattern to extract YAML frontmatter block (between --- delimiters) */
 	frontmatter: regex("^---\r?\n(?<content>[\\s\\S]*?)\r?\n---"),
@@ -36,7 +36,7 @@ export const REGEXES = {
 	headings: regex("^#{1,6}\\s", "gm"),
 
 	/** Regex pattern to match all newline characters for line ending replacement */
-	lineEnding: regex("\n", "g"),
+	lineEnding: regex("\r?\n", "g"),
 } as const;
 
 /** Ratios used in the translation validator manager */
