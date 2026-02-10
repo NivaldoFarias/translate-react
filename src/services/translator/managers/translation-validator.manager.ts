@@ -7,7 +7,7 @@ import type { ChunksToReassemble } from "./chunks.manager";
 import { ApplicationError, ErrorCode } from "@/errors";
 import { logger } from "@/utils";
 
-import { RATIOS, REGEXES, TRANSLATION_PREFIXES } from "./managers.contants";
+import { RATIOS, REGEXES, TRANSLATION_PREFIXES } from "./managers.constants";
 
 export class TranslationValidatorManager {
 	private readonly logger = logger.child({ component: TranslationValidatorManager.name });
@@ -327,9 +327,6 @@ export class TranslationValidatorManager {
 	 * @param file File instance for logger context
 	 *
 	 * @returns Cleaned translated content with artifacts removed
-	 *
-	 * @throws {ApplicationError} with {@link ErrorCode.FormatValidationFailed}
-	 * if validation checks fail (line endings do not match original content)
 	 *
 	 * @example
 	 * ```typescript

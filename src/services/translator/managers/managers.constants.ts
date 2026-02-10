@@ -24,7 +24,7 @@ export const REGEXES = {
 	trailingNewlines: regex("\n+$"),
 
 	/** Regex pattern to extract YAML frontmatter block (between --- delimiters) */
-	frontmatter: regex("^---(?<content>[\\s\\S]*?)---", "m"),
+	frontmatter: regex("^---\r?\n(?<content>[\\s\\S]*?)\r?\n---"),
 
 	/** Regex pattern to match markdown links: [text](url) and [text](url "title") */
 	markdownLink: regex('\\[(?<text>[^\\]]*)\\]\\((?<url>[^)\\s]+)(?:\\s+"[^"]*")?\\)', "g"),

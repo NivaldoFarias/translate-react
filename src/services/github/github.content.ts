@@ -431,12 +431,12 @@ export class GitHubContent {
 	}
 
 	private async getLastCommitAuthor(prNumber: number): Promise<string | undefined> {
-		const commitsResponse = await this.deps.octokit.pulls.listCommits({
-			...this.deps.repositories.upstream,
-			pull_number: prNumber,
-		});
+		const commits = await this.deps.octokit.paginate(
+			"GET /repos/{owner}/{repo}/pulls/{pull_number}/commits",
+			{ ...this.deps.repositories.upstream, pull_number: prNumber, per_page: 100 },
+		);
 
-		const lastCommit = commitsResponse.data.at(-1);
+		const lastCommit = commits.at(-1);
 
 		return lastCommit?.author?.login;
 	}
