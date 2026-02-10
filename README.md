@@ -89,7 +89,7 @@ These **must** be set in your `.env` file:
 | `OPENAI_PROJECT_ID`  | —                                                  | Optional: OpenAI project ID for tracking       |
 | `MAX_TOKENS`         | `8192`                                             | Maximum tokens per LLM response                |
 | `HEADER_APP_URL`     | `https://github.com/NivaldoFarias/translate-react` | App URL for OpenRouter tracking                |
-| `HEADER_APP_TITLE`   | `translate-react v0.1.22`                          | App title for OpenRouter tracking              |
+| `HEADER_APP_TITLE`   | `translate-react v0.1.23`                          | App title for OpenRouter tracking              |
 | `MAX_RETRY_ATTEMPTS` | `5`                                                | Maximum number of retries for LLM API requests |
 
 </details>
