@@ -27,7 +27,7 @@ export const REGEXES = {
 	titleFrontmatterKey: new RegExp(/title:\s*(?<title>.+)/),
 
 	/** Regex pattern to match markdown links: [text](url) and [text](url "title") */
-	markdownLink: new RegExp(/\[(?<text>[^\\]]*)\]\((?<url>[^)\s]+)(?:\s+"[^"]*")?\)/g),
+	markdownLink: new RegExp(/\[(?<text>[^\]]*)\]\((?<url>[^)\s]+)(?:\s+"[^"]*")?\)/g),
 
 	/** Regex pattern to match fenced code blocks (triple backticks with optional language identifier) */
 	codeBlock: new RegExp(/^```([\s\S]*?)\r?\n```/gm),
