@@ -35,8 +35,9 @@ export function createMockCommentBuilderService() {
 export function createMockGitHubService() {
 	return {
 		getDefaultBranch: mock(() => Promise.resolve("main")),
-		getForkOwner: mock(() => Promise.resolve("test-fork-owner")),
+		getForkOwner: mock(() => "test-fork-owner"),
 		getCurrentUser: mock(() => Promise.resolve("test-user")),
+		isProvidedUserForkOwnerOrBot: mock(() => Promise.resolve(true)),
 		getRepositoryTree: mock(() =>
 			Promise.resolve([
 				{

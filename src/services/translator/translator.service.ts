@@ -86,11 +86,13 @@ export class TranslationFile {
 	 * @returns The title of the document, or `undefined` if not found
 	 */
 	private extractDocTitleFromContent(content: string): string | undefined {
-		const frontmatterContentOnly = REGEXES.frontmatter.exec(content)?.groups.content;
+		const frontmatterContentOnly = REGEXES.frontmatter.exec(content)?.groups?.["content"];
 
 		if (!frontmatterContentOnly) return;
 
-		return frontmatterContentOnly.split("title:")[1]?.trim().replace(/['"]/g, "");
+		const title = REGEXES.titleFrontmatterKey.exec(frontmatterContentOnly)?.groups?.["title"];
+
+		return title?.replace(new RegExp(/['"]/g), "");
 	}
 }
 

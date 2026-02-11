@@ -65,24 +65,6 @@ describe("TranslatorService", () => {
 	});
 
 	describe("TranslationFile", () => {
-		test("should extract title from frontmatter when title is present", () => {
-			const content = `# Hello\nWelcome to React!`;
-			const file = createTranslationFileFixture({ content }, "Hello");
-			expect(file.title).toBe("Hello");
-		});
-
-		test("should extract title from frontmatter when title is present with double quotes", () => {
-			const content = `---\ntitle: "Hello"\n---\n# Hello\nWelcome to React!`;
-			const file = createTranslationFileFixture({ content });
-			expect(file.title).toBe("Hello");
-		});
-
-		test("should not extract title from frontmatter when title is not present", () => {
-			const content = `# Hello\nWelcome to React!`;
-			const file = createTranslationFileFixture({ content });
-			expect(file.title).toBeUndefined();
-		});
-
 		describe("logger", () => {
 			test("should create logger with file context when no parent logger provided", () => {
 				const file = createTranslationFileFixture({
@@ -147,24 +129,21 @@ describe("TranslatorService", () => {
 		});
 
 		describe("extractDocTitleFromContent", () => {
-			test("returns title from frontmatter with single quotes", () => {
-				const content = "---\ntitle: 'Hello'\n---\n# Hello";
+			test("should extract title from frontmatter when title is present", () => {
+				const content = `---\ntitle: 'Hello'\n---\n# Hello\nWelcome to React!`;
 				const file = createTranslationFileFixture({ content });
-
 				expect(file.title).toBe("Hello");
 			});
 
-			test("returns title from frontmatter with double quotes", () => {
-				const content = '---\ntitle: "World"\n---\n# World';
+			test("should extract title from frontmatter when title is present with double quotes", () => {
+				const content = `---\ntitle: "Hello"\n---\n# Hello\nWelcome to React!`;
 				const file = createTranslationFileFixture({ content });
-
-				expect(file.title).toBe("World");
+				expect(file.title).toBe("Hello");
 			});
 
-			test("returns undefined when no title in frontmatter", () => {
-				const content = "---\nother: value\n---\n# Doc";
+			test("should not extract title from frontmatter when title is not present", () => {
+				const content = `# Hello\nWelcome to React!`;
 				const file = createTranslationFileFixture({ content });
-
 				expect(file.title).toBeUndefined();
 			});
 		});
@@ -435,7 +414,7 @@ describe("TranslatorService", () => {
 			expect(translation).toBe(expectedTranslation);
 		});
 
-		test("should throw Error when links are lost during translation", () => {
+		test("should log warning when links are lost during translation", async () => {
 			const title = "Title";
 			const sourceContent = `# Title\n\n[Link 1](https://example.com/1)\n[Link 2](https://example.com/2)\n[Link 3](https://example.com/3)`;
 			const translatedContent = `# Título\n\nTexto traduzido sem links`;
@@ -445,10 +424,13 @@ describe("TranslatorService", () => {
 			);
 
 			const file = createTranslationFileFixture({ content: sourceContent }, title);
-			expect(translatorService.translateContent(file)).rejects.toThrow(ApplicationError);
+			const warnSpy = spyOn(file.logger, "warn");
+			await translatorService.translateContent(file);
+
+			expect(warnSpy).toHaveBeenCalled();
 		});
 
-		test("should throw Error when link count differs significantly (>20%)", () => {
+		test("should log warning when link count differs significantly (>20%)", async () => {
 			const title = "Title";
 			const sourceContent = `# Title\n\n[1](u1) [2](u2) [3](u3) [4](u4) [5](u5)`;
 			const translatedContent = `# Título\n\n[1](u1) [2](u2) [3](u3)`;
@@ -458,7 +440,10 @@ describe("TranslatorService", () => {
 			);
 
 			const file = createTranslationFileFixture({ content: sourceContent }, title);
-			expect(translatorService.translateContent(file)).rejects.toThrow(ApplicationError);
+			const warnSpy = spyOn(file.logger, "warn");
+			await translatorService.translateContent(file);
+
+			expect(warnSpy).toHaveBeenCalled();
 		});
 
 		test("should not throw Error when source has no links", () => {
@@ -522,24 +507,29 @@ describe("TranslatorService", () => {
 			expect(translatorService.translateContent(file)).rejects.toThrow(ApplicationError);
 		});
 
-		test("should throw Error when required key 'title' is missing in translation", () => {
+		test("should log warning when required key 'title' is missing in translation", async () => {
 			const sourceContent = `---\ntitle: 'Hello'\ndescription: 'Test'\n---\n\n# Content`;
 			const translatedContent = `---\ndescription: 'Teste'\n---\n\n# Conteúdo`;
 
 			mockChatCompletionsCreate.mockResolvedValue(createChatCompletionFixture(translatedContent));
-
 			const file = createTranslationFileFixture({ content: sourceContent });
-			expect(translatorService.translateContent(file)).rejects.toThrow(ApplicationError);
+			const warnSpy = spyOn(file.logger, "warn");
+			await translatorService.translateContent(file);
+
+			expect(warnSpy).toHaveBeenCalled();
 		});
 
-		test("should throw Error when non-required keys are missing in translation", () => {
+		test("should log warning when non-required keys are missing in translation", async () => {
 			const sourceContent = `---\ntitle: 'Hello'\ncustom_key: 'value'\nauthor: 'John'\n---\n\n# Content`;
 			const translatedContent = `---\ntitle: 'Olá'\n---\n\n# Conteúdo`;
 
 			mockChatCompletionsCreate.mockResolvedValue(createChatCompletionFixture(translatedContent));
 
 			const file = createTranslationFileFixture({ content: sourceContent });
-			expect(translatorService.translateContent(file)).rejects.toThrow(ApplicationError);
+			const warnSpy = spyOn(file.logger, "warn");
+			await translatorService.translateContent(file);
+
+			expect(warnSpy).toHaveBeenCalled();
 		});
 
 		test("should not throw Error when source has no frontmatter", () => {

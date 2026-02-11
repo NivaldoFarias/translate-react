@@ -377,8 +377,9 @@ export class TranslationBatchManager {
 
 			if (upstreamPR) {
 				const prStatus = await this.services.github.checkPullRequestStatus(upstreamPR.number);
-				const forkOwner = this.services.github.getForkOwner();
-				const isCreatedByBotOrUser = prStatus.createdBy === forkOwner;
+				const isCreatedByBotOrUser = await this.services.github.isProvidedUserForkOwnerOrBot(
+					prStatus.createdBy,
+				);
 
 				if (prStatus.hasConflicts && !isCreatedByBotOrUser) {
 					this.logger.info(
@@ -474,8 +475,9 @@ export class TranslationBatchManager {
 
 		if (existingPR) {
 			const prStatus = await this.services.github.checkPullRequestStatus(existingPR.number);
-			const forkOwner = this.services.github.getForkOwner();
-			const isCreatedByBotOrUser = prStatus.createdBy === forkOwner;
+			const isCreatedByBotOrUser = await this.services.github.isProvidedUserForkOwnerOrBot(
+				prStatus.createdBy,
+			);
 
 			if (prStatus.needsUpdate && !isCreatedByBotOrUser) {
 				this.logger.info(
