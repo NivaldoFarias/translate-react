@@ -37,19 +37,17 @@ export abstract class BaseRunnerService {
 		timestamp: Date.now(),
 	};
 
-	/** Injected service dependencies */
-	protected readonly services: RunnerServiceDependencies;
-
 	/** Statistics tracking for the translation process */
 	protected metadata = {
 		results: new Map<ProcessedFileResult["filename"], ProcessedFileResult>(),
 		timestamp: Date.now(),
 	};
 
-	/** Manager instances for workflow orchestration */
-	protected fileDiscovery: FileDiscoveryManager;
-	protected translationBatch: TranslationBatchManager;
-	protected readonly prManager: PRManager;
+	protected readonly managers: {
+		fileDiscovery: FileDiscoveryManager;
+		translationBatch: TranslationBatchManager;
+		prManager: PRManager;
+	};
 
 	/**
 	 * Cleanup handler for process termination.
@@ -74,20 +72,17 @@ export abstract class BaseRunnerService {
 	 * @param options Runner configuration options
 	 */
 	constructor(
-		services: RunnerServiceDependencies,
+		/** Injected service dependencies */
+		protected readonly services: RunnerServiceDependencies,
 		protected readonly options: RunnerOptions = {
 			batchSize: env.BATCH_SIZE,
 		},
 	) {
-		this.services = services;
-
-		this.fileDiscovery = new FileDiscoveryManager(services);
-		this.translationBatch = new TranslationBatchManager(
-			services,
-			new Map(),
-			this.metadata.timestamp,
-		);
-		this.prManager = new PRManager(services, this.metadata.timestamp);
+		this.managers = {
+			fileDiscovery: new FileDiscoveryManager(services),
+			translationBatch: new TranslationBatchManager(services, new Map(), this.metadata.timestamp),
+			prManager: new PRManager(services, this.metadata.timestamp),
+		};
 
 		registerCleanup(async () => {
 			try {
@@ -164,7 +159,7 @@ export abstract class BaseRunnerService {
 	}
 
 	/**
-	 * Fetches the upstream repository tree and glossary for translation processing.
+	 * Fetches the upstream repository tree and translation guidelines for translation processing.
 	 *
 	 * Retrieves all candidate files from upstream.
 	 */
@@ -173,28 +168,39 @@ export abstract class BaseRunnerService {
 
 		this.state.repositoryTree = this.patchRepositoryItem(repositoryTree);
 
-		this.services.translator.glossary = await this.fetchGlossary();
+		this.services.translator.translationGuidelines = await this.fetchTranslationGuidelinesFile();
 
-		this.logger.info("Repository content and glossary fetched successfully");
+		const hasGuidelines = this.services.translator.translationGuidelines !== null;
+		this.logger.info(
+			{ hasGuidelines },
+			"Repository tree fetched" + (hasGuidelines ? " with translation guidelines" : ""),
+		);
 	}
 
 	/**
-	 * Fetches the glossary file from the repository.
+	 * Fetches the translation guidelines file from the repository.
 	 *
-	 * @throws {ApplicationError} with {@link ErrorCode.ResourceLoadError} If the glossary fails to load
+	 * Uses auto-discovery to find common filenames (`GLOSSARY.md`, `TRANSLATION.md`, etc.)
+	 * unless `TRANSLATION_GUIDELINES_FILE` env var is explicitly configured.
+	 *
+	 * @returns The translation guidelines file content, or `null` if not found
 	 */
-	private async fetchGlossary(): Promise<string> {
-		const glossary = await this.services.github.fetchGlossary();
+	private async fetchTranslationGuidelinesFile(): Promise<string | null> {
+		const translationGuidelines = await this.services.github.fetchTranslationGuidelinesFile();
 
-		if (!glossary) {
-			throw new ApplicationError(
-				"Glossary is empty or failed to load",
-				ErrorCode.ResourceLoadError,
-				`${BaseRunnerService.name}.${this.fetchGlossary.name}`,
+		if (!translationGuidelines) {
+			this.logger.warn(
+				"No translation guidelines file found - translations may lack terminology consistency",
 			);
+			return null;
 		}
 
-		return glossary;
+		this.logger.debug(
+			{ contentLength: translationGuidelines.length },
+			"Translation guidelines file loaded successfully",
+		);
+
+		return translationGuidelines;
 	}
 
 	/**
@@ -244,7 +250,7 @@ export abstract class BaseRunnerService {
 			return;
 		}
 
-		const { filesToTranslate, invalidPRsByFile } = await this.fileDiscovery.discoverFiles(
+		const { filesToTranslate, invalidPRsByFile } = await this.managers.fileDiscovery.discoverFiles(
 			this.state.repositoryTree,
 		);
 
@@ -265,7 +271,7 @@ export abstract class BaseRunnerService {
 		this.state.filesToTranslate = filesToTranslate;
 		this.state.invalidPRsByFile = invalidPRsByFile;
 
-		this.translationBatch = new TranslationBatchManager(
+		this.managers.translationBatch = new TranslationBatchManager(
 			this.services,
 			invalidPRsByFile,
 			this.metadata.timestamp,
@@ -274,7 +280,7 @@ export abstract class BaseRunnerService {
 
 	/** Updates the progress issue with the translation results */
 	protected async updateIssueWithResults(): Promise<void> {
-		await this.prManager.updateIssue(this.metadata.results, this.state.filesToTranslate);
+		await this.managers.prManager.updateIssue(this.metadata.results, this.state.filesToTranslate);
 	}
 
 	/**
@@ -285,7 +291,7 @@ export abstract class BaseRunnerService {
 	 * @see {@link PRManager.printFinalStatistics}
 	 */
 	protected printFinalStatistics(): WorkflowStatistics {
-		return this.prManager.printFinalStatistics(this.metadata.results);
+		return this.managers.prManager.printFinalStatistics(this.metadata.results);
 	}
 
 	/**
@@ -296,7 +302,7 @@ export abstract class BaseRunnerService {
 	 * @see {@link TranslationBatchManager.processBatches}
 	 */
 	protected async processInBatches(batchSize = env.BATCH_SIZE): Promise<void> {
-		this.metadata.results = await this.translationBatch.processBatches(
+		this.metadata.results = await this.managers.translationBatch.processBatches(
 			this.state.filesToTranslate,
 			batchSize,
 		);

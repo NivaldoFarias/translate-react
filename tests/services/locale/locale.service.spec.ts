@@ -150,6 +150,8 @@ describe("ptBrLocale.pullRequest.body", () => {
 						hasConflicts: true,
 						mergeable: false,
 						mergeableState: "dirty",
+						createdBy: "other-user",
+						lastCommitAuthor: "other-user",
 					},
 				},
 			});
@@ -171,6 +173,8 @@ describe("ptBrLocale.pullRequest.body", () => {
 						hasConflicts: true,
 						mergeable: false,
 						mergeableState: "dirty",
+						createdBy: "other-user",
+						lastCommitAuthor: "other-user",
 					},
 				},
 			});
@@ -189,6 +193,8 @@ describe("ptBrLocale.pullRequest.body", () => {
 						hasConflicts: true,
 						mergeable: false,
 						mergeableState: "dirty",
+						createdBy: "other-user",
+						lastCommitAuthor: "other-user",
 					},
 				},
 			});
@@ -208,6 +214,8 @@ describe("ptBrLocale.pullRequest.body", () => {
 						hasConflicts: true,
 						mergeable: false,
 						mergeableState: "dirty",
+						createdBy: "other-user",
+						lastCommitAuthor: "other-user",
 					},
 				},
 			});
@@ -291,6 +299,8 @@ describe("ruLocale.pullRequest.body", () => {
 						hasConflicts: true,
 						mergeable: false,
 						mergeableState: "dirty",
+						createdBy: "other-user",
+						lastCommitAuthor: "other-user",
 					},
 				},
 			});

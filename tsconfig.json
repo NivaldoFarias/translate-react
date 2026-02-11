@@ -23,10 +23,10 @@
         "isolatedModules": true,
         "baseUrl": ".",
         "paths": {
-            "@/*": ["src/*"],
-            "@tests/*": ["tests/*"]
+            "@/*": ["./src/*"],
+            "@tests/*": ["./tests/*"]
         }
     },
-    "include": ["src/**/*", "tests/**/*", "./*.config.*"],
+    "include": ["./src/**/*", "./tests/**/*", "./*.config.*"],
     "exclude": ["node_modules", "dist"]
 }

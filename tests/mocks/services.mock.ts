@@ -35,6 +35,9 @@ export function createMockCommentBuilderService() {
 export function createMockGitHubService() {
 	return {
 		getDefaultBranch: mock(() => Promise.resolve("main")),
+		getForkOwner: mock(() => "test-fork-owner"),
+		getCurrentUser: mock(() => Promise.resolve("test-user")),
+		isProvidedUserForkOwnerOrBot: mock(() => Promise.resolve(true)),
 		getRepositoryTree: mock(() =>
 			Promise.resolve([
 				{
@@ -50,7 +53,9 @@ export function createMockGitHubService() {
 		forkExists: mock(() => Promise.resolve()),
 		isForkSynced: mock(() => Promise.resolve(true)),
 		syncFork: mock(() => Promise.resolve(true)),
-		fetchGlossary: mock(() => Promise.resolve("React - React\ncomponent - componente")),
+		fetchTranslationGuidelinesFile: mock(
+			() => Promise.resolve("React - React\ncomponent - componente") as Promise<string | null>,
+		),
 		createBranch: mock(() =>
 			Promise.resolve({
 				data: {
@@ -91,7 +96,11 @@ export function createMockGitHubService() {
 			),
 		),
 		checkPullRequestStatus: mock(() =>
-			Promise.resolve({ needsUpdate: false, mergeableState: "clean" } as PullRequestStatus),
+			Promise.resolve({
+				needsUpdate: false,
+				mergeableState: "clean",
+				createdBy: "test-fork-owner",
+			} as PullRequestStatus),
 		),
 		closePullRequest: mock(() =>
 			Promise.resolve({
@@ -141,7 +150,7 @@ export function createMockTranslatorService() {
 				target: "pt-br",
 			},
 		},
-		glossary: null,
+		translationGuidelines: null,
 	};
 }
 

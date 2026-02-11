@@ -45,6 +45,9 @@ export class GitHubService {
 	private readonly repository: GitHubRepository;
 	private readonly branch: GitHubBranch;
 	private readonly content: GitHubContent;
+	private readonly repositories: BaseRepositories;
+
+	private cachedCurrentUser: string | undefined;
 
 	constructor(dependencies: GitHubServiceDependencies = {}) {
 		const shared: SharedGitHubDependencies = {
@@ -52,6 +55,7 @@ export class GitHubService {
 			repositories: dependencies.repositories ?? DEFAULT_REPOSITORIES,
 		};
 
+		this.repositories = shared.repositories;
 		this.content = new GitHubContent(
 			shared,
 			dependencies.commentBuilderService ?? commentBuilderService,
@@ -79,20 +83,56 @@ export class GitHubService {
 	}
 
 	/**
+	 * Gets the fork repository owner username.
+	 *
+	 * Used to identify PRs created by the bot or user.
+	 *
+	 * @returns The fork owner username
+	 */
+	public getForkOwner(): string {
+		return this.repositories.fork.owner;
+	}
+
+	/**
+	 * Gets the current user username.
+	 *
+	 * @returns The current user username
+	 */
+	public async getCurrentUser(): Promise<string> {
+		this.cachedCurrentUser ??= await this.content.getCurrentUser();
+
+		return this.cachedCurrentUser;
+	}
+
+	/**
+	 * Checks if the provided username is the fork owner or the current user.
+	 *
+	 * @param username Username to check
+	 *
+	 * @returns `true` if the username is the fork owner or the current user, `false` otherwise
+	 */
+	public async isProvidedUserForkOwnerOrBot(username: string | undefined): Promise<boolean> {
+		if (!username) return false;
+
+		const forkOwner = this.getForkOwner();
+		const currentUser = await this.getCurrentUser();
+
+		return username === forkOwner || username === currentUser;
+	}
+
+	/**
 	 * Retrieves the repository file tree from fork or upstream.
 	 *
 	 * @param target Which repository to fetch tree from ('fork' or 'upstream')
 	 * @param baseBranch Branch to get tree from (defaults to target's default branch)
-	 * @param filterIgnored Whether to filter ignored paths
 	 *
 	 * @returns Array of repository tree items
 	 */
 	public async getRepositoryTree(
 		target: "fork" | "upstream" = "fork",
 		baseBranch?: string,
-		filterIgnored = true,
 	): Promise<RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"]> {
-		return this.repository.getRepositoryTree(target, baseBranch, filterIgnored);
+		return this.repository.getRepositoryTree(target, baseBranch);
 	}
 
 	/**
@@ -149,12 +189,18 @@ export class GitHubService {
 	}
 
 	/**
-	 * Fetches the glossary.md file from the repository.
+	 * Fetches the translation guidelines file from the upstream repository.
 	 *
-	 * @returns The content of the glossary file as a string, or null if not found
+	 * Uses auto-discovery to find the guidelines file unless `TRANSLATION_GUIDELINES_FILE`
+	 * env var is explicitly set. Common filenames like `GLOSSARY.md` and `TRANSLATION.md`
+	 * are checked in priority order.
+	 *
+	 * @returns The content of the translation guidelines file as a string, or `null` if not found
+	 *
+	 * @see {@link TRANSLATION_GUIDELINES_CANDIDATES} for the list of auto-discovered filenames
 	 */
-	public async fetchGlossary(): Promise<string | null> {
-		return this.repository.fetchGlossary();
+	public async fetchTranslationGuidelinesFile(): Promise<string | null> {
+		return this.repository.fetchTranslationGuidelinesFile();
 	}
 
 	// === Branch Methods ===

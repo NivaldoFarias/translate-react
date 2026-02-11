@@ -73,13 +73,16 @@ describe("RunnerService", () => {
 			expect(runner.run()).rejects.toThrow("Found no files to translate");
 		});
 
-		test("throws ApplicationError when fetchGlossary returns empty string", () => {
+		test("proceeds without error when fetchTranslationGuidelinesFile returns null", async () => {
 			const github = createMockGitHubService();
-			github.fetchGlossary.mockResolvedValue("");
+			github.fetchTranslationGuidelinesFile.mockResolvedValue(null);
 
 			const runner = createTestRunnerService({ github: github as unknown as GitHubService });
 
-			expect(runner.run()).rejects.toThrow("Glossary is empty or failed to load");
+			const stats = await runner.run();
+
+			expect(stats).toBeDefined();
+			expect(stats.totalCount).toBe(1);
 		});
 	});
 });

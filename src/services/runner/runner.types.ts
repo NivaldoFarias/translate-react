@@ -130,6 +130,12 @@ export interface PullRequestStatus {
 
 	/** Whether the PR needs to be closed and recreated due to conflicts */
 	needsUpdate: boolean;
+
+	/** GitHub username of the PR creator */
+	createdBy: string;
+
+	/** GitHub username of the last commit author */
+	lastCommitAuthor: string | undefined;
 }
 
 /**

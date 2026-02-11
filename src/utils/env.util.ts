@@ -127,6 +127,18 @@ const envSchema = z.object({
 
 	/** Concurrency limit for LLM requests */
 	MAX_LLM_CONCURRENCY: z.coerce.number().positive().default(envDefaults.MAX_LLM_CONCURRENCY),
+
+	/**
+	 * Optional explicit filename for the translation guidelines file.
+	 *
+	 * When set, bypasses auto-discovery and fetches this specific file from the
+	 * upstream repository root. Use when the repo's guidelines file doesn't match
+	 * any of the common naming conventions in {@link TRANSLATION_GUIDELINES_CANDIDATES}.
+	 *
+	 * @example "GLOSSARY.md" // for pt-br.react.dev
+	 * @example "TRANSLATION.md" // for ru.react.dev
+	 */
+	TRANSLATION_GUIDELINES_FILE: z.string().optional(),
 });
 
 /** Type definition for the environment configuration */
@@ -186,10 +198,11 @@ function resolveEnvDefaults(): EnvironmentSchemaDefaults {
  * @returns A Zod schema that validates API tokens/keys
  */
 function createTokenSchema(envName: string) {
+	const whitespaceRegex = new RegExp(/\s/);
 	return z
 		.string()
 		.min(MIN_API_TOKEN_LENGTH, `${envName} looks too short; ensure your API key is set`)
-		.refine((value) => !/\s/.test(value), `${envName} must not contain whitespace`)
+		.refine((value) => !whitespaceRegex.test(value), `${envName} must not contain whitespace`)
 		.refine(
 			(value) =>
 				!["CHANGE_ME", "dev-token", "dev-key", "your-token-here", "your-key-here"].includes(value),

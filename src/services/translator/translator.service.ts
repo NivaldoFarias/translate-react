@@ -1,14 +1,10 @@
 import crypto from "node:crypto";
 
-import { MarkdownTextSplitter } from "@langchain/textsplitters";
 import { StatusCodes } from "http-status-codes";
-import { encodingForModel } from "js-tiktoken";
 import OpenAI from "openai";
 import { APIError } from "openai/error";
 import pRetry, { AbortError } from "p-retry";
 
-import type { MarkdownTextSplitterParams } from "@langchain/textsplitters";
-import type { TiktokenModel } from "js-tiktoken";
 import type PQueue from "p-queue";
 import type { Options as RetryOptions } from "p-retry";
 import type { Logger } from "pino";
@@ -17,36 +13,13 @@ import { openai, queue } from "@/clients/";
 import { ApplicationError, ErrorCode } from "@/errors/";
 import { LanguageDetectorService, languageDetectorService } from "@/services/language-detector/";
 import { localeService, LocaleService } from "@/services/locale/";
-import { env, extractDocTitleFromContent, logger } from "@/utils/";
+import { env, logger } from "@/utils/";
 
-import {
-	CHUNK_OVERLAP,
-	CHUNK_TOKEN_BUFFER,
-	CODE_BLOCK_REGEX,
-	CONNECTIVITY_TEST_MAX_TOKENS,
-	FRONTMATTER_KEY_REGEX,
-	FRONTMATTER_REGEX,
-	HEADINGS_REGEX,
-	LINE_ENDING_REGEX,
-	LLM_TEMPERATURE,
-	MARKDOWN_LINK_REGEX,
-	MAX_CHUNK_TOKENS,
-	MAX_CODE_BLOCK_RATIO,
-	MAX_HEADING_RATIO,
-	MAX_LINK_RATIO,
-	MAX_SIZE_RATIO,
-	MIN_CODE_BLOCK_RATIO,
-	MIN_HEADING_RATIO,
-	MIN_LINK_RATIO,
-	MIN_SIZE_RATIO,
-	REQUIRED_FRONTMATTER_KEYS,
-	SYSTEM_PROMPT_TOKEN_RESERVE,
-	TOKEN_ESTIMATION_FALLBACK_DIVISOR,
-	TRAILING_NEWLINES_REGEX,
-	TRANSLATION_PREFIXES,
-} from "./translator.constants";
+import { ChunksManager, TranslationValidatorManager } from "./managers";
+import { REGEXES } from "./managers/managers.constants";
+import { CONNECTIVITY_TEST_MAX_TOKENS, LLM_TEMPERATURE } from "./translator.constants";
 
-/** Dependency injection interface for TranslatorService */
+/** Dependency injection interface for {@link TranslatorService} */
 export interface TranslatorServiceDependencies {
 	/** OpenAI client instance for LLM API calls */
 	openai: OpenAI;
@@ -65,28 +38,6 @@ export interface TranslatorServiceDependencies {
 
 	/** Retry configuration for LLM API calls */
 	retryConfig: RetryOptions;
-}
-
-/**
- * Result of content chunking operation containing chunks and their separators.
- *
- * The separators array contains the exact whitespace patterns that existed
- * between each pair of chunks in the original content, enabling perfect
- * reassembly that preserves the source formatting.
- */
-interface ChunkingResult {
-	/** Array of content chunks split from the original text */
-	chunks: string[];
-
-	/**
-	 * Array of separator strings between chunks.
-	 *
-	 * Length is always `chunks.length - 1` since there's one separator
-	 * between each pair of adjacent chunks. Each separator is the exact
-	 * whitespace pattern (e.g., `\n`, `\n\n`, `\n\n\n`) extracted from
-	 * the original content at that boundary position.
-	 */
-	separators: string[];
 }
 
 /** Represents a file that needs to be translated */
@@ -116,13 +67,32 @@ export class TranslationFile {
 		/** Optional parent logger to create child logger from (defaults to root logger) */
 		parentLogger?: Logger,
 	) {
-		this.title = extractDocTitleFromContent(content);
+		this.title = this.extractDocTitleFromContent(content);
 		this.correlationId = crypto.randomUUID();
 		this.logger = (parentLogger ?? logger).child({
 			file: this.filename,
 			path: this.path,
 			correlationId: this.correlationId,
 		});
+	}
+
+	/**
+	 * Extracts the title of a document from its content by matching the `title` frontmatter key.
+	 *
+	 * Supports both single and double quotes around the title value.
+	 *
+	 * @param content The content of the document
+	 *
+	 * @returns The title of the document, or `undefined` if not found
+	 */
+	private extractDocTitleFromContent(content: string): string | undefined {
+		const frontmatterContentOnly = REGEXES.frontmatter.exec(content)?.groups?.["content"];
+
+		if (!frontmatterContentOnly) return;
+
+		const title = REGEXES.titleFrontmatterKey.exec(frontmatterContentOnly)?.groups?.["title"];
+
+		return title?.replace(new RegExp(/['"]/g), "");
 	}
 }
 
@@ -163,8 +133,13 @@ export class TranslatorService {
 		languageDetector: LanguageDetectorService;
 	};
 
-	/** Glossary for consistent term translations */
-	public glossary: string | null = null;
+	/** Translation guidelines for consistent term translations */
+	public translationGuidelines: string | null = null;
+
+	public readonly managers: {
+		translationValidator: TranslationValidatorManager;
+		chunks: ChunksManager;
+	};
 
 	/**
 	 * Creates a new TranslatorService instance with injected dependencies.
@@ -180,6 +155,10 @@ export class TranslatorService {
 			languageDetector: dependencies.languageDetectorService,
 		};
 		this.retryConfig = dependencies.retryConfig;
+		this.managers = {
+			translationValidator: new TranslationValidatorManager(this.services.languageDetector),
+			chunks: new ChunksManager(this.model),
+		};
 	}
 
 	/**
@@ -223,8 +202,20 @@ export class TranslatorService {
 		);
 	}
 
+	/**
+	 * Checks if an LLM API response is valid.
+	 * Checks if the response has an ID, usage, and a message.
+	 *
+	 * @param response LLM API response to check
+	 *
+	 * @returns `true` if the response is valid, `false` otherwise
+	 */
 	private isLLMResponseValid(response: OpenAI.Chat.Completions.ChatCompletion): boolean {
-		return !!response.id || !!response.usage?.total_tokens || !!response.choices.at(0)?.message;
+		return Boolean(
+			response.id &&
+			typeof response.usage?.total_tokens === "number" &&
+			response.choices.at(0)?.message,
+		);
 	}
 
 	/**
@@ -280,7 +271,7 @@ export class TranslatorService {
 		const translationStartTime = Date.now();
 		let translatedContent: string;
 
-		const contentNeedsChunking = this.needsChunking(file);
+		const contentNeedsChunking = this.managers.chunks.needsChunking(file);
 		if (!contentNeedsChunking) {
 			translatedContent = await this.callLanguageModel(file);
 		} else {
@@ -289,7 +280,7 @@ export class TranslatorService {
 
 		const translationDuration = Date.now() - translationStartTime;
 
-		this.validateTranslation(file, translatedContent);
+		this.managers.translationValidator.validateTranslation(file, translatedContent);
 
 		file.logger.info(
 			{
@@ -302,513 +293,7 @@ export class TranslatorService {
 			"Translation completed successfully",
 		);
 
-		return this.cleanupTranslatedContent(translatedContent, file);
-	}
-
-	/**
-	 * Validates translated content to ensure completeness and quality.
-	 *
-	 * Performs a comprehensive set of validation checks to catch potential translation
-	 * issues before committing to the repository. This multi-layered validation approach
-	 * helps prevent incomplete translations, structural corruption, and content loss.
-	 *
-	 * @param file Original file containing source content for comparison
-	 * @param translatedContent Translated content to validate against source
-	 *
-	 * @throws {ApplicationError} with {@link ErrorCode.FormatValidationFailed} if validation checks fail (empty content, complete heading loss)
-	 *
-	 * @example
-	 * ```typescript
-	 * const file = new TranslationFile('# Title\nContent', 'doc.md', 'path', 'sha');
-	 * const translated = '# Título\nConteúdo';
-	 * validateTranslation(file, translated); // Passes all checks
-	 * ```
-	 */
-	private validateTranslation(file: TranslationFile, translatedContent: string): void {
-		if (!translatedContent || translatedContent.trim().length === 0) {
-			file.logger.error(
-				{ filename: file.filename, translatedContent },
-				"Translated content is empty",
-			);
-
-			throw new ApplicationError(
-				"Translation produced empty content",
-				ErrorCode.FormatValidationFailed,
-				`${TranslatorService.name}.${this.validateTranslation.name}`,
-				{
-					filename: file.filename,
-					path: file.path,
-					originalLength: file.content.length,
-					translatedLength: translatedContent.length,
-				},
-			);
-		}
-
-		const sizeRatio = translatedContent.length / file.content.length;
-		if (sizeRatio < MIN_SIZE_RATIO || sizeRatio > MAX_SIZE_RATIO) {
-			file.logger.warn(
-				{
-					filename: file.filename,
-					sizeRatio: sizeRatio.toFixed(2),
-					originalLength: file.content.length,
-					translatedLength: translatedContent.length,
-				},
-				`Translation size ratio outside expected range (${MIN_SIZE_RATIO}-${MAX_SIZE_RATIO})`,
-			);
-		}
-
-		const originalHeadings = (file.content.match(HEADINGS_REGEX) ?? []).length;
-		const translatedHeadings = (translatedContent.match(HEADINGS_REGEX) ?? []).length;
-		const headingRatio = translatedHeadings / originalHeadings;
-
-		file.logger.debug(
-			{ originalHeadings, translatedHeadings, headingRatio, regex: HEADINGS_REGEX },
-			`Heading counts for ${file.filename}`,
-		);
-
-		if (originalHeadings === 0) {
-			file.logger.warn("Original file contains no markdown headings. Skipping heading validation");
-			return;
-		}
-
-		if (translatedHeadings === 0) {
-			file.logger.error(
-				{ filename: file.filename, originalHeadings, translatedHeadings },
-				"Translation lost all markdown headings",
-			);
-
-			throw new ApplicationError(
-				"All markdown headings lost during translation",
-				ErrorCode.FormatValidationFailed,
-				`${TranslatorService.name}.${this.validateTranslation.name}`,
-				{
-					path: file.path,
-					originalHeadings,
-					translatedHeadings,
-					originalLength: file.content.length,
-					translatedLength: translatedContent.length,
-				},
-			);
-		} else if (headingRatio < MIN_HEADING_RATIO || headingRatio > MAX_HEADING_RATIO) {
-			file.logger.warn(
-				{
-					filename: file.filename,
-					originalHeadings,
-					translatedHeadings,
-					headingRatio: headingRatio.toFixed(2),
-				},
-				"Significant heading count mismatch detected",
-			);
-		}
-
-		this.validateCodeBlockPreservation(file, translatedContent);
-		this.validateLinkPreservation(file, translatedContent);
-		this.validateFrontmatterIntegrity(file, translatedContent);
-
-		file.logger.debug(
-			{
-				filename: file.filename,
-				sizeRatio: sizeRatio.toFixed(2),
-				originalHeadings,
-				translatedHeadings,
-			},
-			"Translation validation passed",
-		);
-	}
-
-	/**
-	 * Validates that code blocks are preserved during translation.
-	 *
-	 * Compares the count of fenced code blocks (triple backticks) between source
-	 * and translated content. Logs a warning if there's a significant mismatch
-	 * (>20% difference), as this may indicate code blocks were corrupted or removed.
-	 *
-	 * @param file Original file containing source content for comparison
-	 * @param translatedContent Translated content to validate against source
-	 */
-	private validateCodeBlockPreservation(file: TranslationFile, translatedContent: string): void {
-		const originalCodeBlocks = (file.content.match(CODE_BLOCK_REGEX) ?? []).length;
-		const translatedCodeBlocks = (translatedContent.match(CODE_BLOCK_REGEX) ?? []).length;
-
-		file.logger.debug(
-			{ originalCodeBlocks, translatedCodeBlocks },
-			`Code block counts for ${file.filename}`,
-		);
-
-		if (originalCodeBlocks === 0) {
-			file.logger.debug("Original file contains no code blocks. Skipping code block validation");
-			return;
-		}
-
-		const codeBlockRatio = translatedCodeBlocks / originalCodeBlocks;
-
-		if (codeBlockRatio < MIN_CODE_BLOCK_RATIO || codeBlockRatio > MAX_CODE_BLOCK_RATIO) {
-			file.logger.warn(
-				{
-					filename: file.filename,
-					originalCodeBlocks,
-					translatedCodeBlocks,
-					codeBlockRatio: codeBlockRatio.toFixed(2),
-				},
-				"Significant code block count mismatch detected - code blocks may have been corrupted or removed",
-			);
-		}
-	}
-
-	/**
-	 * Validates that markdown links are preserved during translation.
-	 *
-	 * Compares the count of markdown links between source and translated content.
-	 * Logs a warning if there's a significant mismatch (>20% difference), as this
-	 * may indicate links were broken or removed during translation.
-	 *
-	 * @param file Original file containing source content for comparison
-	 * @param translatedContent Translated content to validate against source
-	 */
-	private validateLinkPreservation(file: TranslationFile, translatedContent: string): void {
-		const originalLinks = (file.content.match(MARKDOWN_LINK_REGEX) ?? []).length;
-		const translatedLinks = (translatedContent.match(MARKDOWN_LINK_REGEX) ?? []).length;
-
-		file.logger.debug(
-			{ originalLinks, translatedLinks },
-			`Markdown link counts for ${file.filename}`,
-		);
-
-		if (originalLinks === 0) {
-			file.logger.debug("Original file contains no markdown links. Skipping link validation");
-			return;
-		}
-
-		const linkRatio = translatedLinks / originalLinks;
-
-		if (linkRatio < MIN_LINK_RATIO || linkRatio > MAX_LINK_RATIO) {
-			file.logger.warn(
-				{
-					filename: file.filename,
-					originalLinks,
-					translatedLinks,
-					linkRatio: linkRatio.toFixed(2),
-				},
-				"Significant markdown link count mismatch detected - links may have been broken or removed",
-			);
-		}
-	}
-
-	/**
-	 * Validates that frontmatter structure and required keys are preserved during translation.
-	 *
-	 * Parses YAML frontmatter from source and translated content, then verifies that:
-	 * 1. Required keys (e.g., `title`) are preserved in translation
-	 * 2. The overall frontmatter structure remains intact
-	 *
-	 * @param file Original file containing source content for comparison
-	 * @param translatedContent Translated content to validate against source
-	 */
-	private validateFrontmatterIntegrity(file: TranslationFile, translatedContent: string): void {
-		const originalFrontmatter = FRONTMATTER_REGEX.exec(file.content)?.[1];
-		const translatedFrontmatter = FRONTMATTER_REGEX.exec(translatedContent)?.[1];
-
-		if (!originalFrontmatter) {
-			file.logger.debug("Original file contains no frontmatter. Skipping frontmatter validation");
-			return;
-		}
-
-		if (!translatedFrontmatter) {
-			file.logger.warn(
-				{ filename: file.filename },
-				"Frontmatter lost during translation - original had frontmatter but translation does not",
-			);
-			return;
-		}
-
-		const extractKeys = (content: string): Set<string> => {
-			const keys = new Set<string>();
-			let match: RegExpExecArray | null;
-
-			const regex = new RegExp(FRONTMATTER_KEY_REGEX.source, FRONTMATTER_KEY_REGEX.flags);
-			while ((match = regex.exec(content)) !== null) {
-				if (match[1]) keys.add(match[1]);
-			}
-			return keys;
-		};
-
-		const originalKeys = extractKeys(originalFrontmatter);
-		const translatedKeys = extractKeys(translatedFrontmatter);
-
-		file.logger.debug(
-			{
-				originalKeys: [...originalKeys],
-				translatedKeys: [...translatedKeys],
-			},
-			`Frontmatter keys for ${file.filename}`,
-		);
-
-		const missingRequiredKeys = REQUIRED_FRONTMATTER_KEYS.filter(
-			(key) => originalKeys.has(key) && !translatedKeys.has(key),
-		);
-
-		if (missingRequiredKeys.length > 0) {
-			file.logger.warn(
-				{
-					filename: file.filename,
-					missingRequiredKeys,
-					originalKeys: [...originalKeys],
-					translatedKeys: [...translatedKeys],
-				},
-				"Required frontmatter keys missing in translation",
-			);
-		}
-
-		const missingKeys = [...originalKeys].filter((key) => !translatedKeys.has(key));
-
-		if (missingKeys.length > 0 && missingKeys.some((key) => !missingRequiredKeys.includes(key))) {
-			const nonRequiredMissing = missingKeys.filter((key) => !missingRequiredKeys.includes(key));
-			file.logger.warn(
-				{
-					filename: file.filename,
-					missingKeys: nonRequiredMissing,
-				},
-				"Some frontmatter keys missing in translation",
-			);
-		}
-	}
-
-	/**
-	 * Determines if content is already translated by analyzing its language composition.
-	 * Uses async language detection and scoring to make the determination.
-	 *
-	 * @param file File containing content to analyze
-	 *
-	 * @returns Resolves to `true` if content is already translated
-	 */
-	public async isContentTranslated(file: TranslationFile): Promise<boolean> {
-		try {
-			this.logger.info({ filename: file.filename }, "Checking if content is already translated");
-
-			const analysis = await this.getLanguageAnalysis(file);
-
-			this.logger.info({ analysis }, "Checked translation status");
-
-			return analysis.isTranslated;
-		} catch (error) {
-			this.logger.error(
-				{ error },
-				"Error checking if content is translated. Assuming not translated",
-			);
-
-			return false;
-		}
-	}
-
-	/**
-	 * Gets detailed language analysis for debugging and metrics.
-	 *
-	 * @param file File to analyze
-	 *
-	 * @returns Resolves to the detailed language analysis
-	 */
-	public async getLanguageAnalysis(file: TranslationFile) {
-		if (!file.content.length) {
-			this.logger.error(
-				{ filename: file.filename, path: file.path, contentLength: file.content.length },
-				"File content is empty",
-			);
-
-			throw new ApplicationError(
-				"File content is empty",
-				ErrorCode.NoContent,
-				`${TranslatorService.name}.${this.getLanguageAnalysis.name}`,
-				{ filename: file.filename, path: file.path, contentLength: file.content.length },
-			);
-		}
-
-		const analysis = await this.services.languageDetector.analyzeLanguage(
-			file.filename,
-			file.content,
-		);
-
-		this.logger.info({ analysis }, "Analyzed language of content");
-
-		return analysis;
-	}
-
-	/**
-	 * Estimates token count for content using tiktoken encoding.
-	 *
-	 * Uses the actual tokenization model to provide accurate token counts
-	 * for the specific LLM being used. This is crucial for proper chunking
-	 * and avoiding API limits.
-	 *
-	 * @param content Content to estimate tokens for
-	 *
-	 * @returns Accurate token count using model-specific encoding
-	 *
-	 * @example
-	 * ```typescript
-	 * const translator = new TranslatorService({ source: 'en', target: 'pt-br' });
-	 * const tokenCount = translator.estimateTokenCount('# Hello World\n\nWelcome!');
-	 * console.log(tokenCount); // ~8 tokens
-	 * ```
-	 */
-	/** Lazily-initialized tiktoken encoder instance, cached for performance */
-	private cachedEncoder: ReturnType<typeof encodingForModel> | null = null;
-
-	/**
-	 * Gets or creates a cached tiktoken encoder instance.
-	 *
-	 * The encoder is expensive to create (~500ms) due to vocabulary loading
-	 * and regex compilation, so we cache it for reuse across all token
-	 * estimation calls.
-	 */
-	private getEncoder() {
-		this.cachedEncoder ??= encodingForModel(this.model as TiktokenModel);
-		return this.cachedEncoder;
-	}
-
-	private estimateTokenCount(content: string): number {
-		try {
-			const tokens = this.getEncoder().encode(content);
-
-			return tokens.length;
-		} catch (error) {
-			const fallback = Math.ceil(content.length / TOKEN_ESTIMATION_FALLBACK_DIVISOR);
-			this.logger.error({ error }, "Error estimating token count, using fallback");
-
-			return fallback;
-		}
-	}
-
-	/**
-	 * Determines if content needs chunking based on token estimates.
-	 *
-	 * Checks if the estimated token count exceeds safe limits, leaving buffer
-	 * space for system prompt (approximately 1000 tokens) and output tokens
-	 * (approximately 8000 tokens).
-	 *
-	 * @param content Content to check for chunking requirements
-	 *
-	 * @returns True if content exceeds safe token limits and needs chunking
-	 *
-	 * @example
-	 * ```typescript
-	 * const translator = new TranslatorService({ source: 'en', target: 'pt-br' });
-	 * const needsChunking = translator.needsChunking(largeContent);
-	 * if (needsChunking) {
-	 *   console.log('Content will be split into chunks');
-	 * }
-	 * ```
-	 */
-	private needsChunking(file: TranslationFile): boolean {
-		const estimatedTokens = this.estimateTokenCount(file.content);
-		const maxInputTokens = MAX_CHUNK_TOKENS - SYSTEM_PROMPT_TOKEN_RESERVE;
-		const needsChunking = estimatedTokens > maxInputTokens;
-
-		file.logger.debug(
-			{ estimatedTokens, maxInputTokens, needsChunking, contentLength: file.content.length },
-			needsChunking ?
-				"Content exceeds token limit, chunking required"
-			:	"Content within token limit, no chunking needed",
-		);
-
-		return needsChunking;
-	}
-
-	/**
-	 * Splits content into chunks while preserving exact separators between chunks.
-	 *
-	 * Uses LangChain's {@link MarkdownTextSplitter} for intelligent chunking that respects
-	 * markdown structure and code blocks. After splitting, this method analyzes the
-	 * original content to detect and preserve the exact whitespace pattern (separator)
-	 * that exists between each pair of chunks, enabling perfect reassembly that maintains
-	 * the source document's formatting.
-	 *
-	 * @param content Content to split into manageable chunks for translation
-	 * @param maxTokens Maximum tokens per chunk, defaults to safe limit accounting for prompt overhead
-	 *
-	 * @returns Result object containing chunk array and separator array for reassembly
-	 *
-	 * @see {@link translateWithChunking} for usage in translation workflow
-	 * @see {@link MarkdownTextSplitter} from LangChain for splitting implementation
-	 *
-	 * @example
-	 * ```typescript
-	 * const translator = new TranslatorService();
-	 * const content = '# Title\n\nContent\n\n## Section\n\nMore...';
-	 * const result = await translator.chunkContent(content);
-	 *
-	 * console.log(result.chunks.length);    	// 3
-	 * console.log(result.separators.length); // 2
-	 * console.log(result.separators[0]);     // '\n\n'
-	 * ```
-	 */
-	private async chunkContent(
-		content: string,
-		maxTokens = MAX_CHUNK_TOKENS - CHUNK_TOKEN_BUFFER,
-	): Promise<ChunkingResult> {
-		const markdownTextSplitterOptions: Partial<MarkdownTextSplitterParams> = {
-			chunkSize: maxTokens,
-			chunkOverlap: CHUNK_OVERLAP,
-			lengthFunction: (text: string) => this.estimateTokenCount(text),
-		};
-
-		const splitter = new MarkdownTextSplitter(markdownTextSplitterOptions);
-
-		const rawChunks = await splitter.splitText(content);
-		const chunks = rawChunks.filter((chunk) => chunk.trim().length > 0);
-
-		const separators: string[] = [];
-
-		/**
-		 * Detect the actual separator between each pair of chunks by finding
-		 * where each chunk appears in the original content and extracting the
-		 * whitespace between them.
-		 */
-		let searchStartIndex = 0;
-
-		for (let index = 0; index < chunks.length - 1; index++) {
-			const currentChunk = chunks[index];
-			const nextChunk = chunks[index + 1];
-
-			if (currentChunk == null || nextChunk == null) {
-				throw new ApplicationError(
-					"Encountered null or undefined chunk while computing separators",
-					ErrorCode.ChunkProcessingFailed,
-					`${TranslatorService.name}.${this.chunkContent.name}`,
-					{ index, chunksLength: chunks.length },
-				);
-			}
-
-			if (!currentChunk.trim() || !nextChunk.trim()) {
-				this.logger.warn(
-					{ index, chunksLength: chunks.length },
-					"TranslatorService: encountered empty chunk while computing separators",
-				);
-				separators.push("\n\n");
-				continue;
-			}
-			const currentChunkIndex = content.indexOf(currentChunk.trim(), searchStartIndex);
-
-			if (currentChunkIndex === -1) {
-				separators.push("\n\n");
-				continue;
-			}
-
-			const currentChunkEnd = currentChunkIndex + currentChunk.trim().length;
-
-			const nextChunkIndex = content.indexOf(nextChunk.trim(), currentChunkEnd);
-
-			if (nextChunkIndex === -1) {
-				separators.push("\n\n");
-				continue;
-			}
-
-			const separator = content.substring(currentChunkEnd, nextChunkIndex);
-			separators.push(separator);
-
-			searchStartIndex = nextChunkIndex;
-		}
-
-		return { chunks, separators };
+		return this.managers.translationValidator.cleanupTranslatedContent(translatedContent, file);
 	}
 
 	/**
@@ -837,7 +322,7 @@ export class TranslatorService {
 	private async translateWithChunking(file: TranslationFile): Promise<string> {
 		file.logger.debug({ contentLength: file.content.length }, "Starting chunked translation");
 
-		const { chunks, separators } = await this.chunkContent(file.content);
+		const { chunks, separators } = await this.managers.chunks.chunkContent(file.content);
 
 		file.logger.debug(
 			{
@@ -857,7 +342,7 @@ export class TranslatorService {
 			"All chunks translated, reassembling",
 		);
 
-		return this.validateAndReassembleChunks(file, {
+		return this.managers.translationValidator.validateAndReassembleChunks(file, {
 			original: chunks,
 			translated: translatedChunks,
 			separators,
@@ -865,83 +350,15 @@ export class TranslatorService {
 	}
 
 	/**
-	 * Validates that all chunks were successfully translated and reassembles them.
-	 * Ensures that the number of translated chunks matches the original chunk count.
+	 * Translates a single chunk of content using the language model.
 	 *
-	 * ### Reassembly Strategy
+	 * @param file File instance for logger context
+	 * @param chunk Content to translate
+	 * @param index Index of the chunk
+	 * @param chunks Array of all chunks
 	 *
-	 * Chunks are joined with a single newline character (`\n`) rather than double newlines.
-	 * This is because the chunking process already ensures that each chunk (except the last)
-	 * ends with a trailing newline. Using a single newline as the separator preserves the
-	 * original spacing and prevents the introduction of extra blank lines between sections.
-	 *
-	 * @param content Original content before translation
-	 * @param chunks Chunks object containing original and translated chunks along with separators
-	 * @param chunks.original Original content chunks
-	 * @param chunks.translated Translated content chunks
-	 * @param chunks.separators Separators used between chunks during reassembly
-	 *
-	 * @throws {ApplicationError} with {@link ErrorCode.ChunkProcessingFailed} if chunk count mismatch is detected
-	 *
-	 * @returns Reassembled translated content
+	 * @returns Promise resolving to the translated chunk
 	 */
-	private validateAndReassembleChunks(
-		file: TranslationFile,
-		chunks: { original: string[]; translated: string[]; separators: string[] },
-	): string {
-		if (chunks.translated.length !== chunks.original.length) {
-			file.logger.error(
-				{
-					expectedChunks: chunks.original.length,
-					actualChunks: chunks.translated.length,
-					missingChunks: chunks.original.length - chunks.translated.length,
-				},
-				"Chunk count mismatch detected",
-			);
-
-			throw new ApplicationError(
-				`Chunk count mismatch. Expected ${chunks.original.length} chunks, but only ${chunks.translated.length} were translated`,
-				ErrorCode.ChunkProcessingFailed,
-				`${TranslatorService.name}.${this.translateWithChunking.name}`,
-				{
-					expectedChunks: chunks.original.length,
-					actualChunks: chunks.translated.length,
-					missingChunks: chunks.original.length - chunks.translated.length,
-					contentLength: file.content.length,
-					chunkSizes: chunks.original.map((chunk) => chunk.length),
-				},
-			);
-		}
-
-		let reassembledContent = chunks.translated.reduce((accumulator, chunk, index) => {
-			return accumulator + chunk + (chunks.separators[index] ?? "");
-		}, "");
-
-		const originalEndsWithNewline = file.content.endsWith("\n");
-		const translatedEndsWithNewline = reassembledContent.endsWith("\n");
-
-		if (originalEndsWithNewline && !translatedEndsWithNewline) {
-			const originalTrailingNewlines = TRAILING_NEWLINES_REGEX.exec(file.content)?.[0] ?? "";
-			reassembledContent += originalTrailingNewlines;
-
-			file.logger.debug(
-				{ addedTrailingNewlines: originalTrailingNewlines.length },
-				"Restored trailing newlines from original content",
-			);
-		}
-
-		file.logger.debug(
-			{
-				originalLength: file.content.length,
-				reassembledLength: reassembledContent.length,
-				compressionRatio: (reassembledContent.length / file.content.length).toFixed(2),
-			},
-			"Content reassembly completed",
-		);
-
-		return reassembledContent;
-	}
-
 	private async translateChunk(
 		file: TranslationFile,
 		chunk: string,
@@ -949,7 +366,7 @@ export class TranslatorService {
 		chunks: string[],
 	): Promise<string> {
 		const startTime = Date.now();
-		const estimatedTokens = this.estimateTokenCount(chunk);
+		const estimatedTokens = this.managers.chunks.estimateTokenCount(chunk);
 
 		file.logger.debug(
 			{
@@ -1017,7 +434,7 @@ export class TranslatorService {
 
 		return this.queue.add(async () => {
 			const callStartTime = Date.now();
-			const estimatedInputTokens = this.estimateTokenCount(contentToTranslate);
+			const estimatedInputTokens = this.managers.chunks.estimateTokenCount(contentToTranslate);
 
 			return pRetry(
 				async () => {
@@ -1089,57 +506,6 @@ export class TranslatorService {
 	}
 
 	/**
-	 * Removes common artifacts from translation output.
-	 *
-	 * Strips common LLM response prefixes like "Here is the translation:"
-	 * and converts line endings to match original content format
-	 *
-	 * @param translatedContent Content returned from the language model
-	 * @param file File instance for logger context
-	 *
-	 * @returns Cleaned translated content with artifacts removed
-	 *
-	 * @example
-	 * ```typescript
-	 * const translated = 'Here is the translation:\n\nActual content...';
-	 * const cleaned = cleanupTranslatedContent(translated, file);
-	 * console.log(cleaned); // 'Actual content...'
-	 * ```
-	 */
-	private cleanupTranslatedContent(translatedContent: string, file: TranslationFile): string {
-		file.logger.debug(
-			{ translatedContentLength: translatedContent.length },
-			"Cleaning up translated content",
-		);
-
-		let cleaned = translatedContent;
-
-		for (const prefix of TRANSLATION_PREFIXES) {
-			if (cleaned.trim().toLowerCase().startsWith(prefix.toLowerCase())) {
-				cleaned = cleaned.substring(prefix.length).trim();
-			}
-		}
-
-		cleaned = cleaned.trim();
-
-		file.logger.debug(
-			{ originalContentLength: file.content.length, cleanedContentLength: cleaned.length },
-			"Adjusting line endings to match original content",
-		);
-
-		if (file.content.includes("\r\n")) {
-			cleaned = cleaned.replace(LINE_ENDING_REGEX, "\r\n");
-		}
-
-		file.logger.debug(
-			{ cleanedContentLength: cleaned.length },
-			"Translated content cleanup completed",
-		);
-
-		return cleaned;
-	}
-
-	/**
 	 * Creates the system prompt that defines translation rules and requirements.
 	 * Uses async language detection to determine source language and constructs
 	 * a structured prompt following prompt engineering best practices.
@@ -1168,9 +534,9 @@ export class TranslatorService {
 			"Determined source and target languages for prompt",
 		);
 
-		const glossarySection =
-			this.glossary ?
-				`\n## TERMINOLOGY GLOSSARY\nApply these exact translations for the specified terms:\n${this.glossary}\n`
+		const translationGuidelinesSection =
+			this.translationGuidelines ?
+				`\n## TRANSLATION GUIDELINES\nApply these exact translations for the specified terms:\n${this.translationGuidelines}\n`
 			:	"";
 
 		const builtSystemPrompt = `# ROLE
@@ -1193,7 +559,7 @@ export class TranslatorService {
 	
 				## What NOT to Translate
 				- Code syntax, variable names, function names, API endpoints
-				- Technical terms not specified in the glossary
+				- Technical terms not specified in the translation guidelines
 				- URLs, file paths, or configuration values
 				- Frontmatter keys (only translate values if they're user-facing)
 	
@@ -1210,7 +576,7 @@ export class TranslatorService {
 	
 				${this.services.locale.definitions.rules.specific}
 	
-				${glossarySection}
+				${translationGuidelinesSection}
 			`;
 
 		return builtSystemPrompt;

@@ -30,7 +30,7 @@ import { logger as baseLogger } from "./logger.util";
  * @see {@link https://en.wikipedia.org/wiki/ISO_8601#Representations_of_dates_and_times:~:text=Combined%20date%20and%20time%20representations|ISO 8601: Combined date and time representations}
  */
 export function nftsCompatibleDateString(date = new Date()): string {
-	return date.toISOString().replace(/:/g, "-");
+	return date.toISOString().replace(new RegExp(/:/g), "-");
 }
 
 /**
@@ -170,7 +170,7 @@ export function setupSignalHandlers(
  *
  * @param tree Repository tree from GitHub API
  */
-export function filterMarkdownFiles<T extends RepositoryTreeItem>(tree: T[]): T[] {
+export function filterMarkdownFiles(tree: RepositoryTreeItem[]): RepositoryTreeItem[] {
 	return tree.filter((item) => {
 		if (!item.path) return false;
 		if (!item.path.endsWith(".md")) return false;
@@ -179,39 +179,6 @@ export function filterMarkdownFiles<T extends RepositoryTreeItem>(tree: T[]): T[
 
 		return true;
 	});
-}
-
-/**
- * Extracts the title of a document from its content by matching the `title` frontmatter key.
- *
- * Supports both single and double quotes around the title value.
- *
- * @param content The content of the document
- *
- * @returns The title of the document, or `undefined` if not found
- *
- * @example
- * ```typescript
- * import { extractDocTitleFromContent } from "@/utils/";
- *
- * const title = extractDocTitleFromContent(`
- * ---
- * title: 'Hello'
- * ---
- * # Hello
- *
- * Welcome to React!
- * `);
- * console.log(title);
- * // 'Hello'
- * ```
- */
-export function extractDocTitleFromContent(content: string): string | undefined {
-	const CATCH_CONTENT_TITLE_REGEX = /---[\s\S]*?title:\s*['"](.+?)['"][\s\S]*?---/gs;
-
-	const match = CATCH_CONTENT_TITLE_REGEX.exec(content);
-
-	return match?.[1];
 }
 
 /**
@@ -236,7 +203,6 @@ export function extractDocTitleFromContent(content: string): string | undefined 
  * ```
  */
 export function detectRateLimit(errorMessage: string, statusCode?: number): boolean {
-	/** Check HTTP status code first for most reliable detection */
 	if (statusCode === StatusCodes.TOO_MANY_REQUESTS) {
 		return true;
 	}

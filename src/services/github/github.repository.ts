@@ -4,7 +4,7 @@ import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 import type { SharedGitHubDependencies } from "./github.types";
 
-import { filterMarkdownFiles, logger } from "@/utils/";
+import { env, filterMarkdownFiles, logger, TRANSLATION_GUIDELINES_CANDIDATES } from "@/utils/";
 
 /**
  * Repository operations module for GitHub API.
@@ -45,7 +45,6 @@ export class GitHubRepository {
 	 *
 	 * @param target Which repository to fetch tree from ('fork' or 'upstream')
 	 * @param baseBranch Branch to get tree from (defaults to target's default branch)
-	 * @param filterIgnored Whether to filter ignored paths
 	 *
 	 * @returns Array of repository tree items
 	 *
@@ -61,13 +60,12 @@ export class GitHubRepository {
 	public async getRepositoryTree(
 		target: "fork" | "upstream" = "fork",
 		baseBranch?: string,
-		filterIgnored = true,
 	): Promise<RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"]> {
 		const repoConfig =
 			target === "fork" ? this.deps.repositories.fork : this.deps.repositories.upstream;
 		const branchName = baseBranch ?? (await this.getDefaultBranch(target));
 
-		this.logger.debug({ target, branch: branchName, filterIgnored }, "Fetching repository tree");
+		this.logger.debug({ target, branch: branchName }, "Fetching repository tree");
 
 		const response = await this.deps.octokit.git.getTree({
 			...repoConfig,
@@ -75,7 +73,7 @@ export class GitHubRepository {
 			recursive: "true",
 		});
 
-		const result = filterIgnored ? filterMarkdownFiles(response.data.tree) : response.data.tree;
+		const result = filterMarkdownFiles(response.data.tree);
 
 		this.logger.debug(
 			{
@@ -83,6 +81,7 @@ export class GitHubRepository {
 				branch: branchName,
 				totalItems: response.data.tree.length,
 				filteredItems: result.length,
+				excludedItems: response.data.tree.length - result.length,
 			},
 			"Repository tree fetched",
 		);
@@ -300,40 +299,89 @@ export class GitHubRepository {
 	}
 
 	/**
-	 * Fetches the glossary.md file from the repository.
+	 * Fetches the translation guidelines file from the upstream repository.
 	 *
-	 * This method retrieves the content of the glossary file which contains
-	 * standardized terminology and translations for the project. The glossary
-	 * is essential for maintaining consistent translations across documentation.
+	 * The translation guidelines file contains standardized terminology
+	 * and translations for the project. It is essential for maintaining consistent
+	 * translations across documentation.
 	 *
-	 * @returns The content of the glossary file as a string, or null if the file doesn't exist or cannot be retrieved
+	 * ### Discovery Strategy
+	 *
+	 * 1. If `TRANSLATION_GUIDELINES_FILE` env var is set, fetches that specific file
+	 * 2. Otherwise, tries common filenames in order: `GLOSSARY.md`, `TRANSLATION.md`, etc.
+	 * 3. Returns `null` if no guidelines file is found
+	 *
+	 * @returns The content of the translation guidelines file as a string,
+	 * or `null` if the file doesn't exist or cannot be retrieved
+	 *
+	 * @see {@link TRANSLATION_GUIDELINES_CANDIDATES} for the list of auto-discovered filenames
 	 *
 	 * @example
 	 * ```typescript
-	 * const glossary = await repository.fetchGlossary();
-	 * if (glossary) {
-	 *   // Process glossary content
+	 * const guidelines = await repository.fetchTranslationGuidelinesFile();
+	 * if (guidelines) {
+	 *   translator.translationGuidelines = guidelines;
 	 * } else {
-	 *   console.error('Failed to fetch glossary');
+	 *   logger.warn('No translation guidelines found - proceeding without');
 	 * }
 	 * ```
 	 */
-	public async fetchGlossary(): Promise<string | null> {
+	public async fetchTranslationGuidelinesFile(): Promise<string | null> {
+		if (env.TRANSLATION_GUIDELINES_FILE) {
+			this.logger.debug(
+				{ filename: env.TRANSLATION_GUIDELINES_FILE },
+				"Using explicit translation guidelines filename from env",
+			);
+			return this.tryFetchGuidelinesFile(env.TRANSLATION_GUIDELINES_FILE);
+		}
+
+		this.logger.debug(
+			{ candidates: TRANSLATION_GUIDELINES_CANDIDATES },
+			"Auto-discovering translation guidelines file",
+		);
+
+		for (const candidate of TRANSLATION_GUIDELINES_CANDIDATES) {
+			const content = await this.tryFetchGuidelinesFile(candidate);
+			if (content) {
+				this.logger.debug(
+					{ filename: candidate, contentLength: content.length },
+					"Translation guidelines file found in auto-discovered location",
+				);
+				return content;
+			}
+		}
+
+		this.logger.debug("No translation guidelines file found in any candidate location");
+		return null;
+	}
+
+	/**
+	 * Attempts to fetch a specific guidelines file from the upstream repository.
+	 *
+	 * @param filename The filename to fetch from the repository root
+	 *
+	 * @returns The file content as a string, or `null` if not found or empty
+	 */
+	private async tryFetchGuidelinesFile(filename: string): Promise<string | null> {
 		try {
 			const response = await this.deps.octokit.repos.getContent({
 				...this.deps.repositories.upstream,
-				path: "GLOSSARY.md",
+				path: filename,
 			});
 
 			if ("content" in response.data) {
 				const content = Buffer.from(response.data.content, "base64").toString();
-				this.logger.info({ contentLength: content.length }, "Glossary fetched successfully");
+				this.logger.info(
+					{ filename, contentLength: content.length },
+					"Translation guidelines fetched successfully",
+				);
 				return content;
 			}
 
-			this.logger.warn("Glossary file exists but has no content");
+			this.logger.warn({ filename }, "Translation guidelines file exists but has no content");
 			return null;
 		} catch {
+			this.logger.debug({ filename }, "Translation guidelines file not found");
 			return null;
 		}
 	}

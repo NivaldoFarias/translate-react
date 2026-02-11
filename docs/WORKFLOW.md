@@ -75,12 +75,12 @@ flowchart LR
 
 ### Stage 3: Content Discovery
 
-Fetches repository tree and glossary, filters for markdown files in `src/`.
+Fetches repository tree and translation guidelines, filters for markdown files in `src/`.
 
 ```mermaid
 flowchart LR
     A[Fetch Tree] --> B[Filter .md in src/]
-    B --> C[Fetch Glossary]
+    B --> C[Fetch Translation Guidelines]
     C --> D[Discovery Complete]
 ```
 
@@ -156,7 +156,7 @@ flowchart TD
 
 - **Translation consistency**: Partial merges can create inconsistent translations where some sections use old terminology/style
 - **Context preservation**: LLM translations benefit from processing the full document context, not isolated conflict regions
-- **Quality assurance**: A fresh translation ensures the entire document follows current translation guidelines and glossary
+- **Quality assurance**: A fresh translation ensures the entire document follows current translation guidelines
 - **Simplicity**: Avoids complex three-way merge logic that may produce semantically incorrect results
 
 The new PR description includes an `> [!IMPORTANT]` notice explaining that the previous PR was closed due to conflicts and that this is a completely new translation.

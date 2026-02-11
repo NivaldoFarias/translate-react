@@ -5,7 +5,6 @@ import type { WorkflowStatistics } from "@/services/runner/runner.types";
 import { ApplicationError, ErrorCode } from "@/errors/";
 import {
 	detectRateLimit,
-	extractDocTitleFromContent,
 	filterMarkdownFiles,
 	formatElapsedTime,
 	nftsCompatibleDateString,
@@ -158,29 +157,6 @@ describe("common.util", () => {
 
 			expect(result).toHaveLength(1);
 			expect(result[0]?.path).toBe("src/docs/readme.md");
-		});
-	});
-
-	describe("extractDocTitleFromContent", () => {
-		test("returns title from frontmatter with single quotes", () => {
-			const content = "---\ntitle: 'Hello'\n---\n# Hello";
-			const result = extractDocTitleFromContent(content);
-
-			expect(result).toBe("Hello");
-		});
-
-		test("returns title from frontmatter with double quotes", () => {
-			const content = '---\ntitle: "World"\n---\n# World';
-			const result = extractDocTitleFromContent(content);
-
-			expect(result).toBe("World");
-		});
-
-		test("returns undefined when no title in frontmatter", () => {
-			const content = "---\nother: value\n---\n# Doc";
-			const result = extractDocTitleFromContent(content);
-
-			expect(result).toBeUndefined();
 		});
 	});
 
