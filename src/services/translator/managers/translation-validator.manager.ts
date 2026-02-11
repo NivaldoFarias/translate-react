@@ -129,15 +129,9 @@ export class TranslationValidatorManager {
 		const codeBlockRatio = translatedCodeBlocks / originalCodeBlocks;
 
 		if (codeBlockRatio < RATIOS.codeBlock.min || codeBlockRatio > RATIOS.codeBlock.max) {
-			throw new ApplicationError(
+			file.logger.warn(
+				{ originalCodeBlocks, translatedCodeBlocks, codeBlockRatio: codeBlockRatio.toFixed(2) },
 				"Significant code block count mismatch detected",
-				ErrorCode.FormatValidationFailed,
-				`${TranslationValidatorManager.name}.${this.validateCodeBlockPreservation.name}`,
-				{
-					originalCodeBlocks,
-					translatedCodeBlocks,
-					codeBlockRatio: codeBlockRatio.toFixed(2),
-				},
 			);
 		}
 	}
@@ -169,11 +163,9 @@ export class TranslationValidatorManager {
 		const linkRatio = translatedLinks / originalLinks;
 
 		if (linkRatio < RATIOS.link.min || linkRatio > RATIOS.link.max) {
-			throw new ApplicationError(
-				"Significant markdown link count mismatch detected",
-				ErrorCode.FormatValidationFailed,
-				`${TranslationValidatorManager.name}.${this.validateLinkPreservation.name}`,
+			file.logger.warn(
 				{ originalLinks, translatedLinks, linkRatio: linkRatio.toFixed(2) },
+				"Significant markdown link count mismatch detected",
 			);
 		}
 	}
@@ -192,27 +184,25 @@ export class TranslationValidatorManager {
 	 * if validation checks fail (frontmatter keys missing in translation or frontmatter lost during translation)
 	 */
 	private validateFrontmatterIntegrity(file: TranslationFile, translatedContent: string): void {
-		const originalMatch = REGEXES.frontmatter.exec(file.content);
-		const translatedMatch = REGEXES.frontmatter.exec(translatedContent);
-		const originalFrontmatter = originalMatch?.groups.content;
-		const translatedFrontmatter = translatedMatch?.groups.content;
+		const originalMatch = REGEXES.frontmatter.exec(file.content)?.groups?.["content"];
+		const translatedMatch = REGEXES.frontmatter.exec(translatedContent)?.groups?.["content"];
 
-		if (!originalFrontmatter) {
+		if (!originalMatch) {
 			file.logger.debug("Original file contains no frontmatter. Skipping frontmatter validation");
 			return;
 		}
 
-		if (!translatedFrontmatter) {
+		if (!translatedMatch) {
 			throw new ApplicationError(
 				"Frontmatter lost during translation",
 				ErrorCode.FormatValidationFailed,
 				`${TranslationValidatorManager.name}.${this.validateFrontmatterIntegrity.name}`,
-				{ originalFrontmatter, translatedFrontmatter },
+				{ originalMatch, translatedMatch },
 			);
 		}
 
-		const originalKeys = this.extractKeys(originalFrontmatter);
-		const translatedKeys = this.extractKeys(translatedFrontmatter);
+		const originalKeys = this.extractKeys(originalMatch);
+		const translatedKeys = this.extractKeys(translatedMatch);
 
 		file.logger.debug(
 			{ originalKeys: [...originalKeys], translatedKeys: [...translatedKeys] },
@@ -222,11 +212,9 @@ export class TranslationValidatorManager {
 		const missingKeys = [...originalKeys].filter((key) => !translatedKeys.has(key));
 
 		if (missingKeys.length > 0) {
-			throw new ApplicationError(
+			file.logger.warn(
+				{ originalKeys, translatedKeys, missingKeys },
 				"Frontmatter keys missing in translation",
-				ErrorCode.FormatValidationFailed,
-				`${TranslationValidatorManager.name}.${this.validateFrontmatterIntegrity.name}`,
-				{ missingKeys },
 			);
 		}
 	}
@@ -242,7 +230,7 @@ export class TranslationValidatorManager {
 
 			const [key] = trimmedLine
 				.split(":")
-				.map((s) => s.trim())
+				.map((word) => word.trim())
 				.filter(Boolean);
 			if (!key) continue;
 

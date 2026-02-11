@@ -1,5 +1,3 @@
-import { regex } from "arkregex";
-
 import type { TiktokenModel } from "js-tiktoken";
 
 /** Common LLM response prefixes that should be removed from translated content */
@@ -21,22 +19,24 @@ export const TOKEN_ESTIMATION_FALLBACK_DIVISOR = 3.5;
 /** Regular expressions used in the translation validator manager */
 export const REGEXES = {
 	/** Regex pattern to match trailing newlines */
-	trailingNewlines: regex("\r?\n+$"),
+	trailingNewlines: new RegExp(/\r?\n+$/),
 
 	/** Regex pattern to extract YAML frontmatter block (between --- delimiters) */
-	frontmatter: regex("^---\r?\n(?<content>[\\s\\S]*?)\r?\n---"),
+	frontmatter: new RegExp(/^---\r?\n(?<content>[\s\S]*?)\r?\n---/),
+
+	titleFrontmatterKey: new RegExp(/title:\s*(?<title>.+)/),
 
 	/** Regex pattern to match markdown links: [text](url) and [text](url "title") */
-	markdownLink: regex('\\[(?<text>[^\\]]*)\\]\\((?<url>[^)\\s]+)(?:\\s+"[^"]*")?\\)', "g"),
+	markdownLink: new RegExp(/\[(?<text>[^\\]]*)\]\((?<url>[^)\s]+)(?:\s+"[^"]*")?\)/g),
 
 	/** Regex pattern to match fenced code blocks (triple backticks with optional language identifier) */
-	codeBlock: regex("^```[\\s\\S]*?```", "gm"),
+	codeBlock: new RegExp(/^```([\s\S]*?)\r?\n```/gm),
 
 	/** Regex pattern to match markdown headings (h1-h6) */
-	headings: regex("^#{1,6}\\s", "gm"),
+	headings: new RegExp(/^#{1,6}\s/gm),
 
 	/** Regex pattern to match all newline characters for line ending replacement */
-	lineEnding: regex("\r?\n", "g"),
+	lineEnding: new RegExp(/\r?\n/g),
 } as const;
 
 /** Ratios used in the translation validator manager */

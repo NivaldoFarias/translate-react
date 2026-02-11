@@ -1,4 +1,3 @@
-import { regex } from "arkregex";
 import { StatusCodes } from "http-status-codes";
 
 import type { RepositoryTreeItem, WorkflowStatistics } from "@/services/";
@@ -31,7 +30,7 @@ import { logger as baseLogger } from "./logger.util";
  * @see {@link https://en.wikipedia.org/wiki/ISO_8601#Representations_of_dates_and_times:~:text=Combined%20date%20and%20time%20representations|ISO 8601: Combined date and time representations}
  */
 export function nftsCompatibleDateString(date = new Date()): string {
-	return date.toISOString().replace(regex(":", "g"), "-");
+	return date.toISOString().replace(new RegExp(/:/g), "-");
 }
 
 /**

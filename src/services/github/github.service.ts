@@ -47,6 +47,8 @@ export class GitHubService {
 	private readonly content: GitHubContent;
 	private readonly repositories: BaseRepositories;
 
+	private cachedCurrentUser: string | undefined;
+
 	constructor(dependencies: GitHubServiceDependencies = {}) {
 		const shared: SharedGitHubDependencies = {
 			octokit: dependencies.octokit ?? octokit,
@@ -96,8 +98,26 @@ export class GitHubService {
 	 *
 	 * @returns The current user username
 	 */
-	public getCurrentUser(): Promise<string> {
-		return this.content.getCurrentUser();
+	public async getCurrentUser(): Promise<string> {
+		this.cachedCurrentUser ??= await this.content.getCurrentUser();
+
+		return this.cachedCurrentUser;
+	}
+
+	/**
+	 * Checks if the provided username is the fork owner or the current user.
+	 *
+	 * @param username Username to check
+	 *
+	 * @returns `true` if the username is the fork owner or the current user, `false` otherwise
+	 */
+	public async isProvidedUserForkOwnerOrBot(username: string | undefined): Promise<boolean> {
+		if (!username) return false;
+
+		const forkOwner = this.getForkOwner();
+		const currentUser = await this.getCurrentUser();
+
+		return username === forkOwner || username === currentUser;
 	}
 
 	/**

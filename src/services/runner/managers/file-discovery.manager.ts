@@ -279,8 +279,6 @@ export class FileDiscoveryManager {
 		}
 
 		let numFilesWithPRs = 0;
-		const forkOwner = this.services.github.getForkOwner();
-		const currentUser = await this.services.github.getCurrentUser();
 		const filesToFetch: typeof candidateFiles = [];
 
 		for (const file of candidateFiles) {
@@ -293,10 +291,12 @@ export class FileDiscoveryManager {
 
 			try {
 				const prStatus = await this.services.github.checkPullRequestStatus(prNumber);
-				const isCreatedByBotOrUser =
-					prStatus.createdBy === forkOwner || prStatus.createdBy === currentUser;
-				const isLastCommitAuthorBotOrUser =
-					prStatus.lastCommitAuthor === forkOwner || prStatus.lastCommitAuthor === currentUser;
+				const isCreatedByBotOrUser = await this.services.github.isProvidedUserForkOwnerOrBot(
+					prStatus.createdBy,
+				);
+				const isLastCommitAuthorBotOrUser = await this.services.github.isProvidedUserForkOwnerOrBot(
+					prStatus.lastCommitAuthor,
+				);
 
 				if (
 					(prStatus.needsUpdate || prStatus.hasConflicts) &&
