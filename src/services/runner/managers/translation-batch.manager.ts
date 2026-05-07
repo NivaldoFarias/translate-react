@@ -347,24 +347,16 @@ export class TranslationBatchManager {
 	}
 
 	/**
-	 * Creates a new branch for translation work, or reuses an existing branch if appropriate.
+	 * Creates a new branch for translation work, or reuses an existing one.
 	 *
-	 * This method intelligently handles existing branches by evaluating their associated PRs
-	 * for merge conflicts. When a branch already exists, the method checks if there's an open
-	 * PR and evaluates its merge status. Branches are only deleted and recreated when their
-	 * associated PRs have actual merge conflicts (not when they're simply behind the base branch).
-	 *
-	 * ### Branch Reuse Scenarios
-	 *
-	 * 1. **Branch exists with PR having no conflicts**: Reuses existing branch, preserving PR
-	 * 2. **Branch exists with PR having conflicts**: Closes PR, deletes branch, creates new branch
-	 * 3. **Branch exists without PR**: Reuses existing branch safely
-	 * 4. **No existing branch**: Creates new branch from base
+	 * When an existing branch has an associated PR with merge conflicts, the
+	 * conflicted PR is closed and the branch is deleted so a fresh translation
+	 * can be created from the latest base.
 	 *
 	 * @param file Translation file being processed
 	 * @param baseBranch Optional base branch to create from (defaults to fork's default branch)
 	 *
-	 * @returns Branch reference data containing SHA and branch name for subsequent commit operations
+	 * @returns Branch reference data for subsequent commit operations
 	 */
 	private async createOrGetTranslationBranch(file: TranslationFile, baseBranch?: string) {
 		const actualBaseBranch = baseBranch ?? (await this.services.github.getDefaultBranch("fork"));
@@ -377,11 +369,8 @@ export class TranslationBatchManager {
 
 			if (upstreamPR) {
 				const prStatus = await this.services.github.checkPullRequestStatus(upstreamPR.number);
-				const isCreatedByBotOrUser = await this.services.github.isProvidedUserForkOwnerOrBot(
-					prStatus.createdBy,
-				);
 
-				if (prStatus.hasConflicts && !isCreatedByBotOrUser) {
+				if (prStatus.hasConflicts) {
 					this.logger.info(
 						{
 							filename: file.filename,
@@ -389,7 +378,7 @@ export class TranslationBatchManager {
 							mergeableState: prStatus.mergeableState,
 							createdBy: prStatus.createdBy,
 						},
-						"PR has merge conflicts created by someone else, closing and recreating",
+						"PR has merge conflicts, closing and recreating",
 					);
 					await this.services.github.createCommentOnPullRequest(
 						upstreamPR.number,
@@ -398,17 +387,6 @@ export class TranslationBatchManager {
 
 					await this.services.github.closePullRequest(upstreamPR.number);
 					await this.services.github.deleteBranch(branchName);
-				} else if (prStatus.hasConflicts && isCreatedByBotOrUser) {
-					this.logger.info(
-						{
-							filename: file.filename,
-							prNumber: upstreamPR.number,
-							mergeableState: prStatus.mergeableState,
-							createdBy: prStatus.createdBy,
-						},
-						"PR has conflicts but was created by bot/user - preserving branch",
-					);
-					return existingBranch.data;
 				} else {
 					return existingBranch.data;
 				}
@@ -437,23 +415,15 @@ export class TranslationBatchManager {
 	}
 
 	/**
-	 * Handles pull request creation or reuse for a translation file.
+	 * Creates a new PR or closes a conflicted one and creates a replacement.
 	 *
-	 * Implements intelligent PR lifecycle management by checking if a PR already exists for
-	 * the translation branch and evaluating its merge status. PRs are only closed and recreated
-	 * when they have true conflicts. PRs that are merely behind the base branch are preserved
-	 * since they can be safely rebased without closure.
-	 *
-	 * ### PR Handling Logic
-	 *
-	 * 1. **No existing PR**: Creates new PR with provided metadata
-	 * 2. **Existing PR without conflicts**: Returns existing PR (preserves PR number and discussion)
-	 * 3. **Existing PR with conflicts**: Closes conflicted PR, creates new PR with updated content
+	 * Conflict-free existing PRs are preserved. Conflicted PRs are closed
+	 * with a comment and replaced by a new PR with the fresh translation.
 	 *
 	 * @param file Translation file being processed
 	 * @param processingResult Processing metadata including translation and timing
 	 *
-	 * @returns Either the newly created PR data or the existing PR data if reused
+	 * @returns Newly created or existing PR data
 	 */
 	private async createOrUpdatePullRequest(
 		file: TranslationFile,
@@ -475,18 +445,15 @@ export class TranslationBatchManager {
 
 		if (existingPR) {
 			const prStatus = await this.services.github.checkPullRequestStatus(existingPR.number);
-			const isCreatedByBotOrUser = await this.services.github.isProvidedUserForkOwnerOrBot(
-				prStatus.createdBy,
-			);
 
-			if (prStatus.needsUpdate && !isCreatedByBotOrUser) {
+			if (prStatus.needsUpdate) {
 				this.logger.info(
 					{
 						prNumber: existingPR.number,
 						mergeableState: prStatus.mergeableState,
 						createdBy: prStatus.createdBy,
 					},
-					"Closing PR with merge conflicts created by someone else and creating new one",
+					"Closing conflicted PR and creating replacement",
 				);
 
 				await this.services.github.createCommentOnPullRequest(
@@ -502,17 +469,6 @@ export class TranslationBatchManager {
 				});
 			}
 
-			if (prStatus.needsUpdate && isCreatedByBotOrUser) {
-				this.logger.info(
-					{
-						prNumber: existingPR.number,
-						mergeableState: prStatus.mergeableState,
-						createdBy: prStatus.createdBy,
-					},
-					"PR has conflicts but was created by bot/user - preserving existing PR",
-				);
-			}
-
 			return existingPR;
 		}
 
@@ -523,7 +479,7 @@ export class TranslationBatchManager {
 	}
 
 	/**
-	 * Creates a comprehensive pull request description for translated content.
+	 * Creates a pull request description for translated content.
 	 *
 	 * Generates a detailed PR body including translation metadata, review guidelines,
 	 * processing statistics, and optional conflict notices. When a file has an existing

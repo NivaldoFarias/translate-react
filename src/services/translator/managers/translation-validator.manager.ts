@@ -17,7 +17,7 @@ export class TranslationValidatorManager {
 	/**
 	 * Validates translated content to ensure completeness and quality.
 	 *
-	 * Performs a comprehensive set of validation checks to catch potential translation
+	 * Runs multiple validation checks to catch potential translation
 	 * issues before committing to the repository. This multi-layered validation approach
 	 * helps prevent incomplete translations, structural corruption, and content loss.
 	 *
