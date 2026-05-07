@@ -180,7 +180,7 @@ export class LanguageDetectorService {
 	}
 
 	/**
-	 * Performs comprehensive language analysis on content using Google's CLD2 library.
+	 * Analyzes content language using Google's CLD2 library.
 	 *
 	 * Analyzes text content to determine translation status by comparing confidence scores
 	 * between source and target languages. The method preprocesses content by removing

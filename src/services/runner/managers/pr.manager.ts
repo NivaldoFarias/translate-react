@@ -13,8 +13,8 @@ import { formatElapsedTime, logger } from "@/utils/";
  * Manages pull request operations and workflow statistics reporting.
  *
  * Coordinates issue updates, final statistics generation, and formatted output
- * for translation workflow completion. Provides comprehensive reporting on
- * translation success rates and failure details.
+ * for translation workflow completion. Reports on translation success rates
+ * and failure details.
  */
 export class PRManager {
 	private readonly logger = logger.child({ component: PRManager.name });

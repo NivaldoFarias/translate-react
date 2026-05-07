@@ -301,8 +301,8 @@ export class TranslatorService {
 	 *
 	 * Handles large files by breaking them into manageable pieces and processing
 	 * each chunk separately. Automatically reassembles the translated chunks while
-	 * maintaining proper spacing and structure. Includes comprehensive validation
-	 * to ensure all chunks are successfully translated before reassembly.
+	 * maintaining proper spacing and structure. Validates that all chunks are
+	 * successfully translated before reassembly.
 	 *
 	 * @param content Content to translate (automatically chunked if exceeds token limit)
 	 *

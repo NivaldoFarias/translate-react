@@ -213,48 +213,12 @@ export class FileDiscoveryManager {
 	/**
 	 * Filters candidate files by checking for existing open pull requests.
 	 *
-	 * Fetches all open PRs and their changed files to build an accurate mapping of
-	 * which files have active PRs. Only skips files with VALID (mergeable) PRs.
-	 * Files with invalid/conflicted PRs are processed and tracked for notification
-	 * in new PR descriptions.
-	 *
-	 * ### Filtering Logic
-	 *
-	 * 1. Fetch all open PRs and their changed files using file-based detection (not title parsing)
-	 * 2. Build a map of file paths to PR numbers for efficient lookup
-	 * 3. For each candidate file, check if it appears in any PR's changed files
-	 * 4. If PR exists, validate its merge status
-	 * 5. Skip files with valid, mergeable PRs (no conflicts)
-	 * 6. Track invalid PRs (with conflicts) for later notification in new PR descriptions
-	 *
-	 *
-	 * ### PR Status Validation
-	 *
-	 * Files are only skipped when their associated PR meets ALL criteria:
-	 * - PR is open
-	 * - PR is mergeable (`needsUpdate === false`)
-	 * - PR has no conflicts (`hasConflicts === false`)
-	 * - PR was not created by the bot or the current user
-	 * - PR's last commit author is not the bot or the current user
-	 *
-	 * Files with invalid PRs are included for translation, and the invalid PR information
-	 * is stored in `invalidPRsByFile` for use in PR descriptions.
+	 * Skips files with conflict-free PRs. Files with conflicted PRs are queued
+	 * for re-translation and tracked in `invalidPRsByFile` for notification.
 	 *
 	 * @param candidateFiles Files remaining after cache check that require PR validation
 	 *
-	 * @returns A `Promise` resolving to an object containing:
-	 * - `filesToFetch`: Files requiring content fetch (no valid PR exists)
-	 * - `numFilesWithPRs`: Count of files skipped due to valid existing PRs
-	 * - `invalidPRsByFile`: Map of file paths to invalid PR metadata for notification
-	 *
-	 * @example
-	 * ```typescript
-	 * const result = await this.filterByPRs(cachedCandidates);
-	 * console.log(result.numFilesWithPRs);
-	 * // ^? 10 (files with valid, mergeable PRs)
-	 * console.log(result.invalidPRsByFile.size);
-	 * // ^? 2 (files with conflicted PRs that will be re-translated)
-	 * ```
+	 * @returns Files to fetch, count of skipped files, and map of conflicted PRs
 	 */
 	public async filterByPRs(
 		candidateFiles: PatchedRepositoryTreeItem[],
@@ -291,18 +255,8 @@ export class FileDiscoveryManager {
 
 			try {
 				const prStatus = await this.services.github.checkPullRequestStatus(prNumber);
-				const isCreatedByBotOrUser = await this.services.github.isProvidedUserForkOwnerOrBot(
-					prStatus.createdBy,
-				);
-				const isLastCommitAuthorBotOrUser = await this.services.github.isProvidedUserForkOwnerOrBot(
-					prStatus.lastCommitAuthor,
-				);
 
-				if (
-					(prStatus.needsUpdate || prStatus.hasConflicts) &&
-					!isCreatedByBotOrUser &&
-					!isLastCommitAuthorBotOrUser
-				) {
+				if (prStatus.needsUpdate || prStatus.hasConflicts) {
 					invalidPRsByFile.set(file.path, { prNumber, status: prStatus });
 					filesToFetch.push(file);
 
@@ -314,19 +268,7 @@ export class FileDiscoveryManager {
 							hasConflicts: prStatus.hasConflicts,
 							createdBy: prStatus.createdBy,
 						},
-						"File has invalid PR created by someone else. Will create new translation",
-					);
-				} else if (prStatus.needsUpdate || prStatus.hasConflicts) {
-					numFilesWithPRs++;
-					this.logger.debug(
-						{
-							path: file.path,
-							prNumber,
-							mergeableState: prStatus.mergeableState,
-							hasConflicts: prStatus.hasConflicts,
-							createdBy: prStatus.createdBy,
-						},
-						"Skipping file with conflicted PR created by bot/user. Will not recreate",
+						"File has conflicted PR, will close and re-translate",
 					);
 				} else {
 					numFilesWithPRs++;
@@ -393,7 +335,7 @@ export class FileDiscoveryManager {
 
 			const batchResults = await this.fetchBatch(batch);
 			const successfulFetches = batchResults.filter(
-				(file): file is NonNullable<typeof file> => !!file,
+				(file): file is NonNullable<typeof file> => !!file && file.content.trim().length > 0,
 			);
 
 			uncheckedFiles.push(...successfulFetches);

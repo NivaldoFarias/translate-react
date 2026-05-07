@@ -45,6 +45,12 @@ export interface CommitTranslationOptions {
 	message: string;
 }
 
+/** Max attempts to poll GitHub for a computed `mergeable` value before giving up */
+const MERGEABLE_POLL_MAX_ATTEMPTS = 3;
+
+/** Delay between `mergeable` polling attempts in milliseconds */
+const MERGEABLE_POLL_DELAY_MS = 2_000;
+
 /**
  * Content and pull request operations module for GitHub API.
  *
@@ -390,44 +396,61 @@ export class GitHubContent {
 	/**
 	 * Checks if a pull request has merge conflicts that require closing and recreating.
 	 *
-	 * Determines if a PR needs to be closed and recreated by examining its mergeable status.
-	 * The `needsUpdate` flag is only set to `true` when there are actual merge conflicts
-	 * (indicated by `mergeable === false` and `mergeable_state === "dirty"`). PRs that are
-	 * simply "behind" the base branch remain valid and can be updated via rebase without
-	 * requiring closure.
+	 * Polls GitHub when `mergeable` is `null` (async computation pending) to avoid
+	 * false negatives. After exhausting retries, treats an undetermined state as
+	 * conflicted to avoid silently skipping stale PRs.
 	 *
 	 * @param prNumber Pull request number to check
 	 *
-	 * @returns A Promise resolving to an object containing PR status information
-	 * @example
-	 * ```typescript
-	 * const status = await content.checkPullRequestStatus(123);
-	 * if (status.needsUpdate) {
-	 *   console.log('PR has conflicts and needs recreating');
-	 * } else if (status.mergeableState === 'behind') {
-	 *   console.log('PR is behind but can be rebased');
-	 * }
-	 * ```
+	 * @returns PR status with conflict and mergeability information
 	 */
 	public async checkPullRequestStatus(prNumber: number): Promise<PullRequestStatus> {
-		const prResponse = await this.deps.octokit.pulls.get({
-			...this.deps.repositories.upstream,
-			pull_number: prNumber,
-		});
+		let pr = await this.fetchPullRequest(prNumber);
 
-		const pr = prResponse.data;
-		const hasConflicts = pr.mergeable === false && pr.mergeable_state === "dirty";
+		for (
+			let attempt = 0;
+			pr.mergeable === null && attempt < MERGEABLE_POLL_MAX_ATTEMPTS;
+			attempt++
+		) {
+			this.logger.debug(
+				{ prNumber, attempt: attempt + 1, maxAttempts: MERGEABLE_POLL_MAX_ATTEMPTS },
+				"PR mergeable state not yet computed, polling",
+			);
+			await new Promise((resolve) => setTimeout(resolve, MERGEABLE_POLL_DELAY_MS));
+			pr = await this.fetchPullRequest(prNumber);
+		}
+
+		if (pr.mergeable === null) {
+			this.logger.warn(
+				{ prNumber, mergeableState: pr.mergeable_state },
+				"PR mergeable state still undetermined after polling, treating as conflicted",
+			);
+		}
+
+		const hasConflicts =
+			pr.mergeable === null ||
+			(pr.mergeable === false &&
+				(pr.mergeable_state === "dirty" || pr.mergeable_state === "unknown"));
 		const needsUpdate = hasConflicts;
-		const createdBy = pr.user.login;
 
 		return {
 			hasConflicts,
 			mergeable: pr.mergeable,
 			mergeableState: pr.mergeable_state,
 			needsUpdate,
-			createdBy,
+			createdBy: pr.user.login,
 			lastCommitAuthor: await this.getLastCommitAuthor(prNumber),
 		};
+	}
+
+	/** Fetches a single PR's data from GitHub */
+	private async fetchPullRequest(prNumber: number) {
+		const response = await this.deps.octokit.pulls.get({
+			...this.deps.repositories.upstream,
+			pull_number: prNumber,
+		});
+
+		return response.data;
 	}
 
 	private async getLastCommitAuthor(prNumber: number): Promise<string | undefined> {

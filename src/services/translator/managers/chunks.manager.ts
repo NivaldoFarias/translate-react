@@ -99,7 +99,7 @@ export class ChunksManager {
 	 * Estimates token count for content using tiktoken encoding.
 	 *
 	 * Uses the actual tokenization model to provide accurate token counts
-	 * for the specific LLM being used. This is crucial for proper chunking
+	 * for the specific LLM being used. Required for proper chunking
 	 * and avoiding API limits.
 	 *
 	 * @param content Content to estimate tokens for

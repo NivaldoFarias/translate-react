@@ -92,15 +92,17 @@ Multi-step pipeline to minimize unnecessary translations.
 
 ```mermaid
 flowchart LR
-    A[Candidates] --> B[Batch Fetch Content]
-    B --> C{Has Open PR?}
-    C -->|Yes| D[Skip]
-    C -->|No| E{Already Translated?}
-    E -->|Yes| D
-    E -->|No| F[Add to Queue]
+    A[Candidates] --> B{Has Open PR?}
+    B -->|Yes| C{PR Has Conflicts?}
+    C -->|No| D[Skip]
+    C -->|Yes| E[Queue for Re-translation]
+    B -->|No| F[Batch Fetch Content]
+    F --> G{Already Translated?}
+    G -->|Yes| D
+    G -->|No| E
 ```
 
-**Pipeline:** Cache check → Open PR filter → Content fetch (batched) → Language detection
+**Pipeline:** Cache check → Open PR filter (conflict-aware) → Content fetch (batched) → Language detection
 
 ### Stage 5: Batch Translation
 
@@ -128,13 +130,13 @@ stateDiagram-v2
 
 #### Stale PR Conflict Handling
 
-When a translation PR becomes stale due to upstream changes causing merge conflicts, the workflow automatically handles it:
+When a translation PR becomes stale due to upstream changes causing merge conflicts, the workflow closes it and creates a fresh translation — regardless of who created the original PR.
 
 ```mermaid
 flowchart TD
-    A[Existing PR Found] --> B{Check Status}
-    B -->|mergeable_state: clean| C[Skip - PR Valid]
-    B -->|mergeable_state: dirty| D[PR Has Conflicts]
+    A[Existing PR Found] --> B{"Check mergeable (polls if null)"}
+    B -->|clean| C[Skip - PR Valid]
+    B -->|"dirty / unknown / null after retries"| D[PR Has Conflicts]
     D --> E[Close Stale PR with Comment]
     E --> F[Delete Stale Branch]
     F --> G[Create Fresh Translation]
@@ -142,14 +144,18 @@ flowchart TD
     H --> I[Reference Closed PR in Description]
 ```
 
-**Conflict detection:** The workflow checks `mergeable_state` for each existing PR. A `dirty` state indicates the PR cannot be cleanly merged due to conflicts with the target branch.
+**Conflict detection:** The workflow fetches `mergeable` and `mergeable_state` for each existing PR. GitHub computes `mergeable` asynchronously, so when the value is `null` the workflow polls up to 3 times (2 s apart). A PR is treated as conflicted when:
+
+- `mergeable === false` and `mergeable_state === "dirty"`
+- `mergeable === false` and `mergeable_state === "unknown"`
+- `mergeable` remains `null` after all polling attempts (conservative fallback)
 
 **Complete rewrite approach:** Instead of attempting diff-based conflict resolution, the workflow:
 
 1. Closes the conflicted PR with an explanatory comment
 2. Deletes the stale translation branch
 3. Fetches the latest source file from upstream
-4. Generates a completely new translation
+4. Generates a new translation from the current source
 5. Creates a new PR referencing the closed one
 
 **Rationale:** Complete rewrite is preferred over diff-based resolution because:
@@ -159,7 +165,7 @@ flowchart TD
 - **Quality assurance**: A fresh translation ensures the entire document follows current translation guidelines
 - **Simplicity**: Avoids complex three-way merge logic that may produce semantically incorrect results
 
-The new PR description includes an `> [!IMPORTANT]` notice explaining that the previous PR was closed due to conflicts and that this is a completely new translation.
+The new PR description includes an `> [!IMPORTANT]` notice explaining that the previous PR was closed due to conflicts and that this is a new translation.
 
 ### Stage 6: Progress Reporting
 
@@ -175,13 +181,14 @@ Posts summary to progress issue (non-blocking), prints final statistics.
 flowchart TD
     A[Start] --> B[Fetch Repository Tree]
     B --> C[Filter .md in src/]
-    C --> D[Batch by 10]
-    D --> E[Fetch Content]
-    E --> F{Has Open PR?}
-    F -->|Yes| G[Skip]
-    F -->|No| H{Already Translated?}
+    C --> D{Has Open PR?}
+    D -->|Yes| D1{PR Has Conflicts?}
+    D1 -->|No| G[Skip]
+    D1 -->|Yes| I[Add to Queue]
+    D -->|No| E[Batch Fetch Content]
+    E --> H{Already Translated?}
     H -->|Yes| G
-    H -->|No| I[Add to Queue]
+    H -->|No| I
     G --> J[Discovery Complete]
     I --> J
 ```
