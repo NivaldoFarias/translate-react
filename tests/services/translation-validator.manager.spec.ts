@@ -129,40 +129,42 @@ describe("TranslationValidatorManager", () => {
 		test("should throw when translated content is empty", () => {
 			const file = makeFile("# Title\n\nSome content");
 
-			expect(() => validator.validateTranslation(file, "")).toThrow(
-				"Translation produced empty content",
-			);
+			expect(() => {
+				validator.validateTranslation(file, "");
+			}).toThrow("Translation produced empty content");
 		});
 
 		test("should throw when translated content is whitespace-only", () => {
 			const file = makeFile("# Title\n\nSome content");
 
-			expect(() => validator.validateTranslation(file, "   \n  \t  ")).toThrow(
-				"Translation produced empty content",
-			);
+			expect(() => {
+				validator.validateTranslation(file, "   \n  \t  ");
+			}).toThrow("Translation produced empty content");
 		});
 
 		test("should throw when all headings are lost", () => {
 			const file = makeFile("# Title\n\n## Section\n\nContent");
 
-			expect(() => validator.validateTranslation(file, "Just plain text")).toThrow(
-				"All markdown headings lost during translation",
-			);
+			expect(() => {
+				validator.validateTranslation(file, "Just plain text");
+			}).toThrow("All markdown headings lost during translation");
 		});
 
 		test("should pass when heading counts match", () => {
 			const file = makeFile("# Title\n\n## Section\n\nContent");
 			const translated = "# Título\n\n## Seção\n\nConteúdo";
 
-			expect(() => validator.validateTranslation(file, translated)).not.toThrow();
+			expect(() => {
+				validator.validateTranslation(file, translated);
+			}).not.toThrow();
 		});
 
 		test("should pass when original has no headings", () => {
 			const file = makeFile("Just a paragraph with no headings.");
 
-			expect(() =>
-				validator.validateTranslation(file, "Apenas um parágrafo sem cabeçalhos."),
-			).not.toThrow();
+			expect(() => {
+				validator.validateTranslation(file, "Apenas um parágrafo sem cabeçalhos.");
+			}).not.toThrow();
 		});
 	});
 });

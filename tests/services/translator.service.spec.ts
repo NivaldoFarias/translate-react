@@ -278,7 +278,7 @@ describe("TranslatorService", () => {
 				const idx = chunkCallIndex++;
 				const translatedChunk =
 					translatedSections[idx] ?? `## Seção\n\nConteúdo traduzido fragmento ${idx + 1}.`;
-				return createChatCompletionFixture(translatedChunk);
+				return Promise.resolve(createChatCompletionFixture(translatedChunk));
 			});
 
 			const file = createTranslationFileFixture({ content: largeContent });
