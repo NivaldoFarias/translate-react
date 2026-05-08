@@ -2,7 +2,7 @@ import { RequestError } from "@octokit/request-error";
 
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
-import type { PullRequestStatus } from "../runner";
+import type { PullRequestStatus } from "@/services/runner/";
 
 import type { SharedGitHubDependencies } from "./github.types";
 

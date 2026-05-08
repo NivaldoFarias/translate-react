@@ -429,8 +429,7 @@ export class GitHubContent {
 
 		const hasConflicts =
 			pr.mergeable === null ||
-			(pr.mergeable === false &&
-				(pr.mergeable_state === "dirty" || pr.mergeable_state === "unknown"));
+			(!pr.mergeable && (pr.mergeable_state === "dirty" || pr.mergeable_state === "unknown"));
 		const needsUpdate = hasConflicts;
 
 		return {

@@ -308,8 +308,8 @@ export class TranslatorService {
 	 *
 	 * @returns Promise resolving to translated content reassembled from all chunks
 	 *
-	 * @see {@link chunkContent} for chunking strategy details
-	 * @see {@link callLanguageModel} for individual chunk translation
+	 * @see {@link ChunksManager.chunkContent} for chunking strategy details
+	 * @see {@link TranslatorService.callLanguageModel} for individual chunk translation
 	 *
 	 * @example
 	 * ```typescript

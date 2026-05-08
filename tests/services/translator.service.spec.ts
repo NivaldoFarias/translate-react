@@ -257,18 +257,41 @@ describe("TranslatorService", () => {
 			expect(translatorService.translateContent(file)).rejects.toThrow(apiError);
 		});
 
-		test("should handle large content with chunking", async () => {
-			const largeContent = "Large content ".repeat(1_000);
-			mockChatCompletionsCreate.mockResolvedValue(
-				createChatCompletionFixture("Conteúdo grande traduzido"),
+		test("should trigger chunking for large content and call LLM once per chunk", async () => {
+			const sections = Array.from(
+				{ length: 30 },
+				(_, i) => `## Section ${i + 1}\n\n${"Documentation paragraph. ".repeat(60)}`,
+			);
+			const largeContent = sections.join("\n\n");
+
+			const translatedSections = Array.from(
+				{ length: 30 },
+				(_, i) => `## Seção ${i + 1}\n\n${"Parágrafo de documentação. ".repeat(60)}`,
 			);
 
+			let chunkCallIndex = 0;
+			const { chunks } = await new (await import("@/services/translator/managers")).ChunksManager(
+				"test-model",
+			).chunkContent(largeContent);
+
+			mockChatCompletionsCreate.mockImplementation(async () => {
+				const idx = chunkCallIndex++;
+				const translatedChunk =
+					translatedSections[idx] ?? `## Seção\n\nConteúdo traduzido fragmento ${idx + 1}.`;
+				return createChatCompletionFixture(translatedChunk);
+			});
+
 			const file = createTranslationFileFixture({ content: largeContent });
+
+			const needsChunking = translatorService.managers.chunks.needsChunking(file);
+			expect(needsChunking).toBe(true);
 
 			const translation = await translatorService.translateContent(file);
 
 			expect(translation).toBeDefined();
 			expect(typeof translation).toBe("string");
+			expect(translation.length).toBeGreaterThan(0);
+			expect(mockChatCompletionsCreate.mock.calls.length).toBe(chunks.length);
 		});
 	});
 

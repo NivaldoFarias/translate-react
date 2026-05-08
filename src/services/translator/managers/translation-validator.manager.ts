@@ -244,13 +244,6 @@ export class TranslationValidatorManager {
 	 * Validates that all chunks were successfully translated and reassembles them.
 	 * Ensures that the number of translated chunks matches the original chunk count.
 	 *
-	 * ### Reassembly Strategy
-	 *
-	 * Chunks are joined with a single newline character (`\n`) rather than double newlines.
-	 * This is because the chunking process already ensures that each chunk (except the last)
-	 * ends with a trailing newline. Using a single newline as the separator preserves the
-	 * original spacing and prevents the introduction of extra blank lines between sections.
-	 *
 	 * @param file Original file containing content to validate
 	 * @param chunks Chunking result containing original and translated chunks along with separators
 	 *
