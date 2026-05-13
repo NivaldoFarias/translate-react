@@ -69,14 +69,14 @@ These **must** be set in your `.env` file:
 <details>
 <summary><b>GitHub Configuration</b></summary>
 
-| Variable              | Default           | Description                                |
-| --------------------- | ----------------- | ------------------------------------------ |
-| `REPO_FORK_OWNER`     | `nivaldofarias`   | Fork owner username/organization           |
-| `REPO_FORK_NAME`      | `pt-br.react.dev` | Fork repository name                       |
-| `REPO_UPSTREAM_OWNER` | `reactjs`         | Upstream owner username/organization       |
-| `REPO_UPSTREAM_NAME`  | `pt-br.react.dev` | Upstream repository name                   |
-| `GH_REQUEST_TIMEOUT`  | `30000`           | GitHub API timeout (milliseconds)          |
-| `GH_PAT_TOKEN`        | —                 | Fallback PAT for 403 errors[^gh-pat-token] |
+| Variable              | Default           | Description                                               |
+| --------------------- | ----------------- | --------------------------------------------------------- |
+| `REPO_FORK_OWNER`     | `nivaldofarias`   | Fork owner username/organization                          |
+| `REPO_FORK_NAME`      | `pt-br.react.dev` | Fork repository name                                      |
+| `REPO_UPSTREAM_OWNER` | `reactjs`         | Upstream owner username/organization[^repo-upstream-test] |
+| `REPO_UPSTREAM_NAME`  | `pt-br.react.dev` | Upstream repository name                                  |
+| `GH_REQUEST_TIMEOUT`  | `30000`           | GitHub API timeout (milliseconds)                         |
+| `GH_PAT_TOKEN`        | —                 | Fallback PAT for 403 errors[^gh-pat-token]                |
 
 </details>
 
@@ -98,11 +98,11 @@ These **must** be set in your `.env` file:
 <details>
 <summary><b>Translation Settings</b></summary>
 
-| Variable          | Default | Description                             |
-| ----------------- | ------- | --------------------------------------- |
-| `TARGET_LANGUAGE` | `pt-br` | Target translation language (ISO 639-1) |
-| `SOURCE_LANGUAGE` | `en`    | Source language (ISO 639-1)             |
-| `BATCH_SIZE`      | `1`     | Files to process in parallel            |
+| Variable          | Default | Description                                                                                 |
+| ----------------- | ------- | ------------------------------------------------------------------------------------------- |
+| `TARGET_LANGUAGE` | `pt-br` | React locale for translated output; in Actions, `workflow.yml` sets this from `matrix.lang` |
+| `SOURCE_LANGUAGE` | `en`    | Source locale for detection labels; React English docs — default `en`, omit in CI           |
+| `BATCH_SIZE`      | `1`     | Files to process in parallel                                                                |
 
 </details>
 
@@ -166,3 +166,5 @@ MIT License - see [LICENSE](./LICENSE) file for details.
 ---
 
 [^gh-pat-token]: Optional fallback token for permission-related failures. When the primary `GH_TOKEN` receives a `403` (`Forbidden`) error, the client automatically retries with this PAT. Useful when GitHub App tokens have different permission scopes than PATs for certain operations.
+
+[^repo-upstream-test]: For dry runs, set to your GitHub username in `.env` or repository variable `REPO_UPSTREAM_OWNER` so PRs open against your fork; the translation workflow applies this to every matrix locale (see `.github/workflows/workflow.yml`).

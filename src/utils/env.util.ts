@@ -45,7 +45,12 @@ const envSchema = z.object({
 	/** The name of the forked repository */
 	REPO_FORK_NAME: z.string().default(envDefaults.REPO_FORK_NAME),
 
-	/** Original repository owner */
+	/**
+	 * Upstream repository owner (`reactjs` for official React docs).
+	 *
+	 * Override in `.env` or GitHub Actions variable `REPO_UPSTREAM_OWNER` when testing
+	 * (e.g. point PRs at your fork as the logical upstream for every matrix locale).
+	 */
 	REPO_UPSTREAM_OWNER: z.string().default(envDefaults.REPO_UPSTREAM_OWNER),
 
 	/** Original repository name */
@@ -80,16 +85,18 @@ const envSchema = z.object({
 	/**
 	 * The target language for translation.
 	 *
-	 * Must be one of the 38 supported React translation languages.
+	 * Must be one of the 38 supported React translation languages. GitHub Actions maps
+	 * `matrix.lang` to this value when generating `.env` (see `.github/workflows/workflow.yml`).
 	 *
 	 * @see {@link REACT_TRANSLATION_LANGUAGES}
 	 */
 	TARGET_LANGUAGE: z.enum(REACT_TRANSLATION_LANGUAGES).default(envDefaults.TARGET_LANGUAGE),
 
 	/**
-	 * The source language for translation.
+	 * The source language for translation and language-detector display names.
 	 *
-	 * Must be one of the 38 supported React translation languages.
+	 * Official React docs use English (`en`). Defaults match that; the translation workflow
+	 * does not set this variable.
 	 *
 	 * @see {@link REACT_TRANSLATION_LANGUAGES}
 	 */
