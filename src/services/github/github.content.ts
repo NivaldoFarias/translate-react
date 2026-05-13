@@ -1,5 +1,7 @@
 import { Buffer } from "node:buffer";
 
+import { RequestError } from "@octokit/request-error";
+
 import type { components } from "@octokit/openapi-types";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
@@ -151,7 +153,9 @@ export class GitHubContent {
 	/**
 	 * Commits translated content to a branch.
 	 *
-	 * Updates existing file or creates new one.
+	 * Updates an existing file or creates a new one. Resolves the blob `sha` on the
+	 * target branch immediately before the commit so reused topic branches do not
+	 * send a stale tree `sha` (GitHub returns HTTP 409 when the `sha` does not match).
 	 *
 	 * @param options Commit options
 	 *
@@ -180,13 +184,15 @@ export class GitHubContent {
 	}: CommitTranslationOptions): Promise<
 		RestEndpointMethodTypes["repos"]["createOrUpdateFileContents"]["response"]
 	> {
+		const blobShaOnBranch = await this.resolveBlobShaOnBranchForPath(branch.ref, file.path);
+
 		const response = await this.deps.octokit.repos.createOrUpdateFileContents({
 			...this.deps.repositories.fork,
 			path: file.path,
 			message,
 			content: Buffer.from(content).toString("base64"),
 			branch: branch.ref,
-			sha: file.sha,
+			...(blobShaOnBranch !== undefined ? { sha: blobShaOnBranch } : {}),
 		});
 
 		file.logger.info(
@@ -199,6 +205,44 @@ export class GitHubContent {
 		);
 
 		return response;
+	}
+
+	/**
+	 * Looks up the current file blob `sha` on the fork at `branchRef`, or `undefined`
+	 * when the path is absent on that branch (create instead of update).
+	 *
+	 * @param branchRef Full ref such as `refs/heads/translate/foo`
+	 * @param path Repository path of the file
+	 */
+	private async resolveBlobShaOnBranchForPath(branchRef: string, path: string) {
+		try {
+			const existing = await this.deps.octokit.repos.getContent({
+				...this.deps.repositories.fork,
+				path,
+				ref: branchRef,
+			});
+
+			if (Array.isArray(existing.data)) {
+				this.logger.warn(
+					{ path, branchRef },
+					"GitHub returned a directory listing for getContent; omitting sha for file update",
+				);
+
+				return undefined;
+			}
+
+			if ("sha" in existing.data) {
+				return existing.data.sha;
+			}
+
+			return undefined;
+		} catch (error) {
+			if (error instanceof RequestError && error.status === 404) {
+				return undefined;
+			}
+
+			throw error;
+		}
 	}
 
 	/**
@@ -324,18 +368,15 @@ export class GitHubContent {
 	 *
 	 * ### Workflow
 	 *
-	 * 1. Checks if the issue exists
-	 * 2. Lists comments on the issue
-	 * 3. Finds the user's comment with the correct prefix
-	 * 4. Updates the comment with new results
-	 * 5. Creates a new comment if the user's comment is not found
+	 * 1. Returns early when there are no results, no candidate files, or no pull
+	 *    requests were opened or updated (avoids posting on failure-only runs)
+	 * 2. Resolves the translation progress issue on the upstream repository
+	 * 3. Creates a new issue comment with the compiled summary
 	 *
 	 * @param results Translation results to report
 	 * @param filesToTranslate Files that were translated
 	 *
-	 * @throws {Error} If the issue is not found
-	 *
-	 * @returns The comment created on the issue
+	 * @returns The comment created on the issue, or `undefined` when skipped or no issue
 	 *
 	 * @example
 	 * ```typescript
@@ -348,6 +389,17 @@ export class GitHubContent {
 	): Promise<RestEndpointMethodTypes["issues"]["createComment"]["response"]["data"] | undefined> {
 		if (results.length === 0 || filesToTranslate.length === 0) {
 			this.logger.warn("No results or files to translate. Skipping issue comment update");
+			return;
+		}
+
+		const openedOrUpdatedAnyPullRequest = results.some((r) => r.pullRequest !== null);
+
+		if (!openedOrUpdatedAnyPullRequest) {
+			this.logger.info(
+				{ resultCount: results.length },
+				"No pull requests were opened or updated; skipping translation progress issue comment",
+			);
+
 			return;
 		}
 

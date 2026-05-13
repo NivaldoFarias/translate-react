@@ -53,12 +53,6 @@ export function resolveGitHubActionsRunContext(runtimeEnv: GitHubActionsRunEnvSl
  * @param runtimeEnv Environment slice to read; defaults to the process {@link env}
  *
  * @returns A single-line Markdown fragment, or `undefined` when not running in Actions
- *
- * @example
- * ```typescript
- * formatGithubActionsRunIssueLine();
- * // ^? "**CI run:** [`Sync` · #42](https://github.com/o/r/actions/runs/42)"
- * ```
  */
 export function formatGithubActionsRunIssueLine(runtimeEnv: GitHubActionsRunEnvSlice = env) {
 	const context = resolveGitHubActionsRunContext(runtimeEnv);
@@ -67,5 +61,5 @@ export function formatGithubActionsRunIssueLine(runtimeEnv: GitHubActionsRunEnvS
 		return;
 	}
 
-	return `**CI run:** [\`${context.workflowName}\` · #${context.runId}](${context.url})`;
+	return `###### **CI run:** [\`${context.workflowName} #${context.runId}\`](${context.url})`;
 }
