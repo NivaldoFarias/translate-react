@@ -41,6 +41,14 @@ type ChunkTranslationProgress = Readonly<{
 	total: number;
 }>;
 
+/**
+ * Selects which system prompt {@link TranslatorService.getSystemPrompt} builds for an LLM call.
+ *
+ * `markdownDocument` keeps chunking, verbatim-placeholder, and full doc rules. `frontmatterScalar`
+ * uses a short metadata-only prompt so glossary text in the system message is not echoed into YAML.
+ */
+export type TranslationSystemPromptKind = "markdownDocument" | "frontmatterScalar";
+
 /** Dependency injection interface for {@link TranslatorService} */
 export interface TranslatorServiceDependencies {
 	/** OpenAI client instance for LLM API calls */
@@ -375,6 +383,7 @@ export class TranslatorService {
 						await this.translateFrontmatterStringFields(frontmatterParts.inner, file),
 					)
 				:	preservedYamlBlock;
+
 			translatedContent = mergePreservedYamlFrontmatter(mergedBlock, translatedContent);
 		}
 
@@ -396,37 +405,42 @@ export class TranslatorService {
 		return this.managers.translationValidator.cleanupTranslatedContent(translatedContent, file);
 	}
 
+	/**
+	 * Translates the string fields of a YAML frontmatter document.
+	 *
+	 * @param innerYaml The inner YAML of the frontmatter document
+	 * @param file The file instance for logger context
+	 *
+	 * @returns The translated YAML frontmatter document
+	 */
 	private async translateFrontmatterStringFields(innerYaml: string, file: TranslationFile) {
+		const FRONTMATTER_FIELDS_TO_TRANSLATE = ["title", "description"] as const;
 		let doc;
+
 		try {
 			doc = parseDocument(innerYaml);
 		} catch (error) {
-			file.logger.warn({ err: error }, "YAML frontmatter parse failed; keeping original metadata");
+			file.logger.warn({ error }, "YAML frontmatter parse failed; keeping original metadata");
 			return innerYaml;
 		}
 
 		if (doc.errors.length > 0) {
 			file.logger.warn(
-				{ messages: doc.errors.map((e) => e.message) },
+				{ messages: doc.errors.map((error) => error.message) },
 				"YAML frontmatter document has errors; keeping original metadata",
 			);
 			return innerYaml;
 		}
 
 		const root = doc.contents;
-		if (!isMap(root)) {
-			return innerYaml;
-		}
+		if (!isMap(root)) return innerYaml;
 
-		for (const key of ["title", "description"] as const) {
+		for (const key of FRONTMATTER_FIELDS_TO_TRANSLATE) {
 			const value = doc.get(key);
-			if (typeof value !== "string") {
-				continue;
-			}
+			if (typeof value !== "string") continue;
+
 			const trimmed = value.trim();
-			if (!trimmed.length) {
-				continue;
-			}
+			if (!trimmed.length) continue;
 
 			file.logger.debug(
 				{ key, scalarLength: trimmed.length },
@@ -440,11 +454,18 @@ export class TranslatorService {
 				file.sha,
 				file.logger,
 			);
-			let translatedScalar = await this.callLanguageModel(snippetFile, trimmed);
+			let translatedScalar = await this.callLanguageModel(
+				snippetFile,
+				trimmed,
+				undefined,
+				"frontmatterScalar",
+			);
+
 			translatedScalar = this.managers.translationValidator.cleanupTranslatedContent(
 				translatedScalar,
 				snippetFile,
 			);
+
 			if (!translatedScalar.length) {
 				file.logger.warn(
 					{ key },
@@ -452,6 +473,7 @@ export class TranslatorService {
 				);
 				continue;
 			}
+
 			doc.set(key, translatedScalar);
 		}
 
@@ -561,21 +583,25 @@ export class TranslatorService {
 	/**
 	 * Prepares parameters for LLM chat completion API call.
 	 *
-	 * @param content Content to translate
 	 * @param chunkProgress Optional slice position when translating a chunked body in multiple calls
+	 * @param systemPromptKind Which system prompt to build (defaults to full markdown document rules)
 	 *
 	 * @returns Chat completion parameters object
 	 */
 	private async getLLMCompletionParams(
 		content: string,
 		chunkProgress?: ChunkTranslationProgress,
+		systemPromptKind: TranslationSystemPromptKind = "markdownDocument",
 	): Promise<OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming> {
 		return {
 			model: this.model,
 			temperature: LLM_TEMPERATURE,
 			max_tokens: env.MAX_TOKENS,
 			messages: [
-				{ role: "system", content: await this.getSystemPrompt(content, chunkProgress) },
+				{
+					role: "system",
+					content: await this.getSystemPrompt(content, chunkProgress, systemPromptKind),
+				},
 				{ role: "user", content },
 			],
 		};
@@ -591,6 +617,7 @@ export class TranslatorService {
 	 * @param file File instance for logger context
 	 * @param content Content to translate (defaults to file.content if not provided)
 	 * @param chunkProgress When set, the system prompt notes this body is slice `index` of `total` from one file
+	 * @param systemPromptKind Which system prompt to use; YAML scalar fields use `frontmatterScalar`
 	 *
 	 * @throws {ApplicationError} with {@link ErrorCode.TranslationFailed} if the translation's content is missing/empty
 	 *
@@ -600,6 +627,7 @@ export class TranslatorService {
 		file: TranslationFile,
 		content?: string,
 		chunkProgress?: ChunkTranslationProgress,
+		systemPromptKind: TranslationSystemPromptKind = "markdownDocument",
 	): Promise<string> {
 		const contentToTranslate = content ?? file.content;
 
@@ -613,12 +641,21 @@ export class TranslatorService {
 
 					try {
 						file.logger.debug(
-							{ contentLength: contentToTranslate.length, estimatedInputTokens, model: this.model },
+							{
+								contentLength: contentToTranslate.length,
+								estimatedInputTokens,
+								model: this.model,
+								systemPromptKind,
+							},
 							"Calling LLM API",
 						);
 
 						const completion = await this.openai.chat.completions.create(
-							await this.getLLMCompletionParams(contentToTranslate, chunkProgress),
+							await this.getLLMCompletionParams(
+								contentToTranslate,
+								chunkProgress,
+								systemPromptKind,
+							),
 						);
 
 						const translatedContent = completion.choices[0]?.message.content;
@@ -683,14 +720,16 @@ export class TranslatorService {
 	 *
 	 * @param content Content to determine source language
 	 * @param chunkProgress When set, documents that `content` is one slice of a larger markdown body
+	 * @param systemPromptKind Document translation vs single frontmatter string (see {@link TranslationSystemPromptKind})
 	 *
 	 * @returns Resolves to the system prompt string
 	 */
 	private async getSystemPrompt(
 		content: string,
 		chunkProgress?: ChunkTranslationProgress,
+		systemPromptKind: TranslationSystemPromptKind = "markdownDocument",
 	): Promise<string> {
-		this.logger.debug("Generating system prompt for translation");
+		this.logger.debug({ systemPromptKind }, "Generating system prompt for translation");
 
 		const detectedSourceCode = await this.services.languageDetector.detectPrimaryLanguage(content);
 
@@ -708,6 +747,10 @@ export class TranslatorService {
 			{ detectedSourceCode, languages },
 			"Determined source and target languages for prompt",
 		);
+
+		if (systemPromptKind === "frontmatterScalar") {
+			return this.buildFrontmatterScalarSystemPrompt(languages);
+		}
 
 		const translationGuidelinesSection =
 			this.translationGuidelines ?
@@ -773,6 +816,49 @@ export class TranslatorService {
 			:	"";
 
 		return builtSystemPrompt + verbatimPlaceholderSection;
+	}
+
+	/**
+	 * Builds the system prompt for translating a single YAML frontmatter string (title or description).
+	 *
+	 * Keeps glossary and locale rules as silent reference so models do not treat them as user content to translate into the reply.
+	 *
+	 * @param languages Human-readable source and target language names for the TASK section
+	 *
+	 * @returns The system prompt string for one scalar metadata translation call
+	 */
+	private buildFrontmatterScalarSystemPrompt(languages: { source: string; target: string }) {
+		const termReferenceSection =
+			this.translationGuidelines ?
+				`
+				# TERM REFERENCE (DO NOT OUTPUT)
+				Use only for consistent terminology when translating the user string. Never copy, quote, translate, summarize, or repeat this reference in your reply.
+	
+				${this.translationGuidelines}
+				`
+			:	"";
+
+		return `# ROLE
+				You are an expert technical translator for React documentation metadata.
+	
+				# TASK
+				The user message is one plain-text value from YAML frontmatter (a page title or description). Translate it from ${languages.source} to ${languages.target}.
+	
+				# RULES
+				- Translate only natural language in that string
+				- Keep proper nouns, product names, version numbers, code-like tokens, and URLs unchanged when the source keeps them unless the term reference explicitly maps them
+				- Do not add markdown headings, list markers, code fences, or commentary
+	
+				# OUTPUT (STRICT)
+				- Return only the translated string
+				- No markdown document framing (no line whose first non-space character is #)
+				- No preamble or labels (for example do not start with "Translation:" or "Here is")
+				- Preserve intentional internal line breaks only when the user string already uses multiple lines you must keep
+	
+				${this.services.locale.definitions.rules.specific}
+	
+				${termReferenceSection}
+				`;
 	}
 }
 
