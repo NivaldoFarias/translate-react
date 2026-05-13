@@ -32,7 +32,7 @@ jobs:
             fork_name: "pt-br.react.dev"
             translation_guidelines_file: "GLOSSARY.md"
           - lang: "ru"
-            upstream_owner: ${{ vars.REPO_UPSTREAM_OWNER_RU || 'reactjs' }}
+            upstream_owner: ${{ vars.REPO_UPSTREAM_OWNER || 'reactjs' }}
             upstream_name: "ru.react.dev"
             fork_owner: ${{ github.repository_owner }}
             fork_name: "ru.react.dev"
@@ -89,7 +89,6 @@ jobs:
           GH_TOKEN=${{ steps.generate-token.outputs.token }}
           LLM_API_KEY=${{ secrets.LLM_API_KEY }}
           TARGET_LANGUAGE=${{ matrix.lang }}
-          SOURCE_LANGUAGE=en
           REPO_FORK_OWNER=${{ matrix.fork_owner }}
           REPO_FORK_NAME=${{ matrix.fork_name }}
           REPO_UPSTREAM_OWNER=${{ matrix.upstream_owner }}
