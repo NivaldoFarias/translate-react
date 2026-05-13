@@ -1,12 +1,15 @@
 import { mock } from "bun:test";
 
+import type OpenAI from "openai";
 import type { ChatCompletion } from "openai/resources.mjs";
 
 import { createChatCompletionFixture } from "@tests/fixtures";
 
 /** Factory for creating chat completions mock function */
 export function createChatCompletionsMock(defaultResponse?: ChatCompletion) {
-	return mock(() => Promise.resolve(defaultResponse ?? createChatCompletionFixture()));
+	return mock((_params: OpenAI.Chat.Completions.ChatCompletionCreateParams) =>
+		Promise.resolve(defaultResponse ?? createChatCompletionFixture()),
+	);
 }
 
 /**

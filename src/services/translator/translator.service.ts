@@ -13,7 +13,12 @@ import { openai, queue } from "@/clients/";
 import { ApplicationError, ErrorCode } from "@/errors/";
 import { LanguageDetectorService, languageDetectorService } from "@/services/language-detector/";
 import { localeService, LocaleService } from "@/services/locale/";
-import { env, logger } from "@/utils/";
+import {
+	env,
+	logger,
+	maskLargeVerbatimFencedCodeBlocks,
+	restoreMaskedVerbatimFences,
+} from "@/utils/";
 
 import { ChunksManager, TranslationValidatorManager } from "./managers";
 import { REGEXES } from "./managers/managers.constants";
@@ -229,11 +234,12 @@ export class TranslatorService {
 	 * ### Workflow
 	 *
 	 * 1. Validates input content
-	 * 2. Determines if chunking is needed based on token estimates
-	 * 3. Translates content (with chunking if necessary)
-	 * 4. Validates translation completeness
-	 * 5. Cleans up and returns translated content
-	 * 6. Updates metrics
+	 * 2. Optionally replaces very large fenced code blocks with placeholders when `MASK_VERBATIM_LARGE_FENCES` is enabled
+	 * 3. Determines if chunking is needed based on token estimates (after any masking)
+	 * 4. Translates content (with chunking if necessary)
+	 * 5. Restores verbatim fences when masking was applied
+	 * 6. Validates translation completeness
+	 * 7. Cleans up and returns translated content
 	 *
 	 * @param file File containing content to translate
 	 *
@@ -271,11 +277,36 @@ export class TranslatorService {
 		const translationStartTime = Date.now();
 		let translatedContent: string;
 
-		const contentNeedsChunking = this.managers.chunks.needsChunking(file);
+		const verbatimMask =
+			env.MASK_VERBATIM_LARGE_FENCES ?
+				maskLargeVerbatimFencedCodeBlocks(file.content, {
+					estimateTokens: (markdown) => this.managers.chunks.estimateTokenCount(markdown),
+					minTokens: env.MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS,
+				})
+			:	null;
+
+		const translationInput =
+			verbatimMask && verbatimMask.replacements.length > 0 ?
+				verbatimMask.maskedMarkdown
+			:	file.content;
+
+		const translationWorkFile = new TranslationFile(
+			translationInput,
+			file.filename,
+			file.path,
+			file.sha,
+			file.logger,
+		);
+
+		const contentNeedsChunking = this.managers.chunks.needsChunking(translationWorkFile);
 		if (!contentNeedsChunking) {
-			translatedContent = await this.callLanguageModel(file);
+			translatedContent = await this.callLanguageModel(translationWorkFile);
 		} else {
-			translatedContent = await this.translateWithChunking(file);
+			translatedContent = await this.translateWithChunking(translationWorkFile);
+		}
+
+		if (verbatimMask && verbatimMask.replacements.length > 0) {
+			translatedContent = restoreMaskedVerbatimFences(translatedContent, verbatimMask.replacements);
 		}
 
 		const translationDuration = Date.now() - translationStartTime;
@@ -579,7 +610,16 @@ export class TranslatorService {
 				${translationGuidelinesSection}
 			`;
 
-		return builtSystemPrompt;
+		const verbatimPlaceholderSection =
+			content.includes("<!-- translate-react:verbatim-fence-") ?
+				`
+				# VERBATIM SOURCE PLACEHOLDERS
+				Some fenced code regions were replaced with HTML comments matching \`<!-- translate-react:verbatim-fence-N -->\`.
+				Copy each placeholder comment EXACTLY into your output at the same position; never translate, remove, reorder, or alter these comments.
+				`
+			:	"";
+
+		return builtSystemPrompt + verbatimPlaceholderSection;
 	}
 }
 

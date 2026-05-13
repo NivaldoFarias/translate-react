@@ -152,7 +152,7 @@ stateDiagram-v2
 **Operations:**
 
 - Branch: `createOrGetTranslationBranch` (reuses existing or creates new)
-- Translate: Direct or chunked using the `CHUNKS` budget in translator managers (`maxTokens`, `tokenBuffer`, `overlap` in [`managers.constants.ts`](../src/services/translator/managers/managers.constants.ts))
+- Translate: Direct or chunked using the `CHUNKS` budget in translator managers (`maxTokens`, `tokenBuffer`, `overlap` in [`managers.constants.ts`](../src/services/translator/managers/managers.constants.ts)). Optional cost control: when `MASK_VERBATIM_LARGE_FENCES` is enabled, fences at or above `MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS` (tiktoken estimate) are replaced with HTML comment placeholders before the LLM and merged back after translation ([`markdown-verbatim-fences.util.ts`](../src/utils/markdown-verbatim-fences.util.ts)); natural language **inside** those large fences is not translated while they stay masked.
 - Commit: `commitTranslation` → `createOrUpdatePullRequest`
 - Error: `cleanupFailedTranslation`, circuit-breaker at `MAX_CONSECUTIVE_FAILURES`
 
@@ -280,4 +280,3 @@ flowchart TD
 - **Circuit breaker:** After `MAX_CONSECUTIVE_FAILURES` consecutive failures, `processFile` throws before starting the next file’s work. That rejection propagates through `Promise.all` in the current batch, so `processBatches` stops and **`run()` fails**; later batches are not processed.
 - **Workflow-level:** `RunnerService.run()` wraps the body in `try`/`catch`, logs `Translation workflow failed`, then **rethrows** so `main` can exit with code `1`.
 - **Post-batch gate:** `validateSuccessRate()` can still fail the process after batches complete if the success rate is below `MIN_SUCCESS_RATE`.
-

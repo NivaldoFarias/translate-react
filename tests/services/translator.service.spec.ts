@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, spyOn, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 
 import type { TranslatorServiceDependencies } from "@/services/";
 
@@ -17,6 +17,7 @@ import {
 	createMockOpenAI,
 	createMockQueue,
 } from "@tests/mocks";
+import { testEnv } from "@tests/setup";
 
 /** Module-scoped mock for chat completions (can be spied/cleared per test) */
 const mockChatCompletionsCreate = createChatCompletionsMock();
@@ -292,6 +293,116 @@ describe("TranslatorService", () => {
 			expect(typeof translation).toBe("string");
 			expect(translation.length).toBeGreaterThan(0);
 			expect(mockChatCompletionsCreate.mock.calls.length).toBe(chunks.length);
+		});
+
+		describe("verbatim fence masking (LLM payload)", () => {
+			const previousMask = {
+				fences: false,
+				minTokens: 120,
+			};
+
+			beforeEach(() => {
+				previousMask.fences = testEnv.MASK_VERBATIM_LARGE_FENCES;
+				previousMask.minTokens = testEnv.MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS;
+				testEnv.MASK_VERBATIM_LARGE_FENCES = false;
+				testEnv.MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS = 120;
+			});
+
+			afterEach(() => {
+				testEnv.MASK_VERBATIM_LARGE_FENCES = previousMask.fences;
+				testEnv.MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS = previousMask.minTokens;
+				mockChatCompletionsCreate.mockReset();
+				mockChatCompletionsCreate.mockResolvedValue(createChatCompletionFixture());
+			});
+
+			test("sends fenced line comments and JSX text inside small blocks to the LLM when masking is off", async () => {
+				const inner =
+					'// "what" to animate.\n<ViewTransition>\n\t<div>animate me</div>\n</ViewTransition>\n';
+				const markdown =
+					"# Title\n\n## Section\n\nTo opt-in, wrap it.\n\n```js\n" + inner + "```\n\nAfter.\n";
+
+				let capturedUserContent: string | undefined;
+
+				mockChatCompletionsCreate.mockImplementation((params: unknown) => {
+					const { messages } = params as {
+						messages: { role: string; content: string }[];
+					};
+					const userMessage = messages.find((message) => message.role === "user");
+					capturedUserContent = userMessage?.content;
+
+					return Promise.resolve(
+						createChatCompletionFixture(
+							"# Título\n\n## Seção\n\nPara optar, envolva.\n\n```js\n" +
+								inner +
+								"```\n\nDepois.\n",
+						),
+					);
+				});
+
+				const file = createTranslationFileFixture({ content: markdown });
+				await translatorService.translateContent(file);
+
+				expect(capturedUserContent).toBeDefined();
+				expect(capturedUserContent).toContain('// "what" to animate.');
+				expect(capturedUserContent).toContain("animate me");
+			});
+
+			test("when masking is on, natural language inside a masked large fence never reaches the LLM and is restored verbatim", async () => {
+				testEnv.MASK_VERBATIM_LARGE_FENCES = true;
+				testEnv.MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS = 80;
+
+				const filler = "const x = 1;\n".repeat(400);
+				const secretSentence = "ONLY_SENTENCE_THAT_NEED_TRANSLATION";
+				const markdown =
+					"# Doc\n\n```js\n" + filler + secretSentence + "\n```\n\n## Outro\n\nFinal line.\n";
+
+				let capturedUserContent: string | undefined;
+
+				mockChatCompletionsCreate.mockImplementation((params: unknown) => {
+					const { messages } = params as {
+						messages: { role: string; content: string }[];
+					};
+					const userMessage = messages.find((message) => message.role === "user");
+					capturedUserContent = userMessage?.content;
+					const echoed = userMessage?.content ?? "";
+
+					return Promise.resolve(createChatCompletionFixture(echoed));
+				});
+
+				const file = createTranslationFileFixture({ content: markdown });
+				const result = await translatorService.translateContent(file);
+
+				expect(capturedUserContent).toBeDefined();
+				expect(capturedUserContent).not.toContain(secretSentence);
+				expect(result).toContain(secretSentence);
+				expect(result).toContain("# Doc");
+			});
+
+			test("when masking is on but the threshold is very high, small fences still reach the LLM", async () => {
+				testEnv.MASK_VERBATIM_LARGE_FENCES = true;
+				testEnv.MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS = 50_000;
+
+				const inner = '// "what" to animate.\n<div>animate me</div>\n';
+				const markdown = "# Title\n\n```js\n" + inner + "```\n";
+
+				let capturedUserContent: string | undefined;
+
+				mockChatCompletionsCreate.mockImplementation((params: unknown) => {
+					const { messages } = params as {
+						messages: { role: string; content: string }[];
+					};
+					const userMessage = messages.find((message) => message.role === "user");
+					capturedUserContent = userMessage?.content;
+
+					return Promise.resolve(createChatCompletionFixture(markdown));
+				});
+
+				const file = createTranslationFileFixture({ content: markdown });
+				await translatorService.translateContent(file);
+
+				expect(capturedUserContent).toContain('// "what" to animate.');
+				expect(capturedUserContent).toContain("animate me");
+			});
 		});
 	});
 
