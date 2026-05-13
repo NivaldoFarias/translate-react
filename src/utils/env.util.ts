@@ -157,6 +157,23 @@ const envSchema = z.object({
 		.number()
 		.positive()
 		.default(envDefaults.MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS),
+
+	/**
+	 * Set by the GitHub Actions runner when present; enables workflow run URLs in PR bodies and issue comments.
+	 */
+	GITHUB_ACTIONS: z.stringbool().optional(),
+
+	/** GitHub host URL for the run (e.g. `https://github.com`) */
+	GITHUB_SERVER_URL: z.string().optional(),
+
+	/** `owner/repo` for the repository where the workflow executes */
+	GITHUB_REPOSITORY: z.string().optional(),
+
+	/** Numeric workflow run id */
+	GITHUB_RUN_ID: z.string().optional(),
+
+	/** Workflow display name from the workflow file `name` field */
+	GITHUB_WORKFLOW: z.string().optional(),
 });
 
 /** Type definition for the environment configuration */

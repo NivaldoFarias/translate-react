@@ -4,7 +4,7 @@ import type { TranslationFile } from "@/services/translator/translator.service";
 
 import type { LocalePRBodyStrings } from "./locale.types";
 
-import { formatElapsedTime } from "@/utils/common.util";
+import { formatElapsedTime, resolveGitHubActionsRunContext } from "@/utils/";
 
 /**
  * Formats a timestamp as an ISO date string.
@@ -75,6 +75,11 @@ export function createPRBodyBuilder(strings: LocalePRBodyStrings) {
 		const conflictNotice = buildConflictNotice(metadata.invalidFilePR, strings.conflictNotice);
 		const generationDate = formatGenerationDate(metadata.timestamps.now);
 		const branchRef = processingResult.branch?.ref ?? "unknown";
+		const runContext = resolveGitHubActionsRunContext();
+		const workflowRunLine =
+			runContext ?
+				`- **${strings.techInfo.workflowRun}**: [\`${runContext.workflowName}\` · #${runContext.runId}](${runContext.url})`
+			:	"";
 
 		return `${strings.intro(metadata.languageName)}
 ${conflictNotice}
@@ -102,7 +107,7 @@ ${strings.stats.notes.map((note) => `> - ${note}`).join("\n")}
 
 - **${strings.techInfo.generationDate}**: ${generationDate}
 - **${strings.techInfo.branch}**: \`${branchRef}\`
-
+${workflowRunLine ? `${workflowRunLine}\n` : ""}
 </details>`;
 	};
 }

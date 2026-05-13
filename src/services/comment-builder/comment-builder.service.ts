@@ -2,7 +2,7 @@ import type { LocaleDefinition } from "@/locales";
 
 import type { ProcessedFileResult } from "../runner";
 
-import { logger } from "@/utils/";
+import { formatGithubActionsRunIssueLine, logger } from "@/utils/";
 
 import { localeService } from "../locale";
 import { TranslationFile } from "../translator/translator.service";
@@ -90,7 +90,16 @@ export class CommentBuilderService {
 	 * @returns The concatenated comment
 	 */
 	private concatComment(content: string) {
-		return `${this.comment.prefix}\n\n${content}\n\n${this.comment.suffix}`;
+		const runSection = formatGithubActionsRunIssueLine();
+		const segments = [this.comment.prefix];
+
+		if (runSection) {
+			segments.push(runSection);
+		}
+
+		segments.push(content, this.comment.suffix);
+
+		return segments.join("\n\n");
 	}
 
 	/**

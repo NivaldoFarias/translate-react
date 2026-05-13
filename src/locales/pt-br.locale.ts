@@ -48,6 +48,7 @@ const ptBrPRBodyStrings: LocalePRBodyStrings = {
 		header: "Informações Técnicas",
 		generationDate: "Data de Geração",
 		branch: "Branch",
+		workflowRun: "Execução do workflow",
 	},
 
 	timeFormatLocale: "pt-BR",

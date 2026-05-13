@@ -106,6 +106,9 @@ export interface LocalePRBodyStrings {
 
 		/** Label for branch name */
 		readonly branch: string;
+
+		/** Label for the GitHub Actions workflow run link */
+		readonly workflowRun: string;
 	};
 
 	/** BCP 47 locale string for time formatting (e.g., "pt-BR", "ru-RU") */
