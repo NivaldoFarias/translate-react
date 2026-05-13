@@ -44,7 +44,7 @@ function truncateString(
  * logger.info({ file: 'test.md', size: 1024 }, 'Processing file');
  *
  * // With error object
- * logger.error({ err: error, operation: 'translate' }, 'Translation failed');
+ * logger.error({ error }, 'Translation failed');
  *
  * // Create child logger with context
  * const fileLogger = logger.child({ component: 'translator' });

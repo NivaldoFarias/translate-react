@@ -29,28 +29,16 @@ export function splitLeadingYamlFrontmatter(source: string): LeadingYamlFrontmat
 	if (match?.index !== 0) {
 		return { block: "", rest: source };
 	}
+
 	const block = match[0];
 	const rest = source.slice(block.length);
 	if (rest.length === 0) {
 		return { block: "", rest: source };
 	}
+
 	return { block, rest };
 }
 
-/**
- * Prepends a preserved YAML block and removes a duplicate leading frontmatter block from model output when present.
- *
- * @param preservedBlock Exact `---` … `---` substring taken from the source (never sent to the LLM)
- * @param translated Markdown returned by the model for the body-only payload
- *
- * @returns Combined markdown safe for {@link REGEXES.frontmatter} validation against the original file
- *
- * @example
- * ```typescript
- * mergePreservedYamlFrontmatter("---\ntitle: A\n---", "---\ntitle: B\n---\n\n# X");
- * // "---\ntitle: A\n---\n\n# X"
- * ```
- */
 /**
  * Extracts the inner YAML payload and optional BOM from a full leading frontmatter block.
  *
@@ -91,6 +79,7 @@ export function extractFrontmatterParts(fullBlock: string): { bom: string; inner
 export function buildFrontmatterBlock(bom: string, innerYaml: string): string {
 	const normalized = innerYaml.replace(/\r\n/g, "\n");
 	const body = normalized.endsWith("\n") ? normalized : `${normalized}\n`;
+
 	return `${bom}---\n${body}---`;
 }
 
@@ -98,15 +87,19 @@ export function mergePreservedYamlFrontmatter(preservedBlock: string, translated
 	if (!preservedBlock) {
 		return translated;
 	}
+
 	let body = translated;
 	const duplicate = REGEXES.frontmatter.exec(body);
 	if (duplicate?.index === 0) {
 		body = body.slice(duplicate[0].length);
 	}
+
 	if (body.length === 0) {
 		return preservedBlock;
 	}
+
 	const needsLeadingNewline = !body.startsWith("\n") && !body.startsWith("\r\n");
 	const normalizedBody = needsLeadingNewline ? `\n${body}` : body;
+
 	return preservedBlock + normalizedBody;
 }
