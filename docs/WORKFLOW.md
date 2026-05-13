@@ -4,20 +4,30 @@ Detailed breakdown of the translation workflow: execution stages, data flow, and
 
 ## Table of Contents
 
+- [Table of Contents](#table-of-contents)
 - [Overview](#overview)
+  - [Actual `run()` order](#actual-run-order)
 - [Execution Stages](#execution-stages)
+  - [Stage 1: Initialization](#stage-1-initialization)
+  - [Stage 2: Repository Setup](#stage-2-repository-setup)
+  - [Stage 3: Content Discovery](#stage-3-content-discovery)
+  - [Stage 4: File Filtering](#stage-4-file-filtering)
+  - [Stage 5: Batch Translation](#stage-5-batch-translation)
+  - [Stage 6: Progress Reporting](#stage-6-progress-reporting)
 - [Data Flow Diagrams](#data-flow-diagrams)
+  - [Discovery Phase](#discovery-phase)
+  - [Translation Phase](#translation-phase)
 - [Data Structures](#data-structures)
 - [Error Recovery](#error-recovery)
-- [References](#references)
 
 ## Overview
 
-The translation workflow executes in **six primary stages**, each with specific responsibilities and performance characteristics.
+The sections below group behavior into **six conceptual stages**. The exact call order in code is listed under [Actual `run()` order](#actual-run-order).
 
 ```mermaid
 flowchart TD
-    A[1. Initialization] --> B[2. Repository Setup]
+    A[1. Initialization] --> A1[LLM connectivity]
+    A1 --> B[2. Repository Setup]
     B --> C[3. Content Discovery]
     C --> D[4. File Filtering]
     D --> E[5. Batch Translation]
@@ -26,8 +36,8 @@ flowchart TD
     B -->|Fork Out of Sync| B1[Sync Fork]
     B1 --> C
 
-    C -->|Snapshot Available| C1[Load from Cache]
-    C1 --> D
+    C -.->|optional: pre-filled queue| C1[Skip file discovery]
+    C1 -.-> D
 
     E -->|Per File| E1[Create Branch]
     E1 --> E2[Translate]
@@ -43,20 +53,36 @@ flowchart TD
     classDef subprocess fill:#f3e5f5,stroke:#7b1fa2,stroke-width:1px
     classDef error fill:#ffebee,stroke:#d32f2f,stroke-width:1px
 
-    class A,B,C,D,E,F stage
+    class A,A1,B,C,D,E,F stage
     class B1,C1,E1,E2,E3,E4 subprocess
     class E5 error
 ```
 
+### Actual `run()` order
+
+Order in [`RunnerService.run()`](../src/services/runner/runner.service.ts), then [`main()`](../src/main.ts):
+
+1. `verifyLLMConnectivity()`: translator API reachability
+2. `verifyPermissions()`: wraps `verifyTokenPermissions` on fork and upstream
+3. `syncFork()`: `forkExists()`, then `isForkSynced()` / `syncFork` if behind
+4. `fetchRepositoryTree()`: upstream tree (markdown + `src/` filter applied in GitHub layer) and translation guidelines
+5. `fetchFilesToTranslate()`: unless `state.filesToTranslate` is already populated (unusual outside tests), runs `FileDiscoveryManager.discoverFiles`
+6. `processInBatches()`: per-file branch, translate, commit, PR
+7. `updateIssueWithResults()`: delegates to `commentCompiledResultsOnIssue` when a progress issue exists
+8. `printFinalStatistics()`: returns counts to the caller
+9. `validateSuccessRate()` in `main`: may throw if success rate is below `MIN_SUCCESS_RATE` (process still exits with failure after an otherwise completed batch)
+
 ## Execution Stages
 
-The workflow executes in six stages. Each stage has specific responsibilities and failure modes.
+The workflow is described below in six stages. Each has specific responsibilities and failure modes.
 
 ### Stage 1: Initialization
 
-Validates environment, instantiates services, registers signal handlers.
+**At import / process startup:** Zod validates environment when the `env` module loads; the root logger and service singletons are initialized; `BaseRunnerService` registers a signal-driven cleanup handler (`registerCleanup`).
 
-**Operations:** Zod schema validation → Pino logger init → Service instantiation (GitHub, Translator, Locale, Language Detector, Cache) → Signal handlers (SIGINT, SIGTERM)
+**At `run()` start:** `verifyLLMConnectivity()` runs before any GitHub setup.
+
+**Operations (combined):** Zod env validation → Pino logger → service wiring (GitHub, Translator, Locale, Language Detector, Cache) → signal cleanup registration → **then** LLM connectivity check
 
 ### Stage 2: Repository Setup
 
@@ -66,29 +92,31 @@ Verifies GitHub token permissions and synchronizes fork with upstream.
 flowchart LR
     A[Verify Token] --> B{Valid?}
     B -->|No| C[Error]
-    B -->|Yes| D{Fork Synced?}
-    D -->|Yes| E[Continue]
-    D -->|No| F[Sync Fork] --> E
+    B -->|Yes| D[Fork exists check]
+    D --> E{Fork Synced?}
+    E -->|Yes| F[Continue]
+    E -->|No| G[Sync Fork] --> F
 ```
 
-**Operations:** `verifyTokenPermissions` → `isForkSynced` → `syncFork` (if needed)
+**Operations:** `verifyPermissions` (uses `verifyTokenPermissions` on fork and upstream); then `syncFork`: `forkExists` → `isForkSynced` → `syncFork` when behind
 
 ### Stage 3: Content Discovery
 
-Fetches repository tree and translation guidelines, filters for markdown files in `src/`.
+Fetches the **upstream** Git tree via `getRepositoryTree`, which applies `filterMarkdownFiles` before the runner sees items: `.md` paths under `src/` (with a `/` in the path). The runner then patches filenames, loads translation guidelines (optional), and stores `repositoryTree`.
 
 ```mermaid
 flowchart LR
-    A[Fetch Tree] --> B[Filter .md in src/]
-    B --> C[Fetch Translation Guidelines]
-    C --> D[Discovery Complete]
+    A[Fetch upstream tree] --> B[filterMarkdownFiles in API layer]
+    B --> C[Patch filenames / SHA]
+    C --> D[Fetch translation guidelines]
+    D --> E[Ready for filtering pipeline]
 ```
 
-**Filter criteria:** `.md` extension + `src/` directory + has path and SHA
+**Filter criteria (in `filterMarkdownFiles`):** `.md` suffix, path contains `src/`, path contains `/`, and non-empty `path` (SHA enforced when building `PatchedRepositoryTreeItem` in the runner)
 
 ### Stage 4: File Filtering
 
-Multi-step pipeline to minimize unnecessary translations.
+Multi-step pipeline to minimize unnecessary translations. **Conflicted open PRs are not closed here:** they are recorded in `invalidPRsByFile`, the file stays in the queue, and close/delete/recreate happens during batch translation when branches or PRs are handled.
 
 ```mermaid
 flowchart LR
@@ -102,7 +130,7 @@ flowchart LR
     G -->|No| E
 ```
 
-**Pipeline:** Cache check → Open PR filter (conflict-aware) → Content fetch (batched) → Language detection
+**Pipeline:** Deduplicate by `path` → Language cache lookup → Open PR filter (conflict-aware; queues conflicted paths) → Content fetch (batched) → Language detection
 
 ### Stage 5: Batch Translation
 
@@ -124,24 +152,26 @@ stateDiagram-v2
 **Operations:**
 
 - Branch: `createOrGetTranslationBranch` (reuses existing or creates new)
-- Translate: Direct or chunked based on token threshold (`MAX_CHUNK_TOKENS`)
+- Translate: Direct or chunked using the `CHUNKS` budget in translator managers (`maxTokens`, `tokenBuffer`, `overlap` in [`managers.constants.ts`](../src/services/translator/managers/managers.constants.ts))
 - Commit: `commitTranslation` → `createOrUpdatePullRequest`
 - Error: `cleanupFailedTranslation`, circuit-breaker at `MAX_CONSECUTIVE_FAILURES`
 
-#### Stale PR Conflict Handling
+#### Stale PR conflict handling
 
-When a translation PR becomes stale due to upstream changes causing merge conflicts, the workflow closes it and creates a fresh translation — regardless of who created the original PR.
+**Discovery (`filterByPRs`):** Open PRs are listed; files touched by a PR get `checkPullRequestStatus`. Valid (mergeable) PRs cause the file to be skipped. Conflicted or indeterminate PRs are **kept in the work queue** and summarized in `invalidPRsByFile` for messaging in a **new** PR body (`> [!IMPORTANT]` via [`pr-body.builder.ts`](../src/locales/pr-body.builder.ts)) — the old PR is **not** closed during discovery.
+
+**Translation (`createOrGetTranslationBranch` / `createOrUpdatePullRequest`):** When an existing branch or upstream PR is conflicted, the workflow closes the PR with a comment, deletes the translation branch, and creates a fresh branch/commit/PR — regardless of who opened the original PR.
 
 ```mermaid
 flowchart TD
-    A[Existing PR Found] --> B{"Check mergeable (polls if null)"}
-    B -->|clean| C[Skip - PR Valid]
-    B -->|"dirty / unknown / null after retries"| D[PR Has Conflicts]
-    D --> E[Close Stale PR with Comment]
-    E --> F[Delete Stale Branch]
-    F --> G[Create Fresh Translation]
-    G --> H[Open New PR]
-    H --> I[Reference Closed PR in Description]
+    A[Existing PR at translate time] --> B{"checkPullRequestStatus polls if mergeable null"}
+    B -->|clean| C[Reuse branch / PR]
+    B -->|"dirty / unknown / null after retries"| D[Conflicts]
+    D --> E[Comment + close PR]
+    E --> F[Delete translation branch]
+    F --> G[Re-translate from current upstream]
+    G --> H[Open new PR]
+    H --> I[Optional: invalidPRsByFile notice in body]
 ```
 
 **Conflict detection:** The workflow fetches `mergeable` and `mergeable_state` for each existing PR. GitHub computes `mergeable` asynchronously, so when the value is `null` the workflow polls up to 3 times (2 s apart). A PR is treated as conflicted when:
@@ -150,13 +180,13 @@ flowchart TD
 - `mergeable === false` and `mergeable_state === "unknown"`
 - `mergeable` remains `null` after all polling attempts (conservative fallback)
 
-**Complete rewrite approach:** Instead of attempting diff-based conflict resolution, the workflow:
+**Complete rewrite approach (during translation, not during discovery filtering):** Instead of diff-based conflict resolution, the workflow:
 
 1. Closes the conflicted PR with an explanatory comment
 2. Deletes the stale translation branch
-3. Fetches the latest source file from upstream
-4. Generates a new translation from the current source
-5. Creates a new PR referencing the closed one
+3. Uses freshly fetched source content for the new translation
+4. Commits on a new or recreated branch
+5. Opens a new PR; the body may include context from `invalidPRsByFile` when that metadata was captured earlier
 
 **Rationale:** Complete rewrite is preferred over diff-based resolution because:
 
@@ -165,27 +195,29 @@ flowchart TD
 - **Quality assurance**: A fresh translation ensures the entire document follows current translation guidelines
 - **Simplicity**: Avoids complex three-way merge logic that may produce semantically incorrect results
 
-The new PR description includes an `> [!IMPORTANT]` notice explaining that the previous PR was closed due to conflicts and that this is a new translation.
+When `invalidPRsByFile` is set from discovery, the PR template adds an `> [!IMPORTANT]` conflict notice; every PR body also includes a separate `> [!IMPORTANT]` human-review block from the locale template.
 
 ### Stage 6: Progress Reporting
 
-Posts summary to progress issue (non-blocking), prints final statistics.
+Posts summary to the translation progress issue when that issue can be resolved; logs final statistics. Issue posting is best-effort (missing issue → warn and continue). **Process cleanup** on success path is normal exit; `registerCleanup` runs on termination signals.
 
-**Operations:** `commentCompiledResultsOnIssue` (if issue found) → `printFinalStatistics` → cleanup → exit
+**Operations:** `PRManager.updateIssue` → `GitHubService.commentCompiledResultsOnIssue` (no-op if no issue) → `printFinalStatistics` → caller runs `validateSuccessRate` in `main`
 
 ## Data Flow Diagrams
 
 ### Discovery Phase
 
+Input tree is **already** markdown/`src/`-filtered from Stage 3.
+
 ```mermaid
 flowchart TD
-    A[Start] --> B[Fetch Repository Tree]
-    B --> C[Filter .md in src/]
-    C --> D{Has Open PR?}
-    D -->|Yes| D1{PR Has Conflicts?}
+    A[Filtered tree] --> A1[Deduplicate by path]
+    A1 --> B[Language cache]
+    B --> C{Has Open PR?}
+    C -->|Yes| D1{PR Has Conflicts?}
     D1 -->|No| G[Skip]
     D1 -->|Yes| I[Add to Queue]
-    D -->|No| E[Batch Fetch Content]
+    C -->|No| E[Batch Fetch Content]
     E --> H{Already Translated?}
     H -->|Yes| G
     H -->|No| I
@@ -207,49 +239,45 @@ flowchart TD
     G --> H
     H -->|Valid| I[Commit & Create PR]
     H -->|Invalid| J[Cleanup Branch]
-    I --> K[Update Progress]
+    I --> K[Record result / batch stats]
     J --> K
     K --> L{More Files?}
     L -->|Yes| B
-    L -->|No| M[Complete]
+    L -->|No| M[Run complete: issue update + statistics]
 ```
 
 ## Data Structures
 
-| Structure             | Purpose                        | Key Fields                                                            |
-| --------------------- | ------------------------------ | --------------------------------------------------------------------- |
-| `TranslationFile`     | File candidate for translation | `content`, `filename`, `path`, `sha`                                  |
-| `ProcessedFileResult` | Processing outcome per file    | `filename`, `branch`, `translation`, `pullRequest`, `error`           |
-| `RunnerState`         | Workflow state (in-memory)     | `repositoryTree`, `filesToTranslate`, `processedResults`, `timestamp` |
+| Structure             | Purpose                        | Key Fields                                                                                                                                                      |
+| --------------------- | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TranslationFile`     | File candidate for translation | `content`, `filename`, `path`, `sha`, plus `title`, `logger`, `correlationId` (see [`translator.service.ts`](../src/services/translator/translator.service.ts)) |
+| `ProcessedFileResult` | Processing outcome per file    | `filename`, `branch`, `translation`, `pullRequest`, `error`                                                                                                     |
+| `RunnerState`         | Workflow state (in-memory)     | `repositoryTree`, `filesToTranslate`, `processedResults`, `timestamp`, optional `invalidPRsByFile`                                                              |
 
-See [`runner.types.ts`](../src/services/runner/runner.types.ts) for type definitions.
+See [`runner.types.ts`](../src/services/runner/runner.types.ts) for runner-side type definitions.
 
 ## Error Recovery
 
 ```mermaid
 flowchart TD
-    A[Error] --> B{Severity}
-    B -->|Warning| C[Log & Continue]
-    B -->|Error| D[Cleanup]
-    B -->|Fatal| E[Abort]
-    D --> F[Delete Branch/Close PR]
-    F --> G{Retry?}
-    G -->|Yes| H[Retry Queue]
-    G -->|No| I[Log Failure]
-    H --> J[Next File]
-    I --> J
-    C --> J
-    E --> K[Exit]
+    A[Per-file failure in batch] --> B[cleanupFailedTranslation]
+    B --> C[Increment consecutiveFailures]
+    C --> D{consecutiveFailures >= MAX_CONSECUTIVE_FAILURES?}
+    D -->|Yes| E[Throw ApplicationError stop batches]
+    D -->|No| F[Log error record ProcessedFileResult]
+    F --> G[Next file]
+
+    H[Failure inside run try block] --> I[Log + rethrow to main]
+
+    J[validateSuccessRate in main] --> K{successRate < MIN_SUCCESS_RATE?}
+    K -->|Yes| L[Throw fatal log + exit 1]
+    K -->|No| M[exit 0]
 ```
 
 **Error handling strategy:**
 
-- **Warning**: Log and continue to next file
-- **Error**: Cleanup resources (branch/PR), mark failed, continue
-- **Fatal**: Log error, abort workflow, exit process
-- **Circuit breaker**: After `MAX_CONSECUTIVE_FAILURES`, workflow terminates early
+- **Per file:** On failure after branch work, `cleanupFailedTranslation` deletes the translation branch when possible; the result is stored with `error` set; processing continues with the next file unless the circuit breaker trips.
+- **Circuit breaker:** After `MAX_CONSECUTIVE_FAILURES` consecutive failures, `processFile` throws before starting the next file’s work. That rejection propagates through `Promise.all` in the current batch, so `processBatches` stops and **`run()` fails**; later batches are not processed.
+- **Workflow-level:** `RunnerService.run()` wraps the body in `try`/`catch`, logs `Translation workflow failed`, then **rethrows** so `main` can exit with code `1`.
+- **Post-batch gate:** `validateSuccessRate()` can still fail the process after batches complete if the success rate is below `MIN_SUCCESS_RATE`.
 
-## References
-
-- [Architecture Documentation](./ARCHITECTURE.md) — Service design and patterns
-- [Project README](../README.md) — High-level overview

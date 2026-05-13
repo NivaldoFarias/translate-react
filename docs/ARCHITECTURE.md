@@ -4,6 +4,7 @@ Overview of the `translate-react` CLI: service design, data flow, and error hand
 
 ## Table of Contents
 
+- [Table of Contents](#table-of-contents)
 - [System Overview](#system-overview)
 - [Service Architecture](#service-architecture)
 - [Core Services](#core-services)
