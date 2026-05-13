@@ -6,7 +6,6 @@ export enum ErrorCode {
 	TranslationFailed = "TRANSLATION_FAILED",
 	ChunkProcessingFailed = "CHUNK_PROCESSING_FAILED",
 	NoFilesToTranslate = "NO_FILES_TO_TRANSLATE",
-	BelowMinimumSuccessRate = "BELOW_MINIMUM_SUCCESS_RATE",
 	NoContent = "NO_CONTENT",
 
 	// Domain Validation Errors

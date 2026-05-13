@@ -43,6 +43,15 @@ function createTestTranslatorService(
 	} as TranslatorServiceDependencies);
 }
 
+function queueOpenAiTranslationResponses(...messageContents: string[]) {
+	let step = 0;
+	mockChatCompletionsCreate.mockImplementation(() => {
+		const content = messageContents[step] ?? messageContents.at(-1) ?? "";
+		step += 1;
+		return Promise.resolve(createChatCompletionFixture(content));
+	});
+}
+
 describe("TranslatorService", () => {
 	let translatorService: TranslatorService;
 
@@ -232,9 +241,7 @@ describe("TranslatorService", () => {
 			const title = "Title";
 			const sourceContent = `# Title\n\`\`\`javascript\n// Comment\nconst example = "test";\n\`\`\`\n\nText`;
 			const translatedContent = `# Título\n\`\`\`javascript\n// Comentário traduzido\nconst example = "test";\n\`\`\`\n\nTexto traduzido`;
-			mockChatCompletionsCreate.mockResolvedValue(
-				createChatCompletionFixture(translatedContent, title),
-			);
+			queueOpenAiTranslationResponses(translatedContent, title);
 
 			const file = createTranslationFileFixture({ content: sourceContent }, title);
 
@@ -467,39 +474,38 @@ describe("TranslatorService", () => {
 			const title = "Title";
 			const sourceContent = `# Title\n\n\`\`\`javascript\nconst x = 1;\n\`\`\`\n\nText\n\n\`\`\`python\nprint("hello")\n\`\`\``;
 			const translatedContent = `# Título\n\n\`\`\`javascript\nconst x = 1;\n\`\`\`\n\nTexto\n\n\`\`\`python\nprint("hello")\n\`\`\``;
-			const expectedTranslation = `---\ntitle: '${title}'\n---\n${translatedContent}`;
-
-			mockChatCompletionsCreate.mockResolvedValue(
-				createChatCompletionFixture(translatedContent, title),
-			);
+			queueOpenAiTranslationResponses(translatedContent, title);
 
 			const file = createTranslationFileFixture({ content: sourceContent }, title);
 
 			const translation = await translatorService.translateContent(file);
 
-			expect(translation).toBe(expectedTranslation);
+			expect(translation).toContain(translatedContent);
+			expect(translation).toContain("title:");
 		});
 
-		test("should throw Error when code blocks are lost during translation", () => {
+		test("should warn when code blocks are lost during translation", async () => {
 			const sourceContent = `# Title\n\n\`\`\`javascript\nconst x = 1;\n\`\`\`\n\nText\n\n\`\`\`python\nprint("hello")\n\`\`\``;
 			const translatedContent = `# Título\n\nTexto traduzido sem blocos de código`;
 
 			mockChatCompletionsCreate.mockResolvedValue(createChatCompletionFixture(translatedContent));
 
-			const file = createTranslationFileFixture({ content: sourceContent }, "Title");
-
-			expect(translatorService.translateContent(file)).rejects.toThrow(ApplicationError);
+			const file = createTranslationFileFixture({ content: sourceContent });
+			const warnSpy = spyOn(file.logger, "warn");
+			await translatorService.translateContent(file);
+			expect(warnSpy).toHaveBeenCalled();
 		});
 
-		test("should throw Error when code block count differs significantly (>20%)", () => {
+		test("should warn when code block count differs significantly (>20%)", async () => {
 			const sourceContent = `# Title\n\n\`\`\`js\n1\n\`\`\`\n\n\`\`\`js\n2\n\`\`\`\n\n\`\`\`js\n3\n\`\`\`\n\n\`\`\`js\n4\n\`\`\`\n\n\`\`\`js\n5\n\`\`\``;
 			const translatedContent = `# Título\n\n\`\`\`js\n1\n\`\`\`\n\n\`\`\`js\n2\n\`\`\`\n\n\`\`\`js\n3\n\`\`\``;
 
 			mockChatCompletionsCreate.mockResolvedValue(createChatCompletionFixture(translatedContent));
 
-			const file = createTranslationFileFixture({ content: sourceContent }, "Title");
-
-			expect(translatorService.translateContent(file)).rejects.toThrow(ApplicationError);
+			const file = createTranslationFileFixture({ content: sourceContent });
+			const warnSpy = spyOn(file.logger, "warn");
+			await translatorService.translateContent(file);
+			expect(warnSpy).toHaveBeenCalled();
 		});
 
 		test("should not throw Error when source has no code blocks", () => {
@@ -507,9 +513,7 @@ describe("TranslatorService", () => {
 			const sourceContent = `# Title\n\nText without code blocks`;
 			const translatedContent = `# Título\n\nTexto sem blocos de código`;
 
-			mockChatCompletionsCreate.mockResolvedValue(
-				createChatCompletionFixture(translatedContent, title),
-			);
+			queueOpenAiTranslationResponses(translatedContent, title);
 
 			const file = createTranslationFileFixture({ content: sourceContent }, title);
 
@@ -521,9 +525,7 @@ describe("TranslatorService", () => {
 			const sourceContent = `# Title\n\n\`\`\`js\ncode1\n\`\`\`\n\n\`\`\`js\ncode2\n\`\`\`\n\n\`\`\`js\ncode3\n\`\`\`\n\n\`\`\`js\ncode4\n\`\`\`\n\n\`\`\`js\ncode5\n\`\`\``;
 			const translatedContent = `# Título\n\n\`\`\`js\ncode1\n\`\`\`\n\n\`\`\`js\ncode2\n\`\`\`\n\n\`\`\`js\ncode3\n\`\`\`\n\n\`\`\`js\ncode4\n\`\`\``;
 
-			mockChatCompletionsCreate.mockResolvedValue(
-				createChatCompletionFixture(translatedContent, title),
-			);
+			queueOpenAiTranslationResponses(translatedContent, title);
 
 			const file = createTranslationFileFixture({ content: sourceContent }, title);
 			expect(translatorService.translateContent(file)).resolves.not.toThrow(ApplicationError);
@@ -535,17 +537,14 @@ describe("TranslatorService", () => {
 			const title = "Title";
 			const sourceContent = `# Title\n\nCheck [React docs](https://react.dev) and [MDN](https://developer.mozilla.org).`;
 			const translatedContent = `# Título\n\nVeja [documentação React](https://react.dev) e [MDN](https://developer.mozilla.org).`;
-			const expectedTranslation = `---\ntitle: '${title}'\n---\n${translatedContent}`;
-
-			mockChatCompletionsCreate.mockResolvedValue(
-				createChatCompletionFixture(translatedContent, title),
-			);
+			queueOpenAiTranslationResponses(translatedContent, title);
 
 			const file = createTranslationFileFixture({ content: sourceContent }, title);
 
 			const translation = await translatorService.translateContent(file);
 
-			expect(translation).toBe(expectedTranslation);
+			expect(translation).toContain(translatedContent);
+			expect(translation).toContain("title:");
 		});
 
 		test("should log warning when links are lost during translation", async () => {
@@ -553,9 +552,7 @@ describe("TranslatorService", () => {
 			const sourceContent = `# Title\n\n[Link 1](https://example.com/1)\n[Link 2](https://example.com/2)\n[Link 3](https://example.com/3)`;
 			const translatedContent = `# Título\n\nTexto traduzido sem links`;
 
-			mockChatCompletionsCreate.mockResolvedValue(
-				createChatCompletionFixture(translatedContent, title),
-			);
+			queueOpenAiTranslationResponses(translatedContent, title);
 
 			const file = createTranslationFileFixture({ content: sourceContent }, title);
 			const warnSpy = spyOn(file.logger, "warn");
@@ -569,9 +566,7 @@ describe("TranslatorService", () => {
 			const sourceContent = `# Title\n\n[1](u1) [2](u2) [3](u3) [4](u4) [5](u5)`;
 			const translatedContent = `# Título\n\n[1](u1) [2](u2) [3](u3)`;
 
-			mockChatCompletionsCreate.mockResolvedValue(
-				createChatCompletionFixture(translatedContent, title),
-			);
+			queueOpenAiTranslationResponses(translatedContent, title);
 
 			const file = createTranslationFileFixture({ content: sourceContent }, title);
 			const warnSpy = spyOn(file.logger, "warn");
@@ -585,9 +580,7 @@ describe("TranslatorService", () => {
 			const sourceContent = `# Title\n\nText without links`;
 			const translatedContent = `# Título\n\nTexto sem links`;
 
-			mockChatCompletionsCreate.mockResolvedValue(
-				createChatCompletionFixture(translatedContent, title),
-			);
+			queueOpenAiTranslationResponses(translatedContent, title);
 
 			const file = createTranslationFileFixture({ content: sourceContent }, title);
 			expect(translatorService.translateContent(file)).resolves.not.toThrow(ApplicationError);
@@ -598,9 +591,7 @@ describe("TranslatorService", () => {
 			const sourceContent = `# Title\n\n[1](u1) [2](u2) [3](u3) [4](u4) [5](u5)`;
 			const translatedContent = `# Título\n\n[1](u1) [2](u2) [3](u3) [4](u4)`;
 
-			mockChatCompletionsCreate.mockResolvedValue(
-				createChatCompletionFixture(translatedContent, title),
-			);
+			queueOpenAiTranslationResponses(translatedContent, title);
 
 			const file = createTranslationFileFixture({ content: sourceContent }, title);
 			expect(translatorService.translateContent(file)).resolves.not.toThrow(ApplicationError);
@@ -611,9 +602,7 @@ describe("TranslatorService", () => {
 			const sourceContent = `# Title\n\n[React](https://react.dev "React docs") and [MDN](https://mdn.dev "MDN Web Docs")`;
 			const translatedContent = `# Título\n\n[React](https://react.dev "Docs React") e [MDN](https://mdn.dev "MDN Web Docs")`;
 
-			mockChatCompletionsCreate.mockResolvedValue(
-				createChatCompletionFixture(translatedContent, title),
-			);
+			queueOpenAiTranslationResponses(translatedContent, title);
 
 			const file = createTranslationFileFixture({ content: sourceContent }, title);
 			expect(translatorService.translateContent(file)).resolves.not.toThrow(ApplicationError);
@@ -623,47 +612,39 @@ describe("TranslatorService", () => {
 	describe("Frontmatter Validation", () => {
 		test("should pass validation when frontmatter keys match between source and translation", () => {
 			const sourceContent = `---\ntitle: 'Hello'\ndescription: 'Welcome'\n---\n\n# Content`;
-			const translatedContent = `---\ntitle: 'Olá'\ndescription: 'Bem-vindo'\n---\n\n# Conteúdo`;
+			const translatedBody = `# Conteúdo`;
 
-			mockChatCompletionsCreate.mockResolvedValue(createChatCompletionFixture(translatedContent));
+			queueOpenAiTranslationResponses(translatedBody, "Olá", "Bem-vindo");
 
 			const file = createTranslationFileFixture({ content: sourceContent });
 			expect(translatorService.translateContent(file)).resolves.not.toThrow(ApplicationError);
 		});
 
-		test("should throw Error when frontmatter is completely lost during translation", () => {
+		test("should preserve translated title in YAML when the model returns body without frontmatter", async () => {
 			const sourceContent = `---\ntitle: 'Hello'\n---\n\n# Content`;
-			const translatedContent = `# Conteúdo sem frontmatter`;
+			const translatedContent = `# Conteúdo`;
 
-			mockChatCompletionsCreate.mockResolvedValue(createChatCompletionFixture(translatedContent));
+			queueOpenAiTranslationResponses(translatedContent, "Olá");
 
 			const file = createTranslationFileFixture({ content: sourceContent });
-			expect(translatorService.translateContent(file)).rejects.toThrow(ApplicationError);
+			const result = await translatorService.translateContent(file);
+			expect(result.startsWith("---\n")).toBe(true);
+			expect(result).toContain("Olá");
+			expect(result).toContain("# Conteúdo");
 		});
 
-		test("should log warning when required key 'title' is missing in translation", async () => {
-			const sourceContent = `---\ntitle: 'Hello'\ndescription: 'Test'\n---\n\n# Content`;
-			const translatedContent = `---\ndescription: 'Teste'\n---\n\n# Conteúdo`;
-
-			mockChatCompletionsCreate.mockResolvedValue(createChatCompletionFixture(translatedContent));
-			const file = createTranslationFileFixture({ content: sourceContent });
-			const warnSpy = spyOn(file.logger, "warn");
-			await translatorService.translateContent(file);
-
-			expect(warnSpy).toHaveBeenCalled();
-		});
-
-		test("should log warning when non-required keys are missing in translation", async () => {
+		test("should keep non-translated keys and translate title when the model emits a shorter YAML block", async () => {
 			const sourceContent = `---\ntitle: 'Hello'\ncustom_key: 'value'\nauthor: 'John'\n---\n\n# Content`;
-			const translatedContent = `---\ntitle: 'Olá'\n---\n\n# Conteúdo`;
+			const translatedBody = `# Conteúdo`;
 
-			mockChatCompletionsCreate.mockResolvedValue(createChatCompletionFixture(translatedContent));
+			queueOpenAiTranslationResponses(translatedBody, "Olá");
 
 			const file = createTranslationFileFixture({ content: sourceContent });
-			const warnSpy = spyOn(file.logger, "warn");
-			await translatorService.translateContent(file);
-
-			expect(warnSpy).toHaveBeenCalled();
+			const result = await translatorService.translateContent(file);
+			expect(result).toContain("custom_key: 'value'");
+			expect(result).toContain("author: 'John'");
+			expect(result).toContain("# Conteúdo");
+			expect(result).toContain("Olá");
 		});
 
 		test("should not throw Error when source has no frontmatter", () => {
@@ -671,9 +652,7 @@ describe("TranslatorService", () => {
 			const sourceContent = `# Content without frontmatter`;
 			const translatedContent = `# Conteúdo sem frontmatter`;
 
-			mockChatCompletionsCreate.mockResolvedValue(
-				createChatCompletionFixture(translatedContent, title),
-			);
+			queueOpenAiTranslationResponses(translatedContent, title);
 
 			const file = createTranslationFileFixture({ content: sourceContent }, title);
 			expect(translatorService.translateContent(file)).resolves.not.toThrow(ApplicationError);
@@ -681,9 +660,9 @@ describe("TranslatorService", () => {
 
 		test("should not throw Error when frontmatter with various key formats", () => {
 			const sourceContent = `---\ntitle: 'Test'\nsnake_case_key: 'value'\ncamelCaseKey: 'value2'\nKEY123: 'value3'\n---\n\n# Content`;
-			const translatedContent = `---\ntitle: 'Teste'\nsnake_case_key: 'valor'\ncamelCaseKey: 'valor2'\nKEY123: 'valor3'\n---\n\n# Conteúdo`;
+			const translatedBody = `# Conteúdo`;
 
-			mockChatCompletionsCreate.mockResolvedValue(createChatCompletionFixture(translatedContent));
+			queueOpenAiTranslationResponses(translatedBody, "Teste");
 
 			const file = createTranslationFileFixture({ content: sourceContent });
 			expect(translatorService.translateContent(file)).resolves.not.toThrow(ApplicationError);

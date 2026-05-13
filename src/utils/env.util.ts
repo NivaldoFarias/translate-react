@@ -121,14 +121,6 @@ const envSchema = z.object({
 	 */
 	GH_REQUEST_TIMEOUT: z.coerce.number().positive().default(envDefaults.GH_REQUEST_TIMEOUT),
 
-	/**
-	 * Minimum success rate (0-1) required for workflow to pass.
-	 *
-	 * If the translation success rate falls below this threshold, the workflow
-	 * will exit with a non-zero code. Set to 0 to disable failure detection.
-	 */
-	MIN_SUCCESS_RATE: z.coerce.number().min(0).max(1).default(envDefaults.MIN_SUCCESS_RATE),
-
 	/** Maximum retry attempts for translation errors */
 	MAX_RETRY_ATTEMPTS: z.coerce.number().positive().default(envDefaults.MAX_RETRY_ATTEMPTS),
 

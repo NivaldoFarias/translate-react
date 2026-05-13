@@ -154,7 +154,7 @@ export interface LanguageDetectionResult {
 /**
  * Statistics returned from the workflow execution.
  *
- * Used to determine if the workflow met success rate thresholds.
+ * Returned to `main` for logging after `printFinalStatistics`; also used when building issue comments.
  */
 export interface WorkflowStatistics {
 	/** Number of files successfully translated */

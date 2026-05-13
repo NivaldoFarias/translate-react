@@ -63,7 +63,9 @@ export const logger = pino({
 
 	/**
 	 * Custom serializers for structured logging.
-	 * Transforms values before logging to reduce verbosity and improve readability.
+	 *
+	 * These apply only to matching **top-level** keys. Nested large strings (e.g. `file.content`)
+	 * are not rewritten; omit them at the call site (e.g. `TranslationFile#getLogContext`).
 	 */
 	serializers: {
 		error: pino.stdSerializers.err,

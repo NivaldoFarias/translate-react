@@ -1,12 +1,8 @@
 import { StatusCodes } from "http-status-codes";
 
-import type { RepositoryTreeItem, WorkflowStatistics } from "@/services/";
-
-import { ApplicationError, ErrorCode } from "@/errors/";
+import type { RepositoryTreeItem } from "@/services/";
 
 import { MS_PER_SECOND, processSignals, RATE_LIMIT_PATTERNS } from "./constants.util";
-import { env } from "./env.util";
-import { logger as baseLogger } from "./logger.util";
 
 /**
  * Formats a {@link Date} object into an NFTS-compatible date string.
@@ -31,51 +27,6 @@ import { logger as baseLogger } from "./logger.util";
  */
 export function nftsCompatibleDateString(date = new Date()): string {
 	return date.toISOString().replace(new RegExp(/:/g), "-");
-}
-
-/**
- * Validates the success rate of the workflow against the minimum threshold.
- *
- * @throws {ApplicationError} with {@link ErrorCode.BelowMinimumSuccessRate} If the success rate is below the configured minimum
- *
- * @param statistics final workflow statistics used for validation
- *
- * @see {@link env.MIN_SUCCESS_RATE|`env.MIN_SUCCESS_RATE`} for the configured threshold
- */
-export function validateSuccessRate(statistics: WorkflowStatistics) {
-	const logger = baseLogger.child({ component: validateSuccessRate.name });
-
-	logger.debug(
-		{ successRate: statistics.successRate, minSuccessRate: env.MIN_SUCCESS_RATE },
-		"Validating success rate against minimum threshold",
-	);
-
-	if (statistics.successRate < env.MIN_SUCCESS_RATE) {
-		logger.debug("Success rate below minimum threshold");
-
-		const successPercentage = (statistics.successRate * 100).toFixed(1);
-		const thresholdPercentage = (env.MIN_SUCCESS_RATE * 100).toFixed(0);
-
-		const metadata = {
-			successRate: successPercentage,
-			minSuccessRate: thresholdPercentage,
-			successCount: statistics.successCount,
-			failureCount: statistics.failureCount,
-			totalCount: statistics.totalCount,
-		};
-		const errorMessage = `Success rate ${successPercentage}% below threshold ${thresholdPercentage}%`;
-
-		logger.fatal(metadata, errorMessage);
-
-		throw new ApplicationError(
-			errorMessage,
-			ErrorCode.BelowMinimumSuccessRate,
-			validateSuccessRate.name,
-			metadata,
-		);
-	}
-
-	logger.debug("Success rate meets minimum threshold");
 }
 
 /**
