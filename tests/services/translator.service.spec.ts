@@ -278,11 +278,17 @@ describe("TranslatorService", () => {
 			);
 
 			let chunkCallIndex = 0;
+			let firstSystemPrompt: string | undefined;
 			const { chunks } = await new (await import("@/services/translator/managers")).ChunksManager(
 				"test-model",
 			).chunkContent(largeContent);
 
-			mockChatCompletionsCreate.mockImplementation(async () => {
+			mockChatCompletionsCreate.mockImplementation(async (params: unknown) => {
+				const { messages } = params as { messages: { role: string; content: string }[] };
+				const systemMessage = messages.find((message) => message.role === "system");
+				if (chunkCallIndex === 0) {
+					firstSystemPrompt = systemMessage?.content;
+				}
 				const idx = chunkCallIndex++;
 				const translatedChunk =
 					translatedSections[idx] ?? `## Seção\n\nConteúdo traduzido fragmento ${idx + 1}.`;
@@ -300,6 +306,9 @@ describe("TranslatorService", () => {
 			expect(typeof translation).toBe("string");
 			expect(translation.length).toBeGreaterThan(0);
 			expect(mockChatCompletionsCreate.mock.calls.length).toBe(chunks.length);
+			expect(firstSystemPrompt).toBeDefined();
+			expect(firstSystemPrompt).toContain("DOCUMENT SLICE");
+			expect(firstSystemPrompt).toContain(`slice 1 of ${chunks.length}`);
 		});
 
 		describe("verbatim fence masking (LLM payload)", () => {
