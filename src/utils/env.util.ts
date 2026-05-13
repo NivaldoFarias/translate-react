@@ -146,6 +146,17 @@ const envSchema = z.object({
 	 * @example "TRANSLATION.md" // for ru.react.dev
 	 */
 	TRANSLATION_GUIDELINES_FILE: z.string().optional(),
+
+	/**
+	 * When enabled, fences at or above `MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS` become HTML placeholders before the LLM; restored after. Prose inside those fences is not translated while masked.
+	 */
+	MASK_VERBATIM_LARGE_FENCES: z.coerce.boolean().default(envDefaults.MASK_VERBATIM_LARGE_FENCES),
+
+	/** `Tiktoken` threshold (same estimator as chunking) for treating a fence as verbatim */
+	MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS: z.coerce
+		.number()
+		.positive()
+		.default(envDefaults.MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS),
 });
 
 /** Type definition for the environment configuration */

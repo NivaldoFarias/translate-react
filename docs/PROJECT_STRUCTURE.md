@@ -53,7 +53,7 @@ translate-react/                          # Repository root
 
 ## Key Principles
 
-- **Services**: Business logic in `src/services/`; each service in its own subfolder with `index.ts` barrel export; single **GitHubService** (internally **GitHubRepository**, **GitHubContent**, **GitHubBranch**); **RunnerService** extends **BaseRunnerService** and uses managers in `runner/managers/`; **TranslatorService** uses chunking and validation managers in `translator/managers/`.
+- **Services**: Business logic in `src/services/`; each service in its own subfolder with `index.ts` barrel export; single **GitHubService** (internally **GitHubRepository**, **GitHubContent**, **GitHubBranch**); **RunnerService** extends **BaseRunnerService** and uses managers in `runner/managers/`; **TranslatorService** uses chunking and validation managers in `translator/managers/` and optional large-fence masking from `src/utils/markdown-verbatim-fences.util.ts`.
 - **Clients**: External API clients in `src/clients/`; **Octokit** client in dedicated subfolder with constants.
 - **Errors**: **ApplicationError** and **ErrorCode** in `src/errors/`; top-level handler in `main.ts`; library errors bubble up.
 - **DI**: Module-level singletons; dependencies injected via constructors (e.g. **RunnerServiceDependencies**); tests use mocks from `tests/mocks/`.

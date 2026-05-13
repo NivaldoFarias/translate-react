@@ -138,21 +138,24 @@ Core translation engine (`services/translator/translator.service.ts`) interfacin
 
 ```mermaid
 graph LR
-    A[Input] --> B{Size Check}
-    B -->|< 4000 tokens| C[Direct Translation]
-    B -->|> 4000 tokens| D[Chunking]
-    D --> E[Translate Chunks]
-    E --> F[Reassemble]
-    C --> G[Validation]
-    F --> G
-    G --> H[Output]
+    A[Input] --> B{Optional large-fence mask}
+    B --> C{Size Check}
+    C -->|under limit| D[Direct Translation]
+    C -->|over limit| E[Markdown chunking]
+    E --> F[Translate chunks in parallel]
+    F --> G[Reassemble]
+    D --> H[Restore fences if masked]
+    G --> H
+    H --> I[Validation]
+    I --> J[Output]
 ```
 
-**Content Chunking** (files > `MAX_CHUNK_TOKENS`):
+**Large-fence masking (optional, env-driven):** Fenced blocks whose tiktoken estimate meets `MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS` can be replaced by short HTML comment placeholders before any LLM call, then restored from the original source so structure and validators still see real fences. Disabled by default; see [`markdown-verbatim-fences.util.ts`](../src/utils/markdown-verbatim-fences.util.ts).
 
-1. Split using `RecursiveCharacterTextSplitter` (LangChain) with 200-token overlap
-2. Translate sequentially, passing previous context
-3. Reassemble with original formatting
+**Content chunking** (when estimated input tokens exceed the safe budget in [`ChunksManager`](../src/services/translator/managers/chunks.manager.ts)):
+
+1. Split with LangChain `MarkdownTextSplitter` using the same token estimator and overlap from `CHUNKS` in [`managers.constants.ts`](../src/services/translator/managers/managers.constants.ts)
+2. Translate chunks concurrently (`Promise.all`), then reassemble with captured separators
 
 **Translation guidelines**: Loaded from upstream `GLOSSARY.md`, passed to LLM as system instruction.
 

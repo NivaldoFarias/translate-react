@@ -40,10 +40,10 @@ Automated translation tool for React documentation using LLMs. Processes markdow
 3. Setup the forks of the target React documentation repositories:
    - For the Portuguese (Brazil) repository, fork [`reactjs/pt-br.react.dev`](https://github.com/reactjs/pt-br.react.dev/) to your GitHub account
    - (Optional) For the Russian repository, fork [`reactjs/ru.react.dev`](https://github.com/reactjs/ru.react.dev/) to your GitHub account
-5. Install the `translate-react-bot` GitHub App on the forks of the target React documentation repositories:
-6. Configure Environment: `cp .env.example .env`
+4. Install the `translate-react-bot` GitHub App on the forks of the target React documentation repositories:
+5. Configure Environment: `cp .env.example .env`
    - Then, edit `.env` with your API keys _(see [Configuration section](#configuration))_
-7. Run in Development Mode: `bun run dev`
+6. Run in Development Mode: `bun run dev`
 
 > [!TIP]
 > For a more detailed workflow explanation, see [`WORKFLOW.md`](./docs/WORKFLOW.md).
@@ -98,11 +98,13 @@ These **must** be set in your `.env` file:
 <details>
 <summary><b>Translation Settings</b></summary>
 
-| Variable          | Default | Description                                                                                 |
-| ----------------- | ------- | ------------------------------------------------------------------------------------------- |
-| `TARGET_LANGUAGE` | `pt-br` | React locale for translated output; in Actions, `workflow.yml` sets this from `matrix.lang` |
-| `SOURCE_LANGUAGE` | `en`    | Source locale for detection labels; React English docs — default `en`, omit in CI           |
-| `BATCH_SIZE`      | `1`     | Files to process in parallel                                                                |
+| Variable                                | Default | Description                                                                                                                                                                                   |
+| --------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TARGET_LANGUAGE`                       | `pt-br` | React locale for translated output; in Actions, `workflow.yml` sets this from `matrix.lang`                                                                                                   |
+| `SOURCE_LANGUAGE`                       | `en`    | Source locale for detection labels; React English docs — default `en`, omit in CI                                                                                                             |
+| `BATCH_SIZE`                            | `1`     | Files to process in parallel                                                                                                                                                                  |
+| `MASK_VERBATIM_LARGE_FENCES`            | `false` | When `true`, very large fenced code blocks are sent as short HTML placeholders to the LLM and restored afterward (saves tokens; prose **inside** those fences is not translated while masked) |
+| `MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS` | `120`   | Tiktoken-based threshold (same estimator as chunking) for treating a fence as verbatim when masking is enabled                                                                                |
 
 </details>
 

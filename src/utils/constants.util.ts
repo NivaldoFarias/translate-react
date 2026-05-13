@@ -153,6 +153,14 @@ export interface EnvironmentSchemaDefaults {
 	MIN_SUCCESS_RATE: number;
 	MAX_LLM_CONCURRENCY: number;
 	MAX_RETRY_ATTEMPTS: number;
+
+	/**
+	 * When `true`, large fenced blocks become HTML comment placeholders before the LLM and are restored after.
+	 */
+	MASK_VERBATIM_LARGE_FENCES: boolean;
+
+	/** Minimum estimated tokens (tiktoken) for a fence to be masked when `MASK_VERBATIM_LARGE_FENCES` is on */
+	MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS: number;
 }
 
 /** Placeholders for the environment schema. */
@@ -177,6 +185,8 @@ export const ENV_PLACEHOLDERS = {
 	MIN_SUCCESS_RATE: 0.75,
 	MAX_RETRY_ATTEMPTS: 3,
 	MAX_LLM_CONCURRENCY: 4,
+	MASK_VERBATIM_LARGE_FENCES: false,
+	MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS: 120,
 } satisfies Partial<EnvironmentSchemaDefaults>;
 
 export const environmentDefaults: Record<RuntimeEnvironment, EnvironmentSchemaDefaults> = {
