@@ -154,6 +154,13 @@ export interface EnvironmentSchemaDefaults {
 	MAX_RETRY_ATTEMPTS: number;
 
 	/**
+	 * When greater than zero, caps how many LLM requests may start per rolling minute across the process
+	 * (via {@link https://github.com/sindresorhus/p-queue#intervalCap|p-queue} strict interval). Use for
+	 * OpenRouter `free-models-per-min` and similar quotas. `0` disables interval limiting.
+	 */
+	LLM_MAX_REQUESTS_PER_MINUTE: number;
+
+	/**
 	 * When `true`, large fenced blocks become HTML comment placeholders before the LLM and are restored after.
 	 */
 	MASK_VERBATIM_LARGE_FENCES: boolean;
@@ -195,6 +202,7 @@ export const ENV_PLACEHOLDERS = {
 	GH_REQUEST_TIMEOUT: 30_000,
 	MAX_RETRY_ATTEMPTS: 3,
 	MAX_LLM_CONCURRENCY: 4,
+	LLM_MAX_REQUESTS_PER_MINUTE: 0,
 	MASK_VERBATIM_LARGE_FENCES: false,
 	MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS: 120,
 	LOG_MAX_STRING_LENGTH: MAX_LOG_STRING_LENGTH,
