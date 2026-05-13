@@ -1,3 +1,5 @@
+import { isMap, isScalar, parseDocument } from "yaml";
+
 import { REGEXES } from "./managers/managers.constants";
 
 /**
@@ -81,6 +83,80 @@ export function buildFrontmatterBlock(bom: string, innerYaml: string): string {
 	const body = normalized.endsWith("\n") ? normalized : `${normalized}\n`;
 
 	return `${bom}---\n${body}---`;
+}
+
+/**
+ * Returns the trimmed `title` scalar from inner frontmatter YAML when the document root is a mapping
+ * and `title` resolves to a non-empty string.
+ *
+ * @param innerYaml YAML between the opening and closing `---` delimiters (no fences)
+ *
+ * @returns The trimmed title, or `undefined` when absent, not a string scalar, parse errors occur, or the root is not a map
+ *
+ * @example
+ * ```typescript
+ * extractTitleScalarFromInnerYaml(`title: "a: b"\nother: 1`);
+ * // ^? "a: b"
+ * ```
+ */
+export function extractTitleScalarFromInnerYaml(innerYaml: string): string | undefined {
+	let doc;
+	try {
+		doc = parseDocument(innerYaml);
+	} catch {
+		return undefined;
+	}
+
+	if (doc.errors.length > 0) return undefined;
+	if (!isMap(doc.contents)) return undefined;
+
+	const title = doc.get("title");
+	if (typeof title !== "string") return undefined;
+
+	const trimmed = title.trim();
+	return trimmed.length > 0 ? trimmed : undefined;
+}
+
+/**
+ * Collects top-level keys from inner frontmatter YAML when the document root is a mapping.
+ *
+ * Used to compare source vs translated metadata shape without treating `:` inside quoted values as key separators.
+ *
+ * @param innerYaml YAML between the opening and closing `---` delimiters (no fences)
+ *
+ * @returns A set of top-level key names; empty when the YAML is invalid, has parse errors, or the root is not a plain mapping
+ *
+ * @example
+ * ```typescript
+ * collectTopLevelKeysFromInnerYaml(`title: "x"\ndescription: "a: b"`);
+ * // ^? Set { "title", "description" }
+ * ```
+ */
+export function collectTopLevelKeysFromInnerYaml(innerYaml: string): Set<string> {
+	let doc;
+	try {
+		doc = parseDocument(innerYaml);
+	} catch {
+		return new Set();
+	}
+
+	if (doc.errors.length > 0) return new Set();
+	const root = doc.contents;
+	if (!isMap(root)) return new Set();
+
+	const keys = new Set<string>();
+	for (const pair of root.items) {
+		const keyNode = pair.key;
+		if (!isScalar(keyNode)) continue;
+		const raw = keyNode.value;
+		if (typeof raw === "string") {
+			keys.add(raw);
+		} else if (typeof raw === "number" && Number.isFinite(raw)) {
+			keys.add(String(raw));
+		}
+	}
+
+	return keys;
 }
 
 export function mergePreservedYamlFrontmatter(preservedBlock: string, translated: string) {

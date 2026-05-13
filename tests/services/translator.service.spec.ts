@@ -151,6 +151,12 @@ describe("TranslatorService", () => {
 				expect(file.title).toBe("Hello");
 			});
 
+			test("should extract title when value contains a colon inside double quotes", () => {
+				const content = `---\ntitle: "https://react.dev"\n---\n# Hi`;
+				const file = createTranslationFileFixture({ content });
+				expect(file.title).toBe("https://react.dev");
+			});
+
 			test("should not extract title from frontmatter when title is not present", () => {
 				const content = `# Hello\nWelcome to React!`;
 				const file = createTranslationFileFixture({ content });
