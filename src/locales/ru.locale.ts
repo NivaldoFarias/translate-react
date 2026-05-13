@@ -48,6 +48,7 @@ const ruPRBodyStrings: LocalePRBodyStrings = {
 		header: "Техническая информация",
 		generationDate: "Дата генерации",
 		branch: "Ветка",
+		workflowRun: "Запуск workflow",
 	},
 
 	timeFormatLocale: "ru-RU",
