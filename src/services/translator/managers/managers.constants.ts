@@ -24,8 +24,6 @@ export const REGEXES = {
 	/** Regex pattern to extract YAML frontmatter block (between --- delimiters); allows optional UTF-8 BOM */
 	frontmatter: new RegExp(/^(\uFEFF)?---\r?\n(?<content>[\s\S]*?)\r?\n---/),
 
-	titleFrontmatterKey: new RegExp(/title:\s*(?<title>.+)/),
-
 	/** Regex pattern to match markdown links: [text](url) and [text](url "title") */
 	markdownLink: new RegExp(/\[(?<text>[^\]]*)\]\((?<url>[^)\s]+)(?:\s+"[^"]*")?\)/g),
 

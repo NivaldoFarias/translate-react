@@ -5,6 +5,7 @@ import type { TranslationFile } from "../translator.service";
 import type { ChunksToReassemble } from "./chunks.manager";
 
 import { ApplicationError, ErrorCode } from "@/errors";
+import { collectTopLevelKeysFromInnerYaml } from "@/services/translator/translator-frontmatter.util";
 import { logger } from "@/utils";
 
 import { RATIOS, REGEXES, TRANSLATION_PREFIXES } from "./managers.constants";
@@ -174,7 +175,7 @@ export class TranslationValidatorManager {
 	 * Validates that frontmatter structure and required keys are preserved during translation.
 	 *
 	 * Parses YAML frontmatter from source and translated content, then verifies that:
-	 * 1. Required keys (e.g., `title`) are preserved in translation
+	 * 1. Required keys (e.g., `title`) are preserved in translation (top-level keys via {@link collectTopLevelKeysFromInnerYaml})
 	 * 2. The overall frontmatter structure remains intact
 	 *
 	 * @param file Original file containing source content for comparison
@@ -201,8 +202,8 @@ export class TranslationValidatorManager {
 			);
 		}
 
-		const originalKeys = this.extractKeys(originalMatch);
-		const translatedKeys = this.extractKeys(translatedMatch);
+		const originalKeys = collectTopLevelKeysFromInnerYaml(originalMatch);
+		const translatedKeys = collectTopLevelKeysFromInnerYaml(translatedMatch);
 
 		file.logger.debug(
 			{ originalKeys: [...originalKeys], translatedKeys: [...translatedKeys] },
@@ -217,27 +218,6 @@ export class TranslationValidatorManager {
 				"Frontmatter keys missing in translation",
 			);
 		}
-	}
-
-	private extractKeys(frontmatterContent: string): Set<string> {
-		const keys = new Set<string>();
-		if (!frontmatterContent) return keys;
-
-		const lines = frontmatterContent.split("\n").filter(Boolean);
-		for (const line of lines) {
-			const trimmedLine = line.trim();
-			if (!trimmedLine) continue;
-
-			const [key] = trimmedLine
-				.split(":")
-				.map((word) => word.trim())
-				.filter(Boolean);
-			if (!key) continue;
-
-			keys.add(key);
-		}
-
-		return keys;
 	}
 
 	/**

@@ -2,7 +2,9 @@ import { describe, expect, test } from "bun:test";
 
 import {
 	buildFrontmatterBlock,
+	collectTopLevelKeysFromInnerYaml,
 	extractFrontmatterParts,
+	extractTitleScalarFromInnerYaml,
 	mergePreservedYamlFrontmatter,
 	splitLeadingYamlFrontmatter,
 } from "@/services/translator/translator-frontmatter.util";
@@ -63,6 +65,39 @@ describe("splitLeadingYamlFrontmatter", () => {
 		const { block, rest } = splitLeadingYamlFrontmatter(source);
 		expect(block.startsWith("\uFEFF---")).toBe(true);
 		expect(rest).toBe("\n\n# Hi\n");
+	});
+});
+
+describe("extractTitleScalarFromInnerYaml", () => {
+	test("returns title when value contains a colon inside double quotes", () => {
+		expect(extractTitleScalarFromInnerYaml(`title: "a: b"\nother: 1`)).toBe("a: b");
+	});
+
+	test("returns undefined when title is not a string scalar", () => {
+		expect(extractTitleScalarFromInnerYaml("title: [1, 2]\nother: x")).toBeUndefined();
+	});
+
+	test("returns title for block scalar title", () => {
+		expect(extractTitleScalarFromInnerYaml("title: |\n  x")).toBe("x");
+	});
+
+	test("returns undefined when inner YAML has parse errors", () => {
+		expect(extractTitleScalarFromInnerYaml("title:\n  bad: [")).toBeUndefined();
+	});
+});
+
+describe("collectTopLevelKeysFromInnerYaml", () => {
+	test("collects keys when values contain colons in quotes", () => {
+		const keys = collectTopLevelKeysFromInnerYaml(`title: "x"\ndescription: "a: b"\n`);
+		expect(keys).toEqual(new Set(["title", "description"]));
+	});
+
+	test("returns empty set for non-mapping root", () => {
+		expect(collectTopLevelKeysFromInnerYaml("- item\n")).toEqual(new Set());
+	});
+
+	test("returns empty set on parse errors", () => {
+		expect(collectTopLevelKeysFromInnerYaml("foo: [\n")).toEqual(new Set());
 	});
 });
 

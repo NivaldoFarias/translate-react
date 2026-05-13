@@ -26,6 +26,7 @@ import { REGEXES } from "./managers/managers.constants";
 import {
 	buildFrontmatterBlock,
 	extractFrontmatterParts,
+	extractTitleScalarFromInnerYaml,
 	mergePreservedYamlFrontmatter,
 	splitLeadingYamlFrontmatter,
 } from "./translator-frontmatter.util";
@@ -107,22 +108,18 @@ export class TranslationFile {
 	}
 
 	/**
-	 * Extracts the title of a document from its content by matching the `title` frontmatter key.
-	 *
-	 * Supports both single and double quotes around the title value.
+	 * Extracts the document title from leading YAML frontmatter by parsing the inner block with {@link extractTitleScalarFromInnerYaml}.
 	 *
 	 * @param content The content of the document
 	 *
-	 * @returns The title of the document, or `undefined` if not found
+	 * @returns The trimmed `title` string scalar, or `undefined` when there is no frontmatter or `title` is missing or not a string
 	 */
 	private extractDocTitleFromContent(content: string): string | undefined {
 		const frontmatterContentOnly = REGEXES.frontmatter.exec(content)?.groups?.["content"];
 
 		if (!frontmatterContentOnly) return;
 
-		const title = REGEXES.titleFrontmatterKey.exec(frontmatterContentOnly)?.groups?.["title"];
-
-		return title?.replace(new RegExp(/['"]/g), "");
+		return extractTitleScalarFromInnerYaml(frontmatterContentOnly);
 	}
 
 	/**
