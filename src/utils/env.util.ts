@@ -128,6 +128,26 @@ const envSchema = z.object({
 	MAX_LLM_CONCURRENCY: z.coerce.number().positive().default(envDefaults.MAX_LLM_CONCURRENCY),
 
 	/**
+	 * Caps how many LLM requests may **start** per rolling 60s window (strict sliding window via `p-queue`).
+	 *
+	 * Set to `0` to disable. For OpenRouter free models (`free-models-per-min`), use `15` or `16` and keep
+	 * `MAX_LLM_CONCURRENCY` low (for example `1`).
+	 */
+	LLM_MAX_REQUESTS_PER_MINUTE: z.coerce
+		.number()
+		.int()
+		.min(0)
+		.default(envDefaults.LLM_MAX_REQUESTS_PER_MINUTE),
+
+	/**
+	 * `parallel` issues one LLM call per chunk at once (bounded by the LLM queue). `sequential` translates
+	 * chunks in document order, which reduces bursts on strict free-tier quotas.
+	 */
+	CHUNK_TRANSLATION_MODE: z
+		.enum(["parallel", "sequential"])
+		.default(envDefaults.CHUNK_TRANSLATION_MODE),
+
+	/**
 	 * Optional explicit filename for the translation guidelines file.
 	 *
 	 * When set, bypasses auto-discovery and fetches this specific file from the

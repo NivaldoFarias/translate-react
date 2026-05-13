@@ -16,6 +16,7 @@ import { LanguageDetectorService, languageDetectorService } from "@/services/lan
 import { localeService, LocaleService } from "@/services/locale/";
 import {
 	env,
+	getRateLimitResetWaitMs,
 	logger,
 	maskLargeVerbatimFencedCodeBlocks,
 	restoreMaskedVerbatimFences,
@@ -514,9 +515,17 @@ export class TranslatorService {
 			"Content split into chunks",
 		);
 
-		const translatedChunks = await Promise.all(
-			chunks.map((chunk, index) => this.translateChunk(file, chunk, index, chunks)),
-		);
+		let translatedChunks: string[];
+		if (env.CHUNK_TRANSLATION_MODE === "sequential") {
+			translatedChunks = [];
+			for (const [index, chunk] of chunks.entries()) {
+				translatedChunks.push(await this.translateChunk(file, chunk, index, chunks));
+			}
+		} else {
+			translatedChunks = await Promise.all(
+				chunks.map((chunk, index) => this.translateChunk(file, chunk, index, chunks)),
+			);
+		}
 
 		file.logger.debug(
 			{ translatedChunkCount: translatedChunks.length },
@@ -693,7 +702,7 @@ export class TranslatorService {
 				},
 				{
 					...this.retryConfig,
-					onFailedAttempt: ({ attemptNumber: attempt, error, retriesLeft }) => {
+					onFailedAttempt: async ({ attemptNumber: attempt, error, retriesLeft }) => {
 						file.logger.warn(
 							{
 								attempt,
@@ -704,6 +713,12 @@ export class TranslatorService {
 							},
 							`LLM call attempt ${attempt} failed, ${retriesLeft} retries remaining`,
 						);
+
+						const resetWaitMs = getRateLimitResetWaitMs(error);
+						if (resetWaitMs > 0) {
+							file.logger.info({ resetWaitMs }, "Waiting for LLM rate limit window before retry");
+							await new Promise<void>((resolve) => setTimeout(resolve, resetWaitMs));
+						}
 					},
 				},
 			);
