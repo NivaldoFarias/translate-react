@@ -3,7 +3,10 @@ import { StatusCodes } from "http-status-codes";
 import { APIError } from "openai";
 
 import { MS_PER_SECOND } from "@/utils/constants.util";
-import { getRateLimitResetWaitMs } from "@/utils/llm-rate-limit.util";
+import {
+	getRateLimitResetWaitMs,
+	isOpenRouterDailyFreeModelQuotaError,
+} from "@/utils/llm-rate-limit.util";
 
 describe("getRateLimitResetWaitMs", () => {
 	test("returns 0 for non-API errors", () => {
@@ -66,5 +69,52 @@ describe("getRateLimitResetWaitMs", () => {
 			new Headers([["x-ratelimit-reset", String(now - 10_000)]]),
 		);
 		expect(getRateLimitResetWaitMs(error, now)).toBe(0);
+	});
+});
+
+describe("isOpenRouterDailyFreeModelQuotaError", () => {
+	test("returns false for non-429 errors", () => {
+		const error = APIError.generate(
+			StatusCodes.BAD_REQUEST,
+			{ message: "bad" },
+			undefined,
+			new Headers(),
+		);
+		expect(isOpenRouterDailyFreeModelQuotaError(error)).toBe(false);
+	});
+
+	test("returns false for 429 without daily free-model wording", () => {
+		const error = APIError.generate(
+			StatusCodes.TOO_MANY_REQUESTS,
+			{ message: "Rate limit exceeded: free-models-per-min. " },
+			undefined,
+			new Headers(),
+		);
+		expect(isOpenRouterDailyFreeModelQuotaError(error)).toBe(false);
+	});
+
+	test("returns true when the nested error body mentions free-models-per-day", () => {
+		const error = APIError.generate(
+			StatusCodes.TOO_MANY_REQUESTS,
+			{
+				error: {
+					message:
+						"Rate limit exceeded: free-models-per-day. Add 5 credits to unlock 1000 free model requests per day",
+				},
+			},
+			undefined,
+			new Headers(),
+		);
+		expect(isOpenRouterDailyFreeModelQuotaError(error)).toBe(true);
+	});
+
+	test("returns true when only the top-level message mentions free-models-per-day", () => {
+		const error = APIError.generate(
+			StatusCodes.TOO_MANY_REQUESTS,
+			{},
+			"429 Rate limit exceeded: free-models-per-day. Add credits.",
+			new Headers(),
+		);
+		expect(isOpenRouterDailyFreeModelQuotaError(error)).toBe(true);
 	});
 });
