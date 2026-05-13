@@ -103,8 +103,14 @@ export const RATIOS = {
 } as const;
 
 export const CHUNKS = {
-	/** Number of overlapping tokens between chunks when splitting content */
-	overlap: 200,
+	/**
+	 * Overlapping tokens between adjacent chunks passed to `MarkdownTextSplitter`.
+	 *
+	 * Kept at zero because reassembly is plain concatenation with preserved separators;
+	 * non-zero overlap would send the same source span to multiple LLM calls and can
+	 * duplicate translated paragraphs at chunk boundaries.
+	 */
+	overlap: 0,
 
 	/** Token buffer reserved for chunk processing overhead when splitting content */
 	tokenBuffer: 500,

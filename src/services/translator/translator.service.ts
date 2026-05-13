@@ -31,6 +31,16 @@ import {
 } from "./translator-frontmatter.util";
 import { CONNECTIVITY_TEST_MAX_TOKENS, LLM_TEMPERATURE } from "./translator.constants";
 
+/**
+ * Identifies which segment of a chunked body is being translated in one LLM call.
+ *
+ * Omitted for whole-file translation and for small frontmatter scalar calls.
+ */
+type ChunkTranslationProgress = Readonly<{
+	index: number;
+	total: number;
+}>;
+
 /** Dependency injection interface for {@link TranslatorService} */
 export interface TranslatorServiceDependencies {
 	/** OpenAI client instance for LLM API calls */
@@ -530,7 +540,9 @@ export class TranslatorService {
 			`Translating chunk ${index + 1}/${chunks.length}`,
 		);
 
-		const translatedChunk = await this.callLanguageModel(file, chunk);
+		const chunkProgress: ChunkTranslationProgress | undefined =
+			chunks.length > 1 ? { index: index + 1, total: chunks.length } : undefined;
+		const translatedChunk = await this.callLanguageModel(file, chunk, chunkProgress);
 
 		file.logger.debug(
 			{
@@ -550,18 +562,20 @@ export class TranslatorService {
 	 * Prepares parameters for LLM chat completion API call.
 	 *
 	 * @param content Content to translate
+	 * @param chunkProgress Optional slice position when translating a chunked body in multiple calls
 	 *
 	 * @returns Chat completion parameters object
 	 */
 	private async getLLMCompletionParams(
 		content: string,
+		chunkProgress?: ChunkTranslationProgress,
 	): Promise<OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming> {
 		return {
 			model: this.model,
 			temperature: LLM_TEMPERATURE,
 			max_tokens: env.MAX_TOKENS,
 			messages: [
-				{ role: "system", content: await this.getSystemPrompt(content) },
+				{ role: "system", content: await this.getSystemPrompt(content, chunkProgress) },
 				{ role: "user", content },
 			],
 		};
@@ -576,12 +590,17 @@ export class TranslatorService {
 	 *
 	 * @param file File instance for logger context
 	 * @param content Content to translate (defaults to file.content if not provided)
+	 * @param chunkProgress When set, the system prompt notes this body is slice `index` of `total` from one file
 	 *
 	 * @throws {ApplicationError} with {@link ErrorCode.TranslationFailed} if the translation's content is missing/empty
 	 *
 	 * @returns Resolves to the translated content
 	 */
-	private async callLanguageModel(file: TranslationFile, content?: string): Promise<string> {
+	private async callLanguageModel(
+		file: TranslationFile,
+		content?: string,
+		chunkProgress?: ChunkTranslationProgress,
+	): Promise<string> {
 		const contentToTranslate = content ?? file.content;
 
 		return this.queue.add(async () => {
@@ -599,7 +618,7 @@ export class TranslatorService {
 						);
 
 						const completion = await this.openai.chat.completions.create(
-							await this.getLLMCompletionParams(contentToTranslate),
+							await this.getLLMCompletionParams(contentToTranslate, chunkProgress),
 						);
 
 						const translatedContent = completion.choices[0]?.message.content;
@@ -663,10 +682,14 @@ export class TranslatorService {
 	 * a structured prompt following prompt engineering best practices.
 	 *
 	 * @param content Content to determine source language
+	 * @param chunkProgress When set, documents that `content` is one slice of a larger markdown body
 	 *
 	 * @returns Resolves to the system prompt string
 	 */
-	private async getSystemPrompt(content: string): Promise<string> {
+	private async getSystemPrompt(
+		content: string,
+		chunkProgress?: ChunkTranslationProgress,
+	): Promise<string> {
 		this.logger.debug("Generating system prompt for translation");
 
 		const detectedSourceCode = await this.services.languageDetector.detectPrimaryLanguage(content);
@@ -691,12 +714,21 @@ export class TranslatorService {
 				`\n## TRANSLATION GUIDELINES\nApply these exact translations for the specified terms:\n${this.translationGuidelines}\n`
 			:	"";
 
+		const chunkSliceSection =
+			chunkProgress && chunkProgress.total > 1 ?
+				`
+				# DOCUMENT SLICE
+				The user message is slice ${chunkProgress.index} of ${chunkProgress.total} from one continuous markdown file.
+				Keep terminology and structure aligned with a single document; translate only the markdown in the user message.
+				`
+			:	"";
+
 		const builtSystemPrompt = `# ROLE
 				You are an expert technical translator specializing in React documentation.
 	
 				# TASK
 				Translate the provided content from ${languages.source} to ${languages.target} with absolute precision and technical accuracy.
-	
+				${chunkSliceSection}
 				# CRITICAL PRESERVATION RULES
 				1. **Structure & Formatting**: Preserve ALL markdown syntax, HTML tags, code blocks, frontmatter, and line breaks exactly as written
 				2. **Code Integrity**: Keep ALL code examples, variable names, function names, and URLs COMPLETELY unchanged
