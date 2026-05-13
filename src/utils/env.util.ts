@@ -131,7 +131,7 @@ const envSchema = z.object({
 	 * Caps how many LLM requests may **start** per rolling 60s window (strict sliding window via `p-queue`).
 	 *
 	 * Set to `0` to disable. For OpenRouter free models (`free-models-per-min`), use `15` or `16` and keep
-	 * `MAX_LLM_CONCURRENCY` low (for example `1`).
+	 * `MAX_LLM_CONCURRENCY` low (for example `1`). This does not affect OpenRouter's separate `free-models-per-day` cap.
 	 */
 	LLM_MAX_REQUESTS_PER_MINUTE: z.coerce
 		.number()

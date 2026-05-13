@@ -1,5 +1,4 @@
 import { StatusCodes } from "http-status-codes";
-import { APIError } from "openai/error";
 
 import { MS_PER_SECOND } from "./constants.util";
 
@@ -8,6 +7,78 @@ const RATE_LIMIT_RESET_BUFFER_MS = 750;
 
 /** Refuse to block longer than this when a reset timestamp is far in the future */
 const MAX_RATE_LIMIT_RESET_WAIT_MS = 120_000;
+
+/** OpenRouter body snippet when the account has exhausted the daily free-model allowance */
+const OPENROUTER_FREE_MODELS_PER_DAY = "free-models-per-day";
+
+/**
+ * Narrows unknown failures to OpenAI-compatible 429 responses without relying on `instanceof` across package entry points.
+ *
+ * @param error The thrown value from the OpenAI-compatible client
+ */
+function isOpenAiCompatible429Error(
+	error: unknown,
+): error is { status: number; message: string; headers?: unknown; error?: unknown } {
+	return (
+		typeof error === "object" &&
+		error !== null &&
+		"status" in error &&
+		(error as { status: unknown }).status === StatusCodes.TOO_MANY_REQUESTS &&
+		"message" in error &&
+		typeof (error as { message: unknown }).message === "string"
+	);
+}
+
+/**
+ * Flattens nested OpenAI-style error payloads into searchable text for quota heuristics.
+ *
+ * @param value The nested `error` field from an OpenAI-compatible API error, when present
+ *
+ * @returns Concatenated string fragments, or an empty string when nothing useful is present
+ */
+function flattenOpenAiStyleErrorPayload(value: unknown): string {
+	if (value === null || value === undefined) return "";
+
+	if (typeof value === "string") return value;
+
+	if (typeof value === "number" || typeof value === "boolean") return String(value);
+
+	if (typeof value === "object") {
+		const record = value as { message?: unknown; error?: unknown };
+
+		if (typeof record.message === "string" && record.message.trim().length > 0) {
+			return record.message;
+		}
+
+		if (record.error !== undefined) {
+			const nested = flattenOpenAiStyleErrorPayload(record.error);
+			if (nested.length > 0) return nested;
+		}
+
+		try {
+			return JSON.stringify(value);
+		} catch {
+			return "";
+		}
+	}
+
+	return "";
+}
+
+/**
+ * Detects OpenRouter's daily free-model cap, where short backoff retries only waste time and quota headroom.
+ *
+ * @param error The thrown value from the OpenAI-compatible client
+ *
+ * @returns `true` when the response indicates `free-models-per-day`
+ */
+export function isOpenRouterDailyFreeModelQuotaError(error: unknown) {
+	if (!isOpenAiCompatible429Error(error)) return false;
+
+	const haystack = `${error.message}\n${flattenOpenAiStyleErrorPayload(error.error)}`.toLowerCase();
+
+	return haystack.includes(OPENROUTER_FREE_MODELS_PER_DAY);
+}
 
 /**
  * Reads the first non-empty string header from an OpenAI-compatible `headers` bag without relying on its static type.
@@ -46,7 +117,7 @@ function getFirstHeaderValue(source: unknown, ...names: string[]) {
  * @returns Milliseconds to sleep before retrying, or `0` when no reset-based wait applies
  */
 export function getRateLimitResetWaitMs(error: unknown, nowMs = Date.now()) {
-	if (!(error instanceof APIError) || error.status !== StatusCodes.TOO_MANY_REQUESTS) return 0;
+	if (!isOpenAiCompatible429Error(error)) return 0;
 
 	const raw = getFirstHeaderValue(error.headers, "x-ratelimit-reset", "X-RateLimit-Reset");
 	if (!raw) return 0;

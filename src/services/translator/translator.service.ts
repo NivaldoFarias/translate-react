@@ -17,6 +17,7 @@ import { localeService, LocaleService } from "@/services/locale/";
 import {
 	env,
 	getRateLimitResetWaitMs,
+	isOpenRouterDailyFreeModelQuotaError,
 	logger,
 	maskLargeVerbatimFencedCodeBlocks,
 	restoreMaskedVerbatimFences,
@@ -689,12 +690,24 @@ export class TranslatorService {
 
 						return translatedContent;
 					} catch (error) {
-						if (
-							error instanceof APIError &&
-							(error.status === StatusCodes.UNAUTHORIZED ||
-								error.status === StatusCodes.BAD_REQUEST)
-						) {
-							throw new AbortError(error);
+						if (error instanceof APIError) {
+							if (
+								error.status === StatusCodes.UNAUTHORIZED ||
+								error.status === StatusCodes.BAD_REQUEST
+							) {
+								throw new AbortError(error);
+							}
+
+							if (isOpenRouterDailyFreeModelQuotaError(error)) {
+								file.logger.error(
+									{
+										model: this.model,
+										message: error.message,
+									},
+									"OpenRouter free-models-per-day limit reached; add credits, drop :free, or wait for the daily reset",
+								);
+								throw new AbortError(error);
+							}
 						}
 
 						throw error;
