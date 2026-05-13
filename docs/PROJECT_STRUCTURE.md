@@ -79,7 +79,7 @@ translate-react/                          # Repository root
 | [`runner/`](../src/services/runner/index.ts)                       | Workflow orchestration and manager components                      |
 | [`translator/`](../src/services/translator/index.ts)               | LLM translation; chunking and validation in `translator/managers/` |
 | [`language-detector/`](../src/services/language-detector/index.ts) | Language detection with CLD                                        |
-| [`comment-builder/`](../src/services/comment-builder/index.ts)     | PR comment building                                                |
+| [`comment-builder/`](../src/services/comment-builder/index.ts)     | Markdown bodies for PRs and translation-progress issue summaries   |
 | [`cache/`](../src/services/cache/index.ts)                         | Generic in-memory TTL cache                                        |
 | [`github/`](../src/services/github/index.ts)                       | GitHub API (single service)                                        |
 | [`locale/`](../src/services/locale/index.ts)                       | Locale management                                                  |

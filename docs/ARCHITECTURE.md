@@ -127,7 +127,7 @@ The Runner maintains workflow state (`RunnerState`) in memory during execution, 
 Single public API (`services/github/`) for all GitHub operations. Internally composes three classes:
 
 - **GitHubRepository**: Fork sync, tree fetching (`.md` in `src/`), token verification, translation guidelines retrieval
-- **GitHubContent**: File content retrieval, PR listing/create/update, commits, comments
+- **GitHubContent**: File content retrieval, PR listing/create/update, commits (branch-tip `sha` before contents API writes), progress-issue comments
 - **GitHubBranch**: Translation branch creation (`translate/{file-path}`), cleanup, deletion
 
 Public methods delegate to the appropriate internal class.

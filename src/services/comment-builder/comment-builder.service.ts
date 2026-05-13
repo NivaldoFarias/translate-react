@@ -93,11 +93,11 @@ export class CommentBuilderService {
 		const runSection = formatGithubActionsRunIssueLine();
 		const segments = [this.comment.prefix];
 
+		segments.push(content, this.comment.suffix);
+
 		if (runSection) {
 			segments.push(runSection);
 		}
-
-		segments.push(content, this.comment.suffix);
 
 		return segments.join("\n\n");
 	}

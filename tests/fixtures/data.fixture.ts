@@ -74,7 +74,7 @@ export function createProcessedFileResultsFixture({
 			},
 			filename: `file-${index + 1}.md`,
 			translation: `Translated content for file ${index + 1}`,
-			pullRequest: null,
+			pullRequest: createMockPullRequestListItem(index + 1),
 			error: null,
 		};
 	});

@@ -530,7 +530,7 @@ describe("GitHubService", () => {
 					"# Original Content",
 					"file.md",
 					"src/test/file.md",
-					"abc123",
+					"stale-tree-sha",
 				);
 
 				const result = await githubService.commitTranslation({
@@ -541,6 +541,90 @@ describe("GitHubService", () => {
 				});
 
 				expect(result).toBeDefined();
+				expect(octokitMock.repos.getContent).toHaveBeenCalledWith({
+					...testRepositories.fork,
+					path: mockFile.path,
+					ref: mockBranch.ref,
+				});
+				expect(octokitMock.repos.createOrUpdateFileContents).toHaveBeenCalledWith(
+					expect.objectContaining({
+						...testRepositories.fork,
+						path: mockFile.path,
+						branch: mockBranch.ref,
+						sha: "abc123",
+					}),
+				);
+			});
+
+			test("should use branch-tip blob sha from getContent when it differs from the tree file sha", async () => {
+				octokitMock.repos.getContent.mockResolvedValueOnce({
+					data: {
+						type: "file",
+						encoding: "base64",
+						content: Buffer.from("# On branch").toString("base64"),
+						sha: "branch-tip-sha-999",
+					},
+				});
+
+				const mockBranch = {
+					ref: "refs/heads/translate/reused",
+					node_id: "branch-node-id",
+					url: "https://api.github.com/repos/test/test/git/refs/heads/translate/reused",
+					object: { type: "commit", sha: "branch-sha", url: "" },
+				};
+
+				const mockFile = new TranslationFile(
+					"# Original",
+					"file.md",
+					"src/learn/react-v18.md",
+					"tree-discovery-sha",
+				);
+
+				await githubService.commitTranslation({
+					branch: mockBranch,
+					file: mockFile,
+					content: "# Translated",
+					message: "translate: test",
+				});
+
+				expect(octokitMock.repos.createOrUpdateFileContents).toHaveBeenCalledWith(
+					expect.objectContaining({
+						sha: "branch-tip-sha-999",
+					}),
+				);
+			});
+
+			test("should omit sha when file is missing on the branch (getContent 404)", async () => {
+				const notFoundError = createOctokitRequestErrorFixture({
+					message: "Not Found",
+					status: StatusCodes.NOT_FOUND,
+					options: { request: { method: "GET" }, response: { status: StatusCodes.NOT_FOUND } },
+				});
+				octokitMock.repos.getContent.mockRejectedValueOnce(notFoundError);
+
+				const mockBranch = {
+					ref: "refs/heads/translate/new-file",
+					node_id: "branch-node-id",
+					url: "https://api.github.com/repos/test/test/git/refs/heads/translate/new-file",
+					object: { type: "commit", sha: "branch-sha", url: "" },
+				};
+
+				const mockFile = new TranslationFile("# Original", "new.md", "src/new.md", "tree-sha");
+
+				await githubService.commitTranslation({
+					branch: mockBranch,
+					file: mockFile,
+					content: "# Translated",
+					message: "translate: add file",
+				});
+
+				expect(octokitMock.repos.createOrUpdateFileContents).toHaveBeenCalledWith({
+					...testRepositories.fork,
+					path: mockFile.path,
+					message: "translate: add file",
+					content: Buffer.from("# Translated").toString("base64"),
+					branch: mockBranch.ref,
+				});
 			});
 
 			test("should throw RequestError when commit fails", () => {
@@ -568,6 +652,36 @@ describe("GitHubService", () => {
 						message: "translate: test",
 					}),
 				).rejects.toThrow(commitError);
+			});
+
+			test("should propagate non-404 errors from getContent before commit", () => {
+				const rateLimitError = createOctokitRequestErrorFixture({
+					message: "API rate limit exceeded",
+					status: StatusCodes.TOO_MANY_REQUESTS,
+					options: {
+						request: { method: "GET" },
+						response: { status: StatusCodes.TOO_MANY_REQUESTS },
+					},
+				});
+				octokitMock.repos.getContent.mockRejectedValueOnce(rateLimitError);
+
+				const mockBranch = {
+					ref: "refs/heads/translate/test",
+					node_id: "branch-node-id",
+					url: "https://api.github.com/repos/test/test/git/refs/heads/translate/test",
+					object: { type: "commit", sha: "branch-sha", url: "" },
+				};
+
+				const mockFile = new TranslationFile("# Original", "file.md", "src/test/file.md", "abc123");
+
+				expect(
+					githubService.commitTranslation({
+						branch: mockBranch,
+						file: mockFile,
+						content: "# Translated",
+						message: "translate: test",
+					}),
+				).rejects.toThrow(rateLimitError);
 			});
 		});
 
@@ -943,6 +1057,18 @@ describe("GitHubService", () => {
 						issue_number: 123,
 					}),
 				);
+			});
+
+			test("should skip commenting when no pull requests were produced", async () => {
+				const failedOnly = createProcessedFileResultsFixture({ count: 1, containInvalid: true });
+
+				const result = await githubService.commentCompiledResultsOnIssue(
+					failedOnly,
+					fixtures.translationFiles,
+				);
+
+				expect(result).toBeUndefined();
+				expect(octokitMock.issues.createComment).not.toHaveBeenCalled();
 			});
 
 			test("should skip commenting when no results to report", async () => {

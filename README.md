@@ -128,11 +128,11 @@ bun start     # Production mode
 
 ## Documentation
 
-| Document                                            | Description                                                  |
-| --------------------------------------------------- | ------------------------------------------------------------ |
-| [ARCHITECTURE.md](./docs/ARCHITECTURE.md)           | System architecture, service design, and design patterns     |
-| [WORKFLOW.md](./docs/WORKFLOW.md)                   | Execution workflow with timing analysis and performance data |
-| [PROJECT_STRUCTURE.md](./docs/PROJECT_STRUCTURE.md) | Complete directory structure and navigation guide            |
+| Document                                            | Description                                              |
+| --------------------------------------------------- | -------------------------------------------------------- |
+| [ARCHITECTURE.md](./docs/ARCHITECTURE.md)           | System architecture, service design, and design patterns |
+| [WORKFLOW.md](./docs/WORKFLOW.md)                   | Run order, pipeline stages, and error handling           |
+| [PROJECT_STRUCTURE.md](./docs/PROJECT_STRUCTURE.md) | Complete directory structure and navigation guide        |
 
 ## Contributing
 

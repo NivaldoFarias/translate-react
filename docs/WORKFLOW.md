@@ -13,6 +13,7 @@ Detailed breakdown of the translation workflow: execution stages, data flow, and
   - [Stage 3: Content Discovery](#stage-3-content-discovery)
   - [Stage 4: File Filtering](#stage-4-file-filtering)
   - [Stage 5: Batch Translation](#stage-5-batch-translation)
+    - [Branch-tip SHA before commit](#branch-tip-sha-before-commit)
   - [Stage 6: Progress Reporting](#stage-6-progress-reporting)
 - [Data Flow Diagrams](#data-flow-diagrams)
   - [Discovery Phase](#discovery-phase)
@@ -68,7 +69,7 @@ Order in [`RunnerService.run()`](../src/services/runner/runner.service.ts), then
 4. `fetchRepositoryTree()`: upstream tree (markdown + `src/` filter applied in GitHub layer) and translation guidelines
 5. `fetchFilesToTranslate()`: unless `state.filesToTranslate` is already populated (unusual outside tests), runs `FileDiscoveryManager.discoverFiles`
 6. `processInBatches()`: per-file branch, translate, commit, PR
-7. `updateIssueWithResults()`: delegates to `commentCompiledResultsOnIssue` when a progress issue exists
+7. `updateIssueWithResults()`: `PRManager.updateIssue` → `GitHubService.commentCompiledResultsOnIssue` (see [Stage 6: Progress Reporting](#stage-6-progress-reporting))
 8. `printFinalStatistics()`: returns counts to the caller
 9. `validateSuccessRate()` in `main`: may throw if success rate is below `MIN_SUCCESS_RATE` (process still exits with failure after an otherwise completed batch)
 
@@ -153,8 +154,19 @@ stateDiagram-v2
 
 - Branch: `createOrGetTranslationBranch` (reuses existing or creates new)
 - Translate: Direct or chunked using the `CHUNKS` budget in translator managers (`maxTokens`, `tokenBuffer`, `overlap` in [`managers.constants.ts`](../src/services/translator/managers/managers.constants.ts)). Optional cost control: when `MASK_VERBATIM_LARGE_FENCES` is enabled, fences at or above `MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS` (tiktoken estimate) are replaced with HTML comment placeholders before the LLM and merged back after translation ([`markdown-verbatim-fences.util.ts`](../src/utils/markdown-verbatim-fences.util.ts)); natural language **inside** those large fences is not translated while they stay masked.
-- Commit: `commitTranslation` → `createOrUpdatePullRequest`
+- Commit: `commitTranslation` → `createOrUpdatePullRequest` (see [Branch-tip SHA before commit](#branch-tip-sha-before-commit))
 - Error: `cleanupFailedTranslation`, circuit-breaker at `MAX_CONSECUTIVE_FAILURES`
+
+#### Branch-tip SHA before commit
+
+> [!NOTE]
+> GitHub [`createOrUpdateFileContents`](https://docs.github.com/rest/repos/contents#create-or-update-file-contents)
+> needs the **current** blob `sha` when replacing a file. Discovery stores a `sha` from the
+> upstream tree for reading source bytes; a **reused** `translate/...` branch may already point
+> that path at a **different** blob. `commitTranslation` therefore calls `repos.getContent` on the
+> **fork** for `path` at `branch.ref`, uses that `sha` on update, and **omits** `sha` when the path
+> is missing on the branch (create). Sending a stale `sha` yields **HTTP 409 Conflict** (body text
+> indicates the `sha` does not match).
 
 #### Stale PR conflict handling
 
@@ -195,13 +207,28 @@ flowchart TD
 - **Quality assurance**: A fresh translation ensures the entire document follows current translation guidelines
 - **Simplicity**: Avoids complex three-way merge logic that may produce semantically incorrect results
 
-When `invalidPRsByFile` is set from discovery, the PR template adds an `> [!IMPORTANT]` conflict notice; every PR body also includes a separate `> [!IMPORTANT]` human-review block from the locale template.
+When `invalidPRsByFile` is set from discovery, the PR template adds an `> [!IMPORTANT]` conflict
+notice; every PR body also includes a separate `> [!IMPORTANT]` human-review block from the locale
+template.
 
 ### Stage 6: Progress Reporting
 
-Posts summary to the translation progress issue when that issue can be resolved; logs final statistics. Issue posting is best-effort (missing issue → warn and continue). **Process cleanup** on success path is normal exit; `registerCleanup` runs on termination signals.
+After batches finish, the runner may add a **new** comment on the upstream **Translation Progress**
+issue with a compiled summary. Commenting is **skipped** when any of the following is true:
 
-**Operations:** `PRManager.updateIssue` → `GitHubService.commentCompiledResultsOnIssue` (no-op if no issue) → `printFinalStatistics` → caller runs `validateSuccessRate` in `main`
+- There are zero `ProcessedFileResult` rows
+- There are zero candidate `filesToTranslate`
+- **No result has a non-null `pullRequest`** (nothing opened or updated on GitHub — typical for
+  failure-only runs)
+- Issue search finds no matching open issue (warn and continue)
+
+Otherwise `issues.createComment` runs on the upstream repo. Final counts are always logged via
+`printFinalStatistics`. **Process cleanup** on success path is normal exit; `registerCleanup` runs
+on termination signals.
+
+**Operations:** `PRManager.updateIssue` → `GitHubService.commentCompiledResultsOnIssue` (early
+return when skipped as above) → `printFinalStatistics` → caller runs `validateSuccessRate` in
+`main`
 
 ## Data Flow Diagrams
 
@@ -243,7 +270,7 @@ flowchart TD
     J --> K
     K --> L{More Files?}
     L -->|Yes| B
-    L -->|No| M[Run complete: issue update + statistics]
+    L -->|No| M[Run complete: conditional issue comment + statistics]
 ```
 
 ## Data Structures
