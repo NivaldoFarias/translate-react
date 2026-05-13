@@ -150,7 +150,6 @@ export interface EnvironmentSchemaDefaults {
 	MAX_TOKENS: number;
 	LOG_TO_CONSOLE: boolean;
 	GH_REQUEST_TIMEOUT: number;
-	MIN_SUCCESS_RATE: number;
 	MAX_LLM_CONCURRENCY: number;
 	MAX_RETRY_ATTEMPTS: number;
 
@@ -161,6 +160,18 @@ export interface EnvironmentSchemaDefaults {
 
 	/** Minimum estimated tokens (tiktoken) for a fence to be masked when `MASK_VERBATIM_LARGE_FENCES` is on */
 	MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS: number;
+
+	/** Max characters per string field in structured logs before truncation */
+	LOG_MAX_STRING_LENGTH: number;
+
+	/** How to estimate token counts for chunking (`chars` is conservative when the model has no tiktoken profile) */
+	TOKEN_COUNT_MODE: "tiktoken" | "chars";
+
+	/** When `sequential`, translate chunks in order (slower, better boundary coherence); `parallel` keeps current behavior */
+	CHUNK_TRANSLATION_MODE: "parallel" | "sequential";
+
+	/** When `true`, fetch OpenRouter model `context_length` to widen chunk budget when safe (no effect if base URL is not OpenRouter) */
+	OPENROUTER_RESOLVE_CHUNK_BUDGET: boolean;
 }
 
 /** Placeholders for the environment schema. */
@@ -182,11 +193,14 @@ export const ENV_PLACEHOLDERS = {
 	MAX_TOKENS: 8192,
 	LOG_TO_CONSOLE: true,
 	GH_REQUEST_TIMEOUT: 30_000,
-	MIN_SUCCESS_RATE: 0.75,
 	MAX_RETRY_ATTEMPTS: 3,
 	MAX_LLM_CONCURRENCY: 4,
 	MASK_VERBATIM_LARGE_FENCES: false,
 	MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS: 120,
+	LOG_MAX_STRING_LENGTH: MAX_LOG_STRING_LENGTH,
+	TOKEN_COUNT_MODE: "tiktoken",
+	CHUNK_TRANSLATION_MODE: "parallel",
+	OPENROUTER_RESOLVE_CHUNK_BUDGET: true,
 } satisfies Partial<EnvironmentSchemaDefaults>;
 
 export const environmentDefaults: Record<RuntimeEnvironment, EnvironmentSchemaDefaults> = {

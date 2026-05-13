@@ -181,7 +181,7 @@ In-memory caching (`services/cache/`) for runtime-scoped data.
 
 ## Error Handling
 
-**ApplicationError** is used for domain workflow failures (e.g. no files to translate, below success rate). Carries `ErrorCode`, operation name, and optional metadata. Library errors (`RequestError`, `APIError`) bubble up unmodified.
+**ApplicationError** is used for domain workflow failures (e.g. no files to translate). Carries `ErrorCode`, operation name, and optional metadata. Library errors (`RequestError`, `APIError`) bubble up unmodified.
 
 **Top-Level Handler** (`main.ts`) catches all errors at the process boundary:
 

@@ -21,8 +21,8 @@ export const REGEXES = {
 	/** Regex pattern to match trailing newlines */
 	trailingNewlines: new RegExp(/\r?\n+$/),
 
-	/** Regex pattern to extract YAML frontmatter block (between --- delimiters) */
-	frontmatter: new RegExp(/^---\r?\n(?<content>[\s\S]*?)\r?\n---/),
+	/** Regex pattern to extract YAML frontmatter block (between --- delimiters); allows optional UTF-8 BOM */
+	frontmatter: new RegExp(/^(\uFEFF)?---\r?\n(?<content>[\s\S]*?)\r?\n---/),
 
 	titleFrontmatterKey: new RegExp(/title:\s*(?<title>.+)/),
 

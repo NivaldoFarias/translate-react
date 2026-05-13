@@ -4,6 +4,7 @@ import { StatusCodes } from "http-status-codes";
 import OpenAI from "openai";
 import { APIError } from "openai/error";
 import pRetry, { AbortError } from "p-retry";
+import { isMap, parseDocument } from "yaml";
 
 import type PQueue from "p-queue";
 import type { Options as RetryOptions } from "p-retry";
@@ -22,6 +23,12 @@ import {
 
 import { ChunksManager, TranslationValidatorManager } from "./managers";
 import { REGEXES } from "./managers/managers.constants";
+import {
+	buildFrontmatterBlock,
+	extractFrontmatterParts,
+	mergePreservedYamlFrontmatter,
+	splitLeadingYamlFrontmatter,
+} from "./translator-frontmatter.util";
 import { CONNECTIVITY_TEST_MAX_TOKENS, LLM_TEMPERATURE } from "./translator.constants";
 
 /** Dependency injection interface for {@link TranslatorService} */
@@ -98,6 +105,30 @@ export class TranslationFile {
 		const title = REGEXES.titleFrontmatterKey.exec(frontmatterContentOnly)?.groups?.["title"];
 
 		return title?.replace(new RegExp(/['"]/g), "");
+	}
+
+	/**
+	 * Returns a log-safe snapshot of this file (no `content` body).
+	 *
+	 * Pino `serializers.content` only applies to a top-level `content` key; logging `{ file: this }`
+	 * still serializes `file.content` in full, so use this for structured logs.
+	 */
+	public getLogContext(): {
+		filename: string;
+		path: string;
+		sha: string;
+		correlationId: string;
+		contentLength: number;
+		title: string | undefined;
+	} {
+		return {
+			filename: this.filename,
+			path: this.path,
+			sha: this.sha,
+			correlationId: this.correlationId,
+			contentLength: this.content.length,
+			title: this.title,
+		};
 	}
 }
 
@@ -261,7 +292,7 @@ export class TranslatorService {
 	 * ```
 	 */
 	public async translateContent(file: TranslationFile): Promise<string> {
-		file.logger.info({ file }, "Translating content for file");
+		file.logger.info({ file: file.getLogContext() }, "Translating content for file");
 
 		if (!file.content.length) {
 			file.logger.error({ fileContent: file.content.length }, "File content is empty");
@@ -290,8 +321,24 @@ export class TranslatorService {
 				verbatimMask.maskedMarkdown
 			:	file.content;
 
+		const leadingFrontmatterSplit = splitLeadingYamlFrontmatter(translationInput);
+		const hasBodyAfterLeadingYaml = leadingFrontmatterSplit.rest.length > 0;
+		const preservedYamlBlock = hasBodyAfterLeadingYaml ? leadingFrontmatterSplit.block : "";
+		const translationPayload =
+			hasBodyAfterLeadingYaml ? leadingFrontmatterSplit.rest : translationInput;
+
+		if (preservedYamlBlock) {
+			file.logger.debug(
+				{
+					preservedYamlLength: preservedYamlBlock.length,
+					bodyLength: translationPayload.length,
+				},
+				"Leading YAML frontmatter held back from LLM; will merge back after translation",
+			);
+		}
+
 		const translationWorkFile = new TranslationFile(
-			translationInput,
+			translationPayload,
 			file.filename,
 			file.path,
 			file.sha,
@@ -307,6 +354,18 @@ export class TranslatorService {
 
 		if (verbatimMask && verbatimMask.replacements.length > 0) {
 			translatedContent = restoreMaskedVerbatimFences(translatedContent, verbatimMask.replacements);
+		}
+
+		if (preservedYamlBlock) {
+			const frontmatterParts = extractFrontmatterParts(preservedYamlBlock);
+			const mergedBlock =
+				frontmatterParts ?
+					buildFrontmatterBlock(
+						frontmatterParts.bom,
+						await this.translateFrontmatterStringFields(frontmatterParts.inner, file),
+					)
+				:	preservedYamlBlock;
+			translatedContent = mergePreservedYamlFrontmatter(mergedBlock, translatedContent);
 		}
 
 		const translationDuration = Date.now() - translationStartTime;
@@ -325,6 +384,68 @@ export class TranslatorService {
 		);
 
 		return this.managers.translationValidator.cleanupTranslatedContent(translatedContent, file);
+	}
+
+	private async translateFrontmatterStringFields(innerYaml: string, file: TranslationFile) {
+		let doc;
+		try {
+			doc = parseDocument(innerYaml);
+		} catch (error) {
+			file.logger.warn({ err: error }, "YAML frontmatter parse failed; keeping original metadata");
+			return innerYaml;
+		}
+
+		if (doc.errors.length > 0) {
+			file.logger.warn(
+				{ messages: doc.errors.map((e) => e.message) },
+				"YAML frontmatter document has errors; keeping original metadata",
+			);
+			return innerYaml;
+		}
+
+		const root = doc.contents;
+		if (!isMap(root)) {
+			return innerYaml;
+		}
+
+		for (const key of ["title", "description"] as const) {
+			const value = doc.get(key);
+			if (typeof value !== "string") {
+				continue;
+			}
+			const trimmed = value.trim();
+			if (!trimmed.length) {
+				continue;
+			}
+
+			file.logger.debug(
+				{ key, scalarLength: trimmed.length },
+				"Translating YAML frontmatter field",
+			);
+
+			const snippetFile = new TranslationFile(
+				trimmed,
+				`${file.filename}#${key}`,
+				file.path,
+				file.sha,
+				file.logger,
+			);
+			let translatedScalar = await this.callLanguageModel(snippetFile, trimmed);
+			translatedScalar = this.managers.translationValidator.cleanupTranslatedContent(
+				translatedScalar,
+				snippetFile,
+			);
+			if (!translatedScalar.length) {
+				file.logger.warn(
+					{ key },
+					"Frontmatter field translation was empty; keeping original value",
+				);
+				continue;
+			}
+			doc.set(key, translatedScalar);
+		}
+
+		return String(doc);
 	}
 
 	/**
@@ -592,7 +713,7 @@ export class TranslatorService {
 				- Code syntax, variable names, function names, API endpoints
 				- Technical terms not specified in the translation guidelines
 				- URLs, file paths, or configuration values
-				- Frontmatter keys (only translate values if they're user-facing)
+				- YAML frontmatter key names; title and description values are translated in a dedicated pass after the body
 	
 				## Quality Standards
 				- Use natural, fluent ${languages.target} while maintaining technical precision

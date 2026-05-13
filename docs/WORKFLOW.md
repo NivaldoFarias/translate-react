@@ -70,8 +70,7 @@ Order in [`RunnerService.run()`](../src/services/runner/runner.service.ts), then
 5. `fetchFilesToTranslate()`: unless `state.filesToTranslate` is already populated (unusual outside tests), runs `FileDiscoveryManager.discoverFiles`
 6. `processInBatches()`: per-file branch, translate, commit, PR
 7. `updateIssueWithResults()`: `PRManager.updateIssue` → `GitHubService.commentCompiledResultsOnIssue` (see [Stage 6: Progress Reporting](#stage-6-progress-reporting))
-8. `printFinalStatistics()`: returns counts to the caller
-9. `validateSuccessRate()` in `main`: may throw if success rate is below `MIN_SUCCESS_RATE` (process still exits with failure after an otherwise completed batch)
+8. `printFinalStatistics()`: returns counts to the caller; `main` logs them and exits successfully when no exception was thrown
 
 ## Execution Stages
 
@@ -227,8 +226,7 @@ Otherwise `issues.createComment` runs on the upstream repo. Final counts are alw
 on termination signals.
 
 **Operations:** `PRManager.updateIssue` → `GitHubService.commentCompiledResultsOnIssue` (early
-return when skipped as above) → `printFinalStatistics` → caller runs `validateSuccessRate` in
-`main`
+return when skipped as above) → `printFinalStatistics` → `main` logs statistics and exits `0`
 
 ## Data Flow Diagrams
 
@@ -296,9 +294,7 @@ flowchart TD
 
     H[Failure inside run try block] --> I[Log + rethrow to main]
 
-    J[validateSuccessRate in main] --> K{successRate < MIN_SUCCESS_RATE?}
-    K -->|Yes| L[Throw fatal log + exit 1]
-    K -->|No| M[exit 0]
+    P[Runner completes in main] --> Q[Log statistics + exit 0]
 ```
 
 **Error handling strategy:**
@@ -306,4 +302,3 @@ flowchart TD
 - **Per file:** On failure after branch work, `cleanupFailedTranslation` deletes the translation branch when possible; the result is stored with `error` set; processing continues with the next file unless the circuit breaker trips.
 - **Circuit breaker:** After `MAX_CONSECUTIVE_FAILURES` consecutive failures, `processFile` throws before starting the next file’s work. That rejection propagates through `Promise.all` in the current batch, so `processBatches` stops and **`run()` fails**; later batches are not processed.
 - **Workflow-level:** `RunnerService.run()` wraps the body in `try`/`catch`, logs `Translation workflow failed`, then **rethrows** so `main` can exit with code `1`.
-- **Post-batch gate:** `validateSuccessRate()` can still fail the process after batches complete if the success rate is below `MIN_SUCCESS_RATE`.
