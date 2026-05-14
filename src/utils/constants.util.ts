@@ -136,12 +136,6 @@ export enum ChunkTranslationMode {
 	Sequential = "sequential",
 }
 
-/** Token count mode */
-export enum TokenCountMode {
-	Tiktoken = "tiktoken",
-	Chars = "chars",
-}
-
 export interface EnvironmentSchemaDefaults {
 	NODE_ENV: RuntimeEnvironment;
 	LOG_LEVEL: LogLevel;
@@ -180,17 +174,8 @@ export interface EnvironmentSchemaDefaults {
 	/** Minimum estimated tokens (tiktoken) for a fence to be masked when `MASK_VERBATIM_LARGE_FENCES` is on */
 	MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS: number;
 
-	/** Max characters per string field in structured logs before truncation */
-	LOG_MAX_STRING_LENGTH: number;
-
-	/** How to estimate token counts for chunking (`chars` is conservative when the model has no tiktoken profile) */
-	TOKEN_COUNT_MODE: TokenCountMode;
-
 	/** When `sequential`, translate chunks in order (slower, better boundary coherence); `parallel` keeps current behavior */
 	CHUNK_TRANSLATION_MODE: ChunkTranslationMode;
-
-	/** When `true`, fetch OpenRouter model `context_length` to widen chunk budget when safe (no effect if base URL is not OpenRouter) */
-	OPENROUTER_RESOLVE_CHUNK_BUDGET: boolean;
 }
 
 /**
@@ -223,10 +208,7 @@ export const ENV_PLACEHOLDERS = {
 	LLM_MAX_REQUESTS_PER_MINUTE: 0,
 	MASK_VERBATIM_LARGE_FENCES: false,
 	MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS: 120,
-	LOG_MAX_STRING_LENGTH: MAX_LOG_STRING_LENGTH,
-	TOKEN_COUNT_MODE: TokenCountMode.Tiktoken,
 	CHUNK_TRANSLATION_MODE: ChunkTranslationMode.Parallel,
-	OPENROUTER_RESOLVE_CHUNK_BUDGET: true,
 } satisfies Partial<EnvironmentSchemaDefaults>;
 
 export const environmentDefaults: Record<RuntimeEnvironment, EnvironmentSchemaDefaults> = {

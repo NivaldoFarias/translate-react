@@ -2,25 +2,28 @@
 
 <div align="center">
 
-<h3 align="center" style="color: #999;"><b>Work In Progress</b></h3>
-
 [![CI Status](https://github.com/NivaldoFarias/translate-react/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/NivaldoFarias/translate-react/actions/workflows/ci.yml)
 
 </div>
-  
+
 Automated translation tool for React documentation using LLMs. Processes markdown files, preserves formatting, and creates pull requests via [`translate-react` Bot](https://github.com/apps/translate-react-bot).
+
+You supply the LLM API key and GitHub credentials. In Actions you can pin this repository to a tag or SHA ([details](./docs/WORKFLOW.md#pinning-translate-react-in-github-actions)).
 
 ## Table of Contents
 
 - [Table of Contents](#table-of-contents)
 - [Prerequisites](#prerequisites)
 - [Quick Start](#quick-start)
+- [GitHub Actions on a fork](#github-actions-on-a-fork)
 - [Configuration](#configuration)
   - [Required Environment Variables](#required-environment-variables)
   - [Optional Environment Variables](#optional-environment-variables)
 - [Usage](#usage)
+- [Versioning and releases](#versioning-and-releases)
 - [Documentation](#documentation)
 - [Contributing](#contributing)
+- [Security](#security)
 - [Troubleshooting](#troubleshooting)
   - [Common Issues](#common-issues)
   - [Debug Mode](#debug-mode)
@@ -28,7 +31,7 @@ Automated translation tool for React documentation using LLMs. Processes markdow
 
 ## Prerequisites
 
-- [**Bun**](https://bun.sh/) v1.0.0+ and [**Git**](https://git-scm.com/)
+- [**Bun**](https://bun.sh/) (see `engines` in [`package.json`](./package.json)) and [**Git**](https://git-scm.com/)
 - **GitHub Personal Access Token** with `repo` scope
 - **LLM API Key** (OpenAI, OpenRouter, or compatible)
 - Fork of target React documentation repository with write access
@@ -48,13 +51,17 @@ Automated translation tool for React documentation using LLMs. Processes markdow
 > [!TIP]
 > For a more detailed workflow explanation, see [`WORKFLOW.md`](./docs/WORKFLOW.md).
 
+## GitHub Actions on a fork
+
+You need this repo (or your fork of it) with workflows enabled, the bot app and secrets described in [Operating translate-react (forks)](./docs/WORKFLOW.md#operating-translate-react-forks), and the workflow definition in [`.github/workflows/workflow.yml`](./.github/workflows/workflow.yml). To lock the tool to a tag or SHA, use [Pinning translate-react in GitHub Actions](./docs/WORKFLOW.md#pinning-translate-react-in-github-actions).
+
 ## Configuration
 
 Environment variables are validated at runtime using Zod schemas. See [`src/utils/env.util.ts`](./src/utils/env.util.ts) for complete schema definitions and validation rules.
 
 ### Required Environment Variables
 
-These **must** be set in your `.env` file:
+These **must** be set in your `.env` file (or in the GitHub Actions environment variables):
 
 | Variable      | Description                                                |
 | ------------- | ---------------------------------------------------------- |
@@ -83,15 +90,15 @@ These **must** be set in your `.env` file:
 <details>
 <summary><b>LLM Configuration</b></summary>
 
-| Variable             | Default                                            | Description                                    |
-| -------------------- | -------------------------------------------------- | ---------------------------------------------- |
-| `LLM_MODEL`          | `google/gemini-2.0-flash-exp:free`                 | Model ID for translation                       |
-| `LLM_API_BASE_URL`   | `https://openrouter.ai/api/v1`                     | API endpoint                                   |
-| `OPENAI_PROJECT_ID`  | —                                                  | Optional: OpenAI project ID for tracking       |
-| `MAX_TOKENS`         | `8192`                                             | Maximum tokens per LLM response                |
-| `HEADER_APP_URL`     | `https://github.com/NivaldoFarias/translate-react` | App URL for OpenRouter tracking                |
-| `HEADER_APP_TITLE`   | `translate-react v0.1.24`                          | App title for OpenRouter tracking              |
-| `MAX_RETRY_ATTEMPTS` | `5`                                                | Maximum number of retries for LLM API requests |
+| Variable             | Default                                    | Description                                    |
+| -------------------- | ------------------------------------------ | ---------------------------------------------- |
+| `LLM_MODEL`          | `google/gemini-2.0-flash-exp:free`         | Model ID for translation                       |
+| `LLM_API_BASE_URL`   | `https://openrouter.ai/api/v1`             | LLM API endpoint                               |
+| `OPENAI_PROJECT_ID`  | —                                          | Optional: OpenAI project ID for tracking       |
+| `MAX_TOKENS`         | `8192`                                     | Maximum tokens per LLM response                |
+| `HEADER_APP_URL`     | `package.json` field `homepage`            | App URL for OpenRouter `HTTP-Referer` tracking |
+| `HEADER_APP_TITLE`   | `package.json` fields `name` and `version` | App title for OpenRouter `X-Title`             |
+| `MAX_RETRY_ATTEMPTS` | `3`                                        | Maximum number of retries for LLM API requests |
 
 </details>
 
@@ -126,26 +133,28 @@ bun run dev   # Development mode (auto-reload)
 bun start     # Production mode
 ```
 
+## Versioning and releases
+
+Semver is [`package.json`](./package.json) `version`. OpenRouter `HTTP-Referer` / `X-Title` defaults come from `homepage`, `name`, and `version` there (see [optional env](#optional-environment-variables)). History: [`CHANGELOG.md`](./CHANGELOG.md). Tags and GitHub Releases: [docs/WORKFLOW.md](./docs/WORKFLOW.md#releases-and-semantic-versioning).
+
 ## Documentation
 
-| Document                                            | Description                                              |
-| --------------------------------------------------- | -------------------------------------------------------- |
-| [ARCHITECTURE.md](./docs/ARCHITECTURE.md)           | System architecture, service design, and design patterns |
-| [WORKFLOW.md](./docs/WORKFLOW.md)                   | Run order, pipeline stages, and error handling           |
-| [PROJECT_STRUCTURE.md](./docs/PROJECT_STRUCTURE.md) | Complete directory structure and navigation guide        |
+| Document                                            | Description                         |
+| --------------------------------------------------- | ----------------------------------- |
+| [ARCHITECTURE.md](./docs/ARCHITECTURE.md)           | Layout of services and modules      |
+| [WORKFLOW.md](./docs/WORKFLOW.md)                   | Pipeline order, forks, releases, CI |
+| [PROJECT_STRUCTURE.md](./docs/PROJECT_STRUCTURE.md) | Repository layout                   |
+| [CONTRIBUTING.md](./CONTRIBUTING.md)                | Patches and conventions             |
+| [CHANGELOG.md](./CHANGELOG.md)                      | Release notes                       |
+| [SECURITY.md](./SECURITY.md)                        | Vulnerability reporting             |
 
 ## Contributing
 
-Contributions are welcome. Follow these guidelines:
+See [`CONTRIBUTING.md`](./CONTRIBUTING.md) and [ARCHITECTURE.md](./docs/ARCHITECTURE.md) when changing services.
 
-- **TypeScript**: All code must be properly typed with strict mode enabled
-- **Bun Runtime**: Use Bun exclusively _(not npm/yarn/pnpm)_
-- **Testing**: Add tests for new features using Bun's test runner
-- **Code Style**: Follow ESLint/Prettier configuration
-- **Commits**: Use [Conventional Commits](https://www.conventionalcommits.org/) format
+## Security
 
-> [!TIP]
-> See [ARCHITECTURE.md](./docs/ARCHITECTURE.md) for service design patterns when extending the codebase.
+[`SECURITY.md`](./SECURITY.md).
 
 ## Troubleshooting
 
@@ -170,3 +179,5 @@ MIT License - see [LICENSE](./LICENSE) file for details.
 [^gh-pat-token]: Optional fallback token for permission-related failures. When the primary `GH_TOKEN` receives a `403` (`Forbidden`) error, the client automatically retries with this PAT. Useful when GitHub App tokens have different permission scopes than PATs for certain operations.
 
 [^repo-upstream-test]: For dry runs, set to your GitHub username in `.env` or repository variable `REPO_UPSTREAM_OWNER` so PRs open against your fork; the translation workflow applies this to every matrix locale (see `.github/workflows/workflow.yml`).
+
+[^openrouter-resolve-chunk-budget]: When `true` and `LLM_API_BASE_URL` points at hosted OpenRouter (`openrouter.ai`), the tool calls OpenRouter’s [`GET /v1/models`](https://openrouter.ai/docs/api/api-reference/models/get-models) after the connectivity check. It matches `LLM_MODEL` to a catalog row (`id` or `canonical_slug`), then uses `context_length` and `top_provider.max_completion_tokens` to size chunk inputs and cap chat `max_tokens`. Test defaults set this to `false` in [`src/utils/constants.util.ts`](./src/utils/constants.util.ts) so unit tests stay offline.

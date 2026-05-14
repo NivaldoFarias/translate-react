@@ -7,6 +7,11 @@ Detailed breakdown of the translation workflow: execution stages, data flow, and
 - [Table of Contents](#table-of-contents)
 - [Overview](#overview)
   - [Actual `run()` order](#actual-run-order)
+- [Operating translate-react (forks)](#operating-translate-react-forks)
+- [Pinning translate-react in GitHub Actions](#pinning-translate-react-in-github-actions)
+- [Releases and semantic versioning](#releases-and-semantic-versioning)
+- [Stable 1.x expectations](#stable-1x-expectations)
+- [GitHub repository settings (maintainers)](#github-repository-settings-maintainers)
 - [Execution Stages](#execution-stages)
   - [Stage 1: Initialization](#stage-1-initialization)
   - [Stage 2: Repository Setup](#stage-2-repository-setup)
@@ -71,6 +76,43 @@ Order in [`RunnerService.run()`](../src/services/runner/runner.service.ts), then
 6. `processInBatches()`: per-file branch, translate, commit, PR
 7. `updateIssueWithResults()`: `PRManager.updateIssue` → `GitHubService.commentCompiledResultsOnIssue` (see [Stage 6: Progress Reporting](#stage-6-progress-reporting))
 8. `printFinalStatistics()`: returns counts to the caller; `main` logs them and exits successfully when no exception was thrown
+
+## Operating translate-react (forks)
+
+No hosted backend: you set `LLM_API_KEY` (OpenAI-compatible API) and pay or quota-manage with the provider. Translation Actions use the [translate-react bot app](https://github.com/apps/translate-react-bot); secrets such as `BOT_APP_ID`, `BOT_PRIVATE_KEY`, `LLM_API_KEY`, optional `GH_PAT_TOKEN` / `OPENAI_PROJECT_ID`, and variables such as `LLM_MODEL` are wired in [`.github/workflows/workflow.yml`](../.github/workflows/workflow.yml). Review PRs on the locale fork; note this tool’s version (logs, `package.json`, or CI ref) when comparing runs.
+
+Rate and cost knobs: [`src/utils/constants.util.ts`](../src/utils/constants.util.ts), [`src/utils/env.util.ts`](../src/utils/env.util.ts) — e.g. `LLM_MAX_REQUESTS_PER_MINUTE`, `MAX_LLM_CONCURRENCY`, `MAX_RETRY_ATTEMPTS`, `BATCH_SIZE`, `MASK_VERBATIM_LARGE_FENCES`.
+
+## Pinning translate-react in GitHub Actions
+
+[`.github/workflows/workflow.yml`](../.github/workflows/workflow.yml): optional dispatch input `tool_ref` — branch, tag, or full SHA of this repo for `actions/checkout` before `bun install` / `bun run start`; empty uses the ref chosen in the “Run workflow” UI. Repository variable `BUN_VERSION` overrides the Bun line installed by `oven-sh/setup-bun` (workflow default `1.3`).
+
+## Releases and semantic versioning
+
+Semver is [`package.json`](../package.json) `version` (OpenRouter title defaults use `name` + `version` from there; see [`src/utils/constants.util.ts`](../src/utils/constants.util.ts)).
+
+CI on `main` / `dev` fails if `package.json` `version` does not appear as a `## [version]` heading in [`CHANGELOG.md`](../CHANGELOG.md) (see [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)).
+
+1. Edit [`CHANGELOG.md`](../CHANGELOG.md) (`[Unreleased]` then new dated section).
+2. Bump `version` in [`package.json`](../package.json).
+3. `git tag -a vX.Y.Z -m "vX.Y.Z"` and `git push origin vX.Y.Z`.
+4. GitHub **Release** from that tag; paste the changelog slice into the description.
+
+Rough bump rules: **patch** — fixes / internal prompts, same env contract; **minor** — new optional env or backward-compatible behavior; **major** — breaking env or workflow contract.
+
+## Stable 1.x expectations
+
+`1.0.0` would mean documented stability of required env names (`env.util`), the high-level steps (LLM check → GitHub → sync → discover → translate → PRs → optional issue comment), and a short note on which upstream React docs branch you last tested against. Upstream content pinning is not part of this package’s semver. Until then `0.x` is normal; pin CI if you care.
+
+## GitHub repository settings (maintainers)
+
+Check occasionally alongside workflow YAML (`permissions` in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml), etc.).
+
+- **Actions → General** — `GITHUB_TOKEN` default permission (read vs write); fork workflow approval; log/artifact retention.
+- **Rulesets / branch protection** — CI required on default branch; force-push policy.
+- **Secrets and variables** — secrets for keys; variables for defaults (`LLM_MODEL`, `BUN_VERSION`, optional `HEADER_APP_*`); use **environments** with protection rules if you gate `development` / `production` runs.
+- **Security** — Dependabot / secret scanning if available; reporting per [`SECURITY.md`](../SECURITY.md).
+- **Collaborators** — Who approves external fork workflow runs; who edits secrets.
 
 ## Execution Stages
 

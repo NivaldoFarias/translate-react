@@ -10,10 +10,13 @@ import type PQueue from "p-queue";
 import type { Options as RetryOptions } from "p-retry";
 import type { Logger } from "pino";
 
+import type { OpenRouterModelLimits } from "@/services/openrouter/";
+
 import { openai, queue } from "@/clients/";
 import { ApplicationError, ErrorCode } from "@/errors/";
 import { LanguageDetectorService, languageDetectorService } from "@/services/language-detector/";
 import { localeService, LocaleService } from "@/services/locale/";
+import { openRouterModelLimitsService } from "@/services/openrouter/";
 import {
 	env,
 	getRateLimitResetWaitMs,
@@ -24,7 +27,7 @@ import {
 } from "@/utils/";
 
 import { ChunksManager, TranslationValidatorManager } from "./managers";
-import { REGEXES } from "./managers/managers.constants";
+import { REGEXES, SYSTEM_PROMPT_TOKEN_RESERVE } from "./managers/managers.constants";
 import {
 	buildFrontmatterBlock,
 	extractFrontmatterParts,
@@ -178,6 +181,12 @@ export class TranslatorService {
 	/** Retry configuration for LLM API calls */
 	private readonly retryConfig: RetryOptions;
 
+	/**
+	 * When OpenRouter model metadata is loaded, caps chat `max_tokens` by the provider’s
+	 * `max_completion_tokens` (and `MAX_TOKENS`). Otherwise `null` and {@link env.MAX_TOKENS} is used.
+	 */
+	private providerCompletionTokenCap: number | null = null;
+
 	public readonly services: {
 		/** Locale service for language-specific rules */
 		locale: LocaleService;
@@ -252,6 +261,78 @@ export class TranslatorService {
 				},
 			},
 			"LLM API connectivity test successful",
+		);
+
+		await this.maybeApplyOpenRouterModelLimits();
+	}
+
+	/**
+	 * When enabled and the base URL is hosted OpenRouter, loads `GET /v1/models` limits for {@link env.LLM_MODEL}
+	 * to widen per-chunk input budgets and align `max_tokens` with `top_provider.max_completion_tokens`.
+	 */
+	private async maybeApplyOpenRouterModelLimits() {
+		if (!env.LLM_API_BASE_URL.includes("openrouter")) {
+			return;
+		}
+
+		if (!openRouterModelLimitsService.isHostedOpenRouterBaseUrl(env.LLM_API_BASE_URL)) {
+			this.logger.debug(
+				{ baseUrl: env.LLM_API_BASE_URL },
+				"Skipping OpenRouter model metadata: base URL is not hosted OpenRouter",
+			);
+
+			return;
+		}
+
+		if (!env.LLM_API_KEY) {
+			this.logger.debug("Skipping OpenRouter model metadata: LLM_API_KEY is not set");
+
+			return;
+		}
+
+		const limits: OpenRouterModelLimits | null =
+			await openRouterModelLimitsService.fetchLimitsForModel(
+				env.LLM_API_BASE_URL,
+				env.LLM_API_KEY,
+				this.model,
+			);
+
+		if (!limits) {
+			return;
+		}
+
+		const completionCap = Math.min(env.MAX_TOKENS, limits.maxCompletionTokens ?? env.MAX_TOKENS);
+		this.providerCompletionTokenCap = completionCap;
+
+		const grossChunkInputTokens = Math.floor(
+			limits.contextLength - SYSTEM_PROMPT_TOKEN_RESERVE - completionCap,
+		);
+
+		if (grossChunkInputTokens < 256) {
+			this.logger.warn(
+				{
+					model: this.model,
+					contextLength: limits.contextLength,
+					completionCap,
+					grossChunkInputTokens,
+				},
+				"OpenRouter context window too small for safe chunking; keeping default chunk size",
+			);
+
+			return;
+		}
+
+		this.managers.chunks = new ChunksManager(this.model, grossChunkInputTokens);
+
+		this.logger.info(
+			{
+				model: this.model,
+				contextLength: limits.contextLength,
+				maxCompletionTokens: limits.maxCompletionTokens,
+				grossChunkInputTokens,
+				completionCap,
+			},
+			"Applied OpenRouter model limits for chunking",
 		);
 	}
 
@@ -603,7 +684,7 @@ export class TranslatorService {
 		return {
 			model: this.model,
 			temperature: LLM_TEMPERATURE,
-			max_tokens: env.MAX_TOKENS,
+			max_tokens: this.providerCompletionTokenCap ?? env.MAX_TOKENS,
 			messages: [
 				{
 					role: "system",
