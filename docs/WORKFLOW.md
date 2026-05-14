@@ -28,7 +28,7 @@ Detailed breakdown of the translation workflow: execution stages, data flow, and
 
 ## Overview
 
-The sections below group behavior into **six conceptual stages**. The exact call order in code is listed under [Actual `run()` order](#actual-run-order).
+The sections below group behavior into **six conceptual stages**. For the exact call sequence, see [Actual `run()` order](#actual-run-order).
 
 ```mermaid
 flowchart TD
@@ -116,7 +116,7 @@ Check occasionally alongside workflow YAML (`permissions` in [`.github/workflows
 
 ## Execution Stages
 
-The workflow is described below in six stages. Each has specific responsibilities and failure modes.
+The six stages below match the overview diagram. For conflict handling and branch-tip `sha` behavior, see Stage 4 and Stage 5.
 
 ### Stage 1: Initialization
 
@@ -233,7 +233,7 @@ flowchart TD
 - `mergeable === false` and `mergeable_state === "unknown"`
 - `mergeable` remains `null` after all polling attempts (conservative fallback)
 
-**Complete rewrite approach (during translation, not during discovery filtering):** Instead of diff-based conflict resolution, the workflow:
+**Complete rewrite (during translation, not during discovery filtering):** the workflow:
 
 1. Closes the conflicted PR with an explanatory comment
 2. Deletes the stale translation branch
@@ -241,12 +241,7 @@ flowchart TD
 4. Commits on a new or recreated branch
 5. Opens a new PR; the body may include context from `invalidPRsByFile` when that metadata was captured earlier
 
-**Rationale:** Complete rewrite is preferred over diff-based resolution because:
-
-- **Translation consistency**: Partial merges can create inconsistent translations where some sections use old terminology/style
-- **Context preservation**: LLM translations benefit from processing the full document context, not isolated conflict regions
-- **Quality assurance**: A fresh translation ensures the entire document follows current translation guidelines
-- **Simplicity**: Avoids complex three-way merge logic that may produce semantically incorrect results
+**Why not merge conflicts by hand:** merging hunks tends to mix old and new wording in one file. Re-translating from the current upstream keeps tone and glossary usage consistent and avoids a custom three-way merge for prose.
 
 When `invalidPRsByFile` is set from discovery, the PR template adds an `> [!IMPORTANT]` conflict
 notice; every PR body also includes a separate `> [!IMPORTANT]` human-review block from the locale
@@ -272,46 +267,15 @@ return when skipped as above) → `printFinalStatistics` → `main` logs statist
 
 ## Data Flow Diagrams
 
+Compact views of the same pipeline as [Stage 4](#stage-4-file-filtering) and [Stage 5](#stage-5-batch-translation); use those sections for the full diagrams and notes.
+
 ### Discovery Phase
 
-Input tree is **already** markdown/`src/`-filtered from Stage 3.
-
-```mermaid
-flowchart TD
-    A[Filtered tree] --> A1[Deduplicate by path]
-    A1 --> B[Language cache]
-    B --> C{Has Open PR?}
-    C -->|Yes| D1{PR Has Conflicts?}
-    D1 -->|No| G[Skip]
-    D1 -->|Yes| I[Add to Queue]
-    C -->|No| E[Batch Fetch Content]
-    E --> H{Already Translated?}
-    H -->|Yes| G
-    H -->|No| I
-    G --> J[Discovery Complete]
-    I --> J
-```
+Same decision flow as under [Stage 4: File Filtering](#stage-4-file-filtering).
 
 ### Translation Phase
 
-```mermaid
-flowchart TD
-    A[Translation Queue] --> B[For Each File]
-    B --> C[Create/Get Branch]
-    C --> D{Size > Threshold?}
-    D -->|Yes| E[Chunked Translation]
-    D -->|No| F[Direct Translation]
-    E --> G[Reassemble]
-    F --> H[Validate]
-    G --> H
-    H -->|Valid| I[Commit & Create PR]
-    H -->|Invalid| J[Cleanup Branch]
-    I --> K[Record result / batch stats]
-    J --> K
-    K --> L{More Files?}
-    L -->|Yes| B
-    L -->|No| M[Run complete: conditional issue comment + statistics]
-```
+Same branch → translate → commit → PR loop as under [Stage 5: Batch Translation](#stage-5-batch-translation).
 
 ## Data Structures
 

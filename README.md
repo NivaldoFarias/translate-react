@@ -6,9 +6,9 @@
 
 </div>
 
-Automated translation tool for React documentation using LLMs. Processes markdown files, preserves formatting, and creates pull requests via [`translate-react` Bot](https://github.com/apps/translate-react-bot).
+CLI tool that translates the official React documentation via LLMs, keeps structure intact, and opens PRs through the [`translate-react` bot](https://github.com/apps/translate-react-bot). 
 
-You supply the LLM API key and GitHub credentials. In Actions you can pin this repository to a tag or SHA ([details](./docs/WORKFLOW.md#pinning-translate-react-in-github-actions)).
+You bring the LLM key and GitHub token. To run a fixed revision in Actions, pin a tag or SHA ([Pinning translate-react in GitHub Actions](./docs/WORKFLOW.md#pinning-translate-react-in-github-actions)).
 
 ## Table of Contents
 
@@ -38,7 +38,7 @@ You supply the LLM API key and GitHub credentials. In Actions you can pin this r
 
 ## Quick Start
 
-1. Clone the Repository and Navigate to Directory: `git clone https://github.com/NivaldoFarias/translate-react.git && cd translate-react`
+1. Clone and enter the repo (replace the URL if you use a fork): `git clone https://github.com/NivaldoFarias/translate-react.git && cd translate-react`
 2. Install Dependencies: `bun install`
 3. Setup the forks of the target React documentation repositories:
    - For the Portuguese (Brazil) repository, fork [`reactjs/pt-br.react.dev`](https://github.com/reactjs/pt-br.react.dev/) to your GitHub account
@@ -53,7 +53,7 @@ You supply the LLM API key and GitHub credentials. In Actions you can pin this r
 
 ## GitHub Actions on a fork
 
-You need this repo (or your fork of it) with workflows enabled, the bot app and secrets described in [Operating translate-react (forks)](./docs/WORKFLOW.md#operating-translate-react-forks), and the workflow definition in [`.github/workflows/workflow.yml`](./.github/workflows/workflow.yml). To lock the tool to a tag or SHA, use [Pinning translate-react in GitHub Actions](./docs/WORKFLOW.md#pinning-translate-react-in-github-actions).
+Enable Actions on the repo that holds the workflow, install the bot, and set the secrets and variables listed under [Operating translate-react (forks)](./docs/WORKFLOW.md#operating-translate-react-forks) (see [`.github/workflows/workflow.yml`](./.github/workflows/workflow.yml)). Pinning: [Pinning translate-react in GitHub Actions](./docs/WORKFLOW.md#pinning-translate-react-in-github-actions).
 
 ## Configuration
 
@@ -135,7 +135,7 @@ bun start     # Production mode
 
 ## Versioning and releases
 
-Semver is [`package.json`](./package.json) `version`. OpenRouter `HTTP-Referer` / `X-Title` defaults come from `homepage`, `name`, and `version` there (see [optional env](#optional-environment-variables)). History: [`CHANGELOG.md`](./CHANGELOG.md). Tags and GitHub Releases: [docs/WORKFLOW.md](./docs/WORKFLOW.md#releases-and-semantic-versioning).
+`package.json` `version` is the semver source; OpenRouter header defaults pull from `homepage`, `name`, and `version` unless overridden ([optional env](#optional-environment-variables)). Change log: [`CHANGELOG.md`](./CHANGELOG.md). Tag and release steps: [Releases and semantic versioning](./docs/WORKFLOW.md#releases-and-semantic-versioning).
 
 ## Documentation
 
@@ -150,11 +150,11 @@ Semver is [`package.json`](./package.json) `version`. OpenRouter `HTTP-Referer` 
 
 ## Contributing
 
-See [`CONTRIBUTING.md`](./CONTRIBUTING.md) and [ARCHITECTURE.md](./docs/ARCHITECTURE.md) when changing services.
+[`CONTRIBUTING.md`](./CONTRIBUTING.md); for service layout see [ARCHITECTURE.md](./docs/ARCHITECTURE.md).
 
 ## Security
 
-[`SECURITY.md`](./SECURITY.md).
+[`SECURITY.md`](./SECURITY.md)
 
 ## Troubleshooting
 
@@ -179,5 +179,3 @@ MIT License - see [LICENSE](./LICENSE) file for details.
 [^gh-pat-token]: Optional fallback token for permission-related failures. When the primary `GH_TOKEN` receives a `403` (`Forbidden`) error, the client automatically retries with this PAT. Useful when GitHub App tokens have different permission scopes than PATs for certain operations.
 
 [^repo-upstream-test]: For dry runs, set to your GitHub username in `.env` or repository variable `REPO_UPSTREAM_OWNER` so PRs open against your fork; the translation workflow applies this to every matrix locale (see `.github/workflows/workflow.yml`).
-
-[^openrouter-resolve-chunk-budget]: When `true` and `LLM_API_BASE_URL` points at hosted OpenRouter (`openrouter.ai`), the tool calls OpenRouter’s [`GET /v1/models`](https://openrouter.ai/docs/api/api-reference/models/get-models) after the connectivity check. It matches `LLM_MODEL` to a catalog row (`id` or `canonical_slug`), then uses `context_length` and `top_provider.max_completion_tokens` to size chunk inputs and cap chat `max_tokens`. Test defaults set this to `false` in [`src/utils/constants.util.ts`](./src/utils/constants.util.ts) so unit tests stay offline.
