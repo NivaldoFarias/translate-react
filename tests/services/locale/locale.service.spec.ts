@@ -151,7 +151,6 @@ describe("ptBrLocale.pullRequest.body", () => {
 						mergeable: false,
 						mergeableState: "dirty",
 						createdBy: "other-user",
-						lastCommitAuthor: "other-user",
 					},
 				},
 			});
@@ -174,7 +173,6 @@ describe("ptBrLocale.pullRequest.body", () => {
 						mergeable: false,
 						mergeableState: "dirty",
 						createdBy: "other-user",
-						lastCommitAuthor: "other-user",
 					},
 				},
 			});
@@ -194,7 +192,6 @@ describe("ptBrLocale.pullRequest.body", () => {
 						mergeable: false,
 						mergeableState: "dirty",
 						createdBy: "other-user",
-						lastCommitAuthor: "other-user",
 					},
 				},
 			});
@@ -215,7 +212,6 @@ describe("ptBrLocale.pullRequest.body", () => {
 						mergeable: false,
 						mergeableState: "dirty",
 						createdBy: "other-user",
-						lastCommitAuthor: "other-user",
 					},
 				},
 			});
@@ -300,7 +296,6 @@ describe("ruLocale.pullRequest.body", () => {
 						mergeable: false,
 						mergeableState: "dirty",
 						createdBy: "other-user",
-						lastCommitAuthor: "other-user",
 					},
 				},
 			});

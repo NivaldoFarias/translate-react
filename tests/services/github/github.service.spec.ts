@@ -972,27 +972,6 @@ describe("GitHubService", () => {
 			});
 		});
 
-		describe("getForkOwner", () => {
-			test("should return fork owner from repositories config", () => {
-				const owner = githubService.getForkOwner();
-
-				expect(owner).toBe("test-fork-owner");
-			});
-
-			test("should return custom fork owner when overridden", () => {
-				const customService = createTestGitHubService({
-					repositories: {
-						fork: { owner: "custom-owner", repo: "custom-repo" },
-						upstream: testRepositories.upstream,
-					},
-				});
-
-				const owner = customService.getForkOwner();
-
-				expect(owner).toBe("custom-owner");
-			});
-		});
-
 		describe("closePullRequest", () => {
 			test("should close PR successfully", async () => {
 				octokitMock.pulls.update.mockResolvedValueOnce({ data: { number: 42, state: "closed" } });

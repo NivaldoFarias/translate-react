@@ -109,19 +109,6 @@ export class GitHubContent {
 	}
 
 	/**
-	 * Gets the current user username.
-	 *
-	 * @returns The current user username
-	 */
-	public async getCurrentUser(): Promise<string> {
-		const response = await this.deps.octokit.users.getAuthenticated();
-
-		this.logger.debug({ login: response.data.login }, "Retrieved current user");
-
-		return response.data.login;
-	}
-
-	/**
 	 * Retrieves the list of files changed in a pull request. uses `octokit.paginate` to fetch all files.
 	 *
 	 * @param prNumber Pull request number to fetch changed files from
@@ -490,7 +477,6 @@ export class GitHubContent {
 			mergeableState: pr.mergeable_state,
 			needsUpdate,
 			createdBy: pr.user.login,
-			lastCommitAuthor: await this.getLastCommitAuthor(prNumber),
 		};
 	}
 
@@ -502,17 +488,6 @@ export class GitHubContent {
 		});
 
 		return response.data;
-	}
-
-	private async getLastCommitAuthor(prNumber: number): Promise<string | undefined> {
-		const commits = await this.deps.octokit.paginate(
-			"GET /repos/{owner}/{repo}/pulls/{pull_number}/commits",
-			{ ...this.deps.repositories.upstream, pull_number: prNumber, per_page: 100 },
-		);
-
-		const lastCommit = commits.at(-1);
-
-		return lastCommit?.author?.login;
 	}
 
 	/**
