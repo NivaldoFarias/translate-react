@@ -18,7 +18,6 @@ Detailed breakdown of the translation workflow: execution stages, data flow, and
   - [Stage 3: Content Discovery](#stage-3-content-discovery)
   - [Stage 4: File Filtering](#stage-4-file-filtering)
   - [Stage 5: Batch Translation](#stage-5-batch-translation)
-    - [Branch-tip SHA before commit](#branch-tip-sha-before-commit)
   - [Stage 6: Progress Reporting](#stage-6-progress-reporting)
 - [Data Flow Diagrams](#data-flow-diagrams)
   - [Discovery Phase](#discovery-phase)

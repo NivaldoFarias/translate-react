@@ -101,6 +101,7 @@ ${conflictNotice}
 | **${strings.stats.metrics.processingTime}** | ~${formatElapsedTime(processingTime, strings.timeFormatLocale)} |
 
 > [!NOTE]
+>
 ${strings.stats.notes.map((note) => `> - ${note}`).join("\n")}
 
 ### ${strings.techInfo.header}

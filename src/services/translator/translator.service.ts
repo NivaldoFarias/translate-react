@@ -35,6 +35,7 @@ import {
 	mergePreservedYamlFrontmatter,
 	splitLeadingYamlFrontmatter,
 } from "./translator-frontmatter.util";
+import { stripSpuriousOuterMarkdownFencesWhenSourceHadNoFences } from "./translator-markdown-artifacts.util";
 import { CONNECTIVITY_TEST_MAX_TOKENS, LLM_TEMPERATURE } from "./translator.constants";
 
 /**
@@ -322,7 +323,7 @@ export class TranslatorService {
 			return;
 		}
 
-		this.managers.chunks = new ChunksManager(this.model, grossChunkInputTokens);
+		this.managers.chunks = new ChunksManager(this.model, grossChunkInputTokens, completionCap);
 
 		this.logger.info(
 			{
@@ -453,6 +454,16 @@ export class TranslatorService {
 		if (verbatimMask && verbatimMask.replacements.length > 0) {
 			translatedContent = restoreMaskedVerbatimFences(translatedContent, verbatimMask.replacements);
 		}
+
+		const fileBodySplit = splitLeadingYamlFrontmatter(file.content);
+		const sourceBodyForArtifacts =
+			fileBodySplit.rest.length > 0 ? fileBodySplit.rest : file.content;
+
+		translatedContent = stripSpuriousOuterMarkdownFencesWhenSourceHadNoFences(
+			sourceBodyForArtifacts,
+			translatedContent,
+			file.logger,
+		);
 
 		if (preservedYamlBlock) {
 			const frontmatterParts = extractFrontmatterParts(preservedYamlBlock);
@@ -654,18 +665,24 @@ export class TranslatorService {
 			chunks.length > 1 ? { index: index + 1, total: chunks.length } : undefined;
 		const translatedChunk = await this.callLanguageModel(file, chunk, chunkProgress);
 
+		const strippedChunk = stripSpuriousOuterMarkdownFencesWhenSourceHadNoFences(
+			chunk,
+			translatedChunk,
+			file.logger,
+		);
+
 		file.logger.debug(
 			{
 				chunkIndex: index + 1,
 				totalChunks: chunks.length,
 				originalSize: chunk.length,
-				translatedSize: translatedChunk.length,
+				translatedSize: strippedChunk.length,
 				durationMs: Date.now() - startTime,
 			},
 			`Chunk ${index + 1}/${chunks.length} translation complete`,
 		);
 
-		return translatedChunk;
+		return strippedChunk;
 	}
 
 	/**
@@ -754,6 +771,22 @@ export class TranslatorService {
 								ErrorCode.NoContent,
 								`${TranslatorService.name}.${this.callLanguageModel.name}`,
 								{ model: this.model, contentLength: contentToTranslate.length },
+							);
+						}
+
+						const finishReason = completion.choices[0]?.finish_reason;
+						if (finishReason === "length") {
+							throw new ApplicationError(
+								"Language model response ended at max completion tokens (truncated output)",
+								ErrorCode.TranslationFailed,
+								`${TranslatorService.name}.${this.callLanguageModel.name}`,
+								{
+									model: this.model,
+									contentLength: contentToTranslate.length,
+									finishReason,
+									completionTokens: completion.usage?.completion_tokens,
+									promptTokens: completion.usage?.prompt_tokens,
+								},
 							);
 						}
 

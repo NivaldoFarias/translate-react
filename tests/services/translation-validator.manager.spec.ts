@@ -166,5 +166,13 @@ describe("TranslationValidatorManager", () => {
 				validator.validateTranslation(file, "Apenas um parágrafo sem cabeçalhos.");
 			}).not.toThrow();
 		});
+
+		test("should warn but not throw when fenced blocks remain without a source fence", () => {
+			const file = makeFile("Just a paragraph with no headings.");
+
+			expect(() => {
+				validator.validateTranslation(file, "Texto\n\n```\nunexpected\n```");
+			}).not.toThrow();
+		});
 	});
 });
