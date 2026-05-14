@@ -152,3 +152,6 @@ dist
 # User-specific files
 .dotfiles
 .config-files
+
+# VSCode
+.vscode/

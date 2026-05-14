@@ -1,6 +1,6 @@
 {
 	"name": "translate-react",
-	"version": "0.1.22",
+	"version": "0.1.24",
 	"contributors": [
 		{
 			"name": "Nivaldo Farias",
@@ -11,6 +11,9 @@
 	"homepage": "https://github.com/NivaldoFarias/translate-react",
 	"description": "A tool to translate React docs to any language",
 	"type": "module",
+	"engines": {
+		"bun": ">=1.3.0"
+	},
 	"scripts": {
 		"start": "bun src/main.ts",
 		"dev": "bun --watch src/main.ts",
@@ -36,6 +39,7 @@
 		"p-retry": "^7.1.1",
 		"pino": "^10.3.0",
 		"pretty-bytes": "^7.1.0",
+		"yaml": "^2.9.0",
 		"zod": "^4.3.6"
 	},
 	"devDependencies": {

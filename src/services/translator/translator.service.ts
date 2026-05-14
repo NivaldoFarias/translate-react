@@ -1,52 +1,61 @@
 import crypto from "node:crypto";
 
-import { MarkdownTextSplitter } from "@langchain/textsplitters";
 import { StatusCodes } from "http-status-codes";
-import { encodingForModel } from "js-tiktoken";
 import OpenAI from "openai";
 import { APIError } from "openai/error";
 import pRetry, { AbortError } from "p-retry";
+import { isMap, parseDocument } from "yaml";
 
-import type { MarkdownTextSplitterParams } from "@langchain/textsplitters";
-import type { TiktokenModel } from "js-tiktoken";
 import type PQueue from "p-queue";
 import type { Options as RetryOptions } from "p-retry";
 import type { Logger } from "pino";
+
+import type { OpenRouterModelLimits } from "@/services/openrouter/";
 
 import { openai, queue } from "@/clients/";
 import { ApplicationError, ErrorCode } from "@/errors/";
 import { LanguageDetectorService, languageDetectorService } from "@/services/language-detector/";
 import { localeService, LocaleService } from "@/services/locale/";
-import { env, extractDocTitleFromContent, logger } from "@/utils/";
-
+import { openRouterModelLimitsService } from "@/services/openrouter/";
 import {
-	CHUNK_OVERLAP,
-	CHUNK_TOKEN_BUFFER,
-	CODE_BLOCK_REGEX,
-	CONNECTIVITY_TEST_MAX_TOKENS,
-	FRONTMATTER_KEY_REGEX,
-	FRONTMATTER_REGEX,
-	HEADINGS_REGEX,
-	LINE_ENDING_REGEX,
-	LLM_TEMPERATURE,
-	MARKDOWN_LINK_REGEX,
-	MAX_CHUNK_TOKENS,
-	MAX_CODE_BLOCK_RATIO,
-	MAX_HEADING_RATIO,
-	MAX_LINK_RATIO,
-	MAX_SIZE_RATIO,
-	MIN_CODE_BLOCK_RATIO,
-	MIN_HEADING_RATIO,
-	MIN_LINK_RATIO,
-	MIN_SIZE_RATIO,
-	REQUIRED_FRONTMATTER_KEYS,
-	SYSTEM_PROMPT_TOKEN_RESERVE,
-	TOKEN_ESTIMATION_FALLBACK_DIVISOR,
-	TRAILING_NEWLINES_REGEX,
-	TRANSLATION_PREFIXES,
-} from "./translator.constants";
+	env,
+	getRateLimitResetWaitMs,
+	isOpenRouterDailyFreeModelQuotaError,
+	logger,
+	maskLargeVerbatimFencedCodeBlocks,
+	restoreMaskedVerbatimFences,
+} from "@/utils/";
 
-/** Dependency injection interface for TranslatorService */
+import { ChunksManager, TranslationValidatorManager } from "./managers";
+import { REGEXES, SYSTEM_PROMPT_TOKEN_RESERVE } from "./managers/managers.constants";
+import {
+	buildFrontmatterBlock,
+	extractFrontmatterParts,
+	extractTitleScalarFromInnerYaml,
+	mergePreservedYamlFrontmatter,
+	splitLeadingYamlFrontmatter,
+} from "./translator-frontmatter.util";
+import { CONNECTIVITY_TEST_MAX_TOKENS, LLM_TEMPERATURE } from "./translator.constants";
+
+/**
+ * Identifies which segment of a chunked body is being translated in one LLM call.
+ *
+ * Omitted for whole-file translation and for small frontmatter scalar calls.
+ */
+type ChunkTranslationProgress = Readonly<{
+	index: number;
+	total: number;
+}>;
+
+/**
+ * Selects which system prompt {@link TranslatorService.getSystemPrompt} builds for an LLM call.
+ *
+ * `markdownDocument` keeps chunking, verbatim-placeholder, and full doc rules. `frontmatterScalar`
+ * uses a short metadata-only prompt so glossary text in the system message is not echoed into YAML.
+ */
+export type TranslationSystemPromptKind = "markdownDocument" | "frontmatterScalar";
+
+/** Dependency injection interface for {@link TranslatorService} */
 export interface TranslatorServiceDependencies {
 	/** OpenAI client instance for LLM API calls */
 	openai: OpenAI;
@@ -65,28 +74,6 @@ export interface TranslatorServiceDependencies {
 
 	/** Retry configuration for LLM API calls */
 	retryConfig: RetryOptions;
-}
-
-/**
- * Result of content chunking operation containing chunks and their separators.
- *
- * The separators array contains the exact whitespace patterns that existed
- * between each pair of chunks in the original content, enabling perfect
- * reassembly that preserves the source formatting.
- */
-interface ChunkingResult {
-	/** Array of content chunks split from the original text */
-	chunks: string[];
-
-	/**
-	 * Array of separator strings between chunks.
-	 *
-	 * Length is always `chunks.length - 1` since there's one separator
-	 * between each pair of adjacent chunks. Each separator is the exact
-	 * whitespace pattern (e.g., `\n`, `\n\n`, `\n\n\n`) extracted from
-	 * the original content at that boundary position.
-	 */
-	separators: string[];
 }
 
 /** Represents a file that needs to be translated */
@@ -116,13 +103,52 @@ export class TranslationFile {
 		/** Optional parent logger to create child logger from (defaults to root logger) */
 		parentLogger?: Logger,
 	) {
-		this.title = extractDocTitleFromContent(content);
+		this.title = this.extractDocTitleFromContent(content);
 		this.correlationId = crypto.randomUUID();
 		this.logger = (parentLogger ?? logger).child({
 			file: this.filename,
 			path: this.path,
 			correlationId: this.correlationId,
 		});
+	}
+
+	/**
+	 * Extracts the document title from leading YAML frontmatter by parsing the inner block with {@link extractTitleScalarFromInnerYaml}.
+	 *
+	 * @param content The content of the document
+	 *
+	 * @returns The trimmed `title` string scalar, or `undefined` when there is no frontmatter or `title` is missing or not a string
+	 */
+	private extractDocTitleFromContent(content: string): string | undefined {
+		const frontmatterContentOnly = REGEXES.frontmatter.exec(content)?.groups?.["content"];
+
+		if (!frontmatterContentOnly) return;
+
+		return extractTitleScalarFromInnerYaml(frontmatterContentOnly);
+	}
+
+	/**
+	 * Returns a log-safe snapshot of this file (no `content` body).
+	 *
+	 * Pino `serializers.content` only applies to a top-level `content` key; logging `{ file: this }`
+	 * still serializes `file.content` in full, so use this for structured logs.
+	 */
+	public getLogContext(): {
+		filename: string;
+		path: string;
+		sha: string;
+		correlationId: string;
+		contentLength: number;
+		title: string | undefined;
+	} {
+		return {
+			filename: this.filename,
+			path: this.path,
+			sha: this.sha,
+			correlationId: this.correlationId,
+			contentLength: this.content.length,
+			title: this.title,
+		};
 	}
 }
 
@@ -155,6 +181,12 @@ export class TranslatorService {
 	/** Retry configuration for LLM API calls */
 	private readonly retryConfig: RetryOptions;
 
+	/**
+	 * When OpenRouter model metadata is loaded, caps chat `max_tokens` by the provider’s
+	 * `max_completion_tokens` (and `MAX_TOKENS`). Otherwise `null` and {@link env.MAX_TOKENS} is used.
+	 */
+	private providerCompletionTokenCap: number | null = null;
+
 	public readonly services: {
 		/** Locale service for language-specific rules */
 		locale: LocaleService;
@@ -163,8 +195,13 @@ export class TranslatorService {
 		languageDetector: LanguageDetectorService;
 	};
 
-	/** Glossary for consistent term translations */
-	public glossary: string | null = null;
+	/** Translation guidelines for consistent term translations */
+	public translationGuidelines: string | null = null;
+
+	public readonly managers: {
+		translationValidator: TranslationValidatorManager;
+		chunks: ChunksManager;
+	};
 
 	/**
 	 * Creates a new TranslatorService instance with injected dependencies.
@@ -180,6 +217,10 @@ export class TranslatorService {
 			languageDetector: dependencies.languageDetectorService,
 		};
 		this.retryConfig = dependencies.retryConfig;
+		this.managers = {
+			translationValidator: new TranslationValidatorManager(this.services.languageDetector),
+			chunks: new ChunksManager(this.model),
+		};
 	}
 
 	/**
@@ -221,10 +262,94 @@ export class TranslatorService {
 			},
 			"LLM API connectivity test successful",
 		);
+
+		await this.maybeApplyOpenRouterModelLimits();
 	}
 
+	/**
+	 * When enabled and the base URL is hosted OpenRouter, loads `GET /v1/models` limits for {@link env.LLM_MODEL}
+	 * to widen per-chunk input budgets and align `max_tokens` with `top_provider.max_completion_tokens`.
+	 */
+	private async maybeApplyOpenRouterModelLimits() {
+		if (!env.LLM_API_BASE_URL.includes("openrouter")) {
+			return;
+		}
+
+		if (!openRouterModelLimitsService.isHostedOpenRouterBaseUrl(env.LLM_API_BASE_URL)) {
+			this.logger.debug(
+				{ baseUrl: env.LLM_API_BASE_URL },
+				"Skipping OpenRouter model metadata: base URL is not hosted OpenRouter",
+			);
+
+			return;
+		}
+
+		if (!env.LLM_API_KEY) {
+			this.logger.debug("Skipping OpenRouter model metadata: LLM_API_KEY is not set");
+
+			return;
+		}
+
+		const limits: OpenRouterModelLimits | null =
+			await openRouterModelLimitsService.fetchLimitsForModel(
+				env.LLM_API_BASE_URL,
+				env.LLM_API_KEY,
+				this.model,
+			);
+
+		if (!limits) {
+			return;
+		}
+
+		const completionCap = Math.min(env.MAX_TOKENS, limits.maxCompletionTokens ?? env.MAX_TOKENS);
+		this.providerCompletionTokenCap = completionCap;
+
+		const grossChunkInputTokens = Math.floor(
+			limits.contextLength - SYSTEM_PROMPT_TOKEN_RESERVE - completionCap,
+		);
+
+		if (grossChunkInputTokens < 256) {
+			this.logger.warn(
+				{
+					model: this.model,
+					contextLength: limits.contextLength,
+					completionCap,
+					grossChunkInputTokens,
+				},
+				"OpenRouter context window too small for safe chunking; keeping default chunk size",
+			);
+
+			return;
+		}
+
+		this.managers.chunks = new ChunksManager(this.model, grossChunkInputTokens);
+
+		this.logger.info(
+			{
+				model: this.model,
+				contextLength: limits.contextLength,
+				maxCompletionTokens: limits.maxCompletionTokens,
+				grossChunkInputTokens,
+				completionCap,
+			},
+			"Applied OpenRouter model limits for chunking",
+		);
+	}
+
+	/**
+	 * Checks if an LLM API response is valid.
+	 * Checks if the response has an ID, usage, and a message.
+	 *
+	 * @param response LLM API response to check
+	 *
+	 * @returns `true` if the response is valid, `false` otherwise
+	 */
 	private isLLMResponseValid(response: OpenAI.Chat.Completions.ChatCompletion): boolean {
-		return !!response.id || !!response.usage?.total_tokens || !!response.choices.at(0)?.message;
+		return Boolean(
+			response.id &&
+			typeof response.usage?.total_tokens === "number" &&
+			response.choices.at(0)?.message,
+		);
 	}
 
 	/**
@@ -238,11 +363,12 @@ export class TranslatorService {
 	 * ### Workflow
 	 *
 	 * 1. Validates input content
-	 * 2. Determines if chunking is needed based on token estimates
-	 * 3. Translates content (with chunking if necessary)
-	 * 4. Validates translation completeness
-	 * 5. Cleans up and returns translated content
-	 * 6. Updates metrics
+	 * 2. Optionally replaces very large fenced code blocks with placeholders when `MASK_VERBATIM_LARGE_FENCES` is enabled
+	 * 3. Determines if chunking is needed based on token estimates (after any masking)
+	 * 4. Translates content (with chunking if necessary)
+	 * 5. Restores verbatim fences when masking was applied
+	 * 6. Validates translation completeness
+	 * 7. Cleans up and returns translated content
 	 *
 	 * @param file File containing content to translate
 	 *
@@ -264,7 +390,7 @@ export class TranslatorService {
 	 * ```
 	 */
 	public async translateContent(file: TranslationFile): Promise<string> {
-		file.logger.info({ file }, "Translating content for file");
+		file.logger.info({ file: file.getLogContext() }, "Translating content for file");
 
 		if (!file.content.length) {
 			file.logger.error({ fileContent: file.content.length }, "File content is empty");
@@ -280,16 +406,70 @@ export class TranslatorService {
 		const translationStartTime = Date.now();
 		let translatedContent: string;
 
-		const contentNeedsChunking = this.needsChunking(file);
+		const verbatimMask =
+			env.MASK_VERBATIM_LARGE_FENCES ?
+				maskLargeVerbatimFencedCodeBlocks(file.content, {
+					estimateTokens: (markdown) => this.managers.chunks.estimateTokenCount(markdown),
+					minTokens: env.MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS,
+				})
+			:	null;
+
+		const translationInput =
+			verbatimMask && verbatimMask.replacements.length > 0 ?
+				verbatimMask.maskedMarkdown
+			:	file.content;
+
+		const leadingFrontmatterSplit = splitLeadingYamlFrontmatter(translationInput);
+		const hasBodyAfterLeadingYaml = leadingFrontmatterSplit.rest.length > 0;
+		const preservedYamlBlock = hasBodyAfterLeadingYaml ? leadingFrontmatterSplit.block : "";
+		const translationPayload =
+			hasBodyAfterLeadingYaml ? leadingFrontmatterSplit.rest : translationInput;
+
+		if (preservedYamlBlock) {
+			file.logger.debug(
+				{
+					preservedYamlLength: preservedYamlBlock.length,
+					bodyLength: translationPayload.length,
+				},
+				"Leading YAML frontmatter held back from LLM; will merge back after translation",
+			);
+		}
+
+		const translationWorkFile = new TranslationFile(
+			translationPayload,
+			file.filename,
+			file.path,
+			file.sha,
+			file.logger,
+		);
+
+		const contentNeedsChunking = this.managers.chunks.needsChunking(translationWorkFile);
 		if (!contentNeedsChunking) {
-			translatedContent = await this.callLanguageModel(file);
+			translatedContent = await this.callLanguageModel(translationWorkFile);
 		} else {
-			translatedContent = await this.translateWithChunking(file);
+			translatedContent = await this.translateWithChunking(translationWorkFile);
+		}
+
+		if (verbatimMask && verbatimMask.replacements.length > 0) {
+			translatedContent = restoreMaskedVerbatimFences(translatedContent, verbatimMask.replacements);
+		}
+
+		if (preservedYamlBlock) {
+			const frontmatterParts = extractFrontmatterParts(preservedYamlBlock);
+			const mergedBlock =
+				frontmatterParts ?
+					buildFrontmatterBlock(
+						frontmatterParts.bom,
+						await this.translateFrontmatterStringFields(frontmatterParts.inner, file),
+					)
+				:	preservedYamlBlock;
+
+			translatedContent = mergePreservedYamlFrontmatter(mergedBlock, translatedContent);
 		}
 
 		const translationDuration = Date.now() - translationStartTime;
 
-		this.validateTranslation(file, translatedContent);
+		this.managers.translationValidator.validateTranslation(file, translatedContent);
 
 		file.logger.info(
 			{
@@ -302,513 +482,82 @@ export class TranslatorService {
 			"Translation completed successfully",
 		);
 
-		return this.cleanupTranslatedContent(translatedContent, file);
+		return this.managers.translationValidator.cleanupTranslatedContent(translatedContent, file);
 	}
 
 	/**
-	 * Validates translated content to ensure completeness and quality.
+	 * Translates the string fields of a YAML frontmatter document.
 	 *
-	 * Performs a comprehensive set of validation checks to catch potential translation
-	 * issues before committing to the repository. This multi-layered validation approach
-	 * helps prevent incomplete translations, structural corruption, and content loss.
+	 * @param innerYaml The inner YAML of the frontmatter document
+	 * @param file The file instance for logger context
 	 *
-	 * @param file Original file containing source content for comparison
-	 * @param translatedContent Translated content to validate against source
-	 *
-	 * @throws {ApplicationError} with {@link ErrorCode.FormatValidationFailed} if validation checks fail (empty content, complete heading loss)
-	 *
-	 * @example
-	 * ```typescript
-	 * const file = new TranslationFile('# Title\nContent', 'doc.md', 'path', 'sha');
-	 * const translated = '# Título\nConteúdo';
-	 * validateTranslation(file, translated); // Passes all checks
-	 * ```
+	 * @returns The translated YAML frontmatter document
 	 */
-	private validateTranslation(file: TranslationFile, translatedContent: string): void {
-		if (!translatedContent || translatedContent.trim().length === 0) {
-			file.logger.error(
-				{ filename: file.filename, translatedContent },
-				"Translated content is empty",
-			);
+	private async translateFrontmatterStringFields(innerYaml: string, file: TranslationFile) {
+		const FRONTMATTER_FIELDS_TO_TRANSLATE = ["title", "description"] as const;
+		let doc;
 
-			throw new ApplicationError(
-				"Translation produced empty content",
-				ErrorCode.FormatValidationFailed,
-				`${TranslatorService.name}.${this.validateTranslation.name}`,
-				{
-					filename: file.filename,
-					path: file.path,
-					originalLength: file.content.length,
-					translatedLength: translatedContent.length,
-				},
-			);
-		}
-
-		const sizeRatio = translatedContent.length / file.content.length;
-		if (sizeRatio < MIN_SIZE_RATIO || sizeRatio > MAX_SIZE_RATIO) {
-			file.logger.warn(
-				{
-					filename: file.filename,
-					sizeRatio: sizeRatio.toFixed(2),
-					originalLength: file.content.length,
-					translatedLength: translatedContent.length,
-				},
-				`Translation size ratio outside expected range (${MIN_SIZE_RATIO}-${MAX_SIZE_RATIO})`,
-			);
-		}
-
-		const originalHeadings = (file.content.match(HEADINGS_REGEX) ?? []).length;
-		const translatedHeadings = (translatedContent.match(HEADINGS_REGEX) ?? []).length;
-		const headingRatio = translatedHeadings / originalHeadings;
-
-		file.logger.debug(
-			{ originalHeadings, translatedHeadings, headingRatio, regex: HEADINGS_REGEX },
-			`Heading counts for ${file.filename}`,
-		);
-
-		if (originalHeadings === 0) {
-			file.logger.warn("Original file contains no markdown headings. Skipping heading validation");
-			return;
-		}
-
-		if (translatedHeadings === 0) {
-			file.logger.error(
-				{ filename: file.filename, originalHeadings, translatedHeadings },
-				"Translation lost all markdown headings",
-			);
-
-			throw new ApplicationError(
-				"All markdown headings lost during translation",
-				ErrorCode.FormatValidationFailed,
-				`${TranslatorService.name}.${this.validateTranslation.name}`,
-				{
-					path: file.path,
-					originalHeadings,
-					translatedHeadings,
-					originalLength: file.content.length,
-					translatedLength: translatedContent.length,
-				},
-			);
-		} else if (headingRatio < MIN_HEADING_RATIO || headingRatio > MAX_HEADING_RATIO) {
-			file.logger.warn(
-				{
-					filename: file.filename,
-					originalHeadings,
-					translatedHeadings,
-					headingRatio: headingRatio.toFixed(2),
-				},
-				"Significant heading count mismatch detected",
-			);
-		}
-
-		this.validateCodeBlockPreservation(file, translatedContent);
-		this.validateLinkPreservation(file, translatedContent);
-		this.validateFrontmatterIntegrity(file, translatedContent);
-
-		file.logger.debug(
-			{
-				filename: file.filename,
-				sizeRatio: sizeRatio.toFixed(2),
-				originalHeadings,
-				translatedHeadings,
-			},
-			"Translation validation passed",
-		);
-	}
-
-	/**
-	 * Validates that code blocks are preserved during translation.
-	 *
-	 * Compares the count of fenced code blocks (triple backticks) between source
-	 * and translated content. Logs a warning if there's a significant mismatch
-	 * (>20% difference), as this may indicate code blocks were corrupted or removed.
-	 *
-	 * @param file Original file containing source content for comparison
-	 * @param translatedContent Translated content to validate against source
-	 */
-	private validateCodeBlockPreservation(file: TranslationFile, translatedContent: string): void {
-		const originalCodeBlocks = (file.content.match(CODE_BLOCK_REGEX) ?? []).length;
-		const translatedCodeBlocks = (translatedContent.match(CODE_BLOCK_REGEX) ?? []).length;
-
-		file.logger.debug(
-			{ originalCodeBlocks, translatedCodeBlocks },
-			`Code block counts for ${file.filename}`,
-		);
-
-		if (originalCodeBlocks === 0) {
-			file.logger.debug("Original file contains no code blocks. Skipping code block validation");
-			return;
-		}
-
-		const codeBlockRatio = translatedCodeBlocks / originalCodeBlocks;
-
-		if (codeBlockRatio < MIN_CODE_BLOCK_RATIO || codeBlockRatio > MAX_CODE_BLOCK_RATIO) {
-			file.logger.warn(
-				{
-					filename: file.filename,
-					originalCodeBlocks,
-					translatedCodeBlocks,
-					codeBlockRatio: codeBlockRatio.toFixed(2),
-				},
-				"Significant code block count mismatch detected - code blocks may have been corrupted or removed",
-			);
-		}
-	}
-
-	/**
-	 * Validates that markdown links are preserved during translation.
-	 *
-	 * Compares the count of markdown links between source and translated content.
-	 * Logs a warning if there's a significant mismatch (>20% difference), as this
-	 * may indicate links were broken or removed during translation.
-	 *
-	 * @param file Original file containing source content for comparison
-	 * @param translatedContent Translated content to validate against source
-	 */
-	private validateLinkPreservation(file: TranslationFile, translatedContent: string): void {
-		const originalLinks = (file.content.match(MARKDOWN_LINK_REGEX) ?? []).length;
-		const translatedLinks = (translatedContent.match(MARKDOWN_LINK_REGEX) ?? []).length;
-
-		file.logger.debug(
-			{ originalLinks, translatedLinks },
-			`Markdown link counts for ${file.filename}`,
-		);
-
-		if (originalLinks === 0) {
-			file.logger.debug("Original file contains no markdown links. Skipping link validation");
-			return;
-		}
-
-		const linkRatio = translatedLinks / originalLinks;
-
-		if (linkRatio < MIN_LINK_RATIO || linkRatio > MAX_LINK_RATIO) {
-			file.logger.warn(
-				{
-					filename: file.filename,
-					originalLinks,
-					translatedLinks,
-					linkRatio: linkRatio.toFixed(2),
-				},
-				"Significant markdown link count mismatch detected - links may have been broken or removed",
-			);
-		}
-	}
-
-	/**
-	 * Validates that frontmatter structure and required keys are preserved during translation.
-	 *
-	 * Parses YAML frontmatter from source and translated content, then verifies that:
-	 * 1. Required keys (e.g., `title`) are preserved in translation
-	 * 2. The overall frontmatter structure remains intact
-	 *
-	 * @param file Original file containing source content for comparison
-	 * @param translatedContent Translated content to validate against source
-	 */
-	private validateFrontmatterIntegrity(file: TranslationFile, translatedContent: string): void {
-		const originalFrontmatter = FRONTMATTER_REGEX.exec(file.content)?.[1];
-		const translatedFrontmatter = FRONTMATTER_REGEX.exec(translatedContent)?.[1];
-
-		if (!originalFrontmatter) {
-			file.logger.debug("Original file contains no frontmatter. Skipping frontmatter validation");
-			return;
-		}
-
-		if (!translatedFrontmatter) {
-			file.logger.warn(
-				{ filename: file.filename },
-				"Frontmatter lost during translation - original had frontmatter but translation does not",
-			);
-			return;
-		}
-
-		const extractKeys = (content: string): Set<string> => {
-			const keys = new Set<string>();
-			let match: RegExpExecArray | null;
-
-			const regex = new RegExp(FRONTMATTER_KEY_REGEX.source, FRONTMATTER_KEY_REGEX.flags);
-			while ((match = regex.exec(content)) !== null) {
-				if (match[1]) keys.add(match[1]);
-			}
-			return keys;
-		};
-
-		const originalKeys = extractKeys(originalFrontmatter);
-		const translatedKeys = extractKeys(translatedFrontmatter);
-
-		file.logger.debug(
-			{
-				originalKeys: [...originalKeys],
-				translatedKeys: [...translatedKeys],
-			},
-			`Frontmatter keys for ${file.filename}`,
-		);
-
-		const missingRequiredKeys = REQUIRED_FRONTMATTER_KEYS.filter(
-			(key) => originalKeys.has(key) && !translatedKeys.has(key),
-		);
-
-		if (missingRequiredKeys.length > 0) {
-			file.logger.warn(
-				{
-					filename: file.filename,
-					missingRequiredKeys,
-					originalKeys: [...originalKeys],
-					translatedKeys: [...translatedKeys],
-				},
-				"Required frontmatter keys missing in translation",
-			);
-		}
-
-		const missingKeys = [...originalKeys].filter((key) => !translatedKeys.has(key));
-
-		if (missingKeys.length > 0 && missingKeys.some((key) => !missingRequiredKeys.includes(key))) {
-			const nonRequiredMissing = missingKeys.filter((key) => !missingRequiredKeys.includes(key));
-			file.logger.warn(
-				{
-					filename: file.filename,
-					missingKeys: nonRequiredMissing,
-				},
-				"Some frontmatter keys missing in translation",
-			);
-		}
-	}
-
-	/**
-	 * Determines if content is already translated by analyzing its language composition.
-	 * Uses async language detection and scoring to make the determination.
-	 *
-	 * @param file File containing content to analyze
-	 *
-	 * @returns Resolves to `true` if content is already translated
-	 */
-	public async isContentTranslated(file: TranslationFile): Promise<boolean> {
 		try {
-			this.logger.info({ filename: file.filename }, "Checking if content is already translated");
-
-			const analysis = await this.getLanguageAnalysis(file);
-
-			this.logger.info({ analysis }, "Checked translation status");
-
-			return analysis.isTranslated;
+			doc = parseDocument(innerYaml);
 		} catch (error) {
-			this.logger.error(
-				{ error },
-				"Error checking if content is translated. Assuming not translated",
-			);
-
-			return false;
-		}
-	}
-
-	/**
-	 * Gets detailed language analysis for debugging and metrics.
-	 *
-	 * @param file File to analyze
-	 *
-	 * @returns Resolves to the detailed language analysis
-	 */
-	public async getLanguageAnalysis(file: TranslationFile) {
-		if (!file.content.length) {
-			this.logger.error(
-				{ filename: file.filename, path: file.path, contentLength: file.content.length },
-				"File content is empty",
-			);
-
-			throw new ApplicationError(
-				"File content is empty",
-				ErrorCode.NoContent,
-				`${TranslatorService.name}.${this.getLanguageAnalysis.name}`,
-				{ filename: file.filename, path: file.path, contentLength: file.content.length },
-			);
+			file.logger.warn({ error }, "YAML frontmatter parse failed; keeping original metadata");
+			return innerYaml;
 		}
 
-		const analysis = await this.services.languageDetector.analyzeLanguage(
-			file.filename,
-			file.content,
-		);
-
-		this.logger.info({ analysis }, "Analyzed language of content");
-
-		return analysis;
-	}
-
-	/**
-	 * Estimates token count for content using tiktoken encoding.
-	 *
-	 * Uses the actual tokenization model to provide accurate token counts
-	 * for the specific LLM being used. This is crucial for proper chunking
-	 * and avoiding API limits.
-	 *
-	 * @param content Content to estimate tokens for
-	 *
-	 * @returns Accurate token count using model-specific encoding
-	 *
-	 * @example
-	 * ```typescript
-	 * const translator = new TranslatorService({ source: 'en', target: 'pt-br' });
-	 * const tokenCount = translator.estimateTokenCount('# Hello World\n\nWelcome!');
-	 * console.log(tokenCount); // ~8 tokens
-	 * ```
-	 */
-	/** Lazily-initialized tiktoken encoder instance, cached for performance */
-	private cachedEncoder: ReturnType<typeof encodingForModel> | null = null;
-
-	/**
-	 * Gets or creates a cached tiktoken encoder instance.
-	 *
-	 * The encoder is expensive to create (~500ms) due to vocabulary loading
-	 * and regex compilation, so we cache it for reuse across all token
-	 * estimation calls.
-	 */
-	private getEncoder() {
-		this.cachedEncoder ??= encodingForModel(this.model as TiktokenModel);
-		return this.cachedEncoder;
-	}
-
-	private estimateTokenCount(content: string): number {
-		try {
-			const tokens = this.getEncoder().encode(content);
-
-			return tokens.length;
-		} catch (error) {
-			const fallback = Math.ceil(content.length / TOKEN_ESTIMATION_FALLBACK_DIVISOR);
-			this.logger.error({ error }, "Error estimating token count, using fallback");
-
-			return fallback;
+		if (doc.errors.length > 0) {
+			file.logger.warn(
+				{ messages: doc.errors.map((error) => error.message) },
+				"YAML frontmatter document has errors; keeping original metadata",
+			);
+			return innerYaml;
 		}
-	}
 
-	/**
-	 * Determines if content needs chunking based on token estimates.
-	 *
-	 * Checks if the estimated token count exceeds safe limits, leaving buffer
-	 * space for system prompt (approximately 1000 tokens) and output tokens
-	 * (approximately 8000 tokens).
-	 *
-	 * @param content Content to check for chunking requirements
-	 *
-	 * @returns True if content exceeds safe token limits and needs chunking
-	 *
-	 * @example
-	 * ```typescript
-	 * const translator = new TranslatorService({ source: 'en', target: 'pt-br' });
-	 * const needsChunking = translator.needsChunking(largeContent);
-	 * if (needsChunking) {
-	 *   console.log('Content will be split into chunks');
-	 * }
-	 * ```
-	 */
-	private needsChunking(file: TranslationFile): boolean {
-		const estimatedTokens = this.estimateTokenCount(file.content);
-		const maxInputTokens = MAX_CHUNK_TOKENS - SYSTEM_PROMPT_TOKEN_RESERVE;
-		const needsChunking = estimatedTokens > maxInputTokens;
+		const root = doc.contents;
+		if (!isMap(root)) return innerYaml;
 
-		file.logger.debug(
-			{ estimatedTokens, maxInputTokens, needsChunking, contentLength: file.content.length },
-			needsChunking ?
-				"Content exceeds token limit, chunking required"
-			:	"Content within token limit, no chunking needed",
-		);
+		for (const key of FRONTMATTER_FIELDS_TO_TRANSLATE) {
+			const value = doc.get(key);
+			if (typeof value !== "string") continue;
 
-		return needsChunking;
-	}
+			const trimmed = value.trim();
+			if (!trimmed.length) continue;
 
-	/**
-	 * Splits content into chunks while preserving exact separators between chunks.
-	 *
-	 * Uses LangChain's {@link MarkdownTextSplitter} for intelligent chunking that respects
-	 * markdown structure and code blocks. After splitting, this method analyzes the
-	 * original content to detect and preserve the exact whitespace pattern (separator)
-	 * that exists between each pair of chunks, enabling perfect reassembly that maintains
-	 * the source document's formatting.
-	 *
-	 * @param content Content to split into manageable chunks for translation
-	 * @param maxTokens Maximum tokens per chunk, defaults to safe limit accounting for prompt overhead
-	 *
-	 * @returns Result object containing chunk array and separator array for reassembly
-	 *
-	 * @see {@link translateWithChunking} for usage in translation workflow
-	 * @see {@link MarkdownTextSplitter} from LangChain for splitting implementation
-	 *
-	 * @example
-	 * ```typescript
-	 * const translator = new TranslatorService();
-	 * const content = '# Title\n\nContent\n\n## Section\n\nMore...';
-	 * const result = await translator.chunkContent(content);
-	 *
-	 * console.log(result.chunks.length);    	// 3
-	 * console.log(result.separators.length); // 2
-	 * console.log(result.separators[0]);     // '\n\n'
-	 * ```
-	 */
-	private async chunkContent(
-		content: string,
-		maxTokens = MAX_CHUNK_TOKENS - CHUNK_TOKEN_BUFFER,
-	): Promise<ChunkingResult> {
-		const markdownTextSplitterOptions: Partial<MarkdownTextSplitterParams> = {
-			chunkSize: maxTokens,
-			chunkOverlap: CHUNK_OVERLAP,
-			lengthFunction: (text: string) => this.estimateTokenCount(text),
-		};
+			file.logger.debug(
+				{ key, scalarLength: trimmed.length },
+				"Translating YAML frontmatter field",
+			);
 
-		const splitter = new MarkdownTextSplitter(markdownTextSplitterOptions);
+			const snippetFile = new TranslationFile(
+				trimmed,
+				`${file.filename}#${key}`,
+				file.path,
+				file.sha,
+				file.logger,
+			);
+			let translatedScalar = await this.callLanguageModel(
+				snippetFile,
+				trimmed,
+				undefined,
+				"frontmatterScalar",
+			);
 
-		const rawChunks = await splitter.splitText(content);
-		const chunks = rawChunks.filter((chunk) => chunk.trim().length > 0);
+			translatedScalar = this.managers.translationValidator.cleanupTranslatedContent(
+				translatedScalar,
+				snippetFile,
+			);
 
-		const separators: string[] = [];
-
-		/**
-		 * Detect the actual separator between each pair of chunks by finding
-		 * where each chunk appears in the original content and extracting the
-		 * whitespace between them.
-		 */
-		let searchStartIndex = 0;
-
-		for (let index = 0; index < chunks.length - 1; index++) {
-			const currentChunk = chunks[index];
-			const nextChunk = chunks[index + 1];
-
-			if (currentChunk == null || nextChunk == null) {
-				throw new ApplicationError(
-					"Encountered null or undefined chunk while computing separators",
-					ErrorCode.ChunkProcessingFailed,
-					`${TranslatorService.name}.${this.chunkContent.name}`,
-					{ index, chunksLength: chunks.length },
+			if (!translatedScalar.length) {
+				file.logger.warn(
+					{ key },
+					"Frontmatter field translation was empty; keeping original value",
 				);
-			}
-
-			if (!currentChunk.trim() || !nextChunk.trim()) {
-				this.logger.warn(
-					{ index, chunksLength: chunks.length },
-					"TranslatorService: encountered empty chunk while computing separators",
-				);
-				separators.push("\n\n");
-				continue;
-			}
-			const currentChunkIndex = content.indexOf(currentChunk.trim(), searchStartIndex);
-
-			if (currentChunkIndex === -1) {
-				separators.push("\n\n");
 				continue;
 			}
 
-			const currentChunkEnd = currentChunkIndex + currentChunk.trim().length;
-
-			const nextChunkIndex = content.indexOf(nextChunk.trim(), currentChunkEnd);
-
-			if (nextChunkIndex === -1) {
-				separators.push("\n\n");
-				continue;
-			}
-
-			const separator = content.substring(currentChunkEnd, nextChunkIndex);
-			separators.push(separator);
-
-			searchStartIndex = nextChunkIndex;
+			doc.set(key, translatedScalar);
 		}
 
-		return { chunks, separators };
+		return String(doc);
 	}
 
 	/**
@@ -816,15 +565,15 @@ export class TranslatorService {
 	 *
 	 * Handles large files by breaking them into manageable pieces and processing
 	 * each chunk separately. Automatically reassembles the translated chunks while
-	 * maintaining proper spacing and structure. Includes comprehensive validation
-	 * to ensure all chunks are successfully translated before reassembly.
+	 * maintaining proper spacing and structure. Validates that all chunks are
+	 * successfully translated before reassembly.
 	 *
 	 * @param content Content to translate (automatically chunked if exceeds token limit)
 	 *
 	 * @returns Promise resolving to translated content reassembled from all chunks
 	 *
-	 * @see {@link chunkContent} for chunking strategy details
-	 * @see {@link callLanguageModel} for individual chunk translation
+	 * @see {@link ChunksManager.chunkContent} for chunking strategy details
+	 * @see {@link TranslatorService.callLanguageModel} for individual chunk translation
 	 *
 	 * @example
 	 * ```typescript
@@ -837,7 +586,7 @@ export class TranslatorService {
 	private async translateWithChunking(file: TranslationFile): Promise<string> {
 		file.logger.debug({ contentLength: file.content.length }, "Starting chunked translation");
 
-		const { chunks, separators } = await this.chunkContent(file.content);
+		const { chunks, separators } = await this.managers.chunks.chunkContent(file.content);
 
 		file.logger.debug(
 			{
@@ -848,16 +597,24 @@ export class TranslatorService {
 			"Content split into chunks",
 		);
 
-		const translatedChunks = await Promise.all(
-			chunks.map((chunk, index) => this.translateChunk(file, chunk, index, chunks)),
-		);
+		let translatedChunks: string[];
+		if (env.CHUNK_TRANSLATION_MODE === "sequential") {
+			translatedChunks = [];
+			for (const [index, chunk] of chunks.entries()) {
+				translatedChunks.push(await this.translateChunk(file, chunk, index, chunks));
+			}
+		} else {
+			translatedChunks = await Promise.all(
+				chunks.map((chunk, index) => this.translateChunk(file, chunk, index, chunks)),
+			);
+		}
 
 		file.logger.debug(
 			{ translatedChunkCount: translatedChunks.length },
 			"All chunks translated, reassembling",
 		);
 
-		return this.validateAndReassembleChunks(file, {
+		return this.managers.translationValidator.validateAndReassembleChunks(file, {
 			original: chunks,
 			translated: translatedChunks,
 			separators,
@@ -865,83 +622,15 @@ export class TranslatorService {
 	}
 
 	/**
-	 * Validates that all chunks were successfully translated and reassembles them.
-	 * Ensures that the number of translated chunks matches the original chunk count.
+	 * Translates a single chunk of content using the language model.
 	 *
-	 * ### Reassembly Strategy
+	 * @param file File instance for logger context
+	 * @param chunk Content to translate
+	 * @param index Index of the chunk
+	 * @param chunks Array of all chunks
 	 *
-	 * Chunks are joined with a single newline character (`\n`) rather than double newlines.
-	 * This is because the chunking process already ensures that each chunk (except the last)
-	 * ends with a trailing newline. Using a single newline as the separator preserves the
-	 * original spacing and prevents the introduction of extra blank lines between sections.
-	 *
-	 * @param content Original content before translation
-	 * @param chunks Chunks object containing original and translated chunks along with separators
-	 * @param chunks.original Original content chunks
-	 * @param chunks.translated Translated content chunks
-	 * @param chunks.separators Separators used between chunks during reassembly
-	 *
-	 * @throws {ApplicationError} with {@link ErrorCode.ChunkProcessingFailed} if chunk count mismatch is detected
-	 *
-	 * @returns Reassembled translated content
+	 * @returns Promise resolving to the translated chunk
 	 */
-	private validateAndReassembleChunks(
-		file: TranslationFile,
-		chunks: { original: string[]; translated: string[]; separators: string[] },
-	): string {
-		if (chunks.translated.length !== chunks.original.length) {
-			file.logger.error(
-				{
-					expectedChunks: chunks.original.length,
-					actualChunks: chunks.translated.length,
-					missingChunks: chunks.original.length - chunks.translated.length,
-				},
-				"Chunk count mismatch detected",
-			);
-
-			throw new ApplicationError(
-				`Chunk count mismatch. Expected ${chunks.original.length} chunks, but only ${chunks.translated.length} were translated`,
-				ErrorCode.ChunkProcessingFailed,
-				`${TranslatorService.name}.${this.translateWithChunking.name}`,
-				{
-					expectedChunks: chunks.original.length,
-					actualChunks: chunks.translated.length,
-					missingChunks: chunks.original.length - chunks.translated.length,
-					contentLength: file.content.length,
-					chunkSizes: chunks.original.map((chunk) => chunk.length),
-				},
-			);
-		}
-
-		let reassembledContent = chunks.translated.reduce((accumulator, chunk, index) => {
-			return accumulator + chunk + (chunks.separators[index] ?? "");
-		}, "");
-
-		const originalEndsWithNewline = file.content.endsWith("\n");
-		const translatedEndsWithNewline = reassembledContent.endsWith("\n");
-
-		if (originalEndsWithNewline && !translatedEndsWithNewline) {
-			const originalTrailingNewlines = TRAILING_NEWLINES_REGEX.exec(file.content)?.[0] ?? "";
-			reassembledContent += originalTrailingNewlines;
-
-			file.logger.debug(
-				{ addedTrailingNewlines: originalTrailingNewlines.length },
-				"Restored trailing newlines from original content",
-			);
-		}
-
-		file.logger.debug(
-			{
-				originalLength: file.content.length,
-				reassembledLength: reassembledContent.length,
-				compressionRatio: (reassembledContent.length / file.content.length).toFixed(2),
-			},
-			"Content reassembly completed",
-		);
-
-		return reassembledContent;
-	}
-
 	private async translateChunk(
 		file: TranslationFile,
 		chunk: string,
@@ -949,7 +638,7 @@ export class TranslatorService {
 		chunks: string[],
 	): Promise<string> {
 		const startTime = Date.now();
-		const estimatedTokens = this.estimateTokenCount(chunk);
+		const estimatedTokens = this.managers.chunks.estimateTokenCount(chunk);
 
 		file.logger.debug(
 			{
@@ -961,7 +650,9 @@ export class TranslatorService {
 			`Translating chunk ${index + 1}/${chunks.length}`,
 		);
 
-		const translatedChunk = await this.callLanguageModel(file, chunk);
+		const chunkProgress: ChunkTranslationProgress | undefined =
+			chunks.length > 1 ? { index: index + 1, total: chunks.length } : undefined;
+		const translatedChunk = await this.callLanguageModel(file, chunk, chunkProgress);
 
 		file.logger.debug(
 			{
@@ -980,19 +671,25 @@ export class TranslatorService {
 	/**
 	 * Prepares parameters for LLM chat completion API call.
 	 *
-	 * @param content Content to translate
+	 * @param chunkProgress Optional slice position when translating a chunked body in multiple calls
+	 * @param systemPromptKind Which system prompt to build (defaults to full markdown document rules)
 	 *
 	 * @returns Chat completion parameters object
 	 */
 	private async getLLMCompletionParams(
 		content: string,
+		chunkProgress?: ChunkTranslationProgress,
+		systemPromptKind: TranslationSystemPromptKind = "markdownDocument",
 	): Promise<OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming> {
 		return {
 			model: this.model,
 			temperature: LLM_TEMPERATURE,
-			max_tokens: env.MAX_TOKENS,
+			max_tokens: this.providerCompletionTokenCap ?? env.MAX_TOKENS,
 			messages: [
-				{ role: "system", content: await this.getSystemPrompt(content) },
+				{
+					role: "system",
+					content: await this.getSystemPrompt(content, chunkProgress, systemPromptKind),
+				},
 				{ role: "user", content },
 			],
 		};
@@ -1007,17 +704,24 @@ export class TranslatorService {
 	 *
 	 * @param file File instance for logger context
 	 * @param content Content to translate (defaults to file.content if not provided)
+	 * @param chunkProgress When set, the system prompt notes this body is slice `index` of `total` from one file
+	 * @param systemPromptKind Which system prompt to use; YAML scalar fields use `frontmatterScalar`
 	 *
 	 * @throws {ApplicationError} with {@link ErrorCode.TranslationFailed} if the translation's content is missing/empty
 	 *
 	 * @returns Resolves to the translated content
 	 */
-	private async callLanguageModel(file: TranslationFile, content?: string): Promise<string> {
+	private async callLanguageModel(
+		file: TranslationFile,
+		content?: string,
+		chunkProgress?: ChunkTranslationProgress,
+		systemPromptKind: TranslationSystemPromptKind = "markdownDocument",
+	): Promise<string> {
 		const contentToTranslate = content ?? file.content;
 
 		return this.queue.add(async () => {
 			const callStartTime = Date.now();
-			const estimatedInputTokens = this.estimateTokenCount(contentToTranslate);
+			const estimatedInputTokens = this.managers.chunks.estimateTokenCount(contentToTranslate);
 
 			return pRetry(
 				async () => {
@@ -1025,12 +729,21 @@ export class TranslatorService {
 
 					try {
 						file.logger.debug(
-							{ contentLength: contentToTranslate.length, estimatedInputTokens, model: this.model },
+							{
+								contentLength: contentToTranslate.length,
+								estimatedInputTokens,
+								model: this.model,
+								systemPromptKind,
+							},
 							"Calling LLM API",
 						);
 
 						const completion = await this.openai.chat.completions.create(
-							await this.getLLMCompletionParams(contentToTranslate),
+							await this.getLLMCompletionParams(
+								contentToTranslate,
+								chunkProgress,
+								systemPromptKind,
+							),
 						);
 
 						const translatedContent = completion.choices[0]?.message.content;
@@ -1058,12 +771,24 @@ export class TranslatorService {
 
 						return translatedContent;
 					} catch (error) {
-						if (
-							error instanceof APIError &&
-							(error.status === StatusCodes.UNAUTHORIZED ||
-								error.status === StatusCodes.BAD_REQUEST)
-						) {
-							throw new AbortError(error);
+						if (error instanceof APIError) {
+							if (
+								error.status === StatusCodes.UNAUTHORIZED ||
+								error.status === StatusCodes.BAD_REQUEST
+							) {
+								throw new AbortError(error);
+							}
+
+							if (isOpenRouterDailyFreeModelQuotaError(error)) {
+								file.logger.error(
+									{
+										model: this.model,
+										message: error.message,
+									},
+									"OpenRouter free-models-per-day limit reached; add credits, drop :free, or wait for the daily reset",
+								);
+								throw new AbortError(error);
+							}
 						}
 
 						throw error;
@@ -1071,7 +796,7 @@ export class TranslatorService {
 				},
 				{
 					...this.retryConfig,
-					onFailedAttempt: ({ attemptNumber: attempt, error, retriesLeft }) => {
+					onFailedAttempt: async ({ attemptNumber: attempt, error, retriesLeft }) => {
 						file.logger.warn(
 							{
 								attempt,
@@ -1082,61 +807,16 @@ export class TranslatorService {
 							},
 							`LLM call attempt ${attempt} failed, ${retriesLeft} retries remaining`,
 						);
+
+						const resetWaitMs = getRateLimitResetWaitMs(error);
+						if (resetWaitMs > 0) {
+							file.logger.info({ resetWaitMs }, "Waiting for LLM rate limit window before retry");
+							await new Promise<void>((resolve) => setTimeout(resolve, resetWaitMs));
+						}
 					},
 				},
 			);
 		});
-	}
-
-	/**
-	 * Removes common artifacts from translation output.
-	 *
-	 * Strips common LLM response prefixes like "Here is the translation:"
-	 * and converts line endings to match original content format
-	 *
-	 * @param translatedContent Content returned from the language model
-	 * @param file File instance for logger context
-	 *
-	 * @returns Cleaned translated content with artifacts removed
-	 *
-	 * @example
-	 * ```typescript
-	 * const translated = 'Here is the translation:\n\nActual content...';
-	 * const cleaned = cleanupTranslatedContent(translated, file);
-	 * console.log(cleaned); // 'Actual content...'
-	 * ```
-	 */
-	private cleanupTranslatedContent(translatedContent: string, file: TranslationFile): string {
-		file.logger.debug(
-			{ translatedContentLength: translatedContent.length },
-			"Cleaning up translated content",
-		);
-
-		let cleaned = translatedContent;
-
-		for (const prefix of TRANSLATION_PREFIXES) {
-			if (cleaned.trim().toLowerCase().startsWith(prefix.toLowerCase())) {
-				cleaned = cleaned.substring(prefix.length).trim();
-			}
-		}
-
-		cleaned = cleaned.trim();
-
-		file.logger.debug(
-			{ originalContentLength: file.content.length, cleanedContentLength: cleaned.length },
-			"Adjusting line endings to match original content",
-		);
-
-		if (file.content.includes("\r\n")) {
-			cleaned = cleaned.replace(LINE_ENDING_REGEX, "\r\n");
-		}
-
-		file.logger.debug(
-			{ cleanedContentLength: cleaned.length },
-			"Translated content cleanup completed",
-		);
-
-		return cleaned;
 	}
 
 	/**
@@ -1145,11 +825,17 @@ export class TranslatorService {
 	 * a structured prompt following prompt engineering best practices.
 	 *
 	 * @param content Content to determine source language
+	 * @param chunkProgress When set, documents that `content` is one slice of a larger markdown body
+	 * @param systemPromptKind Document translation vs single frontmatter string (see {@link TranslationSystemPromptKind})
 	 *
 	 * @returns Resolves to the system prompt string
 	 */
-	private async getSystemPrompt(content: string): Promise<string> {
-		this.logger.debug("Generating system prompt for translation");
+	private async getSystemPrompt(
+		content: string,
+		chunkProgress?: ChunkTranslationProgress,
+		systemPromptKind: TranslationSystemPromptKind = "markdownDocument",
+	): Promise<string> {
+		this.logger.debug({ systemPromptKind }, "Generating system prompt for translation");
 
 		const detectedSourceCode = await this.services.languageDetector.detectPrimaryLanguage(content);
 
@@ -1168,9 +854,22 @@ export class TranslatorService {
 			"Determined source and target languages for prompt",
 		);
 
-		const glossarySection =
-			this.glossary ?
-				`\n## TERMINOLOGY GLOSSARY\nApply these exact translations for the specified terms:\n${this.glossary}\n`
+		if (systemPromptKind === "frontmatterScalar") {
+			return this.buildFrontmatterScalarSystemPrompt(languages);
+		}
+
+		const translationGuidelinesSection =
+			this.translationGuidelines ?
+				`\n## TRANSLATION GUIDELINES\nApply these exact translations for the specified terms:\n${this.translationGuidelines}\n`
+			:	"";
+
+		const chunkSliceSection =
+			chunkProgress && chunkProgress.total > 1 ?
+				`
+				# DOCUMENT SLICE
+				The user message is slice ${chunkProgress.index} of ${chunkProgress.total} from one continuous markdown file.
+				Keep terminology and structure aligned with a single document; translate only the markdown in the user message.
+				`
 			:	"";
 
 		const builtSystemPrompt = `# ROLE
@@ -1178,7 +877,7 @@ export class TranslatorService {
 	
 				# TASK
 				Translate the provided content from ${languages.source} to ${languages.target} with absolute precision and technical accuracy.
-	
+				${chunkSliceSection}
 				# CRITICAL PRESERVATION RULES
 				1. **Structure & Formatting**: Preserve ALL markdown syntax, HTML tags, code blocks, frontmatter, and line breaks exactly as written
 				2. **Code Integrity**: Keep ALL code examples, variable names, function names, and URLs COMPLETELY unchanged
@@ -1193,9 +892,9 @@ export class TranslatorService {
 	
 				## What NOT to Translate
 				- Code syntax, variable names, function names, API endpoints
-				- Technical terms not specified in the glossary
+				- Technical terms not specified in the translation guidelines
 				- URLs, file paths, or configuration values
-				- Frontmatter keys (only translate values if they're user-facing)
+				- YAML frontmatter key names; title and description values are translated in a dedicated pass after the body
 	
 				## Quality Standards
 				- Use natural, fluent ${languages.target} while maintaining technical precision
@@ -1210,10 +909,62 @@ export class TranslatorService {
 	
 				${this.services.locale.definitions.rules.specific}
 	
-				${glossarySection}
+				${translationGuidelinesSection}
 			`;
 
-		return builtSystemPrompt;
+		const verbatimPlaceholderSection =
+			content.includes("<!-- translate-react:verbatim-fence-") ?
+				`
+				# VERBATIM SOURCE PLACEHOLDERS
+				Some fenced code regions were replaced with HTML comments matching \`<!-- translate-react:verbatim-fence-N -->\`.
+				Copy each placeholder comment EXACTLY into your output at the same position; never translate, remove, reorder, or alter these comments.
+				`
+			:	"";
+
+		return builtSystemPrompt + verbatimPlaceholderSection;
+	}
+
+	/**
+	 * Builds the system prompt for translating a single YAML frontmatter string (title or description).
+	 *
+	 * Keeps glossary and locale rules as silent reference so models do not treat them as user content to translate into the reply.
+	 *
+	 * @param languages Human-readable source and target language names for the TASK section
+	 *
+	 * @returns The system prompt string for one scalar metadata translation call
+	 */
+	private buildFrontmatterScalarSystemPrompt(languages: { source: string; target: string }) {
+		const termReferenceSection =
+			this.translationGuidelines ?
+				`
+				# TERM REFERENCE (DO NOT OUTPUT)
+				Use only for consistent terminology when translating the user string. Never copy, quote, translate, summarize, or repeat this reference in your reply.
+	
+				${this.translationGuidelines}
+				`
+			:	"";
+
+		return `# ROLE
+				You are an expert technical translator for React documentation metadata.
+	
+				# TASK
+				The user message is one plain-text value from YAML frontmatter (a page title or description). Translate it from ${languages.source} to ${languages.target}.
+	
+				# RULES
+				- Translate only natural language in that string
+				- Keep proper nouns, product names, version numbers, code-like tokens, and URLs unchanged when the source keeps them unless the term reference explicitly maps them
+				- Do not add markdown headings, list markers, code fences, or commentary
+	
+				# OUTPUT (STRICT)
+				- Return only the translated string
+				- No markdown document framing (no line whose first non-space character is #)
+				- No preamble or labels (for example do not start with "Translation:" or "Here is")
+				- Preserve intentional internal line breaks only when the user string already uses multiple lines you must keep
+	
+				${this.services.locale.definitions.rules.specific}
+	
+				${termReferenceSection}
+				`;
 	}
 }
 

@@ -130,6 +130,9 @@ export interface PullRequestStatus {
 
 	/** Whether the PR needs to be closed and recreated due to conflicts */
 	needsUpdate: boolean;
+
+	/** GitHub username of the PR creator */
+	createdBy: string;
 }
 
 /**
@@ -148,7 +151,7 @@ export interface LanguageDetectionResult {
 /**
  * Statistics returned from the workflow execution.
  *
- * Used to determine if the workflow met success rate thresholds.
+ * Returned to `main` for logging after `printFinalStatistics`; also used when building issue comments.
  */
 export interface WorkflowStatistics {
 	/** Number of files successfully translated */

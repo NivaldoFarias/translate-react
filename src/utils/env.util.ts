@@ -45,7 +45,12 @@ const envSchema = z.object({
 	/** The name of the forked repository */
 	REPO_FORK_NAME: z.string().default(envDefaults.REPO_FORK_NAME),
 
-	/** Original repository owner */
+	/**
+	 * Upstream repository owner (`reactjs` for official React docs).
+	 *
+	 * Override in `.env` or GitHub Actions variable `REPO_UPSTREAM_OWNER` when testing
+	 * (e.g. point PRs at your fork as the logical upstream for every matrix locale).
+	 */
 	REPO_UPSTREAM_OWNER: z.string().default(envDefaults.REPO_UPSTREAM_OWNER),
 
 	/** Original repository name */
@@ -80,16 +85,18 @@ const envSchema = z.object({
 	/**
 	 * The target language for translation.
 	 *
-	 * Must be one of the 38 supported React translation languages.
+	 * Must be one of the 38 supported React translation languages. GitHub Actions maps
+	 * `matrix.lang` to this value when generating `.env` (see `.github/workflows/workflow.yml`).
 	 *
 	 * @see {@link REACT_TRANSLATION_LANGUAGES}
 	 */
 	TARGET_LANGUAGE: z.enum(REACT_TRANSLATION_LANGUAGES).default(envDefaults.TARGET_LANGUAGE),
 
 	/**
-	 * The source language for translation.
+	 * The source language for translation and language-detector display names.
 	 *
-	 * Must be one of the 38 supported React translation languages.
+	 * Official React docs use English (`en`). Defaults match that; the translation workflow
+	 * does not set this variable.
 	 *
 	 * @see {@link REACT_TRANSLATION_LANGUAGES}
 	 */
@@ -114,19 +121,71 @@ const envSchema = z.object({
 	 */
 	GH_REQUEST_TIMEOUT: z.coerce.number().positive().default(envDefaults.GH_REQUEST_TIMEOUT),
 
-	/**
-	 * Minimum success rate (0-1) required for workflow to pass.
-	 *
-	 * If the translation success rate falls below this threshold, the workflow
-	 * will exit with a non-zero code. Set to 0 to disable failure detection.
-	 */
-	MIN_SUCCESS_RATE: z.coerce.number().min(0).max(1).default(envDefaults.MIN_SUCCESS_RATE),
-
 	/** Maximum retry attempts for translation errors */
 	MAX_RETRY_ATTEMPTS: z.coerce.number().positive().default(envDefaults.MAX_RETRY_ATTEMPTS),
 
 	/** Concurrency limit for LLM requests */
 	MAX_LLM_CONCURRENCY: z.coerce.number().positive().default(envDefaults.MAX_LLM_CONCURRENCY),
+
+	/**
+	 * Caps how many LLM requests may **start** per rolling 60s window (strict sliding window via `p-queue`).
+	 *
+	 * Set to `0` to disable. For OpenRouter free models (`free-models-per-min`), use `15` or `16` and keep
+	 * `MAX_LLM_CONCURRENCY` low (for example `1`). This does not affect OpenRouter's separate `free-models-per-day` cap.
+	 */
+	LLM_MAX_REQUESTS_PER_MINUTE: z.coerce
+		.number()
+		.int()
+		.min(0)
+		.default(envDefaults.LLM_MAX_REQUESTS_PER_MINUTE),
+
+	/**
+	 * `parallel` issues one LLM call per chunk at once (bounded by the LLM queue). `sequential` translates
+	 * chunks in document order, which reduces bursts on strict free-tier quotas.
+	 */
+	CHUNK_TRANSLATION_MODE: z
+		.enum(["parallel", "sequential"])
+		.default(envDefaults.CHUNK_TRANSLATION_MODE),
+
+	/**
+	 * Optional explicit filename for the translation guidelines file.
+	 *
+	 * When set, bypasses auto-discovery and fetches this specific file from the
+	 * upstream repository root. Use when the repo's guidelines file doesn't match
+	 * any of the common naming conventions in {@link TRANSLATION_GUIDELINES_CANDIDATES}.
+	 *
+	 * @example "GLOSSARY.md" // for pt-br.react.dev
+	 * @example "TRANSLATION.md" // for ru.react.dev
+	 */
+	TRANSLATION_GUIDELINES_FILE: z.string().optional(),
+
+	/**
+	 * When enabled, fences at or above `MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS` become HTML placeholders before the LLM; restored after. Prose inside those fences is not translated while masked.
+	 */
+	MASK_VERBATIM_LARGE_FENCES: z.coerce.boolean().default(envDefaults.MASK_VERBATIM_LARGE_FENCES),
+
+	/** `Tiktoken` threshold (same estimator as chunking) for treating a fence as verbatim */
+	MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS: z.coerce
+		.number()
+		.positive()
+		.default(envDefaults.MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS),
+
+	/**
+	 * Set by the GitHub Actions runner when present; enables workflow run URLs in PR bodies and issue comments.
+	 */
+	GITHUB_ACTIONS: z.stringbool().optional(),
+
+	/** GitHub host URL for the run (e.g. `https://github.com`) */
+	GITHUB_SERVER_URL: z.string().optional(),
+
+	/** `owner/repo` for the repository where the workflow executes */
+	GITHUB_REPOSITORY: z.string().optional(),
+
+	/** Numeric workflow run id */
+	GITHUB_RUN_ID: z.string().optional(),
+
+	/** Workflow display name from the workflow file `name` field */
+	GITHUB_WORKFLOW: z.string().optional(),
 });
 
 /** Type definition for the environment configuration */
@@ -186,10 +245,11 @@ function resolveEnvDefaults(): EnvironmentSchemaDefaults {
  * @returns A Zod schema that validates API tokens/keys
  */
 function createTokenSchema(envName: string) {
+	const whitespaceRegex = new RegExp(/\s/);
 	return z
 		.string()
 		.min(MIN_API_TOKEN_LENGTH, `${envName} looks too short; ensure your API key is set`)
-		.refine((value) => !/\s/.test(value), `${envName} must not contain whitespace`)
+		.refine((value) => !whitespaceRegex.test(value), `${envName} must not contain whitespace`)
 		.refine(
 			(value) =>
 				!["CHANGE_ME", "dev-token", "dev-key", "your-token-here", "your-key-here"].includes(value),

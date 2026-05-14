@@ -1,5 +1,5 @@
 import { handleTopLevelError } from "@/errors/";
-import { logger as baseLogger, env, setupSignalHandlers, validateSuccessRate } from "@/utils/";
+import { logger as baseLogger, env, setupSignalHandlers } from "@/utils/";
 
 import { name, version } from "../package.json";
 
@@ -29,9 +29,15 @@ async function main() {
 
 		const statistics = await runnerService.run();
 
-		validateSuccessRate(statistics);
-
-		logger.info("Workflow completed successfully");
+		logger.info(
+			{
+				successRate: statistics.successRate,
+				successCount: statistics.successCount,
+				failureCount: statistics.failureCount,
+				totalCount: statistics.totalCount,
+			},
+			"Workflow finished",
+		);
 
 		process.exit(0);
 	} catch (error) {

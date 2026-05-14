@@ -88,7 +88,7 @@ describe("GitHubService", () => {
 
 		describe("getRepositoryTree", () => {
 			test("should return fork tree when target is fork", async () => {
-				const tree = await githubService.getRepositoryTree("fork", "main", false);
+				const tree = await githubService.getRepositoryTree("fork", "main");
 
 				expect(octokitMock.git.getTree).toHaveBeenCalledWith({
 					...testRepositories.fork,
@@ -99,7 +99,7 @@ describe("GitHubService", () => {
 			});
 
 			test("should return upstream tree when target is upstream", async () => {
-				const tree = await githubService.getRepositoryTree("upstream", "main", false);
+				const tree = await githubService.getRepositoryTree("upstream", "main");
 
 				expect(octokitMock.git.getTree).toHaveBeenCalledWith({
 					...testRepositories.upstream,
@@ -110,7 +110,7 @@ describe("GitHubService", () => {
 			});
 
 			test("should default to fork when no target is specified", async () => {
-				const tree = await githubService.getRepositoryTree(undefined, "main", false);
+				const tree = await githubService.getRepositoryTree(undefined, "main");
 
 				expect(octokitMock.git.getTree).toHaveBeenCalledWith({
 					...testRepositories.fork,
@@ -123,7 +123,7 @@ describe("GitHubService", () => {
 			test("should fetch default branch when base branch is not specified", async () => {
 				octokitMock.repos.get.mockResolvedValueOnce({ data: { default_branch: "develop" } });
 
-				await githubService.getRepositoryTree("fork", undefined, false);
+				await githubService.getRepositoryTree("fork", undefined);
 
 				expect(octokitMock.repos.get).toHaveBeenCalledWith(testRepositories.fork);
 				expect(octokitMock.git.getTree).toHaveBeenCalledWith({
@@ -149,21 +149,6 @@ describe("GitHubService", () => {
 
 				expect(tree).toHaveLength(1);
 				expect(tree[0]?.path).toBe("src/test/file.md");
-			});
-
-			test("should not filter tree when filterIgnored is false", async () => {
-				octokitMock.git.getTree.mockResolvedValueOnce({
-					data: {
-						tree: [
-							{ path: "src/test/file.md", type: "blob", sha: "abc123", url: "", mode: "100644" },
-							{ path: "README.md", type: "blob", sha: "def456", url: "", mode: "100644" },
-						],
-					},
-				});
-
-				const tree = await githubService.getRepositoryTree("fork", "main", false);
-
-				expect(tree).toHaveLength(2);
 			});
 
 			test("should throw RequestError when API call fails", () => {
@@ -334,41 +319,70 @@ describe("GitHubService", () => {
 			});
 		});
 
-		describe("fetchGlossary", () => {
-			test("should return glossary content when file exists", async () => {
-				const glossaryContent = "React - React\ncomponent - componente";
+		describe("fetchTranslationGuidelinesFile", () => {
+			test("should return translation guidelines content when first candidate file exists", async () => {
+				const translationGuidelinesContent = "React - React\ncomponent - componente";
 				octokitMock.repos.getContent.mockResolvedValueOnce({
 					data: {
-						content: Buffer.from(glossaryContent).toString("base64"),
+						content: Buffer.from(translationGuidelinesContent).toString("base64"),
 						encoding: "base64",
 						type: "file",
 						sha: "abc123",
 					},
 				});
 
-				const result = await githubService.fetchGlossary();
+				const result = await githubService.fetchTranslationGuidelinesFile();
 
-				expect(result).toBe(glossaryContent);
+				expect(result).toBe(translationGuidelinesContent);
 				expect(octokitMock.repos.getContent).toHaveBeenCalledWith({
 					...testRepositories.upstream,
 					path: "GLOSSARY.md",
 				});
 			});
 
-			test("should return null when glossary file has no content", async () => {
-				octokitMock.repos.getContent.mockResolvedValueOnce({ data: {} });
+			test("should try next candidate when first file does not exist", async () => {
+				const translationGuidelinesContent = "## Translation Guidelines";
+				octokitMock.repos.getContent.mockRejectedValueOnce(
+					Object.assign(new Error("Not Found"), { status: StatusCodes.NOT_FOUND }),
+				);
+				octokitMock.repos.getContent.mockResolvedValueOnce({
+					data: {
+						content: Buffer.from(translationGuidelinesContent).toString("base64"),
+						encoding: "base64",
+						type: "file",
+						sha: "def456",
+					},
+				});
 
-				const result = await githubService.fetchGlossary();
+				const result = await githubService.fetchTranslationGuidelinesFile();
+
+				expect(result).toBe(translationGuidelinesContent);
+				expect(octokitMock.repos.getContent).toHaveBeenCalledTimes(2);
+				expect(octokitMock.repos.getContent).toHaveBeenNthCalledWith(1, {
+					...testRepositories.upstream,
+					path: "GLOSSARY.md",
+				});
+				expect(octokitMock.repos.getContent).toHaveBeenNthCalledWith(2, {
+					...testRepositories.upstream,
+					path: "TRANSLATION.md",
+				});
+			});
+
+			test("should return null when translation guidelines file has no content", async () => {
+				octokitMock.repos.getContent.mockResolvedValue({ data: {} });
+
+				const result = await githubService.fetchTranslationGuidelinesFile();
 
 				expect(result).toBeNull();
 			});
 
-			test("should return null when glossary file does not exist", async () => {
-				octokitMock.repos.getContent.mockRejectedValueOnce(
-					Object.assign(new Error("Not Found"), { status: StatusCodes.NOT_FOUND }),
-				);
+			test("should return null when no candidate files exist", async () => {
+				const notFoundError = Object.assign(new Error("Not Found"), {
+					status: StatusCodes.NOT_FOUND,
+				});
+				octokitMock.repos.getContent.mockRejectedValue(notFoundError);
 
-				const result = await githubService.fetchGlossary();
+				const result = await githubService.fetchTranslationGuidelinesFile();
 
 				expect(result).toBeNull();
 			});
@@ -516,7 +530,7 @@ describe("GitHubService", () => {
 					"# Original Content",
 					"file.md",
 					"src/test/file.md",
-					"abc123",
+					"stale-tree-sha",
 				);
 
 				const result = await githubService.commitTranslation({
@@ -527,6 +541,90 @@ describe("GitHubService", () => {
 				});
 
 				expect(result).toBeDefined();
+				expect(octokitMock.repos.getContent).toHaveBeenCalledWith({
+					...testRepositories.fork,
+					path: mockFile.path,
+					ref: mockBranch.ref,
+				});
+				expect(octokitMock.repos.createOrUpdateFileContents).toHaveBeenCalledWith(
+					expect.objectContaining({
+						...testRepositories.fork,
+						path: mockFile.path,
+						branch: mockBranch.ref,
+						sha: "abc123",
+					}),
+				);
+			});
+
+			test("should use branch-tip blob sha from getContent when it differs from the tree file sha", async () => {
+				octokitMock.repos.getContent.mockResolvedValueOnce({
+					data: {
+						type: "file",
+						encoding: "base64",
+						content: Buffer.from("# On branch").toString("base64"),
+						sha: "branch-tip-sha-999",
+					},
+				});
+
+				const mockBranch = {
+					ref: "refs/heads/translate/reused",
+					node_id: "branch-node-id",
+					url: "https://api.github.com/repos/test/test/git/refs/heads/translate/reused",
+					object: { type: "commit", sha: "branch-sha", url: "" },
+				};
+
+				const mockFile = new TranslationFile(
+					"# Original",
+					"file.md",
+					"src/learn/react-v18.md",
+					"tree-discovery-sha",
+				);
+
+				await githubService.commitTranslation({
+					branch: mockBranch,
+					file: mockFile,
+					content: "# Translated",
+					message: "translate: test",
+				});
+
+				expect(octokitMock.repos.createOrUpdateFileContents).toHaveBeenCalledWith(
+					expect.objectContaining({
+						sha: "branch-tip-sha-999",
+					}),
+				);
+			});
+
+			test("should omit sha when file is missing on the branch (getContent 404)", async () => {
+				const notFoundError = createOctokitRequestErrorFixture({
+					message: "Not Found",
+					status: StatusCodes.NOT_FOUND,
+					options: { request: { method: "GET" }, response: { status: StatusCodes.NOT_FOUND } },
+				});
+				octokitMock.repos.getContent.mockRejectedValueOnce(notFoundError);
+
+				const mockBranch = {
+					ref: "refs/heads/translate/new-file",
+					node_id: "branch-node-id",
+					url: "https://api.github.com/repos/test/test/git/refs/heads/translate/new-file",
+					object: { type: "commit", sha: "branch-sha", url: "" },
+				};
+
+				const mockFile = new TranslationFile("# Original", "new.md", "src/new.md", "tree-sha");
+
+				await githubService.commitTranslation({
+					branch: mockBranch,
+					file: mockFile,
+					content: "# Translated",
+					message: "translate: add file",
+				});
+
+				expect(octokitMock.repos.createOrUpdateFileContents).toHaveBeenCalledWith({
+					...testRepositories.fork,
+					path: mockFile.path,
+					message: "translate: add file",
+					content: Buffer.from("# Translated").toString("base64"),
+					branch: mockBranch.ref,
+				});
 			});
 
 			test("should throw RequestError when commit fails", () => {
@@ -554,6 +652,36 @@ describe("GitHubService", () => {
 						message: "translate: test",
 					}),
 				).rejects.toThrow(commitError);
+			});
+
+			test("should propagate non-404 errors from getContent before commit", () => {
+				const rateLimitError = createOctokitRequestErrorFixture({
+					message: "API rate limit exceeded",
+					status: StatusCodes.TOO_MANY_REQUESTS,
+					options: {
+						request: { method: "GET" },
+						response: { status: StatusCodes.TOO_MANY_REQUESTS },
+					},
+				});
+				octokitMock.repos.getContent.mockRejectedValueOnce(rateLimitError);
+
+				const mockBranch = {
+					ref: "refs/heads/translate/test",
+					node_id: "branch-node-id",
+					url: "https://api.github.com/repos/test/test/git/refs/heads/translate/test",
+					object: { type: "commit", sha: "branch-sha", url: "" },
+				};
+
+				const mockFile = new TranslationFile("# Original", "file.md", "src/test/file.md", "abc123");
+
+				expect(
+					githubService.commitTranslation({
+						branch: mockBranch,
+						file: mockFile,
+						content: "# Translated",
+						message: "translate: test",
+					}),
+				).rejects.toThrow(rateLimitError);
 			});
 		});
 
@@ -642,19 +770,18 @@ describe("GitHubService", () => {
 
 		describe("listOpenPullRequests", () => {
 			test("should return list of open pull requests when called", async () => {
-				octokitMock.pulls.list.mockResolvedValueOnce({
-					data: [
-						{ number: 1, title: "PR 1" },
-						{ number: 2, title: "PR 2" },
-					],
-				} as RestEndpointMethodTypes["pulls"]["list"]["response"]);
+				octokitMock.paginate.mockResolvedValueOnce([
+					{ number: 1, title: "PR 1" },
+					{ number: 2, title: "PR 2" },
+				] as RestEndpointMethodTypes["pulls"]["list"]["response"]["data"]);
 
 				const prs = await githubService.listOpenPullRequests();
 
 				expect(prs).toHaveLength(2);
-				expect(octokitMock.pulls.list).toHaveBeenCalledWith({
+				expect(octokitMock.paginate).toHaveBeenCalledWith("GET /repos/{owner}/{repo}/pulls", {
 					...testRepositories.upstream,
 					state: "open",
+					per_page: 100,
 				});
 			});
 
@@ -668,7 +795,7 @@ describe("GitHubService", () => {
 
 			test("should throw RequestError when API call fails", () => {
 				const apiError = createOctokitRequestErrorFixture({ message: "API Error" });
-				octokitMock.pulls.list.mockRejectedValueOnce(apiError);
+				octokitMock.paginate.mockRejectedValueOnce(apiError);
 
 				expect(githubService.listOpenPullRequests()).rejects.toThrow(apiError);
 			});
@@ -676,21 +803,22 @@ describe("GitHubService", () => {
 
 		describe("getPullRequestFiles", () => {
 			test("should return list of file paths when PR has files", async () => {
-				octokitMock.pulls.listFiles.mockResolvedValueOnce({
-					data: [{ filename: "src/file1.md" }, { filename: "src/file2.md" }],
-				} as RestEndpointMethodTypes["pulls"]["listFiles"]["response"]);
+				octokitMock.paginate.mockResolvedValueOnce([
+					{ filename: "src/file1.md" },
+					{ filename: "src/file2.md" },
+				]);
 
 				const files = await githubService.getPullRequestFiles(123);
 
 				expect(files).toEqual(["src/file1.md", "src/file2.md"]);
-				expect(octokitMock.pulls.listFiles).toHaveBeenCalledWith({
-					...testRepositories.upstream,
-					pull_number: 123,
-				});
+				expect(octokitMock.paginate).toHaveBeenCalledWith(
+					"GET /repos/{owner}/{repo}/pulls/{pull_number}/files",
+					{ ...testRepositories.upstream, pull_number: 123, per_page: 100 },
+				);
 			});
 
 			test("should return empty array when PR has no files", async () => {
-				octokitMock.pulls.listFiles.mockResolvedValueOnce({ data: [] });
+				octokitMock.paginate.mockResolvedValueOnce([]);
 
 				const files = await githubService.getPullRequestFiles(123);
 
@@ -699,7 +827,7 @@ describe("GitHubService", () => {
 
 			test("should throw RequestError when API call fails", () => {
 				const apiError = createOctokitRequestErrorFixture({ message: "API Error" });
-				octokitMock.pulls.listFiles.mockRejectedValueOnce(apiError);
+				octokitMock.paginate.mockRejectedValueOnce(apiError);
 
 				expect(githubService.getPullRequestFiles(123)).rejects.toThrow(apiError);
 			});
@@ -772,6 +900,7 @@ describe("GitHubService", () => {
 							number: 1,
 							mergeable: true,
 							mergeable_state: "clean",
+							user: { login: "test-user" },
 						},
 					}),
 				);
@@ -781,11 +910,17 @@ describe("GitHubService", () => {
 				expect(status.hasConflicts).toBe(false);
 				expect(status.needsUpdate).toBe(false);
 				expect(status.mergeableState).toBe("clean");
+				expect(status.createdBy).toBe("test-user");
 			});
 
 			test("should return dirty status when PR has conflicts", async () => {
 				octokitMock.pulls.get.mockResolvedValueOnce({
-					data: { number: 1, mergeable: false, mergeable_state: "dirty" },
+					data: {
+						number: 1,
+						mergeable: false,
+						mergeable_state: "dirty",
+						user: { login: "other-user" },
+					},
 				});
 
 				const status = await githubService.checkPullRequestStatus(1);
@@ -793,11 +928,17 @@ describe("GitHubService", () => {
 				expect(status.hasConflicts).toBe(true);
 				expect(status.needsUpdate).toBe(true);
 				expect(status.mergeableState).toBe("dirty");
+				expect(status.createdBy).toBe("other-user");
 			});
 
 			test("should return behind status without conflicts", async () => {
 				octokitMock.pulls.get.mockResolvedValueOnce({
-					data: { number: 1, mergeable: true, mergeable_state: "behind" },
+					data: {
+						number: 1,
+						mergeable: true,
+						mergeable_state: "behind",
+						user: { login: "test-fork-owner" },
+					},
 				});
 
 				const status = await githubService.checkPullRequestStatus(1);
@@ -805,6 +946,22 @@ describe("GitHubService", () => {
 				expect(status.hasConflicts).toBe(false);
 				expect(status.needsUpdate).toBe(false);
 				expect(status.mergeableState).toBe("behind");
+				expect(status.createdBy).toBe("test-fork-owner");
+			});
+
+			test("should return creator login when user exists", async () => {
+				octokitMock.pulls.get.mockResolvedValueOnce({
+					data: {
+						number: 1,
+						mergeable: true,
+						mergeable_state: "clean",
+						user: { login: "test-creator" },
+					},
+				});
+
+				const status = await githubService.checkPullRequestStatus(1);
+
+				expect(status.createdBy).toBe("test-creator");
 			});
 
 			test("should throw RequestError when API call fails", () => {
@@ -879,6 +1036,18 @@ describe("GitHubService", () => {
 						issue_number: 123,
 					}),
 				);
+			});
+
+			test("should skip commenting when no pull requests were produced", async () => {
+				const failedOnly = createProcessedFileResultsFixture({ count: 1, containInvalid: true });
+
+				const result = await githubService.commentCompiledResultsOnIssue(
+					failedOnly,
+					fixtures.translationFiles,
+				);
+
+				expect(result).toBeUndefined();
+				expect(octokitMock.issues.createComment).not.toHaveBeenCalled();
 			});
 
 			test("should skip commenting when no results to report", async () => {

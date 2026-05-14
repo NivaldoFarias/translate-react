@@ -180,7 +180,7 @@ export class LanguageDetectorService {
 	}
 
 	/**
-	 * Performs comprehensive language analysis on content using Google's CLD2 library.
+	 * Analyzes content language using Google's CLD2 library.
 	 *
 	 * Analyzes text content to determine translation status by comparing confidence scores
 	 * between source and target languages. The method preprocesses content by removing
@@ -328,11 +328,11 @@ export class LanguageDetectorService {
 		this.logger.debug("Cleaning content for language detection");
 
 		const regexes = {
-			codeBlock: /```[\s\S]*?```/g,
-			inlineCode: /`[^`]*`/g,
-			htmlTags: /<[^>]*>/g,
-			urls: /https?:\/\/[^\s]+/g,
-			whitespace: /\s+/g,
+			codeBlock: new RegExp(/```[\s\S]*?```/g),
+			inlineCode: new RegExp(/`[^`]*`/g),
+			htmlTags: new RegExp(/<[^>]*>/g),
+			urls: new RegExp(/https?:\/\/[^\s]+/g),
+			whitespace: new RegExp(/\s+/g),
 		} as const;
 
 		this.logger.debug({ regexes }, "Using regex patterns for content cleaning");

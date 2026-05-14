@@ -2,14 +2,14 @@ import type { LocaleDefinition } from "@/locales";
 
 import type { ProcessedFileResult } from "../runner";
 
-import { logger } from "@/utils/";
+import { formatGithubActionsRunIssueLine, logger } from "@/utils/";
 
 import { localeService } from "../locale";
 import { TranslationFile } from "../translator/translator.service";
 
 export interface FileEntry {
 	file: TranslationFile;
-	prNumber: number | undefined;
+	prNumber: number;
 }
 
 export interface HierarchicalStructure {
@@ -57,6 +57,8 @@ export class CommentBuilderService {
 	public buildComment(results: ProcessedFileResult[], filesToTranslate: TranslationFile[]) {
 		const concattedData = results
 			.map((result) => {
+				if (!result.pullRequest) return null;
+
 				const translationFile = filesToTranslate.find((file) => file.filename === result.filename);
 
 				if (!translationFile) return null;
@@ -66,7 +68,7 @@ export class CommentBuilderService {
 				return {
 					file: translationFile,
 					pathParts: this.simplifyPathParts(pathParts),
-					prNumber: result.pullRequest?.number,
+					prNumber: result.pullRequest.number,
 				} satisfies FileWithHierarchy;
 			})
 			.filter(Boolean);
@@ -88,7 +90,16 @@ export class CommentBuilderService {
 	 * @returns The concatenated comment
 	 */
 	private concatComment(content: string) {
-		return `${this.comment.prefix}\n\n${content}\n\n${this.comment.suffix}`;
+		const runSection = formatGithubActionsRunIssueLine();
+		const segments = [this.comment.prefix];
+
+		segments.push(content, this.comment.suffix);
+
+		if (runSection) {
+			segments.push(runSection);
+		}
+
+		return segments.join("\n\n");
 	}
 
 	/**
@@ -224,7 +235,7 @@ export class CommentBuilderService {
 
 		const dirs = Object.keys(structure)
 			.filter((key) => key !== "files")
-			.sort();
+			.toSorted();
 
 		for (const dir of dirs) {
 			const currentLevel = structure[dir];
@@ -232,9 +243,9 @@ export class CommentBuilderService {
 				continue;
 			}
 
-			const sortedEntries = currentLevel.files.toSorted((left, right) =>
-				left.file.filename.localeCompare(right.file.filename),
-			);
+			const sortedEntries = currentLevel.files.toSorted((left, right) => {
+				return left.file.filename.localeCompare(right.file.filename);
+			});
 
 			if (
 				sortedEntries.length === 1 &&
@@ -248,8 +259,6 @@ export class CommentBuilderService {
 			lines.push(`${indent}- ${dir}`);
 
 			for (const entry of sortedEntries) {
-				if (!entry.prNumber) continue;
-
 				lines.push(`${indent}  - #${entry.prNumber}`);
 			}
 
