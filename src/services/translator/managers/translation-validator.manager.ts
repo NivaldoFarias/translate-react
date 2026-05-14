@@ -59,7 +59,7 @@ export class TranslationValidatorManager {
 
 		const originalHeadings = (file.content.match(REGEXES.headings) ?? []).length;
 		const translatedHeadings = (translatedContent.match(REGEXES.headings) ?? []).length;
-		const headingRatio = translatedHeadings / originalHeadings;
+		const headingRatio = originalHeadings > 0 ? translatedHeadings / originalHeadings : 0;
 
 		file.logger.debug(
 			{ originalHeadings, translatedHeadings, headingRatio, regex: REGEXES.headings },
@@ -68,10 +68,7 @@ export class TranslationValidatorManager {
 
 		if (originalHeadings === 0) {
 			file.logger.warn("Original file contains no markdown headings. Skipping heading validation");
-			return;
-		}
-
-		if (translatedHeadings === 0) {
+		} else if (translatedHeadings === 0) {
 			throw new ApplicationError(
 				"All markdown headings lost during translation",
 				ErrorCode.FormatValidationFailed,
@@ -104,14 +101,11 @@ export class TranslationValidatorManager {
 	 * Validates that code blocks are preserved during translation.
 	 *
 	 * Compares the count of fenced code blocks (triple backticks) between source
-	 * and translated content. Logs a warning if there's a significant mismatch
-	 * (>20% difference), as this may indicate code blocks were corrupted or removed.
+	 * and translated content. When the source has no fences but the translation still
+	 * contains any after post-processing, logs a warning. Otherwise logs on large ratio drift.
 	 *
 	 * @param file Original file containing source content for comparison
 	 * @param translatedContent Translated content to validate against source
-	 *
-	 * @throws {ApplicationError} with {@link ErrorCode.FormatValidationFailed}
-	 * if validation checks fail (significant code block count mismatch or code blocks lost during translation)
 	 */
 	private validateCodeBlockPreservation(file: TranslationFile, translatedContent: string): void {
 		const originalCodeBlocks = (file.content.match(REGEXES.codeBlock) ?? []).length;
@@ -123,7 +117,13 @@ export class TranslationValidatorManager {
 		);
 
 		if (originalCodeBlocks === 0) {
-			file.logger.debug("Original file contains no code blocks. Skipping code block validation");
+			if (translatedCodeBlocks > 0) {
+				file.logger.warn(
+					{ originalCodeBlocks, translatedCodeBlocks },
+					"Translation still contains fenced code blocks while source had none",
+				);
+			}
+
 			return;
 		}
 

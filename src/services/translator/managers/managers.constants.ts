@@ -88,9 +88,9 @@ export const RATIOS = {
 	size: {
 		/**
 		 * Minimum acceptable size ratio for translated content
-		 * (0.5 = 50% of original)
+		 * (0.55 = 55% of original; catches abrupt truncation while allowing terse locales)
 		 */
-		min: 0.5,
+		min: 0.55,
 
 		/**
 		 * Maximum acceptable size ratio for translated content
@@ -116,6 +116,18 @@ export const CHUNKS = {
 	/** Maximum number of tokens that can be translated in a single request */
 	maxTokens: 4_000,
 } as const;
+
+/**
+ * Tokens reserved below the provider completion cap when deriving per-chunk input budgets
+ * so translated output is less likely to hit `max_tokens` mid-chunk.
+ */
+export const CHUNK_OUTPUT_COMPLETION_RESERVE = 384;
+
+/**
+ * Conservative upper bound on completion tokens per source token for markdown translation
+ * (some target languages expand versus English source).
+ */
+export const TRANSLATION_OUTPUT_TO_INPUT_TOKEN_RATIO = 1.2;
 
 /** Default tiktoken model to use for token counting */
 export const DEFAULT_TIKTOKEN_MODEL = "gpt-5";

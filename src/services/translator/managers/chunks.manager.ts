@@ -7,14 +7,16 @@ import type { Tiktoken, TiktokenModel } from "js-tiktoken";
 import type { TranslationFile } from "../translator.service";
 
 import { ApplicationError, ErrorCode } from "@/errors";
-import { logger } from "@/utils";
+import { env, logger } from "@/utils";
 
 import {
+	CHUNK_OUTPUT_COMPLETION_RESERVE,
 	CHUNKS,
 	DEFAULT_TIKTOKEN_MODEL,
 	SUPPORTED_TIKTOKEN_MODELS,
 	SYSTEM_PROMPT_TOKEN_RESERVE,
 	TOKEN_ESTIMATION_FALLBACK_DIVISOR,
+	TRANSLATION_OUTPUT_TO_INPUT_TOKEN_RATIO,
 } from "./managers.constants";
 
 /**
@@ -56,12 +58,48 @@ export class ChunksManager {
 	private readonly maxGrossChunkInputTokens: number;
 
 	/**
+	 * Provider `max_tokens` / completion cap for one assistant message; used to cap chunk **input**
+	 * so a single translation call is less likely to exceed available completion budget.
+	 */
+	private readonly maxCompletionTokensPerResponse: number;
+
+	/**
 	 * @param model LLM model id (used for tiktoken profile selection)
 	 * @param maxGrossChunkInputTokens Upper bound on estimated input tokens per chunk (same role as {@link CHUNKS.maxTokens})
+	 * @param maxCompletionTokensPerResponse Completion token cap for one chat completion (defaults to {@link env.MAX_TOKENS})
 	 */
-	constructor(model: string, maxGrossChunkInputTokens: number = CHUNKS.maxTokens) {
+	constructor(
+		model: string,
+		maxGrossChunkInputTokens: number = CHUNKS.maxTokens,
+		maxCompletionTokensPerResponse: number = env.MAX_TOKENS,
+	) {
 		this.model = model;
 		this.maxGrossChunkInputTokens = maxGrossChunkInputTokens;
+		this.maxCompletionTokensPerResponse = maxCompletionTokensPerResponse;
+	}
+
+	/**
+	 * Maximum estimated **source** tokens per markdown chunk so the model can usually finish
+	 * within {@link maxCompletionTokensPerResponse} completion tokens.
+	 */
+	public getMaxChunkInputTokensFromCompletionCap(): number {
+		const budget = Math.max(
+			512,
+			this.maxCompletionTokensPerResponse - CHUNK_OUTPUT_COMPLETION_RESERVE,
+		);
+
+		return Math.max(256, Math.floor(budget / TRANSLATION_OUTPUT_TO_INPUT_TOKEN_RATIO));
+	}
+
+	/**
+	 * Effective `chunkSize` passed to {@link MarkdownTextSplitter}: limited by both context budget
+	 * and completion-token budget for translation output.
+	 */
+	public getMarkdownChunkSplitterTokenBudget(): number {
+		const fromContext = this.maxGrossChunkInputTokens - CHUNKS.tokenBuffer;
+		const fromCompletion = this.getMaxChunkInputTokensFromCompletionCap();
+
+		return Math.max(256, Math.min(fromContext, fromCompletion));
 	}
 
 	/** Lazily-initialized tiktoken encoder instance, cached for performance */
@@ -140,8 +178,10 @@ export class ChunksManager {
 	/**
 	 * Determines if content needs chunking based on token estimates.
 	 *
-	 * Compares estimated body tokens to `maxGrossChunkInputTokens - SYSTEM_PROMPT_TOKEN_RESERVE`
-	 * so one-shot requests leave room for the system prompt overhead constant.
+	 * Chunking is required when the body exceeds either the configured **context** budget
+	 * (`maxGrossChunkInputTokens - SYSTEM_PROMPT_TOKEN_RESERVE`) or the **completion** budget
+	 * derived from {@link maxCompletionTokensPerResponse} so a single-shot translation is unlikely
+	 * to hit `max_tokens` mid-document.
 	 *
 	 * @param content Content to check for chunking requirements
 	 *
@@ -158,11 +198,22 @@ export class ChunksManager {
 	 */
 	public needsChunking(file: TranslationFile): boolean {
 		const estimatedTokens = this.estimateTokenCount(file.content);
-		const maxInputTokens = this.maxGrossChunkInputTokens - SYSTEM_PROMPT_TOKEN_RESERVE;
-		const needsChunking = estimatedTokens > maxInputTokens;
+		const maxContextInputTokens = this.maxGrossChunkInputTokens - SYSTEM_PROMPT_TOKEN_RESERVE;
+		const maxSingleShotInputFromCompletion = this.getMaxChunkInputTokensFromCompletionCap();
+		const exceedsContextWindow = estimatedTokens > maxContextInputTokens;
+		const exceedsSingleCompletionBudget = estimatedTokens > maxSingleShotInputFromCompletion;
+		const needsChunking = exceedsContextWindow || exceedsSingleCompletionBudget;
 
 		file.logger.debug(
-			{ estimatedTokens, maxInputTokens, needsChunking, contentLength: file.content.length },
+			{
+				estimatedTokens,
+				maxContextInputTokens,
+				maxSingleShotInputFromCompletion,
+				exceedsContextWindow,
+				exceedsSingleCompletionBudget,
+				needsChunking,
+				contentLength: file.content.length,
+			},
 			needsChunking ?
 				"Content exceeds token limit, chunking required"
 			:	"Content within token limit, no chunking needed",
@@ -201,7 +252,7 @@ export class ChunksManager {
 	 */
 	public async chunkContent(
 		content: string,
-		maxTokens = this.maxGrossChunkInputTokens - CHUNKS.tokenBuffer,
+		maxTokens = this.getMarkdownChunkSplitterTokenBudget(),
 	): Promise<ChunkingResult> {
 		const markdownTextSplitterOptions: Partial<MarkdownTextSplitterParams> = {
 			chunkSize: maxTokens,
