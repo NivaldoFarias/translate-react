@@ -1,5 +1,7 @@
 import { Buffer } from "node:buffer";
 
+import { RequestError } from "@octokit/request-error";
+
 import type { components } from "@octokit/openapi-types";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
@@ -45,6 +47,12 @@ export interface CommitTranslationOptions {
 	message: string;
 }
 
+/** Max attempts to poll GitHub for a computed `mergeable` value before giving up */
+const MERGEABLE_POLL_MAX_ATTEMPTS = 3;
+
+/** Delay between `mergeable` polling attempts in milliseconds */
+const MERGEABLE_POLL_DELAY_MS = 2_000;
+
 /**
  * Content and pull request operations module for GitHub API.
  *
@@ -82,23 +90,26 @@ export class GitHubContent {
 	}
 
 	/**
-	 * Lists all open pull requests.
+	 * Lists all open pull requests. uses `octokit.paginate` to fetch all PRs.
 	 *
 	 * @returns A list of open pull requests
 	 */
 	public async listOpenPullRequests(): Promise<
 		RestEndpointMethodTypes["pulls"]["list"]["response"]["data"]
 	> {
-		const response = await this.deps.octokit.pulls.list({
+		const response = await this.deps.octokit.paginate("GET /repos/{owner}/{repo}/pulls", {
 			...this.deps.repositories.upstream,
 			state: "open",
+			per_page: 100,
 		});
 
-		return response.data;
+		this.logger.debug({ count: response.length }, "Listed open pull requests");
+
+		return response;
 	}
 
 	/**
-	 * Retrieves the list of files changed in a pull request.
+	 * Retrieves the list of files changed in a pull request. uses `octokit.paginate` to fetch all files.
 	 *
 	 * @param prNumber Pull request number to fetch changed files from
 	 *
@@ -112,18 +123,26 @@ export class GitHubContent {
 	 * ```
 	 */
 	public async getPullRequestFiles(prNumber: number): Promise<string[]> {
-		const response = await this.deps.octokit.pulls.listFiles({
-			...this.deps.repositories.upstream,
-			pull_number: prNumber,
-		});
+		const response = await this.deps.octokit.paginate(
+			"GET /repos/{owner}/{repo}/pulls/{pull_number}/files",
+			{
+				...this.deps.repositories.upstream,
+				pull_number: prNumber,
+				per_page: 100,
+			},
+		);
 
-		return response.data.map((file) => file.filename);
+		this.logger.debug({ count: response.length }, "Retrieved pull request files");
+
+		return response.map((file) => file.filename);
 	}
 
 	/**
 	 * Commits translated content to a branch.
 	 *
-	 * Updates existing file or creates new one.
+	 * Updates an existing file or creates a new one. Resolves the blob `sha` on the
+	 * target branch immediately before the commit so reused topic branches do not
+	 * send a stale tree `sha` (GitHub returns HTTP 409 when the `sha` does not match).
 	 *
 	 * @param options Commit options
 	 *
@@ -152,13 +171,15 @@ export class GitHubContent {
 	}: CommitTranslationOptions): Promise<
 		RestEndpointMethodTypes["repos"]["createOrUpdateFileContents"]["response"]
 	> {
+		const blobShaOnBranch = await this.resolveBlobShaOnBranchForPath(branch.ref, file.path);
+
 		const response = await this.deps.octokit.repos.createOrUpdateFileContents({
 			...this.deps.repositories.fork,
 			path: file.path,
 			message,
 			content: Buffer.from(content).toString("base64"),
 			branch: branch.ref,
-			sha: file.sha,
+			...(blobShaOnBranch !== undefined ? { sha: blobShaOnBranch } : {}),
 		});
 
 		file.logger.info(
@@ -171,6 +192,44 @@ export class GitHubContent {
 		);
 
 		return response;
+	}
+
+	/**
+	 * Looks up the current file blob `sha` on the fork at `branchRef`, or `undefined`
+	 * when the path is absent on that branch (create instead of update).
+	 *
+	 * @param branchRef Full ref such as `refs/heads/translate/foo`
+	 * @param path Repository path of the file
+	 */
+	private async resolveBlobShaOnBranchForPath(branchRef: string, path: string) {
+		try {
+			const existing = await this.deps.octokit.repos.getContent({
+				...this.deps.repositories.fork,
+				path,
+				ref: branchRef,
+			});
+
+			if (Array.isArray(existing.data)) {
+				this.logger.warn(
+					{ path, branchRef },
+					"GitHub returned a directory listing for getContent; omitting sha for file update",
+				);
+
+				return undefined;
+			}
+
+			if ("sha" in existing.data) {
+				return existing.data.sha;
+			}
+
+			return undefined;
+		} catch (error) {
+			if (error instanceof RequestError && error.status === 404) {
+				return undefined;
+			}
+
+			throw error;
+		}
 	}
 
 	/**
@@ -296,18 +355,15 @@ export class GitHubContent {
 	 *
 	 * ### Workflow
 	 *
-	 * 1. Checks if the issue exists
-	 * 2. Lists comments on the issue
-	 * 3. Finds the user's comment with the correct prefix
-	 * 4. Updates the comment with new results
-	 * 5. Creates a new comment if the user's comment is not found
+	 * 1. Returns early when there are no results, no candidate files, or no pull
+	 *    requests were opened or updated (avoids posting on failure-only runs)
+	 * 2. Resolves the translation progress issue on the upstream repository
+	 * 3. Creates a new issue comment with the compiled summary
 	 *
 	 * @param results Translation results to report
 	 * @param filesToTranslate Files that were translated
 	 *
-	 * @throws {Error} If the issue is not found
-	 *
-	 * @returns The comment created on the issue
+	 * @returns The comment created on the issue, or `undefined` when skipped or no issue
 	 *
 	 * @example
 	 * ```typescript
@@ -320,6 +376,17 @@ export class GitHubContent {
 	): Promise<RestEndpointMethodTypes["issues"]["createComment"]["response"]["data"] | undefined> {
 		if (results.length === 0 || filesToTranslate.length === 0) {
 			this.logger.warn("No results or files to translate. Skipping issue comment update");
+			return;
+		}
+
+		const openedOrUpdatedAnyPullRequest = results.some((r) => r.pullRequest !== null);
+
+		if (!openedOrUpdatedAnyPullRequest) {
+			this.logger.info(
+				{ resultCount: results.length },
+				"No pull requests were opened or updated; skipping translation progress issue comment",
+			);
+
 			return;
 		}
 
@@ -368,33 +435,40 @@ export class GitHubContent {
 	/**
 	 * Checks if a pull request has merge conflicts that require closing and recreating.
 	 *
-	 * Determines if a PR needs to be closed and recreated by examining its mergeable status.
-	 * The `needsUpdate` flag is only set to `true` when there are actual merge conflicts
-	 * (indicated by `mergeable === false` and `mergeable_state === "dirty"`). PRs that are
-	 * simply "behind" the base branch remain valid and can be updated via rebase without
-	 * requiring closure.
+	 * Polls GitHub when `mergeable` is `null` (async computation pending) to avoid
+	 * false negatives. After exhausting retries, treats an undetermined state as
+	 * conflicted to avoid silently skipping stale PRs.
 	 *
 	 * @param prNumber Pull request number to check
 	 *
-	 * @returns A Promise resolving to an object containing PR status information
-	 * @example
-	 * ```typescript
-	 * const status = await content.checkPullRequestStatus(123);
-	 * if (status.needsUpdate) {
-	 *   console.log('PR has conflicts and needs recreating');
-	 * } else if (status.mergeableState === 'behind') {
-	 *   console.log('PR is behind but can be rebased');
-	 * }
-	 * ```
+	 * @returns PR status with conflict and mergeability information
 	 */
 	public async checkPullRequestStatus(prNumber: number): Promise<PullRequestStatus> {
-		const prResponse = await this.deps.octokit.pulls.get({
-			...this.deps.repositories.upstream,
-			pull_number: prNumber,
-		});
+		let pr = await this.fetchPullRequest(prNumber);
 
-		const pr = prResponse.data;
-		const hasConflicts = pr.mergeable === false && pr.mergeable_state === "dirty";
+		for (
+			let attempt = 0;
+			pr.mergeable === null && attempt < MERGEABLE_POLL_MAX_ATTEMPTS;
+			attempt++
+		) {
+			this.logger.debug(
+				{ prNumber, attempt: attempt + 1, maxAttempts: MERGEABLE_POLL_MAX_ATTEMPTS },
+				"PR mergeable state not yet computed, polling",
+			);
+			await new Promise((resolve) => setTimeout(resolve, MERGEABLE_POLL_DELAY_MS));
+			pr = await this.fetchPullRequest(prNumber);
+		}
+
+		if (pr.mergeable === null) {
+			this.logger.warn(
+				{ prNumber, mergeableState: pr.mergeable_state },
+				"PR mergeable state still undetermined after polling, treating as conflicted",
+			);
+		}
+
+		const hasConflicts =
+			pr.mergeable === null ||
+			(!pr.mergeable && (pr.mergeable_state === "dirty" || pr.mergeable_state === "unknown"));
 		const needsUpdate = hasConflicts;
 
 		return {
@@ -402,7 +476,18 @@ export class GitHubContent {
 			mergeable: pr.mergeable,
 			mergeableState: pr.mergeable_state,
 			needsUpdate,
+			createdBy: pr.user.login,
 		};
+	}
+
+	/** Fetches a single PR's data from GitHub */
+	private async fetchPullRequest(prNumber: number) {
+		const response = await this.deps.octokit.pulls.get({
+			...this.deps.repositories.upstream,
+			pull_number: prNumber,
+		});
+
+		return response.data;
 	}
 
 	/**

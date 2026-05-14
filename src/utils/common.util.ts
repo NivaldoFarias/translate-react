@@ -1,12 +1,8 @@
 import { StatusCodes } from "http-status-codes";
 
-import type { RepositoryTreeItem, WorkflowStatistics } from "@/services/";
-
-import { ApplicationError, ErrorCode } from "@/errors/";
+import type { RepositoryTreeItem } from "@/services/";
 
 import { MS_PER_SECOND, processSignals, RATE_LIMIT_PATTERNS } from "./constants.util";
-import { env } from "./env.util";
-import { logger as baseLogger } from "./logger.util";
 
 /**
  * Formats a {@link Date} object into an NFTS-compatible date string.
@@ -30,52 +26,7 @@ import { logger as baseLogger } from "./logger.util";
  * @see {@link https://en.wikipedia.org/wiki/ISO_8601#Representations_of_dates_and_times:~:text=Combined%20date%20and%20time%20representations|ISO 8601: Combined date and time representations}
  */
 export function nftsCompatibleDateString(date = new Date()): string {
-	return date.toISOString().replace(/:/g, "-");
-}
-
-/**
- * Validates the success rate of the workflow against the minimum threshold.
- *
- * @throws {ApplicationError} with {@link ErrorCode.BelowMinimumSuccessRate} If the success rate is below the configured minimum
- *
- * @param statistics final workflow statistics used for validation
- *
- * @see {@link env.MIN_SUCCESS_RATE|`env.MIN_SUCCESS_RATE`} for the configured threshold
- */
-export function validateSuccessRate(statistics: WorkflowStatistics) {
-	const logger = baseLogger.child({ component: validateSuccessRate.name });
-
-	logger.debug(
-		{ successRate: statistics.successRate, minSuccessRate: env.MIN_SUCCESS_RATE },
-		"Validating success rate against minimum threshold",
-	);
-
-	if (statistics.successRate < env.MIN_SUCCESS_RATE) {
-		logger.debug("Success rate below minimum threshold");
-
-		const successPercentage = (statistics.successRate * 100).toFixed(1);
-		const thresholdPercentage = (env.MIN_SUCCESS_RATE * 100).toFixed(0);
-
-		const metadata = {
-			successRate: successPercentage,
-			minSuccessRate: thresholdPercentage,
-			successCount: statistics.successCount,
-			failureCount: statistics.failureCount,
-			totalCount: statistics.totalCount,
-		};
-		const errorMessage = `Success rate ${successPercentage}% below threshold ${thresholdPercentage}%`;
-
-		logger.fatal(metadata, errorMessage);
-
-		throw new ApplicationError(
-			errorMessage,
-			ErrorCode.BelowMinimumSuccessRate,
-			validateSuccessRate.name,
-			metadata,
-		);
-	}
-
-	logger.debug("Success rate meets minimum threshold");
+	return date.toISOString().replace(new RegExp(/:/g), "-");
 }
 
 /**
@@ -170,7 +121,7 @@ export function setupSignalHandlers(
  *
  * @param tree Repository tree from GitHub API
  */
-export function filterMarkdownFiles<T extends RepositoryTreeItem>(tree: T[]): T[] {
+export function filterMarkdownFiles(tree: RepositoryTreeItem[]): RepositoryTreeItem[] {
 	return tree.filter((item) => {
 		if (!item.path) return false;
 		if (!item.path.endsWith(".md")) return false;
@@ -179,39 +130,6 @@ export function filterMarkdownFiles<T extends RepositoryTreeItem>(tree: T[]): T[
 
 		return true;
 	});
-}
-
-/**
- * Extracts the title of a document from its content by matching the `title` frontmatter key.
- *
- * Supports both single and double quotes around the title value.
- *
- * @param content The content of the document
- *
- * @returns The title of the document, or `undefined` if not found
- *
- * @example
- * ```typescript
- * import { extractDocTitleFromContent } from "@/utils/";
- *
- * const title = extractDocTitleFromContent(`
- * ---
- * title: 'Hello'
- * ---
- * # Hello
- *
- * Welcome to React!
- * `);
- * console.log(title);
- * // 'Hello'
- * ```
- */
-export function extractDocTitleFromContent(content: string): string | undefined {
-	const CATCH_CONTENT_TITLE_REGEX = /---[\s\S]*?title:\s*['"](.+?)['"][\s\S]*?---/gs;
-
-	const match = CATCH_CONTENT_TITLE_REGEX.exec(content);
-
-	return match?.[1];
 }
 
 /**
@@ -236,7 +154,6 @@ export function extractDocTitleFromContent(content: string): string | undefined 
  * ```
  */
 export function detectRateLimit(errorMessage: string, statusCode?: number): boolean {
-	/** Check HTTP status code first for most reliable detection */
 	if (statusCode === StatusCodes.TOO_MANY_REQUESTS) {
 		return true;
 	}

@@ -2,47 +2,58 @@
 
 <div align="center">
 
-<h3 align="center" style="color: #999;"><b>Work In Progress</b></h3>
-
 [![CI Status](https://github.com/NivaldoFarias/translate-react/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/NivaldoFarias/translate-react/actions/workflows/ci.yml)
 
 </div>
-  
-Automated translation tool for React documentation using LLMs. Processes markdown files, preserves formatting, and creates pull requests via [`translate-react` Bot](https://github.com/apps/translate-react-bot).
 
-> [!TIP]
-> For detailed workflow analysis, see [WORKFLOW.md](./docs/WORKFLOW.md).
+CLI tool that translates the official React documentation via LLMs, keeps structure intact, and opens PRs through the [`translate-react` bot](https://github.com/apps/translate-react-bot).
+
+You bring the LLM key and GitHub token. To run a fixed revision in Actions, pin a tag or SHA ([Pinning translate-react in GitHub Actions](./docs/WORKFLOW.md#pinning-translate-react-in-github-actions)).
 
 ## Table of Contents
 
+- [Table of Contents](#table-of-contents)
 - [Prerequisites](#prerequisites)
 - [Quick Start](#quick-start)
+- [GitHub Actions on a fork](#github-actions-on-a-fork)
 - [Configuration](#configuration)
+  - [Required Environment Variables](#required-environment-variables)
+  - [Optional Environment Variables](#optional-environment-variables)
 - [Usage](#usage)
-- [Project Structure](#project-structure)
+- [Versioning and releases](#versioning-and-releases)
 - [Documentation](#documentation)
 - [Contributing](#contributing)
+- [Security](#security)
 - [Troubleshooting](#troubleshooting)
+  - [Common Issues](#common-issues)
+  - [Debug Mode](#debug-mode)
 - [License](#license)
 
 ## Prerequisites
 
-- [**Bun**](https://bun.sh/) v1.0.0+ and [**Git**](https://git-scm.com/)
+- [**Bun**](https://bun.sh/) (see `engines` in [`package.json`](./package.json)) and [**Git**](https://git-scm.com/)
 - **GitHub Personal Access Token** with `repo` scope
 - **LLM API Key** (OpenAI, OpenRouter, or compatible)
 - Fork of target React documentation repository with write access
 
 ## Quick Start
 
-1. Clone the Repository and Navigate to Directory: `git clone https://github.com/NivaldoFarias/translate-react.git && cd translate-react`
+1. Clone and enter the repo (replace the URL if you use a fork): `git clone https://github.com/NivaldoFarias/translate-react.git && cd translate-react`
 2. Install Dependencies: `bun install`
 3. Setup the forks of the target React documentation repositories:
-   3.1. For the Portuguese (Brazil) repository, fork [`reactjs/pt-br.react.dev`](https://github.com/reactjs/pt-br.react.dev/) to your GitHub account
-   3.2. (Optional) For the Russian repository, fork [`reactjs/ru.react.dev`](https://github.com/reactjs/ru.react.dev/) to your GitHub account
+   - For the Portuguese (Brazil) repository, fork [`reactjs/pt-br.react.dev`](https://github.com/reactjs/pt-br.react.dev/) to your GitHub account
+   - (Optional) For the Russian repository, fork [`reactjs/ru.react.dev`](https://github.com/reactjs/ru.react.dev/) to your GitHub account
 4. Install the `translate-react-bot` GitHub App on the forks of the target React documentation repositories:
 5. Configure Environment: `cp .env.example .env`
-   5.1. Then, edit `.env` with your API keys _(see [Configuration section](#configuration))_
+   - Then, edit `.env` with your API keys _(see [Configuration section](#configuration))_
 6. Run in Development Mode: `bun run dev`
+
+> [!TIP]
+> For a more detailed workflow explanation, see [`WORKFLOW.md`](./docs/WORKFLOW.md).
+
+## GitHub Actions on a fork
+
+Enable Actions on the repo that holds the workflow, install the bot, and set the secrets and variables listed under [Operating translate-react (forks)](./docs/WORKFLOW.md#operating-translate-react-forks) (see [`.github/workflows/workflow.yml`](./.github/workflows/workflow.yml)). Pinning: [Pinning translate-react in GitHub Actions](./docs/WORKFLOW.md#pinning-translate-react-in-github-actions).
 
 ## Configuration
 
@@ -50,7 +61,7 @@ Environment variables are validated at runtime using Zod schemas. See [`src/util
 
 ### Required Environment Variables
 
-These **must** be set in your `.env` file:
+These **must** be set in your `.env` file (or in the GitHub Actions environment variables):
 
 | Variable      | Description                                                |
 | ------------- | ---------------------------------------------------------- |
@@ -65,43 +76,42 @@ These **must** be set in your `.env` file:
 <details>
 <summary><b>GitHub Configuration</b></summary>
 
-| Variable              | Default           | Description                                  |
-| --------------------- | ----------------- | -------------------------------------------- |
-| `REPO_FORK_OWNER`     | `nivaldofarias`   | Fork owner username/organization             |
-| `REPO_FORK_NAME`      | `pt-br.react.dev` | Fork repository name                         |
-| `REPO_UPSTREAM_OWNER` | `reactjs`         | Upstream owner username/organization         |
-| `REPO_UPSTREAM_NAME`  | `pt-br.react.dev` | Upstream repository name                     |
-| `GH_REQUEST_TIMEOUT`  | `30000`           | GitHub API timeout (milliseconds)            |
-| `GH_PAT_TOKEN`        | —                 | Fallback PAT for 403 errors (see note below) |
-
-> [!NOTE]
-> **GH_PAT_TOKEN**: Optional fallback token for permission-related failures. When the primary `GH_TOKEN` receives a 403 (Forbidden) error, the client automatically retries with this PAT. Useful when GitHub App tokens have different permission scopes than PATs for certain operations.
+| Variable              | Default           | Description                                               |
+| --------------------- | ----------------- | --------------------------------------------------------- |
+| `REPO_FORK_OWNER`     | `nivaldofarias`   | Fork owner username/organization                          |
+| `REPO_FORK_NAME`      | `pt-br.react.dev` | Fork repository name                                      |
+| `REPO_UPSTREAM_OWNER` | `reactjs`         | Upstream owner username/organization[^repo-upstream-test] |
+| `REPO_UPSTREAM_NAME`  | `pt-br.react.dev` | Upstream repository name                                  |
+| `GH_REQUEST_TIMEOUT`  | `30000`           | GitHub API timeout (milliseconds)                         |
+| `GH_PAT_TOKEN`        | —                 | Fallback PAT for 403 errors[^gh-pat-token]                |
 
 </details>
 
 <details>
 <summary><b>LLM Configuration</b></summary>
 
-| Variable             | Default                                            | Description                                    |
-| -------------------- | -------------------------------------------------- | ---------------------------------------------- |
-| `LLM_MODEL`          | `google/gemini-2.0-flash-exp:free`                 | Model ID for translation                       |
-| `LLM_API_BASE_URL`   | `https://openrouter.ai/api/v1`                     | API endpoint                                   |
-| `OPENAI_PROJECT_ID`  | —                                                  | Optional: OpenAI project ID for tracking       |
-| `MAX_TOKENS`         | `8192`                                             | Maximum tokens per LLM response                |
-| `HEADER_APP_URL`     | `https://github.com/NivaldoFarias/translate-react` | App URL for OpenRouter tracking                |
-| `HEADER_APP_TITLE`   | `translate-react v0.1.22`                          | App title for OpenRouter tracking              |
-| `MAX_RETRY_ATTEMPTS` | `5`                                                | Maximum number of retries for LLM API requests |
+| Variable             | Default                                    | Description                                    |
+| -------------------- | ------------------------------------------ | ---------------------------------------------- |
+| `LLM_MODEL`          | `google/gemini-2.0-flash-exp:free`         | Model ID for translation                       |
+| `LLM_API_BASE_URL`   | `https://openrouter.ai/api/v1`             | LLM API endpoint                               |
+| `OPENAI_PROJECT_ID`  | —                                          | Optional: OpenAI project ID for tracking       |
+| `MAX_TOKENS`         | `8192`                                     | Maximum tokens per LLM response                |
+| `HEADER_APP_URL`     | `package.json` field `homepage`            | App URL for OpenRouter `HTTP-Referer` tracking |
+| `HEADER_APP_TITLE`   | `package.json` fields `name` and `version` | App title for OpenRouter `X-Title`             |
+| `MAX_RETRY_ATTEMPTS` | `3`                                        | Maximum number of retries for LLM API requests |
 
 </details>
 
 <details>
 <summary><b>Translation Settings</b></summary>
 
-| Variable          | Default | Description                             |
-| ----------------- | ------- | --------------------------------------- |
-| `TARGET_LANGUAGE` | `pt-br` | Target translation language (ISO 639-1) |
-| `SOURCE_LANGUAGE` | `en`    | Source language (ISO 639-1)             |
-| `BATCH_SIZE`      | `1`     | Files to process in parallel            |
+| Variable                                | Default | Description                                                                                                                                                                                   |
+| --------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TARGET_LANGUAGE`                       | `pt-br` | React locale for translated output; in Actions, `workflow.yml` sets this from `matrix.lang`                                                                                                   |
+| `SOURCE_LANGUAGE`                       | `en`    | Source locale for detection labels; React English docs — default `en`, omit in CI                                                                                                             |
+| `BATCH_SIZE`                            | `1`     | Files to process in parallel                                                                                                                                                                  |
+| `MASK_VERBATIM_LARGE_FENCES`            | `false` | When `true`, very large fenced code blocks are sent as short HTML placeholders to the LLM and restored afterward (saves tokens; prose **inside** those fences is not translated while masked) |
+| `MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS` | `120`   | Tiktoken-based threshold (same estimator as chunking) for treating a fence as verbatim when masking is enabled                                                                                |
 
 </details>
 
@@ -123,53 +133,28 @@ bun run dev   # Development mode (auto-reload)
 bun start     # Production mode
 ```
 
-## Project Structure
+## Versioning and releases
 
-```plaintext
-translate-react/
-├── src/
-│   ├── clients/                          # Octokit, OpenAI, queue clients
-│   ├── errors/                           # Error handling (ApplicationError, helpers)
-│   ├── locales/                          # Language locale definitions
-│   ├── services/                         # Core services
-│   │   ├── cache/                        # In-memory caching
-│   │   ├── github/                       # GitHub API (single service)
-│   │   ├── locale/                       # Locale management
-│   │   ├── comment-builder/              # Comment builder
-│   │   ├── language-detector/            # Language detector
-│   │   ├── runner/                       # Workflow orchestration
-│   │   └── translator/                   # LLM translation engine
-│   ├── utils/                            # Utilities and constants
-│   └── main.ts                           # Entry point
-│
-├── docs/                                 # Technical documentation
-├── tests/                                # Test suite
-└── logs/                                 # Structured error logs (JSONL)
-```
-
-> [!TIP]
-> For the complete directory structure with file-level details, see [PROJECT_STRUCTURE.md](./docs/PROJECT_STRUCTURE.md).
+`package.json` `version` is the semver source; OpenRouter header defaults pull from `homepage`, `name`, and `version` unless overridden ([optional env](#optional-environment-variables)). Change log: [`CHANGELOG.md`](./CHANGELOG.md). Tag and release steps: [Releases and semantic versioning](./docs/WORKFLOW.md#releases-and-semantic-versioning).
 
 ## Documentation
 
-| Document                                            | Description                                                  |
-| --------------------------------------------------- | ------------------------------------------------------------ |
-| [ARCHITECTURE.md](./docs/ARCHITECTURE.md)           | System architecture, service design, and design patterns     |
-| [WORKFLOW.md](./docs/WORKFLOW.md)                   | Execution workflow with timing analysis and performance data |
-| [PROJECT_STRUCTURE.md](./docs/PROJECT_STRUCTURE.md) | Complete directory structure and navigation guide            |
+| Document                                            | Description                         |
+| --------------------------------------------------- | ----------------------------------- |
+| [ARCHITECTURE.md](./docs/ARCHITECTURE.md)           | Layout of services and modules      |
+| [WORKFLOW.md](./docs/WORKFLOW.md)                   | Pipeline order, forks, releases, CI |
+| [PROJECT_STRUCTURE.md](./docs/PROJECT_STRUCTURE.md) | Repository layout                   |
+| [CONTRIBUTING.md](./CONTRIBUTING.md)                | Patches and conventions             |
+| [CHANGELOG.md](./CHANGELOG.md)                      | Release notes                       |
+| [SECURITY.md](./SECURITY.md)                        | Vulnerability reporting             |
 
 ## Contributing
 
-Contributions are welcome. Follow these guidelines:
+[`CONTRIBUTING.md`](./CONTRIBUTING.md); for service layout see [ARCHITECTURE.md](./docs/ARCHITECTURE.md).
 
-- **TypeScript**: All code must be properly typed with strict mode enabled
-- **Bun Runtime**: Use Bun exclusively _(not npm/yarn/pnpm)_
-- **Testing**: Add tests for new features using Bun's test runner
-- **Code Style**: Follow ESLint/Prettier configuration
-- **Commits**: Use [Conventional Commits](https://www.conventionalcommits.org/) format
+## Security
 
-> [!TIP]
-> See [ARCHITECTURE.md](./docs/ARCHITECTURE.md) for service design patterns when extending the codebase.
+[`SECURITY.md`](./SECURITY.md)
 
 ## Troubleshooting
 
@@ -178,7 +163,7 @@ Contributions are welcome. Follow these guidelines:
 | Error                                                   | Solution                                                           |
 | ------------------------------------------------------- | ------------------------------------------------------------------ |
 | `GH_TOKEN: String must contain at least 1 character(s)` | Set `GH_TOKEN` and `LLM_API_KEY` in `.env`                         |
-| GitHub API error (404 / 403 / 429)                      | Verify repository and token scope; tool auto-retries on rate limit |
+| GitHub API error (`404` / `403` / `429`)                | Verify repository and token scope; tool auto-retries on rate limit |
 | LLM API error (quota / rate limit)                      | Check API credits; switch providers via `LLM_API_BASE_URL`         |
 
 ### Debug Mode
@@ -188,3 +173,9 @@ Enable verbose logging: `LOG_LEVEL="debug" bun run dev`
 ## License
 
 MIT License - see [LICENSE](./LICENSE) file for details.
+
+---
+
+[^gh-pat-token]: Optional fallback token for permission-related failures. When the primary `GH_TOKEN` receives a `403` (`Forbidden`) error, the client automatically retries with this PAT. Useful when GitHub App tokens have different permission scopes than PATs for certain operations.
+
+[^repo-upstream-test]: For dry runs, set to your GitHub username in `.env` or repository variable `REPO_UPSTREAM_OWNER` so PRs open against your fork; the translation workflow applies this to every matrix locale (see `.github/workflows/workflow.yml`).

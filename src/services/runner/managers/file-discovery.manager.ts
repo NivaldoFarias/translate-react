@@ -11,7 +11,7 @@ import type {
 
 import { LanguageDetectorService } from "@/services/language-detector/";
 import { TranslationFile } from "@/services/translator/";
-import { filterMarkdownFiles, logger } from "@/utils/";
+import { logger } from "@/utils/";
 
 import {
 	FILE_FETCH_BATCH_SIZE,
@@ -71,24 +71,18 @@ export class FileDiscoveryManager {
 	}> {
 		this.logger.debug({ fileCount: repositoryTree.length }, "Starting file discovery pipeline");
 
-		const markdownFiles = filterMarkdownFiles(repositoryTree);
-		this.logger.debug(
-			{ before: repositoryTree.length, after: markdownFiles.length },
-			"Stage 1/6: Markdown filter complete",
-		);
-
-		const uniqueFiles = markdownFiles.filter(
+		const uniqueFiles = repositoryTree.filter(
 			(file, index, self) => index === self.findIndex((compare) => compare.path === file.path),
 		);
 		this.logger.debug(
-			{ before: markdownFiles.length, after: uniqueFiles.length },
-			"Stage 2/6: Deduplication complete",
+			{ before: repositoryTree.length, after: uniqueFiles.length },
+			"Stage 1/5: Deduplication complete",
 		);
 
 		const { candidateFiles, cacheHits, cacheMisses } = this.checkCache(uniqueFiles);
 		this.logger.debug(
 			{ before: uniqueFiles.length, after: candidateFiles.length, cacheHits, cacheMisses },
-			"Stage 3/6: Cache lookup complete",
+			"Stage 2/5: Cache lookup complete",
 		);
 
 		const { filesToFetch, numFilesWithPRs, invalidPRsByFile } =
@@ -100,13 +94,13 @@ export class FileDiscoveryManager {
 				skippedByValidPRs: numFilesWithPRs,
 				invalidPRs: invalidPRsByFile.size,
 			},
-			"Stage 4/6: PR filter complete",
+			"Stage 3/5: PR filter complete",
 		);
 
 		const uncheckedFiles = await this.fetchContent(filesToFetch);
 		this.logger.debug(
 			{ before: filesToFetch.length, after: uncheckedFiles.length },
-			"Stage 5/6: Content fetch complete",
+			"Stage 4/5: Content fetch complete",
 		);
 
 		const { numFilesFiltered, filesToTranslate } =
@@ -117,7 +111,7 @@ export class FileDiscoveryManager {
 				after: filesToTranslate.length,
 				detectedAsTranslated: numFilesFiltered,
 			},
-			"Stage 6/6: Language detection complete",
+			"Stage 5/5: Language detection complete",
 		);
 
 		const totalFiltered = cacheHits + numFilesFiltered + numFilesWithPRs;
@@ -126,7 +120,6 @@ export class FileDiscoveryManager {
 			{
 				pipeline: {
 					initial: repositoryTree.length,
-					afterMarkdownFilter: markdownFiles.length,
 					afterDedup: uniqueFiles.length,
 					afterCache: candidateFiles.length,
 					afterPRFilter: filesToFetch.length,
@@ -220,45 +213,12 @@ export class FileDiscoveryManager {
 	/**
 	 * Filters candidate files by checking for existing open pull requests.
 	 *
-	 * Fetches all open PRs and their changed files to build an accurate mapping of
-	 * which files have active PRs. Only skips files with VALID (mergeable) PRs.
-	 * Files with invalid/conflicted PRs are processed and tracked for notification
-	 * in new PR descriptions.
-	 *
-	 * ### Filtering Logic
-	 *
-	 * 1. Fetch all open PRs and their changed files using file-based detection (not title parsing)
-	 * 2. Build a map of file paths to PR numbers for efficient lookup
-	 * 3. For each candidate file, check if it appears in any PR's changed files
-	 * 4. If PR exists, validate its merge status
-	 * 5. Skip files with valid, mergeable PRs (no conflicts)
-	 * 6. Track invalid PRs (with conflicts) for later notification in new PR descriptions
-	 *
-	 * ### PR Status Validation
-	 *
-	 * Files are only skipped when their associated PR meets ALL criteria:
-	 * - PR is open
-	 * - PR is mergeable (`needsUpdate === false`)
-	 * - PR has no conflicts (`hasConflicts === false`)
-	 *
-	 * Files with invalid PRs are included for translation, and the invalid PR information
-	 * is stored in `invalidPRsByFile` for use in PR descriptions.
+	 * Skips files with conflict-free PRs. Files with conflicted PRs are queued
+	 * for re-translation and tracked in `invalidPRsByFile` for notification.
 	 *
 	 * @param candidateFiles Files remaining after cache check that require PR validation
 	 *
-	 * @returns A `Promise` resolving to an object containing:
-	 * - `filesToFetch`: Files requiring content fetch (no valid PR exists)
-	 * - `numFilesWithPRs`: Count of files skipped due to valid existing PRs
-	 * - `invalidPRsByFile`: Map of file paths to invalid PR metadata for notification
-	 *
-	 * @example
-	 * ```typescript
-	 * const result = await this.filterByPRs(cachedCandidates);
-	 * console.log(result.numFilesWithPRs);
-	 * // ^? 10 (files with valid, mergeable PRs)
-	 * console.log(result.invalidPRsByFile.size);
-	 * // ^? 2 (files with conflicted PRs that will be re-translated)
-	 * ```
+	 * @returns Files to fetch, count of skipped files, and map of conflicted PRs
 	 */
 	public async filterByPRs(
 		candidateFiles: PatchedRepositoryTreeItem[],
@@ -286,49 +246,46 @@ export class FileDiscoveryManager {
 		const filesToFetch: typeof candidateFiles = [];
 
 		for (const file of candidateFiles) {
-			if (!file.path) {
+			const prNumber = prByFile.get(file.path);
+
+			if (!prNumber) {
 				filesToFetch.push(file);
 				continue;
 			}
 
-			const prNumber = prByFile.get(file.path);
+			try {
+				const prStatus = await this.services.github.checkPullRequestStatus(prNumber);
 
-			if (prNumber) {
-				try {
-					const prStatus = await this.services.github.checkPullRequestStatus(prNumber);
-
-					if (prStatus.needsUpdate || prStatus.hasConflicts) {
-						invalidPRsByFile.set(file.path, { prNumber, status: prStatus });
-						filesToFetch.push(file);
-
-						this.logger.debug(
-							{
-								path: file.path,
-								prNumber,
-								mergeableState: prStatus.mergeableState,
-								hasConflicts: prStatus.hasConflicts,
-							},
-							"File has invalid PR - will create new translation",
-						);
-					} else {
-						numFilesWithPRs++;
-						this.logger.debug(
-							{
-								path: file.path,
-								prNumber,
-								mergeableState: prStatus.mergeableState,
-							},
-							"Skipping file with valid existing PR",
-						);
-					}
-				} catch (error) {
-					this.logger.warn(
-						{ path: file.path, prNumber, error },
-						"Failed to check PR status, including file for processing",
-					);
+				if (prStatus.needsUpdate || prStatus.hasConflicts) {
+					invalidPRsByFile.set(file.path, { prNumber, status: prStatus });
 					filesToFetch.push(file);
+
+					this.logger.debug(
+						{
+							path: file.path,
+							prNumber,
+							mergeableState: prStatus.mergeableState,
+							hasConflicts: prStatus.hasConflicts,
+							createdBy: prStatus.createdBy,
+						},
+						"File has conflicted PR, will close and re-translate",
+					);
+				} else {
+					numFilesWithPRs++;
+					this.logger.debug(
+						{
+							path: file.path,
+							prNumber,
+							mergeableState: prStatus.mergeableState,
+						},
+						"Skipping file with valid existing PR",
+					);
 				}
-			} else {
+			} catch (error) {
+				this.logger.warn(
+					{ path: file.path, prNumber, error },
+					"Failed to check PR status, including file for processing",
+				);
 				filesToFetch.push(file);
 			}
 		}
@@ -378,7 +335,7 @@ export class FileDiscoveryManager {
 
 			const batchResults = await this.fetchBatch(batch);
 			const successfulFetches = batchResults.filter(
-				(file): file is NonNullable<typeof file> => !!file,
+				(file): file is NonNullable<typeof file> => !!file && file.content.trim().length > 0,
 			);
 
 			uncheckedFiles.push(...successfulFetches);

@@ -83,16 +83,14 @@ export class GitHubService {
 	 *
 	 * @param target Which repository to fetch tree from ('fork' or 'upstream')
 	 * @param baseBranch Branch to get tree from (defaults to target's default branch)
-	 * @param filterIgnored Whether to filter ignored paths
 	 *
 	 * @returns Array of repository tree items
 	 */
 	public async getRepositoryTree(
 		target: "fork" | "upstream" = "fork",
 		baseBranch?: string,
-		filterIgnored = true,
 	): Promise<RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"]> {
-		return this.repository.getRepositoryTree(target, baseBranch, filterIgnored);
+		return this.repository.getRepositoryTree(target, baseBranch);
 	}
 
 	/**
@@ -149,12 +147,18 @@ export class GitHubService {
 	}
 
 	/**
-	 * Fetches the glossary.md file from the repository.
+	 * Fetches the translation guidelines file from the upstream repository.
 	 *
-	 * @returns The content of the glossary file as a string, or null if not found
+	 * Uses auto-discovery to find the guidelines file unless `TRANSLATION_GUIDELINES_FILE`
+	 * env var is explicitly set. Common filenames like `GLOSSARY.md` and `TRANSLATION.md`
+	 * are checked in priority order.
+	 *
+	 * @returns The content of the translation guidelines file as a string, or `null` if not found
+	 *
+	 * @see {@link TRANSLATION_GUIDELINES_CANDIDATES} for the list of auto-discovered filenames
 	 */
-	public async fetchGlossary(): Promise<string | null> {
-		return this.repository.fetchGlossary();
+	public async fetchTranslationGuidelinesFile(): Promise<string | null> {
+		return this.repository.fetchTranslationGuidelinesFile();
 	}
 
 	// === Branch Methods ===

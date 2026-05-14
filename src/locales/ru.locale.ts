@@ -48,6 +48,7 @@ const ruPRBodyStrings: LocalePRBodyStrings = {
 		header: "Техническая информация",
 		generationDate: "Дата генерации",
 		branch: "Ветка",
+		workflowRun: "Запуск workflow",
 	},
 
 	timeFormatLocale: "ru-RU",
@@ -78,8 +79,7 @@ export const ruLocale: LocaleDefinition = {
 - Preserve English technical terms that are commonly used untranslated in Russian developer communities (e.g., "render", "props", "state", "hook")`,
 	},
 	pullRequest: {
-		title: (file: TranslationFile) =>
-			`Перевод ${file.title ? `**${file.title}**` : `\`${file.filename}\``} на русский язык`,
+		title: (file: TranslationFile) => `Перевод \`${file.filename}\` на русский язык`,
 		body: createPRBodyBuilder(ruPRBodyStrings),
 	},
 };

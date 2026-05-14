@@ -10,7 +10,7 @@ import type {
 import { ApplicationError, ErrorCode } from "@/errors/";
 import { LanguageDetectorService } from "@/services/language-detector/";
 import { TranslationFile } from "@/services/translator/";
-import { logger } from "@/utils/";
+import { isTranslationEquivalentToCurrentBlob, logger } from "@/utils/";
 
 import { MAX_CONSECUTIVE_FAILURES } from "./managers.constants";
 
@@ -268,6 +268,28 @@ export class TranslationBatchManager {
 				"Step 2/4: Translation complete",
 			);
 
+			if (isTranslationEquivalentToCurrentBlob(file, metadata.translation)) {
+				file.logger.warn(
+					{ path: file.path, contentLength: metadata.translation.length },
+					"Translation matches existing blob; skipping commit and pull request",
+				);
+
+				await this.deleteIdleTranslationBranchIfAtForkBase(
+					this.getTranslationBranchName(file),
+					metadata.branch,
+				);
+
+				this.consecutiveFailures = 0;
+				this.updateBatchProgress("success");
+
+				file.logger.debug(
+					{ totalDurationMs: Date.now() - startTime },
+					"File processing complete (no-op translation)",
+				);
+
+				return metadata;
+			}
+
 			const languageName = this.services.languageDetector.getLanguageName(
 				LanguageDetectorService.languages.target,
 			);
@@ -346,29 +368,59 @@ export class TranslationBatchManager {
 		}
 	}
 
+	/** Resolves the `translate/…` branch name used for commits and pull requests */
+	private getTranslationBranchName(file: TranslationFile) {
+		return `translate/${file.path.split("/").slice(2).join("/")}`;
+	}
+
 	/**
-	 * Creates a new branch for translation work, or reuses an existing branch if appropriate.
+	 * Deletes a translation branch that still points at the fork default tip after a no-op translation.
 	 *
-	 * This method intelligently handles existing branches by evaluating their associated PRs
-	 * for merge conflicts. When a branch already exists, the method checks if there's an open
-	 * PR and evaluates its merge status. Branches are only deleted and recreated when their
-	 * associated PRs have actual merge conflicts (not when they're simply behind the base branch).
+	 * @param branchName Translation branch name without `refs/heads/` prefix
+	 * @param branchRef Git ref returned from branch creation or lookup
+	 */
+	private async deleteIdleTranslationBranchIfAtForkBase(
+		branchName: string,
+		branchRef: NonNullable<ProcessedFileResult["branch"]>,
+	) {
+		const branchTipSha = branchRef.object.sha;
+		const defaultBranchName = await this.services.github.getDefaultBranch("fork");
+		const defaultBranchRef = await this.services.github.getBranch(defaultBranchName);
+		const defaultTipSha = defaultBranchRef?.data.object.sha;
+
+		if (!defaultTipSha || branchTipSha !== defaultTipSha) {
+			return;
+		}
+
+		try {
+			await this.services.github.deleteBranch(branchName);
+			this.logger.info(
+				{ branchName },
+				"Deleted translation branch still identical to fork default (no-op translation)",
+			);
+		} catch (error) {
+			this.logger.warn(
+				{ branchName, error },
+				"Failed to delete redundant translation branch after no-op translation",
+			);
+		}
+	}
+
+	/**
+	 * Creates a new branch for translation work, or reuses an existing one.
 	 *
-	 * ### Branch Reuse Scenarios
-	 *
-	 * 1. **Branch exists with PR having no conflicts**: Reuses existing branch, preserving PR
-	 * 2. **Branch exists with PR having conflicts**: Closes PR, deletes branch, creates new branch
-	 * 3. **Branch exists without PR**: Reuses existing branch safely
-	 * 4. **No existing branch**: Creates new branch from base
+	 * When an existing branch has an associated PR with merge conflicts, the
+	 * conflicted PR is closed and the branch is deleted so a fresh translation
+	 * can be created from the latest base.
 	 *
 	 * @param file Translation file being processed
 	 * @param baseBranch Optional base branch to create from (defaults to fork's default branch)
 	 *
-	 * @returns Branch reference data containing SHA and branch name for subsequent commit operations
+	 * @returns Branch reference data for subsequent commit operations
 	 */
 	private async createOrGetTranslationBranch(file: TranslationFile, baseBranch?: string) {
 		const actualBaseBranch = baseBranch ?? (await this.services.github.getDefaultBranch("fork"));
-		const branchName = `translate/${file.path.split("/").slice(2).join("/")}`;
+		const branchName = this.getTranslationBranchName(file);
 
 		const existingBranch = await this.services.github.getBranch(branchName);
 
@@ -384,6 +436,7 @@ export class TranslationBatchManager {
 							filename: file.filename,
 							prNumber: upstreamPR.number,
 							mergeableState: prStatus.mergeableState,
+							createdBy: prStatus.createdBy,
 						},
 						"PR has merge conflicts, closing and recreating",
 					);
@@ -422,29 +475,21 @@ export class TranslationBatchManager {
 	}
 
 	/**
-	 * Handles pull request creation or reuse for a translation file.
+	 * Creates a new PR or closes a conflicted one and creates a replacement.
 	 *
-	 * Implements intelligent PR lifecycle management by checking if a PR already exists for
-	 * the translation branch and evaluating its merge status. PRs are only closed and recreated
-	 * when they have true conflicts. PRs that are merely behind the base branch are preserved
-	 * since they can be safely rebased without closure.
-	 *
-	 * ### PR Handling Logic
-	 *
-	 * 1. **No existing PR**: Creates new PR with provided metadata
-	 * 2. **Existing PR without conflicts**: Returns existing PR (preserves PR number and discussion)
-	 * 3. **Existing PR with conflicts**: Closes conflicted PR, creates new PR with updated content
+	 * Conflict-free existing PRs are preserved. Conflicted PRs are closed
+	 * with a comment and replaced by a new PR with the fresh translation.
 	 *
 	 * @param file Translation file being processed
 	 * @param processingResult Processing metadata including translation and timing
 	 *
-	 * @returns Either the newly created PR data or the existing PR data if reused
+	 * @returns Newly created or existing PR data
 	 */
 	private async createOrUpdatePullRequest(
 		file: TranslationFile,
 		processingResult: ProcessedFileResult,
 	) {
-		const branchName = `translate/${file.path.split("/").slice(2).join("/")}`;
+		const branchName = this.getTranslationBranchName(file);
 		const languageName = this.services.languageDetector.getLanguageName(
 			LanguageDetectorService.languages.target,
 		);
@@ -463,8 +508,12 @@ export class TranslationBatchManager {
 
 			if (prStatus.needsUpdate) {
 				this.logger.info(
-					{ prNumber: existingPR.number, mergeableState: prStatus.mergeableState },
-					"Closing PR with merge conflicts and creating new one",
+					{
+						prNumber: existingPR.number,
+						mergeableState: prStatus.mergeableState,
+						createdBy: prStatus.createdBy,
+					},
+					"Closing conflicted PR and creating replacement",
 				);
 
 				await this.services.github.createCommentOnPullRequest(
@@ -490,7 +539,7 @@ export class TranslationBatchManager {
 	}
 
 	/**
-	 * Creates a comprehensive pull request description for translated content.
+	 * Creates a pull request description for translated content.
 	 *
 	 * Generates a detailed PR body including translation metadata, review guidelines,
 	 * processing statistics, and optional conflict notices. When a file has an existing

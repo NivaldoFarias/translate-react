@@ -4,6 +4,7 @@ Overview of the `translate-react` CLI: service design, data flow, and error hand
 
 ## Table of Contents
 
+- [Table of Contents](#table-of-contents)
 - [System Overview](#system-overview)
 - [Service Architecture](#service-architecture)
 - [Core Services](#core-services)
@@ -20,7 +21,7 @@ Overview of the `translate-react` CLI: service design, data flow, and error hand
 
 ## System Overview
 
-The system follows a **modular, service-oriented architecture** with clear separation of concerns. Each service handles a specific domain (GitHub operations, translation, language detection, etc.) and communicates through well-defined interfaces.
+`main.ts` runs the CLI. **RunnerService** calls GitHub, translator, language detector, and cache in sequence (see [WORKFLOW.md](./WORKFLOW.md)). **GitHubService** and **TranslatorService** talk to the GitHub REST API and the configured LLM endpoint. Errors surface at the top level in `main.ts` with structured logging (Pino).
 
 ```mermaid
 graph TB
@@ -110,23 +111,14 @@ classDiagram
 
 ### Runner Service
 
-The Runner Service (`services/runner/`) acts as the **workflow orchestrator**, coordinating all other services to execute the translation pipeline.
-
-**Responsibilities:**
-
-- Workflow state management and orchestration
-- Batch processing coordination
-- Progress tracking and logging
-- Error recovery and cleanup
-
-The Runner maintains workflow state (`RunnerState`) in memory during execution, tracking repository tree, files to translate, and processed results.
+Code under `src/services/runner/`. Runs the pipeline in [`RunnerService.run()`](../src/services/runner/runner.service.ts): keeps `RunnerState` in memory (tree, queue, results) and delegates batch work to managers. Details: [WORKFLOW.md](./WORKFLOW.md).
 
 ### GitHub Service
 
 Single public API (`services/github/`) for all GitHub operations. Internally composes three classes:
 
-- **GitHubRepository**: Fork sync, tree fetching (`.md` in `src/`), token verification, glossary retrieval
-- **GitHubContent**: File content retrieval, PR listing/create/update, commits, comments
+- **GitHubRepository**: Fork sync, tree fetching (`.md` in `src/`), token verification, translation guidelines retrieval
+- **GitHubContent**: File content retrieval, PR listing/create/update, commits (branch-tip `sha` before contents API writes), progress-issue comments
 - **GitHubBranch**: Translation branch creation (`translate/{file-path}`), cleanup, deletion
 
 Public methods delegate to the appropriate internal class.
@@ -137,23 +129,26 @@ Core translation engine (`services/translator/translator.service.ts`) interfacin
 
 ```mermaid
 graph LR
-    A[Input] --> B{Size Check}
-    B -->|< 4000 tokens| C[Direct Translation]
-    B -->|> 4000 tokens| D[Chunking]
-    D --> E[Translate Chunks]
-    E --> F[Reassemble]
-    C --> G[Validation]
-    F --> G
-    G --> H[Output]
+    A[Input] --> B{Optional large-fence mask}
+    B --> C{Size Check}
+    C -->|under limit| D[Direct Translation]
+    C -->|over limit| E[Markdown chunking]
+    E --> F[Translate chunks in parallel]
+    F --> G[Reassemble]
+    D --> H[Restore fences if masked]
+    G --> H
+    H --> I[Validation]
+    I --> J[Output]
 ```
 
-**Content Chunking** (files > `MAX_CHUNK_TOKENS`):
+**Large-fence masking (optional, env-driven):** Fenced blocks whose tiktoken estimate meets `MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS` can be replaced by short HTML comment placeholders before any LLM call, then restored from the original source so structure and validators still see real fences. Disabled by default; see [`markdown-verbatim-fences.util.ts`](../src/utils/markdown-verbatim-fences.util.ts).
 
-1. Split using `RecursiveCharacterTextSplitter` (LangChain) with 200-token overlap
-2. Translate sequentially, passing previous context
-3. Reassemble with original formatting
+**Content chunking** (when estimated input tokens exceed the safe budget in [`ChunksManager`](../src/services/translator/managers/chunks.manager.ts)):
 
-**Glossary**: Loaded from upstream `GLOSSARY.md`, passed to LLM as system instruction.
+1. Split with LangChain `MarkdownTextSplitter` using the same token estimator and overlap from `CHUNKS` in [`managers.constants.ts`](../src/services/translator/managers/managers.constants.ts)
+2. Translate chunks concurrently (`Promise.all`), then reassemble with captured separators
+
+**Translation guidelines**: Loaded from upstream `GLOSSARY.md`, passed to LLM as system instruction.
 
 ### Language Detector Service
 
@@ -177,7 +172,7 @@ In-memory caching (`services/cache/`) for runtime-scoped data.
 
 ## Error Handling
 
-**ApplicationError** is used for domain workflow failures (e.g. no files to translate, below success rate). Carries `ErrorCode`, operation name, and optional metadata. Library errors (`RequestError`, `APIError`) bubble up unmodified.
+**ApplicationError** is used for domain workflow failures (e.g. no files to translate). Carries `ErrorCode`, operation name, and optional metadata. Library errors (`RequestError`, `APIError`) bubble up unmodified.
 
 **Top-Level Handler** (`main.ts`) catches all errors at the process boundary:
 
@@ -219,9 +214,9 @@ Mock factories live in `tests/mocks/`.
 | Translation           | Sequential (rate-limited)    |
 | PR creation           | Sequential (avoid conflicts) |
 
-**Memory**: Streaming content processing, GC after each batch, lazy glossary loading.
+**Memory**: Streaming content processing, GC after each batch, lazy translation guidelines loading.
 
 ## References
 
-- [Workflow Documentation](./WORKFLOW.md) — Detailed execution flow and data flow diagrams
-- [Project README](../README.md) — High-level overview
+- [WORKFLOW.md](./WORKFLOW.md) — Call order, stages, forks, releases
+- [README.md](../README.md) — Install, env tables, troubleshooting

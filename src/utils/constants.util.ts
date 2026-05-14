@@ -41,13 +41,16 @@ export const MIN_API_TOKEN_LENGTH = 20;
 /** Number of milliseconds in a second (for converting Unix timestamps to milliseconds) */
 export const MS_PER_SECOND = 1_000;
 
+/** Maximum length for string values in logs before truncation */
+export const MAX_LOG_STRING_LENGTH = 500;
+
 /**
  * Common rate limit patterns from various providers.
  *
  * Used to detect rate limit errors in error messages. Includes:
  * - Standard phrases like "rate limit" and "too many requests"
  * - HTTP status code as string
- * - Provider-specific phrases like "free-models-per-" for OpenRouter
+ * - Provider-specific phrases like "free-models-per-" / `free-models-per-day` for OpenRouter
  * - General quota exceeded patterns
  * - "requests per" patterns indicating rate limits
  */
@@ -58,6 +61,22 @@ export const RATE_LIMIT_PATTERNS = [
 	"quota",
 	"too many requests",
 	"requests per",
+] as const;
+
+/**
+ * Common filenames for translation guidelines in React documentation repos.
+ *
+ * Used by auto-discovery to locate the translation guidelines file when no
+ * explicit filename is provided. Files are checked in priority order.
+ *
+ * @see {@link https://github.com/reactjs/pt-br.react.dev/blob/main/GLOSSARY.md|pt-br uses GLOSSARY.md}
+ * @see {@link https://github.com/reactjs/ru.react.dev/blob/main/TRANSLATION.md|ru uses TRANSLATION.md}
+ */
+export const TRANSLATION_GUIDELINES_CANDIDATES = [
+	"GLOSSARY.md",
+	"TRANSLATION.md",
+	"TRANSLATING.md",
+	"translation-glossary.md",
 ] as const;
 
 /**
@@ -111,6 +130,12 @@ export const REACT_TRANSLATION_LANGUAGES = [
 /** Type for React translation language codes */
 export type ReactLanguageCode = (typeof REACT_TRANSLATION_LANGUAGES)[number];
 
+/** Chunk translation mode */
+export enum ChunkTranslationMode {
+	Parallel = "parallel",
+	Sequential = "sequential",
+}
+
 export interface EnvironmentSchemaDefaults {
 	NODE_ENV: RuntimeEnvironment;
 	LOG_LEVEL: LogLevel;
@@ -131,12 +156,35 @@ export interface EnvironmentSchemaDefaults {
 	MAX_TOKENS: number;
 	LOG_TO_CONSOLE: boolean;
 	GH_REQUEST_TIMEOUT: number;
-	MIN_SUCCESS_RATE: number;
 	MAX_LLM_CONCURRENCY: number;
 	MAX_RETRY_ATTEMPTS: number;
+
+	/**
+	 * When greater than zero, caps how many LLM requests may start per rolling minute across the process
+	 * (via {@link https://github.com/sindresorhus/p-queue#intervalCap|p-queue} strict interval). Use for
+	 * OpenRouter `free-models-per-min` and similar quotas. `0` disables interval limiting.
+	 */
+	LLM_MAX_REQUESTS_PER_MINUTE: number;
+
+	/**
+	 * When `true`, large fenced blocks become HTML comment placeholders before the LLM and are restored after.
+	 */
+	MASK_VERBATIM_LARGE_FENCES: boolean;
+
+	/** Minimum estimated tokens (tiktoken) for a fence to be masked when `MASK_VERBATIM_LARGE_FENCES` is on */
+	MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS: number;
+
+	/** When `sequential`, translate chunks in order (slower, better boundary coherence); `parallel` keeps current behavior */
+	CHUNK_TRANSLATION_MODE: ChunkTranslationMode;
 }
 
-/** Placeholders for the environment schema. */
+/**
+ * Placeholders for the environment schema.
+ *
+ * Most of these values are overridden by providedenvironment variables.
+ *
+ * @see {@link EnvironmentSchemaDefaults}
+ */
 export const ENV_PLACEHOLDERS = {
 	REPO_FORK_OWNER: "nivaldofarias",
 	REPO_FORK_NAME: "pt-br.react.dev",
@@ -155,9 +203,12 @@ export const ENV_PLACEHOLDERS = {
 	MAX_TOKENS: 8192,
 	LOG_TO_CONSOLE: true,
 	GH_REQUEST_TIMEOUT: 30_000,
-	MIN_SUCCESS_RATE: 0.75,
 	MAX_RETRY_ATTEMPTS: 3,
 	MAX_LLM_CONCURRENCY: 4,
+	LLM_MAX_REQUESTS_PER_MINUTE: 0,
+	MASK_VERBATIM_LARGE_FENCES: false,
+	MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS: 120,
+	CHUNK_TRANSLATION_MODE: ChunkTranslationMode.Parallel,
 } satisfies Partial<EnvironmentSchemaDefaults>;
 
 export const environmentDefaults: Record<RuntimeEnvironment, EnvironmentSchemaDefaults> = {

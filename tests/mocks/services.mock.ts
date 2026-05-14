@@ -50,7 +50,9 @@ export function createMockGitHubService() {
 		forkExists: mock(() => Promise.resolve()),
 		isForkSynced: mock(() => Promise.resolve(true)),
 		syncFork: mock(() => Promise.resolve(true)),
-		fetchGlossary: mock(() => Promise.resolve("React - React\ncomponent - componente")),
+		fetchTranslationGuidelinesFile: mock(
+			() => Promise.resolve("React - React\ncomponent - componente") as Promise<string | null>,
+		),
 		createBranch: mock(() =>
 			Promise.resolve({
 				data: {
@@ -91,7 +93,13 @@ export function createMockGitHubService() {
 			),
 		),
 		checkPullRequestStatus: mock(() =>
-			Promise.resolve({ needsUpdate: false, mergeableState: "clean" } as PullRequestStatus),
+			Promise.resolve({
+				hasConflicts: false,
+				mergeable: true,
+				needsUpdate: false,
+				mergeableState: "clean",
+				createdBy: "test-fork-owner",
+			} satisfies PullRequestStatus),
 		),
 		closePullRequest: mock(() =>
 			Promise.resolve({
@@ -141,7 +149,7 @@ export function createMockTranslatorService() {
 				target: "pt-br",
 			},
 		},
-		glossary: null,
+		translationGuidelines: null,
 	};
 }
 
