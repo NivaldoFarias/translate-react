@@ -21,7 +21,7 @@ Overview of the `translate-react` CLI: service design, data flow, and error hand
 
 ## System Overview
 
-The system follows a **modular, service-oriented architecture** with clear separation of concerns. Each service handles a specific domain (GitHub operations, translation, language detection, etc.) and communicates through well-defined interfaces.
+`main.ts` runs the CLI. **RunnerService** calls GitHub, translator, language detector, and cache in sequence (see [WORKFLOW.md](./WORKFLOW.md)). **GitHubService** and **TranslatorService** talk to the GitHub REST API and the configured LLM endpoint. Errors surface at the top level in `main.ts` with structured logging (Pino).
 
 ```mermaid
 graph TB
@@ -111,16 +111,7 @@ classDiagram
 
 ### Runner Service
 
-The Runner Service (`services/runner/`) acts as the **workflow orchestrator**, coordinating all other services to execute the translation pipeline.
-
-**Responsibilities:**
-
-- Workflow state management and orchestration
-- Batch processing coordination
-- Progress tracking and logging
-- Error recovery and cleanup
-
-The Runner maintains workflow state (`RunnerState`) in memory during execution, tracking repository tree, files to translate, and processed results.
+Code under `src/services/runner/`. Runs the pipeline in [`RunnerService.run()`](../src/services/runner/runner.service.ts): keeps `RunnerState` in memory (tree, queue, results) and delegates batch work to managers. Details: [WORKFLOW.md](./WORKFLOW.md).
 
 ### GitHub Service
 
@@ -227,5 +218,5 @@ Mock factories live in `tests/mocks/`.
 
 ## References
 
-- [Workflow Documentation](./WORKFLOW.md) — Detailed execution flow and data flow diagrams
-- [Project README](../README.md) — High-level overview
+- [WORKFLOW.md](./WORKFLOW.md) — Call order, stages, forks, releases
+- [README.md](../README.md) — Install, env tables, troubleshooting

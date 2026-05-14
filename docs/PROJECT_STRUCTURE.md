@@ -53,11 +53,11 @@ translate-react/                          # Repository root
 
 ## Key Principles
 
-- **Services**: Business logic in `src/services/`; each service in its own subfolder with `index.ts` barrel export; single **GitHubService** (internally **GitHubRepository**, **GitHubContent**, **GitHubBranch**); **RunnerService** extends **BaseRunnerService** and uses managers in `runner/managers/`; **TranslatorService** uses chunking and validation managers in `translator/managers/` and optional large-fence masking from `src/utils/markdown-verbatim-fences.util.ts`.
-- **Clients**: External API clients in `src/clients/`; **Octokit** client in dedicated subfolder with constants.
-- **Errors**: **ApplicationError** and **ErrorCode** in `src/errors/`; top-level handler in `main.ts`; library errors bubble up.
-- **DI**: Module-level singletons; dependencies injected via constructors (e.g. **RunnerServiceDependencies**); tests use mocks from `tests/mocks/`.
-- **Runtime**: Bun (package manager and runtime). TypeScript, ESLint, Prettier.
+- **Services**: Logic in `src/services/` (one folder per concern). **GitHubService** composes **GitHubRepository**, **GitHubContent**, and **GitHubBranch**. **RunnerService** extends **BaseRunnerService** and uses `runner/managers/`. **TranslatorService** uses `translator/managers/` plus optional large-fence masking (`src/utils/markdown-verbatim-fences.util.ts`).
+- **Clients**: `src/clients/` — Octokit wrapper, OpenAI client, queue helper.
+- **Errors**: `src/errors/` (**ApplicationError**, **ErrorCode**); `main.ts` handles uncaught errors; Octokit/OpenAI errors pass through with logging.
+- **Construction**: Module-level singletons; constructors take typed deps; tests swap mocks from `tests/mocks/`.
+- **Tooling**: Bun, TypeScript, ESLint, Prettier.
 
 ## File Categories
 
@@ -133,3 +133,5 @@ RunnerService (extends BaseRunnerService)
 ```
 
 Services are created at module level; `main.ts` imports `runnerService` from [`src/services/`](../src/services/index.ts).
+
+Pipeline order and stage behavior live in [WORKFLOW.md](./WORKFLOW.md); this file is layout and file placement only.
