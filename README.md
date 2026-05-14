@@ -6,7 +6,7 @@
 
 </div>
 
-CLI tool that translates the official React documentation via LLMs, keeps structure intact, and opens PRs through the [`translate-react` bot](https://github.com/apps/translate-react-bot). 
+CLI tool that translates the official React documentation via LLMs, keeps structure intact, and opens PRs through the [`translate-react` bot](https://github.com/apps/translate-react-bot).
 
 You bring the LLM key and GitHub token. To run a fixed revision in Actions, pin a tag or SHA ([Pinning translate-react in GitHub Actions](./docs/WORKFLOW.md#pinning-translate-react-in-github-actions)).
 
