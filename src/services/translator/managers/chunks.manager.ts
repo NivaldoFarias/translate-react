@@ -51,7 +51,18 @@ export type ChunksToReassemble = Omit<ChunkingResult, "chunks"> & {
 export class ChunksManager {
 	private readonly logger = logger.child({ component: ChunksManager.name });
 
-	constructor(private readonly model: string) {}
+	private readonly model: string;
+
+	private readonly maxGrossChunkInputTokens: number;
+
+	/**
+	 * @param model LLM model id (used for tiktoken profile selection)
+	 * @param maxGrossChunkInputTokens Upper bound on estimated input tokens per chunk (same role as {@link CHUNKS.maxTokens})
+	 */
+	constructor(model: string, maxGrossChunkInputTokens: number = CHUNKS.maxTokens) {
+		this.model = model;
+		this.maxGrossChunkInputTokens = maxGrossChunkInputTokens;
+	}
 
 	/** Lazily-initialized tiktoken encoder instance, cached for performance */
 	private cachedEncoder: Tiktoken | null = null;
@@ -129,9 +140,8 @@ export class ChunksManager {
 	/**
 	 * Determines if content needs chunking based on token estimates.
 	 *
-	 * Checks if the estimated token count exceeds safe limits, leaving buffer
-	 * space for system prompt (approximately 1000 tokens) and output tokens
-	 * (approximately 8000 tokens).
+	 * Compares estimated body tokens to `maxGrossChunkInputTokens - SYSTEM_PROMPT_TOKEN_RESERVE`
+	 * so one-shot requests leave room for the system prompt overhead constant.
 	 *
 	 * @param content Content to check for chunking requirements
 	 *
@@ -148,7 +158,7 @@ export class ChunksManager {
 	 */
 	public needsChunking(file: TranslationFile): boolean {
 		const estimatedTokens = this.estimateTokenCount(file.content);
-		const maxInputTokens = CHUNKS.maxTokens - SYSTEM_PROMPT_TOKEN_RESERVE;
+		const maxInputTokens = this.maxGrossChunkInputTokens - SYSTEM_PROMPT_TOKEN_RESERVE;
 		const needsChunking = estimatedTokens > maxInputTokens;
 
 		file.logger.debug(
@@ -191,7 +201,7 @@ export class ChunksManager {
 	 */
 	public async chunkContent(
 		content: string,
-		maxTokens = CHUNKS.maxTokens - CHUNKS.tokenBuffer,
+		maxTokens = this.maxGrossChunkInputTokens - CHUNKS.tokenBuffer,
 	): Promise<ChunkingResult> {
 		const markdownTextSplitterOptions: Partial<MarkdownTextSplitterParams> = {
 			chunkSize: maxTokens,
