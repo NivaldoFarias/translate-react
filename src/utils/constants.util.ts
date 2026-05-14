@@ -1,4 +1,4 @@
-import { homepage, name } from "../../package.json";
+import { homepage, name, version } from "../../package.json";
 
 /**
  * Available runtime environments for the application.
@@ -130,6 +130,18 @@ export const REACT_TRANSLATION_LANGUAGES = [
 /** Type for React translation language codes */
 export type ReactLanguageCode = (typeof REACT_TRANSLATION_LANGUAGES)[number];
 
+/** Chunk translation mode */
+export enum ChunkTranslationMode {
+	Parallel = "parallel",
+	Sequential = "sequential",
+}
+
+/** Token count mode */
+export enum TokenCountMode {
+	Tiktoken = "tiktoken",
+	Chars = "chars",
+}
+
 export interface EnvironmentSchemaDefaults {
 	NODE_ENV: RuntimeEnvironment;
 	LOG_LEVEL: LogLevel;
@@ -172,16 +184,22 @@ export interface EnvironmentSchemaDefaults {
 	LOG_MAX_STRING_LENGTH: number;
 
 	/** How to estimate token counts for chunking (`chars` is conservative when the model has no tiktoken profile) */
-	TOKEN_COUNT_MODE: "tiktoken" | "chars";
+	TOKEN_COUNT_MODE: TokenCountMode;
 
 	/** When `sequential`, translate chunks in order (slower, better boundary coherence); `parallel` keeps current behavior */
-	CHUNK_TRANSLATION_MODE: "parallel" | "sequential";
+	CHUNK_TRANSLATION_MODE: ChunkTranslationMode;
 
 	/** When `true`, fetch OpenRouter model `context_length` to widen chunk budget when safe (no effect if base URL is not OpenRouter) */
 	OPENROUTER_RESOLVE_CHUNK_BUDGET: boolean;
 }
 
-/** Placeholders for the environment schema. */
+/**
+ * Placeholders for the environment schema.
+ *
+ * Most of these values are overridden by providedenvironment variables.
+ *
+ * @see {@link EnvironmentSchemaDefaults}
+ */
 export const ENV_PLACEHOLDERS = {
 	REPO_FORK_OWNER: "nivaldofarias",
 	REPO_FORK_NAME: "pt-br.react.dev",
@@ -189,7 +207,7 @@ export const ENV_PLACEHOLDERS = {
 	REPO_UPSTREAM_NAME: "pt-br.react.dev",
 	LLM_MODEL: "google/gemini-2.0-flash-exp:free",
 	LLM_API_BASE_URL: "https://openrouter.ai/api/v1",
-	HEADER_APP_TITLE: name,
+	HEADER_APP_TITLE: `${name} v${version}`,
 	HEADER_APP_URL: homepage,
 	TARGET_LANGUAGE: "pt-br",
 	SOURCE_LANGUAGE: "en",
@@ -206,8 +224,8 @@ export const ENV_PLACEHOLDERS = {
 	MASK_VERBATIM_LARGE_FENCES: false,
 	MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS: 120,
 	LOG_MAX_STRING_LENGTH: MAX_LOG_STRING_LENGTH,
-	TOKEN_COUNT_MODE: "tiktoken",
-	CHUNK_TRANSLATION_MODE: "parallel",
+	TOKEN_COUNT_MODE: TokenCountMode.Tiktoken,
+	CHUNK_TRANSLATION_MODE: ChunkTranslationMode.Parallel,
 	OPENROUTER_RESOLVE_CHUNK_BUDGET: true,
 } satisfies Partial<EnvironmentSchemaDefaults>;
 
