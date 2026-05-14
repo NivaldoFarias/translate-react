@@ -133,9 +133,6 @@ export interface PullRequestStatus {
 
 	/** GitHub username of the PR creator */
 	createdBy: string;
-
-	/** GitHub username of the last commit author */
-	lastCommitAuthor: string | undefined;
 }
 
 /**

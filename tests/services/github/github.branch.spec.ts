@@ -39,7 +39,6 @@ describe("GitHubBranch", () => {
 					mergeable: true,
 					mergeableState: "clean",
 					createdBy: "other-user",
-					lastCommitAuthor: "other-user",
 				}),
 			);
 
@@ -67,7 +66,6 @@ describe("GitHubBranch", () => {
 					mergeable: true,
 					mergeableState: "clean",
 					createdBy: "other-user",
-					lastCommitAuthor: "other-user",
 				}),
 			);
 
@@ -95,7 +93,6 @@ describe("GitHubBranch", () => {
 					mergeable: true,
 					mergeableState: "clean",
 					createdBy: "other-user",
-					lastCommitAuthor: "other-user",
 				}),
 			);
 
@@ -120,7 +117,6 @@ describe("GitHubBranch", () => {
 					mergeable: true,
 					mergeableState: "clean",
 					createdBy: "other-user",
-					lastCommitAuthor: "other-user",
 				}),
 			);
 

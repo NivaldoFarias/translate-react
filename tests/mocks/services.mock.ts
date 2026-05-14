@@ -35,9 +35,6 @@ export function createMockCommentBuilderService() {
 export function createMockGitHubService() {
 	return {
 		getDefaultBranch: mock(() => Promise.resolve("main")),
-		getForkOwner: mock(() => "test-fork-owner"),
-		getCurrentUser: mock(() => Promise.resolve("test-user")),
-		isProvidedUserForkOwnerOrBot: mock(() => Promise.resolve(true)),
 		getRepositoryTree: mock(() =>
 			Promise.resolve([
 				{
@@ -97,10 +94,12 @@ export function createMockGitHubService() {
 		),
 		checkPullRequestStatus: mock(() =>
 			Promise.resolve({
+				hasConflicts: false,
+				mergeable: true,
 				needsUpdate: false,
 				mergeableState: "clean",
 				createdBy: "test-fork-owner",
-			} as PullRequestStatus),
+			} satisfies PullRequestStatus),
 		),
 		closePullRequest: mock(() =>
 			Promise.resolve({
