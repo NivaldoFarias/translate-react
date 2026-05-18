@@ -5,7 +5,6 @@ export enum ErrorCode {
 	// Domain Workflow Errors
 	TranslationFailed = "TRANSLATION_FAILED",
 	ChunkProcessingFailed = "CHUNK_PROCESSING_FAILED",
-	NoFilesToTranslate = "NO_FILES_TO_TRANSLATE",
 	NoContent = "NO_CONTENT",
 
 	// Domain Validation Errors
