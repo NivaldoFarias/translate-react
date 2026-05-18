@@ -216,10 +216,11 @@ export class TranslationBatchManager {
 	 *
 	 * ### Workflow Steps
 	 *
-	 * 1. **Branch Creation**: Creates or retrieves translation branch for isolation
-	 * 2. **Content Translation**: Translates file content (may involve chunking for large files)
-	 * 3. **Commit Operation**: Commits translated content to branch with descriptive message
-	 * 4. **Pull Request**: Creates or updates PR with translation and detailed metadata
+	 * 1. **Existing PR guard**: Skips when a mergeable open PR already exists for the path
+	 * 2. **Branch Creation**: Creates or retrieves translation branch for isolation
+	 * 3. **Content Translation**: Translates file content (may involve chunking for large files)
+	 * 4. **Commit Operation**: Commits translated content to branch with descriptive message
+	 * 5. **Pull Request**: Creates or updates PR with translation and detailed metadata
 	 *
 	 * ### Timing and Sequencing
 	 *
@@ -267,18 +268,28 @@ export class TranslationBatchManager {
 				);
 			}
 
+			const skippedForExistingPullRequest = await this.skipIfValidExistingPullRequest(
+				file,
+				metadata,
+				startTime,
+			);
+
+			if (skippedForExistingPullRequest) {
+				return skippedForExistingPullRequest;
+			}
+
 			const branchStart = Date.now();
 			metadata.branch = await this.createOrGetTranslationBranch(file);
 			file.logger.debug(
 				{ branchRef: metadata.branch.ref, durationMs: Date.now() - branchStart },
-				"Step 1/4: Branch created/retrieved",
+				"Step 1/5: Branch created/retrieved",
 			);
 
 			const translationStart = Date.now();
 			metadata.translation = await this.services.translator.translateContent(file);
 			file.logger.debug(
 				{ translationSize: metadata.translation.length, durationMs: Date.now() - translationStart },
-				"Step 2/4: Translation complete",
+				"Step 3/5: Translation complete",
 			);
 
 			if (isTranslationEquivalentToCurrentBlob(file, metadata.translation)) {
@@ -314,13 +325,13 @@ export class TranslationBatchManager {
 				content: metadata.translation,
 				message: `docs: translate \`${file.filename}\` to ${languageName}`,
 			});
-			file.logger.debug({ durationMs: Date.now() - commitStart }, "Step 3/4: Commit complete");
+			file.logger.debug({ durationMs: Date.now() - commitStart }, "Step 4/5: Commit complete");
 
 			const prStart = Date.now();
 			metadata.pullRequest = await this.createOrUpdatePullRequest(file, metadata);
 			file.logger.debug(
 				{ prNumber: metadata.pullRequest.number, durationMs: Date.now() - prStart },
-				"Step 4/4: Pull request created/updated",
+				"Step 5/5: Pull request created/updated",
 			);
 
 			this.consecutiveFailures = 0;
@@ -384,6 +395,55 @@ export class TranslationBatchManager {
 	/** Resolves the `translate/…` branch name used for commits and pull requests */
 	private getTranslationBranchName(file: TranslationFile) {
 		return `translate/${file.path.split("/").slice(2).join("/")}`;
+	}
+
+	/**
+	 * Returns completed metadata when an open, mergeable PR already covers the file.
+	 *
+	 * @param file Translation file being processed
+	 * @param metadata In-progress processing result to populate when skipping
+	 * @param startTime Workflow step start time for duration logging
+	 *
+	 * @returns Filled metadata when skipped, or `null` to continue translation
+	 */
+	private async skipIfValidExistingPullRequest(
+		file: TranslationFile,
+		metadata: ProcessedFileResult,
+		startTime: number,
+	) {
+		const branchName = this.getTranslationBranchName(file);
+		const existingPR = await this.services.github.findPullRequestByBranch(branchName);
+
+		if (!existingPR) {
+			return null;
+		}
+
+		const prStatus = await this.services.github.checkPullRequestStatus(existingPR.number);
+
+		if (prStatus.needsUpdate || prStatus.hasConflicts) {
+			return null;
+		}
+
+		metadata.pullRequest = existingPR;
+
+		this.consecutiveFailures = 0;
+		this.updateBatchProgress("success");
+
+		file.logger.info(
+			{
+				path: file.path,
+				prNumber: existingPR.number,
+				mergeableState: prStatus.mergeableState,
+			},
+			"Skipping file with valid existing pull request",
+		);
+
+		file.logger.debug(
+			{ totalDurationMs: Date.now() - startTime },
+			"File processing complete (existing PR)",
+		);
+
+		return metadata;
 	}
 
 	/**
