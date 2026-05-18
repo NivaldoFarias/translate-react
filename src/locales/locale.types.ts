@@ -92,8 +92,16 @@ export interface LocalePRBodyStrings {
 			readonly processingTime: string;
 		};
 
-		/** Explanatory notes below the stats table */
-		readonly notes: readonly string[];
+		/**
+		 * Footnote definitions for statistics rows in the PR template.
+		 */
+		readonly notes: {
+			/** Footnote body for the content ratio metric */
+			readonly contentRatio: string;
+
+			/** Footnote body for the processing time metric */
+			readonly processingTime: string;
+		};
 	};
 
 	/** Technical information section */
@@ -107,9 +115,21 @@ export interface LocalePRBodyStrings {
 		/** Label for branch name */
 		readonly branch: string;
 
+		/** Label for the configured LLM translation model id */
+		readonly translationModel: string;
+
 		/** Label for the GitHub Actions workflow run link */
 		readonly workflowRun: string;
 	};
+
+	/**
+	 * Renders the TIP block body with a link to the repository issue chooser.
+	 *
+	 * @param issueChooserUrl Absolute URL to `/issues/new/choose`
+	 *
+	 * @returns Markdown for the tip (one or more lines; each line is prefixed with `>` by the builder)
+	 */
+	readonly feedbackTip: (issueChooserUrl: string) => string;
 
 	/** BCP 47 locale string for time formatting (e.g., "pt-BR", "ru-RU") */
 	readonly timeFormatLocale: string;

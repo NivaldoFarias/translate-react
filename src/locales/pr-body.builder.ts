@@ -80,6 +80,11 @@ export function createPRBodyBuilder(strings: LocalePRBodyStrings) {
 			runContext ?
 				`- **${strings.techInfo.workflowRun}**: [\`${runContext.workflowName}\` · #${runContext.runId}](${runContext.url})`
 			:	"";
+		const feedbackTipQuoted = strings
+			.feedbackTip(metadata.newIssueChooserUrl)
+			.split("\n")
+			.map((line) => `> ${line}`)
+			.join("\n");
 
 		return `${strings.intro(metadata.languageName)}
 ${conflictNotice}
@@ -96,19 +101,25 @@ ${conflictNotice}
 |--------|-------|
 | **${strings.stats.metrics.sourceSize}** | ${metadata.content.source} |
 | **${strings.stats.metrics.translationSize}** | ${metadata.content.translation} |
-| **${strings.stats.metrics.contentRatio}** | ${metadata.content.compressionRatio}x |
+| **${strings.stats.metrics.contentRatio}** | ${metadata.content.compressionRatio}x [^content-ratio] |
 | **${strings.stats.metrics.filePath}** | \`${file.path}\` |
-| **${strings.stats.metrics.processingTime}** | ~${formatElapsedTime(processingTime, strings.timeFormatLocale)} |
-
-> [!NOTE]
->
-${strings.stats.notes.map((note) => `> - ${note}`).join("\n")}
+| **${strings.stats.metrics.processingTime}** | ~${formatElapsedTime(processingTime, strings.timeFormatLocale)} [^processing-time] |
 
 ### ${strings.techInfo.header}
 
 - **${strings.techInfo.generationDate}**: ${generationDate}
 - **${strings.techInfo.branch}**: \`${branchRef}\`
+- **${strings.techInfo.translationModel}**: \`${metadata.translationModel}\`
 ${workflowRunLine ? `${workflowRunLine}\n` : ""}
-</details>`;
+</details>
+
+> [!TIP]
+${feedbackTipQuoted}
+
+---
+
+[^content-ratio]: ${strings.stats.notes.contentRatio}
+[^processing-time]: ${strings.stats.notes.processingTime}
+`;
 	};
 }
