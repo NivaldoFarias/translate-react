@@ -60,14 +60,10 @@ export interface LocalePRBodyStrings {
 		 * Body explaining why the PR was closed.
 		 *
 		 * @param prNumber The closed PR number
-		 * @param mergeableState The mergeable state that caused closure
 		 *
-		 * @returns Formatted conflict explanation
+		 * @returns Formatted conflict notice
 		 */
-		readonly body: (prNumber: number, mergeableState: string) => string;
-
-		/** Explanation of the complete rewrite approach */
-		readonly rewriteExplanation: string;
+		readonly body: (prNumber: number) => string;
 	};
 
 	/** Important notice about human review requirement */

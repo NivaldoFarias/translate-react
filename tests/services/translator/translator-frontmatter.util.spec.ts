@@ -121,6 +121,22 @@ describe("mergePreservedYamlFrontmatter", () => {
 		);
 	});
 
+	test("preserves extra blank lines after frontmatter when source had more leading newlines than the model returned", () => {
+		const preserved = "---\ntitle: Source\n---";
+		const sourceRest = "\n\n# Heading\n";
+		expect(mergePreservedYamlFrontmatter(preserved, "# Heading\n", sourceRest)).toBe(
+			"---\ntitle: Source\n---\n\n# Heading\n",
+		);
+	});
+
+	test("pads one missing newline when source had a single break before the heading", () => {
+		const preserved = "---\ntitle: Source\n---";
+		const sourceRest = "\n# Heading\n";
+		expect(mergePreservedYamlFrontmatter(preserved, "# Heading\n", sourceRest)).toBe(
+			"---\ntitle: Source\n---\n# Heading\n",
+		);
+	});
+
 	test("strips duplicate leading YAML from model output before prepending", () => {
 		const preserved = "---\ntitle: Source\n---";
 		const translated = "---\ntitle: Wrong\n---\n\n# Heading\n";

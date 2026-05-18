@@ -732,7 +732,7 @@ describe("GitHubService", () => {
 		});
 
 		describe("getFile", () => {
-			test("should get file content when file exists", async () => {
+			test("should get upstream file content at default branch when file exists", async () => {
 				const repoTreeItem: PatchedRepositoryTreeItem = createRepositoryTreeItemFixture({
 					path: "src/test/file.md",
 					sha: "abc123",
@@ -745,6 +745,12 @@ describe("GitHubService", () => {
 				expect(file.sha).toBe("abc123");
 				expect(file.path).toBe("src/test/file.md");
 				expect(file.filename).toBe("file.md");
+				expect(octokitMock.repos.getContent).toHaveBeenCalledWith({
+					...testRepositories.upstream,
+					path: "src/test/file.md",
+					ref: "main",
+				});
+				expect(octokitMock.git.getBlob).not.toHaveBeenCalled();
 			});
 
 			test("should handle file content errors when file does not exist", () => {
@@ -756,7 +762,7 @@ describe("GitHubService", () => {
 						response: { status: StatusCodes.NOT_FOUND },
 					},
 				});
-				octokitMock.git.getBlob.mockRejectedValueOnce(notFoundError);
+				octokitMock.repos.getContent.mockRejectedValueOnce(notFoundError);
 
 				const repoTreeItem: PatchedRepositoryTreeItem = createRepositoryTreeItemFixture({
 					path: "src/test/non-existent.md",
@@ -827,9 +833,22 @@ describe("GitHubService", () => {
 
 			test("should throw RequestError when API call fails", () => {
 				const apiError = createOctokitRequestErrorFixture({ message: "API Error" });
-				octokitMock.paginate.mockRejectedValueOnce(apiError);
+				octokitMock.paginate.mockRejectedValue(apiError);
 
 				expect(githubService.getPullRequestFiles(123)).rejects.toThrow(apiError);
+			});
+
+			test("should retry pull request file list fetch before failing", async () => {
+				const apiError = createOctokitRequestErrorFixture({ message: "Transient API Error" });
+				octokitMock.paginate
+					.mockRejectedValueOnce(apiError)
+					.mockRejectedValueOnce(apiError)
+					.mockResolvedValueOnce([{ filename: "src/file1.md" }]);
+
+				const files = await githubService.getPullRequestFiles(456);
+
+				expect(files).toEqual(["src/file1.md"]);
+				expect(octokitMock.paginate).toHaveBeenCalledTimes(3);
 			});
 		});
 

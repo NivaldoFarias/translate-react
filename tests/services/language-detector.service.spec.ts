@@ -74,6 +74,18 @@ describe("LanguageDetector", () => {
 			expect(analysis.languageScore.target).toBe(0);
 		});
 
+		test("should treat large markdown with only fenced code as below minimum cleaned prose", async () => {
+			const filename = "code-only.md";
+			const onlyFences = "```js\nconst x = 1;\n```\n".repeat(40);
+
+			const analysis = await detector.analyzeLanguage(filename, onlyFences);
+
+			expect(analysis.isTranslated).toBe(false);
+			expect(analysis.ratio).toBe(0);
+			expect(analysis.languageScore.source).toBe(0);
+			expect(analysis.languageScore.target).toBe(0);
+		});
+
 		test("should handle empty text content", async () => {
 			const filename = "empty.md";
 			const emptyText = "";

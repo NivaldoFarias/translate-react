@@ -17,8 +17,10 @@ const TRAILING_FENCE_LINE = new RegExp("(\\r?\\n)[\\t ]*(```+|~~~+)\\s*$");
 
 /**
  * Counts consecutive newline characters from the start of `s` (treats `\r\n` as one logical break).
+ *
+ * @param s String whose leading newline run is measured (optional UTF-8 BOM is skipped before counting)
  */
-function leadingNewlineRunLength(s: string): number {
+export function leadingNewlineRunLength(s: string): number {
 	let index = 0;
 	if (s.startsWith("\uFEFF")) {
 		index += 1;

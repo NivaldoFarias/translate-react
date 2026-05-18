@@ -216,6 +216,9 @@ export class FileDiscoveryManager {
 	 * Skips files with conflict-free PRs. Files with conflicted PRs are queued
 	 * for re-translation and tracked in `invalidPRsByFile` for notification.
 	 *
+	 * Pull request file lists are fetched with retries; a persistent failure aborts
+	 * discovery so paths are not translated without a reliable open-PR map.
+	 *
 	 * @param candidateFiles Files remaining after cache check that require PR validation
 	 *
 	 * @returns Files to fetch, count of skipped files, and map of conflicted PRs
@@ -228,17 +231,10 @@ export class FileDiscoveryManager {
 		const prByFile = new Map<string, number>();
 
 		for (const pr of openPRs) {
-			try {
-				const changedFiles = await this.services.github.getPullRequestFiles(pr.number);
+			const changedFiles = await this.services.github.getPullRequestFiles(pr.number);
 
-				for (const filePath of changedFiles) {
-					prByFile.set(filePath, pr.number);
-				}
-			} catch (error) {
-				this.logger.warn(
-					{ prNumber: pr.number, error },
-					"Failed to fetch PR files, skipping this PR",
-				);
+			for (const filePath of changedFiles) {
+				prByFile.set(filePath, pr.number);
 			}
 		}
 
@@ -306,8 +302,8 @@ export class FileDiscoveryManager {
 	 * Fetches file contents from repository in parallel batches.
 	 *
 	 * Processes files in batches using {@link FILE_FETCH_BATCH_SIZE} to manage concurrent
-	 * GitHub API requests. Provides progress logging at 10% intervals and filters out
-	 * files with missing metadata.
+	 * GitHub API requests. Loads each path from the upstream default branch via
+	 * {@link GitHubService.getFile}. Filters out files with missing metadata.
 	 *
 	 * @param filesToFetch Files requiring content download
 	 *
@@ -397,13 +393,16 @@ export class FileDiscoveryManager {
 				file.content,
 			);
 
-			if (file.sha && analysis.detectedLanguage) {
+			if (file.sha && (analysis.detectedLanguage || analysis.isTranslated)) {
 				const cacheKey = this.buildLanguageCacheKey(file);
 
 				this.services.languageCache.set(
 					cacheKey,
 					{
-						detectedLanguage: analysis.detectedLanguage,
+						detectedLanguage:
+							analysis.isTranslated ?
+								LanguageDetectorService.languages.target
+							:	(analysis.detectedLanguage ?? "und"),
 						confidence: analysis.languageScore.target,
 						timestamp: Date.now(),
 					},
