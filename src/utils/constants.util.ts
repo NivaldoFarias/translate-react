@@ -35,6 +35,15 @@ export const errorMessages = {
 	invalidKey: (key: string) => `Invalid key: ${key}`,
 } as const;
 
+/**
+ * Canonical HTML base URL for this workflow runner repository.
+ *
+ * Used when `GITHUB_REPOSITORY` is unset so PR bodies still link to the correct issue tracker
+ * (fork/upstream env vars point at React docs repos, not this tool).
+ */
+export const WORKFLOW_RUNNER_REPOSITORY_HTML_BASE =
+	"https://github.com/NivaldoFarias/translate-react" as const;
+
 /** Minimum length required for a valid API token */
 export const MIN_API_TOKEN_LENGTH = 20;
 
@@ -173,9 +182,6 @@ export interface EnvironmentSchemaDefaults {
 
 	/** Minimum estimated tokens (tiktoken) for a fence to be masked when `MASK_VERBATIM_LARGE_FENCES` is on */
 	MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS: number;
-
-	/** When `sequential`, translate chunks in order (slower, better boundary coherence); `parallel` keeps current behavior */
-	CHUNK_TRANSLATION_MODE: ChunkTranslationMode;
 }
 
 /**
@@ -208,7 +214,6 @@ export const ENV_PLACEHOLDERS = {
 	LLM_MAX_REQUESTS_PER_MINUTE: 0,
 	MASK_VERBATIM_LARGE_FENCES: false,
 	MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS: 120,
-	CHUNK_TRANSLATION_MODE: ChunkTranslationMode.Parallel,
 } satisfies Partial<EnvironmentSchemaDefaults>;
 
 export const environmentDefaults: Record<RuntimeEnvironment, EnvironmentSchemaDefaults> = {

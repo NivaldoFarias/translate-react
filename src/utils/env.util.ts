@@ -140,14 +140,6 @@ const envSchema = z.object({
 		.default(envDefaults.LLM_MAX_REQUESTS_PER_MINUTE),
 
 	/**
-	 * `parallel` issues one LLM call per chunk at once (bounded by the LLM queue). `sequential` translates
-	 * chunks in document order, which reduces bursts on strict free-tier quotas.
-	 */
-	CHUNK_TRANSLATION_MODE: z
-		.enum(["parallel", "sequential"])
-		.default(envDefaults.CHUNK_TRANSLATION_MODE),
-
-	/**
 	 * Optional explicit filename for the translation guidelines file.
 	 *
 	 * When set, bypasses auto-discovery and fetches this specific file from the

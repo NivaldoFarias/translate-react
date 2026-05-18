@@ -11,7 +11,7 @@ import type {
 } from "./runner.types";
 
 import { ApplicationError, ErrorCode } from "@/errors/";
-import { env, logger, registerCleanup } from "@/utils/";
+import { env, logger, registerCleanup, resolveRunnerNewIssueChooserUrl } from "@/utils/";
 
 import { FileDiscoveryManager, PRManager, TranslationBatchManager } from "./managers";
 
@@ -80,7 +80,9 @@ export abstract class BaseRunnerService {
 	) {
 		this.managers = {
 			fileDiscovery: new FileDiscoveryManager(services),
-			translationBatch: new TranslationBatchManager(services, new Map(), this.metadata.timestamp),
+			translationBatch: new TranslationBatchManager(services, new Map(), this.metadata.timestamp, {
+				newIssueChooserUrl: resolveRunnerNewIssueChooserUrl(),
+			}),
 			prManager: new PRManager(services, this.metadata.timestamp),
 		};
 
@@ -271,10 +273,13 @@ export abstract class BaseRunnerService {
 		this.state.filesToTranslate = filesToTranslate;
 		this.state.invalidPRsByFile = invalidPRsByFile;
 
+		const newIssueChooserUrl = resolveRunnerNewIssueChooserUrl();
+
 		this.managers.translationBatch = new TranslationBatchManager(
 			this.services,
 			invalidPRsByFile,
 			this.metadata.timestamp,
+			{ newIssueChooserUrl },
 		);
 	}
 

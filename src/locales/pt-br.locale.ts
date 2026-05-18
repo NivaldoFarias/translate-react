@@ -38,18 +38,24 @@ const ptBrPRBodyStrings: LocalePRBodyStrings = {
 			filePath: "Caminho do Arquivo",
 			processingTime: "Tempo de Processamento",
 		},
-		notes: [
-			'"Razão de Conteúdo" indica como o comprimento da tradução se compara à fonte (~1.0x: mesmo comprimento, >1.0x: tradução é mais longa). Diferentes idiomas naturalmente têm níveis variados de verbosidade.',
-			'"Tempo de Processamento" baseia-se no cálculo do tempo total desde o início do fluxo até a conclusão da tradução deste arquivo específico.',
-		],
+		notes: {
+			contentRatio:
+				"`Razão de Conteúdo` indica como o comprimento da tradução se compara à fonte (~1.0x: mesmo comprimento, >1.0x: tradução é mais longa). Diferentes idiomas naturalmente têm níveis variados de verbosidade.",
+			processingTime:
+				"`Tempo de Processamento` baseia-se no cálculo do tempo total desde o início do fluxo até a conclusão da tradução deste arquivo específico.",
+		},
 	},
 
 	techInfo: {
 		header: "Informações Técnicas",
 		generationDate: "Data de Geração",
 		branch: "Branch",
+		translationModel: "Modelo de tradução (LLM)",
 		workflowRun: "Execução do workflow",
 	},
+
+	feedbackTip: (issueChooserUrl) =>
+		`Encontrou problemas no resultado ou no conteúdo traduzido? [Abra uma issue](${issueChooserUrl}) neste repositório com o máximo de contexto possível.`,
 
 	timeFormatLocale: "pt-BR",
 };
@@ -65,8 +71,8 @@ export const ptBrLocale: LocaleDefinition = {
 		prefix: "As seguintes páginas foram traduzidas e PRs foram criados:",
 		suffix: `> [!IMPORTANT]
 >
-> As traduções foram geradas por uma LLM e requerem revisão humana para garantir precisão técnica e fluência.
-> Esta implementação é um trabalho em progresso e pode apresentar inconsistências em conteúdos técnicos complexos ou formatação específica.`,
+> - As traduções foram geradas por uma LLM e requerem revisão humana para garantir precisão técnica e fluência.
+> - Esta implementação é um **trabalho em progresso** e pode apresentar inconsistências em conteúdos técnicos complexos ou formatação específica.`,
 	},
 	rules: {
 		specific: `
