@@ -8,6 +8,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Changed
 
+## [0.1.27] - 2026-05-18
+
+### Fixed
+
+- `CHANGELOG.md`: add the missing `[0.1.26]` release reference link at the bottom so version anchors
+  match the other shipped releases.
+
 ## [0.1.26] - 2026-05-18
 
 ### Added
@@ -75,5 +82,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 - README `MAX_RETRY_ATTEMPTS` default matches `src/utils/constants.util.ts` (`3`).
 
+[0.1.27]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.1.27
+[0.1.26]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.1.26
 [0.1.25]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.1.25
 [0.1.24]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.1.24
