@@ -56,8 +56,8 @@ export class RunnerService extends BaseRunnerService {
 	 * 2. Verifies GitHub token permissions
 	 * 3. Syncs fork with upstream
 	 * 4. Fetches repository tree
-	 * 5. Identifies files for translation
-	 * 6. Processes files in batches
+	 * 5. Identifies files for translation (when none remain after filtering, batch translation is skipped)
+	 * 6. Processes files in batches when there is work to do
 	 * 7. Reports results
 	 *
 	 * @returns Statistics about the workflow execution (success/failure counts)
@@ -70,8 +70,10 @@ export class RunnerService extends BaseRunnerService {
 
 			await this.fetchRepositoryTree();
 
-			await this.fetchFilesToTranslate();
-			await this.processInBatches();
+			const hasFilesToTranslate = await this.fetchFilesToTranslate();
+			if (hasFilesToTranslate) {
+				await this.processInBatches();
+			}
 
 			this.state.processedResults = Array.from(this.metadata.results.values());
 

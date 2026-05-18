@@ -25,6 +25,7 @@ Detailed breakdown of the translation workflow: execution stages, data flow, and
   - [Translation Phase](#translation-phase)
 - [Data Structures](#data-structures)
 - [Error Recovery](#error-recovery)
+  - [Empty discovery](#empty-discovery-no-files-to-translate)
 
 ## Overview
 
@@ -72,10 +73,10 @@ Order in [`RunnerService.run()`](../src/services/runner/runner.service.ts), then
 2. `verifyPermissions()`: wraps `verifyTokenPermissions` on fork and upstream
 3. `syncFork()`: `forkExists()`, then `isForkSynced()` / `syncFork` if behind
 4. `fetchRepositoryTree()`: upstream tree (markdown + `src/` filter applied in GitHub layer) and translation guidelines
-5. `fetchFilesToTranslate()`: unless `state.filesToTranslate` is already populated (unusual outside tests), runs `FileDiscoveryManager.discoverFiles`
-6. `processInBatches()`: per-file branch, translate, commit, PR
+5. `fetchFilesToTranslate()`: unless `state.filesToTranslate` is already populated (unusual outside tests), runs `FileDiscoveryManager.discoverFiles`; returns `false` when that pipeline yields no candidates, so the next step is skipped
+6. `processInBatches()`: when step 5 returned `true`, per-file branch, translate, commit, PR; omitted when there is nothing to translate (workflow still completes successfully)
 7. `updateIssueWithResults()`: `PRManager.updateIssue` → `GitHubService.commentCompiledResultsOnIssue` (see [Stage 6: Progress Reporting](#stage-6-progress-reporting))
-8. `printFinalStatistics()`: returns counts to the caller; `main` logs them and exits successfully when no exception was thrown
+8. `printFinalStatistics()`: returns counts to the caller (zeros when step 6 was skipped); `main` logs them and exits successfully when no exception was thrown
 
 ## Operating translate-react (forks)
 
@@ -312,3 +313,7 @@ flowchart TD
 - **Per file:** On failure after branch work, `cleanupFailedTranslation` deletes the translation branch when possible; the result is stored with `error` set; processing continues with the next file unless the circuit breaker trips.
 - **Circuit breaker:** After `MAX_CONSECUTIVE_FAILURES` consecutive failures, `processFile` throws before starting the next file’s work. That rejection propagates through `Promise.all` in the current batch, so `processBatches` stops and **`run()` fails**; later batches are not processed.
 - **Workflow-level:** `RunnerService.run()` wraps the body in `try`/`catch`, logs `Translation workflow failed`, then **rethrows** so `main` can exit with code `1`.
+
+### Empty discovery (no files to translate)
+
+When `FileDiscoveryManager.discoverFiles` returns zero files (for example every path already has a mergeable open PR, or language detection treats content as already translated), `fetchFilesToTranslate` logs at **info** and returns `false`. `RunnerService.run()` **does not** call `processInBatches`, then continues with `updateIssueWithResults` and `printFinalStatistics`.
