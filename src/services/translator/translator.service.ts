@@ -14,6 +14,8 @@ import type { Logger } from "pino";
 import type { OpenRouterModelLimits } from "@/services/openrouter/";
 import type { ReactLanguageCode } from "@/utils/";
 
+import type { FrontmatterBatchFieldKey } from "./translator-frontmatter-batch.schema";
+
 import { openai, queue } from "@/clients/";
 import { ApplicationError, ErrorCode } from "@/errors/";
 import { LanguageDetectorService, languageDetectorService } from "@/services/language-detector/";
@@ -31,7 +33,6 @@ import {
 import { ChunksManager, TranslationValidatorManager } from "./managers";
 import { REGEXES, SYSTEM_PROMPT_TOKEN_RESERVE } from "./managers/managers.constants";
 import {
-	type FrontmatterBatchFieldKey,
 	frontmatterBatchRequestEnvelopeSchema,
 	frontmatterBatchTranslationEnvelopeSchema,
 } from "./translator-frontmatter-batch.schema";
