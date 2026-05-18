@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test";
 
 import type { RunnerServiceDependencies } from "@/services/runner/runner.types";
 
-import { TranslationBatchManager } from "@/services/runner/managers/translation-batch.manager";
 import { localeService } from "@/services/";
+import { TranslationBatchManager } from "@/services/runner/managers/translation-batch.manager";
 
 import { createMockPullRequestListItem, createTranslationFileFixture } from "@tests/fixtures";
 import {

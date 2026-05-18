@@ -630,7 +630,10 @@ describe("TranslatorService", () => {
 			const sourceContent = `---\ntitle: 'Hello'\ndescription: 'Welcome'\n---\n\n# Content`;
 			const translatedBody = `# Conteúdo`;
 
-			queueOpenAiTranslationResponses(translatedBody, createFrontmatterBatchLlmJsonContent("Bem-vindo"));
+			queueOpenAiTranslationResponses(
+				translatedBody,
+				createFrontmatterBatchLlmJsonContent("Bem-vindo"),
+			);
 
 			const file = createTranslationFileFixture({ content: sourceContent });
 			const result = await translatorService.translateContent(file);

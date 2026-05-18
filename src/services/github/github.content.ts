@@ -146,10 +146,7 @@ export class GitHubContent {
 					},
 				);
 
-				this.logger.debug(
-					{ count: response.length, prNumber },
-					"Retrieved pull request files",
-				);
+				this.logger.debug({ count: response.length, prNumber }, "Retrieved pull request files");
 
 				return response.map((file) => file.filename);
 			} catch (error) {
@@ -325,7 +322,7 @@ export class GitHubContent {
 	 * Fetches source markdown from the upstream default branch at `file.path`.
 	 *
 	 * Uses `repos.getContent` on the upstream repository so discovery always reads
-	 * English source from `main` (or the upstream default), not bytes from a fork
+	 * source from `main` (or the upstream default), not bytes from a fork
 	 * `translate/...` branch that may already contain a translation.
 	 *
 	 * @param file File reference from the upstream repository tree
@@ -360,9 +357,8 @@ export class GitHubContent {
 		}
 
 		const content = Buffer.from(response.data.content, "base64").toString();
-		const sha = response.data.sha ?? file.sha;
 
-		return new TranslationFile(content, file.filename, file.path, sha);
+		return new TranslationFile(content, file.filename, file.path, response.data.sha || file.sha);
 	}
 
 	/**
