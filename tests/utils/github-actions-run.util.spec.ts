@@ -46,7 +46,7 @@ describe("github-actions-run.util", () => {
 	test("formatGithubActionsRunIssueLine produces Markdown link", () => {
 		const line = formatGithubActionsRunIssueLine(sampleCiEnv);
 
-		expect(line).toContain("###### **CI run:**");
+		expect(line).toContain("###### **GitHub Action Run:**");
 		expect(line).toContain("[`Sync & Translate #25802803407`]");
 		expect(line).toContain("(https://github.com/reactjs/ru.react.dev/actions/runs/25802803407)");
 	});

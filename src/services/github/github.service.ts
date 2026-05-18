@@ -281,6 +281,18 @@ export class GitHubService {
 	}
 
 	/**
+	 * Reads markdown content from the fork at a translation branch tip.
+	 *
+	 * @param path Repository path of the file
+	 * @param branchName Translation branch name without `refs/heads/` prefix
+	 *
+	 * @returns File body, or `undefined` when absent on that branch
+	 */
+	public async getForkFileContentAtBranch(path: string, branchName: string) {
+		return this.content.getForkFileContentAtBranch(path, branchName);
+	}
+
+	/**
 	 * Retrieves a pull request by branch name.
 	 *
 	 * @param branchName Source branch name

@@ -15,6 +15,7 @@ import type {
 import type { SharedGitHubDependencies } from "./github.types";
 
 import { ApplicationError, ErrorCode } from "@/errors/";
+import { filterReportableProgressCommentResults } from "@/services/runner/runner.types";
 import { TranslationFile } from "@/services/translator/";
 import { logger } from "@/utils/";
 
@@ -362,6 +363,47 @@ export class GitHubContent {
 	}
 
 	/**
+	 * Reads file content from the fork at a translation branch tip.
+	 *
+	 * @param path Repository path of the markdown file
+	 * @param branchName Translation branch name without `refs/heads/` prefix
+	 *
+	 * @returns File body as UTF-8 text, or `undefined` when the path is missing on that branch
+	 */
+	public async getForkFileContentAtBranch(path: string, branchName: string) {
+		const branchRef = `refs/heads/${branchName}`;
+
+		try {
+			const response = await this.deps.octokit.repos.getContent({
+				...this.deps.repositories.fork,
+				path,
+				ref: branchRef,
+			});
+
+			if (Array.isArray(response.data)) {
+				this.logger.warn(
+					{ path, branchRef },
+					"GitHub returned a directory listing for fork branch content lookup",
+				);
+
+				return undefined;
+			}
+
+			if (!("content" in response.data) || !response.data.content) {
+				return undefined;
+			}
+
+			return Buffer.from(response.data.content, "base64").toString();
+		} catch (error) {
+			if (error instanceof RequestError && error.status === 404) {
+				return undefined;
+			}
+
+			throw error;
+		}
+	}
+
+	/**
 	 * Resolves and caches the upstream repository default branch name.
 	 */
 	private async resolveUpstreamDefaultBranchRef() {
@@ -457,12 +499,12 @@ export class GitHubContent {
 			return;
 		}
 
-		const openedOrUpdatedAnyPullRequest = results.some((r) => r.pullRequest !== null);
+		const reportableResults = filterReportableProgressCommentResults(results);
 
-		if (!openedOrUpdatedAnyPullRequest) {
+		if (reportableResults.length === 0) {
 			this.logger.info(
 				{ resultCount: results.length },
-				"No pull requests were opened or updated; skipping translation progress issue comment",
+				"No pull requests were opened or updated in this run; skipping translation progress issue comment",
 			);
 
 			return;

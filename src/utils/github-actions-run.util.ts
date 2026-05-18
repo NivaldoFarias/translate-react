@@ -61,5 +61,5 @@ export function formatGithubActionsRunIssueLine(runtimeEnv: GitHubActionsRunEnvS
 		return;
 	}
 
-	return `###### **CI run:** [\`${context.workflowName} #${context.runId}\`](${context.url})`;
+	return `###### **GitHub Action Run:** [\`${context.workflowName} #${context.runId}\`](${context.url})`;
 }

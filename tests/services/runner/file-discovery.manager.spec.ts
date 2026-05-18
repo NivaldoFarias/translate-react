@@ -25,23 +25,26 @@ function createTestFileDiscoveryManager(overrides: Partial<RunnerServiceDependen
 
 describe("FileDiscoveryManager", () => {
 	describe("filterByPRs", () => {
-		test("propagates error when pull request files cannot be fetched", () => {
+		test("includes file for processing when translation pull request evaluation fails", async () => {
 			const github = createMockGitHubService();
-			github.listOpenPullRequests.mockResolvedValue([{ number: 42 }] as never);
-			github.getPullRequestFiles.mockRejectedValue(new Error("GitHub API unavailable"));
+			github.findPullRequestByBranch.mockRejectedValue(new Error("GitHub API unavailable"));
 
 			const manager = createTestFileDiscoveryManager({
 				github: github as unknown as RunnerServiceDependencies["github"],
 			});
 			const candidate = createRepositoryTreeItemFixture({ path: "src/content/page.md" });
 
-			expect(manager.filterByPRs([candidate])).rejects.toThrow("GitHub API unavailable");
+			const result = await manager.filterByPRs([candidate]);
+
+			expect(result.filesToFetch).toHaveLength(1);
+			expect(result.numFilesWithPRs).toBe(0);
 		});
 
-		test("skips file when open pull request is mergeable", async () => {
+		test("skips file when open translation pull request is valid", async () => {
 			const github = createMockGitHubService();
-			github.listOpenPullRequests.mockResolvedValue([{ number: 7 }] as never);
-			github.getPullRequestFiles.mockResolvedValue(["src/content/page.md"]);
+			const languageDetector = createMockLanguageDetectorService();
+
+			github.findPullRequestByBranch.mockResolvedValue({ number: 7 } as never);
 			github.checkPullRequestStatus.mockResolvedValue({
 				hasConflicts: false,
 				mergeable: true,
@@ -49,9 +52,21 @@ describe("FileDiscoveryManager", () => {
 				mergeableState: "clean",
 				createdBy: "translate-react-bot",
 			});
+			github.getForkFileContentAtBranch.mockResolvedValue(
+				"Conteúdo em português suficientemente longo para detecção de idioma.",
+			);
+			languageDetector.analyzeLanguage.mockResolvedValue({
+				isTranslated: true,
+				ratio: 0.9,
+				detectedLanguage: "pt",
+				languageScore: { target: 0.9, source: 0.1 },
+				rawResult: { reliable: true, languages: [], textBytes: 100, chunks: [] },
+			} as never);
 
 			const manager = createTestFileDiscoveryManager({
 				github: github as unknown as RunnerServiceDependencies["github"],
+				languageDetector:
+					languageDetector as unknown as RunnerServiceDependencies["languageDetector"],
 			});
 			const candidate = createRepositoryTreeItemFixture({ path: "src/content/page.md" });
 
