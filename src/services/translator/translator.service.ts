@@ -646,17 +646,9 @@ export class TranslatorService {
 			"Content split into chunks",
 		);
 
-		let translatedChunks: string[];
-		if (env.CHUNK_TRANSLATION_MODE === "sequential") {
-			translatedChunks = [];
-			for (const [index, chunk] of chunks.entries()) {
-				translatedChunks.push(await this.translateChunk(file, chunk, index, chunks));
-			}
-		} else {
-			translatedChunks = await Promise.all(
-				chunks.map((chunk, index) => this.translateChunk(file, chunk, index, chunks)),
-			);
-		}
+		const translatedChunks = await Promise.all(
+			chunks.map((chunk, index) => this.translateChunk(file, chunk, index, chunks)),
+		);
 
 		file.logger.debug(
 			{ translatedChunkCount: translatedChunks.length },
@@ -726,7 +718,7 @@ export class TranslatorService {
 	/**
 	 * Prepares parameters for LLM chat completion API call.
 	 *
-	 * @param file Translation unit carrying {@link TranslationFile.documentSourceLanguage} for the system prompt
+	 * @param file Translation file instance
 	 * @param userMessageContent User message sent to the model
 	 * @param chunkProgress Optional slice position when translating a chunked body in multiple calls
 	 * @param systemPromptKind Which system prompt to build (defaults to full markdown document rules)
@@ -760,7 +752,7 @@ export class TranslatorService {
 	 * Automatically applies rate limiting to prevent exceeding API limits,
 	 * especially important for free-tier LLM models with strict rate limits.
 	 *
-	 * @param file File instance for logger context and {@link TranslationFile.documentSourceLanguage}
+	 * @param file Translation file instance
 	 * @param content Content to translate (defaults to file.content if not provided)
 	 * @param chunkProgress When set, the system prompt notes this body is slice `index` of `total` from one file
 	 * @param systemPromptKind Which system prompt to use; YAML scalar fields use `frontmatterScalar`
@@ -899,9 +891,7 @@ export class TranslatorService {
 	/**
 	 * Creates the system prompt that defines translation rules and requirements.
 	 *
-	 * Source language is read from {@link TranslationFile.documentSourceLanguage} (set in {@link TranslatorService.translateContent} before chunking), not from per-chunk CLD.
-	 *
-	 * @param file Translation unit whose {@link TranslationFile.documentSourceLanguage} supplies the source language name
+	 * @param file Translation file instance
 	 * @param userMessageContent User message body for placeholder checks (verbatim fence hints)
 	 * @param chunkProgress When set, documents that `userMessageContent` is one slice of a larger markdown body
 	 * @param systemPromptKind Document translation vs single frontmatter string (see {@link TranslationSystemPromptKind})

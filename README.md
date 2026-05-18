@@ -8,8 +8,6 @@
 
 CLI tool that translates the official React documentation via LLMs, keeps structure intact, and opens PRs through the [`translate-react` bot](https://github.com/apps/translate-react-bot).
 
-You bring the LLM key and GitHub token. To run a fixed revision in Actions, pin a tag or SHA ([Pinning translate-react in GitHub Actions](./docs/WORKFLOW.md#pinning-translate-react-in-github-actions)).
-
 ## Table of Contents
 
 - [Table of Contents](#table-of-contents)
@@ -43,7 +41,7 @@ You bring the LLM key and GitHub token. To run a fixed revision in Actions, pin 
 3. Setup the forks of the target React documentation repositories:
    - For the Portuguese (Brazil) repository, fork [`reactjs/pt-br.react.dev`](https://github.com/reactjs/pt-br.react.dev/) to your GitHub account
    - (Optional) For the Russian repository, fork [`reactjs/ru.react.dev`](https://github.com/reactjs/ru.react.dev/) to your GitHub account
-4. Install the `translate-react-bot` GitHub App on the forks of the target React documentation repositories:
+4. Install the [`translate-react-bot`](https://github.com/apps/translate-react-bot) GitHub App on the forks of the target React documentation repositories:
 5. Configure Environment: `cp .env.example .env`
    - Then, edit `.env` with your API keys _(see [Configuration section](#configuration))_
 6. Run in Development Mode: `bun run dev`

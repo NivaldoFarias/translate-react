@@ -10,7 +10,7 @@ import type {
 import { ApplicationError, ErrorCode } from "@/errors/";
 import { LanguageDetectorService } from "@/services/language-detector/";
 import { TranslationFile } from "@/services/translator/";
-import { isTranslationEquivalentToCurrentBlob, logger } from "@/utils/";
+import { env, isTranslationEquivalentToCurrentBlob, logger } from "@/utils/";
 
 import { MAX_CONSECUTIVE_FAILURES } from "./managers.constants";
 
@@ -31,6 +31,17 @@ export interface PullRequestDescriptionMetadata {
 		now: number;
 		workflowStart: number;
 	};
+	/** LLM model id used for translation (from `LLM_MODEL`) */
+	translationModel: string;
+	/** Absolute URL to GitHub’s “choose issue template” page for this workflow runner (translate-react), not React docs repos */
+	newIssueChooserUrl: string;
+}
+
+/**
+ * URLs and other values injected into automated translation PR bodies.
+ */
+export interface TranslationBatchPullRequestContext {
+	readonly newIssueChooserUrl: string;
 }
 
 /**
@@ -69,11 +80,13 @@ export class TranslationBatchManager {
 	 * @param services Injected service dependencies for GitHub and translation
 	 * @param invalidPRsByFile Map of files with invalid PRs for notification
 	 * @param workflowStartTimestamp Timestamp when workflow started for timing calculations
+	 * @param pullRequestContext URLs and values merged into generated PR bodies (issue chooser link)
 	 */
 	constructor(
 		private readonly services: RunnerServiceDependencies,
 		private readonly invalidPRsByFile: Map<string, InvalidFilePullRequest>,
 		private readonly workflowStartTimestamp: number,
+		private readonly pullRequestContext: TranslationBatchPullRequestContext,
 	) {}
 
 	/**
@@ -542,9 +555,10 @@ export class TranslationBatchManager {
 	 * Creates a pull request description for translated content.
 	 *
 	 * Generates a detailed PR body including translation metadata, review guidelines,
-	 * processing statistics, and optional conflict notices. When a file has an existing
-	 * invalid PR (with merge conflicts), includes a GitHub Flavored Markdown note to
-	 * inform maintainers about the duplicate PR situation.
+	 * processing statistics (with GFM footnotes for metric explanations), optional conflict notices,
+	 * technical info including the configured LLM model, and a feedback TIP linking to the issue chooser.
+	 * When a file has an existing invalid PR (with merge conflicts), includes a GitHub Flavored Markdown
+	 * alert to inform maintainers about the duplicate PR situation.
 	 *
 	 * @param file Translation file being processed with original content
 	 * @param processingResult Processing metadata
@@ -577,6 +591,8 @@ export class TranslationBatchManager {
 				now: Date.now(),
 				workflowStart: this.workflowStartTimestamp,
 			},
+			translationModel: env.LLM_MODEL,
+			newIssueChooserUrl: this.pullRequestContext.newIssueChooserUrl,
 		};
 		return this.services.locale.definitions.pullRequest.body(
 			file,
