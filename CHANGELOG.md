@@ -8,6 +8,26 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Changed
 
+## [0.1.26] - 2026-05-18
+
+### Added
+
+- `buildRunnerNewIssueChooserUrl` / `resolveRunnerNewIssueChooserUrl`
+  (`src/utils/runner-issue-chooser-url.util.ts`): resolve a GitHub new-issue chooser URL for runner
+  feedback, with `WORKFLOW_RUNNER_REPOSITORY_HTML_BASE` fallback; covered by
+  `tests/utils/runner-issue-chooser-url.util.spec.ts`.
+- PR body: translation model line, metric footnotes, and a feedback tip; locale stats `notes` /
+  `feedbackTip` in `locale.types`, `pr-body.builder`, and `pt-br` / `ru` locales; extended
+  `locale.service` PR body tests.
+- `TranslationBatchManager` / runner base: pass `translationModel` and `newIssueChooserUrl` into PR
+  metadata.
+
+### Changed
+
+- `TranslatorService`: chunk translation always runs in parallel; remove `CHUNK_TRANSLATION_MODE`
+  from the environment schema and defaults (`env.util`, `constants.util`).
+- README: minor setup copy tweaks.
+
 ## [0.1.25] - 2026-05-18
 
 ### Added
