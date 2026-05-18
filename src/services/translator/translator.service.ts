@@ -11,6 +11,7 @@ import type { Options as RetryOptions } from "p-retry";
 import type { Logger } from "pino";
 
 import type { OpenRouterModelLimits } from "@/services/openrouter/";
+import type { ReactLanguageCode } from "@/utils/";
 
 import { openai, queue } from "@/clients/";
 import { ApplicationError, ErrorCode } from "@/errors/";
@@ -35,6 +36,7 @@ import {
 	mergePreservedYamlFrontmatter,
 	splitLeadingYamlFrontmatter,
 } from "./translator-frontmatter.util";
+import { stripSpuriousOuterMarkdownFencesWhenSourceHadNoFences } from "./translator-markdown-artifacts.util";
 import { CONNECTIVITY_TEST_MAX_TOKENS, LLM_TEMPERATURE } from "./translator.constants";
 
 /**
@@ -87,21 +89,35 @@ export class TranslationFile {
 	/** Correlation ID for end-to-end tracing across the file's workflow */
 	public readonly correlationId: string;
 
+	/**
+	 * Resolved CLD source language for system prompts; set before any chunked or scalar LLM call for this logical document.
+	 *
+	 * @see {@link TranslatorService.translateContent} for when this is populated
+	 */
+	public documentSourceLanguage?: ReactLanguageCode;
+
+	/**
+	 * Builds a translation unit with optional logger parent and optional resolved source language.
+	 *
+	 * @param content Raw file body as fetched or synthesized for the workflow
+	 * @param filename Display filename for logs and PR context
+	 * @param path Repository path of the blob
+	 * @param sha Git object id for the blob
+	 * @param parentLogger Optional child logger parent when this file is a slice or snippet of another unit
+	 * @param documentSourceLanguage Optional resolved source language; omit when unknown until {@link TranslatorService.translateContent} runs
+	 *
+	 * @example
+	 * ```typescript
+	 * const file = new TranslationFile("# Hi", "doc.md", "src/content/doc.md", "abc123");
+	 * ```
+	 */
 	constructor(
-		/** The content of the file */
 		public readonly content: string,
-
-		/** The filename of the file */
 		public readonly filename: string,
-
-		/** The path of the file */
 		public readonly path: string,
-
-		/** The SHA of the file */
 		public readonly sha: string,
-
-		/** Optional parent logger to create child logger from (defaults to root logger) */
 		parentLogger?: Logger,
+		documentSourceLanguage?: ReactLanguageCode,
 	) {
 		this.title = this.extractDocTitleFromContent(content);
 		this.correlationId = crypto.randomUUID();
@@ -110,6 +126,9 @@ export class TranslationFile {
 			path: this.path,
 			correlationId: this.correlationId,
 		});
+		if (documentSourceLanguage !== undefined) {
+			this.documentSourceLanguage = documentSourceLanguage;
+		}
 	}
 
 	/**
@@ -140,6 +159,7 @@ export class TranslationFile {
 		correlationId: string;
 		contentLength: number;
 		title: string | undefined;
+		documentSourceLanguage: ReactLanguageCode | undefined;
 	} {
 		return {
 			filename: this.filename,
@@ -148,6 +168,7 @@ export class TranslationFile {
 			correlationId: this.correlationId,
 			contentLength: this.content.length,
 			title: this.title,
+			documentSourceLanguage: this.documentSourceLanguage,
 		};
 	}
 }
@@ -322,7 +343,7 @@ export class TranslatorService {
 			return;
 		}
 
-		this.managers.chunks = new ChunksManager(this.model, grossChunkInputTokens);
+		this.managers.chunks = new ChunksManager(this.model, grossChunkInputTokens, completionCap);
 
 		this.logger.info(
 			{
@@ -353,6 +374,19 @@ export class TranslatorService {
 	}
 
 	/**
+	 * Resolves the document source language once on full markdown before chunking or body-only extraction.
+	 *
+	 * Uses the same string passed into the frontmatter split (after verbatim masking when enabled), so CLD sees the whole file the workflow will translate.
+	 *
+	 * @param fullMarkdown Full markdown for this translation pass
+	 *
+	 * @returns Detected React source code, or `en` when the input is too short for CLD or detection is inconclusive
+	 */
+	private async resolveDocumentSourceLanguage(fullMarkdown: string) {
+		return (await this.services.languageDetector.detectPrimaryLanguage(fullMarkdown)) ?? "en";
+	}
+
+	/**
 	 * Main translation method that processes files and manages the translation workflow.
 	 *
 	 * Automatically handles large files through intelligent chunking while preserving
@@ -364,11 +398,12 @@ export class TranslatorService {
 	 *
 	 * 1. Validates input content
 	 * 2. Optionally replaces very large fenced code blocks with placeholders when `MASK_VERBATIM_LARGE_FENCES` is enabled
-	 * 3. Determines if chunking is needed based on token estimates (after any masking)
-	 * 4. Translates content (with chunking if necessary)
-	 * 5. Restores verbatim fences when masking was applied
-	 * 6. Validates translation completeness
-	 * 7. Cleans up and returns translated content
+	 * 3. Resolves source language once on full-file markdown (after any verbatim masking) before chunking
+	 * 4. Determines if chunking is needed based on token estimates (after any masking)
+	 * 5. Translates content (with chunking if necessary)
+	 * 6. Restores verbatim fences when masking was applied
+	 * 7. Validates translation completeness
+	 * 8. Cleans up and returns translated content
 	 *
 	 * @param file File containing content to translate
 	 *
@@ -419,6 +454,8 @@ export class TranslatorService {
 				verbatimMask.maskedMarkdown
 			:	file.content;
 
+		file.documentSourceLanguage = await this.resolveDocumentSourceLanguage(translationInput);
+
 		const leadingFrontmatterSplit = splitLeadingYamlFrontmatter(translationInput);
 		const hasBodyAfterLeadingYaml = leadingFrontmatterSplit.rest.length > 0;
 		const preservedYamlBlock = hasBodyAfterLeadingYaml ? leadingFrontmatterSplit.block : "";
@@ -441,6 +478,7 @@ export class TranslatorService {
 			file.path,
 			file.sha,
 			file.logger,
+			file.documentSourceLanguage,
 		);
 
 		const contentNeedsChunking = this.managers.chunks.needsChunking(translationWorkFile);
@@ -453,6 +491,16 @@ export class TranslatorService {
 		if (verbatimMask && verbatimMask.replacements.length > 0) {
 			translatedContent = restoreMaskedVerbatimFences(translatedContent, verbatimMask.replacements);
 		}
+
+		const fileBodySplit = splitLeadingYamlFrontmatter(file.content);
+		const sourceBodyForArtifacts =
+			fileBodySplit.rest.length > 0 ? fileBodySplit.rest : file.content;
+
+		translatedContent = stripSpuriousOuterMarkdownFencesWhenSourceHadNoFences(
+			sourceBodyForArtifacts,
+			translatedContent,
+			file.logger,
+		);
 
 		if (preservedYamlBlock) {
 			const frontmatterParts = extractFrontmatterParts(preservedYamlBlock);
@@ -533,6 +581,7 @@ export class TranslatorService {
 				file.path,
 				file.sha,
 				file.logger,
+				file.documentSourceLanguage,
 			);
 			let translatedScalar = await this.callLanguageModel(
 				snippetFile,
@@ -654,33 +703,42 @@ export class TranslatorService {
 			chunks.length > 1 ? { index: index + 1, total: chunks.length } : undefined;
 		const translatedChunk = await this.callLanguageModel(file, chunk, chunkProgress);
 
+		const strippedChunk = stripSpuriousOuterMarkdownFencesWhenSourceHadNoFences(
+			chunk,
+			translatedChunk,
+			file.logger,
+		);
+
 		file.logger.debug(
 			{
 				chunkIndex: index + 1,
 				totalChunks: chunks.length,
 				originalSize: chunk.length,
-				translatedSize: translatedChunk.length,
+				translatedSize: strippedChunk.length,
 				durationMs: Date.now() - startTime,
 			},
 			`Chunk ${index + 1}/${chunks.length} translation complete`,
 		);
 
-		return translatedChunk;
+		return strippedChunk;
 	}
 
 	/**
 	 * Prepares parameters for LLM chat completion API call.
 	 *
+	 * @param file Translation unit carrying {@link TranslationFile.documentSourceLanguage} for the system prompt
+	 * @param userMessageContent User message sent to the model
 	 * @param chunkProgress Optional slice position when translating a chunked body in multiple calls
 	 * @param systemPromptKind Which system prompt to build (defaults to full markdown document rules)
 	 *
 	 * @returns Chat completion parameters object
 	 */
-	private async getLLMCompletionParams(
-		content: string,
+	private getLLMCompletionParams(
+		file: TranslationFile,
+		userMessageContent: string,
 		chunkProgress?: ChunkTranslationProgress,
 		systemPromptKind: TranslationSystemPromptKind = "markdownDocument",
-	): Promise<OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming> {
+	): OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming {
 		return {
 			model: this.model,
 			temperature: LLM_TEMPERATURE,
@@ -688,9 +746,9 @@ export class TranslatorService {
 			messages: [
 				{
 					role: "system",
-					content: await this.getSystemPrompt(content, chunkProgress, systemPromptKind),
+					content: this.getSystemPrompt(file, userMessageContent, chunkProgress, systemPromptKind),
 				},
-				{ role: "user", content },
+				{ role: "user", content: userMessageContent },
 			],
 		};
 	}
@@ -702,7 +760,7 @@ export class TranslatorService {
 	 * Automatically applies rate limiting to prevent exceeding API limits,
 	 * especially important for free-tier LLM models with strict rate limits.
 	 *
-	 * @param file File instance for logger context
+	 * @param file File instance for logger context and {@link TranslationFile.documentSourceLanguage}
 	 * @param content Content to translate (defaults to file.content if not provided)
 	 * @param chunkProgress When set, the system prompt notes this body is slice `index` of `total` from one file
 	 * @param systemPromptKind Which system prompt to use; YAML scalar fields use `frontmatterScalar`
@@ -717,6 +775,8 @@ export class TranslatorService {
 		chunkProgress?: ChunkTranslationProgress,
 		systemPromptKind: TranslationSystemPromptKind = "markdownDocument",
 	): Promise<string> {
+		file.documentSourceLanguage ??= await this.resolveDocumentSourceLanguage(file.content);
+
 		const contentToTranslate = content ?? file.content;
 
 		return this.queue.add(async () => {
@@ -739,7 +799,8 @@ export class TranslatorService {
 						);
 
 						const completion = await this.openai.chat.completions.create(
-							await this.getLLMCompletionParams(
+							this.getLLMCompletionParams(
+								file,
 								contentToTranslate,
 								chunkProgress,
 								systemPromptKind,
@@ -754,6 +815,22 @@ export class TranslatorService {
 								ErrorCode.NoContent,
 								`${TranslatorService.name}.${this.callLanguageModel.name}`,
 								{ model: this.model, contentLength: contentToTranslate.length },
+							);
+						}
+
+						const finishReason = completion.choices[0]?.finish_reason;
+						if (finishReason === "length") {
+							throw new ApplicationError(
+								"Language model response ended at max completion tokens (truncated output)",
+								ErrorCode.TranslationFailed,
+								`${TranslatorService.name}.${this.callLanguageModel.name}`,
+								{
+									model: this.model,
+									contentLength: contentToTranslate.length,
+									finishReason,
+									completionTokens: completion.usage?.completion_tokens,
+									promptTokens: completion.usage?.prompt_tokens,
+								},
 							);
 						}
 
@@ -821,36 +898,35 @@ export class TranslatorService {
 
 	/**
 	 * Creates the system prompt that defines translation rules and requirements.
-	 * Uses async language detection to determine source language and constructs
-	 * a structured prompt following prompt engineering best practices.
 	 *
-	 * @param content Content to determine source language
-	 * @param chunkProgress When set, documents that `content` is one slice of a larger markdown body
+	 * Source language is read from {@link TranslationFile.documentSourceLanguage} (set in {@link TranslatorService.translateContent} before chunking), not from per-chunk CLD.
+	 *
+	 * @param file Translation unit whose {@link TranslationFile.documentSourceLanguage} supplies the source language name
+	 * @param userMessageContent User message body for placeholder checks (verbatim fence hints)
+	 * @param chunkProgress When set, documents that `userMessageContent` is one slice of a larger markdown body
 	 * @param systemPromptKind Document translation vs single frontmatter string (see {@link TranslationSystemPromptKind})
 	 *
-	 * @returns Resolves to the system prompt string
+	 * @returns The system prompt string
 	 */
-	private async getSystemPrompt(
-		content: string,
+	private getSystemPrompt(
+		file: TranslationFile,
+		userMessageContent: string,
 		chunkProgress?: ChunkTranslationProgress,
 		systemPromptKind: TranslationSystemPromptKind = "markdownDocument",
-	): Promise<string> {
-		this.logger.debug({ systemPromptKind }, "Generating system prompt for translation");
+	) {
+		const documentSourceLanguage = file.documentSourceLanguage ?? "en";
 
-		const detectedSourceCode = await this.services.languageDetector.detectPrimaryLanguage(content);
+		this.logger.debug({ systemPromptKind }, "Generating system prompt for translation");
 
 		const languages = {
 			target: this.services.languageDetector.getLanguageName(
 				LanguageDetectorService.languages.target,
 			),
-			source: this.services.languageDetector.getLanguageName(
-				detectedSourceCode ?? LanguageDetectorService.languages.source,
-				false,
-			),
+			source: this.services.languageDetector.getLanguageName(documentSourceLanguage, false),
 		};
 
 		this.logger.debug(
-			{ detectedSourceCode, languages },
+			{ documentSourceLanguage, languages },
 			"Determined source and target languages for prompt",
 		);
 
@@ -913,7 +989,7 @@ export class TranslatorService {
 			`;
 
 		const verbatimPlaceholderSection =
-			content.includes("<!-- translate-react:verbatim-fence-") ?
+			userMessageContent.includes("<!-- translate-react:verbatim-fence-") ?
 				`
 				# VERBATIM SOURCE PLACEHOLDERS
 				Some fenced code regions were replaced with HTML comments matching \`<!-- translate-react:verbatim-fence-N -->\`.

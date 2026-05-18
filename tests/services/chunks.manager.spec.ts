@@ -12,7 +12,7 @@ import {
 
 const FIXTURE_PATH = path.resolve(
 	import.meta.dir,
-	"../fixtures/react-labs-view-transitions-activity-and-more.md",
+	"../fixtures/md/react-labs-view-transitions-activity-and-more.md",
 );
 
 const TEST_MODEL = "gpt-4o";
@@ -89,6 +89,36 @@ describe("ChunksManager", () => {
 			expect(smallTokens).toBeLessThan(maxInputTokens);
 			expect(chunksManager.needsChunking(smallFile)).toBe(false);
 		});
+
+		test("should require chunking when input fits a huge context but exceeds completion-sized single shot", () => {
+			const completionBounded = new ChunksManager(TEST_MODEL, 500_000, 8192);
+			let content = "# Long document\n\n";
+			while (completionBounded.estimateTokenCount(content) < 7200) {
+				content += "Paragraph text for sizing. ".repeat(25) + "\n\n";
+			}
+
+			const file = new TranslationFile(content, "long.md", "long.md", "sha-completion");
+
+			expect(completionBounded.needsChunking(file)).toBe(true);
+		});
+
+		test("should split long bodies into chunks bounded by the completion cap", async () => {
+			const completionBounded = new ChunksManager(TEST_MODEL, 500_000, 8192);
+			const budget = completionBounded.getMarkdownChunkSplitterTokenBudget();
+			let content = "# Title\n\n";
+			while (completionBounded.estimateTokenCount(content) < budget * 4) {
+				content += `## Section\n\n${"Line content. ".repeat(120)}\n\n`;
+			}
+
+			const result = await completionBounded.chunkContent(content);
+
+			expect(result.chunks.length).toBeGreaterThan(1);
+			for (const chunk of result.chunks) {
+				expect(completionBounded.estimateTokenCount(chunk)).toBeLessThanOrEqual(
+					budget + CHUNKS.overlap,
+				);
+			}
+		});
 	});
 
 	describe("chunkContent", () => {
@@ -134,7 +164,7 @@ describe("ChunksManager", () => {
 				(_, i) => `## Section ${i + 1}\n\n${"Some documentation text. ".repeat(80)}`,
 			).join("\n\n");
 
-			const maxTokensPerChunk = CHUNKS.maxTokens - CHUNKS.tokenBuffer;
+			const maxTokensPerChunk = chunksManager.getMarkdownChunkSplitterTokenBudget();
 			const result = await chunksManager.chunkContent(content);
 
 			for (const chunk of result.chunks) {
@@ -195,7 +225,7 @@ describe("ChunksManager", () => {
 		});
 
 		test("each chunk should stay within token limits", async () => {
-			const maxTokensPerChunk = CHUNKS.maxTokens - CHUNKS.tokenBuffer;
+			const maxTokensPerChunk = chunksManager.getMarkdownChunkSplitterTokenBudget();
 			const result = await chunksManager.chunkContent(fixtureContent);
 
 			for (const chunk of result.chunks) {
@@ -206,7 +236,7 @@ describe("ChunksManager", () => {
 
 		test("chunk count should be proportional to content size", async () => {
 			const totalTokens = chunksManager.estimateTokenCount(fixtureContent);
-			const maxTokensPerChunk = CHUNKS.maxTokens - CHUNKS.tokenBuffer;
+			const maxTokensPerChunk = chunksManager.getMarkdownChunkSplitterTokenBudget();
 			const expectedMinChunks = Math.floor(totalTokens / maxTokensPerChunk);
 
 			const result = await chunksManager.chunkContent(fixtureContent);
