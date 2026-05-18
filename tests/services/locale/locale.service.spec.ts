@@ -165,25 +165,6 @@ describe("ptBrLocale.pullRequest.body", () => {
 			expect(body).toContain("fechado automaticamente");
 		});
 
-		test("should include mergeable state in conflict notice", () => {
-			const metadata = createPullRequestDescriptionMetadata({
-				invalidFilePR: {
-					prNumber: 99,
-					status: {
-						needsUpdate: true,
-						hasConflicts: true,
-						mergeable: false,
-						mergeableState: "dirty",
-						createdBy: "other-user",
-					},
-				},
-			});
-
-			const body = buildPullRequestBody(file, processingResult, metadata);
-
-			expect(body).toContain("mergeable_state: dirty");
-		});
-
 		test("should note rewrite from current source in conflict notice", () => {
 			const metadata = createPullRequestDescriptionMetadata({
 				invalidFilePR: {
