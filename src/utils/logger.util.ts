@@ -1,7 +1,7 @@
 import pino from "pino";
 
 import { nftsCompatibleDateString } from "./common.util";
-import { MAX_LOG_STRING_LENGTH, RuntimeEnvironment } from "./constants.util";
+import { MAX_LOG_STRING_LENGTH } from "./constants.util";
 import { env } from "./env.util";
 
 /**
@@ -120,9 +120,9 @@ export const logger = pino({
 
 			/**
 			 * Console transport - pretty-printed for development
-			 * Only active when `LOG_TO_CONSOLE` is enabled and not in production
+			 * Only active when `LOG_TO_CONSOLE` is enabled
 			 */
-			...(env.LOG_TO_CONSOLE && env.NODE_ENV !== RuntimeEnvironment.Production ?
+			...(env.LOG_TO_CONSOLE ?
 				[
 					{
 						target: "pino-pretty",

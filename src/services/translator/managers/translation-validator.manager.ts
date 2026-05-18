@@ -175,7 +175,7 @@ export class TranslationValidatorManager {
 	 * Validates that frontmatter structure and required keys are preserved during translation.
 	 *
 	 * Parses YAML frontmatter from source and translated content, then verifies that:
-	 * 1. Required keys (e.g., `title`) are preserved in translation (top-level keys via {@link collectTopLevelKeysFromInnerYaml})
+	 * 1. Top-level keys (e.g. `title`, `description`) are preserved in translation (via {@link collectTopLevelKeysFromInnerYaml})
 	 * 2. The overall frontmatter structure remains intact
 	 *
 	 * @param file Original file containing source content for comparison

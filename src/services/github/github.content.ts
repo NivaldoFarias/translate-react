@@ -14,6 +14,7 @@ import type {
 
 import type { SharedGitHubDependencies } from "./github.types";
 
+import { ApplicationError, ErrorCode } from "@/errors/";
 import { TranslationFile } from "@/services/translator/";
 import { logger } from "@/utils/";
 
@@ -53,6 +54,12 @@ const MERGEABLE_POLL_MAX_ATTEMPTS = 3;
 /** Delay between `mergeable` polling attempts in milliseconds */
 const MERGEABLE_POLL_DELAY_MS = 2_000;
 
+/** Max attempts to fetch a pull request file list before failing the workflow */
+const PR_FILES_FETCH_MAX_ATTEMPTS = 3;
+
+/** Delay between pull request file list fetch retries in milliseconds */
+const PR_FILES_FETCH_DELAY_MS = 0;
+
 /**
  * Content and pull request operations module for GitHub API.
  *
@@ -60,6 +67,9 @@ const MERGEABLE_POLL_DELAY_MS = 2_000;
  */
 export class GitHubContent {
 	private readonly logger = logger.child({ component: GitHubContent.name });
+
+	/** Cached upstream default branch ref for repeated `getFile` calls in one run */
+	private upstreamDefaultBranchRef: string | undefined;
 
 	constructor(
 		private readonly deps: SharedGitHubDependencies,
@@ -123,18 +133,45 @@ export class GitHubContent {
 	 * ```
 	 */
 	public async getPullRequestFiles(prNumber: number): Promise<string[]> {
-		const response = await this.deps.octokit.paginate(
-			"GET /repos/{owner}/{repo}/pulls/{pull_number}/files",
-			{
-				...this.deps.repositories.upstream,
-				pull_number: prNumber,
-				per_page: 100,
-			},
-		);
+		let lastError: unknown;
 
-		this.logger.debug({ count: response.length }, "Retrieved pull request files");
+		for (let attempt = 0; attempt < PR_FILES_FETCH_MAX_ATTEMPTS; attempt++) {
+			try {
+				const response = await this.deps.octokit.paginate(
+					"GET /repos/{owner}/{repo}/pulls/{pull_number}/files",
+					{
+						...this.deps.repositories.upstream,
+						pull_number: prNumber,
+						per_page: 100,
+					},
+				);
 
-		return response.map((file) => file.filename);
+				this.logger.debug({ count: response.length, prNumber }, "Retrieved pull request files");
+
+				return response.map((file) => file.filename);
+			} catch (error) {
+				lastError = error;
+				const isLastAttempt = attempt >= PR_FILES_FETCH_MAX_ATTEMPTS - 1;
+
+				if (isLastAttempt) {
+					break;
+				}
+
+				this.logger.warn(
+					{
+						prNumber,
+						attempt: attempt + 1,
+						maxAttempts: PR_FILES_FETCH_MAX_ATTEMPTS,
+						error,
+					},
+					"Failed to fetch pull request files, retrying",
+				);
+
+				await new Promise((resolve) => setTimeout(resolve, PR_FILES_FETCH_DELAY_MS));
+			}
+		}
+
+		throw lastError;
 	}
 
 	/**
@@ -282,21 +319,60 @@ export class GitHubContent {
 	}
 
 	/**
-	 * Fetches raw content of a file from GitHub.
+	 * Fetches source markdown from the upstream default branch at `file.path`.
 	 *
-	 * @param file File reference to fetch
+	 * Uses `repos.getContent` on the upstream repository so discovery always reads
+	 * source from `main` (or the upstream default), not bytes from a fork
+	 * `translate/...` branch that may already contain a translation.
 	 *
-	 * @returns A `TranslationFile` backed by the decoded blob body
+	 * @param file File reference from the upstream repository tree
+	 *
+	 * @returns A `TranslationFile` backed by upstream branch content and blob `sha`
 	 */
 	public async getFile(file: PatchedRepositoryTreeItem): Promise<TranslationFile> {
-		const response = await this.deps.octokit.git.getBlob({
-			...this.deps.repositories.fork,
-			file_sha: file.sha,
+		const ref = await this.resolveUpstreamDefaultBranchRef();
+
+		const response = await this.deps.octokit.repos.getContent({
+			...this.deps.repositories.upstream,
+			path: file.path,
+			ref,
 		});
+
+		if (Array.isArray(response.data)) {
+			throw new ApplicationError(
+				`Expected file at path but received directory listing: ${file.path}`,
+				ErrorCode.ResourceLoadError,
+				`${GitHubContent.name}.${this.getFile.name}`,
+				{ path: file.path, ref },
+			);
+		}
+
+		if (!("content" in response.data) || !response.data.content) {
+			throw new ApplicationError(
+				`Upstream file has no content: ${file.path}`,
+				ErrorCode.ResourceLoadError,
+				`${GitHubContent.name}.${this.getFile.name}`,
+				{ path: file.path, ref },
+			);
+		}
 
 		const content = Buffer.from(response.data.content, "base64").toString();
 
-		return new TranslationFile(content, file.filename, file.path, file.sha);
+		return new TranslationFile(content, file.filename, file.path, response.data.sha || file.sha);
+	}
+
+	/**
+	 * Resolves and caches the upstream repository default branch name.
+	 */
+	private async resolveUpstreamDefaultBranchRef() {
+		if (this.upstreamDefaultBranchRef) {
+			return this.upstreamDefaultBranchRef;
+		}
+
+		const response = await this.deps.octokit.repos.get(this.deps.repositories.upstream);
+		this.upstreamDefaultBranchRef = response.data.default_branch;
+
+		return this.upstreamDefaultBranchRef;
 	}
 
 	/**

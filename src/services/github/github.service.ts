@@ -270,11 +270,11 @@ export class GitHubService {
 	}
 
 	/**
-	 * Fetches raw content of a file from GitHub.
+	 * Fetches source markdown from the upstream default branch at `file.path`.
 	 *
-	 * @param file File reference to fetch
+	 * @param file File reference from the upstream repository tree
 	 *
-	 * @returns Translation file with content
+	 * @returns Translation file with upstream content and blob `sha`
 	 */
 	public async getFile(file: PatchedRepositoryTreeItem): Promise<TranslationFile> {
 		return this.content.getFile(file);

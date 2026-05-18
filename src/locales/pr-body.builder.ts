@@ -21,6 +21,8 @@ function formatGenerationDate(timestamp: number): string {
 /**
  * Builds the conflict notice section for PR body when a stale PR was closed.
  *
+ * Renders one blockquote line under `[!NOTE]` (bold title, then full body text).
+ *
  * @param invalidFilePR Metadata about the closed stale PR
  * @param strings Locale-specific strings for the conflict notice
  *
@@ -30,14 +32,9 @@ function buildConflictNotice(
 	invalidFilePR: PullRequestDescriptionMetadata["invalidFilePR"],
 	strings: LocalePRBodyStrings["conflictNotice"],
 ) {
-	if (!invalidFilePR) {
-		return "";
-	}
+	if (!invalidFilePR) return "";
 
-	return `> [!IMPORTANT]
-> **${strings.title}**: ${strings.body(invalidFilePR.prNumber, invalidFilePR.status.mergeableState)}
->
-> ${strings.rewriteExplanation}`;
+	return `**${strings.title}**. ${strings.body(invalidFilePR.prNumber)}`;
 }
 
 /**
@@ -87,7 +84,6 @@ export function createPRBodyBuilder(strings: LocalePRBodyStrings) {
 			.join("\n");
 
 		return `${strings.intro(metadata.languageName)}
-${conflictNotice}
 
 > [!IMPORTANT]
 > ${strings.humanReviewNotice}
@@ -96,6 +92,8 @@ ${conflictNotice}
 <summary>${strings.detailsSummary}</summary>
 
 ### ${strings.stats.header}
+
+${conflictNotice}
 
 | ${strings.stats.metrics.metricColumn} | ${strings.stats.metrics.valueColumn} |
 |--------|-------|
@@ -111,6 +109,7 @@ ${conflictNotice}
 - **${strings.techInfo.branch}**: \`${branchRef}\`
 - **${strings.techInfo.translationModel}**: \`${metadata.translationModel}\`
 ${workflowRunLine ? `${workflowRunLine}\n` : ""}
+
 </details>
 
 > [!TIP]

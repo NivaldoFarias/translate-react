@@ -16,10 +16,8 @@ const ptBrPRBodyStrings: LocalePRBodyStrings = {
 
 	conflictNotice: {
 		title: "PR anterior fechado",
-		body: (prNumber, mergeableState) =>
-			`O PR #${prNumber} foi **fechado automaticamente** devido a conflitos de merge com a branch principal (\`mergeable_state: ${mergeableState}\`).`,
-		rewriteExplanation:
-			"Esta é uma **tradução completamente nova** baseada na versão mais atual do arquivo fonte. A abordagem de reescrita completa (ao invés de resolução de conflitos baseada em diff) garante consistência e qualidade da tradução.",
+		body: (prNumber) =>
+			`O PR #${prNumber} foi fechado automaticamente por conflito com a branch principal. Esta tradução foi refeita a partir do arquivo fonte atual, sem merge manual dos conflitos do PR anterior.`,
 	},
 
 	humanReviewNotice:
@@ -55,7 +53,10 @@ const ptBrPRBodyStrings: LocalePRBodyStrings = {
 	},
 
 	feedbackTip: (issueChooserUrl) =>
-		`Encontrou problemas no resultado ou no conteúdo traduzido? [Abra uma issue](${issueChooserUrl}) neste repositório com o máximo de contexto possível.`,
+		`Caso encontre erros ou trechos ruins, [abra uma issue](${issueChooserUrl}) com:
+- arquivo
+- linha/trecho
+- (se possível) como você corrigiria`,
 
 	timeFormatLocale: "pt-BR",
 };
@@ -72,7 +73,7 @@ export const ptBrLocale: LocaleDefinition = {
 		suffix: `> [!IMPORTANT]
 >
 > - As traduções foram geradas por uma LLM e requerem revisão humana para garantir precisão técnica e fluência.
-> - Esta implementação é um **trabalho em progresso** e pode apresentar inconsistências em conteúdos técnicos complexos ou formatação específica.`,
+> - Esta implementação é um **WIP** (Work In Progress) e pode apresentar inconsistências em conteúdos técnicos complexos ou formatação específica.`,
 	},
 	rules: {
 		specific: `

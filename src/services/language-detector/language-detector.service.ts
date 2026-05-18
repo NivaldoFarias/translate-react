@@ -188,7 +188,7 @@ export class LanguageDetectorService {
 	 * confidence scores, and determines translation status based on configurable thresholds.
 	 *
 	 * The analysis workflow includes:
-	 * 1. **Content validation**: Ensures minimum content length for reliable detection
+	 * 1. **Content validation**: Ensures cleaned prose (after removing code, URLs, etc.) meets minimum length for reliable detection
 	 * 2. **Content preprocessing**: Removes code blocks and technical content via `cleanContent()`
 	 * 3. **Language detection**: Uses CLD2 to detect all languages present in content
 	 * 4. **Score calculation**: Computes confidence scores for source and target languages
@@ -231,16 +231,27 @@ export class LanguageDetectorService {
 		try {
 			this.logger.info({ filename }, "Starting language analysis");
 
-			if (!content || content.length < this.MIN_CONTENT_LENGTH) {
-				this.logger.warn(
-					{ contentLength: content.length, minContentLength: this.MIN_CONTENT_LENGTH },
-					"File's content length is below minimum threshold for reliable detection",
-				);
+			if (!content.trim()) {
+				this.logger.warn({ contentLength: content.length }, "File content is empty");
 
 				return fallbackLanguageAnalysisResult;
 			}
 
 			const cleanContent = this.cleanContent(content);
+
+			if (cleanContent.length < this.MIN_CONTENT_LENGTH) {
+				this.logger.warn(
+					{
+						contentLength: content.length,
+						cleanedLength: cleanContent.length,
+						minContentLength: this.MIN_CONTENT_LENGTH,
+					},
+					"Cleaned prose length is below minimum threshold for reliable detection",
+				);
+
+				return fallbackLanguageAnalysisResult;
+			}
+
 			const detection = await cld.detect(cleanContent);
 
 			const primaryLanguage = detection.languages[0];
@@ -292,15 +303,28 @@ export class LanguageDetectorService {
 		try {
 			this.logger.info("Starting primary language detection");
 
-			if (!text || text.length < this.MIN_CONTENT_LENGTH) {
+			if (!text.trim()) {
 				this.logger.warn(
-					{ textLength: text.length, minContentLength: this.MIN_CONTENT_LENGTH },
-					"Text's length is below minimum threshold for reliable detection",
+					{ textLength: text.length },
+					"Text is empty for primary language detection",
 				);
 				return;
 			}
 
 			const cleanContent = this.cleanContent(text);
+
+			if (cleanContent.length < this.MIN_CONTENT_LENGTH) {
+				this.logger.warn(
+					{
+						textLength: text.length,
+						cleanedLength: cleanContent.length,
+						minContentLength: this.MIN_CONTENT_LENGTH,
+					},
+					"Cleaned text length is below minimum threshold for reliable detection",
+				);
+				return;
+			}
+
 			const detection = await cld.detect(cleanContent);
 			const code = detection.languages[0]?.code ?? "und";
 
