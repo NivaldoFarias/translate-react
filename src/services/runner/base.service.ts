@@ -2,6 +2,7 @@ import { sleep } from "bun";
 
 import type {
 	PatchedRepositoryTreeItem,
+	PrFilterResult,
 	ProcessedFileResult,
 	RepositoryTreeItem,
 	RunnerOptions,
@@ -225,6 +226,24 @@ export abstract class BaseRunnerService {
 	}
 
 	/**
+	 * Rebuilds {@link managers.translationBatch} with {@link resolveRunnerNewIssueChooserUrl} and
+	 * invalid-PR metadata, regardless of whether `filesToTranslate` came from discovery or a
+	 * pre-filled {@link state}.
+	 *
+	 * @param invalidPRsByFile Paths to open PRs that need conflict messaging in new PR bodies
+	 */
+	private rebuildTranslationBatchManager(invalidPRsByFile: PrFilterResult["invalidPRsByFile"]) {
+		const newIssueChooserUrl = resolveRunnerNewIssueChooserUrl();
+
+		this.managers.translationBatch = new TranslationBatchManager(
+			this.services,
+			invalidPRsByFile,
+			this.metadata.timestamp,
+			{ newIssueChooserUrl },
+		);
+	}
+
+	/**
 	 * Fetches and filters files that need translation through a multi-stage pipeline.
 	 *
 	 * Orchestrates the complete file discovery workflow using {@link FileDiscoveryManager}
@@ -242,14 +261,16 @@ export abstract class BaseRunnerService {
 	 * Files with existing PRs that have merge conflicts are identified and stored in
 	 * {@link state.invalidPRsByFile} for notification in new PR descriptions.
 	 *
-	 * @throws {ApplicationError} with {@link ErrorCode.NoFilesToTranslate} If no files are found to translate
+	 * @returns `true` when there is at least one file to translate; `false` when discovery
+	 * produced no candidates, in which case the caller should skip batch translation.
 	 */
-	protected async fetchFilesToTranslate(): Promise<void> {
+	protected async fetchFilesToTranslate() {
 		if (this.state.filesToTranslate.length) {
 			this.logger.info(
 				`Found ${this.state.filesToTranslate.length} files to translate (from cache)`,
 			);
-			return;
+			this.rebuildTranslationBatchManager(this.state.invalidPRsByFile ?? new Map());
+			return true;
 		}
 
 		const { filesToTranslate, invalidPRsByFile } = await this.managers.fileDiscovery.discoverFiles(
@@ -257,12 +278,11 @@ export abstract class BaseRunnerService {
 		);
 
 		if (filesToTranslate.length === 0) {
-			throw new ApplicationError(
-				"Found no files to translate",
-				ErrorCode.NoFilesToTranslate,
-				`${BaseRunnerService.name}.${this.fetchFilesToTranslate.name}`,
-				{ filesToTranslate, invalidPRsByFile },
+			this.logger.info(
+				{ invalidPRFileCount: invalidPRsByFile.size },
+				"No files to translate after discovery; skipping batch translation",
 			);
+			return false;
 		}
 
 		this.logger.info(
@@ -273,14 +293,9 @@ export abstract class BaseRunnerService {
 		this.state.filesToTranslate = filesToTranslate;
 		this.state.invalidPRsByFile = invalidPRsByFile;
 
-		const newIssueChooserUrl = resolveRunnerNewIssueChooserUrl();
+		this.rebuildTranslationBatchManager(invalidPRsByFile);
 
-		this.managers.translationBatch = new TranslationBatchManager(
-			this.services,
-			invalidPRsByFile,
-			this.metadata.timestamp,
-			{ newIssueChooserUrl },
-		);
+		return true;
 	}
 
 	/** Updates the progress issue with the translation results */
