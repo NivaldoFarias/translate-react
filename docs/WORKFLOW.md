@@ -88,10 +88,6 @@ Rate and cost knobs: [`src/utils/constants.util.ts`](../src/utils/constants.util
 
 `bun run smoke:llm-workflow` runs [`src/scripts/llm-workflow-smoke.ts`](../src/scripts/llm-workflow-smoke.ts): one [`RunnerService.run()`](../src/services/runner/runner.service.ts) with the real [`translatorService`](../src/services/translator/translator.service.ts) and mocked GitHub from [`createWorkflowGitHubServiceFromFiles`](../tests/integration/create-integration-runner.ts). Markdown is loaded via [`loadIntegrationWorkflowFilesFromMdFixtureDir`](../tests/integration/create-integration-runner.ts) with **every** `*.md` under [`tests/fixtures/md/`](../tests/fixtures/md/) (same helper as [`tests/integration/workflow.integration.spec.ts`](../tests/integration/workflow.integration.spec.ts), which selects specific files by name). Use the same `.env` as the main workflow for API tokens (`GH_TOKEN`, `LLM_API_KEY`) and other validated settings. Do not use `bun test` for this path — [`tests/setup.ts`](../tests/setup.ts) replaces `env`, so those keys would not reach the client.
 
-## Pinning translate-react in GitHub Actions
-
-[`.github/workflows/workflow.yml`](../.github/workflows/workflow.yml): optional dispatch input `tool_ref` — branch, tag, or full SHA of this repo for `actions/checkout` before `bun install` / `bun run start`; empty uses the ref chosen in the “Run workflow” UI. Repository variable `BUN_VERSION` overrides the Bun line installed by `oven-sh/setup-bun` (workflow default `1.3`).
-
 ## Releases and semantic versioning
 
 Semver is [`package.json`](../package.json) `version` (OpenRouter title defaults use `name` + `version` from there; see [`src/utils/constants.util.ts`](../src/utils/constants.util.ts)).
