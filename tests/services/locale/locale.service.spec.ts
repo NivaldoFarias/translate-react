@@ -22,6 +22,8 @@ function createPullRequestDescriptionMetadata(
 			now: 1706900000000,
 			workflowStart: 1706899000000,
 		},
+		translationModel: "google/gemini-2.0-flash-exp:free",
+		newIssueChooserUrl: "https://github.com/NivaldoFarias/translate-react/issues/new/choose",
 		...overrides,
 	};
 }
@@ -255,6 +257,40 @@ describe("ptBrLocale.pullRequest.body", () => {
 
 			expect(body).toContain("requer revisão humana");
 		});
+
+		test("should include translation model under technical info", () => {
+			const metadata = createPullRequestDescriptionMetadata({
+				translationModel: "anthropic/claude-3.5-sonnet",
+			});
+
+			const body = buildPullRequestBody(file, processingResult, metadata);
+
+			expect(body).toContain("Modelo de tradução (LLM)");
+			expect(body).toContain("`anthropic/claude-3.5-sonnet`");
+		});
+
+		test("should use footnotes for content ratio and processing time metrics", () => {
+			const metadata = createPullRequestDescriptionMetadata();
+
+			const body = buildPullRequestBody(file, processingResult, metadata);
+
+			expect(body).toContain("1.20x [^content-ratio]");
+			expect(body).toContain("[^processing-time]");
+			expect(body).toContain("[^content-ratio]:");
+			expect(body).toContain("[^processing-time]:");
+			expect(body).not.toContain("> [!NOTE]");
+			expect(body).toContain("Razão de Conteúdo");
+		});
+
+		test("should end with a TIP linking to the issue chooser", () => {
+			const url = "https://github.com/example/repo/issues/new/choose";
+			const metadata = createPullRequestDescriptionMetadata({ newIssueChooserUrl: url });
+
+			const body = buildPullRequestBody(file, processingResult, metadata);
+
+			expect(body).toContain("> [!TIP]");
+			expect(body).toContain(`](${url})`);
+		});
 	});
 });
 
@@ -339,6 +375,7 @@ describe("ruLocale.pullRequest.body", () => {
 
 			expect(body).toContain("Статистика обработки");
 			expect(body).toContain("Техническая информация");
+			expect(body).toContain("Модель перевода (LLM)");
 		});
 	});
 });
