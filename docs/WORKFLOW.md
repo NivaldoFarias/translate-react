@@ -85,9 +85,7 @@ Rate and cost knobs: [`src/utils/constants.util.ts`](../src/utils/constants.util
 
 ## Local LLM workflow smoke
 
-`bun run smoke:llm-workflow` runs [`src/scripts/llm-workflow-smoke.ts`](../src/scripts/llm-workflow-smoke.ts): one [`RunnerService.run()`](../src/services/runner/runner.service.ts) with the real [`translatorService`](../src/services/translator/translator.service.ts) and mocked GitHub from [`createWorkflowGitHubService`](../tests/integration/create-integration-runner.ts). Do not use `bun test` for this path — [`tests/setup.ts`](../tests/setup.ts) replaces `env`, so `.env` keys would not reach the client.
-
-Optional: `LLM_WORKFLOW_SMOKE_MARKDOWN` (repo-relative, e.g. `tests/fixtures/react-labs-view-transitions-activity-and-more.md`).
+`bun run smoke:llm-workflow` runs [`src/scripts/llm-workflow-smoke.ts`](../src/scripts/llm-workflow-smoke.ts): one [`RunnerService.run()`](../src/services/runner/runner.service.ts) with the real [`translatorService`](../src/services/translator/translator.service.ts) and mocked GitHub from [`createWorkflowGitHubServiceFromFiles`](../tests/integration/create-integration-runner.ts). Markdown is loaded via [`loadIntegrationWorkflowFilesFromMdFixtureDir`](../tests/integration/create-integration-runner.ts) with **every** `*.md` under [`tests/fixtures/md/`](../tests/fixtures/md/) (same helper as [`tests/integration/workflow.integration.spec.ts`](../tests/integration/workflow.integration.spec.ts), which selects specific files by name). Use the same `.env` as the main workflow for API tokens (`GH_TOKEN`, `LLM_API_KEY`) and other validated settings. Do not use `bun test` for this path — [`tests/setup.ts`](../tests/setup.ts) replaces `env`, so those keys would not reach the client.
 
 ## Pinning translate-react in GitHub Actions
 

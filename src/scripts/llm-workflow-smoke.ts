@@ -1,12 +1,16 @@
 /**
  * Runs `RunnerService` once with real `translatorService` (live LLM) and mocked GitHub.
+ *
  * Use `bun run smoke:llm-workflow`, not `bun test` — the test preload replaces `env`.
  *
- * Optional `LLM_WORKFLOW_SMOKE_MARKDOWN`: repo-relative path to a `.md` file for a larger run.
+ * Markdown inputs are every `*.md` file under `tests/fixtures/md/` (sorted by name), loaded via
+ * {@link loadIntegrationWorkflowFilesFromMdFixtureDir} (same helper as integration tests).
+ * Configure tokens and workflow knobs via the same `.env` / environment as the main app (`GH_TOKEN`,
+ * `LLM_API_KEY`, `LLM_MODEL`, etc.).
+ *
+ * Mocked GitHub outputs (per-fixture folders under `.out/`, plus the translation-progress issue
+ * comment at `.out/translation-progress-issue-comment.md`) are written for inspection after each run.
  */
-
-import fs from "node:fs/promises";
-import path from "node:path";
 
 import type { GitHubService } from "@/services/github/";
 import type { LanguageCacheEntry, RunnerServiceDependencies } from "@/services/runner/runner.types";
@@ -16,54 +20,31 @@ import { languageDetectorService } from "@/services/language-detector/";
 import { localeService } from "@/services/locale/";
 import { RunnerService } from "@/services/runner/runner.service";
 import { translatorService } from "@/services/translator/translator.service";
-import { logger } from "@/utils/";
+import { env, logger, RuntimeEnvironment } from "@/utils/";
 
 import {
-	createWorkflowGitHubService,
-	INTEGRATION_SMALL_MARKDOWN,
+	createWorkflowGitHubServiceFromFiles,
+	INTEGRATION_MD_FIXTURE_DIR_RELATIVE,
+	loadIntegrationWorkflowFilesFromMdFixtureDir,
 } from "@tests/integration/create-integration-runner";
-
-const MARKDOWN_PATH_ENV = "LLM_WORKFLOW_SMOKE_MARKDOWN";
 
 const log = logger.child({ component: "llm-workflow-smoke" });
 
-/** Resolves the markdown content for the smoke run */
-async function resolveMarkdownContent() {
-	const relative = import.meta.env[MARKDOWN_PATH_ENV];
-	if (typeof relative === "string" && relative.trim().length > 0) {
-		const absolute = path.resolve(process.cwd(), relative.trim());
-
-		return fs.readFile(absolute, "utf8");
-	}
-
-	return INTEGRATION_SMALL_MARKDOWN;
-}
-
-async function buildSmokeFile() {
-	const content = await resolveMarkdownContent();
-	const customPath = import.meta.env[MARKDOWN_PATH_ENV];
-	const filename =
-		typeof customPath === "string" && customPath.trim().length > 0 ?
-			path.basename(customPath.trim())
-		:	"workflow-llm-smoke.md";
-
-	return {
-		repoPath: `src/content/${filename}`,
-		filename,
-		content,
-		sha: "sha-workflow-llm-smoke",
-	};
-}
+/** Relative root directory where this script persists mocked GitHub artifacts */
+const SMOKE_GITHUB_ARTIFACT_DIR = ".out" as const;
 
 async function main() {
-	if (import.meta.env.NODE_ENV === "test") {
+	if (env.NODE_ENV === RuntimeEnvironment.Test) {
 		log.error("Use bun run smoke:llm-workflow (bun test mocks env)");
 		process.exit(1);
 	}
 
 	try {
-		const file = await buildSmokeFile();
-		const github = createWorkflowGitHubService(file);
+		const integrationFiles = await loadIntegrationWorkflowFilesFromMdFixtureDir();
+		const github = createWorkflowGitHubServiceFromFiles(integrationFiles, {
+			captureArtifactsDir: SMOKE_GITHUB_ARTIFACT_DIR,
+		});
+		const totalBytes = integrationFiles.reduce((sum, f) => sum + f.content.length, 0);
 
 		const runner = new RunnerService(
 			{
@@ -78,9 +59,12 @@ async function main() {
 
 		log.info(
 			{
-				model: import.meta.env["LLM_MODEL"],
-				markdownBytes: file.content.length,
-				repoPath: file.repoPath,
+				model: env.LLM_MODEL,
+				fixtureDir: INTEGRATION_MD_FIXTURE_DIR_RELATIVE,
+				fileCount: integrationFiles.length,
+				markdownBytes: totalBytes,
+				files: integrationFiles.map((f) => f.repoPath),
+				mockGithubArtifactsDir: SMOKE_GITHUB_ARTIFACT_DIR,
 			},
 			"LLM workflow smoke started",
 		);

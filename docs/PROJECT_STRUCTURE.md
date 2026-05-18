@@ -39,7 +39,7 @@ translate-react/                          # Repository root
 │   ├── clients/
 │   │   └── octokit/
 │   ├── errors/
-│   ├── fixtures/
+│   ├── fixtures/                         # Test data (`md/` = docs-like markdown for smoke + specs)
 │   ├── mocks/
 │   ├── services/
 │   │   ├── cache/
