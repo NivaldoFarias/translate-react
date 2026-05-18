@@ -10,6 +10,30 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Fixed
 
+## [0.1.28] - 2026-05-18
+
+### Added
+
+- `translator-frontmatter-batch.schema` and `callLanguageModelFrontmatterBatch`: translate
+  frontmatter `description` in one structured LLM completion via `zodResponseFormat` (metadata pass
+  no longer includes `title`).
+- `leadingNewlineRunLength` export and `normalizeBodyAfterFrontmatterMerge` to preserve body
+  spacing after frontmatter merge.
+- Tests: `translation-batch.manager`, `file-discovery.manager`, passthrough chat-completions mock,
+  and extended translator / frontmatter specs.
+
+### Changed
+
+- `LanguageDetectorService`: apply minimum length to cleaned prose before CLD.
+- `FileDiscoveryManager`: cache detected language when the file is already translated.
+- PR body: shorter conflict notice copy and placement in `pr-body.builder` and `pt-br` / `ru`
+  locales; normalize WIP wording in locale strings.
+- Actions workflow: remove `tool_ref` dispatch input; checkout uses `github.ref` for branches and
+  tags; `docs/WORKFLOW.md` drops the pinning section.
+- `logger.util`: honor `LOG_TO_CONSOLE` for pretty transport in all environments.
+
+### Fixed
+
 - `GitHubContent.getFile`: read source markdown from upstream default branch via `repos.getContent`
   instead of fork `git.getBlob`, so existing `translate/...` translations are not re-used as input.
 - `filterByPRs` / `getPullRequestFiles`: retry PR file lists and fail discovery when mapping is
@@ -90,6 +114,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 - README `MAX_RETRY_ATTEMPTS` default matches `src/utils/constants.util.ts` (`3`).
 
+[0.1.28]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.1.28
 [0.1.27]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.1.27
 [0.1.26]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.1.26
 [0.1.25]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.1.25
