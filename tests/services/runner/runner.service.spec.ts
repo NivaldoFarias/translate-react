@@ -64,13 +64,18 @@ describe("RunnerService", () => {
 			expect(runner.run()).rejects.toThrow(ApplicationError);
 		});
 
-		test("throws ApplicationError with NoFilesToTranslate when repository tree is empty", () => {
+		test("completes successfully with empty statistics when repository tree yields no translation work", async () => {
 			const github = createMockGitHubService();
 			github.getRepositoryTree.mockResolvedValue([]);
 
 			const runner = createTestRunnerService({ github: github as unknown as GitHubService });
 
-			expect(runner.run()).rejects.toThrow("Found no files to translate");
+			const stats = await runner.run();
+
+			expect(stats.totalCount).toBe(0);
+			expect(stats.successCount).toBe(0);
+			expect(stats.failureCount).toBe(0);
+			expect(stats.successRate).toBe(0);
 		});
 
 		test("proceeds without error when fetchTranslationGuidelinesFile returns null", async () => {
