@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test } from "bun:test";
 
 import type { ProcessedFileResult } from "@/services/";
 
-import { CommentBuilderService, TranslationFile } from "@/services/";
+import { CommentBuilderService, PullRequestProgressAction, TranslationFile } from "@/services/";
 
 import { createMockPullRequestListItem } from "@tests/fixtures";
 
@@ -18,12 +18,16 @@ describe("CommentBuilderService", () => {
 	const createMockResult = (
 		filename: string,
 		prNumber: number | null = null,
+		pullRequestProgress: PullRequestProgressAction | null = prNumber ?
+			PullRequestProgressAction.Created
+		:	null,
 	): ProcessedFileResult => {
 		return {
 			branch: null,
 			filename,
 			translation: `Translated content of ${filename}`,
 			pullRequest: prNumber ? createMockPrData(prNumber) : null,
+			pullRequestProgress,
 			error: null,
 		};
 	};
@@ -75,6 +79,18 @@ describe("CommentBuilderService", () => {
 			expect(result.trim()).not.toBe("");
 		});
 
+		test("should omit pull requests only reused without a new commit in this run", () => {
+			const results: ProcessedFileResult[] = [
+				createMockResult("intro.md", 123, PullRequestProgressAction.Created),
+				createMockResult("api.md", 124, PullRequestProgressAction.Reused),
+			];
+
+			const result = commentBuilderService.buildComment(results, filesToTranslate);
+
+			expect(result).toContain("#123");
+			expect(result).not.toContain("#124");
+		});
+
 		test("should handle empty results array", () => {
 			const results: ProcessedFileResult[] = [];
 			const filesToTranslate: TranslationFile[] = [];
@@ -91,6 +107,7 @@ describe("CommentBuilderService", () => {
 					filename: "post.md",
 					translation: "# Blog Post",
 					branch: null,
+					pullRequestProgress: PullRequestProgressAction.Created,
 					pullRequest: createMockPrData(126),
 					error: null,
 				},
@@ -162,6 +179,7 @@ describe("CommentBuilderService", () => {
 					filename: "test.md",
 					translation: "# Test",
 					branch: null,
+					pullRequestProgress: PullRequestProgressAction.Created,
 					pullRequest: createMockPrData(127),
 					error: null,
 				},
@@ -184,6 +202,7 @@ describe("CommentBuilderService", () => {
 					filename: "article.md",
 					translation: "# Article",
 					branch: null,
+					pullRequestProgress: PullRequestProgressAction.Created,
 					pullRequest: createMockPrData(128),
 					error: null,
 				},
@@ -215,6 +234,7 @@ describe("CommentBuilderService", () => {
 					filename: "intro.md",
 					translation: "# Introduction",
 					branch: null,
+					pullRequestProgress: PullRequestProgressAction.Created,
 					pullRequest: createMockPrData(129),
 					error: null,
 				},
@@ -222,6 +242,7 @@ describe("CommentBuilderService", () => {
 					filename: "advanced.md",
 					translation: "# Advanced",
 					branch: null,
+					pullRequestProgress: PullRequestProgressAction.Created,
 					pullRequest: createMockPrData(130),
 					error: null,
 				},
@@ -229,6 +250,7 @@ describe("CommentBuilderService", () => {
 					filename: "api.md",
 					translation: "# API",
 					branch: null,
+					pullRequestProgress: PullRequestProgressAction.Created,
 					pullRequest: createMockPrData(131),
 					error: null,
 				},
@@ -266,6 +288,7 @@ describe("CommentBuilderService", () => {
 					filename: "zebra.md",
 					translation: "# Zebra",
 					branch: null,
+					pullRequestProgress: PullRequestProgressAction.Created,
 					pullRequest: createMockPrData(132),
 					error: null,
 				},
@@ -273,6 +296,7 @@ describe("CommentBuilderService", () => {
 					filename: "alpha.md",
 					translation: "# Alpha",
 					branch: null,
+					pullRequestProgress: PullRequestProgressAction.Created,
 					pullRequest: createMockPrData(133),
 					error: null,
 				},
@@ -296,6 +320,7 @@ describe("CommentBuilderService", () => {
 					filename: "deep.md",
 					translation: "# Deep",
 					branch: null,
+					pullRequestProgress: PullRequestProgressAction.Created,
 					pullRequest: createMockPrData(134),
 					error: null,
 				},
@@ -327,6 +352,7 @@ describe("CommentBuilderService", () => {
 					filename: "",
 					translation: "# Empty",
 					branch: null,
+					pullRequestProgress: PullRequestProgressAction.Created,
 					pullRequest: createMockPrData(135),
 					error: null,
 				},
@@ -347,6 +373,7 @@ describe("CommentBuilderService", () => {
 					filename: "special-file_name.with.dots.md",
 					translation: "# Special",
 					branch: null,
+					pullRequestProgress: PullRequestProgressAction.Created,
 					pullRequest: createMockPrData(136),
 					error: null,
 				},
@@ -375,6 +402,7 @@ describe("CommentBuilderService", () => {
 					filename: `file-${index.toString().padStart(2, "0")}.md`,
 					branch: null,
 					translation: `# File ${index}`,
+					pullRequestProgress: PullRequestProgressAction.Created,
 					pullRequest: createMockPrData(100 + index),
 					error: null,
 				});

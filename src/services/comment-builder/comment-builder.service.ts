@@ -7,6 +7,8 @@ import { formatGithubActionsRunIssueLine, logger } from "@/utils/";
 import { localeService } from "../locale";
 import { TranslationFile } from "../translator/translator.service";
 
+import { selectProgressCommentPayload } from "./progress-comment.util";
+
 export interface FileEntry {
 	file: TranslationFile;
 	prNumber: number;
@@ -40,6 +42,7 @@ export class CommentBuilderService {
 	 *
 	 * Processes translation results and file data to create a structured comment
 	 * that organizes translated files by their directory hierarchy for better readability.
+	 * Only results with {@link PullRequestProgressAction.Created} are included (reused PRs are omitted).
 	 *
 	 * @param results Translation processing results containing PR information
 	 * @param filesToTranslate Original files that were processed for translation
@@ -55,11 +58,16 @@ export class CommentBuilderService {
 	 * ```
 	 */
 	public buildComment(results: ProcessedFileResult[], filesToTranslate: TranslationFile[]) {
-		const concattedData = results
+		const { reportableResults, reportableFiles } = selectProgressCommentPayload(
+			results,
+			filesToTranslate,
+		);
+
+		const concattedData = reportableResults
 			.map((result) => {
 				if (!result.pullRequest) return null;
 
-				const translationFile = filesToTranslate.find((file) => file.filename === result.filename);
+				const translationFile = reportableFiles.find((file) => file.filename === result.filename);
 
 				if (!translationFile) return null;
 

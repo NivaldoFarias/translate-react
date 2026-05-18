@@ -85,6 +85,7 @@ export function createMockGitHubService() {
 			}),
 		),
 		getFile: mock((_file: unknown) => Promise.resolve(createTranslationFileFixture())),
+		getForkFileContentAtBranch: mock(() => Promise.resolve(undefined as string | undefined)),
 		findPullRequestByBranch: mock(() =>
 			Promise.resolve(
 				undefined as

@@ -10,9 +10,17 @@ import type {
 import { ApplicationError, ErrorCode } from "@/errors/";
 import { LanguageDetectorService } from "@/services/language-detector/";
 import { TranslationFile } from "@/services/translator/";
-import { env, isTranslationEquivalentToCurrentBlob, logger } from "@/utils/";
+import {
+	env,
+	getTranslationBranchNameFromPath,
+	isTranslationEquivalentToCurrentBlob,
+	logger,
+} from "@/utils/";
+
+import { PullRequestProgressAction } from "../runner.types";
 
 import { MAX_CONSECUTIVE_FAILURES } from "./managers.constants";
+import { TranslationPullRequestValidityManager } from "./translation-pull-request-validity.manager";
 
 export interface InvalidFilePullRequest {
 	prNumber: number;
@@ -74,6 +82,8 @@ export class TranslationBatchManager {
 	 */
 	private consecutiveFailures = 0;
 
+	private readonly translationPullRequestValidity: TranslationPullRequestValidityManager;
+
 	/**
 	 * Initializes the batch manager with service dependencies.
 	 *
@@ -87,7 +97,9 @@ export class TranslationBatchManager {
 		private readonly invalidPRsByFile: Map<string, InvalidFilePullRequest>,
 		private readonly workflowStartTimestamp: number,
 		private readonly pullRequestContext: TranslationBatchPullRequestContext,
-	) {}
+	) {
+		this.translationPullRequestValidity = new TranslationPullRequestValidityManager(services);
+	}
 
 	/**
 	 * Processes files in batches to manage resources and provide progress feedback.
@@ -246,6 +258,7 @@ export class TranslationBatchManager {
 			filename: file.filename,
 			translation: null,
 			pullRequest: null,
+			pullRequestProgress: null,
 			error: null,
 		};
 
@@ -268,21 +281,21 @@ export class TranslationBatchManager {
 				);
 			}
 
-			const skippedForExistingPullRequest = await this.skipIfValidExistingPullRequest(
+			const skippedForValidTranslationPullRequest = await this.skipIfValidTranslationPullRequest(
 				file,
 				metadata,
 				startTime,
 			);
 
-			if (skippedForExistingPullRequest) {
-				return skippedForExistingPullRequest;
+			if (skippedForValidTranslationPullRequest) {
+				return skippedForValidTranslationPullRequest;
 			}
 
 			const branchStart = Date.now();
-			metadata.branch = await this.createOrGetTranslationBranch(file);
+			metadata.branch = await this.resetTranslationBranch(file);
 			file.logger.debug(
 				{ branchRef: metadata.branch.ref, durationMs: Date.now() - branchStart },
-				"Step 1/5: Branch created/retrieved",
+				"Step 1/5: Translation branch reset for single-commit workflow",
 			);
 
 			const translationStart = Date.now();
@@ -299,7 +312,7 @@ export class TranslationBatchManager {
 				);
 
 				await this.deleteIdleTranslationBranchIfAtForkBase(
-					this.getTranslationBranchName(file),
+					getTranslationBranchNameFromPath(file.path),
 					metadata.branch,
 				);
 
@@ -328,9 +341,15 @@ export class TranslationBatchManager {
 			file.logger.debug({ durationMs: Date.now() - commitStart }, "Step 4/5: Commit complete");
 
 			const prStart = Date.now();
-			metadata.pullRequest = await this.createOrUpdatePullRequest(file, metadata);
+			const pullRequestOutcome = await this.openTranslationPullRequest(file, metadata);
+			metadata.pullRequest = pullRequestOutcome.pullRequest;
+			metadata.pullRequestProgress = pullRequestOutcome.progress;
 			file.logger.debug(
-				{ prNumber: metadata.pullRequest.number, durationMs: Date.now() - prStart },
+				{
+					prNumber: metadata.pullRequest.number,
+					pullRequestProgress: metadata.pullRequestProgress,
+					durationMs: Date.now() - prStart,
+				},
 				"Step 5/5: Pull request created/updated",
 			);
 
@@ -392,13 +411,8 @@ export class TranslationBatchManager {
 		}
 	}
 
-	/** Resolves the `translate/…` branch name used for commits and pull requests */
-	private getTranslationBranchName(file: TranslationFile) {
-		return `translate/${file.path.split("/").slice(2).join("/")}`;
-	}
-
 	/**
-	 * Returns completed metadata when an open, mergeable PR already covers the file.
+	 * Returns completed metadata when an open translation pull request is already valid.
 	 *
 	 * @param file Translation file being processed
 	 * @param metadata In-progress processing result to populate when skipping
@@ -406,25 +420,19 @@ export class TranslationBatchManager {
 	 *
 	 * @returns Filled metadata when skipped, or `null` to continue translation
 	 */
-	private async skipIfValidExistingPullRequest(
+	private async skipIfValidTranslationPullRequest(
 		file: TranslationFile,
 		metadata: ProcessedFileResult,
 		startTime: number,
 	) {
-		const branchName = this.getTranslationBranchName(file);
-		const existingPR = await this.services.github.findPullRequestByBranch(branchName);
+		const validity = await this.translationPullRequestValidity.evaluate(file.path);
 
-		if (!existingPR) {
+		if (!validity.isValid || !validity.pullRequest) {
 			return null;
 		}
 
-		const prStatus = await this.services.github.checkPullRequestStatus(existingPR.number);
-
-		if (prStatus.needsUpdate || prStatus.hasConflicts) {
-			return null;
-		}
-
-		metadata.pullRequest = existingPR;
+		metadata.pullRequest = validity.pullRequest;
+		metadata.pullRequestProgress = PullRequestProgressAction.Reused;
 
 		this.consecutiveFailures = 0;
 		this.updateBatchProgress("success");
@@ -432,8 +440,8 @@ export class TranslationBatchManager {
 		file.logger.info(
 			{
 				path: file.path,
-				prNumber: existingPR.number,
-				mergeableState: prStatus.mergeableState,
+				prNumber: validity.pullRequest.number,
+				mergeableState: validity.pullRequestStatus?.mergeableState,
 			},
 			"Skipping file with valid existing pull request",
 		);
@@ -480,135 +488,100 @@ export class TranslationBatchManager {
 	}
 
 	/**
-	 * Creates a new branch for translation work, or reuses an existing one.
+	 * Closes any open translation PR and recreates the branch from the fork default tip.
 	 *
-	 * When an existing branch has an associated PR with merge conflicts, the
-	 * conflicted PR is closed and the branch is deleted so a fresh translation
-	 * can be created from the latest base.
+	 * Ensures the subsequent translation commit is the only commit on the topic branch.
 	 *
 	 * @param file Translation file being processed
-	 * @param baseBranch Optional base branch to create from (defaults to fork's default branch)
 	 *
-	 * @returns Branch reference data for subsequent commit operations
+	 * @returns Fresh branch reference for a single translation commit
 	 */
-	private async createOrGetTranslationBranch(file: TranslationFile, baseBranch?: string) {
-		const actualBaseBranch = baseBranch ?? (await this.services.github.getDefaultBranch("fork"));
-		const branchName = this.getTranslationBranchName(file);
+	private async resetTranslationBranch(file: TranslationFile) {
+		const branchName = getTranslationBranchNameFromPath(file.path);
+		const existingPullRequest = await this.services.github.findPullRequestByBranch(branchName);
+
+		if (existingPullRequest) {
+			this.logger.info(
+				{
+					filename: file.filename,
+					prNumber: existingPullRequest.number,
+					branchName,
+				},
+				"Closing open translation pull request before branch reset",
+			);
+
+			await this.services.github.createCommentOnPullRequest(
+				existingPullRequest.number,
+				"This PR is being closed so the translation branch can be refreshed from the current upstream source.",
+			);
+			await this.services.github.closePullRequest(existingPullRequest.number);
+		}
 
 		const existingBranch = await this.services.github.getBranch(branchName);
 
 		if (existingBranch) {
-			const upstreamPR = await this.services.github.findPullRequestByBranch(branchName);
-
-			if (upstreamPR) {
-				const prStatus = await this.services.github.checkPullRequestStatus(upstreamPR.number);
-
-				if (prStatus.hasConflicts) {
-					this.logger.info(
-						{
-							filename: file.filename,
-							prNumber: upstreamPR.number,
-							mergeableState: prStatus.mergeableState,
-							createdBy: prStatus.createdBy,
-						},
-						"PR has merge conflicts, closing and recreating",
-					);
-					await this.services.github.createCommentOnPullRequest(
-						upstreamPR.number,
-						"This PR has merge conflicts and is being closed. A new PR with the updated translation will be created.",
-					);
-
-					await this.services.github.closePullRequest(upstreamPR.number);
-					await this.services.github.deleteBranch(branchName);
-				} else {
-					return existingBranch.data;
-				}
-			} else {
-				const isBehind = await this.services.github.isBranchBehind(
-					branchName,
-					actualBaseBranch,
-					"fork",
-				);
-
-				if (isBehind) {
-					this.logger.info(
-						{ filename: file.filename, branchName },
-						"Branch is behind base, deleting and recreating",
-					);
-					await this.services.github.deleteBranch(branchName);
-				} else {
-					return existingBranch.data;
-				}
-			}
+			this.logger.info(
+				{ filename: file.filename, branchName },
+				"Deleting translation branch before reset",
+			);
+			await this.services.github.deleteBranch(branchName);
 		}
 
-		const newBranch = await this.services.github.createBranch(branchName, actualBaseBranch);
+		const forkDefaultBranch = await this.services.github.getDefaultBranch("fork");
+		const newBranch = await this.services.github.createBranch(branchName, forkDefaultBranch);
 
 		return newBranch.data;
 	}
 
 	/**
-	 * Creates a new PR or closes a conflicted one and creates a replacement.
-	 *
-	 * Conflict-free existing PRs are preserved. Conflicted PRs are closed
-	 * with a comment and replaced by a new PR with the fresh translation.
+	 * Opens a new upstream pull request for a freshly reset translation branch.
 	 *
 	 * @param file Translation file being processed
 	 * @param processingResult Processing metadata including translation and timing
 	 *
-	 * @returns Newly created or existing PR data
+	 * @returns Newly created pull request metadata for progress reporting
 	 */
-	private async createOrUpdatePullRequest(
+	private async openTranslationPullRequest(
 		file: TranslationFile,
 		processingResult: ProcessedFileResult,
-	) {
-		const branchName = this.getTranslationBranchName(file);
+	): Promise<{
+		pullRequest: NonNullable<ProcessedFileResult["pullRequest"]>;
+		progress: PullRequestProgressAction.Created;
+	}> {
+		const branchName = getTranslationBranchNameFromPath(file.path);
 		const languageName = this.services.languageDetector.getLanguageName(
 			LanguageDetectorService.languages.target,
 		);
-		const prOptions = {
+		const pullRequestOptions = {
 			title: this.services.locale.definitions.pullRequest.title(file),
 			body: this.createPullRequestDescription(file, processingResult, languageName),
 			baseBranch: "main",
 		};
 
-		this.logger.info({ branchName, title: prOptions.title }, "Creating or updating pull request");
+		this.logger.info(
+			{ branchName, title: pullRequestOptions.title },
+			"Opening pull request for refreshed translation branch",
+		);
 
-		const existingPR = await this.services.github.findPullRequestByBranch(branchName);
+		const strayPullRequest = await this.services.github.findPullRequestByBranch(branchName);
 
-		if (existingPR) {
-			const prStatus = await this.services.github.checkPullRequestStatus(existingPR.number);
-
-			if (prStatus.needsUpdate) {
-				this.logger.info(
-					{
-						prNumber: existingPR.number,
-						mergeableState: prStatus.mergeableState,
-						createdBy: prStatus.createdBy,
-					},
-					"Closing conflicted PR and creating replacement",
-				);
-
-				await this.services.github.createCommentOnPullRequest(
-					existingPR.number,
-					"This PR has merge conflicts and is being closed. A new PR with the updated translation will be created.",
-				);
-
-				await this.services.github.closePullRequest(existingPR.number);
-
-				return await this.services.github.createPullRequest({
-					branch: branchName,
-					...prOptions,
-				});
-			}
-
-			return existingPR;
+		if (strayPullRequest) {
+			this.logger.warn(
+				{ prNumber: strayPullRequest.number, branchName },
+				"Unexpected open pull request before create; closing before opening replacement",
+			);
+			await this.services.github.closePullRequest(strayPullRequest.number);
 		}
 
-		return await this.services.github.createPullRequest({
+		const pullRequest = await this.services.github.createPullRequest({
 			branch: branchName,
-			...prOptions,
+			...pullRequestOptions,
 		});
+
+		return {
+			pullRequest,
+			progress: PullRequestProgressAction.Created,
+		};
 	}
 
 	/**

@@ -18,6 +18,7 @@ import {
 	LANGUAGE_CACHE_TTL_MS,
 	MIN_CACHE_CONFIDENCE,
 } from "./managers.constants";
+import { TranslationPullRequestValidityManager } from "./translation-pull-request-validity.manager";
 
 /**
  * Manages file discovery and filtering pipeline for translation workflow.
@@ -29,12 +30,16 @@ import {
 export class FileDiscoveryManager {
 	private readonly logger = logger.child({ component: FileDiscoveryManager.name });
 
+	private readonly translationPullRequestValidity: TranslationPullRequestValidityManager;
+
 	/**
 	 * Initializes the file discovery manager with service dependencies.
 	 *
 	 * @param services Injected service dependencies for GitHub, translation, and caching
 	 */
-	constructor(private readonly services: RunnerServiceDependencies) {}
+	constructor(private readonly services: RunnerServiceDependencies) {
+		this.translationPullRequestValidity = new TranslationPullRequestValidityManager(services);
+	}
 
 	/**
 	 * Discovers and filters files requiring translation through complete pipeline.
@@ -211,13 +216,11 @@ export class FileDiscoveryManager {
 	}
 
 	/**
-	 * Filters candidate files by checking for existing open pull requests.
+	 * Filters candidate files by validating open translation pull requests per path.
 	 *
-	 * Skips files with conflict-free PRs. Files with conflicted PRs are queued
-	 * for re-translation and tracked in `invalidPRsByFile` for notification.
-	 *
-	 * Pull request file lists are fetched with retries; a persistent failure aborts
-	 * discovery so paths are not translated without a reliable open-PR map.
+	 * Skips paths whose `translate/…` branch has an open PR, target-language content on
+	 * the fork, and a mergeable sync with base. Out-of-sync PRs are tracked in
+	 * `invalidPRsByFile` for conflict messaging when a replacement PR is opened.
 	 *
 	 * @param candidateFiles Files remaining after cache check that require PR validation
 	 *
@@ -226,61 +229,55 @@ export class FileDiscoveryManager {
 	public async filterByPRs(
 		candidateFiles: PatchedRepositoryTreeItem[],
 	): Promise<PullRequestFilterResult> {
-		const openPRs = await this.services.github.listOpenPullRequests();
 		const invalidPRsByFile = new Map<string, { prNumber: number; status: PullRequestStatus }>();
-		const prByFile = new Map<string, number>();
-
-		for (const pr of openPRs) {
-			const changedFiles = await this.services.github.getPullRequestFiles(pr.number);
-
-			for (const filePath of changedFiles) {
-				prByFile.set(filePath, pr.number);
-			}
-		}
 
 		let numFilesWithPRs = 0;
 		const filesToFetch: typeof candidateFiles = [];
 
 		for (const file of candidateFiles) {
-			const prNumber = prByFile.get(file.path);
-
-			if (!prNumber) {
-				filesToFetch.push(file);
-				continue;
-			}
-
 			try {
-				const prStatus = await this.services.github.checkPullRequestStatus(prNumber);
+				const validity = await this.translationPullRequestValidity.evaluate(file.path);
 
-				if (prStatus.needsUpdate || prStatus.hasConflicts) {
-					invalidPRsByFile.set(file.path, { prNumber, status: prStatus });
-					filesToFetch.push(file);
-
-					this.logger.debug(
-						{
-							path: file.path,
-							prNumber,
-							mergeableState: prStatus.mergeableState,
-							hasConflicts: prStatus.hasConflicts,
-							createdBy: prStatus.createdBy,
-						},
-						"File has conflicted PR, will close and re-translate",
-					);
-				} else {
+				if (validity.isValid) {
 					numFilesWithPRs++;
+
 					this.logger.debug(
 						{
 							path: file.path,
-							prNumber,
-							mergeableState: prStatus.mergeableState,
+							prNumber: validity.pullRequest?.number,
+							mergeableState: validity.pullRequestStatus?.mergeableState,
 						},
-						"Skipping file with valid existing PR",
+						"Skipping file with valid existing pull request",
+					);
+
+					continue;
+				}
+
+				if (
+					validity.invalidReason === "out_of_sync" &&
+					validity.pullRequest &&
+					validity.pullRequestStatus
+				) {
+					invalidPRsByFile.set(file.path, {
+						prNumber: validity.pullRequest.number,
+						status: validity.pullRequestStatus,
+					});
+
+					this.logger.debug(
+						{
+							path: file.path,
+							prNumber: validity.pullRequest.number,
+							mergeableState: validity.pullRequestStatus.mergeableState,
+						},
+						"File has out-of-sync translation pull request, will refresh",
 					);
 				}
+
+				filesToFetch.push(file);
 			} catch (error) {
 				this.logger.warn(
-					{ path: file.path, prNumber, error },
-					"Failed to check PR status, including file for processing",
+					{ path: file.path, error },
+					"Failed to evaluate translation pull request, including file for processing",
 				);
 				filesToFetch.push(file);
 			}
