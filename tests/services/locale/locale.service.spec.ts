@@ -184,7 +184,7 @@ describe("ptBrLocale.pullRequest.body", () => {
 			expect(body).toContain("mergeable_state: dirty");
 		});
 
-		test("should explain complete rewrite approach in conflict notice", () => {
+		test("should note rewrite from current source in conflict notice", () => {
 			const metadata = createPullRequestDescriptionMetadata({
 				invalidFilePR: {
 					prNumber: 123,
@@ -200,8 +200,8 @@ describe("ptBrLocale.pullRequest.body", () => {
 
 			const body = buildPullRequestBody(file, processingResult, metadata);
 
-			expect(body).toContain("tradução completamente nova");
-			expect(body).toContain("versão mais atual");
+			expect(body).toContain("refeita a partir do arquivo fonte atual");
+			expect(body).toContain("sem merge manual dos conflitos");
 		});
 
 		test("should use GFM IMPORTANT alert syntax for conflict notice", () => {
@@ -318,7 +318,7 @@ describe("ruLocale.pullRequest.body", () => {
 			const body = buildPullRequestBody(file, processingResult, metadata);
 
 			expect(body).not.toContain("Предыдущий PR закрыт");
-			expect(body).not.toContain("автоматически закрыт");
+			expect(body).not.toContain("закрыт автоматически");
 		});
 
 		test("should include conflict notice with PR number when invalidFilePR exists", () => {
@@ -341,7 +341,7 @@ describe("ruLocale.pullRequest.body", () => {
 			expect(body).toContain("> [!IMPORTANT]");
 			expect(body).toContain("**Предыдущий PR закрыт**");
 			expect(body).toContain("#42");
-			expect(body).toContain("автоматически закрыт");
+			expect(body).toContain("закрыт автоматически");
 		});
 	});
 

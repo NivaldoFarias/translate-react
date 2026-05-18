@@ -1,6 +1,7 @@
 import { isMap, isScalar, parseDocument } from "yaml";
 
 import { REGEXES } from "./managers/managers.constants";
+import { leadingNewlineRunLength } from "./translator-markdown-artifacts.util";
 
 /**
  * Result of splitting a markdown document into a leading YAML frontmatter block and the rest.
@@ -159,7 +160,46 @@ export function collectTopLevelKeysFromInnerYaml(innerYaml: string): Set<string>
 	return keys;
 }
 
-export function mergePreservedYamlFrontmatter(preservedBlock: string, translated: string) {
+/**
+ * Normalizes spacing between the closing frontmatter fence and the first body line.
+ *
+ * @param body Translated body after duplicate leading frontmatter removal
+ * @param sourceBodyAfterFrontmatter When set, leading newline depth is padded to match this prefix
+ *
+ * @returns Body text safe to concatenate immediately after a closing `---` fence
+ */
+function normalizeBodyAfterFrontmatterMerge(body: string, sourceBodyAfterFrontmatter?: string) {
+	if (sourceBodyAfterFrontmatter !== undefined) {
+		const sourceNewlines = leadingNewlineRunLength(sourceBodyAfterFrontmatter);
+		const bodyNewlines = leadingNewlineRunLength(body);
+		if (sourceNewlines > bodyNewlines) {
+			return "\n".repeat(sourceNewlines - bodyNewlines) + body;
+		}
+
+		return body;
+	}
+
+	const needsLeadingNewline = !body.startsWith("\n") && !body.startsWith("\r\n");
+	return needsLeadingNewline ? `\n${body}` : body;
+}
+
+/**
+ * Reattaches preserved YAML frontmatter to translated body output, optionally restoring the same
+ * leading newline depth as the source body had after the closing fence (so blank lines before the
+ * first heading are not collapsed when the model omits them).
+ *
+ * @param preservedBlock Full leading `---` … `---` block (rebuilt or original) to prepend
+ * @param translated Model output for the body (may include a duplicate leading frontmatter block)
+ * @param sourceBodyAfterFrontmatter When set, the original markdown body slice that was translated;
+ * used only to compare leading newline runs against `translated` after duplicate frontmatter removal
+ *
+ * @returns Full document string with frontmatter plus body
+ */
+export function mergePreservedYamlFrontmatter(
+	preservedBlock: string,
+	translated: string,
+	sourceBodyAfterFrontmatter?: string,
+) {
 	if (!preservedBlock) {
 		return translated;
 	}
@@ -174,8 +214,5 @@ export function mergePreservedYamlFrontmatter(preservedBlock: string, translated
 		return preservedBlock;
 	}
 
-	const needsLeadingNewline = !body.startsWith("\n") && !body.startsWith("\r\n");
-	const normalizedBody = needsLeadingNewline ? `\n${body}` : body;
-
-	return preservedBlock + normalizedBody;
+	return preservedBlock + normalizeBodyAfterFrontmatterMerge(body, sourceBodyAfterFrontmatter);
 }

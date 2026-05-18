@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import { StatusCodes } from "http-status-codes";
 import OpenAI from "openai";
 import { APIError } from "openai/error";
+import { zodResponseFormat } from "openai/helpers/zod";
 import pRetry, { AbortError } from "p-retry";
 import { isMap, parseDocument } from "yaml";
 
@@ -30,6 +31,11 @@ import {
 import { ChunksManager, TranslationValidatorManager } from "./managers";
 import { REGEXES, SYSTEM_PROMPT_TOKEN_RESERVE } from "./managers/managers.constants";
 import {
+	type FrontmatterBatchFieldKey,
+	frontmatterBatchRequestEnvelopeSchema,
+	frontmatterBatchTranslationEnvelopeSchema,
+} from "./translator-frontmatter-batch.schema";
+import {
 	buildFrontmatterBlock,
 	extractFrontmatterParts,
 	extractTitleScalarFromInnerYaml,
@@ -38,6 +44,12 @@ import {
 } from "./translator-frontmatter.util";
 import { stripSpuriousOuterMarkdownFencesWhenSourceHadNoFences } from "./translator-markdown-artifacts.util";
 import { CONNECTIVITY_TEST_MAX_TOKENS, LLM_TEMPERATURE } from "./translator.constants";
+
+/** Structured-output schema for batched YAML `description` translation (OpenRouter/OpenAI JSON mode). */
+const FRONTMATTER_BATCH_RESPONSE_FORMAT = zodResponseFormat(
+	frontmatterBatchTranslationEnvelopeSchema,
+	"frontmatter_batch_translations",
+);
 
 /**
  * Identifies which segment of a chunked body is being translated in one LLM call.
@@ -52,10 +64,10 @@ type ChunkTranslationProgress = Readonly<{
 /**
  * Selects which system prompt {@link TranslatorService.getSystemPrompt} builds for an LLM call.
  *
- * `markdownDocument` keeps chunking, verbatim-placeholder, and full doc rules. `frontmatterScalar`
- * uses a short metadata-only prompt so glossary text in the system message is not echoed into YAML.
+ * `markdownDocument` keeps chunking, verbatim-placeholder, and full doc rules. `frontmatterBatch`
+ * uses one structured-output call for the YAML `description` string field when present.
  */
-export type TranslationSystemPromptKind = "markdownDocument" | "frontmatterScalar";
+export type TranslationSystemPromptKind = "markdownDocument" | "frontmatterBatch";
 
 /** Dependency injection interface for {@link TranslatorService} */
 export interface TranslatorServiceDependencies {
@@ -512,7 +524,11 @@ export class TranslatorService {
 					)
 				:	preservedYamlBlock;
 
-			translatedContent = mergePreservedYamlFrontmatter(mergedBlock, translatedContent);
+			translatedContent = mergePreservedYamlFrontmatter(
+				mergedBlock,
+				translatedContent,
+				translationPayload,
+			);
 		}
 
 		const translationDuration = Date.now() - translationStartTime;
@@ -534,7 +550,7 @@ export class TranslatorService {
 	}
 
 	/**
-	 * Translates the string fields of a YAML frontmatter document.
+	 * Translates the `description` string field of a YAML frontmatter document when present; other keys are left unchanged.
 	 *
 	 * @param innerYaml The inner YAML of the frontmatter document
 	 * @param file The file instance for logger context
@@ -542,7 +558,6 @@ export class TranslatorService {
 	 * @returns The translated YAML frontmatter document
 	 */
 	private async translateFrontmatterStringFields(innerYaml: string, file: TranslationFile) {
-		const FRONTMATTER_FIELDS_TO_TRANSLATE = ["title", "description"] as const;
 		let doc;
 
 		try {
@@ -563,31 +578,47 @@ export class TranslatorService {
 		const root = doc.contents;
 		if (!isMap(root)) return innerYaml;
 
-		for (const key of FRONTMATTER_FIELDS_TO_TRANSLATE) {
-			const value = doc.get(key);
-			if (typeof value !== "string") continue;
+		const batchItems: { fieldKey: FrontmatterBatchFieldKey; source: string }[] = [];
 
-			const trimmed = value.trim();
-			if (!trimmed.length) continue;
+		const descriptionValue = doc.get("description");
+		if (typeof descriptionValue === "string") {
+			const trimmed = descriptionValue.trim();
+			if (trimmed.length > 0) {
+				batchItems.push({ fieldKey: "description", source: trimmed });
+			}
+		}
 
-			file.logger.debug(
-				{ key, scalarLength: trimmed.length },
-				"Translating YAML frontmatter field",
-			);
+		if (batchItems.length === 0) {
+			return doc.toString({ lineWidth: 0 });
+		}
+
+		file.logger.debug(
+			{ fields: batchItems.map((item) => item.fieldKey) },
+			"Translating YAML frontmatter string fields in one structured LLM call",
+		);
+
+		const envelope = await this.callLanguageModelFrontmatterBatch(file, batchItems);
+		const translatedByKey = new Map(
+			envelope.items.map((item) => [item.fieldKey, item.translated] as const),
+		);
+
+		for (const { fieldKey } of batchItems) {
+			let translatedScalar = translatedByKey.get(fieldKey);
+			if (translatedScalar === undefined) {
+				file.logger.warn(
+					{ fieldKey },
+					"Frontmatter batch response missing a field; keeping original value",
+				);
+				continue;
+			}
 
 			const snippetFile = new TranslationFile(
-				trimmed,
-				`${file.filename}#${key}`,
+				translatedScalar,
+				`${file.filename}#${fieldKey}`,
 				file.path,
 				file.sha,
 				file.logger,
 				file.documentSourceLanguage,
-			);
-			let translatedScalar = await this.callLanguageModel(
-				snippetFile,
-				trimmed,
-				undefined,
-				"frontmatterScalar",
 			);
 
 			translatedScalar = this.managers.translationValidator.cleanupTranslatedContent(
@@ -597,16 +628,200 @@ export class TranslatorService {
 
 			if (!translatedScalar.length) {
 				file.logger.warn(
-					{ key },
-					"Frontmatter field translation was empty; keeping original value",
+					{ fieldKey },
+					"Frontmatter field translation was empty after cleanup; keeping original value",
 				);
 				continue;
 			}
 
-			doc.set(key, translatedScalar);
+			doc.set(fieldKey, translatedScalar);
 		}
 
-		return String(doc);
+		return doc.toString({ lineWidth: 0 });
+	}
+
+	/**
+	 * Translates all requested YAML frontmatter string fields in one LLM completion using JSON schema output.
+	 *
+	 * Uses the same glossary and locale rules as the markdown body pass, encoded in the system prompt, so
+	 * terminology stays consistent between the `description` field and the document body.
+	 *
+	 * @param file Logical document being translated (for logging and resolved source language)
+	 * @param batchItems Field keys and source strings to translate (the `description` field when present)
+	 *
+	 * @throws {ApplicationError} When the model returns empty content, truncates, or JSON that fails schema validation
+	 *
+	 * @returns Parsed envelope matching {@link frontmatterBatchTranslationEnvelopeSchema}
+	 */
+	private async callLanguageModelFrontmatterBatch(
+		file: TranslationFile,
+		batchItems: readonly { fieldKey: FrontmatterBatchFieldKey; source: string }[],
+	) {
+		file.documentSourceLanguage ??= await this.resolveDocumentSourceLanguage(file.content);
+
+		const requestPayload = frontmatterBatchRequestEnvelopeSchema.parse({ items: batchItems });
+		const userMessage = JSON.stringify(requestPayload);
+		const contentLengthForLog = userMessage.length;
+
+		return this.queue.add(async () => {
+			const callStartTime = Date.now();
+			const estimatedInputTokens = this.managers.chunks.estimateTokenCount(userMessage);
+
+			return pRetry(
+				async () => {
+					const attemptStartTime = Date.now();
+
+					try {
+						file.logger.debug(
+							{
+								contentLength: contentLengthForLog,
+								estimatedInputTokens,
+								model: this.model,
+								systemPromptKind: "frontmatterBatch",
+							},
+							"Calling LLM API for batched frontmatter metadata",
+						);
+
+						const completion = await this.openai.chat.completions.create(
+							this.getLLMCompletionParams(
+								file,
+								userMessage,
+								undefined,
+								"frontmatterBatch",
+								FRONTMATTER_BATCH_RESPONSE_FORMAT,
+							),
+						);
+
+						const rawJson = completion.choices[0]?.message.content;
+
+						if (!rawJson) {
+							throw new ApplicationError(
+								"No content returned from language model for frontmatter batch",
+								ErrorCode.NoContent,
+								`${TranslatorService.name}.${this.callLanguageModelFrontmatterBatch.name}`,
+								{ model: this.model, contentLength: contentLengthForLog },
+							);
+						}
+
+						const finishReason = completion.choices[0]?.finish_reason;
+						if (finishReason === "length") {
+							throw new ApplicationError(
+								"Language model response ended at max completion tokens (truncated frontmatter batch JSON)",
+								ErrorCode.TranslationFailed,
+								`${TranslatorService.name}.${this.callLanguageModelFrontmatterBatch.name}`,
+								{
+									model: this.model,
+									contentLength: contentLengthForLog,
+									finishReason,
+									completionTokens: completion.usage?.completion_tokens,
+									promptTokens: completion.usage?.prompt_tokens,
+								},
+							);
+						}
+
+						const parsedEnvelope = frontmatterBatchTranslationEnvelopeSchema.safeParse(
+							JSON.parse(rawJson),
+						);
+
+						if (!parsedEnvelope.success) {
+							throw new ApplicationError(
+								"Frontmatter batch response failed schema validation",
+								ErrorCode.TranslationFailed,
+								`${TranslatorService.name}.${this.callLanguageModelFrontmatterBatch.name}`,
+								{
+									model: this.model,
+									issues: parsedEnvelope.error.issues,
+								},
+							);
+						}
+
+						const requestedKeys = new Set(batchItems.map((item) => item.fieldKey));
+						const responseKeys = new Set(parsedEnvelope.data.items.map((item) => item.fieldKey));
+
+						if (
+							requestedKeys.size !== responseKeys.size ||
+							[...requestedKeys].some((k) => !responseKeys.has(k))
+						) {
+							throw new ApplicationError(
+								"Frontmatter batch response keys do not match requested fields",
+								ErrorCode.TranslationFailed,
+								`${TranslatorService.name}.${this.callLanguageModelFrontmatterBatch.name}`,
+								{
+									requested: [...requestedKeys],
+									received: [...responseKeys],
+								},
+							);
+						}
+
+						file.logger.debug(
+							{
+								model: this.model,
+								durationMs: Date.now() - attemptStartTime,
+								inputTokens: completion.usage?.prompt_tokens,
+								outputTokens: completion.usage?.completion_tokens,
+								totalTokens: completion.usage?.total_tokens,
+								fieldCount: parsedEnvelope.data.items.length,
+							},
+							"LLM frontmatter batch call successful",
+						);
+
+						return parsedEnvelope.data;
+					} catch (error) {
+						if (error instanceof SyntaxError) {
+							throw new ApplicationError(
+								"Frontmatter batch response was not valid JSON",
+								ErrorCode.TranslationFailed,
+								`${TranslatorService.name}.${this.callLanguageModelFrontmatterBatch.name}`,
+								{ model: this.model, parseError: error.message },
+							);
+						}
+
+						if (error instanceof APIError) {
+							if (
+								error.status === StatusCodes.UNAUTHORIZED ||
+								error.status === StatusCodes.BAD_REQUEST
+							) {
+								throw new AbortError(error);
+							}
+
+							if (isOpenRouterDailyFreeModelQuotaError(error)) {
+								file.logger.error(
+									{
+										model: this.model,
+										message: error.message,
+									},
+									"OpenRouter free-models-per-day limit reached; add credits, drop :free, or wait for the daily reset",
+								);
+								throw new AbortError(error);
+							}
+						}
+
+						throw error;
+					}
+				},
+				{
+					...this.retryConfig,
+					onFailedAttempt: async ({ attemptNumber: attempt, error, retriesLeft }) => {
+						file.logger.warn(
+							{
+								attempt,
+								retriesLeft,
+								error: error instanceof Error ? error.message : String(error),
+								totalElapsedMs: Date.now() - callStartTime,
+								contentLength: contentLengthForLog,
+							},
+							`LLM frontmatter batch attempt ${attempt} failed, ${retriesLeft} retries remaining`,
+						);
+
+						const resetWaitMs = getRateLimitResetWaitMs(error);
+						if (resetWaitMs > 0) {
+							file.logger.info({ resetWaitMs }, "Waiting for LLM rate limit window before retry");
+							await new Promise<void>((resolve) => setTimeout(resolve, resetWaitMs));
+						}
+					},
+				},
+			);
+		});
 	}
 
 	/**
@@ -730,8 +945,9 @@ export class TranslatorService {
 		userMessageContent: string,
 		chunkProgress?: ChunkTranslationProgress,
 		systemPromptKind: TranslationSystemPromptKind = "markdownDocument",
+		responseFormat?: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming["response_format"],
 	): OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming {
-		return {
+		const params: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming = {
 			model: this.model,
 			temperature: LLM_TEMPERATURE,
 			max_tokens: this.providerCompletionTokenCap ?? env.MAX_TOKENS,
@@ -743,6 +959,12 @@ export class TranslatorService {
 				{ role: "user", content: userMessageContent },
 			],
 		};
+
+		if (responseFormat) {
+			params.response_format = responseFormat;
+		}
+
+		return params;
 	}
 
 	/**
@@ -755,7 +977,7 @@ export class TranslatorService {
 	 * @param file Translation file instance
 	 * @param content Content to translate (defaults to file.content if not provided)
 	 * @param chunkProgress When set, the system prompt notes this body is slice `index` of `total` from one file
-	 * @param systemPromptKind Which system prompt to use; YAML scalar fields use `frontmatterScalar`
+	 * @param systemPromptKind Which system prompt to use; YAML metadata uses `frontmatterBatch`
 	 *
 	 * @throws {ApplicationError} with {@link ErrorCode.TranslationFailed} if the translation's content is missing/empty
 	 *
@@ -894,7 +1116,7 @@ export class TranslatorService {
 	 * @param file Translation file instance
 	 * @param userMessageContent User message body for placeholder checks (verbatim fence hints)
 	 * @param chunkProgress When set, documents that `userMessageContent` is one slice of a larger markdown body
-	 * @param systemPromptKind Document translation vs single frontmatter string (see {@link TranslationSystemPromptKind})
+	 * @param systemPromptKind Document translation vs batched YAML metadata JSON (see {@link TranslationSystemPromptKind})
 	 *
 	 * @returns The system prompt string
 	 */
@@ -920,8 +1142,8 @@ export class TranslatorService {
 			"Determined source and target languages for prompt",
 		);
 
-		if (systemPromptKind === "frontmatterScalar") {
-			return this.buildFrontmatterScalarSystemPrompt(languages);
+		if (systemPromptKind === "frontmatterBatch") {
+			return this.buildFrontmatterBatchSystemPrompt(languages);
 		}
 
 		const translationGuidelinesSection =
@@ -946,7 +1168,7 @@ export class TranslatorService {
 				${chunkSliceSection}
 				# CRITICAL PRESERVATION RULES
 				1. **Structure & Formatting**: Preserve ALL markdown syntax, HTML tags, code blocks, frontmatter, and line breaks exactly as written
-				2. **Code Integrity**: Keep ALL code examples, variable names, function names, and URLs COMPLETELY unchanged
+				2. **Code & identifiers**: Keep ALL code examples, URLs, and every programming identifier (functions, variables, classes, hooks, packages, props as in code) unchanged in every context—fenced blocks, inline code, tables, lists, or prose
 				3. **Content Completeness**: Translate EVERY piece of text content WITHOUT adding, removing, or omitting anything
 				4. **Whitespace Integrity**: ALWAYS preserve blank lines, especially after horizontal rules (---). The pattern '---\n\n##' must remain '---\n\n##' and never become '---\n##'
 	
@@ -957,10 +1179,8 @@ export class TranslatorService {
 				- Alt text, titles, and descriptive content
 	
 				## What NOT to Translate
-				- Code syntax, variable names, function names, API endpoints
-				- Technical terms not specified in the translation guidelines
-				- URLs, file paths, or configuration values
-				- YAML frontmatter key names; title and description values are translated in a dedicated pass after the body
+				- API endpoints; URLs, paths, and configuration values; technical terms unless the translation guidelines map them
+				- YAML frontmatter key names; the \`title\` value is not machine-translated; only a string \`description\` value may be translated in a dedicated pass after the body
 	
 				## Quality Standards
 				- Use natural, fluent ${languages.target} while maintaining technical precision
@@ -991,41 +1211,41 @@ export class TranslatorService {
 	}
 
 	/**
-	 * Builds the system prompt for translating a single YAML frontmatter string (title or description).
+	 * Builds the system prompt for batched YAML frontmatter string translation with structured JSON output.
 	 *
-	 * Keeps glossary and locale rules as silent reference so models do not treat them as user content to translate into the reply.
+	 * Embeds the same glossary and locale rules as the markdown body pass (as silent reference) so
+	 * the `description` field stays aligned with body terminology without echoing the glossary into free text.
 	 *
 	 * @param languages Human-readable source and target language names for the TASK section
 	 *
-	 * @returns The system prompt string for one scalar metadata translation call
+	 * @returns The system prompt string for the frontmatter batch completion
 	 */
-	private buildFrontmatterScalarSystemPrompt(languages: { source: string; target: string }) {
+	private buildFrontmatterBatchSystemPrompt(languages: { source: string; target: string }) {
 		const termReferenceSection =
 			this.translationGuidelines ?
 				`
 				# TERM REFERENCE (DO NOT OUTPUT)
-				Use only for consistent terminology when translating the user string. Never copy, quote, translate, summarize, or repeat this reference in your reply.
+				Use only for consistent terminology when translating each \`source\` string. Never copy, quote, translate, summarize, or repeat this reference in your reply JSON.
 	
 				${this.translationGuidelines}
 				`
 			:	"";
 
 		return `# ROLE
-				You are an expert technical translator for React documentation metadata.
+				You are an expert technical translator for React documentation YAML metadata.
 	
 				# TASK
-				The user message is one plain-text value from YAML frontmatter (a page title or description). Translate it from ${languages.source} to ${languages.target}.
-	
-				# RULES
-				- Translate only natural language in that string
-				- Keep proper nouns, product names, version numbers, code-like tokens, and URLs unchanged when the source keeps them unless the term reference explicitly maps them
-				- Do not add markdown headings, list markers, code fences, or commentary
+				The user message is a single JSON object with an \`items\` array of length 1. The element has \`fieldKey\` "description" and \`source\` (the English string to translate). Translate \`source\` from ${languages.source} to ${languages.target}.
 	
 				# OUTPUT (STRICT)
-				- Return only the translated string
-				- No markdown document framing (no line whose first non-space character is #)
-				- No preamble or labels (for example do not start with "Translation:" or "Here is")
-				- Preserve intentional internal line breaks only when the user string already uses multiple lines you must keep
+				- Reply with JSON only, matching the response schema: an object \`items\` whose length equals the request, each item having \`fieldKey\` (same as input) and \`translated\` (the translated string only).
+				- Do not add markdown, code fences, or commentary outside the JSON object.
+				- Preserve intentional internal line breaks in a string only when the corresponding \`source\` already uses multiple lines you must keep.
+	
+				# RULES
+				- Translate only natural language in each \`source\` value
+				- Keep programming identifiers, proper nouns, versions, code-like tokens, and URLs unchanged unless the term reference explicitly maps them
+				- Never translate the JSON keys \`fieldKey\`, \`source\`, \`items\`, or \`translated\` themselves
 	
 				${this.services.locale.definitions.rules.specific}
 	
