@@ -8,6 +8,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Changed
 
+### Fixed
+
+- `GitHubContent.getFile`: read source markdown from upstream default branch via `repos.getContent`
+  instead of fork `git.getBlob`, so existing `translate/...` translations are not re-used as input.
+- `filterByPRs` / `getPullRequestFiles`: retry PR file lists and fail discovery when mapping is
+  unreliable; `TranslationBatchManager` skips translate/commit when a mergeable open PR already
+  exists for the path.
+
 ## [0.1.27] - 2026-05-18
 
 ### Fixed

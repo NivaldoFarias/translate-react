@@ -73,7 +73,7 @@ export const ptBrLocale: LocaleDefinition = {
 		suffix: `> [!IMPORTANT]
 >
 > - As traduções foram geradas por uma LLM e requerem revisão humana para garantir precisão técnica e fluência.
-> - Esta implementação é um **trabalho em progresso** e pode apresentar inconsistências em conteúdos técnicos complexos ou formatação específica.`,
+> - Esta implementação é um **WIP** (Work In Progress) e pode apresentar inconsistências em conteúdos técnicos complexos ou formatação específica.`,
 	},
 	rules: {
 		specific: `
