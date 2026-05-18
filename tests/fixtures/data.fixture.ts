@@ -158,6 +158,19 @@ export function createRepositoryTreeItemFixture(
 }
 
 /**
+ * JSON assistant message content for mocked YAML `description` frontmatter LLM completions.
+ *
+ * @param descriptionTranslated Translated `description` string returned in the structured batch response
+ *
+ * @returns String passed as `choices[0].message.content` for the frontmatter batch completion
+ */
+export function createFrontmatterBatchLlmJsonContent(descriptionTranslated: string) {
+	return JSON.stringify({
+		items: [{ fieldKey: "description" as const, translated: descriptionTranslated }],
+	});
+}
+
+/**
  * Creates a {@link ChatCompletion} fixture.
  *
  * @param overrides Optional overrides for the ChatCompletion fields

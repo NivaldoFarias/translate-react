@@ -397,13 +397,16 @@ export class FileDiscoveryManager {
 				file.content,
 			);
 
-			if (file.sha && analysis.detectedLanguage) {
+			if (file.sha && (analysis.detectedLanguage || analysis.isTranslated)) {
 				const cacheKey = this.buildLanguageCacheKey(file);
 
 				this.services.languageCache.set(
 					cacheKey,
 					{
-						detectedLanguage: analysis.detectedLanguage,
+						detectedLanguage:
+							analysis.isTranslated ?
+								LanguageDetectorService.languages.target
+							:	(analysis.detectedLanguage ?? "und"),
 						confidence: analysis.languageScore.target,
 						timestamp: Date.now(),
 					},

@@ -7,6 +7,7 @@ import { localeService, TranslationFile, TranslatorService } from "@/services/";
 
 import {
 	createChatCompletionFixture,
+	createFrontmatterBatchLlmJsonContent,
 	createLanguageAnalysisResultFixture,
 	createOpenAIApiErrorFixture,
 	createTranslationFileFixture,
@@ -247,7 +248,7 @@ describe("TranslatorService", () => {
 			const title = "Title";
 			const sourceContent = `# Title\n\`\`\`javascript\n// Comment\nconst example = "test";\n\`\`\`\n\nText`;
 			const translatedContent = `# Título\n\`\`\`javascript\n// Comentário traduzido\nconst example = "test";\n\`\`\`\n\nTexto traduzido`;
-			queueOpenAiTranslationResponses(translatedContent, title);
+			queueOpenAiTranslationResponses(translatedContent);
 
 			const file = createTranslationFileFixture({ content: sourceContent }, title);
 
@@ -489,7 +490,7 @@ describe("TranslatorService", () => {
 			const title = "Title";
 			const sourceContent = `# Title\n\n\`\`\`javascript\nconst x = 1;\n\`\`\`\n\nText\n\n\`\`\`python\nprint("hello")\n\`\`\``;
 			const translatedContent = `# Título\n\n\`\`\`javascript\nconst x = 1;\n\`\`\`\n\nTexto\n\n\`\`\`python\nprint("hello")\n\`\`\``;
-			queueOpenAiTranslationResponses(translatedContent, title);
+			queueOpenAiTranslationResponses(translatedContent);
 
 			const file = createTranslationFileFixture({ content: sourceContent }, title);
 
@@ -528,7 +529,7 @@ describe("TranslatorService", () => {
 			const sourceContent = `# Title\n\nText without code blocks`;
 			const translatedContent = `# Título\n\nTexto sem blocos de código`;
 
-			queueOpenAiTranslationResponses(translatedContent, title);
+			queueOpenAiTranslationResponses(translatedContent);
 
 			const file = createTranslationFileFixture({ content: sourceContent }, title);
 
@@ -540,7 +541,7 @@ describe("TranslatorService", () => {
 			const sourceContent = `# Title\n\n\`\`\`js\ncode1\n\`\`\`\n\n\`\`\`js\ncode2\n\`\`\`\n\n\`\`\`js\ncode3\n\`\`\`\n\n\`\`\`js\ncode4\n\`\`\`\n\n\`\`\`js\ncode5\n\`\`\``;
 			const translatedContent = `# Título\n\n\`\`\`js\ncode1\n\`\`\`\n\n\`\`\`js\ncode2\n\`\`\`\n\n\`\`\`js\ncode3\n\`\`\`\n\n\`\`\`js\ncode4\n\`\`\``;
 
-			queueOpenAiTranslationResponses(translatedContent, title);
+			queueOpenAiTranslationResponses(translatedContent);
 
 			const file = createTranslationFileFixture({ content: sourceContent }, title);
 			expect(translatorService.translateContent(file)).resolves.not.toThrow(ApplicationError);
@@ -552,7 +553,7 @@ describe("TranslatorService", () => {
 			const title = "Title";
 			const sourceContent = `# Title\n\nCheck [React docs](https://react.dev) and [MDN](https://developer.mozilla.org).`;
 			const translatedContent = `# Título\n\nVeja [documentação React](https://react.dev) e [MDN](https://developer.mozilla.org).`;
-			queueOpenAiTranslationResponses(translatedContent, title);
+			queueOpenAiTranslationResponses(translatedContent);
 
 			const file = createTranslationFileFixture({ content: sourceContent }, title);
 
@@ -567,7 +568,7 @@ describe("TranslatorService", () => {
 			const sourceContent = `# Title\n\n[Link 1](https://example.com/1)\n[Link 2](https://example.com/2)\n[Link 3](https://example.com/3)`;
 			const translatedContent = `# Título\n\nTexto traduzido sem links`;
 
-			queueOpenAiTranslationResponses(translatedContent, title);
+			queueOpenAiTranslationResponses(translatedContent);
 
 			const file = createTranslationFileFixture({ content: sourceContent }, title);
 			const warnSpy = spyOn(file.logger, "warn");
@@ -581,7 +582,7 @@ describe("TranslatorService", () => {
 			const sourceContent = `# Title\n\n[1](u1) [2](u2) [3](u3) [4](u4) [5](u5)`;
 			const translatedContent = `# Título\n\n[1](u1) [2](u2) [3](u3)`;
 
-			queueOpenAiTranslationResponses(translatedContent, title);
+			queueOpenAiTranslationResponses(translatedContent);
 
 			const file = createTranslationFileFixture({ content: sourceContent }, title);
 			const warnSpy = spyOn(file.logger, "warn");
@@ -595,7 +596,7 @@ describe("TranslatorService", () => {
 			const sourceContent = `# Title\n\nText without links`;
 			const translatedContent = `# Título\n\nTexto sem links`;
 
-			queueOpenAiTranslationResponses(translatedContent, title);
+			queueOpenAiTranslationResponses(translatedContent);
 
 			const file = createTranslationFileFixture({ content: sourceContent }, title);
 			expect(translatorService.translateContent(file)).resolves.not.toThrow(ApplicationError);
@@ -606,7 +607,7 @@ describe("TranslatorService", () => {
 			const sourceContent = `# Title\n\n[1](u1) [2](u2) [3](u3) [4](u4) [5](u5)`;
 			const translatedContent = `# Título\n\n[1](u1) [2](u2) [3](u3) [4](u4)`;
 
-			queueOpenAiTranslationResponses(translatedContent, title);
+			queueOpenAiTranslationResponses(translatedContent);
 
 			const file = createTranslationFileFixture({ content: sourceContent }, title);
 			expect(translatorService.translateContent(file)).resolves.not.toThrow(ApplicationError);
@@ -617,7 +618,7 @@ describe("TranslatorService", () => {
 			const sourceContent = `# Title\n\n[React](https://react.dev "React docs") and [MDN](https://mdn.dev "MDN Web Docs")`;
 			const translatedContent = `# Título\n\n[React](https://react.dev "Docs React") e [MDN](https://mdn.dev "MDN Web Docs")`;
 
-			queueOpenAiTranslationResponses(translatedContent, title);
+			queueOpenAiTranslationResponses(translatedContent);
 
 			const file = createTranslationFileFixture({ content: sourceContent }, title);
 			expect(translatorService.translateContent(file)).resolves.not.toThrow(ApplicationError);
@@ -625,41 +626,75 @@ describe("TranslatorService", () => {
 	});
 
 	describe("Frontmatter Validation", () => {
-		test("should pass validation when frontmatter keys match between source and translation", () => {
+		test("should pass validation when frontmatter keys match between source and translation", async () => {
 			const sourceContent = `---\ntitle: 'Hello'\ndescription: 'Welcome'\n---\n\n# Content`;
 			const translatedBody = `# Conteúdo`;
 
-			queueOpenAiTranslationResponses(translatedBody, "Olá", "Bem-vindo");
+			queueOpenAiTranslationResponses(translatedBody, createFrontmatterBatchLlmJsonContent("Bem-vindo"));
 
 			const file = createTranslationFileFixture({ content: sourceContent });
-			expect(translatorService.translateContent(file)).resolves.not.toThrow(ApplicationError);
+			const result = await translatorService.translateContent(file);
+			expect(result).toContain("Bem-vindo");
+			expect(result).toContain("Hello");
 		});
 
-		test("should preserve translated title in YAML when the model returns body without frontmatter", async () => {
+		test("should preserve original title in YAML when the model returns body without frontmatter", async () => {
 			const sourceContent = `---\ntitle: 'Hello'\n---\n\n# Content`;
 			const translatedContent = `# Conteúdo`;
 
-			queueOpenAiTranslationResponses(translatedContent, "Olá");
+			queueOpenAiTranslationResponses(translatedContent);
 
 			const file = createTranslationFileFixture({ content: sourceContent });
 			const result = await translatorService.translateContent(file);
 			expect(result.startsWith("---\n")).toBe(true);
-			expect(result).toContain("Olá");
+			expect(result).toContain("Hello");
+			expect(result).not.toContain("Olá");
 			expect(result).toContain("# Conteúdo");
 		});
 
-		test("should keep non-translated keys and translate title when the model emits a shorter YAML block", async () => {
+		test("should keep non-translated keys and preserve title when the model emits a shorter YAML block", async () => {
 			const sourceContent = `---\ntitle: 'Hello'\ncustom_key: 'value'\nauthor: 'John'\n---\n\n# Content`;
 			const translatedBody = `# Conteúdo`;
 
-			queueOpenAiTranslationResponses(translatedBody, "Olá");
+			queueOpenAiTranslationResponses(translatedBody);
 
 			const file = createTranslationFileFixture({ content: sourceContent });
 			const result = await translatorService.translateContent(file);
 			expect(result).toContain("custom_key: 'value'");
 			expect(result).toContain("author: 'John'");
 			expect(result).toContain("# Conteúdo");
-			expect(result).toContain("Olá");
+			expect(result).toContain("Hello");
+			expect(result).not.toContain("Olá");
+		});
+
+		test("should keep long non-translated YAML scalars on one physical line in frontmatter", async () => {
+			const longAuthor = "A".repeat(120);
+			const sourceContent = `---\ntitle: Hello\nauthor: '${longAuthor}'\n---\n\n# Content`;
+			const translatedBody = `# Conteúdo`;
+
+			queueOpenAiTranslationResponses(translatedBody);
+
+			const file = createTranslationFileFixture({ content: sourceContent });
+			const result = await translatorService.translateContent(file);
+
+			const frontmatterMatch = /^---\r?\n([\s\S]*?)\r?\n---/.exec(result);
+			expect(frontmatterMatch).not.toBeNull();
+			if (frontmatterMatch === null) {
+				throw new Error("expected leading YAML frontmatter block");
+			}
+
+			const innerYaml = frontmatterMatch[1];
+			expect(innerYaml).toBeDefined();
+			if (innerYaml === undefined) {
+				throw new Error("expected inner YAML capture in frontmatter regex");
+			}
+
+			const authorLine = innerYaml.split("\n").find((line) => line.startsWith("author:"));
+			expect(authorLine).toBeDefined();
+			if (authorLine === undefined) {
+				throw new Error("expected author field line in frontmatter");
+			}
+			expect(authorLine.length).toBeGreaterThan(110);
 		});
 
 		test("should not throw Error when source has no frontmatter", () => {
@@ -667,20 +702,22 @@ describe("TranslatorService", () => {
 			const sourceContent = `# Content without frontmatter`;
 			const translatedContent = `# Conteúdo sem frontmatter`;
 
-			queueOpenAiTranslationResponses(translatedContent, title);
+			queueOpenAiTranslationResponses(translatedContent);
 
 			const file = createTranslationFileFixture({ content: sourceContent }, title);
 			expect(translatorService.translateContent(file)).resolves.not.toThrow(ApplicationError);
 		});
 
-		test("should not throw Error when frontmatter with various key formats", () => {
+		test("should not throw Error when frontmatter with various key formats", async () => {
 			const sourceContent = `---\ntitle: 'Test'\nsnake_case_key: 'value'\ncamelCaseKey: 'value2'\nKEY123: 'value3'\n---\n\n# Content`;
 			const translatedBody = `# Conteúdo`;
 
-			queueOpenAiTranslationResponses(translatedBody, "Teste");
+			queueOpenAiTranslationResponses(translatedBody);
 
 			const file = createTranslationFileFixture({ content: sourceContent });
-			expect(translatorService.translateContent(file)).resolves.not.toThrow(ApplicationError);
+			const result = await translatorService.translateContent(file);
+			expect(result).toContain("Test");
+			expect(result).not.toContain("Teste");
 		});
 	});
 
