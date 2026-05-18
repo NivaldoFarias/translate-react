@@ -1,6 +1,6 @@
 {
 	"name": "translate-react",
-	"version": "0.1.24",
+	"version": "0.1.25",
 	"contributors": [
 		{
 			"name": "Nivaldo Farias",
@@ -24,6 +24,7 @@
 		"format:check": "prettier --check .",
 		"type-check": "tsc",
 		"test": "bun test",
+		"smoke:llm-workflow": "bun src/scripts/llm-workflow-smoke.ts",
 		"test:watch": "bun test --watch",
 		"test:coverage": "bun test --coverage"
 	},

@@ -285,6 +285,8 @@ export class GitHubContent {
 	 * Fetches raw content of a file from GitHub.
 	 *
 	 * @param file File reference to fetch
+	 *
+	 * @returns A `TranslationFile` backed by the decoded blob body
 	 */
 	public async getFile(file: PatchedRepositoryTreeItem): Promise<TranslationFile> {
 		const response = await this.deps.octokit.git.getBlob({

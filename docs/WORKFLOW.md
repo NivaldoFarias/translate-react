@@ -8,6 +8,7 @@ Detailed breakdown of the translation workflow: execution stages, data flow, and
 - [Overview](#overview)
   - [Actual `run()` order](#actual-run-order)
 - [Operating translate-react (forks)](#operating-translate-react-forks)
+- [Local LLM workflow smoke](#local-llm-workflow-smoke)
 - [Pinning translate-react in GitHub Actions](#pinning-translate-react-in-github-actions)
 - [Releases and semantic versioning](#releases-and-semantic-versioning)
 - [Stable 1.x expectations](#stable-1x-expectations)
@@ -18,7 +19,6 @@ Detailed breakdown of the translation workflow: execution stages, data flow, and
   - [Stage 3: Content Discovery](#stage-3-content-discovery)
   - [Stage 4: File Filtering](#stage-4-file-filtering)
   - [Stage 5: Batch Translation](#stage-5-batch-translation)
-    - [Branch-tip SHA before commit](#branch-tip-sha-before-commit)
   - [Stage 6: Progress Reporting](#stage-6-progress-reporting)
 - [Data Flow Diagrams](#data-flow-diagrams)
   - [Discovery Phase](#discovery-phase)
@@ -82,6 +82,10 @@ Order in [`RunnerService.run()`](../src/services/runner/runner.service.ts), then
 No hosted backend: you set `LLM_API_KEY` (OpenAI-compatible API) and pay or quota-manage with the provider. Translation Actions use the [translate-react bot app](https://github.com/apps/translate-react-bot); secrets such as `BOT_APP_ID`, `BOT_PRIVATE_KEY`, `LLM_API_KEY`, optional `GH_PAT_TOKEN` / `OPENAI_PROJECT_ID`, and variables such as `LLM_MODEL` are wired in [`.github/workflows/workflow.yml`](../.github/workflows/workflow.yml). Review PRs on the locale fork; note this tool’s version (logs, `package.json`, or CI ref) when comparing runs.
 
 Rate and cost knobs: [`src/utils/constants.util.ts`](../src/utils/constants.util.ts), [`src/utils/env.util.ts`](../src/utils/env.util.ts) — e.g. `LLM_MAX_REQUESTS_PER_MINUTE`, `MAX_LLM_CONCURRENCY`, `MAX_RETRY_ATTEMPTS`, `BATCH_SIZE`, `MASK_VERBATIM_LARGE_FENCES`.
+
+## Local LLM workflow smoke
+
+`bun run smoke:llm-workflow` runs [`src/scripts/llm-workflow-smoke.ts`](../src/scripts/llm-workflow-smoke.ts): one [`RunnerService.run()`](../src/services/runner/runner.service.ts) with the real [`translatorService`](../src/services/translator/translator.service.ts) and mocked GitHub from [`createWorkflowGitHubServiceFromFiles`](../tests/integration/create-integration-runner.ts). Markdown is loaded via [`loadIntegrationWorkflowFilesFromMdFixtureDir`](../tests/integration/create-integration-runner.ts) with **every** `*.md` under [`tests/fixtures/md/`](../tests/fixtures/md/) (same helper as [`tests/integration/workflow.integration.spec.ts`](../tests/integration/workflow.integration.spec.ts), which selects specific files by name). Use the same `.env` as the main workflow for API tokens (`GH_TOKEN`, `LLM_API_KEY`) and other validated settings. Do not use `bun test` for this path — [`tests/setup.ts`](../tests/setup.ts) replaces `env`, so those keys would not reach the client.
 
 ## Pinning translate-react in GitHub Actions
 

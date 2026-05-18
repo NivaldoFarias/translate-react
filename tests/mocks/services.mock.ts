@@ -84,7 +84,7 @@ export function createMockGitHubService() {
 				html_url: "https://github.com/test/test/pull/1",
 			}),
 		),
-		getFile: mock(() => Promise.resolve(createTranslationFileFixture())),
+		getFile: mock((_file: unknown) => Promise.resolve(createTranslationFileFixture())),
 		findPullRequestByBranch: mock(() =>
 			Promise.resolve(
 				undefined as

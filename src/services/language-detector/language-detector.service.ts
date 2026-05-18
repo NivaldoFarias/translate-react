@@ -286,7 +286,7 @@ export class LanguageDetectorService {
 	 *
 	 * @param text Text content to analyze
 	 *
-	 * @returns Resolves to the detected language code or undefined
+	 * @returns Resolves to the detected language code, `undefined` when the input is empty or shorter than {@link MIN_CONTENT_LENGTH_FOR_DETECTION}, or `"en"` when CLD throws (unreliable chunk-shaped input is avoided by running this on full-file markdown in {@link TranslatorService})
 	 */
 	public async detectPrimaryLanguage(text: string): Promise<ReactLanguageCode | undefined> {
 		try {
@@ -313,7 +313,12 @@ export class LanguageDetectorService {
 		} catch (error) {
 			if (error instanceof ApplicationError) throw error;
 
-			this.logger.error({ error }, "Primary language detection failed");
+			this.logger.warn(
+				{ error },
+				"Primary language detection failed; assuming English source for translation prompts",
+			);
+
+			return "en";
 		}
 	}
 
