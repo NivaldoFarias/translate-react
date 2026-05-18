@@ -8,6 +8,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Changed
 
+- `locale.service.spec`: remove hanging unit test for PR `mergeable_state` in conflict notice.
+
 ### Fixed
 
 ## [0.1.28] - 2026-05-18
