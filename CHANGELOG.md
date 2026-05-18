@@ -8,9 +8,29 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Changed
 
-- `locale.service.spec`: remove hanging unit test for PR `mergeable_state` in conflict notice.
-
 ### Fixed
+
+## [0.1.29] - 2026-05-18
+
+### Added
+
+- `TranslationPullRequestValidityManager`: skip translation when an open `translate/…` PR has
+  target-language fork content and is in sync with its base.
+- `getTranslationBranchNameFromPath` (`translation-branch.util.ts`) and
+  `GitHubContent.getForkFileContentAtBranch` for fork reads on translation branches.
+- `PullRequestProgressAction` on `ProcessedFileResult`; `selectProgressCommentPayload` /
+  `filterReportableProgressCommentResults` so progress-issue comments list only PRs opened in the
+  current run.
+- Fixture `tests/fixtures/md/use-memo.md`; specs for validity manager, progress comment util, and
+  extended batch / discovery / GitHub service tests.
+
+### Changed
+
+- `FileDiscoveryManager.filterByPRs`: per-path branch validation via validity manager instead of
+  bulk PR file-list mapping.
+- `TranslationBatchManager`: reset `translate/…` branches to a single commit before
+  translate/commit; close open PRs before reset; reuse valid open PRs without re-translating.
+- `CommentBuilderService.buildComment`: document and filter to newly created PRs only.
 
 ## [0.1.28] - 2026-05-18
 
@@ -33,6 +53,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 - Actions workflow: remove `tool_ref` dispatch input; checkout uses `github.ref` for branches and
   tags; `docs/WORKFLOW.md` drops the pinning section.
 - `logger.util`: honor `LOG_TO_CONSOLE` for pretty transport in all environments.
+- `locale.service.spec`: remove hanging unit test for PR `mergeable_state` in conflict notice.
 
 ### Fixed
 
@@ -116,6 +137,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 - README `MAX_RETRY_ATTEMPTS` default matches `src/utils/constants.util.ts` (`3`).
 
+[0.1.29]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.1.29
 [0.1.28]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.1.28
 [0.1.27]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.1.27
 [0.1.26]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.1.26
