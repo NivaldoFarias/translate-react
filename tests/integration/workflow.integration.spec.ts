@@ -3,8 +3,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import {
 	createIntegrationRunner,
 	installOpenRouterModelLimitsStub,
-	INTEGRATION_SMALL_MARKDOWN,
-	readTestsFixtureUtf8,
+	loadIntegrationWorkflowFilesFromMdFixtureDir,
 	restoreOpenRouterModelLimitsStub,
 } from "./create-integration-runner";
 
@@ -18,12 +17,16 @@ describe("RunnerService workflow integration", () => {
 	});
 
 	test("small markdown: full run with real TranslatorService and mocked GitHub", async () => {
-		const { runner, github, chatMock } = createIntegrationRunner({
-			repoPath: "src/content/integration-doc.md",
-			filename: "integration-doc.md",
-			content: INTEGRATION_SMALL_MARKDOWN,
-			sha: "sha-integration-001",
-		});
+		const files = await loadIntegrationWorkflowFilesFromMdFixtureDir(["hydrateRoot.md"]);
+
+		expect(files.length).toBe(1);
+
+		const file = files[0];
+		if (file === undefined) {
+			throw new Error("expected one integration workflow file");
+		}
+
+		const { runner, github, chatMock } = createIntegrationRunner(file);
 
 		const stats = await runner.run();
 
@@ -38,16 +41,18 @@ describe("RunnerService workflow integration", () => {
 	});
 
 	test("large fixture: full run with chunking and passthrough LLM", async () => {
-		const content = await readTestsFixtureUtf8(
-			"fixtures/react-labs-view-transitions-activity-and-more.md",
-		);
+		const files = await loadIntegrationWorkflowFilesFromMdFixtureDir([
+			"react-labs-view-transitions-activity-and-more.md",
+		]);
 
-		const { runner, github, chatMock } = createIntegrationRunner({
-			repoPath: "src/content/react-labs-view-transitions-activity-and-more.md",
-			filename: "react-labs-view-transitions-activity-and-more.md",
-			content,
-			sha: "sha-large-fixture-001",
-		});
+		expect(files.length).toBe(1);
+
+		const file = files[0];
+		if (file === undefined) {
+			throw new Error("expected one integration workflow file");
+		}
+
+		const { runner, github, chatMock } = createIntegrationRunner(file);
 
 		const stats = await runner.run();
 

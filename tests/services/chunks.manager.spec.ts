@@ -12,7 +12,7 @@ import {
 
 const FIXTURE_PATH = path.resolve(
 	import.meta.dir,
-	"../fixtures/react-labs-view-transitions-activity-and-more.md",
+	"../fixtures/md/react-labs-view-transitions-activity-and-more.md",
 );
 
 const TEST_MODEL = "gpt-4o";
