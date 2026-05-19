@@ -19,7 +19,7 @@ export function createMockCommentBuilderService() {
 		concatComment: mock((content: string) => `prefix\n\n${content}\n\nsuffix`),
 		comment: {
 			suffix: "suffix",
-			prefix: "prefix",
+			prefix: "As seguintes páginas foram traduzidas e PRs foram criados:",
 		},
 	};
 }

@@ -88,6 +88,8 @@ jobs:
           GH_REQUEST_TIMEOUT: ${{ vars.GH_REQUEST_TIMEOUT }}
           HEADER_APP_URL: ${{ vars.HEADER_APP_URL }}
           HEADER_APP_TITLE: ${{ vars.HEADER_APP_TITLE }}
+          GITHUB_REF: ${{ github.ref }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
         run: |
           cat > .env << EOF
           GH_TOKEN=${{ steps.generate-token.outputs.token }}
@@ -114,6 +116,8 @@ jobs:
           [ -n "$HEADER_APP_URL" ] && echo "HEADER_APP_URL=$HEADER_APP_URL" >> .env || true
           [ -n "$HEADER_APP_TITLE" ] && echo "HEADER_APP_TITLE=$HEADER_APP_TITLE" >> .env || true
           [ -n "${{ matrix.translation_guidelines_file }}" ] && echo "TRANSLATION_GUIDELINES_FILE=${{ matrix.translation_guidelines_file }}" >> .env || true
+          echo "GITHUB_REF=${GITHUB_REF}" >> .env
+          echo "GITHUB_REF_NAME=${GITHUB_REF_NAME}" >> .env
 
       - name: Run translation workflow (${{ matrix.lang }})
         run: bun run start

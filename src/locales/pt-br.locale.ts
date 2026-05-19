@@ -1,6 +1,6 @@
 import type { TranslationFile } from "@/services/translator/translator.service";
 
-import type { LocaleDefinition, LocalePRBodyStrings } from "./locale.types";
+import type { LocaleDefinition, LocalePRBodyStrings, ProgressCommentRunContext } from "./locale.types";
 
 import { createPRBodyBuilder } from "./pr-body.builder";
 
@@ -69,7 +69,13 @@ const ptBrPRBodyStrings: LocalePRBodyStrings = {
  */
 export const ptBrLocale: LocaleDefinition = {
 	comment: {
-		prefix: "As seguintes páginas foram traduzidas e PRs foram criados:",
+		prefix: (runContext?: ProgressCommentRunContext) => {
+			if (!runContext) {
+				return "As seguintes páginas foram traduzidas e PRs foram criados:";
+			}
+
+			return `A última execução do \`translate-react\` (**${runContext.refLabel}**, workflow [\`${runContext.workflowName}\` · #${runContext.runId}](${runContext.url})) traduziu as seguintes páginas e criou estes PRs:`;
+		},
 		suffix: `> [!IMPORTANT]
 >
 > - As traduções foram geradas por uma LLM e requerem revisão humana para garantir precisão técnica e fluência.
