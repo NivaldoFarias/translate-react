@@ -1,6 +1,10 @@
 import type { TranslationFile } from "@/services/translator/translator.service";
 
-import type { LocaleDefinition, LocalePRBodyStrings, ProgressCommentRunContext } from "./locale.types";
+import type {
+	LocaleDefinition,
+	LocalePRBodyStrings,
+	ProgressCommentRunContext,
+} from "./locale.types";
 
 import { createPRBodyBuilder } from "./pr-body.builder";
 
