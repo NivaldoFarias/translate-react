@@ -10,7 +10,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Fixed
 
-## [0.1.29] - 2026-05-18
+## [0.1.29] - 2026-05-19
 
 ### Added
 
@@ -21,8 +21,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 - `PullRequestProgressAction` on `ProcessedFileResult`; `selectProgressCommentPayload` /
   `filterReportableProgressCommentResults` so progress-issue comments list only PRs opened in the
   current run.
-- Fixture `tests/fixtures/md/use-memo.md`; specs for validity manager, progress comment util, and
-  extended batch / discovery / GitHub service tests.
+- `ProgressCommentRunContext` and locale `comment.prefix` callbacks (`pt-br`, `ru`) for
+  CI-aware translation-progress issue openers.
+- Fixture `tests/fixtures/md/use-memo.md`; specs for validity manager, progress comment util,
+  `github-actions-run.util`, and extended batch / discovery / GitHub service tests.
 
 ### Changed
 
@@ -31,6 +33,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 - `TranslationBatchManager`: reset `translate/…` branches to a single commit before
   translate/commit; close open PRs before reset; reuse valid open PRs without re-translating.
 - `CommentBuilderService.buildComment`: document and filter to newly created PRs only.
+- Translation-progress issue comments: branch or tag ref and linked workflow run in the opening
+  line; drop `formatGithubActionsRunIssueLine` footer.
+- `resolveGitHubActionsRunContext`: resolve `refLabel` from `GITHUB_REF` / `GITHUB_REF_NAME`.
+- Actions workflow: pass `github.ref` and `github.ref_name` into `.env` for the translation step.
+- Integration workflow spec: separate small (`use-memo.md`) and medium (`hydrateRoot.md`) runs.
 
 ## [0.1.28] - 2026-05-18
 
