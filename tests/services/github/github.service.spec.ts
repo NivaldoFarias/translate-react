@@ -12,7 +12,7 @@ import type {
 
 import type { MockOctokit } from "@tests/mocks";
 
-import { GitHubService, TranslationFile } from "@/services/";
+import { GitHubService, PullRequestProgressAction, TranslationFile } from "@/services/";
 
 import {
 	createOctokitRequestErrorFixture,
@@ -1062,6 +1062,27 @@ describe("GitHubService", () => {
 
 				const result = await githubService.commentCompiledResultsOnIssue(
 					failedOnly,
+					fixtures.translationFiles,
+				);
+
+				expect(result).toBeUndefined();
+				expect(octokitMock.issues.createComment).not.toHaveBeenCalled();
+			});
+
+			test("should skip commenting when only existing pull requests were reused", async () => {
+				const reusedOnly: ProcessedFileResult[] = [
+					{
+						branch: null,
+						filename: "legacy.md",
+						translation: null,
+						pullRequest: { number: 1090 } as ProcessedFileResult["pullRequest"],
+						pullRequestProgress: PullRequestProgressAction.Reused,
+						error: null,
+					},
+				];
+
+				const result = await githubService.commentCompiledResultsOnIssue(
+					reusedOnly,
 					fixtures.translationFiles,
 				);
 

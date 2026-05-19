@@ -2,10 +2,12 @@ import type { LocaleDefinition } from "@/locales";
 
 import type { ProcessedFileResult } from "../runner";
 
-import { formatGithubActionsRunIssueLine, logger } from "@/utils/";
+import { logger, resolveGitHubActionsRunContext } from "@/utils/";
 
 import { localeService } from "../locale";
 import { TranslationFile } from "../translator/translator.service";
+
+import { selectProgressCommentPayload } from "./progress-comment.util";
 
 export interface FileEntry {
 	file: TranslationFile;
@@ -40,6 +42,7 @@ export class CommentBuilderService {
 	 *
 	 * Processes translation results and file data to create a structured comment
 	 * that organizes translated files by their directory hierarchy for better readability.
+	 * Only results with {@link PullRequestProgressAction.Created} are included (reused PRs are omitted).
 	 *
 	 * @param results Translation processing results containing PR information
 	 * @param filesToTranslate Original files that were processed for translation
@@ -55,11 +58,16 @@ export class CommentBuilderService {
 	 * ```
 	 */
 	public buildComment(results: ProcessedFileResult[], filesToTranslate: TranslationFile[]) {
-		const concattedData = results
+		const { reportableResults, reportableFiles } = selectProgressCommentPayload(
+			results,
+			filesToTranslate,
+		);
+
+		const concattedData = reportableResults
 			.map((result) => {
 				if (!result.pullRequest) return null;
 
-				const translationFile = filesToTranslate.find((file) => file.filename === result.filename);
+				const translationFile = reportableFiles.find((file) => file.filename === result.filename);
 
 				if (!translationFile) return null;
 
@@ -90,16 +98,10 @@ export class CommentBuilderService {
 	 * @returns The concatenated comment
 	 */
 	private concatComment(content: string) {
-		const runSection = formatGithubActionsRunIssueLine();
-		const segments = [this.comment.prefix];
+		const runContext = resolveGitHubActionsRunContext();
+		const prefix = this.locale.comment.prefix(runContext);
 
-		segments.push(content, this.comment.suffix);
-
-		if (runSection) {
-			segments.push(runSection);
-		}
-
-		return segments.join("\n\n");
+		return [prefix, content, this.comment.suffix].join("\n\n");
 	}
 
 	/**
@@ -275,7 +277,7 @@ export class CommentBuilderService {
 	/** Comment template for issue comments */
 	public get comment() {
 		return {
-			prefix: this.locale.comment.prefix,
+			prefix: this.locale.comment.prefix(),
 			suffix: this.locale.comment.suffix,
 		};
 	}

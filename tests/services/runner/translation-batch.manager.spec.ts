@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test";
 
+import type { LanguageAnalysisResult } from "@/services/";
 import type { RunnerServiceDependencies } from "@/services/runner/runner.types";
 
-import { localeService } from "@/services/";
+import { localeService, PullRequestProgressAction } from "@/services/";
 import { TranslationBatchManager } from "@/services/runner/managers/translation-batch.manager";
 
 import { createMockPullRequestListItem, createTranslationFileFixture } from "@tests/fixtures";
@@ -30,9 +31,10 @@ function createTestTranslationBatchManager(overrides: Partial<RunnerServiceDepen
 
 describe("TranslationBatchManager", () => {
 	describe("processBatches", () => {
-		test("skips translate and commit when open pull request is mergeable", async () => {
+		test("skips translate and commit when open translation pull request is valid", async () => {
 			const github = createMockGitHubService();
 			const translator = createMockTranslatorService();
+			const languageDetector = createMockLanguageDetectorService();
 			const existingPR = createMockPullRequestListItem(1082);
 
 			github.findPullRequestByBranch.mockResolvedValue(existingPR);
@@ -43,10 +45,22 @@ describe("TranslationBatchManager", () => {
 				mergeableState: "clean",
 				createdBy: "translate-react-bot",
 			});
+			github.getForkFileContentAtBranch.mockResolvedValue(
+				"Conteúdo em português suficientemente longo para detecção de idioma.",
+			);
+			languageDetector.analyzeLanguage.mockResolvedValue({
+				isTranslated: true,
+				ratio: 0.9,
+				detectedLanguage: "pt",
+				languageScore: { target: 0.9, source: 0.1 },
+				rawResult: { reliable: true, languages: [], textBytes: 100, chunks: [] },
+			} as never);
 
 			const manager = createTestTranslationBatchManager({
 				github: github as unknown as RunnerServiceDependencies["github"],
 				translator: translator as unknown as RunnerServiceDependencies["translator"],
+				languageDetector:
+					languageDetector as unknown as RunnerServiceDependencies["languageDetector"],
 			});
 			const file = createTranslationFileFixture({
 				path: "src/content/blog/2021/12/17/react-conf-2021-recap.md",
@@ -59,17 +73,31 @@ describe("TranslationBatchManager", () => {
 			expect(github.commitTranslation).not.toHaveBeenCalled();
 			expect(github.createBranch).not.toHaveBeenCalled();
 			expect(results.get(file.filename)?.pullRequest).toEqual(existingPR);
+			expect(results.get(file.filename)?.pullRequestProgress).toBe(
+				PullRequestProgressAction.Reused,
+			);
 		});
 
-		test("translates when no open pull request exists for the translation branch", async () => {
+		test("resets branch and translates when no valid open translation pull request exists", async () => {
 			const github = createMockGitHubService();
 			const translator = createMockTranslatorService();
+			const languageDetector = createMockLanguageDetectorService();
 
 			github.findPullRequestByBranch.mockResolvedValue(undefined);
+			github.getBranch.mockResolvedValue(undefined as never);
+			languageDetector.analyzeLanguage.mockResolvedValue({
+				isTranslated: false,
+				ratio: 0,
+				detectedLanguage: "en",
+				languageScore: { target: 0, source: 1 },
+				rawResult: { reliable: true, languages: [], textBytes: 100, chunks: [] },
+			} satisfies LanguageAnalysisResult);
 
 			const manager = createTestTranslationBatchManager({
 				github: github as unknown as RunnerServiceDependencies["github"],
 				translator: translator as unknown as RunnerServiceDependencies["translator"],
+				languageDetector:
+					languageDetector as unknown as RunnerServiceDependencies["languageDetector"],
 			});
 			const file = createTranslationFileFixture({
 				path: "src/content/new-page.md",
@@ -79,7 +107,9 @@ describe("TranslationBatchManager", () => {
 			await manager.processBatches([file], 1);
 
 			expect(translator.translateContent).toHaveBeenCalled();
+			expect(github.createBranch).toHaveBeenCalled();
 			expect(github.commitTranslation).toHaveBeenCalled();
+			expect(github.createPullRequest).toHaveBeenCalled();
 		});
 	});
 });

@@ -22,7 +22,7 @@ import type {
 	RunnerServiceDependencies,
 } from "@/services/runner/runner.types";
 
-import { localeService } from "@/services/";
+import { localeService, PullRequestProgressAction } from "@/services/";
 import { commentBuilderService } from "@/services/comment-builder/";
 import { openRouterModelLimitsService } from "@/services/openrouter/";
 import { RunnerService } from "@/services/runner/runner.service";
@@ -233,9 +233,13 @@ export function createWorkflowGitHubServiceFromFiles(
 				return undefined;
 			}
 
-			const openedOrUpdatedAnyPullRequest = results.some((result) => result.pullRequest != null);
+			const hasReportablePullRequest = results.some(
+				(result) =>
+					result.pullRequest !== null &&
+					result.pullRequestProgress === PullRequestProgressAction.Created,
+			);
 
-			if (!openedOrUpdatedAnyPullRequest) {
+			if (!hasReportablePullRequest) {
 				return undefined;
 			}
 
