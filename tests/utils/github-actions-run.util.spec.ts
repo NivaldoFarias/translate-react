@@ -72,6 +72,8 @@ describe("github-actions-run.util", () => {
 
 		expect(prefix).toContain("A última execução do `translate-react`");
 		expect(prefix).toContain("**main**");
-		expect(prefix).toContain("[`Run Translation Workflow` · #25802803407](https://github.com/reactjs/ru.react.dev/actions/runs/25802803407)");
+		expect(prefix).toContain(
+			"[`Run Translation Workflow` · #25802803407](https://github.com/reactjs/ru.react.dev/actions/runs/25802803407)",
+		);
 	});
 });

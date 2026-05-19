@@ -100,7 +100,9 @@ describe("LocaleService", () => {
 
 				expect(prefix).toContain("A última execução do `translate-react`");
 				expect(prefix).toContain("**v0.1.28**");
-				expect(prefix).toContain("[`Run Translation Workflow` · #1](https://github.com/o/r/actions/runs/1)");
+				expect(prefix).toContain(
+					"[`Run Translation Workflow` · #1](https://github.com/o/r/actions/runs/1)",
+				);
 			});
 
 			test("should have suffix function that generates observations", () => {
