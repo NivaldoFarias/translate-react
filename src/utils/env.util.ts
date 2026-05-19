@@ -178,6 +178,12 @@ const envSchema = z.object({
 
 	/** Workflow display name from the workflow file `name` field */
 	GITHUB_WORKFLOW: z.string().optional(),
+
+	/** Full ref that triggered the workflow (e.g. `refs/heads/main`, `refs/tags/v1.0.0`) */
+	GITHUB_REF: z.string().optional(),
+
+	/** Short ref name (branch or tag without `refs/heads/` / `refs/tags/`) */
+	GITHUB_REF_NAME: z.string().optional(),
 });
 
 /** Type definition for the environment configuration */

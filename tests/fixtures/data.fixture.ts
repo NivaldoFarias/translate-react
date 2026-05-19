@@ -5,7 +5,12 @@ import type { ChatCompletion } from "openai/resources";
 
 import type { PatchedRepositoryTreeItem } from "@/services";
 
-import { LanguageAnalysisResult, ProcessedFileResult, TranslationFile } from "@/services";
+import {
+	LanguageAnalysisResult,
+	ProcessedFileResult,
+	PullRequestProgressAction,
+	TranslationFile,
+} from "@/services";
 
 type PullRequestListItem = RestEndpointMethodTypes["pulls"]["list"]["response"]["data"][number];
 type PartialChatCompletion = PartialDeep<
@@ -57,6 +62,7 @@ export function createProcessedFileResultsFixture({
 				filename: `file-${index + 1}.md`,
 				translation: null,
 				pullRequest: null,
+				pullRequestProgress: null,
 				error: new Error(`Translation failed for file ${index + 1}`),
 			};
 		}
@@ -75,6 +81,7 @@ export function createProcessedFileResultsFixture({
 			filename: `file-${index + 1}.md`,
 			translation: `Translated content for file ${index + 1}`,
 			pullRequest: createMockPullRequestListItem(index + 1),
+			pullRequestProgress: PullRequestProgressAction.Created,
 			error: null,
 		};
 	});

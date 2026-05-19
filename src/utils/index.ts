@@ -7,3 +7,4 @@ export * from "./logger.util";
 export * from "./common.util";
 export * from "./markdown-verbatim-fences.util";
 export * from "./translation-content-compare.util";
+export * from "./translation-branch.util";

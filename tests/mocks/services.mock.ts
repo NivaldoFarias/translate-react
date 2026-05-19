@@ -19,7 +19,7 @@ export function createMockCommentBuilderService() {
 		concatComment: mock((content: string) => `prefix\n\n${content}\n\nsuffix`),
 		comment: {
 			suffix: "suffix",
-			prefix: "prefix",
+			prefix: "As seguintes páginas foram traduzidas e PRs foram criados:",
 		},
 	};
 }
@@ -85,6 +85,7 @@ export function createMockGitHubService() {
 			}),
 		),
 		getFile: mock((_file: unknown) => Promise.resolve(createTranslationFileFixture())),
+		getForkFileContentAtBranch: mock(() => Promise.resolve(undefined as string | undefined)),
 		findPullRequestByBranch: mock(() =>
 			Promise.resolve(
 				undefined as

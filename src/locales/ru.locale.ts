@@ -1,6 +1,10 @@
 import type { TranslationFile } from "@/services/translator/translator.service";
 
-import type { LocaleDefinition, LocalePRBodyStrings } from "./locale.types";
+import type {
+	LocaleDefinition,
+	LocalePRBodyStrings,
+	ProgressCommentRunContext,
+} from "./locale.types";
 
 import { createPRBodyBuilder } from "./pr-body.builder";
 
@@ -69,7 +73,13 @@ const ruPRBodyStrings: LocalePRBodyStrings = {
  */
 export const ruLocale: LocaleDefinition = {
 	comment: {
-		prefix: "Следующие страницы были переведены и созданы PR:",
+		prefix: (runContext?: ProgressCommentRunContext) => {
+			if (!runContext) {
+				return "Следующие страницы были переведены и созданы PR:";
+			}
+
+			return `Последний запуск \`translate-react\` (**${runContext.refLabel}**, workflow [\`${runContext.workflowName}\` · #${runContext.runId}](${runContext.url})) перевёл следующие страницы и создал эти PR:`;
+		},
 		suffix: `> [!IMPORTANT]
 >
 > - Переводы были созданы с помощью LLM и требуют проверки человеком для обеспечения технической точности и беглости.
