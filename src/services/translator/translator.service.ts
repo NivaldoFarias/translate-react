@@ -30,7 +30,9 @@ import {
 
 import { ChunksManager, TranslationValidatorManager } from "./managers";
 import { SYSTEM_PROMPT_TOKEN_RESERVE } from "./managers/managers.constants";
-import { TRANSLATION_VALIDATION_MAX_ATTEMPTS } from "./validation/validation.constants";
+import { TranslationPipelineManager } from "./pipeline/translation-pipeline.manager";
+import type { TranslationAttemptContext } from "./pipeline/translation-attempt.context";
+import { emptyTranslationAttemptContext } from "./pipeline/translation-attempt.context";
 import {
 	frontmatterBatchRequestEnvelopeSchema,
 	frontmatterBatchTranslationEnvelopeSchema,
@@ -142,6 +144,7 @@ export class TranslatorService {
 	public readonly managers: {
 		translationValidator: TranslationValidatorManager;
 		chunks: ChunksManager;
+		pipeline: TranslationPipelineManager;
 	};
 
 	/**
@@ -161,6 +164,7 @@ export class TranslatorService {
 		this.managers = {
 			translationValidator: new TranslationValidatorManager(this.services.languageDetector),
 			chunks: new ChunksManager(this.model),
+			pipeline: new TranslationPipelineManager(),
 		};
 	}
 
@@ -359,7 +363,6 @@ export class TranslatorService {
 		}
 
 		const translationStartTime = Date.now();
-		let translatedContent = "";
 
 		const verbatimMask =
 			env.MASK_VERBATIM_LARGE_FENCES ?
@@ -405,74 +408,43 @@ export class TranslatorService {
 		const sourceBodyForArtifacts =
 			fileBodySplit.rest.length > 0 ? fileBodySplit.rest : file.content;
 
-		let validationRetryHints: string[] = [];
+		const translatedContent = await this.managers.pipeline.translateWithValidationRetries({
+			file,
+			translateBody: (attemptContext) =>
+				this.translateMarkdownBody(translationWorkFile, attemptContext),
+			finalizeTranslation: async (bodyTranslation) => {
+				let finalized = bodyTranslation;
 
-		for (let attempt = 1; attempt <= TRANSLATION_VALIDATION_MAX_ATTEMPTS; attempt++) {
-			let bodyTranslation = await this.translateMarkdownBody(
-				translationWorkFile,
-				validationRetryHints,
-			);
+				if (verbatimMask && verbatimMask.replacements.length > 0) {
+					finalized = restoreMaskedVerbatimFences(finalized, verbatimMask.replacements);
+				}
 
-			if (verbatimMask && verbatimMask.replacements.length > 0) {
-				bodyTranslation = restoreMaskedVerbatimFences(
-					bodyTranslation,
-					verbatimMask.replacements,
+				finalized = stripSpuriousOuterMarkdownFencesWhenSourceHadNoFences(
+					sourceBodyForArtifacts,
+					finalized,
+					file.logger,
 				);
-			}
 
-			bodyTranslation = stripSpuriousOuterMarkdownFencesWhenSourceHadNoFences(
-				sourceBodyForArtifacts,
-				bodyTranslation,
-				file.logger,
-			);
+				if (preservedYamlBlock) {
+					const frontmatterParts = extractFrontmatterParts(preservedYamlBlock);
+					const mergedBlock =
+						frontmatterParts ?
+							buildFrontmatterBlock(
+								frontmatterParts.bom,
+								await this.translateFrontmatterStringFields(frontmatterParts.inner, file),
+							)
+						:	preservedYamlBlock;
 
-			if (preservedYamlBlock) {
-				const frontmatterParts = extractFrontmatterParts(preservedYamlBlock);
-				const mergedBlock =
-					frontmatterParts ?
-						buildFrontmatterBlock(
-							frontmatterParts.bom,
-							await this.translateFrontmatterStringFields(frontmatterParts.inner, file),
-						)
-					:	preservedYamlBlock;
+					return mergePreservedYamlFrontmatter(mergedBlock, finalized, translationPayload);
+				}
 
-				translatedContent = mergePreservedYamlFrontmatter(
-					mergedBlock,
-					bodyTranslation,
-					translationPayload,
-				);
-			} else {
-				translatedContent = bodyTranslation;
-			}
-
-			const validationIssues = this.managers.translationValidator.collectRetryableValidationIssues(
-				file,
-				translatedContent,
-			);
-
-			if (validationIssues.length === 0) {
-				break;
-			}
-
-			if (attempt >= TRANSLATION_VALIDATION_MAX_ATTEMPTS) {
-				throw this.managers.translationValidator.createValidationFailedError(
-					file,
-					translatedContent,
-					validationIssues,
-				);
-			}
-
-			validationRetryHints = validationIssues.map((issue) => issue.retryHint);
-
-			file.logger.warn(
-				{
-					attempt,
-					maxAttempts: TRANSLATION_VALIDATION_MAX_ATTEMPTS,
-					guardIds: validationIssues.map((issue) => issue.guardId),
-				},
-				"Post-translation validation failed; retrying with guard hints",
-			);
-		}
+				return finalized;
+			},
+			collectIssues: (content) =>
+				this.managers.translationValidator.collectRetryableValidationIssues(file, content),
+			createFailedError: (content, issues) =>
+				this.managers.translationValidator.createValidationFailedError(file, content, issues),
+		});
 
 		const translationDuration = Date.now() - translationStartTime;
 
@@ -794,17 +766,17 @@ export class TranslatorService {
 	 * Translates markdown body content (single-shot or chunked) with optional validation retry hints.
 	 *
 	 * @param file Work file whose `content` is the body sent to the LLM (frontmatter already split off)
-	 * @param validationRetryHints Guard hints from a failed post-translation validation attempt
+	 * @param attemptContext Guard hints from a failed post-translation validation attempt
 	 *
 	 * @returns Translated markdown body before frontmatter merge
 	 */
 	private async translateMarkdownBody(
 		file: TranslationFile,
-		validationRetryHints: string[] = [],
+		attemptContext: TranslationAttemptContext = emptyTranslationAttemptContext(),
 	) {
 		const contentNeedsChunking = this.managers.chunks.needsChunking(file);
 		if (contentNeedsChunking) {
-			return this.translateWithChunking(file, validationRetryHints);
+			return this.translateWithChunking(file, attemptContext);
 		}
 
 		try {
@@ -814,7 +786,7 @@ export class TranslatorService {
 				undefined,
 				"markdownDocument",
 				undefined,
-				validationRetryHints,
+				attemptContext,
 			);
 		} catch (error) {
 			if (!isCompletionLengthTruncationError(error)) {
@@ -825,13 +797,13 @@ export class TranslatorService {
 				{ path: file.path, contentLength: file.content.length },
 				"Completion token limit reached; translating in chunks",
 			);
-			return this.translateWithChunking(file, validationRetryHints);
+			return this.translateWithChunking(file, attemptContext);
 		}
 	}
 
 	private async translateWithChunking(
 		file: TranslationFile,
-		validationRetryHints: string[] = [],
+		attemptContext: TranslationAttemptContext = emptyTranslationAttemptContext(),
 	): Promise<string> {
 		file.logger.debug({ contentLength: file.content.length }, "Starting chunked translation");
 
@@ -848,7 +820,7 @@ export class TranslatorService {
 
 		const translatedChunks = await Promise.all(
 			chunks.map((chunk, index) =>
-				this.translateChunk(file, chunk, index, chunks, validationRetryHints),
+				this.translateChunk(file, chunk, index, chunks, attemptContext),
 			),
 		);
 
@@ -879,7 +851,7 @@ export class TranslatorService {
 		chunk: string,
 		index: number,
 		chunks: string[],
-		validationRetryHints: string[] = [],
+		attemptContext: TranslationAttemptContext = emptyTranslationAttemptContext(),
 	): Promise<string> {
 		const startTime = Date.now();
 		const estimatedTokens = this.managers.chunks.estimateTokenCount(chunk);
@@ -902,7 +874,7 @@ export class TranslatorService {
 			chunkProgress,
 			"markdownDocument",
 			undefined,
-			validationRetryHints,
+			attemptContext,
 		);
 
 		const strippedChunk = stripSpuriousOuterMarkdownFencesWhenSourceHadNoFences(
@@ -941,7 +913,7 @@ export class TranslatorService {
 		chunkProgress?: ChunkTranslationProgress,
 		systemPromptKind: TranslationSystemPromptKind = "markdownDocument",
 		responseFormat?: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming["response_format"],
-		validationRetryHints: string[] = [],
+		attemptContext: TranslationAttemptContext = emptyTranslationAttemptContext(),
 	): OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming {
 		const params: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming = {
 			model: this.model,
@@ -955,7 +927,7 @@ export class TranslatorService {
 						userMessageContent,
 						chunkProgress,
 						systemPromptKind,
-						validationRetryHints,
+						attemptContext,
 					),
 				},
 				{ role: "user", content: userMessageContent },
@@ -991,7 +963,7 @@ export class TranslatorService {
 		chunkProgress?: ChunkTranslationProgress,
 		systemPromptKind: TranslationSystemPromptKind = "markdownDocument",
 		responseFormat?: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming["response_format"],
-		validationRetryHints: string[] = [],
+		attemptContext: TranslationAttemptContext = emptyTranslationAttemptContext(),
 	): Promise<string> {
 		file.documentSourceLanguage ??= await this.resolveDocumentSourceLanguage(file.content);
 
@@ -1023,7 +995,7 @@ export class TranslatorService {
 								chunkProgress,
 								systemPromptKind,
 								responseFormat,
-								validationRetryHints,
+								attemptContext,
 							),
 						);
 
@@ -1133,7 +1105,7 @@ export class TranslatorService {
 		userMessageContent: string,
 		chunkProgress?: ChunkTranslationProgress,
 		systemPromptKind: TranslationSystemPromptKind = "markdownDocument",
-		validationRetryHints: string[] = [],
+		attemptContext: TranslationAttemptContext = emptyTranslationAttemptContext(),
 	) {
 		const documentSourceLanguage = file.documentSourceLanguage ?? "en";
 
@@ -1170,11 +1142,11 @@ export class TranslatorService {
 			:	"";
 
 		const validationRetrySection =
-			validationRetryHints.length > 0 ?
+			attemptContext.validationRetryHints.length > 0 ?
 				`
 				# CORRECTION REQUIRED (previous attempt failed validation)
 				A previous translation of this content was rejected. Apply every correction below in a new full translation of the user message:
-				${validationRetryHints.map((hint) => `- ${hint}`).join("\n")}
+				${attemptContext.validationRetryHints.map((hint) => `- ${hint}`).join("\n")}
 				`
 			:	"";
 
