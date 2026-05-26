@@ -6,19 +6,20 @@ import type {
 	PatchedRepositoryTreeItem,
 	PrFilterResult as PullRequestFilterResult,
 	PullRequestStatus,
-	RunnerServiceDependencies,
-} from "../runner.types";
+} from "@/domain/workflow/";
+
+import type { RunnerServiceDependencies } from "../runner.types";
 
 import { LanguageDetectorService } from "@/services/language-detector/";
 import { TranslationFile } from "@/services/translator/";
 import { logger } from "@/utils/";
 
+import { TranslationPullRequestValidityManager } from "./translation-pull-request-validity.manager";
 import {
 	FILE_FETCH_BATCH_SIZE,
 	LANGUAGE_CACHE_TTL_MS,
 	MIN_CACHE_CONFIDENCE,
-} from "./managers.constants";
-import { TranslationPullRequestValidityManager } from "./translation-pull-request-validity.manager";
+} from "./workflow.constants";
 
 /**
  * Manages file discovery and filtering pipeline for translation workflow.

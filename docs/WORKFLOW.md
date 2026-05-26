@@ -86,7 +86,7 @@ Rate and cost knobs: [`src/utils/constants.util.ts`](../src/utils/constants.util
 
 ## Local LLM workflow smoke
 
-`bun run smoke:llm-workflow` runs [`src/scripts/llm-workflow-smoke.ts`](../src/scripts/llm-workflow-smoke.ts): one [`RunnerService.run()`](../src/services/runner/runner.service.ts) with the real [`translatorService`](../src/services/translator/translator.service.ts) and mocked GitHub from [`createWorkflowGitHubServiceFromFiles`](../tests/integration/create-integration-runner.ts). Markdown is loaded via [`loadIntegrationWorkflowFilesFromMdFixtureDir`](../tests/integration/create-integration-runner.ts) with **every** `*.md` under [`tests/fixtures/md/`](../tests/fixtures/md/) (same helper as [`tests/integration/workflow.integration.spec.ts`](../tests/integration/workflow.integration.spec.ts), which selects specific files by name). Use the same `.env` as the main workflow for API tokens (`GH_TOKEN`, `LLM_API_KEY`) and other validated settings. Do not use `bun test` for this path — [`tests/setup.ts`](../tests/setup.ts) replaces `env`, so those keys would not reach the client.
+`bun run smoke:llm-workflow` runs [`src/scripts/llm-workflow-smoke.ts`](../src/scripts/llm-workflow-smoke.ts): one [`RunnerService.run()`](../src/services/runner/runner.service.ts) with [`translatorService`](../src/composition.ts) from [`composition.ts`](../src/composition.ts) and mocked GitHub from [`createWorkflowGitHubServiceFromFiles`](../tests/integration/create-integration-runner.ts). Markdown is loaded via [`loadIntegrationWorkflowFilesFromMdFixtureDir`](../tests/integration/create-integration-runner.ts) with **every** `*.md` under [`tests/fixtures/md/`](../tests/fixtures/md/) (same helper as [`tests/integration/workflow.integration.spec.ts`](../tests/integration/workflow.integration.spec.ts), which selects specific files by name). Use the same `.env` as the main workflow for API tokens (`GH_TOKEN`, `LLM_API_KEY`) and other validated settings. Do not use `bun test` for this path — [`tests/setup.ts`](../tests/setup.ts) replaces `env`, so those keys would not reach the client.
 
 ## Releases and semantic versioning
 
@@ -121,11 +121,11 @@ The six stages below match the overview diagram. For conflict handling and branc
 
 ### Stage 1: Initialization
 
-**At import / process startup:** Zod validates environment when the `env` module loads; the root logger and service singletons are initialized; `BaseRunnerService` registers a signal-driven cleanup handler (`registerCleanup`).
+**At import / process startup:** Zod validates `env` when the module loads; [`composition.ts`](../src/composition.ts) constructs service singletons; `BaseRunnerService` registers signal cleanup (`registerCleanup`).
 
 **At `run()` start:** `verifyLLMConnectivity()` runs before any GitHub setup.
 
-**Operations (combined):** Zod env validation → Pino logger → service wiring (GitHub, Translator, Locale, Language Detector, Cache) → signal cleanup registration → **then** LLM connectivity check
+**Operations (combined):** env validation → logger → composition wiring → cleanup registration → LLM connectivity check
 
 ### Stage 2: Repository Setup
 
@@ -200,7 +200,7 @@ stateDiagram-v2
 
 - **Existing PR guard:** Before branch work, `processFile` checks `findPullRequestByBranch` + `checkPullRequestStatus`. Mergeable open PRs skip translate/commit (belt-and-suspenders if a path slipped past discovery).
 - Branch: `createOrGetTranslationBranch` (reuses existing or creates new)
-- Translate: Direct or chunked using the `CHUNKS` budget in translator managers (`maxTokens`, `tokenBuffer`, `overlap` in [`managers.constants.ts`](../src/services/translator/managers/managers.constants.ts)). Optional cost control: when `MASK_VERBATIM_LARGE_FENCES` is enabled, fences at or above `MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS` (tiktoken estimate) are replaced with HTML comment placeholders before the LLM and merged back after translation ([`markdown-verbatim-fences.util.ts`](../src/utils/markdown-verbatim-fences.util.ts)); natural language **inside** those large fences is not translated while they stay masked.
+- Translate: Direct or chunked using the `CHUNKS` budget in [`chunking.constants.ts`](../src/services/translator/chunking/chunking.constants.ts). Optional cost control: when `MASK_VERBATIM_LARGE_FENCES` is enabled, fences at or above `MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS` (tiktoken estimate) are replaced with HTML comment placeholders before the LLM and merged back after translation ([`markdown-verbatim-fences.util.ts`](../src/utils/markdown-verbatim-fences.util.ts)); natural language **inside** those large fences is not translated while they stay masked.
 - Commit: `commitTranslation` → `createOrUpdatePullRequest` (see [Branch-tip SHA before commit](#branch-tip-sha-before-commit))
 - Error: `cleanupFailedTranslation`, circuit-breaker at `MAX_CONSECUTIVE_FAILURES`
 
@@ -286,13 +286,13 @@ Same branch → translate → commit → PR loop as under [Stage 5: Batch Transl
 
 ## Data Structures
 
-| Structure             | Purpose                        | Key Fields                                                                                                                                                      |
-| --------------------- | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `TranslationFile`     | File candidate for translation | `content`, `filename`, `path`, `sha`, plus `title`, `logger`, `correlationId` (see [`translator.service.ts`](../src/services/translator/translator.service.ts)) |
-| `ProcessedFileResult` | Processing outcome per file    | `filename`, `branch`, `translation`, `pullRequest`, `error`                                                                                                     |
-| `RunnerState`         | Workflow state (in-memory)     | `repositoryTree`, `filesToTranslate`, `processedResults`, `timestamp`, optional `invalidPRsByFile`                                                              |
+| Structure             | Purpose                        | Key fields                                                                                                                   |
+| --------------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| `TranslationFile`     | File candidate for translation | `content`, `filename`, `path`, `sha`, `logger` — see [`translation-file.ts`](../src/services/translator/translation-file.ts) |
+| `ProcessedFileResult` | Outcome per file               | `filename`, `branch`, `translation`, `pullRequest`, `pullRequestProgress`, `error`                                           |
+| `RunnerState`         | In-memory workflow state       | `repositoryTree`, `filesToTranslate`, `processedResults`, optional `invalidPRsByFile`                                        |
 
-See [`runner.types.ts`](../src/services/runner/runner.types.ts) for runner-side type definitions.
+Shared types: [`src/domain/workflow/`](../src/domain/workflow/). Runner-only types (`RunnerState`, dependencies): [`runner.types.ts`](../src/services/runner/runner.types.ts).
 
 ## Error Recovery
 

@@ -1,10 +1,8 @@
 import type { SetNonNullable } from "type-fest";
 
-import type {
-	ProcessedFileResult,
-	RunnerServiceDependencies,
-	WorkflowStatistics,
-} from "../runner.types";
+import type { ProcessedFileResult, WorkflowStatistics } from "@/domain/workflow/";
+
+import type { RunnerServiceDependencies } from "../runner.types";
 
 import { TranslationFile } from "@/services/translator/";
 import { formatElapsedTime, logger } from "@/utils/";

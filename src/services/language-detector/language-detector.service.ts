@@ -447,4 +447,3 @@ export class LanguageDetectorService {
 }
 
 /** Pre-configured instance of {@link LanguageDetectorService} for application-wide use */
-export const languageDetectorService = new LanguageDetectorService();

@@ -5,16 +5,15 @@ import type {
 	PrFilterResult,
 	ProcessedFileResult,
 	RepositoryTreeItem,
-	RunnerOptions,
-	RunnerServiceDependencies,
-	RunnerState,
 	WorkflowStatistics,
-} from "./runner.types";
+} from "@/domain/workflow/";
+
+import type { RunnerOptions, RunnerServiceDependencies, RunnerState } from "./runner.types";
 
 import { ApplicationError, ErrorCode } from "@/errors/";
 import { env, logger, registerCleanup, resolveRunnerNewIssueChooserUrl } from "@/utils/";
 
-import { FileDiscoveryManager, PRManager, TranslationBatchManager } from "./managers";
+import { FileDiscoveryManager, PRManager, TranslationBatchManager } from "./workflow";
 
 /**
  * Base class for translation workflow runners.

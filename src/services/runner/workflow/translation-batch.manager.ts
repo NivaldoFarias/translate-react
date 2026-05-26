@@ -2,11 +2,14 @@ import prettyBytes from "pretty-bytes";
 
 import type {
 	FileProcessingProgress,
+	InvalidFilePullRequest,
 	ProcessedFileResult,
-	PullRequestStatus,
-	RunnerServiceDependencies,
-} from "../runner.types";
+	PullRequestDescriptionMetadata,
+} from "@/domain/workflow/";
 
+import type { RunnerServiceDependencies } from "../runner.types";
+
+import { PullRequestProgressAction } from "@/domain/workflow/";
 import { ApplicationError, ErrorCode } from "@/errors/";
 import { LanguageDetectorService } from "@/services/language-detector/";
 import { TranslationFile } from "@/services/translator/";
@@ -17,33 +20,8 @@ import {
 	logger,
 } from "@/utils/";
 
-import { PullRequestProgressAction } from "../runner.types";
-
-import { MAX_CONSECUTIVE_FAILURES } from "./managers.constants";
 import { TranslationPullRequestValidityManager } from "./translation-pull-request-validity.manager";
-
-export interface InvalidFilePullRequest {
-	prNumber: number;
-	status: PullRequestStatus;
-}
-
-export interface PullRequestDescriptionMetadata {
-	languageName: string;
-	invalidFilePR: InvalidFilePullRequest | undefined;
-	content: {
-		source: string;
-		translation: string;
-		compressionRatio: string;
-	};
-	timestamps: {
-		now: number;
-		workflowStart: number;
-	};
-	/** LLM model id used for translation (from `LLM_MODEL`) */
-	translationModel: string;
-	/** Absolute URL to GitHub’s “choose issue template” page for this workflow runner (translate-react), not React docs repos */
-	newIssueChooserUrl: string;
-}
+import { MAX_CONSECUTIVE_FAILURES } from "./workflow.constants";
 
 /**
  * URLs and other values injected into automated translation PR bodies.

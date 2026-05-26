@@ -6,8 +6,8 @@ import type { ReactLanguageCode } from "@/utils/";
 
 import { logger } from "@/utils/";
 
+import { extractTitleScalarFromInnerYaml } from "./markdown/frontmatter";
 import { MARKDOWN_REGEXES } from "./markdown/markdown.regexes";
-import { extractTitleScalarFromInnerYaml } from "./translator-frontmatter.util";
 
 /** Represents a file that needs to be translated */
 export class TranslationFile {

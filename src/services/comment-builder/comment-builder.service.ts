@@ -1,11 +1,8 @@
+import type { ProcessedFileResult } from "@/domain/workflow/";
 import type { LocaleDefinition } from "@/locales";
-
-import type { ProcessedFileResult } from "../runner";
 
 import { TranslationFile } from "@/services/translator/";
 import { logger, resolveGitHubActionsRunContext } from "@/utils/";
-
-import { localeService } from "../locale";
 
 import { selectProgressCommentPayload } from "./progress-comment.util";
 
@@ -33,7 +30,7 @@ export class CommentBuilderService {
 	 *
 	 * @param localeDefinition Optional locale service for dependency injection (defaults to singleton)
 	 */
-	constructor(localeDefinition: LocaleDefinition = localeService.definitions) {
+	constructor(localeDefinition: LocaleDefinition) {
 		this.locale = localeDefinition;
 	}
 
@@ -282,5 +279,3 @@ export class CommentBuilderService {
 		};
 	}
 }
-
-export const commentBuilderService = new CommentBuilderService();

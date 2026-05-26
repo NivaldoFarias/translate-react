@@ -1,6 +1,6 @@
 import type { Logger } from "pino";
 
-import { MARKDOWN_REGEXES } from "./markdown/markdown.regexes";
+import { MARKDOWN_REGEXES } from "./markdown.regexes";
 
 /**
  * Opening line of a markdown fenced code block at the very start of a slice (after optional BOM,

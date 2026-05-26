@@ -1,6 +1,8 @@
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
-import type { PullRequestStatus, RunnerServiceDependencies } from "../runner.types";
+import type { PullRequestStatus } from "@/domain/workflow/";
+
+import type { RunnerServiceDependencies } from "../runner.types";
 
 import { getTranslationBranchNameFromPath, logger } from "@/utils/";
 

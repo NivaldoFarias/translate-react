@@ -4,7 +4,7 @@ import type { LanguageAnalysisResult } from "@/services/";
 import type { RunnerServiceDependencies } from "@/services/runner/runner.types";
 
 import { localeService, PullRequestProgressAction } from "@/services/";
-import { TranslationBatchManager } from "@/services/runner/managers/translation-batch.manager";
+import { TranslationBatchManager } from "@/services/runner/workflow/translation-batch.manager";
 
 import { createMockPullRequestListItem, createTranslationFileFixture } from "@tests/fixtures";
 import {

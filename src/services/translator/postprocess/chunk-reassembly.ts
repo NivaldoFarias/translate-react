@@ -1,4 +1,4 @@
-import type { ChunksToReassemble } from "../managers/chunks.manager";
+import type { ChunksToReassemble } from "../chunking/chunks.manager";
 import type { TranslationFile } from "../translation-file";
 
 import { ApplicationError, ErrorCode } from "@/errors";

@@ -1,137 +1,51 @@
 # Project Structure
 
-Overview of the `translate-react` project layout. The tree below lists **directories only**; root config files and module filenames are covered in [File Categories](#file-categories) and the linked source trees.
+Layout of the `translate-react` repository. For behavior and call order, see [WORKFLOW.md](./WORKFLOW.md) and [ARCHITECTURE.md](./ARCHITECTURE.md).
 
-## Table of Contents
-
-- [Table of Contents](#table-of-contents)
-- [Directory Structure](#directory-structure)
-- [Key Principles](#key-principles)
-- [File Categories](#file-categories)
-  - [Configuration](#configuration)
-  - [Services](#services)
-  - [Errors](#errors)
-- [Quick Navigation](#quick-navigation)
-- [Service Layout](#service-layout)
-
-## Directory Structure
+## Source tree
 
 ```plaintext
-translate-react/                          # Repository root
-├── docs/                                 # Technical documentation
-├── src/                                  # Application source (entry `main.ts`, build `build.ts`)
-│   ├── clients/                          # External API clients
-│   │   └── octokit/                      # Octokit client and constants
-│   ├── errors/                           # Application errors and helpers
-│   ├── locales/                          # Locale definitions and PR body templates
-│   ├── services/                         # Business logic (one folder per service)
-│   │   ├── cache/
-│   │   ├── comment-builder/
-│   │   ├── github/
-│   │   ├── language-detector/
-│   │   ├── locale/
-│   │   ├── runner/
-│   │   │   └── managers/                 # File discovery, batches, PR workflow
-│   │   └── translator/
-│   │       └── managers/                 # Chunking and translation validation
-│   └── utils/                            # Env, logger, constants, shared helpers
-├── tests/                                # Unit tests (layout mirrors `src/` where used)
-│   ├── clients/
-│   │   └── octokit/
-│   ├── errors/
-│   ├── fixtures/                         # Test data (`md/` = docs-like markdown for smoke + specs)
-│   ├── mocks/
-│   ├── services/
-│   │   ├── cache/
-│   │   ├── github/
-│   │   ├── locale/
-│   │   └── runner/
-│   └── utils/
-└── .github/
-    └── workflows/                        # CI and translation automation
+src/
+├── main.ts                 # CLI entry
+├── composition.ts          # wires service singletons (import from here in app code)
+├── domain/workflow/        # shared PR/tree/workflow types (not runner-specific)
+├── clients/                # Octokit, OpenAI client, rate-limit queue
+├── errors/
+├── locales/                # PR/issue copy per target language
+├── services/
+│   ├── runner/workflow/    # discovery, batch translate, PR manager
+│   ├── translator/
+│   │   ├── chunking/       # ChunksManager, token budgets
+│   │   ├── llm/            # TranslationLlmClient, prompts
+│   │   ├── markdown/       # frontmatter, artifacts, regexes
+│   │   ├── pipeline/       # validation retry loop
+│   │   ├── postprocess/
+│   │   └── validation/     # post-translation guards
+│   ├── github/
+│   ├── language-detector/
+│   ├── comment-builder/
+│   ├── locale/
+│   └── cache/
+└── utils/                  # env, logger, constants; markdown-verbatim-fences stays here
 ```
 
-## Key Principles
+## Import rules
 
-- **Services**: Logic in `src/services/` (one folder per concern). **GitHubService** composes **GitHubRepository**, **GitHubContent**, and **GitHubBranch**. **RunnerService** extends **BaseRunnerService** and uses `runner/managers/`. **TranslatorService** uses `translator/managers/` plus optional large-fence masking (`src/utils/markdown-verbatim-fences.util.ts`).
-- **Clients**: `src/clients/` — Octokit wrapper, OpenAI client, queue helper.
-- **Errors**: `src/errors/` (**ApplicationError**, **ErrorCode**); `main.ts` handles uncaught errors; Octokit/OpenAI errors pass through with logging.
-- **Construction**: Module-level singletons; constructors take typed deps; tests swap mocks from `tests/mocks/`.
-- **Tooling**: Bun, TypeScript, ESLint, Prettier.
+- **`github/`** and **`locales/`** use `@/domain/workflow/` for shared workflow types. They must not import `@/services/runner/`.
+- **New singletons** belong in [`composition.ts`](../src/composition.ts), not at the bottom of individual service files.
+- Prefer `@/services/<name>/` or `@/domain/workflow/` over deep relative paths across packages.
 
-## File Categories
+## Tests
 
-### Configuration
+`tests/` mirrors `src/` where practical (e.g. `tests/services/translator/chunking/`). Shared fixtures: `tests/fixtures/md/`. Mocks: `tests/mocks/`.
 
-| File                                            | Purpose                  |
-| ----------------------------------------------- | ------------------------ |
-| [`package.json`](../package.json)               | Dependencies and scripts |
-| [`tsconfig.json`](../tsconfig.json)             | TypeScript config        |
-| [`bunfig.toml`](../bunfig.toml)                 | Bun config               |
-| [`eslint.config.mjs`](../eslint.config.mjs)     | ESLint rules             |
-| [`prettier.config.mjs`](../prettier.config.mjs) | Prettier config          |
-| [`.env.example`](../.env.example)               | Environment template     |
+## Commands
 
-### Services
-
-| Directory                                                          | Responsibility                                                     |
-| ------------------------------------------------------------------ | ------------------------------------------------------------------ |
-| [`runner/`](../src/services/runner/index.ts)                       | Workflow orchestration and manager components                      |
-| [`translator/`](../src/services/translator/index.ts)               | LLM translation; chunking and validation in `translator/managers/` |
-| [`language-detector/`](../src/services/language-detector/index.ts) | Language detection with CLD                                        |
-| [`comment-builder/`](../src/services/comment-builder/index.ts)     | Markdown bodies for PRs and translation-progress issue summaries   |
-| [`cache/`](../src/services/cache/index.ts)                         | Generic in-memory TTL cache                                        |
-| [`github/`](../src/services/github/index.ts)                       | GitHub API (single service)                                        |
-| [`locale/`](../src/services/locale/index.ts)                       | Locale management                                                  |
-
-### Errors
-
-Paths are under [`src/errors/`](../src/errors/).
-
-| File               | Purpose                     |
-| ------------------ | --------------------------- |
-| `error.ts`         | ApplicationError, ErrorCode |
-| `error.helpers.ts` | handleTopLevelError         |
-
-## Quick Navigation
-
-| Task        | Command              |
-| ----------- | -------------------- |
-| Development | `bun run dev`        |
-| Run         | `bun run start`      |
-| Build       | `bun run build`      |
-| Lint        | `bun run lint`       |
-| Type check  | `bun run type-check` |
-| Test        | `bun run test`       |
-
-| Directory            | Purpose                          |
-| -------------------- | -------------------------------- |
-| `src/`               | Application source               |
-| `src/services/`      | Business logic                   |
-| `src/clients/`       | Octokit, OpenAI, queue           |
-| `src/errors/`        | Error types and helpers          |
-| `src/locales/`       | Locale data and PR body builders |
-| `src/utils/`         | Env, logger, constants, helpers  |
-| `tests/`             | Unit tests and mocks             |
-| `docs/`              | Technical documentation          |
-| `.github/workflows/` | GitHub Actions workflows         |
-
-## Service Layout
-
-```plaintext
-RunnerService (extends BaseRunnerService)
-├── GitHubService (composes GitHubRepository, GitHubContent, GitHubBranch)
-├── TranslatorService
-├── LanguageDetectorService
-├── CacheService
-├── LocaleService
-├── CommentBuilderService
-└── managers/
-    ├── FileDiscoveryManager
-    ├── TranslationBatchManager
-    └── PRManager
-```
-
-Services are created at module level; `main.ts` imports `runnerService` from [`src/services/`](../src/services/index.ts).
-
-Pipeline order and stage behavior live in [WORKFLOW.md](./WORKFLOW.md); this file is layout and file placement only.
+| Task       | Command                      |
+| ---------- | ---------------------------- |
+| Run        | `bun run start`              |
+| Dev        | `bun run dev`                |
+| Test       | `bun run test`               |
+| Type check | `bun run type-check`         |
+| Lint       | `bun run lint`               |
+| LLM smoke  | `bun run smoke:llm-workflow` |

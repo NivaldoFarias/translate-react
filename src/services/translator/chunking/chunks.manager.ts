@@ -17,7 +17,7 @@ import {
 	SYSTEM_PROMPT_TOKEN_RESERVE,
 	TOKEN_ESTIMATION_FALLBACK_DIVISOR,
 	TRANSLATION_OUTPUT_TO_INPUT_TOKEN_RATIO,
-} from "./managers.constants";
+} from "./chunking.constants";
 
 /**
  * Result of content chunking operation containing chunks and their separators.

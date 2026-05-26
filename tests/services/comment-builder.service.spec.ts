@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, test } from "bun:test";
 
 import type { ProcessedFileResult } from "@/services/";
 
+import { localeService } from "@/composition";
 import { CommentBuilderService, PullRequestProgressAction, TranslationFile } from "@/services/";
 
 import { createMockPullRequestListItem } from "@tests/fixtures";
@@ -10,7 +11,7 @@ describe("CommentBuilderService", () => {
 	let commentBuilderService: CommentBuilderService;
 
 	beforeEach(() => {
-		commentBuilderService = new CommentBuilderService();
+		commentBuilderService = new CommentBuilderService(localeService.definitions);
 	});
 
 	const createMockPrData = (prNumber: number) => createMockPullRequestListItem(prNumber);
