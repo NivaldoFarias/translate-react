@@ -10,6 +10,37 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Fixed
 
+## [0.1.30] - 2026-05-26
+
+### Added
+
+- `src/domain/workflow/` shared types (`workflow.types`, `pull-request.types`) decoupled from runner
+  imports; `composition.ts` wires service singletons.
+- Translator pipeline split: `TranslationLlmClient`, `TranslationPromptBuilder`,
+  `TranslationPipelineManager`, `TranslationFile`, and `markdown/` helpers (`artifacts`,
+  `frontmatter`, `markdown.regexes`).
+- Post-translation validation under `translator/validation/`: `PostTranslationValidationService`,
+  pluggable guards (frontmatter, headings, fence identifiers, non-empty content), and
+  `fence-code-identifier.analyzer`.
+- `postprocess/` (`chunk-reassembly`, `translation-output-cleanup`) for assembled chunk output.
+- `isCompletionLengthTruncationError` in `error.helpers.ts` for truncated LLM completions (including
+  when wrapped in `AbortError`).
+- Specs for LLM client, pipeline manager, chunk reassembly, validation guards/analyzer, and
+  `translation-file`; tests mirrored to the new `src/` layout.
+
+### Changed
+
+- Remove `src/services/index.ts` barrel; import domain and service modules directly.
+- Runner `managers/` → `workflow/`; translator `managers/` → `chunking/`; extract
+  `TranslationLlmClient` and group markdown helpers.
+- `github/` and `locales/` no longer import runner types; use `@/domain/workflow/`.
+- `OpenRouterModelLimitsService` injected via `composition.ts` and `TranslatorService` DI.
+- `CommentBuilderService`: deduplicate progress-issue filtering via `buildReportableComment`.
+- Throw `InsufficientPermissions` when the GitHub token scope check fails.
+- Drop dead `RATIOS` alias, `ChunkTranslationMode` enum, and unused validator code.
+- `docs/ARCHITECTURE.md`, `docs/PROJECT_STRUCTURE.md`, `docs/WORKFLOW.md`, and `README.md` updated
+  for the new module layout; `eslint.config.mjs` path rules aligned with `src/`.
+
 ## [0.1.29] - 2026-05-19
 
 ### Added
@@ -144,6 +175,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 - README `MAX_RETRY_ATTEMPTS` default matches `src/utils/constants.util.ts` (`3`).
 
+[0.1.30]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.1.30
 [0.1.29]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.1.29
 [0.1.28]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.1.28
 [0.1.27]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.1.27
