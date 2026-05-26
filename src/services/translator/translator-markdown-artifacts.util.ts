@@ -1,6 +1,6 @@
 import type { Logger } from "pino";
 
-import { REGEXES } from "./managers/managers.constants";
+import { MARKDOWN_REGEXES } from "./markdown/markdown.regexes";
 
 /**
  * Opening line of a markdown fenced code block at the very start of a slice (after optional BOM,
@@ -98,7 +98,7 @@ export function stripSpuriousOuterMarkdownFencesWhenSourceHadNoFences(
 	translatedMarkdown: string,
 	logger?: Logger,
 ): string {
-	if ((sourceMarkdown.match(REGEXES.codeBlock) ?? []).length > 0) {
+	if ((sourceMarkdown.match(MARKDOWN_REGEXES.codeBlock) ?? []).length > 0) {
 		return translatedMarkdown;
 	}
 

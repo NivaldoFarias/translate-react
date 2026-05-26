@@ -29,11 +29,8 @@ import {
 } from "@/utils/";
 
 import { ChunksManager, TranslationValidatorManager } from "./managers";
-import {
-	REGEXES,
-	SYSTEM_PROMPT_TOKEN_RESERVE,
-	TRANSLATION_VALIDATION_MAX_ATTEMPTS,
-} from "./managers/managers.constants";
+import { SYSTEM_PROMPT_TOKEN_RESERVE } from "./managers/managers.constants";
+import { TRANSLATION_VALIDATION_MAX_ATTEMPTS } from "./validation/validation.constants";
 import {
 	frontmatterBatchRequestEnvelopeSchema,
 	frontmatterBatchTranslationEnvelopeSchema,

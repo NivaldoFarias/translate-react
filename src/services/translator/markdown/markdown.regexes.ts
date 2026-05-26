@@ -18,6 +18,3 @@ export const MARKDOWN_REGEXES = {
 	/** Regex pattern to match all newline characters for line ending replacement */
 	lineEnding: new RegExp(/\r?\n/g),
 } as const;
-
-/** @deprecated Use {@link MARKDOWN_REGEXES}; kept for incremental migration from `managers.constants` */
-export const REGEXES = MARKDOWN_REGEXES;
