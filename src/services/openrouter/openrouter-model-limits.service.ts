@@ -156,6 +156,3 @@ export class OpenRouterModelLimitsService {
 		return { contextLength, maxCompletionTokens };
 	}
 }
-
-/** Shared {@link OpenRouterModelLimitsService} instance for the CLI process. */
-export const openRouterModelLimitsService = new OpenRouterModelLimitsService();

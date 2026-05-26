@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, test } from "bun:test";
 
 import type { TranslationLlmClientDependencies } from "@/services/translator/llm/translation-llm.client.types";
 
+import { localeService } from "@/composition";
 import { ApplicationError, ErrorCode, isCompletionLengthTruncationError } from "@/errors/";
-import { localeService } from "@/services/";
 import { TranslationLlmClient } from "@/services/translator/llm/translation-llm.client";
 import { TranslationPromptBuilder } from "@/services/translator/llm/translation-prompt.builder";
 

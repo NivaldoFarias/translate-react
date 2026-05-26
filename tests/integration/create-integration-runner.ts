@@ -22,9 +22,8 @@ import type {
 import type { LanguageDetectorService } from "@/services/language-detector/";
 import type { RunnerServiceDependencies } from "@/services/runner/runner.types";
 
-import { commentBuilderService, localeService } from "@/composition";
-import { PullRequestProgressAction } from "@/services/";
-import { openRouterModelLimitsService } from "@/services/openrouter/";
+import { commentBuilderService, localeService, openRouterModelLimitsService } from "@/composition";
+import { PullRequestProgressAction } from "@/domain/workflow/";
 import { RunnerService } from "@/services/runner/runner.service";
 import { TranslationFile, TranslatorService } from "@/services/translator/";
 
@@ -310,6 +309,7 @@ export function createIntegrationTranslator() {
 		localeService,
 		languageDetectorService:
 			createMockLanguageDetectorService() as unknown as LanguageDetectorService,
+		openRouterModelLimitsService,
 		queue: createMockQueue() as unknown as PQueue,
 		retryConfig: {
 			retries: 0,

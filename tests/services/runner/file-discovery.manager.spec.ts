@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import type { RunnerServiceDependencies } from "@/services/runner/runner.types";
 
-import { localeService } from "@/services/";
+import { localeService } from "@/composition";
 import { FileDiscoveryManager } from "@/services/runner/workflow/file-discovery.manager";
 
 import { createRepositoryTreeItemFixture } from "@tests/fixtures";

@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 
-import type { ProcessedFileResult } from "@/services/";
+import type { ProcessedFileResult } from "@/domain/workflow/";
 
 import { localeService } from "@/composition";
-import { CommentBuilderService, PullRequestProgressAction, TranslationFile } from "@/services/";
+import { PullRequestProgressAction } from "@/domain/workflow/";
+import { CommentBuilderService } from "@/services/comment-builder/comment-builder.service";
+import { TranslationFile } from "@/services/translator/translation-file";
 
 import { createMockPullRequestListItem } from "@tests/fixtures";
 

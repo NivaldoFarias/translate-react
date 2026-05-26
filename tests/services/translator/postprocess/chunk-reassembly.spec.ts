@@ -3,8 +3,8 @@ import { describe, expect, test } from "bun:test";
 import type { ChunksToReassemble } from "@/services/translator/chunking/chunks.manager";
 
 import { ApplicationError } from "@/errors";
-import { TranslationFile } from "@/services/";
 import { validateAndReassembleChunks } from "@/services/translator/postprocess/chunk-reassembly";
+import { TranslationFile } from "@/services/translator/translation-file";
 
 describe("validateAndReassembleChunks", () => {
 	function makeFile(content: string) {

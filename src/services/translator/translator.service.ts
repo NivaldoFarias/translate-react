@@ -6,7 +6,7 @@ import type { Options as RetryOptions } from "p-retry";
 
 import type { LanguageDetectorService } from "@/services/language-detector/";
 import type { LocaleService } from "@/services/locale/";
-import type { OpenRouterModelLimits } from "@/services/openrouter/";
+import type { OpenRouterModelLimits, OpenRouterModelLimitsService } from "@/services/openrouter/";
 
 import type {
 	ChunkTranslationProgress,
@@ -16,7 +16,6 @@ import type { TranslationAttemptContext } from "./pipeline/translation-attempt.c
 import type { FrontmatterBatchFieldKey } from "./translator-frontmatter-batch.schema";
 
 import { ApplicationError, ErrorCode, isCompletionLengthTruncationError } from "@/errors/";
-import { openRouterModelLimitsService } from "@/services/openrouter/";
 import {
 	env,
 	logger,
@@ -62,14 +61,17 @@ export interface TranslatorServiceDependencies {
 	/** Rate limiting queue for LLM API calls */
 	queue: PQueue;
 
-	/** Optional locale service (defaults to singleton) */
+	/** Locale strings and PR templates for the target language */
 	localeService: LocaleService;
 
-	/** Optional language detector service */
+	/** CLD-backed language detector */
 	languageDetectorService: LanguageDetectorService;
 
 	/** Retry configuration for LLM API calls */
 	retryConfig: RetryOptions;
+
+	/** OpenRouter model catalog limits (hosted API only) */
+	openRouterModelLimitsService: OpenRouterModelLimitsService;
 
 	/** Optional LLM transport client (defaults to {@link TranslationLlmClient}) */
 	llmClient?: TranslationLlmClient;
@@ -133,6 +135,9 @@ export class TranslatorService {
 	/** OpenAI chat completion transport with retries and rate limiting */
 	private readonly llmClient: TranslationLlmClient;
 
+	/** Resolves OpenRouter `GET /v1/models` limits for chunk and completion caps */
+	private readonly openRouterModelLimitsService: OpenRouterModelLimitsService;
+
 	/**
 	 * Creates a new TranslatorService instance with injected dependencies.
 	 *
@@ -147,6 +152,7 @@ export class TranslatorService {
 			languageDetector: dependencies.languageDetectorService,
 		};
 		this.retryConfig = dependencies.retryConfig;
+		this.openRouterModelLimitsService = dependencies.openRouterModelLimitsService;
 		this.managers = {
 			chunks: new ChunksManager(this.model),
 			pipeline: new TranslationPipelineManager(),
@@ -225,7 +231,7 @@ export class TranslatorService {
 			return;
 		}
 
-		if (!openRouterModelLimitsService.isHostedOpenRouterBaseUrl(env.LLM_API_BASE_URL)) {
+		if (!this.openRouterModelLimitsService.isHostedOpenRouterBaseUrl(env.LLM_API_BASE_URL)) {
 			this.logger.debug(
 				{ baseUrl: env.LLM_API_BASE_URL },
 				"Skipping OpenRouter model metadata: base URL is not hosted OpenRouter",
@@ -241,7 +247,7 @@ export class TranslatorService {
 		}
 
 		const limits: OpenRouterModelLimits | null =
-			await openRouterModelLimitsService.fetchLimitsForModel(
+			await this.openRouterModelLimitsService.fetchLimitsForModel(
 				env.LLM_API_BASE_URL,
 				env.LLM_API_KEY,
 				this.model,

@@ -3,14 +3,11 @@ import { PartialDeep } from "type-fest";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 import type { ChatCompletion } from "openai/resources";
 
-import type { PatchedRepositoryTreeItem } from "@/services";
+import type { PatchedRepositoryTreeItem, ProcessedFileResult } from "@/domain/workflow/";
+import type { LanguageAnalysisResult } from "@/services/language-detector/language-detector.service";
 
-import {
-	LanguageAnalysisResult,
-	ProcessedFileResult,
-	PullRequestProgressAction,
-	TranslationFile,
-} from "@/services";
+import { PullRequestProgressAction } from "@/domain/workflow/";
+import { TranslationFile } from "@/services/translator/translation-file";
 
 type PullRequestListItem = RestEndpointMethodTypes["pulls"]["list"]["response"]["data"][number];
 type PartialChatCompletion = PartialDeep<

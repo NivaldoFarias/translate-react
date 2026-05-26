@@ -6,6 +6,7 @@ import { CommentBuilderService } from "@/services/comment-builder/comment-builde
 import { GitHubService } from "@/services/github/github.service";
 import { LanguageDetectorService } from "@/services/language-detector/language-detector.service";
 import { LocaleService } from "@/services/locale/locale.service";
+import { OpenRouterModelLimitsService } from "@/services/openrouter/openrouter-model-limits.service";
 import { RunnerService } from "@/services/runner/runner.service";
 import { TranslatorService } from "@/services/translator/translator.service";
 import { env } from "@/utils/";
@@ -19,6 +20,9 @@ export const languageDetectorService = new LanguageDetectorService();
 /** Markdown for translation-progress issues and PR comments */
 export const commentBuilderService = new CommentBuilderService(localeService.definitions);
 
+/** OpenRouter model catalog limits for chunk and completion caps */
+export const openRouterModelLimitsService = new OpenRouterModelLimitsService();
+
 /** GitHub API facade (fork, upstream, PRs, commits) */
 export const githubService = new GitHubService({ commentBuilderService });
 
@@ -29,6 +33,7 @@ export const translatorService = new TranslatorService({
 	queue,
 	localeService,
 	languageDetectorService,
+	openRouterModelLimitsService,
 	retryConfig: {
 		retries: env.MAX_RETRY_ATTEMPTS,
 	},
