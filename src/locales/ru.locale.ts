@@ -80,7 +80,10 @@ export const ruLocale: LocaleDefinition = {
 
 			return `Последний запуск \`translate-react\` (**${runContext.refLabel}**, workflow [\`${runContext.workflowName}\` · #${runContext.runId}](${runContext.url})) перевёл следующие страницы и создал эти PR:`;
 		},
-		suffix: ``,
+		suffix: `> [!IMPORTANT]
+>
+> - Переводы были созданы с помощью LLM и требуют проверки человеком для обеспечения технической точности и беглости.
+> - Эта реализация является **WIP** (Work In Progress) и может содержать несоответствия в сложном техническом контенте или специфическом форматировании.`,
 	},
 	rules: {
 		specific: `
