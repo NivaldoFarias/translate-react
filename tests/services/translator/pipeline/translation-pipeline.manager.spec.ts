@@ -12,12 +12,12 @@ describe("TranslationPipelineManager", () => {
 
 		const result = await pipeline.translateWithValidationRetries({
 			file,
-			translateBody: async (context) => {
+			translateBody: (context) => {
 				lastHints = context.validationRetryHints;
 				callCount++;
-				return callCount === 1 ? "bad" : "good";
+				return Promise.resolve(callCount === 1 ? "bad" : "good");
 			},
-			finalizeTranslation: async (body) => body,
+			finalizeTranslation: (body) => Promise.resolve(body),
 			collectIssues: (content) =>
 				content === "bad" ?
 					[
@@ -38,15 +38,15 @@ describe("TranslationPipelineManager", () => {
 		expect(lastHints).toEqual(["keep `Foo` unchanged"]);
 	});
 
-	test("throws after final failed attempt", async () => {
+	test("throws after final failed attempt", () => {
 		const file = new TranslationFile("# Title", "doc.md", "src/doc.md", "sha");
 		const pipeline = new TranslationPipelineManager(2);
 
 		expect(
 			pipeline.translateWithValidationRetries({
 				file,
-				translateBody: async () => "bad",
-				finalizeTranslation: async (body) => body,
+				translateBody: () => Promise.resolve("bad"),
+				finalizeTranslation: (body) => Promise.resolve(body),
 				collectIssues: () => [
 					{
 						guardId: "nonEmptyContent",
