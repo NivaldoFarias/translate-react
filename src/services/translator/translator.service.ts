@@ -1,5 +1,3 @@
-import crypto from "node:crypto";
-
 import { StatusCodes } from "http-status-codes";
 import OpenAI from "openai";
 import { APIError } from "openai/error";
@@ -17,7 +15,7 @@ import type { ReactLanguageCode } from "@/utils/";
 import type { FrontmatterBatchFieldKey } from "./translator-frontmatter-batch.schema";
 
 import { openai, queue } from "@/clients/";
-import { ApplicationError, ErrorCode } from "@/errors/";
+import { ApplicationError, ErrorCode, isCompletionLengthTruncationError } from "@/errors/";
 import { LanguageDetectorService, languageDetectorService } from "@/services/language-detector/";
 import { localeService, LocaleService } from "@/services/locale/";
 import { openRouterModelLimitsService } from "@/services/openrouter/";
@@ -31,7 +29,11 @@ import {
 } from "@/utils/";
 
 import { ChunksManager, TranslationValidatorManager } from "./managers";
-import { REGEXES, SYSTEM_PROMPT_TOKEN_RESERVE } from "./managers/managers.constants";
+import {
+	REGEXES,
+	SYSTEM_PROMPT_TOKEN_RESERVE,
+	TRANSLATION_VALIDATION_MAX_ATTEMPTS,
+} from "./managers/managers.constants";
 import {
 	frontmatterBatchRequestEnvelopeSchema,
 	frontmatterBatchTranslationEnvelopeSchema,
@@ -45,6 +47,9 @@ import {
 } from "./translator-frontmatter.util";
 import { stripSpuriousOuterMarkdownFencesWhenSourceHadNoFences } from "./translator-markdown-artifacts.util";
 import { CONNECTIVITY_TEST_MAX_TOKENS, LLM_TEMPERATURE } from "./translator.constants";
+import { TranslationFile } from "./translation-file";
+
+export { TranslationFile } from "./translation-file";
 
 /** Structured-output schema for batched YAML `description` translation (OpenRouter/OpenAI JSON mode). */
 const FRONTMATTER_BATCH_RESPONSE_FORMAT = zodResponseFormat(
@@ -89,101 +94,6 @@ export interface TranslatorServiceDependencies {
 
 	/** Retry configuration for LLM API calls */
 	retryConfig: RetryOptions;
-}
-
-/** Represents a file that needs to be translated */
-export class TranslationFile {
-	/** The title of the document extracted from frontmatter */
-	public readonly title: string | undefined;
-
-	/** Logger instance with file-specific context for workflow tracing */
-	public readonly logger: Logger;
-
-	/** Correlation ID for end-to-end tracing across the file's workflow */
-	public readonly correlationId: string;
-
-	/**
-	 * Resolved CLD source language for system prompts; set before any chunked or scalar LLM call for this logical document.
-	 *
-	 * @see {@link TranslatorService.translateContent} for when this is populated
-	 */
-	public documentSourceLanguage?: ReactLanguageCode;
-
-	/**
-	 * Builds a translation unit with optional logger parent and optional resolved source language.
-	 *
-	 * @param content Raw file body as fetched or synthesized for the workflow
-	 * @param filename Display filename for logs and PR context
-	 * @param path Repository path of the blob
-	 * @param sha Git object id for the blob
-	 * @param parentLogger Optional child logger parent when this file is a slice or snippet of another unit
-	 * @param documentSourceLanguage Optional resolved source language; omit when unknown until {@link TranslatorService.translateContent} runs
-	 *
-	 * @example
-	 * ```typescript
-	 * const file = new TranslationFile("# Hi", "doc.md", "src/content/doc.md", "abc123");
-	 * ```
-	 */
-	constructor(
-		public readonly content: string,
-		public readonly filename: string,
-		public readonly path: string,
-		public readonly sha: string,
-		parentLogger?: Logger,
-		documentSourceLanguage?: ReactLanguageCode,
-	) {
-		this.title = this.extractDocTitleFromContent(content);
-		this.correlationId = crypto.randomUUID();
-		this.logger = (parentLogger ?? logger).child({
-			file: this.filename,
-			path: this.path,
-			correlationId: this.correlationId,
-		});
-		if (documentSourceLanguage !== undefined) {
-			this.documentSourceLanguage = documentSourceLanguage;
-		}
-	}
-
-	/**
-	 * Extracts the document title from leading YAML frontmatter by parsing the inner block with {@link extractTitleScalarFromInnerYaml}.
-	 *
-	 * @param content The content of the document
-	 *
-	 * @returns The trimmed `title` string scalar, or `undefined` when there is no frontmatter or `title` is missing or not a string
-	 */
-	private extractDocTitleFromContent(content: string): string | undefined {
-		const frontmatterContentOnly = REGEXES.frontmatter.exec(content)?.groups?.["content"];
-
-		if (!frontmatterContentOnly) return;
-
-		return extractTitleScalarFromInnerYaml(frontmatterContentOnly);
-	}
-
-	/**
-	 * Returns a log-safe snapshot of this file (no `content` body).
-	 *
-	 * Pino `serializers.content` only applies to a top-level `content` key; logging `{ file: this }`
-	 * still serializes `file.content` in full, so use this for structured logs.
-	 */
-	public getLogContext(): {
-		filename: string;
-		path: string;
-		sha: string;
-		correlationId: string;
-		contentLength: number;
-		title: string | undefined;
-		documentSourceLanguage: ReactLanguageCode | undefined;
-	} {
-		return {
-			filename: this.filename,
-			path: this.path,
-			sha: this.sha,
-			correlationId: this.correlationId,
-			contentLength: this.content.length,
-			title: this.title,
-			documentSourceLanguage: this.documentSourceLanguage,
-		};
-	}
 }
 
 /**
@@ -452,7 +362,7 @@ export class TranslatorService {
 		}
 
 		const translationStartTime = Date.now();
-		let translatedContent: string;
+		let translatedContent = "";
 
 		const verbatimMask =
 			env.MASK_VERBATIM_LARGE_FENCES ?
@@ -494,47 +404,82 @@ export class TranslatorService {
 			file.documentSourceLanguage,
 		);
 
-		const contentNeedsChunking = this.managers.chunks.needsChunking(translationWorkFile);
-		if (!contentNeedsChunking) {
-			translatedContent = await this.callLanguageModel(translationWorkFile);
-		} else {
-			translatedContent = await this.translateWithChunking(translationWorkFile);
-		}
-
-		if (verbatimMask && verbatimMask.replacements.length > 0) {
-			translatedContent = restoreMaskedVerbatimFences(translatedContent, verbatimMask.replacements);
-		}
-
 		const fileBodySplit = splitLeadingYamlFrontmatter(file.content);
 		const sourceBodyForArtifacts =
 			fileBodySplit.rest.length > 0 ? fileBodySplit.rest : file.content;
 
-		translatedContent = stripSpuriousOuterMarkdownFencesWhenSourceHadNoFences(
-			sourceBodyForArtifacts,
-			translatedContent,
-			file.logger,
-		);
+		let validationRetryHints: string[] = [];
 
-		if (preservedYamlBlock) {
-			const frontmatterParts = extractFrontmatterParts(preservedYamlBlock);
-			const mergedBlock =
-				frontmatterParts ?
-					buildFrontmatterBlock(
-						frontmatterParts.bom,
-						await this.translateFrontmatterStringFields(frontmatterParts.inner, file),
-					)
-				:	preservedYamlBlock;
+		for (let attempt = 1; attempt <= TRANSLATION_VALIDATION_MAX_ATTEMPTS; attempt++) {
+			let bodyTranslation = await this.translateMarkdownBody(
+				translationWorkFile,
+				validationRetryHints,
+			);
 
-			translatedContent = mergePreservedYamlFrontmatter(
-				mergedBlock,
+			if (verbatimMask && verbatimMask.replacements.length > 0) {
+				bodyTranslation = restoreMaskedVerbatimFences(
+					bodyTranslation,
+					verbatimMask.replacements,
+				);
+			}
+
+			bodyTranslation = stripSpuriousOuterMarkdownFencesWhenSourceHadNoFences(
+				sourceBodyForArtifacts,
+				bodyTranslation,
+				file.logger,
+			);
+
+			if (preservedYamlBlock) {
+				const frontmatterParts = extractFrontmatterParts(preservedYamlBlock);
+				const mergedBlock =
+					frontmatterParts ?
+						buildFrontmatterBlock(
+							frontmatterParts.bom,
+							await this.translateFrontmatterStringFields(frontmatterParts.inner, file),
+						)
+					:	preservedYamlBlock;
+
+				translatedContent = mergePreservedYamlFrontmatter(
+					mergedBlock,
+					bodyTranslation,
+					translationPayload,
+				);
+			} else {
+				translatedContent = bodyTranslation;
+			}
+
+			const validationIssues = this.managers.translationValidator.collectRetryableValidationIssues(
+				file,
 				translatedContent,
-				translationPayload,
+			);
+
+			if (validationIssues.length === 0) {
+				break;
+			}
+
+			if (attempt >= TRANSLATION_VALIDATION_MAX_ATTEMPTS) {
+				throw this.managers.translationValidator.createValidationFailedError(
+					file,
+					translatedContent,
+					validationIssues,
+				);
+			}
+
+			validationRetryHints = validationIssues.map((issue) => issue.retryHint);
+
+			file.logger.warn(
+				{
+					attempt,
+					maxAttempts: TRANSLATION_VALIDATION_MAX_ATTEMPTS,
+					guardIds: validationIssues.map((issue) => issue.guardId),
+				},
+				"Post-translation validation failed; retrying with guard hints",
 			);
 		}
 
 		const translationDuration = Date.now() - translationStartTime;
 
-		this.managers.translationValidator.validateTranslation(file, translatedContent);
+		this.managers.translationValidator.recordSoftValidationWarnings(file, translatedContent);
 
 		file.logger.info(
 			{
@@ -848,7 +793,49 @@ export class TranslatorService {
 	 * console.log('Translation completed:', translated.length);
 	 * ```
 	 */
-	private async translateWithChunking(file: TranslationFile): Promise<string> {
+	/**
+	 * Translates markdown body content (single-shot or chunked) with optional validation retry hints.
+	 *
+	 * @param file Work file whose `content` is the body sent to the LLM (frontmatter already split off)
+	 * @param validationRetryHints Guard hints from a failed post-translation validation attempt
+	 *
+	 * @returns Translated markdown body before frontmatter merge
+	 */
+	private async translateMarkdownBody(
+		file: TranslationFile,
+		validationRetryHints: string[] = [],
+	) {
+		const contentNeedsChunking = this.managers.chunks.needsChunking(file);
+		if (contentNeedsChunking) {
+			return this.translateWithChunking(file, validationRetryHints);
+		}
+
+		try {
+			return await this.callLanguageModel(
+				file,
+				undefined,
+				undefined,
+				"markdownDocument",
+				undefined,
+				validationRetryHints,
+			);
+		} catch (error) {
+			if (!isCompletionLengthTruncationError(error)) {
+				throw error;
+			}
+
+			file.logger.info(
+				{ path: file.path, contentLength: file.content.length },
+				"Completion token limit reached; translating in chunks",
+			);
+			return this.translateWithChunking(file, validationRetryHints);
+		}
+	}
+
+	private async translateWithChunking(
+		file: TranslationFile,
+		validationRetryHints: string[] = [],
+	): Promise<string> {
 		file.logger.debug({ contentLength: file.content.length }, "Starting chunked translation");
 
 		const { chunks, separators } = await this.managers.chunks.chunkContent(file.content);
@@ -863,7 +850,9 @@ export class TranslatorService {
 		);
 
 		const translatedChunks = await Promise.all(
-			chunks.map((chunk, index) => this.translateChunk(file, chunk, index, chunks)),
+			chunks.map((chunk, index) =>
+				this.translateChunk(file, chunk, index, chunks, validationRetryHints),
+			),
 		);
 
 		file.logger.debug(
@@ -893,6 +882,7 @@ export class TranslatorService {
 		chunk: string,
 		index: number,
 		chunks: string[],
+		validationRetryHints: string[] = [],
 	): Promise<string> {
 		const startTime = Date.now();
 		const estimatedTokens = this.managers.chunks.estimateTokenCount(chunk);
@@ -909,7 +899,14 @@ export class TranslatorService {
 
 		const chunkProgress: ChunkTranslationProgress | undefined =
 			chunks.length > 1 ? { index: index + 1, total: chunks.length } : undefined;
-		const translatedChunk = await this.callLanguageModel(file, chunk, chunkProgress);
+		const translatedChunk = await this.callLanguageModel(
+			file,
+			chunk,
+			chunkProgress,
+			"markdownDocument",
+			undefined,
+			validationRetryHints,
+		);
 
 		const strippedChunk = stripSpuriousOuterMarkdownFencesWhenSourceHadNoFences(
 			chunk,
@@ -947,6 +944,7 @@ export class TranslatorService {
 		chunkProgress?: ChunkTranslationProgress,
 		systemPromptKind: TranslationSystemPromptKind = "markdownDocument",
 		responseFormat?: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming["response_format"],
+		validationRetryHints: string[] = [],
 	): OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming {
 		const params: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming = {
 			model: this.model,
@@ -955,7 +953,13 @@ export class TranslatorService {
 			messages: [
 				{
 					role: "system",
-					content: this.getSystemPrompt(file, userMessageContent, chunkProgress, systemPromptKind),
+					content: this.getSystemPrompt(
+						file,
+						userMessageContent,
+						chunkProgress,
+						systemPromptKind,
+						validationRetryHints,
+					),
 				},
 				{ role: "user", content: userMessageContent },
 			],
@@ -989,6 +993,8 @@ export class TranslatorService {
 		content?: string,
 		chunkProgress?: ChunkTranslationProgress,
 		systemPromptKind: TranslationSystemPromptKind = "markdownDocument",
+		responseFormat?: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming["response_format"],
+		validationRetryHints: string[] = [],
 	): Promise<string> {
 		file.documentSourceLanguage ??= await this.resolveDocumentSourceLanguage(file.content);
 
@@ -1019,6 +1025,8 @@ export class TranslatorService {
 								contentToTranslate,
 								chunkProgress,
 								systemPromptKind,
+								responseFormat,
+								validationRetryHints,
 							),
 						);
 
@@ -1035,17 +1043,19 @@ export class TranslatorService {
 
 						const finishReason = completion.choices[0]?.finish_reason;
 						if (finishReason === "length") {
-							throw new ApplicationError(
-								"Language model response ended at max completion tokens (truncated output)",
-								ErrorCode.TranslationFailed,
-								`${TranslatorService.name}.${this.callLanguageModel.name}`,
-								{
-									model: this.model,
-									contentLength: contentToTranslate.length,
-									finishReason,
-									completionTokens: completion.usage?.completion_tokens,
-									promptTokens: completion.usage?.prompt_tokens,
-								},
+							throw new AbortError(
+								new ApplicationError(
+									"Language model response ended at max completion tokens (truncated output)",
+									ErrorCode.TranslationFailed,
+									`${TranslatorService.name}.${this.callLanguageModel.name}`,
+									{
+										model: this.model,
+										contentLength: contentToTranslate.length,
+										finishReason,
+										completionTokens: completion.usage?.completion_tokens,
+										promptTokens: completion.usage?.prompt_tokens,
+									},
+								),
 							);
 						}
 
@@ -1126,6 +1136,7 @@ export class TranslatorService {
 		userMessageContent: string,
 		chunkProgress?: ChunkTranslationProgress,
 		systemPromptKind: TranslationSystemPromptKind = "markdownDocument",
+		validationRetryHints: string[] = [],
 	) {
 		const documentSourceLanguage = file.documentSourceLanguage ?? "en";
 
@@ -1161,12 +1172,22 @@ export class TranslatorService {
 				`
 			:	"";
 
+		const validationRetrySection =
+			validationRetryHints.length > 0 ?
+				`
+				# CORRECTION REQUIRED (previous attempt failed validation)
+				A previous translation of this content was rejected. Apply every correction below in a new full translation of the user message:
+				${validationRetryHints.map((hint) => `- ${hint}`).join("\n")}
+				`
+			:	"";
+
 		const builtSystemPrompt = `# ROLE
 				You are an expert technical translator specializing in React documentation.
 	
 				# TASK
 				Translate the provided content from ${languages.source} to ${languages.target} with absolute precision and technical accuracy.
 				${chunkSliceSection}
+				${validationRetrySection}
 				# CRITICAL PRESERVATION RULES
 				1. **Structure & Formatting**: Preserve ALL markdown syntax, HTML tags, code blocks, frontmatter, and line breaks exactly as written
 				2. **Code & identifiers**: Keep ALL code examples, URLs, and every programming identifier (functions, variables, classes, hooks, packages, props as in code) unchanged in every context—fenced blocks, inline code, tables, lists, or prose

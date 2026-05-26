@@ -4,7 +4,7 @@ import { encodingForModel } from "js-tiktoken";
 import type { MarkdownTextSplitterParams } from "@langchain/textsplitters";
 import type { Tiktoken, TiktokenModel } from "js-tiktoken";
 
-import type { TranslationFile } from "../translator.service";
+import type { TranslationFile } from "../translation-file";
 
 import { ApplicationError, ErrorCode } from "@/errors";
 import { env, logger } from "@/utils";
