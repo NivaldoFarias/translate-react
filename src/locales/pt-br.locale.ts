@@ -80,10 +80,7 @@ export const ptBrLocale: LocaleDefinition = {
 
 			return `A última execução do \`translate-react\` (**${runContext.refLabel}**, workflow [\`${runContext.workflowName}\` · #${runContext.runId}](${runContext.url})) traduziu as seguintes páginas e criou estes PRs:`;
 		},
-		suffix: `> [!IMPORTANT]
->
-> - As traduções foram geradas por uma LLM e requerem revisão humana para garantir precisão técnica e fluência.
-> - Esta implementação é um **WIP** (Work In Progress) e pode apresentar inconsistências em conteúdos técnicos complexos ou formatação específica.`,
+		suffix: `###### ps.: as traduções foram geradas por uma LLM e requerem revisão humana para garantir precisão técnica e fluência.`,
 	},
 	rules: {
 		specific: `
