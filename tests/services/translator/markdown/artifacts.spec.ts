@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { stripSpuriousOuterMarkdownFencesWhenSourceHadNoFences } from "@/services/translator/translator-markdown-artifacts.util";
+import { stripSpuriousOuterMarkdownFencesWhenSourceHadNoFences } from "@/services/translator/markdown/artifacts";
 
 describe("stripSpuriousOuterMarkdownFencesWhenSourceHadNoFences", () => {
 	test("returns unchanged when the source already has fenced code blocks", () => {

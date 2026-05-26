@@ -1,7 +1,7 @@
 import { isMap, isScalar, parseDocument } from "yaml";
 
-import { MARKDOWN_REGEXES } from "./markdown/markdown.regexes";
-import { leadingNewlineRunLength } from "./translator-markdown-artifacts.util";
+import { leadingNewlineRunLength } from "./artifacts";
+import { MARKDOWN_REGEXES } from "./markdown.regexes";
 
 /**
  * Result of splitting a markdown document into a leading YAML frontmatter block and the rest.

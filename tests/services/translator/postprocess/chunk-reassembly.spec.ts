@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import type { ChunksToReassemble } from "@/services/translator/managers/chunks.manager";
+import type { ChunksToReassemble } from "@/services/translator/chunking/chunks.manager";
 
 import { ApplicationError } from "@/errors";
 import { TranslationFile } from "@/services/";

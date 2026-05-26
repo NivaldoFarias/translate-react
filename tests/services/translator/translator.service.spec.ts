@@ -2,8 +2,9 @@ import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 
 import type { TranslatorServiceDependencies } from "@/services/";
 
+import { localeService } from "@/composition";
 import { ApplicationError } from "@/errors";
-import { localeService, TranslatorService } from "@/services/";
+import { TranslatorService } from "@/services/translator/translator.service";
 
 import {
 	createChatCompletionFixture,
@@ -194,7 +195,7 @@ describe("TranslatorService", () => {
 
 			let chunkCallIndex = 0;
 			let firstSystemPrompt: string | undefined;
-			const { chunks } = await new (await import("@/services/translator/managers")).ChunksManager(
+			const { chunks } = await new (await import("@/services/translator/chunking")).ChunksManager(
 				"test-model",
 			).chunkContent(largeContent);
 
@@ -691,20 +692,6 @@ describe("TranslatorService", () => {
 			const file = createTranslationFileFixture({ content: "Test content" });
 
 			expect(translatorService.translateContent(file)).rejects.toThrow();
-		});
-
-		test("should return false for invalid LLM response", () => {
-			const invalidResponse = createChatCompletionFixture({
-				id: undefined,
-				usage: undefined,
-				// @ts-expect-error - invalid `message` type for testing
-				choices: [{ message: null }],
-			});
-
-			// @ts-expect-error - call to a private method
-			const isValid = translatorService.isLLMResponseValid(invalidResponse);
-
-			expect(isValid).toBe(false);
 		});
 	});
 });

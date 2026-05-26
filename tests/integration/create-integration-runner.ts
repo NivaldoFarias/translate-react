@@ -8,6 +8,11 @@ import type { Mock } from "bun:test";
 import type OpenAI from "openai";
 import type PQueue from "p-queue";
 
+import type {
+	LanguageCacheEntry,
+	PatchedRepositoryTreeItem,
+	ProcessedFileResult,
+} from "@/domain/workflow/";
 import type { CacheService } from "@/services/cache/";
 import type { GitHubService } from "@/services/github/";
 import type {
@@ -15,15 +20,10 @@ import type {
 	PullRequestOptions,
 } from "@/services/github/github.content";
 import type { LanguageDetectorService } from "@/services/language-detector/";
-import type {
-	LanguageCacheEntry,
-	PatchedRepositoryTreeItem,
-	ProcessedFileResult,
-	RunnerServiceDependencies,
-} from "@/services/runner/runner.types";
+import type { RunnerServiceDependencies } from "@/services/runner/runner.types";
 
-import { localeService, PullRequestProgressAction } from "@/services/";
-import { commentBuilderService } from "@/services/comment-builder/";
+import { commentBuilderService, localeService } from "@/composition";
+import { PullRequestProgressAction } from "@/services/";
 import { openRouterModelLimitsService } from "@/services/openrouter/";
 import { RunnerService } from "@/services/runner/runner.service";
 import { TranslationFile, TranslatorService } from "@/services/translator/";

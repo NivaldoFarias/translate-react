@@ -5,17 +5,17 @@ import { RequestError } from "@octokit/request-error";
 import type { components } from "@octokit/openapi-types";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
-import type { CommentBuilderService } from "@/services/comment-builder/";
 import type {
 	PatchedRepositoryTreeItem,
 	ProcessedFileResult,
 	PullRequestStatus,
-} from "@/services/runner/";
+} from "@/domain/workflow/";
+import type { CommentBuilderService } from "@/services/comment-builder/";
 
 import type { SharedGitHubDependencies } from "./github.types";
 
+import { filterReportableProgressCommentResults } from "@/domain/workflow/";
 import { ApplicationError, ErrorCode } from "@/errors/";
-import { filterReportableProgressCommentResults } from "@/services/runner/runner.types";
 import { TranslationFile } from "@/services/translator/";
 import { logger } from "@/utils/";
 

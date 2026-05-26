@@ -61,6 +61,46 @@ export default defineConfig(
 		},
 	},
 	{
+		files: ["src/services/github/**/*.{ts,tsx}"],
+		rules: {
+			"no-restricted-imports": [
+				"error",
+				{
+					patterns: [
+						{
+							group: ["@/services/runner", "@/services/runner/**"],
+							message: "GitHub layer must use @/domain/workflow, not runner.",
+						},
+					],
+				},
+			],
+		},
+	},
+	{
+		files: ["src/locales/**/*.{ts,tsx}"],
+		rules: {
+			"no-restricted-imports": [
+				"error",
+				{
+					patterns: [
+						{
+							group: ["@/services/runner", "@/services/runner/**"],
+							message: "Locales must use @/domain/workflow, not runner.",
+						},
+						{
+							group: [
+								"@/services/github/github.content",
+								"@/services/github/github.repository",
+								"@/services/github/github.branch",
+							],
+							message: "Import GitHubService from @/services/github instead of internal modules.",
+						},
+					],
+				},
+			],
+		},
+	},
+	{
 		files: ["tests/**"],
 		rules: {},
 	},

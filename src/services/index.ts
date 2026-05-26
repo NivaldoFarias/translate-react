@@ -1,3 +1,5 @@
+export * from "@/domain/workflow/";
+export * from "@/composition";
 export * from "./comment-builder/";
 export * from "./language-detector/";
 export * from "./openrouter/";

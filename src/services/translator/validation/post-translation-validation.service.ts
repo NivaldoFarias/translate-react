@@ -3,7 +3,7 @@ import type { TranslationFile } from "../translation-file";
 import type { TranslationValidationIssue } from "./validation.types";
 
 import { ApplicationError, ErrorCode } from "@/errors";
-import { collectTopLevelKeysFromInnerYaml } from "@/services/translator/translator-frontmatter.util";
+import { collectTopLevelKeysFromInnerYaml } from "@/services/translator/markdown/frontmatter";
 
 import { MARKDOWN_REGEXES } from "../markdown/markdown.regexes";
 

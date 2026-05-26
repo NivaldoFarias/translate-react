@@ -1,13 +1,11 @@
-import { StatusCodes } from "http-status-codes";
 import OpenAI from "openai";
-import { APIError } from "openai/error";
-import { zodResponseFormat } from "openai/helpers/zod";
-import pRetry, { AbortError } from "p-retry";
 import { isMap, parseDocument } from "yaml";
 
 import type PQueue from "p-queue";
 import type { Options as RetryOptions } from "p-retry";
 
+import type { LanguageDetectorService } from "@/services/language-detector/";
+import type { LocaleService } from "@/services/locale/";
 import type { OpenRouterModelLimits } from "@/services/openrouter/";
 
 import type {
@@ -17,50 +15,36 @@ import type {
 import type { TranslationAttemptContext } from "./pipeline/translation-attempt.context";
 import type { FrontmatterBatchFieldKey } from "./translator-frontmatter-batch.schema";
 
-import { openai, queue } from "@/clients/";
 import { ApplicationError, ErrorCode, isCompletionLengthTruncationError } from "@/errors/";
-import { LanguageDetectorService, languageDetectorService } from "@/services/language-detector/";
-import { localeService, LocaleService } from "@/services/locale/";
 import { openRouterModelLimitsService } from "@/services/openrouter/";
 import {
 	env,
-	getRateLimitResetWaitMs,
-	isOpenRouterDailyFreeModelQuotaError,
 	logger,
 	maskLargeVerbatimFencedCodeBlocks,
 	restoreMaskedVerbatimFences,
 } from "@/utils/";
 
+import { ChunksManager } from "./chunking";
+import { SYSTEM_PROMPT_TOKEN_RESERVE } from "./chunking/chunking.constants";
+import { TranslationLlmClient } from "./llm/translation-llm.client";
 import { TranslationPromptBuilder } from "./llm/translation-prompt.builder";
-import { ChunksManager } from "./managers";
-import { SYSTEM_PROMPT_TOKEN_RESERVE } from "./managers/managers.constants";
-import { emptyTranslationAttemptContext } from "./pipeline/translation-attempt.context";
-import { TranslationPipelineManager } from "./pipeline/translation-pipeline.manager";
-import { validateAndReassembleChunks } from "./postprocess/chunk-reassembly";
-import { cleanupTranslatedContent } from "./postprocess/translation-output-cleanup";
-import { TranslationFile } from "./translation-file";
-import {
-	frontmatterBatchRequestEnvelopeSchema,
-	frontmatterBatchTranslationEnvelopeSchema,
-} from "./translator-frontmatter-batch.schema";
+import { stripSpuriousOuterMarkdownFencesWhenSourceHadNoFences } from "./markdown/artifacts";
 import {
 	buildFrontmatterBlock,
 	extractFrontmatterParts,
 	mergePreservedYamlFrontmatter,
 	splitLeadingYamlFrontmatter,
-} from "./translator-frontmatter.util";
-import { stripSpuriousOuterMarkdownFencesWhenSourceHadNoFences } from "./translator-markdown-artifacts.util";
+} from "./markdown/frontmatter";
+import { emptyTranslationAttemptContext } from "./pipeline/translation-attempt.context";
+import { TranslationPipelineManager } from "./pipeline/translation-pipeline.manager";
+import { validateAndReassembleChunks } from "./postprocess/chunk-reassembly";
+import { cleanupTranslatedContent } from "./postprocess/translation-output-cleanup";
+import { TranslationFile } from "./translation-file";
 import { CONNECTIVITY_TEST_MAX_TOKENS, LLM_TEMPERATURE } from "./translator.constants";
 import { PostTranslationValidationService } from "./validation/post-translation-validation.service";
 import { TranslationLanguageCheck } from "./validation/translation-language-check";
 
 export { TranslationFile } from "./translation-file";
-
-/** Structured-output schema for batched YAML `description` translation (OpenRouter/OpenAI JSON mode). */
-const FRONTMATTER_BATCH_RESPONSE_FORMAT = zodResponseFormat(
-	frontmatterBatchTranslationEnvelopeSchema,
-	"frontmatter_batch_translations",
-);
 
 export type {
 	ChunkTranslationProgress,
@@ -86,6 +70,9 @@ export interface TranslatorServiceDependencies {
 
 	/** Retry configuration for LLM API calls */
 	retryConfig: RetryOptions;
+
+	/** Optional LLM transport client (defaults to {@link TranslationLlmClient}) */
+	llmClient?: TranslationLlmClient;
 }
 
 /**
@@ -143,6 +130,9 @@ export class TranslatorService {
 
 	private readonly promptBuilder: TranslationPromptBuilder;
 
+	/** OpenAI chat completion transport with retries and rate limiting */
+	private readonly llmClient: TranslationLlmClient;
+
 	/**
 	 * Creates a new TranslatorService instance with injected dependencies.
 	 *
@@ -167,6 +157,20 @@ export class TranslatorService {
 			this.services.languageDetector,
 			this.services.locale,
 		);
+		this.llmClient =
+			dependencies.llmClient ??
+			new TranslationLlmClient({
+				openai: this.openai,
+				model: this.model,
+				queue: this.queue,
+				retryConfig: this.retryConfig,
+				promptBuilder: this.promptBuilder,
+				estimateInputTokens: (content) => this.managers.chunks.estimateTokenCount(content),
+				getCompletionTokenCap: () => this.providerCompletionTokenCap ?? env.MAX_TOKENS,
+				resolveDocumentSourceLanguage: (fullMarkdown) =>
+					this.resolveDocumentSourceLanguage(fullMarkdown),
+				getTranslationGuidelines: () => this.translationGuidelines,
+			});
 	}
 
 	/**
@@ -188,7 +192,7 @@ export class TranslatorService {
 			temperature: LLM_TEMPERATURE,
 		});
 
-		if (!this.isLLMResponseValid(response)) {
+		if (!this.llmClient.isLLMResponseValid(response)) {
 			throw new ApplicationError(
 				"Invalid LLM API response",
 				ErrorCode.InitializationError,
@@ -279,22 +283,6 @@ export class TranslatorService {
 				completionCap,
 			},
 			"Applied OpenRouter model limits for chunking",
-		);
-	}
-
-	/**
-	 * Checks if an LLM API response is valid.
-	 * Checks if the response has an ID, usage, and a message.
-	 *
-	 * @param response LLM API response to check
-	 *
-	 * @returns `true` if the response is valid, `false` otherwise
-	 */
-	private isLLMResponseValid(response: OpenAI.Chat.Completions.ChatCompletion): boolean {
-		return Boolean(
-			response.id &&
-			typeof response.usage?.total_tokens === "number" &&
-			response.choices.at(0)?.message,
 		);
 	}
 
@@ -513,7 +501,7 @@ export class TranslatorService {
 			"Translating YAML frontmatter string fields in one structured LLM call",
 		);
 
-		const envelope = await this.callLanguageModelFrontmatterBatch(file, batchItems);
+		const envelope = await this.llmClient.callLanguageModelFrontmatterBatch(file, batchItems);
 		const translatedByKey = new Map(
 			envelope.items.map((item) => [item.fieldKey, item.translated] as const),
 		);
@@ -551,190 +539,6 @@ export class TranslatorService {
 		}
 
 		return doc.toString({ lineWidth: 0 });
-	}
-
-	/**
-	 * Translates all requested YAML frontmatter string fields in one LLM completion using JSON schema output.
-	 *
-	 * Uses the same glossary and locale rules as the markdown body pass, encoded in the system prompt, so
-	 * terminology stays consistent between the `description` field and the document body.
-	 *
-	 * @param file Logical document being translated (for logging and resolved source language)
-	 * @param batchItems Field keys and source strings to translate (the `description` field when present)
-	 *
-	 * @throws {ApplicationError} When the model returns empty content, truncates, or JSON that fails schema validation
-	 *
-	 * @returns Parsed envelope matching {@link frontmatterBatchTranslationEnvelopeSchema}
-	 */
-	private async callLanguageModelFrontmatterBatch(
-		file: TranslationFile,
-		batchItems: readonly { fieldKey: FrontmatterBatchFieldKey; source: string }[],
-	) {
-		file.documentSourceLanguage ??= await this.resolveDocumentSourceLanguage(file.content);
-
-		const requestPayload = frontmatterBatchRequestEnvelopeSchema.parse({ items: batchItems });
-		const userMessage = JSON.stringify(requestPayload);
-		const contentLengthForLog = userMessage.length;
-
-		return this.queue.add(async () => {
-			const callStartTime = Date.now();
-			const estimatedInputTokens = this.managers.chunks.estimateTokenCount(userMessage);
-
-			return pRetry(
-				async () => {
-					const attemptStartTime = Date.now();
-
-					try {
-						file.logger.debug(
-							{
-								contentLength: contentLengthForLog,
-								estimatedInputTokens,
-								model: this.model,
-								systemPromptKind: "frontmatterBatch",
-							},
-							"Calling LLM API for batched frontmatter metadata",
-						);
-
-						const completion = await this.openai.chat.completions.create(
-							this.getLLMCompletionParams(
-								file,
-								userMessage,
-								undefined,
-								"frontmatterBatch",
-								FRONTMATTER_BATCH_RESPONSE_FORMAT,
-							),
-						);
-
-						const rawJson = completion.choices[0]?.message.content;
-
-						if (!rawJson) {
-							throw new ApplicationError(
-								"No content returned from language model for frontmatter batch",
-								ErrorCode.NoContent,
-								`${TranslatorService.name}.${this.callLanguageModelFrontmatterBatch.name}`,
-								{ model: this.model, contentLength: contentLengthForLog },
-							);
-						}
-
-						const finishReason = completion.choices[0]?.finish_reason;
-						if (finishReason === "length") {
-							throw new ApplicationError(
-								"Language model response ended at max completion tokens (truncated frontmatter batch JSON)",
-								ErrorCode.TranslationFailed,
-								`${TranslatorService.name}.${this.callLanguageModelFrontmatterBatch.name}`,
-								{
-									model: this.model,
-									contentLength: contentLengthForLog,
-									finishReason,
-									completionTokens: completion.usage?.completion_tokens,
-									promptTokens: completion.usage?.prompt_tokens,
-								},
-							);
-						}
-
-						const parsedEnvelope = frontmatterBatchTranslationEnvelopeSchema.safeParse(
-							JSON.parse(rawJson),
-						);
-
-						if (!parsedEnvelope.success) {
-							throw new ApplicationError(
-								"Frontmatter batch response failed schema validation",
-								ErrorCode.TranslationFailed,
-								`${TranslatorService.name}.${this.callLanguageModelFrontmatterBatch.name}`,
-								{
-									model: this.model,
-									issues: parsedEnvelope.error.issues,
-								},
-							);
-						}
-
-						const requestedKeys = new Set(batchItems.map((item) => item.fieldKey));
-						const responseKeys = new Set(parsedEnvelope.data.items.map((item) => item.fieldKey));
-
-						if (
-							requestedKeys.size !== responseKeys.size ||
-							[...requestedKeys].some((k) => !responseKeys.has(k))
-						) {
-							throw new ApplicationError(
-								"Frontmatter batch response keys do not match requested fields",
-								ErrorCode.TranslationFailed,
-								`${TranslatorService.name}.${this.callLanguageModelFrontmatterBatch.name}`,
-								{
-									requested: [...requestedKeys],
-									received: [...responseKeys],
-								},
-							);
-						}
-
-						file.logger.debug(
-							{
-								model: this.model,
-								durationMs: Date.now() - attemptStartTime,
-								inputTokens: completion.usage?.prompt_tokens,
-								outputTokens: completion.usage?.completion_tokens,
-								totalTokens: completion.usage?.total_tokens,
-								fieldCount: parsedEnvelope.data.items.length,
-							},
-							"LLM frontmatter batch call successful",
-						);
-
-						return parsedEnvelope.data;
-					} catch (error) {
-						if (error instanceof SyntaxError) {
-							throw new ApplicationError(
-								"Frontmatter batch response was not valid JSON",
-								ErrorCode.TranslationFailed,
-								`${TranslatorService.name}.${this.callLanguageModelFrontmatterBatch.name}`,
-								{ model: this.model, parseError: error.message },
-							);
-						}
-
-						if (error instanceof APIError) {
-							if (
-								error.status === StatusCodes.UNAUTHORIZED ||
-								error.status === StatusCodes.BAD_REQUEST
-							) {
-								throw new AbortError(error);
-							}
-
-							if (isOpenRouterDailyFreeModelQuotaError(error)) {
-								file.logger.error(
-									{
-										model: this.model,
-										message: error.message,
-									},
-									"OpenRouter free-models-per-day limit reached; add credits, drop :free, or wait for the daily reset",
-								);
-								throw new AbortError(error);
-							}
-						}
-
-						throw error;
-					}
-				},
-				{
-					...this.retryConfig,
-					onFailedAttempt: async ({ attemptNumber: attempt, error, retriesLeft }) => {
-						file.logger.warn(
-							{
-								attempt,
-								retriesLeft,
-								error: error instanceof Error ? error.message : String(error),
-								totalElapsedMs: Date.now() - callStartTime,
-								contentLength: contentLengthForLog,
-							},
-							`LLM frontmatter batch attempt ${attempt} failed, ${retriesLeft} retries remaining`,
-						);
-
-						const resetWaitMs = getRateLimitResetWaitMs(error);
-						if (resetWaitMs > 0) {
-							file.logger.info({ resetWaitMs }, "Waiting for LLM rate limit window before retry");
-							await new Promise<void>((resolve) => setTimeout(resolve, resetWaitMs));
-						}
-					},
-				},
-			);
-		});
 	}
 
 	/**
@@ -893,211 +697,22 @@ export class TranslatorService {
 		return strippedChunk;
 	}
 
-	/**
-	 * Prepares parameters for LLM chat completion API call.
-	 *
-	 * @param file Translation file instance
-	 * @param userMessageContent User message sent to the model
-	 * @param chunkProgress Optional slice position when translating a chunked body in multiple calls
-	 * @param systemPromptKind Which system prompt to build (defaults to full markdown document rules)
-	 *
-	 * @returns Chat completion parameters object
-	 */
-	private getLLMCompletionParams(
-		file: TranslationFile,
-		userMessageContent: string,
-		chunkProgress?: ChunkTranslationProgress,
-		systemPromptKind: TranslationSystemPromptKind = "markdownDocument",
-		responseFormat?: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming["response_format"],
-		attemptContext: TranslationAttemptContext = emptyTranslationAttemptContext(),
-	): OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming {
-		const params: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming = {
-			model: this.model,
-			temperature: LLM_TEMPERATURE,
-			max_tokens: this.providerCompletionTokenCap ?? env.MAX_TOKENS,
-			messages: [
-				{
-					role: "system",
-					content: this.promptBuilder.buildSystemPrompt(
-						{
-							file,
-							userMessageContent,
-							chunkProgress,
-							attemptContext,
-							translationGuidelines: this.translationGuidelines,
-						},
-						systemPromptKind,
-					),
-				},
-				{ role: "user", content: userMessageContent },
-			],
-		};
-
-		if (responseFormat) {
-			params.response_format = responseFormat;
-		}
-
-		return params;
-	}
-
-	/**
-	 * Sends content to the language model for translation.
-	 *
-	 * Constructs system and user prompts based on detected language.
-	 * Automatically applies rate limiting to prevent exceeding API limits,
-	 * especially important for free-tier LLM models with strict rate limits.
-	 *
-	 * @param file Translation file instance
-	 * @param content Content to translate (defaults to file.content if not provided)
-	 * @param chunkProgress When set, the system prompt notes this body is slice `index` of `total` from one file
-	 * @param systemPromptKind Which system prompt to use; YAML metadata uses `frontmatterBatch`
-	 *
-	 * @throws {ApplicationError} with {@link ErrorCode.TranslationFailed} if the translation's content is missing/empty
-	 *
-	 * @returns Resolves to the translated content
-	 */
-	private async callLanguageModel(
+	/** @see {@link TranslationLlmClient.callLanguageModel} */
+	private callLanguageModel(
 		file: TranslationFile,
 		content?: string,
 		chunkProgress?: ChunkTranslationProgress,
 		systemPromptKind: TranslationSystemPromptKind = "markdownDocument",
 		responseFormat?: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming["response_format"],
 		attemptContext: TranslationAttemptContext = emptyTranslationAttemptContext(),
-	): Promise<string> {
-		file.documentSourceLanguage ??= await this.resolveDocumentSourceLanguage(file.content);
-
-		const contentToTranslate = content ?? file.content;
-
-		return this.queue.add(async () => {
-			const callStartTime = Date.now();
-			const estimatedInputTokens = this.managers.chunks.estimateTokenCount(contentToTranslate);
-
-			return pRetry(
-				async () => {
-					const attemptStartTime = Date.now();
-
-					try {
-						file.logger.debug(
-							{
-								contentLength: contentToTranslate.length,
-								estimatedInputTokens,
-								model: this.model,
-								systemPromptKind,
-							},
-							"Calling LLM API",
-						);
-
-						const completion = await this.openai.chat.completions.create(
-							this.getLLMCompletionParams(
-								file,
-								contentToTranslate,
-								chunkProgress,
-								systemPromptKind,
-								responseFormat,
-								attemptContext,
-							),
-						);
-
-						const translatedContent = completion.choices[0]?.message.content;
-
-						if (!translatedContent) {
-							throw new ApplicationError(
-								"No content returned from language model",
-								ErrorCode.NoContent,
-								`${TranslatorService.name}.${this.callLanguageModel.name}`,
-								{ model: this.model, contentLength: contentToTranslate.length },
-							);
-						}
-
-						const finishReason = completion.choices[0]?.finish_reason;
-						if (finishReason === "length") {
-							throw new AbortError(
-								new ApplicationError(
-									"Language model response ended at max completion tokens (truncated output)",
-									ErrorCode.TranslationFailed,
-									`${TranslatorService.name}.${this.callLanguageModel.name}`,
-									{
-										model: this.model,
-										contentLength: contentToTranslate.length,
-										finishReason,
-										completionTokens: completion.usage?.completion_tokens,
-										promptTokens: completion.usage?.prompt_tokens,
-									},
-								),
-							);
-						}
-
-						file.logger.debug(
-							{
-								model: this.model,
-								durationMs: Date.now() - attemptStartTime,
-								inputTokens: completion.usage?.prompt_tokens,
-								outputTokens: completion.usage?.completion_tokens,
-								totalTokens: completion.usage?.total_tokens,
-								translatedLength: translatedContent.length,
-							},
-							"LLM API call successful",
-						);
-
-						return translatedContent;
-					} catch (error) {
-						if (error instanceof APIError) {
-							if (
-								error.status === StatusCodes.UNAUTHORIZED ||
-								error.status === StatusCodes.BAD_REQUEST
-							) {
-								throw new AbortError(error);
-							}
-
-							if (isOpenRouterDailyFreeModelQuotaError(error)) {
-								file.logger.error(
-									{
-										model: this.model,
-										message: error.message,
-									},
-									"OpenRouter free-models-per-day limit reached; add credits, drop :free, or wait for the daily reset",
-								);
-								throw new AbortError(error);
-							}
-						}
-
-						throw error;
-					}
-				},
-				{
-					...this.retryConfig,
-					onFailedAttempt: async ({ attemptNumber: attempt, error, retriesLeft }) => {
-						file.logger.warn(
-							{
-								attempt,
-								retriesLeft,
-								error: error.message,
-								totalElapsedMs: Date.now() - callStartTime,
-								contentLength: contentToTranslate.length,
-							},
-							`LLM call attempt ${attempt} failed, ${retriesLeft} retries remaining`,
-						);
-
-						const resetWaitMs = getRateLimitResetWaitMs(error);
-						if (resetWaitMs > 0) {
-							file.logger.info({ resetWaitMs }, "Waiting for LLM rate limit window before retry");
-							await new Promise<void>((resolve) => setTimeout(resolve, resetWaitMs));
-						}
-					},
-				},
-			);
-		});
+	) {
+		return this.llmClient.callLanguageModel(
+			file,
+			content,
+			chunkProgress,
+			systemPromptKind,
+			responseFormat,
+			attemptContext,
+		);
 	}
 }
-
-/** Pre-configured instance of {@link TranslatorService} for application-wide use */
-export const translatorService = new TranslatorService({
-	openai,
-	model: env.LLM_MODEL,
-	queue: queue,
-	localeService,
-	languageDetectorService,
-	retryConfig: {
-		retries: env.MAX_RETRY_ATTEMPTS,
-	},
-});

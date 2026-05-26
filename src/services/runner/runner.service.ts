@@ -1,16 +1,8 @@
-import type {
-	LanguageCacheEntry,
-	RunnerOptions,
-	RunnerServiceDependencies,
-	WorkflowStatistics,
-} from "./runner.types";
+import type { WorkflowStatistics } from "@/domain/workflow/";
+
+import type { RunnerOptions, RunnerServiceDependencies } from "./runner.types";
 
 import { extractErrorMessage } from "@/errors/";
-import { CacheService } from "@/services/cache/";
-import { githubService } from "@/services/github/";
-import { languageDetectorService } from "@/services/language-detector/";
-import { localeService } from "@/services/locale/";
-import { translatorService } from "@/services/translator/";
 import { logger } from "@/utils/";
 
 import { BaseRunnerService } from "./base.service";
@@ -89,11 +81,3 @@ export class RunnerService extends BaseRunnerService {
 		}
 	}
 }
-
-export const runnerService = new RunnerService({
-	github: githubService,
-	translator: translatorService,
-	languageCache: new CacheService<LanguageCacheEntry>(),
-	locale: localeService,
-	languageDetector: languageDetectorService,
-});

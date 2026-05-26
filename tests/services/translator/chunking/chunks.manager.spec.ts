@@ -4,15 +4,15 @@ import path from "node:path";
 import { beforeAll, beforeEach, describe, expect, test } from "bun:test";
 
 import { TranslationFile } from "@/services/";
-import { ChunksManager } from "@/services/translator/managers";
+import { ChunksManager } from "@/services/translator/chunking";
 import {
 	CHUNKS,
 	SYSTEM_PROMPT_TOKEN_RESERVE,
-} from "@/services/translator/managers/managers.constants";
+} from "@/services/translator/chunking/chunking.constants";
 
 const FIXTURE_PATH = path.resolve(
 	import.meta.dir,
-	"../fixtures/md/react-labs-view-transitions-activity-and-more.md",
+	"../../../fixtures/md/react-labs-view-transitions-activity-and-more.md",
 );
 
 const TEST_MODEL = "gpt-4o";
