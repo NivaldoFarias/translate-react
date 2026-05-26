@@ -7,8 +7,14 @@ import { isMap, parseDocument } from "yaml";
 
 import type PQueue from "p-queue";
 import type { Options as RetryOptions } from "p-retry";
+
 import type { OpenRouterModelLimits } from "@/services/openrouter/";
 
+import type {
+	ChunkTranslationProgress,
+	TranslationSystemPromptKind,
+} from "./llm/translation-system-prompt.types";
+import type { TranslationAttemptContext } from "./pipeline/translation-attempt.context";
 import type { FrontmatterBatchFieldKey } from "./translator-frontmatter-batch.schema";
 
 import { openai, queue } from "@/clients/";
@@ -25,20 +31,14 @@ import {
 	restoreMaskedVerbatimFences,
 } from "@/utils/";
 
+import { TranslationPromptBuilder } from "./llm/translation-prompt.builder";
 import { ChunksManager } from "./managers";
+import { SYSTEM_PROMPT_TOKEN_RESERVE } from "./managers/managers.constants";
+import { emptyTranslationAttemptContext } from "./pipeline/translation-attempt.context";
+import { TranslationPipelineManager } from "./pipeline/translation-pipeline.manager";
 import { validateAndReassembleChunks } from "./postprocess/chunk-reassembly";
 import { cleanupTranslatedContent } from "./postprocess/translation-output-cleanup";
-import { PostTranslationValidationService } from "./validation/post-translation-validation.service";
-import { TranslationLanguageCheck } from "./validation/translation-language-check";
-import { SYSTEM_PROMPT_TOKEN_RESERVE } from "./managers/managers.constants";
-import { TranslationPromptBuilder } from "./llm/translation-prompt.builder";
-import type {
-	ChunkTranslationProgress,
-	TranslationSystemPromptKind,
-} from "./llm/translation-system-prompt.types";
-import { TranslationPipelineManager } from "./pipeline/translation-pipeline.manager";
-import type { TranslationAttemptContext } from "./pipeline/translation-attempt.context";
-import { emptyTranslationAttemptContext } from "./pipeline/translation-attempt.context";
+import { TranslationFile } from "./translation-file";
 import {
 	frontmatterBatchRequestEnvelopeSchema,
 	frontmatterBatchTranslationEnvelopeSchema,
@@ -51,7 +51,8 @@ import {
 } from "./translator-frontmatter.util";
 import { stripSpuriousOuterMarkdownFencesWhenSourceHadNoFences } from "./translator-markdown-artifacts.util";
 import { CONNECTIVITY_TEST_MAX_TOKENS, LLM_TEMPERATURE } from "./translator.constants";
-import { TranslationFile } from "./translation-file";
+import { PostTranslationValidationService } from "./validation/post-translation-validation.service";
+import { TranslationLanguageCheck } from "./validation/translation-language-check";
 
 export { TranslationFile } from "./translation-file";
 
@@ -816,9 +817,7 @@ export class TranslatorService {
 		);
 
 		const translatedChunks = await Promise.all(
-			chunks.map((chunk, index) =>
-				this.translateChunk(file, chunk, index, chunks, attemptContext),
-			),
+			chunks.map((chunk, index) => this.translateChunk(file, chunk, index, chunks, attemptContext)),
 		);
 
 		file.logger.debug(
@@ -1089,7 +1088,6 @@ export class TranslatorService {
 			);
 		});
 	}
-
 }
 
 /** Pre-configured instance of {@link TranslatorService} for application-wide use */

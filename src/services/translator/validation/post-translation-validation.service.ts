@@ -1,11 +1,13 @@
 import type { TranslationFile } from "../translation-file";
+
 import type { TranslationValidationIssue } from "./validation.types";
 
 import { ApplicationError, ErrorCode } from "@/errors";
 import { collectTopLevelKeysFromInnerYaml } from "@/services/translator/translator-frontmatter.util";
 
-import { collectPostTranslationValidationIssues } from "./guards";
 import { MARKDOWN_REGEXES } from "../markdown/markdown.regexes";
+
+import { collectPostTranslationValidationIssues } from "./guards";
 import { VALIDATION_RATIOS } from "./validation.constants";
 
 export type { TranslationValidationIssue } from "./validation.types";
@@ -208,7 +210,8 @@ export class PostTranslationValidationService {
 	private validateFrontmatterIntegrity(file: TranslationFile, translatedContent: string): void {
 		const originalMatch = MARKDOWN_REGEXES.frontmatter.exec(file.content)?.groups?.["content"];
 		MARKDOWN_REGEXES.frontmatter.lastIndex = 0;
-		const translatedMatch = MARKDOWN_REGEXES.frontmatter.exec(translatedContent)?.groups?.["content"];
+		const translatedMatch =
+			MARKDOWN_REGEXES.frontmatter.exec(translatedContent)?.groups?.["content"];
 		MARKDOWN_REGEXES.frontmatter.lastIndex = 0;
 
 		if (!originalMatch) {

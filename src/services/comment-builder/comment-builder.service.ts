@@ -2,10 +2,10 @@ import type { LocaleDefinition } from "@/locales";
 
 import type { ProcessedFileResult } from "../runner";
 
+import { TranslationFile } from "@/services/translator/";
 import { logger, resolveGitHubActionsRunContext } from "@/utils/";
 
 import { localeService } from "../locale";
-import { TranslationFile } from "@/services/translator/";
 
 import { selectProgressCommentPayload } from "./progress-comment.util";
 

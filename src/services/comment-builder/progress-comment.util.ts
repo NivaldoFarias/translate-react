@@ -1,5 +1,6 @@
-import type { ProcessedFileResult } from "../runner/runner.types";
 import type { TranslationFile } from "@/services/translator/";
+
+import type { ProcessedFileResult } from "../runner/runner.types";
 
 import { filterReportableProgressCommentResults } from "../runner/runner.types";
 

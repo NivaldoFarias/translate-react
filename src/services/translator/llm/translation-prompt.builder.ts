@@ -1,7 +1,9 @@
 import type { Logger } from "pino";
 
-import type { TranslationFile } from "../translation-file";
+import type { LocaleService } from "@/services/locale/";
+
 import type { TranslationAttemptContext } from "../pipeline/translation-attempt.context";
+import type { TranslationFile } from "../translation-file";
 
 import type {
 	ChunkTranslationProgress,
@@ -9,7 +11,6 @@ import type {
 } from "./translation-system-prompt.types";
 
 import { LanguageDetectorService } from "@/services/language-detector/";
-import type { LocaleService } from "@/services/locale/";
 import { logger } from "@/utils/";
 
 /** Parameters for building a markdown document system prompt */
