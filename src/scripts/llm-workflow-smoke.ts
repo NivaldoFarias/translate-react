@@ -19,7 +19,7 @@ import { CacheService } from "@/services/cache/";
 import { languageDetectorService } from "@/services/language-detector/";
 import { localeService } from "@/services/locale/";
 import { RunnerService } from "@/services/runner/runner.service";
-import { translatorService } from "@/services/translator/translator.service";
+import { translatorService } from "@/services/translator/";
 import { env, logger, RuntimeEnvironment } from "@/utils/";
 
 import {

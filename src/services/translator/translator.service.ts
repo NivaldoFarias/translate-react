@@ -7,10 +7,7 @@ import { isMap, parseDocument } from "yaml";
 
 import type PQueue from "p-queue";
 import type { Options as RetryOptions } from "p-retry";
-import type { Logger } from "pino";
-
 import type { OpenRouterModelLimits } from "@/services/openrouter/";
-import type { ReactLanguageCode } from "@/utils/";
 
 import type { FrontmatterBatchFieldKey } from "./translator-frontmatter-batch.schema";
 
@@ -49,7 +46,6 @@ import {
 import {
 	buildFrontmatterBlock,
 	extractFrontmatterParts,
-	extractTitleScalarFromInnerYaml,
 	mergePreservedYamlFrontmatter,
 	splitLeadingYamlFrontmatter,
 } from "./translator-frontmatter.util";
