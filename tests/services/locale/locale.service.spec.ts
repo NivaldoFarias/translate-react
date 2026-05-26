@@ -109,7 +109,7 @@ describe("LocaleService", () => {
 			test("should have suffix function that generates observations", () => {
 				const suffix = localeService.definitions.comment.suffix;
 
-				expect(suffix).toContain("> [!IMPORTANT]");
+				expect(suffix).toContain("###### ps.:");
 			});
 		});
 
