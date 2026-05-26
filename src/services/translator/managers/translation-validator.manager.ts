@@ -1,14 +1,18 @@
 import type { LanguageDetectorService } from "@/services/language-detector";
 
-import type { TranslationFile } from "../translator.service";
+import type { TranslationFile } from "../translation-file";
+import type { TranslationValidationIssue } from "../translation-validation.types";
 
 import type { ChunksToReassemble } from "./chunks.manager";
 
 import { ApplicationError, ErrorCode } from "@/errors";
 import { collectTopLevelKeysFromInnerYaml } from "@/services/translator/translator-frontmatter.util";
+import { collectPostTranslationValidationIssues } from "@/services/translator/translation-validation-guards";
 import { logger } from "@/utils";
 
 import { RATIOS, REGEXES, TRANSLATION_PREFIXES } from "./managers.constants";
+
+export type { TranslationValidationIssue } from "../translation-validation.types";
 
 export class TranslationValidatorManager {
 	private readonly logger = logger.child({ component: TranslationValidatorManager.name });
@@ -16,35 +20,86 @@ export class TranslationValidatorManager {
 	constructor(private readonly languageDetectorService: LanguageDetectorService) {}
 
 	/**
-	 * Validates translated content to ensure completeness and quality.
-	 *
-	 * Runs multiple validation checks to catch potential translation
-	 * issues before committing to the repository. This multi-layered validation approach
-	 * helps prevent incomplete translations, structural corruption, and content loss.
+	 * Runs post-translation guards that can trigger an LLM retry with hints.
 	 *
 	 * @param file Original file containing source content for comparison
 	 * @param translatedContent Translated content to validate against source
 	 *
-	 * @throws {ApplicationError} with {@link ErrorCode.FormatValidationFailed}
-	 * if validation checks fail (empty content, complete heading loss)
+	 * @returns All retryable issues; empty when the output passes every guard
+	 */
+	public collectRetryableValidationIssues(
+		file: TranslationFile,
+		translatedContent: string,
+	): TranslationValidationIssue[] {
+		return collectPostTranslationValidationIssues(file.content, translatedContent);
+	}
+
+	/**
+	 * Validates translated content to ensure completeness and quality.
 	 *
-	 * @example
-	 * ```typescript
-	 * const file = new TranslationFile('# Title\nContent', 'doc.md', 'path', 'sha');
-	 * const translated = '# Título\nConteúdo';
-	 * validateTranslation(file, translated); // Passes all checks
-	 * ```
+	 * Hard failures are handled by {@link collectRetryableValidationIssues}. This method
+	 * throws when any guard fails, then records soft warnings (ratio drift) without throwing.
+	 *
+	 * @param file Original file containing source content for comparison
+	 * @param translatedContent Translated content to validate against source
+	 *
+	 * @throws {ApplicationError} with {@link ErrorCode.FormatValidationFailed} when a guard fails
 	 */
 	public validateTranslation(file: TranslationFile, translatedContent: string): void {
-		if (!translatedContent || translatedContent.trim().length === 0) {
-			throw new ApplicationError(
-				"Translation produced empty content",
-				ErrorCode.FormatValidationFailed,
-				`${TranslationValidatorManager.name}.${this.validateTranslation.name}`,
-				{ originalLength: file.content.length, translatedLength: translatedContent.length },
-			);
+		const issues = this.collectRetryableValidationIssues(file, translatedContent);
+		if (issues.length > 0) {
+			throw this.createValidationFailedError(file, translatedContent, issues);
 		}
 
+		this.recordSoftValidationWarnings(file, translatedContent);
+
+		file.logger.debug(
+			{
+				sizeRatio: (translatedContent.length / file.content.length).toFixed(2),
+				originalHeadings: (file.content.match(REGEXES.headings) ?? []).length,
+				translatedHeadings: (translatedContent.match(REGEXES.headings) ?? []).length,
+			},
+			"Translation validation passed",
+		);
+	}
+
+	/**
+	 * Builds an {@link ApplicationError} for failed post-translation guards.
+	 *
+	 * @param file Original translation file
+	 * @param translatedContent Model output that failed validation
+	 * @param issues Guard issues collected from {@link collectRetryableValidationIssues}
+	 *
+	 * @returns Error to throw after the final failed attempt
+	 */
+	public createValidationFailedError(
+		file: TranslationFile,
+		translatedContent: string,
+		issues: TranslationValidationIssue[],
+	) {
+		const summary = issues.map((issue) => issue.message).join("; ");
+
+		return new ApplicationError(
+			summary,
+			ErrorCode.FormatValidationFailed,
+			`${TranslationValidatorManager.name}.validateTranslation`,
+			{
+				filename: file.filename,
+				path: file.path,
+				originalLength: file.content.length,
+				translatedLength: translatedContent.length,
+				validationIssues: issues.map(({ guardId, message }) => ({ guardId, message })),
+			},
+		);
+	}
+
+	/**
+	 * Logs non-blocking validation warnings (ratio drift, missing optional keys).
+	 *
+	 * @param file Original file containing source content for comparison
+	 * @param translatedContent Translated content to validate against source
+	 */
+	public recordSoftValidationWarnings(file: TranslationFile, translatedContent: string): void {
 		const sizeRatio = translatedContent.length / file.content.length;
 		if (sizeRatio < RATIOS.size.min || sizeRatio > RATIOS.size.max) {
 			file.logger.warn(
@@ -68,18 +123,6 @@ export class TranslationValidatorManager {
 
 		if (originalHeadings === 0) {
 			file.logger.warn("Original file contains no markdown headings. Skipping heading validation");
-		} else if (translatedHeadings === 0) {
-			throw new ApplicationError(
-				"All markdown headings lost during translation",
-				ErrorCode.FormatValidationFailed,
-				`${TranslationValidatorManager.name}.${this.validateTranslation.name}`,
-				{
-					originalHeadings,
-					translatedHeadings,
-					originalLength: file.content.length,
-					translatedLength: translatedContent.length,
-				},
-			);
 		} else if (headingRatio < RATIOS.heading.min || headingRatio > RATIOS.heading.max) {
 			file.logger.warn(
 				{ originalHeadings, translatedHeadings, headingRatio: headingRatio.toFixed(2) },
@@ -90,11 +133,6 @@ export class TranslationValidatorManager {
 		this.validateCodeBlockPreservation(file, translatedContent);
 		this.validateLinkPreservation(file, translatedContent);
 		this.validateFrontmatterIntegrity(file, translatedContent);
-
-		file.logger.debug(
-			{ sizeRatio: sizeRatio.toFixed(2), originalHeadings, translatedHeadings },
-			"Translation validation passed",
-		);
 	}
 
 	/**
@@ -140,15 +178,8 @@ export class TranslationValidatorManager {
 	/**
 	 * Validates that markdown links are preserved during translation.
 	 *
-	 * Compares the count of markdown links between source and translated content.
-	 * Logs a warning if there's a significant mismatch (>20% difference), as this
-	 * may indicate links were broken or removed during translation.
-	 *
 	 * @param file Original file containing source content for comparison
 	 * @param translatedContent Translated content to validate against source
-	 *
-	 * @throws {ApplicationError} with {@link ErrorCode.FormatValidationFailed}
-	 * if validation checks fail (significant markdown link count mismatch or links lost during translation)
 	 */
 	private validateLinkPreservation(file: TranslationFile, translatedContent: string): void {
 		const originalLinks = (file.content.match(REGEXES.markdownLink) ?? []).length;
@@ -174,19 +205,14 @@ export class TranslationValidatorManager {
 	/**
 	 * Validates that frontmatter structure and required keys are preserved during translation.
 	 *
-	 * Parses YAML frontmatter from source and translated content, then verifies that:
-	 * 1. Top-level keys (e.g. `title`, `description`) are preserved in translation (via {@link collectTopLevelKeysFromInnerYaml})
-	 * 2. The overall frontmatter structure remains intact
-	 *
 	 * @param file Original file containing source content for comparison
 	 * @param translatedContent Translated content to validate against source
-	 *
-	 * @throws {ApplicationError} with {@link ErrorCode.FormatValidationFailed}
-	 * if validation checks fail (frontmatter keys missing in translation or frontmatter lost during translation)
 	 */
 	private validateFrontmatterIntegrity(file: TranslationFile, translatedContent: string): void {
 		const originalMatch = REGEXES.frontmatter.exec(file.content)?.groups?.["content"];
+		REGEXES.frontmatter.lastIndex = 0;
 		const translatedMatch = REGEXES.frontmatter.exec(translatedContent)?.groups?.["content"];
+		REGEXES.frontmatter.lastIndex = 0;
 
 		if (!originalMatch) {
 			file.logger.debug("Original file contains no frontmatter. Skipping frontmatter validation");
@@ -194,12 +220,7 @@ export class TranslationValidatorManager {
 		}
 
 		if (!translatedMatch) {
-			throw new ApplicationError(
-				"Frontmatter lost during translation",
-				ErrorCode.FormatValidationFailed,
-				`${TranslationValidatorManager.name}.${this.validateFrontmatterIntegrity.name}`,
-				{ originalMatch, translatedMatch },
-			);
+			return;
 		}
 
 		const originalKeys = collectTopLevelKeysFromInnerYaml(originalMatch);
@@ -222,13 +243,11 @@ export class TranslationValidatorManager {
 
 	/**
 	 * Validates that all chunks were successfully translated and reassembles them.
-	 * Ensures that the number of translated chunks matches the original chunk count.
 	 *
 	 * @param file Original file containing content to validate
 	 * @param chunks Chunking result containing original and translated chunks along with separators
 	 *
-	 * @throws {ApplicationError} with {@link ErrorCode.ChunkProcessingFailed}
-	 * if chunk count mismatch is detected
+	 * @throws {ApplicationError} with {@link ErrorCode.ChunkProcessingFailed} when chunk counts differ
 	 *
 	 * @returns Reassembled translated content
 	 */
@@ -281,20 +300,10 @@ export class TranslationValidatorManager {
 	/**
 	 * Removes common artifacts from translation output.
 	 *
-	 * Strips common LLM response prefixes like "Here is the translation:"
-	 * and converts line endings to match original content format
-	 *
 	 * @param translatedContent Content returned from the language model
 	 * @param file File instance for logger context
 	 *
 	 * @returns Cleaned translated content with artifacts removed
-	 *
-	 * @example
-	 * ```typescript
-	 * const translated = 'Here is the translation:\n\nActual content...';
-	 * const cleaned = cleanupTranslatedContent(translated, file);
-	 * console.log(cleaned); // 'Actual content...'
-	 * ```
 	 */
 	public cleanupTranslatedContent(translatedContent: string, file: TranslationFile): string {
 		file.logger.debug(
@@ -334,8 +343,7 @@ export class TranslationValidatorManager {
 	 *
 	 * @param file File to analyze
 	 *
-	 * @throws {ApplicationError} with {@link ErrorCode.NoContent}
-	 * if file content is empty
+	 * @throws {ApplicationError} with {@link ErrorCode.NoContent} when file content is empty
 	 *
 	 * @returns Resolves to the detailed language analysis
 	 */
@@ -361,11 +369,10 @@ export class TranslationValidatorManager {
 
 	/**
 	 * Determines if content is already translated by analyzing its language composition.
-	 * Uses async language detection and scoring to make the determination.
 	 *
 	 * @param file File containing content to analyze
 	 *
-	 * @returns Resolves to `true` if content is already translated
+	 * @returns Resolves to `true` when content is already translated
 	 */
 	public async isContentTranslated(file: TranslationFile): Promise<boolean> {
 		try {

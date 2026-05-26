@@ -5,7 +5,7 @@ import type { ProcessedFileResult } from "../runner";
 import { logger, resolveGitHubActionsRunContext } from "@/utils/";
 
 import { localeService } from "../locale";
-import { TranslationFile } from "../translator/translator.service";
+import { TranslationFile } from "@/services/translator/";
 
 import { selectProgressCommentPayload } from "./progress-comment.util";
 
