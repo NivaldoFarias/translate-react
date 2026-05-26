@@ -1,6 +1,6 @@
 import { isMap, isScalar, parseDocument } from "yaml";
 
-import { REGEXES } from "./managers/managers.constants";
+import { MARKDOWN_REGEXES } from "./markdown/markdown.regexes";
 import { leadingNewlineRunLength } from "./translator-markdown-artifacts.util";
 
 /**
@@ -14,7 +14,7 @@ export interface LeadingYamlFrontmatterSplit {
 }
 
 /**
- * Splits a leading YAML frontmatter block from markdown when it matches {@link REGEXES.frontmatter} at position 0.
+ * Splits a leading YAML frontmatter block from markdown when it matches {@link MARKDOWN_REGEXES.frontmatter} at position 0.
  *
  * @param source Full markdown source (possibly masked) used as the translation input
  *
@@ -28,7 +28,7 @@ export interface LeadingYamlFrontmatterSplit {
  * ```
  */
 export function splitLeadingYamlFrontmatter(source: string): LeadingYamlFrontmatterSplit {
-	const match = REGEXES.frontmatter.exec(source);
+	const match = MARKDOWN_REGEXES.frontmatter.exec(source);
 	if (match?.index !== 0) {
 		return { block: "", rest: source };
 	}
@@ -47,7 +47,7 @@ export function splitLeadingYamlFrontmatter(source: string): LeadingYamlFrontmat
  *
  * @param fullBlock Markdown starting with a frontmatter fence (e.g. `---\n...\n---`)
  *
- * @returns BOM prefix and inner YAML, or `null` when the block does not match {@link REGEXES.frontmatter} at the start
+ * @returns BOM prefix and inner YAML, or `null` when the block does not match {@link MARKDOWN_REGEXES.frontmatter} at the start
  *
  * @example
  * ```typescript
@@ -56,7 +56,7 @@ export function splitLeadingYamlFrontmatter(source: string): LeadingYamlFrontmat
  * ```
  */
 export function extractFrontmatterParts(fullBlock: string): { bom: string; inner: string } | null {
-	const match = REGEXES.frontmatter.exec(fullBlock);
+	const match = MARKDOWN_REGEXES.frontmatter.exec(fullBlock);
 	const inner = match?.groups?.["content"];
 	if (inner === undefined) {
 		return null;
@@ -205,7 +205,7 @@ export function mergePreservedYamlFrontmatter(
 	}
 
 	let body = translated;
-	const duplicate = REGEXES.frontmatter.exec(body);
+	const duplicate = MARKDOWN_REGEXES.frontmatter.exec(body);
 	if (duplicate?.index === 0) {
 		body = body.slice(duplicate[0].length);
 	}

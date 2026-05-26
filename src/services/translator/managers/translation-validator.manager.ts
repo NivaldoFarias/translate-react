@@ -1,18 +1,22 @@
 import type { LanguageDetectorService } from "@/services/language-detector";
 
 import type { TranslationFile } from "../translation-file";
-import type { TranslationValidationIssue } from "../translation-validation.types";
+import type { TranslationValidationIssue } from "../validation/validation.types";
 
 import type { ChunksToReassemble } from "./chunks.manager";
 
 import { ApplicationError, ErrorCode } from "@/errors";
 import { collectTopLevelKeysFromInnerYaml } from "@/services/translator/translator-frontmatter.util";
-import { collectPostTranslationValidationIssues } from "@/services/translator/translation-validation-guards";
+import { collectPostTranslationValidationIssues } from "@/services/translator/validation/guards";
 import { logger } from "@/utils";
 
-import { RATIOS, REGEXES, TRANSLATION_PREFIXES } from "./managers.constants";
+import { MARKDOWN_REGEXES } from "../markdown/markdown.regexes";
+import {
+	TRANSLATION_PREFIXES,
+	VALIDATION_RATIOS,
+} from "../validation/validation.constants";
 
-export type { TranslationValidationIssue } from "../translation-validation.types";
+export type { TranslationValidationIssue } from "../validation/validation.types";
 
 export class TranslationValidatorManager {
 	private readonly logger = logger.child({ component: TranslationValidatorManager.name });
@@ -56,8 +60,8 @@ export class TranslationValidatorManager {
 		file.logger.debug(
 			{
 				sizeRatio: (translatedContent.length / file.content.length).toFixed(2),
-				originalHeadings: (file.content.match(REGEXES.headings) ?? []).length,
-				translatedHeadings: (translatedContent.match(REGEXES.headings) ?? []).length,
+				originalHeadings: (file.content.match(MARKDOWN_REGEXES.headings) ?? []).length,
+				translatedHeadings: (translatedContent.match(MARKDOWN_REGEXES.headings) ?? []).length,
 			},
 			"Translation validation passed",
 		);
@@ -101,29 +105,32 @@ export class TranslationValidatorManager {
 	 */
 	public recordSoftValidationWarnings(file: TranslationFile, translatedContent: string): void {
 		const sizeRatio = translatedContent.length / file.content.length;
-		if (sizeRatio < RATIOS.size.min || sizeRatio > RATIOS.size.max) {
+		if (sizeRatio < VALIDATION_RATIOS.size.min || sizeRatio > VALIDATION_RATIOS.size.max) {
 			file.logger.warn(
 				{
 					sizeRatio: sizeRatio.toFixed(2),
 					originalLength: file.content.length,
 					translatedLength: translatedContent.length,
 				},
-				`Translation size ratio outside expected range (${RATIOS.size.min}-${RATIOS.size.max})`,
+				`Translation size ratio outside expected range (${VALIDATION_RATIOS.size.min}-${VALIDATION_RATIOS.size.max})`,
 			);
 		}
 
-		const originalHeadings = (file.content.match(REGEXES.headings) ?? []).length;
-		const translatedHeadings = (translatedContent.match(REGEXES.headings) ?? []).length;
+		const originalHeadings = (file.content.match(MARKDOWN_REGEXES.headings) ?? []).length;
+		const translatedHeadings = (translatedContent.match(MARKDOWN_REGEXES.headings) ?? []).length;
 		const headingRatio = originalHeadings > 0 ? translatedHeadings / originalHeadings : 0;
 
 		file.logger.debug(
-			{ originalHeadings, translatedHeadings, headingRatio, regex: REGEXES.headings },
+			{ originalHeadings, translatedHeadings, headingRatio, regex: MARKDOWN_REGEXES.headings },
 			"Heading counts for translation",
 		);
 
 		if (originalHeadings === 0) {
 			file.logger.warn("Original file contains no markdown headings. Skipping heading validation");
-		} else if (headingRatio < RATIOS.heading.min || headingRatio > RATIOS.heading.max) {
+		} else if (
+			headingRatio < VALIDATION_RATIOS.heading.min ||
+			headingRatio > VALIDATION_RATIOS.heading.max
+		) {
 			file.logger.warn(
 				{ originalHeadings, translatedHeadings, headingRatio: headingRatio.toFixed(2) },
 				"Significant heading count mismatch detected",
@@ -146,8 +153,8 @@ export class TranslationValidatorManager {
 	 * @param translatedContent Translated content to validate against source
 	 */
 	private validateCodeBlockPreservation(file: TranslationFile, translatedContent: string): void {
-		const originalCodeBlocks = (file.content.match(REGEXES.codeBlock) ?? []).length;
-		const translatedCodeBlocks = (translatedContent.match(REGEXES.codeBlock) ?? []).length;
+		const originalCodeBlocks = (file.content.match(MARKDOWN_REGEXES.codeBlock) ?? []).length;
+		const translatedCodeBlocks = (translatedContent.match(MARKDOWN_REGEXES.codeBlock) ?? []).length;
 
 		file.logger.debug(
 			{ originalCodeBlocks, translatedCodeBlocks },
@@ -167,7 +174,10 @@ export class TranslationValidatorManager {
 
 		const codeBlockRatio = translatedCodeBlocks / originalCodeBlocks;
 
-		if (codeBlockRatio < RATIOS.codeBlock.min || codeBlockRatio > RATIOS.codeBlock.max) {
+		if (
+			codeBlockRatio < VALIDATION_RATIOS.codeBlock.min ||
+			codeBlockRatio > VALIDATION_RATIOS.codeBlock.max
+		) {
 			file.logger.warn(
 				{ originalCodeBlocks, translatedCodeBlocks, codeBlockRatio: codeBlockRatio.toFixed(2) },
 				"Significant code block count mismatch detected",
@@ -182,8 +192,8 @@ export class TranslationValidatorManager {
 	 * @param translatedContent Translated content to validate against source
 	 */
 	private validateLinkPreservation(file: TranslationFile, translatedContent: string): void {
-		const originalLinks = (file.content.match(REGEXES.markdownLink) ?? []).length;
-		const translatedLinks = (translatedContent.match(REGEXES.markdownLink) ?? []).length;
+		const originalLinks = (file.content.match(MARKDOWN_REGEXES.markdownLink) ?? []).length;
+		const translatedLinks = (translatedContent.match(MARKDOWN_REGEXES.markdownLink) ?? []).length;
 
 		file.logger.debug({ originalLinks, translatedLinks }, "Markdown link counts for translation");
 
@@ -194,7 +204,7 @@ export class TranslationValidatorManager {
 
 		const linkRatio = translatedLinks / originalLinks;
 
-		if (linkRatio < RATIOS.link.min || linkRatio > RATIOS.link.max) {
+		if (linkRatio < VALIDATION_RATIOS.link.min || linkRatio > VALIDATION_RATIOS.link.max) {
 			file.logger.warn(
 				{ originalLinks, translatedLinks, linkRatio: linkRatio.toFixed(2) },
 				"Significant markdown link count mismatch detected",
@@ -209,10 +219,10 @@ export class TranslationValidatorManager {
 	 * @param translatedContent Translated content to validate against source
 	 */
 	private validateFrontmatterIntegrity(file: TranslationFile, translatedContent: string): void {
-		const originalMatch = REGEXES.frontmatter.exec(file.content)?.groups?.["content"];
-		REGEXES.frontmatter.lastIndex = 0;
-		const translatedMatch = REGEXES.frontmatter.exec(translatedContent)?.groups?.["content"];
-		REGEXES.frontmatter.lastIndex = 0;
+		const originalMatch = MARKDOWN_REGEXES.frontmatter.exec(file.content)?.groups?.["content"];
+		MARKDOWN_REGEXES.frontmatter.lastIndex = 0;
+		const translatedMatch = MARKDOWN_REGEXES.frontmatter.exec(translatedContent)?.groups?.["content"];
+		MARKDOWN_REGEXES.frontmatter.lastIndex = 0;
 
 		if (!originalMatch) {
 			file.logger.debug("Original file contains no frontmatter. Skipping frontmatter validation");
@@ -275,7 +285,7 @@ export class TranslationValidatorManager {
 		const translatedEndsWithNewline = reassembledContent.endsWith("\n");
 
 		if (originalEndsWithNewline && !translatedEndsWithNewline) {
-			const originalMatch = REGEXES.trailingNewlines.exec(file.content);
+			const originalMatch = MARKDOWN_REGEXES.trailingNewlines.exec(file.content);
 			const originalTrailingNewlines = originalMatch?.[0] ?? "";
 			reassembledContent += originalTrailingNewlines;
 
@@ -327,7 +337,7 @@ export class TranslationValidatorManager {
 		);
 
 		if (file.content.includes("\r\n")) {
-			cleaned = cleaned.replace(REGEXES.lineEnding, "\r\n");
+			cleaned = cleaned.replace(MARKDOWN_REGEXES.lineEnding, "\r\n");
 		}
 
 		file.logger.debug(
