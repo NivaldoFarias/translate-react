@@ -30,6 +30,11 @@ import {
 
 import { ChunksManager, TranslationValidatorManager } from "./managers";
 import { SYSTEM_PROMPT_TOKEN_RESERVE } from "./managers/managers.constants";
+import { TranslationPromptBuilder } from "./llm/translation-prompt.builder";
+import type {
+	ChunkTranslationProgress,
+	TranslationSystemPromptKind,
+} from "./llm/translation-system-prompt.types";
 import { TranslationPipelineManager } from "./pipeline/translation-pipeline.manager";
 import type { TranslationAttemptContext } from "./pipeline/translation-attempt.context";
 import { emptyTranslationAttemptContext } from "./pipeline/translation-attempt.context";
@@ -56,23 +61,10 @@ const FRONTMATTER_BATCH_RESPONSE_FORMAT = zodResponseFormat(
 	"frontmatter_batch_translations",
 );
 
-/**
- * Identifies which segment of a chunked body is being translated in one LLM call.
- *
- * Omitted for whole-file translation and for small frontmatter scalar calls.
- */
-type ChunkTranslationProgress = Readonly<{
-	index: number;
-	total: number;
-}>;
-
-/**
- * Selects which system prompt {@link TranslatorService.getSystemPrompt} builds for an LLM call.
- *
- * `markdownDocument` keeps chunking, verbatim-placeholder, and full doc rules. `frontmatterBatch`
- * uses one structured-output call for the YAML `description` string field when present.
- */
-export type TranslationSystemPromptKind = "markdownDocument" | "frontmatterBatch";
+export type {
+	ChunkTranslationProgress,
+	TranslationSystemPromptKind,
+} from "./llm/translation-system-prompt.types";
 
 /** Dependency injection interface for {@link TranslatorService} */
 export interface TranslatorServiceDependencies {
@@ -147,6 +139,8 @@ export class TranslatorService {
 		pipeline: TranslationPipelineManager;
 	};
 
+	private readonly promptBuilder: TranslationPromptBuilder;
+
 	/**
 	 * Creates a new TranslatorService instance with injected dependencies.
 	 *
@@ -166,6 +160,10 @@ export class TranslatorService {
 			chunks: new ChunksManager(this.model),
 			pipeline: new TranslationPipelineManager(),
 		};
+		this.promptBuilder = new TranslationPromptBuilder(
+			this.services.languageDetector,
+			this.services.locale,
+		);
 	}
 
 	/**
@@ -922,12 +920,15 @@ export class TranslatorService {
 			messages: [
 				{
 					role: "system",
-					content: this.getSystemPrompt(
-						file,
-						userMessageContent,
-						chunkProgress,
+					content: this.promptBuilder.buildSystemPrompt(
+						{
+							file,
+							userMessageContent,
+							chunkProgress,
+							attemptContext,
+							translationGuidelines: this.translationGuidelines,
+						},
 						systemPromptKind,
-						attemptContext,
 					),
 				},
 				{ role: "user", content: userMessageContent },
@@ -1090,159 +1091,6 @@ export class TranslatorService {
 		});
 	}
 
-	/**
-	 * Creates the system prompt that defines translation rules and requirements.
-	 *
-	 * @param file Translation file instance
-	 * @param userMessageContent User message body for placeholder checks (verbatim fence hints)
-	 * @param chunkProgress When set, documents that `userMessageContent` is one slice of a larger markdown body
-	 * @param systemPromptKind Document translation vs batched YAML metadata JSON (see {@link TranslationSystemPromptKind})
-	 *
-	 * @returns The system prompt string
-	 */
-	private getSystemPrompt(
-		file: TranslationFile,
-		userMessageContent: string,
-		chunkProgress?: ChunkTranslationProgress,
-		systemPromptKind: TranslationSystemPromptKind = "markdownDocument",
-		attemptContext: TranslationAttemptContext = emptyTranslationAttemptContext(),
-	) {
-		const documentSourceLanguage = file.documentSourceLanguage ?? "en";
-
-		this.logger.debug({ systemPromptKind }, "Generating system prompt for translation");
-
-		const languages = {
-			target: this.services.languageDetector.getLanguageName(
-				LanguageDetectorService.languages.target,
-			),
-			source: this.services.languageDetector.getLanguageName(documentSourceLanguage, false),
-		};
-
-		this.logger.debug(
-			{ documentSourceLanguage, languages },
-			"Determined source and target languages for prompt",
-		);
-
-		if (systemPromptKind === "frontmatterBatch") {
-			return this.buildFrontmatterBatchSystemPrompt(languages);
-		}
-
-		const translationGuidelinesSection =
-			this.translationGuidelines ?
-				`\n## TRANSLATION GUIDELINES\nApply these exact translations for the specified terms:\n${this.translationGuidelines}\n`
-			:	"";
-
-		const chunkSliceSection =
-			chunkProgress && chunkProgress.total > 1 ?
-				`
-				# DOCUMENT SLICE
-				The user message is slice ${chunkProgress.index} of ${chunkProgress.total} from one continuous markdown file.
-				Keep terminology and structure aligned with a single document; translate only the markdown in the user message.
-				`
-			:	"";
-
-		const validationRetrySection =
-			attemptContext.validationRetryHints.length > 0 ?
-				`
-				# CORRECTION REQUIRED (previous attempt failed validation)
-				A previous translation of this content was rejected. Apply every correction below in a new full translation of the user message:
-				${attemptContext.validationRetryHints.map((hint) => `- ${hint}`).join("\n")}
-				`
-			:	"";
-
-		const builtSystemPrompt = `# ROLE
-				You are an expert technical translator specializing in React documentation.
-	
-				# TASK
-				Translate the provided content from ${languages.source} to ${languages.target} with absolute precision and technical accuracy.
-				${chunkSliceSection}
-				${validationRetrySection}
-				# CRITICAL PRESERVATION RULES
-				1. **Structure & Formatting**: Preserve ALL markdown syntax, HTML tags, code blocks, frontmatter, and line breaks exactly as written
-				2. **Code & identifiers**: Keep ALL code examples, URLs, and every programming identifier (functions, variables, classes, hooks, packages, props as in code) unchanged in every context—fenced blocks, inline code, tables, lists, or prose
-				3. **Content Completeness**: Translate EVERY piece of text content WITHOUT adding, removing, or omitting anything
-				4. **Whitespace Integrity**: ALWAYS preserve blank lines, especially after horizontal rules (---). The pattern '---\n\n##' must remain '---\n\n##' and never become '---\n##'
-	
-				# TRANSLATION GUIDELINES
-				## What to Translate
-				- Natural language text and documentation content
-				- Code comments and string literals (when they contain user-facing text)
-				- Alt text, titles, and descriptive content
-	
-				## What NOT to Translate
-				- API endpoints; URLs, paths, and configuration values; technical terms unless the translation guidelines map them
-				- YAML frontmatter key names; the \`title\` value is not machine-translated; only a string \`description\` value may be translated in a dedicated pass after the body
-	
-				## Quality Standards
-				- Use natural, fluent ${languages.target} while maintaining technical precision
-				- Apply consistent terminology throughout the document
-				- Ensure technical accuracy and clarity for developers
-	
-				# OUTPUT REQUIREMENTS
-				- Return ONLY the translated content
-				- Do NOT add explanatory text, code block wrappers, or prefixes
-				- Maintain exact whitespace patterns, including list formatting and blank lines
-				- Preserve any trailing newlines from the original content
-	
-				${this.services.locale.definitions.rules.specific}
-	
-				${translationGuidelinesSection}
-			`;
-
-		const verbatimPlaceholderSection =
-			userMessageContent.includes("<!-- translate-react:verbatim-fence-") ?
-				`
-				# VERBATIM SOURCE PLACEHOLDERS
-				Some fenced code regions were replaced with HTML comments matching \`<!-- translate-react:verbatim-fence-N -->\`.
-				Copy each placeholder comment EXACTLY into your output at the same position; never translate, remove, reorder, or alter these comments.
-				`
-			:	"";
-
-		return builtSystemPrompt + verbatimPlaceholderSection;
-	}
-
-	/**
-	 * Builds the system prompt for batched YAML frontmatter string translation with structured JSON output.
-	 *
-	 * Embeds the same glossary and locale rules as the markdown body pass (as silent reference) so
-	 * the `description` field stays aligned with body terminology without echoing the glossary into free text.
-	 *
-	 * @param languages Human-readable source and target language names for the TASK section
-	 *
-	 * @returns The system prompt string for the frontmatter batch completion
-	 */
-	private buildFrontmatterBatchSystemPrompt(languages: { source: string; target: string }) {
-		const termReferenceSection =
-			this.translationGuidelines ?
-				`
-				# TERM REFERENCE (DO NOT OUTPUT)
-				Use only for consistent terminology when translating each \`source\` string. Never copy, quote, translate, summarize, or repeat this reference in your reply JSON.
-	
-				${this.translationGuidelines}
-				`
-			:	"";
-
-		return `# ROLE
-				You are an expert technical translator for React documentation YAML metadata.
-	
-				# TASK
-				The user message is a single JSON object with an \`items\` array of length 1. The element has \`fieldKey\` "description" and \`source\` (the English string to translate). Translate \`source\` from ${languages.source} to ${languages.target}.
-	
-				# OUTPUT (STRICT)
-				- Reply with JSON only, matching the response schema: an object \`items\` whose length equals the request, each item having \`fieldKey\` (same as input) and \`translated\` (the translated string only).
-				- Do not add markdown, code fences, or commentary outside the JSON object.
-				- Preserve intentional internal line breaks in a string only when the corresponding \`source\` already uses multiple lines you must keep.
-	
-				# RULES
-				- Translate only natural language in each \`source\` value
-				- Keep programming identifiers, proper nouns, versions, code-like tokens, and URLs unchanged unless the term reference explicitly maps them
-				- Never translate the JSON keys \`fieldKey\`, \`source\`, \`items\`, or \`translated\` themselves
-	
-				${this.services.locale.definitions.rules.specific}
-	
-				${termReferenceSection}
-				`;
-	}
 }
 
 /** Pre-configured instance of {@link TranslatorService} for application-wide use */
