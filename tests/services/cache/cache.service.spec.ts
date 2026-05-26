@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-import { CacheService } from "@/services/";
+import { CacheService } from "@/services/cache/cache.service";
 
 /** Creates a cache with a fake clock for deterministic TTL tests (no sleep). */
 function createCacheWithFakeClock(): {

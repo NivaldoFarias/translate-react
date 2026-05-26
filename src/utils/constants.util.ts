@@ -139,12 +139,6 @@ export const REACT_TRANSLATION_LANGUAGES = [
 /** Type for React translation language codes */
 export type ReactLanguageCode = (typeof REACT_TRANSLATION_LANGUAGES)[number];
 
-/** Chunk translation mode */
-export enum ChunkTranslationMode {
-	Parallel = "parallel",
-	Sequential = "sequential",
-}
-
 export interface EnvironmentSchemaDefaults {
 	NODE_ENV: RuntimeEnvironment;
 	LOG_LEVEL: LogLevel;

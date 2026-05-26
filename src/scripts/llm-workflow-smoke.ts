@@ -12,14 +12,13 @@
  * comment at `.out/translation-progress-issue-comment.md`) are written for inspection after each run.
  */
 
+import type { LanguageCacheEntry } from "@/domain/workflow/";
 import type { GitHubService } from "@/services/github/";
-import type { LanguageCacheEntry, RunnerServiceDependencies } from "@/services/runner/runner.types";
+import type { RunnerServiceDependencies } from "@/services/runner/runner.types";
 
+import { languageDetectorService, localeService, translatorService } from "@/composition";
 import { CacheService } from "@/services/cache/";
-import { languageDetectorService } from "@/services/language-detector/";
-import { localeService } from "@/services/locale/";
 import { RunnerService } from "@/services/runner/runner.service";
-import { translatorService } from "@/services/translator/translator.service";
 import { env, logger, RuntimeEnvironment } from "@/utils/";
 
 import {

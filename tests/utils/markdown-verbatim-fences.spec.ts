@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { beforeAll, describe, expect, test } from "bun:test";
 
-import { ChunksManager } from "@/services/translator/managers";
+import { ChunksManager } from "@/services/translator/chunking";
 import {
 	maskLargeVerbatimFencedCodeBlocks,
 	restoreMaskedVerbatimFences,

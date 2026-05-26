@@ -131,24 +131,28 @@ bun run dev   # Development mode (auto-reload)
 bun start     # Production mode
 ```
 
+To exercise translation with real LLM calls and mocked GitHub (fixture markdown under `tests/fixtures/md/`), use `bun run smoke:llm-workflow`. See [Local LLM workflow smoke](./docs/WORKFLOW.md#local-llm-workflow-smoke).
+
 ## Versioning and releases
 
 `package.json` `version` is the semver source; OpenRouter header defaults pull from `homepage`, `name`, and `version` unless overridden ([optional env](#optional-environment-variables)). Change log: [`CHANGELOG.md`](./CHANGELOG.md). Tag and release steps: [Releases and semantic versioning](./docs/WORKFLOW.md#releases-and-semantic-versioning).
 
 ## Documentation
 
-| Document                                            | Description                         |
-| --------------------------------------------------- | ----------------------------------- |
-| [ARCHITECTURE.md](./docs/ARCHITECTURE.md)           | Layout of services and modules      |
-| [WORKFLOW.md](./docs/WORKFLOW.md)                   | Pipeline order, forks, releases, CI |
-| [PROJECT_STRUCTURE.md](./docs/PROJECT_STRUCTURE.md) | Repository layout                   |
-| [CONTRIBUTING.md](./CONTRIBUTING.md)                | Patches and conventions             |
-| [CHANGELOG.md](./CHANGELOG.md)                      | Release notes                       |
-| [SECURITY.md](./SECURITY.md)                        | Vulnerability reporting             |
+| Document                                            | Description                                      |
+| --------------------------------------------------- | ------------------------------------------------ |
+| [ARCHITECTURE.md](./docs/ARCHITECTURE.md)           | Services, translator pipeline, errors            |
+| [WORKFLOW.md](./docs/WORKFLOW.md)                   | Run order, forks, releases, CI, local smoke test |
+| [PROJECT_STRUCTURE.md](./docs/PROJECT_STRUCTURE.md) | `src/` layout, composition root, domain types    |
+| [CONTRIBUTING.md](./CONTRIBUTING.md)                | Patches and conventions                          |
+| [CHANGELOG.md](./CHANGELOG.md)                      | Release notes                                    |
+| [SECURITY.md](./SECURITY.md)                        | Vulnerability reporting                          |
+
+Entry point: [`src/main.ts`](./src/main.ts) imports `runnerService` from [`src/composition.ts`](./src/composition.ts), where service singletons are constructed.
 
 ## Contributing
 
-[`CONTRIBUTING.md`](./CONTRIBUTING.md); for service layout see [ARCHITECTURE.md](./docs/ARCHITECTURE.md).
+See [`CONTRIBUTING.md`](./CONTRIBUTING.md). Code layout: [PROJECT_STRUCTURE.md](./docs/PROJECT_STRUCTURE.md) and [ARCHITECTURE.md](./docs/ARCHITECTURE.md).
 
 ## Security
 

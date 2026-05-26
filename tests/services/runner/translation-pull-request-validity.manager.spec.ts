@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test";
 
 import type { RunnerServiceDependencies } from "@/services/runner/runner.types";
 
-import { localeService } from "@/services/";
-import { TranslationPullRequestValidityManager } from "@/services/runner/managers/translation-pull-request-validity.manager";
+import { localeService } from "@/composition";
+import { TranslationPullRequestValidityManager } from "@/services/runner/workflow/translation-pull-request-validity.manager";
 
 import { createMockPullRequestListItem } from "@tests/fixtures";
 import {

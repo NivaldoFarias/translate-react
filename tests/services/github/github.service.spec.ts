@@ -4,15 +4,14 @@ import { StatusCodes } from "http-status-codes";
 import type { components } from "@octokit/openapi-types";
 import type { Octokit, RestEndpointMethodTypes } from "@octokit/rest";
 
-import type {
-	GitHubServiceDependencies,
-	PatchedRepositoryTreeItem,
-	ProcessedFileResult,
-} from "@/services/";
+import type { PatchedRepositoryTreeItem, ProcessedFileResult } from "@/domain/workflow/";
+import type { GitHubServiceDependencies } from "@/services/github/github.service";
 
 import type { MockOctokit } from "@tests/mocks";
 
-import { GitHubService, PullRequestProgressAction, TranslationFile } from "@/services/";
+import { PullRequestProgressAction } from "@/domain/workflow/";
+import { GitHubService } from "@/services/github/github.service";
+import { TranslationFile } from "@/services/translator/translation-file";
 
 import {
 	createOctokitRequestErrorFixture,

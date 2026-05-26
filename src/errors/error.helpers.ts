@@ -1,5 +1,6 @@
 import { RequestError } from "@octokit/request-error";
 import { APIError } from "openai/error";
+import { AbortError } from "p-retry";
 
 import { logger as baseLogger } from "@/utils/";
 
@@ -97,6 +98,28 @@ export function handleTopLevelError(
 		},
 		`Unknown error: ${String(error)}`,
 	);
+}
+
+/**
+ * Returns whether `error` is a max-completion-token truncation from the translator.
+ *
+ * Matches {@link ApplicationError} with a truncated-output message, including when
+ * wrapped in {@link AbortError} from `p-retry`.
+ *
+ * @param error Caught rejection from {@link TranslatorService.callLanguageModel}
+ *
+ * @returns `true` when the model stopped at the completion token limit
+ */
+export function isCompletionLengthTruncationError(error: unknown) {
+	if (error instanceof ApplicationError && error.code === ErrorCode.TranslationFailed) {
+		return error.message.includes("truncated output");
+	}
+
+	if (error instanceof AbortError) {
+		return isCompletionLengthTruncationError(error.originalError);
+	}
+
+	return false;
 }
 
 /**

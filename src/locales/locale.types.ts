@@ -1,8 +1,5 @@
-import type {
-	ProcessedFileResult,
-	PullRequestDescriptionMetadata,
-	TranslationFile,
-} from "@/services";
+import type { ProcessedFileResult, PullRequestDescriptionMetadata } from "@/domain/workflow/";
+import type { TranslationFile } from "@/services/translator/";
 
 /**
  * GitHub Actions metadata for the translation-progress issue comment opener.

@@ -1,7 +1,7 @@
-import type { ProcessedFileResult } from "../runner/runner.types";
-import type { TranslationFile } from "../translator/translator.service";
+import type { ProcessedFileResult } from "@/domain/workflow/";
+import type { TranslationFile } from "@/services/translator/";
 
-import { filterReportableProgressCommentResults } from "../runner/runner.types";
+import { filterReportableProgressCommentResults } from "@/domain/workflow/";
 
 /**
  * Pairs reportable batch results with their translation files for progress-issue comments.

@@ -1,0 +1,23 @@
+import type { PostTranslationValidationGuard } from "../validation.types";
+
+import { MARKDOWN_REGEXES } from "../../markdown/markdown.regexes";
+
+/** Rejects translations that dropped YAML frontmatter */
+export const frontmatterPreservedGuard: PostTranslationValidationGuard = (source, translated) => {
+	const originalMatch = MARKDOWN_REGEXES.frontmatter.exec(source)?.groups?.["content"];
+	if (!originalMatch) return null;
+
+	MARKDOWN_REGEXES.frontmatter.lastIndex = 0;
+
+	const translatedMatch = MARKDOWN_REGEXES.frontmatter.exec(translated)?.groups?.["content"];
+	MARKDOWN_REGEXES.frontmatter.lastIndex = 0;
+
+	if (translatedMatch) return null;
+
+	return {
+		guardId: "frontmatterPreserved",
+		message: "Frontmatter lost during translation",
+		retryHint:
+			"Keep the leading YAML frontmatter block (`---` delimiters and keys) intact. Only translate allowed string values per the rules; never remove the frontmatter block.",
+	};
+};

@@ -85,4 +85,3 @@ export class LocaleService {
 }
 
 /** Pre-configured instance of {@link LocaleService} for application-wide use */
-export const localeService = new LocaleService();

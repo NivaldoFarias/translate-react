@@ -1,10 +1,11 @@
 import { describe, expect, test } from "bun:test";
 
-import type { LanguageAnalysisResult } from "@/services/";
+import type { LanguageAnalysisResult } from "@/services/language-detector/language-detector.service";
 import type { RunnerServiceDependencies } from "@/services/runner/runner.types";
 
-import { localeService, PullRequestProgressAction } from "@/services/";
-import { TranslationBatchManager } from "@/services/runner/managers/translation-batch.manager";
+import { localeService } from "@/composition";
+import { PullRequestProgressAction } from "@/domain/workflow/";
+import { TranslationBatchManager } from "@/services/runner/workflow/translation-batch.manager";
 
 import { createMockPullRequestListItem, createTranslationFileFixture } from "@tests/fixtures";
 import {
