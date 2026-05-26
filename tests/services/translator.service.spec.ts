@@ -109,8 +109,7 @@ describe("TranslatorService", () => {
 
 			const file = createTranslationFileFixture({ content: "Conteúdo em português." });
 
-			const analysis =
-				await translatorService.managers.languageCheck.getLanguageAnalysis(file);
+			const analysis = await translatorService.managers.languageCheck.getLanguageAnalysis(file);
 
 			expect(analysis).toBe(expectedAnalysis);
 			expect(analyzeSpy).toHaveBeenCalledWith(file.filename, file.content);
@@ -119,9 +118,9 @@ describe("TranslatorService", () => {
 		test("throws ApplicationError when file content is empty", () => {
 			const file = createTranslationFileFixture({ content: "" });
 
-			expect(
-				translatorService.managers.languageCheck.getLanguageAnalysis(file),
-			).rejects.toThrow("File content is empty");
+			expect(translatorService.managers.languageCheck.getLanguageAnalysis(file)).rejects.toThrow(
+				"File content is empty",
+			);
 		});
 	});
 
@@ -348,8 +347,7 @@ describe("TranslatorService", () => {
 				content: "This is English content that needs translation.",
 			});
 
-			const isTranslated =
-				await translatorService.managers.languageCheck.isContentTranslated(file);
+			const isTranslated = await translatorService.managers.languageCheck.isContentTranslated(file);
 
 			expect(isTranslated).toBe(false);
 		});
@@ -363,8 +361,7 @@ describe("TranslatorService", () => {
 				content: "Este é um conteúdo em português que já foi traduzido.",
 			});
 
-			const isTranslated =
-				await translatorService.managers.languageCheck.isContentTranslated(file);
+			const isTranslated = await translatorService.managers.languageCheck.isContentTranslated(file);
 
 			expect(isTranslated).toBe(true);
 		});
@@ -374,8 +371,7 @@ describe("TranslatorService", () => {
 				content: "This has some English and também algum português.",
 			});
 
-			const isTranslated =
-				await translatorService.managers.languageCheck.isContentTranslated(file);
+			const isTranslated = await translatorService.managers.languageCheck.isContentTranslated(file);
 
 			expect(typeof isTranslated).toBe("boolean");
 		});
@@ -387,8 +383,7 @@ describe("TranslatorService", () => {
 
 			const file = createTranslationFileFixture({ content: "Some content." });
 
-			const isTranslated =
-				await translatorService.managers.languageCheck.isContentTranslated(file);
+			const isTranslated = await translatorService.managers.languageCheck.isContentTranslated(file);
 
 			expect(isTranslated).toBe(false);
 		});

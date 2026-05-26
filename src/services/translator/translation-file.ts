@@ -4,9 +4,10 @@ import type { Logger } from "pino";
 
 import type { ReactLanguageCode } from "@/utils/";
 
+import { logger } from "@/utils/";
+
 import { MARKDOWN_REGEXES } from "./markdown/markdown.regexes";
 import { extractTitleScalarFromInnerYaml } from "./translator-frontmatter.util";
-import { logger } from "@/utils/";
 
 /** Represents a file that needs to be translated */
 export class TranslationFile {
@@ -69,8 +70,7 @@ export class TranslationFile {
 	 * @returns The trimmed `title` string scalar, or `undefined` when there is no frontmatter or `title` is missing or not a string
 	 */
 	private extractDocTitleFromContent(content: string): string | undefined {
-		const frontmatterContentOnly =
-			MARKDOWN_REGEXES.frontmatter.exec(content)?.groups?.["content"];
+		const frontmatterContentOnly = MARKDOWN_REGEXES.frontmatter.exec(content)?.groups?.["content"];
 
 		if (!frontmatterContentOnly) return;
 

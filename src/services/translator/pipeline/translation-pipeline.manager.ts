@@ -1,11 +1,12 @@
+import type { ApplicationError } from "@/errors";
+
 import type { TranslationFile } from "../translation-file";
 import type { TranslationValidationIssue } from "../validation/validation.types";
 
 import type { TranslationAttemptContext } from "./translation-attempt.context";
 
-import type { ApplicationError } from "@/errors";
-
 import { TRANSLATION_VALIDATION_MAX_ATTEMPTS } from "../validation/validation.constants";
+
 import {
 	emptyTranslationAttemptContext,
 	translationAttemptContextFromHints,
@@ -39,9 +40,7 @@ export class TranslationPipelineManager {
 	/**
 	 * @param maxAttempts Maximum full-document attempts including the first try
 	 */
-	constructor(
-		private readonly maxAttempts: number = TRANSLATION_VALIDATION_MAX_ATTEMPTS,
-	) {}
+	constructor(private readonly maxAttempts: number = TRANSLATION_VALIDATION_MAX_ATTEMPTS) {}
 
 	/**
 	 * Runs the validation retry loop until guards pass or attempts are exhausted.
@@ -51,8 +50,7 @@ export class TranslationPipelineManager {
 	 * @returns Assembled translated document that passed all guards
 	 */
 	public async translateWithValidationRetries(params: TranslationPipelineRunParams) {
-		const { file, translateBody, finalizeTranslation, collectIssues, createFailedError } =
-			params;
+		const { file, translateBody, finalizeTranslation, collectIssues, createFailedError } = params;
 
 		let attemptContext = emptyTranslationAttemptContext();
 		let translatedContent = "";
