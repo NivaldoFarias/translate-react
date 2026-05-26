@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 
-import type { TranslatorServiceDependencies } from "@/services/";
+import type { TranslatorServiceDependencies } from "@/services/translator/translator.service";
 
 import { localeService } from "@/composition";
 import { ApplicationError } from "@/errors";
+import { OpenRouterModelLimitsService } from "@/services/openrouter/openrouter-model-limits.service";
 import { TranslatorService } from "@/services/translator/translator.service";
 
 import {
@@ -34,6 +35,8 @@ function createTestTranslatorService(
 		localeService: overrides.localeService ?? localeService,
 		languageDetectorService:
 			overrides.languageDetectorService ?? createMockLanguageDetectorService(),
+		openRouterModelLimitsService:
+			overrides.openRouterModelLimitsService ?? new OpenRouterModelLimitsService(),
 		queue: overrides.queue ?? createMockQueue(),
 		retryConfig: {
 			retries: overrides.retryConfig?.retries ?? 0,

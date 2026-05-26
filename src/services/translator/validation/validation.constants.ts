@@ -73,6 +73,3 @@ export const VALIDATION_RATIOS = {
 		max: 2.0,
 	},
 } as const;
-
-/** @deprecated Use {@link VALIDATION_RATIOS} */
-export const RATIOS = VALIDATION_RATIOS;

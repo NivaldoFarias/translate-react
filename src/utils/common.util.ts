@@ -1,6 +1,6 @@
 import { StatusCodes } from "http-status-codes";
 
-import type { RepositoryTreeItem } from "@/services/";
+import type { RepositoryTreeItem } from "@/domain/workflow/";
 
 import { MS_PER_SECOND, processSignals, RATE_LIMIT_PATTERNS } from "./constants.util";
 

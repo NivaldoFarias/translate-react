@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import type { ReactLanguageCode } from "@/utils/";
 
 import { ApplicationError, ErrorCode } from "@/errors/";
-import { LanguageDetectorService } from "@/services/";
+import { LanguageDetectorService } from "@/services/language-detector/language-detector.service";
 
 describe("LanguageDetector", () => {
 	let detector: LanguageDetectorService;

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 
-import { TranslationFile } from "@/services/";
+import { TranslationFile } from "@/services/translator/translation-file";
 import { PostTranslationValidationService } from "@/services/translator/validation/post-translation-validation.service";
 
 describe("PostTranslationValidationService", () => {

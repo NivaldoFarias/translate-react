@@ -3,12 +3,12 @@ import path from "node:path";
 
 import { beforeAll, beforeEach, describe, expect, test } from "bun:test";
 
-import { TranslationFile } from "@/services/";
 import { ChunksManager } from "@/services/translator/chunking";
 import {
 	CHUNKS,
 	SYSTEM_PROMPT_TOKEN_RESERVE,
 } from "@/services/translator/chunking/chunking.constants";
+import { TranslationFile } from "@/services/translator/translation-file";
 
 const FIXTURE_PATH = path.resolve(
 	import.meta.dir,
