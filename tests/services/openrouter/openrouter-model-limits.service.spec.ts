@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 
-import { openRouterModelLimitsService, OpenRouterModelLimitsService } from "@/services/openrouter/";
+import { OpenRouterModelLimitsService } from "@/services/openrouter/openrouter-model-limits.service";
 
 const realFetch = globalThis.fetch;
 
@@ -51,6 +51,8 @@ function openRouterModelFixture(
 }
 
 describe("OpenRouterModelLimitsService", () => {
+	const service = new OpenRouterModelLimitsService();
+
 	const mockFetch = mock(
 		(_input: RequestInfo | URL, _init?: RequestInit): Promise<Response> =>
 			Promise.reject(new Error("mockFetch not configured")),
@@ -59,49 +61,43 @@ describe("OpenRouterModelLimitsService", () => {
 	beforeEach(() => {
 		mockFetch.mockReset();
 		globalThis.fetch = mockFetch as unknown as typeof fetch;
-		openRouterModelLimitsService.resetListCache();
+		service.resetListCache();
 	});
 
 	afterEach(() => {
 		globalThis.fetch = realFetch;
-		openRouterModelLimitsService.resetListCache();
+		service.resetListCache();
 	});
 
 	describe("isHostedOpenRouterBaseUrl", () => {
 		test("returns true for openrouter.ai", () => {
-			expect(
-				openRouterModelLimitsService.isHostedOpenRouterBaseUrl("https://openrouter.ai/api/v1"),
-			).toBe(true);
+			expect(service.isHostedOpenRouterBaseUrl("https://openrouter.ai/api/v1")).toBe(true);
 		});
 
 		test("returns true for api subdomain", () => {
-			expect(
-				openRouterModelLimitsService.isHostedOpenRouterBaseUrl("https://api.openrouter.ai/v1"),
-			).toBe(true);
+			expect(service.isHostedOpenRouterBaseUrl("https://api.openrouter.ai/v1")).toBe(true);
 		});
 
 		test("returns false for other hosts", () => {
-			expect(
-				openRouterModelLimitsService.isHostedOpenRouterBaseUrl("https://api.openai.com/v1"),
-			).toBe(false);
+			expect(service.isHostedOpenRouterBaseUrl("https://api.openai.com/v1")).toBe(false);
 		});
 
 		test("returns false for invalid URL", () => {
-			expect(openRouterModelLimitsService.isHostedOpenRouterBaseUrl("not-a-url")).toBe(false);
+			expect(service.isHostedOpenRouterBaseUrl("not-a-url")).toBe(false);
 		});
 	});
 
 	describe("resolveModelsListUrl", () => {
 		test("appends /models without duplicating slash", () => {
-			expect(
-				openRouterModelLimitsService.resolveModelsListUrl("https://openrouter.ai/api/v1"),
-			).toBe("https://openrouter.ai/api/v1/models");
+			expect(service.resolveModelsListUrl("https://openrouter.ai/api/v1")).toBe(
+				"https://openrouter.ai/api/v1/models",
+			);
 		});
 
 		test("strips trailing slashes before appending", () => {
-			expect(
-				openRouterModelLimitsService.resolveModelsListUrl("https://openrouter.ai/api/v1///"),
-			).toBe("https://openrouter.ai/api/v1/models");
+			expect(service.resolveModelsListUrl("https://openrouter.ai/api/v1///")).toBe(
+				"https://openrouter.ai/api/v1/models",
+			);
 		});
 	});
 
@@ -115,7 +111,7 @@ describe("OpenRouterModelLimitsService", () => {
 				} as Response),
 			);
 
-			const result = await openRouterModelLimitsService.fetchLimitsForModel(
+			const result = await service.fetchLimitsForModel(
 				"https://openrouter.ai/api/v1",
 				"sk-test",
 				"acme/model",
@@ -157,7 +153,7 @@ describe("OpenRouterModelLimitsService", () => {
 				} as Response),
 			);
 
-			const result = await openRouterModelLimitsService.fetchLimitsForModel(
+			const result = await service.fetchLimitsForModel(
 				"https://openrouter.ai/api/v1",
 				"sk-test",
 				"acme/model",
@@ -192,7 +188,7 @@ describe("OpenRouterModelLimitsService", () => {
 				} as Response),
 			);
 
-			const result = await openRouterModelLimitsService.fetchLimitsForModel(
+			const result = await service.fetchLimitsForModel(
 				"https://openrouter.ai/api/v1",
 				"sk-test",
 				"vendor/foo",
@@ -228,11 +224,7 @@ describe("OpenRouterModelLimitsService", () => {
 			});
 
 			await isolated.fetchLimitsForModel("https://openrouter.ai/api/v1", "k", "solo/model");
-			await openRouterModelLimitsService.fetchLimitsForModel(
-				"https://openrouter.ai/api/v1",
-				"k",
-				"solo/model",
-			);
+			await service.fetchLimitsForModel("https://openrouter.ai/api/v1", "k", "solo/model");
 
 			expect(callCount).toBe(2);
 		});

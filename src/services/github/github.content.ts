@@ -5,17 +5,17 @@ import { RequestError } from "@octokit/request-error";
 import type { components } from "@octokit/openapi-types";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
-import type { CommentBuilderService } from "@/services/comment-builder/";
 import type {
 	PatchedRepositoryTreeItem,
 	ProcessedFileResult,
 	PullRequestStatus,
-} from "@/services/runner/";
+} from "@/domain/workflow/";
+import type { CommentBuilderService } from "@/services/comment-builder/";
 
 import type { SharedGitHubDependencies } from "./github.types";
 
 import { ApplicationError, ErrorCode } from "@/errors/";
-import { filterReportableProgressCommentResults } from "@/services/runner/runner.types";
+import { selectProgressCommentPayload } from "@/services/comment-builder/progress-comment.util";
 import { TranslationFile } from "@/services/translator/";
 import { logger } from "@/utils/";
 
@@ -499,7 +499,10 @@ export class GitHubContent {
 			return;
 		}
 
-		const reportableResults = filterReportableProgressCommentResults(results);
+		const { reportableResults, reportableFiles } = selectProgressCommentPayload(
+			results,
+			filesToTranslate,
+		);
 
 		if (reportableResults.length === 0) {
 			this.logger.info(
@@ -520,7 +523,7 @@ export class GitHubContent {
 		const createCommentResponse = await this.deps.octokit.issues.createComment({
 			...this.deps.repositories.upstream,
 			issue_number: translationProgressIssue.number,
-			body: this.commentBuilder.buildComment(results, filesToTranslate),
+			body: this.commentBuilder.buildReportableComment(reportableResults, reportableFiles),
 		});
 
 		this.logger.info(

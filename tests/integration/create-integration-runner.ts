@@ -8,6 +8,11 @@ import type { Mock } from "bun:test";
 import type OpenAI from "openai";
 import type PQueue from "p-queue";
 
+import type {
+	LanguageCacheEntry,
+	PatchedRepositoryTreeItem,
+	ProcessedFileResult,
+} from "@/domain/workflow/";
 import type { CacheService } from "@/services/cache/";
 import type { GitHubService } from "@/services/github/";
 import type {
@@ -15,16 +20,10 @@ import type {
 	PullRequestOptions,
 } from "@/services/github/github.content";
 import type { LanguageDetectorService } from "@/services/language-detector/";
-import type {
-	LanguageCacheEntry,
-	PatchedRepositoryTreeItem,
-	ProcessedFileResult,
-	RunnerServiceDependencies,
-} from "@/services/runner/runner.types";
+import type { RunnerServiceDependencies } from "@/services/runner/runner.types";
 
-import { localeService, PullRequestProgressAction } from "@/services/";
-import { commentBuilderService } from "@/services/comment-builder/";
-import { openRouterModelLimitsService } from "@/services/openrouter/";
+import { commentBuilderService, localeService, openRouterModelLimitsService } from "@/composition";
+import { PullRequestProgressAction } from "@/domain/workflow/";
 import { RunnerService } from "@/services/runner/runner.service";
 import { TranslationFile, TranslatorService } from "@/services/translator/";
 
@@ -310,6 +309,7 @@ export function createIntegrationTranslator() {
 		localeService,
 		languageDetectorService:
 			createMockLanguageDetectorService() as unknown as LanguageDetectorService,
+		openRouterModelLimitsService,
 		queue: createMockQueue() as unknown as PQueue,
 		retryConfig: {
 			retries: 0,

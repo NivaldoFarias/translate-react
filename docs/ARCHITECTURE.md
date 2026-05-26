@@ -21,12 +21,13 @@ Overview of the `translate-react` CLI: service design, data flow, and error hand
 
 ## System Overview
 
-`main.ts` runs the CLI. **RunnerService** calls GitHub, translator, language detector, and cache in sequence (see [WORKFLOW.md](./WORKFLOW.md)). **GitHubService** and **TranslatorService** talk to the GitHub REST API and the configured LLM endpoint. Errors surface at the top level in `main.ts` with structured logging (Pino).
+[`main.ts`](../src/main.ts) imports `runnerService` from [`composition.ts`](../src/composition.ts). **RunnerService** drives GitHub, translator, language detector, and cache (see [WORKFLOW.md](./WORKFLOW.md)). **GitHubService** and **TranslatorService** call the GitHub REST API and the configured LLM endpoint. Errors reach [`handleTopLevelError`](../src/errors/error.helpers.ts) in `main.ts` (Pino, then `process.exit(1)`).
 
 ```mermaid
 graph TB
     subgraph "Entry Point"
         CLI[CLI / main.ts]
+        Comp[composition.ts]
     end
 
     subgraph "Orchestration Layer"
@@ -51,7 +52,8 @@ graph TB
         LLMAPI[LLM API<br/>OpenAI/OpenRouter]
     end
 
-    CLI --> Runner
+    CLI --> Comp
+    Comp --> Runner
     Runner --> GitHub
     Runner --> Translator
     Runner --> LangDetector
@@ -111,7 +113,11 @@ classDiagram
 
 ### Runner Service
 
-Code under `src/services/runner/`. Runs the pipeline in [`RunnerService.run()`](../src/services/runner/runner.service.ts): keeps `RunnerState` in memory (tree, queue, results) and delegates batch work to managers. Details: [WORKFLOW.md](./WORKFLOW.md).
+Code under `src/services/runner/`. [`RunnerService.run()`](../src/services/runner/runner.service.ts) keeps `RunnerState` in memory and delegates to workflow stages in [`runner/workflow/`](../src/services/runner/workflow/) (discovery, batch, PR). Details: [WORKFLOW.md](./WORKFLOW.md).
+
+### Shared workflow types
+
+[`src/domain/workflow/`](../src/domain/workflow/) holds cross-cutting DTOs (`ProcessedFileResult`, tree items, PR status, workflow statistics). **GitHub** and **locales** import from here; they do not import `runner/`.
 
 ### GitHub Service
 
@@ -125,7 +131,15 @@ Public methods delegate to the appropriate internal class.
 
 ### Translator Service
 
-Core translation engine (`services/translator/translator.service.ts`) interfacing with LLM APIs.
+[`TranslatorService`](../src/services/translator/translator.service.ts) coordinates translation. Supporting code lives alongside it:
+
+- [`translation-file.ts`](../src/services/translator/translation-file.ts) — file entity
+- [`pipeline/`](../src/services/translator/pipeline/) — validation retry loop
+- [`llm/`](../src/services/translator/llm/) — prompts, [`TranslationLlmClient`](../src/services/translator/llm/translation-llm.client.ts) (OpenAI + retries)
+- [`validation/`](../src/services/translator/validation/) — post-translation guards
+- [`postprocess/`](../src/services/translator/postprocess/) — cleanup and chunk reassembly
+- [`chunking/`](../src/services/translator/chunking/) — token limits and markdown splitting
+- [`markdown/`](../src/services/translator/markdown/) — frontmatter, fence cleanup, regexes
 
 ```mermaid
 graph LR
@@ -137,16 +151,15 @@ graph LR
     F --> G[Reassemble]
     D --> H[Restore fences if masked]
     G --> H
-    H --> I[Validation]
+    H --> I[Post-translation guards]
     I --> J[Output]
 ```
 
 **Large-fence masking (optional, env-driven):** Fenced blocks whose tiktoken estimate meets `MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS` can be replaced by short HTML comment placeholders before any LLM call, then restored from the original source so structure and validators still see real fences. Disabled by default; see [`markdown-verbatim-fences.util.ts`](../src/utils/markdown-verbatim-fences.util.ts).
 
-**Content chunking** (when estimated input tokens exceed the safe budget in [`ChunksManager`](../src/services/translator/managers/chunks.manager.ts)):
+**Content chunking** (when input exceeds the safe token budget in [`ChunksManager`](../src/services/translator/chunking/chunks.manager.ts)): LangChain `MarkdownTextSplitter`, then parallel chunk translation and reassembly (`CHUNKS` in [`chunking.constants.ts`](../src/services/translator/chunking/chunking.constants.ts)).
 
-1. Split with LangChain `MarkdownTextSplitter` using the same token estimator and overlap from `CHUNKS` in [`managers.constants.ts`](../src/services/translator/managers/managers.constants.ts)
-2. Translate chunks concurrently (`Promise.all`), then reassemble with captured separators
+**Post-translation validation:** Guards in `validation/guards/`; failures feed retry hints through `TranslationPipelineManager`.
 
 **Translation guidelines**: Loaded from upstream `GLOSSARY.md`, passed to LLM as system instruction.
 
@@ -172,9 +185,9 @@ In-memory caching (`services/cache/`) for runtime-scoped data.
 
 ## Error Handling
 
-**ApplicationError** is used for domain workflow failures (e.g. no files to translate). Carries `ErrorCode`, operation name, and optional metadata. Library errors (`RequestError`, `APIError`) bubble up unmodified.
+**ApplicationError** covers domain workflow failures (empty file, validation exhausted, and similar). It carries `ErrorCode`, an operation name, and optional metadata. Inner code rethrows `ApplicationError` unchanged; Octokit and OpenAI errors usually bubble to the boundary.
 
-**Top-Level Handler** (`main.ts`) catches all errors at the process boundary:
+**Top-level handler** (`main.ts` via `handleTopLevelError`):
 
 - **ApplicationError**: logs code, operation, message, metadata
 - **RequestError** (Octokit): logs as GitHub API error with status, request ID
@@ -185,12 +198,13 @@ All errors result in `process.exit(1)`.
 
 ## Design Patterns
 
-- **Runner**: `BaseRunnerService` holds shared state and managers; `RunnerService` extends it with `run()` implementation
-- **GitHub**: Composition pattern — `GitHubService` composes three internal classes with shared Octokit/config
+- **Runner**: `BaseRunnerService` holds state and workflow-stage helpers; `RunnerService` implements `run()`
+- **GitHub**: `GitHubService` composes repository, content, and branch helpers behind one facade
+- **Translator**: `TranslatorService` orchestrates; `TranslationLlmClient` owns transport; guards are pluggable under `validation/guards/`
 
 ## Dependency Injection
 
-Services are instantiated at module level. `main.ts` imports `runnerService` built with other services. Dependencies are passed via typed constructor arguments. Tests inject mocks via constructors:
+[`composition.ts`](../src/composition.ts) wires service singletons. `main.ts` imports `runnerService` from there. Dependencies are passed via typed constructor arguments. Tests inject mocks via constructors:
 
 ```typescript
 const service = new RunnerService({

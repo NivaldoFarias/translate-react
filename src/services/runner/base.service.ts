@@ -5,16 +5,15 @@ import type {
 	PrFilterResult,
 	ProcessedFileResult,
 	RepositoryTreeItem,
-	RunnerOptions,
-	RunnerServiceDependencies,
-	RunnerState,
 	WorkflowStatistics,
-} from "./runner.types";
+} from "@/domain/workflow/";
+
+import type { RunnerOptions, RunnerServiceDependencies, RunnerState } from "./runner.types";
 
 import { ApplicationError, ErrorCode } from "@/errors/";
 import { env, logger, registerCleanup, resolveRunnerNewIssueChooserUrl } from "@/utils/";
 
-import { FileDiscoveryManager, PRManager, TranslationBatchManager } from "./managers";
+import { FileDiscoveryManager, PRManager, TranslationBatchManager } from "./workflow";
 
 /**
  * Base class for translation workflow runners.
@@ -108,7 +107,7 @@ export abstract class BaseRunnerService {
 	/**
 	 * Verifies GitHub token permissions
 	 *
-	 * @throws {ApplicationError} with {@link ErrorCode.InitializationError} If token permissions verification fails
+	 * @throws {ApplicationError} with {@link ErrorCode.InsufficientPermissions} when the token lacks required scopes
 	 */
 	protected async verifyPermissions(): Promise<void> {
 		const hasPermissions = await this.services.github.verifyTokenPermissions();
@@ -118,7 +117,7 @@ export abstract class BaseRunnerService {
 
 			throw new ApplicationError(
 				"Token permissions verification failed",
-				ErrorCode.InitializationError,
+				ErrorCode.InsufficientPermissions,
 				`${BaseRunnerService.name}.${this.verifyPermissions.name}`,
 				{ hasPermissions },
 			);
@@ -226,7 +225,7 @@ export abstract class BaseRunnerService {
 	}
 
 	/**
-	 * Rebuilds {@link managers.translationBatch} with {@link resolveRunnerNewIssueChooserUrl} and
+	 * Rebuilds the translation batch workflow stage with {@link resolveRunnerNewIssueChooserUrl} and
 	 * invalid-PR metadata, regardless of whether `filesToTranslate` came from discovery or a
 	 * pre-filled {@link state}.
 	 *

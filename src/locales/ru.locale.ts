@@ -1,4 +1,4 @@
-import type { TranslationFile } from "@/services/translator/translator.service";
+import type { TranslationFile } from "@/services/translator/";
 
 import type {
 	LocaleDefinition,

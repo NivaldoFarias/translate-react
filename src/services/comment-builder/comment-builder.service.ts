@@ -1,11 +1,8 @@
+import type { ProcessedFileResult } from "@/domain/workflow/";
 import type { LocaleDefinition } from "@/locales";
 
-import type { ProcessedFileResult } from "../runner";
-
+import { TranslationFile } from "@/services/translator/";
 import { logger, resolveGitHubActionsRunContext } from "@/utils/";
-
-import { localeService } from "../locale";
-import { TranslationFile } from "../translator/translator.service";
 
 import { selectProgressCommentPayload } from "./progress-comment.util";
 
@@ -31,9 +28,9 @@ export class CommentBuilderService {
 	/**
 	 * Creates a new {@link CommentBuilderService} instance.
 	 *
-	 * @param localeDefinition Optional locale service for dependency injection (defaults to singleton)
+	 * @param localeDefinition Locale strings and PR templates for the target language
 	 */
-	constructor(localeDefinition: LocaleDefinition = localeService.definitions) {
+	constructor(localeDefinition: LocaleDefinition) {
 		this.locale = localeDefinition;
 	}
 
@@ -58,11 +55,23 @@ export class CommentBuilderService {
 	 * ```
 	 */
 	public buildComment(results: ProcessedFileResult[], filesToTranslate: TranslationFile[]) {
-		const { reportableResults, reportableFiles } = selectProgressCommentPayload(
-			results,
-			filesToTranslate,
-		);
+		const payload = selectProgressCommentPayload(results, filesToTranslate);
 
+		return this.buildReportableComment(payload.reportableResults, payload.reportableFiles);
+	}
+
+	/**
+	 * Builds a progress-issue comment from already-filtered reportable results.
+	 *
+	 * @param reportableResults Results with {@link PullRequestProgressAction.Created}
+	 * @param reportableFiles Translation files matching `reportableResults`
+	 *
+	 * @returns Formatted hierarchical comment string for GitHub issue posting
+	 */
+	public buildReportableComment(
+		reportableResults: ProcessedFileResult[],
+		reportableFiles: TranslationFile[],
+	) {
 		const concattedData = reportableResults
 			.map((result) => {
 				if (!result.pullRequest) return null;
@@ -282,5 +291,3 @@ export class CommentBuilderService {
 		};
 	}
 }
-
-export const commentBuilderService = new CommentBuilderService();

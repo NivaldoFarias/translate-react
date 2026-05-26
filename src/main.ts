@@ -1,9 +1,8 @@
+import { runnerService } from "@/composition";
 import { handleTopLevelError } from "@/errors/";
 import { logger as baseLogger, env, setupSignalHandlers } from "@/utils/";
 
 import { name, version } from "../package.json";
-
-import { runnerService } from "./services";
 
 if (import.meta.main) {
 	await main();

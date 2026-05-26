@@ -2,7 +2,8 @@ import { mock } from "bun:test";
 
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
-import type { LanguageAnalysisResult, PullRequestStatus } from "@/services/";
+import type { PullRequestStatus } from "@/domain/workflow/";
+import type { LanguageAnalysisResult } from "@/services/language-detector/language-detector.service";
 import type { ReactLanguageCode } from "@/utils/constants.util";
 
 import { createTranslationFileFixture } from "@tests/fixtures";
@@ -13,9 +14,12 @@ import { createTranslationFileFixture } from "@tests/fixtures";
  * @returns Mocked CommentBuilderService instance
  */
 export function createMockCommentBuilderService() {
+	const mockCommentBody = mock(() => "Mock comment");
+
 	return {
-		build: mock(() => "Mock comment"),
-		buildComment: mock(() => "Mock comment"),
+		build: mockCommentBody,
+		buildComment: mockCommentBody,
+		buildReportableComment: mockCommentBody,
 		concatComment: mock((content: string) => `prefix\n\n${content}\n\nsuffix`),
 		comment: {
 			suffix: "suffix",

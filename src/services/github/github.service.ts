@@ -4,14 +4,14 @@ import type {
 	PatchedRepositoryTreeItem,
 	ProcessedFileResult,
 	PullRequestStatus,
-} from "@/services/runner/";
+} from "@/domain/workflow/";
+import type { CommentBuilderService } from "@/services/comment-builder/comment-builder.service";
 import type { TranslationFile } from "@/services/translator/";
 
 import type { CommitTranslationOptions, PullRequestOptions } from "./github.content";
 import type { BaseRepositories, SharedGitHubDependencies } from "./github.types";
 
 import { octokit } from "@/clients/";
-import { commentBuilderService } from "@/services/comment-builder/";
 import { env } from "@/utils/";
 
 import { GitHubBranch } from "./github.branch";
@@ -32,7 +32,7 @@ export const DEFAULT_REPOSITORIES: BaseRepositories = {
 export interface GitHubServiceDependencies {
 	octokit?: Octokit;
 	repositories?: BaseRepositories;
-	commentBuilderService?: typeof commentBuilderService;
+	commentBuilderService: CommentBuilderService;
 }
 
 /**
@@ -46,16 +46,13 @@ export class GitHubService {
 	private readonly branch: GitHubBranch;
 	private readonly content: GitHubContent;
 
-	constructor(dependencies: GitHubServiceDependencies = {}) {
+	constructor(dependencies: GitHubServiceDependencies) {
 		const shared: SharedGitHubDependencies = {
 			octokit: dependencies.octokit ?? octokit,
 			repositories: dependencies.repositories ?? DEFAULT_REPOSITORIES,
 		};
 
-		this.content = new GitHubContent(
-			shared,
-			dependencies.commentBuilderService ?? commentBuilderService,
-		);
+		this.content = new GitHubContent(shared, dependencies.commentBuilderService);
 		this.repository = new GitHubRepository(shared);
 		this.branch = new GitHubBranch(shared);
 
@@ -344,5 +341,3 @@ export class GitHubService {
 		return this.content.commentCompiledResultsOnIssue(results, filesToTranslate);
 	}
 }
-
-export const githubService = new GitHubService();

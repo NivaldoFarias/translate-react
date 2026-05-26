@@ -1,74 +1,54 @@
-import crypto from "node:crypto";
-
-import { StatusCodes } from "http-status-codes";
 import OpenAI from "openai";
-import { APIError } from "openai/error";
-import { zodResponseFormat } from "openai/helpers/zod";
-import pRetry, { AbortError } from "p-retry";
 import { isMap, parseDocument } from "yaml";
 
 import type PQueue from "p-queue";
 import type { Options as RetryOptions } from "p-retry";
-import type { Logger } from "pino";
 
-import type { OpenRouterModelLimits } from "@/services/openrouter/";
-import type { ReactLanguageCode } from "@/utils/";
+import type { LanguageDetectorService } from "@/services/language-detector/";
+import type { LocaleService } from "@/services/locale/";
+import type { OpenRouterModelLimits, OpenRouterModelLimitsService } from "@/services/openrouter/";
 
+import type {
+	ChunkTranslationProgress,
+	TranslationSystemPromptKind,
+} from "./llm/translation-system-prompt.types";
+import type { TranslationAttemptContext } from "./pipeline/translation-attempt.context";
 import type { FrontmatterBatchFieldKey } from "./translator-frontmatter-batch.schema";
 
-import { openai, queue } from "@/clients/";
-import { ApplicationError, ErrorCode } from "@/errors/";
-import { LanguageDetectorService, languageDetectorService } from "@/services/language-detector/";
-import { localeService, LocaleService } from "@/services/locale/";
-import { openRouterModelLimitsService } from "@/services/openrouter/";
+import { ApplicationError, ErrorCode, isCompletionLengthTruncationError } from "@/errors/";
 import {
 	env,
-	getRateLimitResetWaitMs,
-	isOpenRouterDailyFreeModelQuotaError,
 	logger,
 	maskLargeVerbatimFencedCodeBlocks,
 	restoreMaskedVerbatimFences,
 } from "@/utils/";
 
-import { ChunksManager, TranslationValidatorManager } from "./managers";
-import { REGEXES, SYSTEM_PROMPT_TOKEN_RESERVE } from "./managers/managers.constants";
-import {
-	frontmatterBatchRequestEnvelopeSchema,
-	frontmatterBatchTranslationEnvelopeSchema,
-} from "./translator-frontmatter-batch.schema";
+import { ChunksManager } from "./chunking";
+import { SYSTEM_PROMPT_TOKEN_RESERVE } from "./chunking/chunking.constants";
+import { TranslationLlmClient } from "./llm/translation-llm.client";
+import { TranslationPromptBuilder } from "./llm/translation-prompt.builder";
+import { stripSpuriousOuterMarkdownFencesWhenSourceHadNoFences } from "./markdown/artifacts";
 import {
 	buildFrontmatterBlock,
 	extractFrontmatterParts,
-	extractTitleScalarFromInnerYaml,
 	mergePreservedYamlFrontmatter,
 	splitLeadingYamlFrontmatter,
-} from "./translator-frontmatter.util";
-import { stripSpuriousOuterMarkdownFencesWhenSourceHadNoFences } from "./translator-markdown-artifacts.util";
+} from "./markdown/frontmatter";
+import { emptyTranslationAttemptContext } from "./pipeline/translation-attempt.context";
+import { TranslationPipelineManager } from "./pipeline/translation-pipeline.manager";
+import { validateAndReassembleChunks } from "./postprocess/chunk-reassembly";
+import { cleanupTranslatedContent } from "./postprocess/translation-output-cleanup";
+import { TranslationFile } from "./translation-file";
 import { CONNECTIVITY_TEST_MAX_TOKENS, LLM_TEMPERATURE } from "./translator.constants";
+import { PostTranslationValidationService } from "./validation/post-translation-validation.service";
+import { TranslationLanguageCheck } from "./validation/translation-language-check";
 
-/** Structured-output schema for batched YAML `description` translation (OpenRouter/OpenAI JSON mode). */
-const FRONTMATTER_BATCH_RESPONSE_FORMAT = zodResponseFormat(
-	frontmatterBatchTranslationEnvelopeSchema,
-	"frontmatter_batch_translations",
-);
+export { TranslationFile } from "./translation-file";
 
-/**
- * Identifies which segment of a chunked body is being translated in one LLM call.
- *
- * Omitted for whole-file translation and for small frontmatter scalar calls.
- */
-type ChunkTranslationProgress = Readonly<{
-	index: number;
-	total: number;
-}>;
-
-/**
- * Selects which system prompt {@link TranslatorService.getSystemPrompt} builds for an LLM call.
- *
- * `markdownDocument` keeps chunking, verbatim-placeholder, and full doc rules. `frontmatterBatch`
- * uses one structured-output call for the YAML `description` string field when present.
- */
-export type TranslationSystemPromptKind = "markdownDocument" | "frontmatterBatch";
+export type {
+	ChunkTranslationProgress,
+	TranslationSystemPromptKind,
+} from "./llm/translation-system-prompt.types";
 
 /** Dependency injection interface for {@link TranslatorService} */
 export interface TranslatorServiceDependencies {
@@ -81,109 +61,20 @@ export interface TranslatorServiceDependencies {
 	/** Rate limiting queue for LLM API calls */
 	queue: PQueue;
 
-	/** Optional locale service (defaults to singleton) */
+	/** Locale strings and PR templates for the target language */
 	localeService: LocaleService;
 
-	/** Optional language detector service */
+	/** CLD-backed language detector */
 	languageDetectorService: LanguageDetectorService;
 
 	/** Retry configuration for LLM API calls */
 	retryConfig: RetryOptions;
-}
 
-/** Represents a file that needs to be translated */
-export class TranslationFile {
-	/** The title of the document extracted from frontmatter */
-	public readonly title: string | undefined;
+	/** OpenRouter model catalog limits (hosted API only) */
+	openRouterModelLimitsService: OpenRouterModelLimitsService;
 
-	/** Logger instance with file-specific context for workflow tracing */
-	public readonly logger: Logger;
-
-	/** Correlation ID for end-to-end tracing across the file's workflow */
-	public readonly correlationId: string;
-
-	/**
-	 * Resolved CLD source language for system prompts; set before any chunked or scalar LLM call for this logical document.
-	 *
-	 * @see {@link TranslatorService.translateContent} for when this is populated
-	 */
-	public documentSourceLanguage?: ReactLanguageCode;
-
-	/**
-	 * Builds a translation unit with optional logger parent and optional resolved source language.
-	 *
-	 * @param content Raw file body as fetched or synthesized for the workflow
-	 * @param filename Display filename for logs and PR context
-	 * @param path Repository path of the blob
-	 * @param sha Git object id for the blob
-	 * @param parentLogger Optional child logger parent when this file is a slice or snippet of another unit
-	 * @param documentSourceLanguage Optional resolved source language; omit when unknown until {@link TranslatorService.translateContent} runs
-	 *
-	 * @example
-	 * ```typescript
-	 * const file = new TranslationFile("# Hi", "doc.md", "src/content/doc.md", "abc123");
-	 * ```
-	 */
-	constructor(
-		public readonly content: string,
-		public readonly filename: string,
-		public readonly path: string,
-		public readonly sha: string,
-		parentLogger?: Logger,
-		documentSourceLanguage?: ReactLanguageCode,
-	) {
-		this.title = this.extractDocTitleFromContent(content);
-		this.correlationId = crypto.randomUUID();
-		this.logger = (parentLogger ?? logger).child({
-			file: this.filename,
-			path: this.path,
-			correlationId: this.correlationId,
-		});
-		if (documentSourceLanguage !== undefined) {
-			this.documentSourceLanguage = documentSourceLanguage;
-		}
-	}
-
-	/**
-	 * Extracts the document title from leading YAML frontmatter by parsing the inner block with {@link extractTitleScalarFromInnerYaml}.
-	 *
-	 * @param content The content of the document
-	 *
-	 * @returns The trimmed `title` string scalar, or `undefined` when there is no frontmatter or `title` is missing or not a string
-	 */
-	private extractDocTitleFromContent(content: string): string | undefined {
-		const frontmatterContentOnly = REGEXES.frontmatter.exec(content)?.groups?.["content"];
-
-		if (!frontmatterContentOnly) return;
-
-		return extractTitleScalarFromInnerYaml(frontmatterContentOnly);
-	}
-
-	/**
-	 * Returns a log-safe snapshot of this file (no `content` body).
-	 *
-	 * Pino `serializers.content` only applies to a top-level `content` key; logging `{ file: this }`
-	 * still serializes `file.content` in full, so use this for structured logs.
-	 */
-	public getLogContext(): {
-		filename: string;
-		path: string;
-		sha: string;
-		correlationId: string;
-		contentLength: number;
-		title: string | undefined;
-		documentSourceLanguage: ReactLanguageCode | undefined;
-	} {
-		return {
-			filename: this.filename,
-			path: this.path,
-			sha: this.sha,
-			correlationId: this.correlationId,
-			contentLength: this.content.length,
-			title: this.title,
-			documentSourceLanguage: this.documentSourceLanguage,
-		};
-	}
+	/** Optional LLM transport client (defaults to {@link TranslationLlmClient}) */
+	llmClient?: TranslationLlmClient;
 }
 
 /**
@@ -233,9 +124,19 @@ export class TranslatorService {
 	public translationGuidelines: string | null = null;
 
 	public readonly managers: {
-		translationValidator: TranslationValidatorManager;
 		chunks: ChunksManager;
+		pipeline: TranslationPipelineManager;
+		validation: PostTranslationValidationService;
+		languageCheck: TranslationLanguageCheck;
 	};
+
+	private readonly promptBuilder: TranslationPromptBuilder;
+
+	/** OpenAI chat completion transport with retries and rate limiting */
+	private readonly llmClient: TranslationLlmClient;
+
+	/** Resolves OpenRouter `GET /v1/models` limits for chunk and completion caps */
+	private readonly openRouterModelLimitsService: OpenRouterModelLimitsService;
 
 	/**
 	 * Creates a new TranslatorService instance with injected dependencies.
@@ -251,10 +152,31 @@ export class TranslatorService {
 			languageDetector: dependencies.languageDetectorService,
 		};
 		this.retryConfig = dependencies.retryConfig;
+		this.openRouterModelLimitsService = dependencies.openRouterModelLimitsService;
 		this.managers = {
-			translationValidator: new TranslationValidatorManager(this.services.languageDetector),
 			chunks: new ChunksManager(this.model),
+			pipeline: new TranslationPipelineManager(),
+			validation: new PostTranslationValidationService(),
+			languageCheck: new TranslationLanguageCheck(this.services.languageDetector),
 		};
+		this.promptBuilder = new TranslationPromptBuilder(
+			this.services.languageDetector,
+			this.services.locale,
+		);
+		this.llmClient =
+			dependencies.llmClient ??
+			new TranslationLlmClient({
+				openai: this.openai,
+				model: this.model,
+				queue: this.queue,
+				retryConfig: this.retryConfig,
+				promptBuilder: this.promptBuilder,
+				estimateInputTokens: (content) => this.managers.chunks.estimateTokenCount(content),
+				getCompletionTokenCap: () => this.providerCompletionTokenCap ?? env.MAX_TOKENS,
+				resolveDocumentSourceLanguage: (fullMarkdown) =>
+					this.resolveDocumentSourceLanguage(fullMarkdown),
+				getTranslationGuidelines: () => this.translationGuidelines,
+			});
 	}
 
 	/**
@@ -276,7 +198,7 @@ export class TranslatorService {
 			temperature: LLM_TEMPERATURE,
 		});
 
-		if (!this.isLLMResponseValid(response)) {
+		if (!this.llmClient.isLLMResponseValid(response)) {
 			throw new ApplicationError(
 				"Invalid LLM API response",
 				ErrorCode.InitializationError,
@@ -309,7 +231,7 @@ export class TranslatorService {
 			return;
 		}
 
-		if (!openRouterModelLimitsService.isHostedOpenRouterBaseUrl(env.LLM_API_BASE_URL)) {
+		if (!this.openRouterModelLimitsService.isHostedOpenRouterBaseUrl(env.LLM_API_BASE_URL)) {
 			this.logger.debug(
 				{ baseUrl: env.LLM_API_BASE_URL },
 				"Skipping OpenRouter model metadata: base URL is not hosted OpenRouter",
@@ -325,7 +247,7 @@ export class TranslatorService {
 		}
 
 		const limits: OpenRouterModelLimits | null =
-			await openRouterModelLimitsService.fetchLimitsForModel(
+			await this.openRouterModelLimitsService.fetchLimitsForModel(
 				env.LLM_API_BASE_URL,
 				env.LLM_API_KEY,
 				this.model,
@@ -367,22 +289,6 @@ export class TranslatorService {
 				completionCap,
 			},
 			"Applied OpenRouter model limits for chunking",
-		);
-	}
-
-	/**
-	 * Checks if an LLM API response is valid.
-	 * Checks if the response has an ID, usage, and a message.
-	 *
-	 * @param response LLM API response to check
-	 *
-	 * @returns `true` if the response is valid, `false` otherwise
-	 */
-	private isLLMResponseValid(response: OpenAI.Chat.Completions.ChatCompletion): boolean {
-		return Boolean(
-			response.id &&
-			typeof response.usage?.total_tokens === "number" &&
-			response.choices.at(0)?.message,
 		);
 	}
 
@@ -452,7 +358,6 @@ export class TranslatorService {
 		}
 
 		const translationStartTime = Date.now();
-		let translatedContent: string;
 
 		const verbatimMask =
 			env.MASK_VERBATIM_LARGE_FENCES ?
@@ -494,47 +399,51 @@ export class TranslatorService {
 			file.documentSourceLanguage,
 		);
 
-		const contentNeedsChunking = this.managers.chunks.needsChunking(translationWorkFile);
-		if (!contentNeedsChunking) {
-			translatedContent = await this.callLanguageModel(translationWorkFile);
-		} else {
-			translatedContent = await this.translateWithChunking(translationWorkFile);
-		}
-
-		if (verbatimMask && verbatimMask.replacements.length > 0) {
-			translatedContent = restoreMaskedVerbatimFences(translatedContent, verbatimMask.replacements);
-		}
-
 		const fileBodySplit = splitLeadingYamlFrontmatter(file.content);
 		const sourceBodyForArtifacts =
 			fileBodySplit.rest.length > 0 ? fileBodySplit.rest : file.content;
 
-		translatedContent = stripSpuriousOuterMarkdownFencesWhenSourceHadNoFences(
-			sourceBodyForArtifacts,
-			translatedContent,
-			file.logger,
-		);
+		const translatedContent = await this.managers.pipeline.translateWithValidationRetries({
+			file,
+			translateBody: (attemptContext) =>
+				this.translateMarkdownBody(translationWorkFile, attemptContext),
+			finalizeTranslation: async (bodyTranslation) => {
+				let finalized = bodyTranslation;
 
-		if (preservedYamlBlock) {
-			const frontmatterParts = extractFrontmatterParts(preservedYamlBlock);
-			const mergedBlock =
-				frontmatterParts ?
-					buildFrontmatterBlock(
-						frontmatterParts.bom,
-						await this.translateFrontmatterStringFields(frontmatterParts.inner, file),
-					)
-				:	preservedYamlBlock;
+				if (verbatimMask && verbatimMask.replacements.length > 0) {
+					finalized = restoreMaskedVerbatimFences(finalized, verbatimMask.replacements);
+				}
 
-			translatedContent = mergePreservedYamlFrontmatter(
-				mergedBlock,
-				translatedContent,
-				translationPayload,
-			);
-		}
+				finalized = stripSpuriousOuterMarkdownFencesWhenSourceHadNoFences(
+					sourceBodyForArtifacts,
+					finalized,
+					file.logger,
+				);
+
+				if (preservedYamlBlock) {
+					const frontmatterParts = extractFrontmatterParts(preservedYamlBlock);
+					const mergedBlock =
+						frontmatterParts ?
+							buildFrontmatterBlock(
+								frontmatterParts.bom,
+								await this.translateFrontmatterStringFields(frontmatterParts.inner, file),
+							)
+						:	preservedYamlBlock;
+
+					return mergePreservedYamlFrontmatter(mergedBlock, finalized, translationPayload);
+				}
+
+				return finalized;
+			},
+			collectIssues: (content) =>
+				this.managers.validation.collectRetryableValidationIssues(file, content),
+			createFailedError: (content, issues) =>
+				this.managers.validation.createValidationFailedError(file, content, issues),
+		});
 
 		const translationDuration = Date.now() - translationStartTime;
 
-		this.managers.translationValidator.validateTranslation(file, translatedContent);
+		this.managers.validation.recordSoftValidationWarnings(file, translatedContent);
 
 		file.logger.info(
 			{
@@ -547,7 +456,7 @@ export class TranslatorService {
 			"Translation completed successfully",
 		);
 
-		return this.managers.translationValidator.cleanupTranslatedContent(translatedContent, file);
+		return cleanupTranslatedContent(translatedContent, file);
 	}
 
 	/**
@@ -598,7 +507,7 @@ export class TranslatorService {
 			"Translating YAML frontmatter string fields in one structured LLM call",
 		);
 
-		const envelope = await this.callLanguageModelFrontmatterBatch(file, batchItems);
+		const envelope = await this.llmClient.callLanguageModelFrontmatterBatch(file, batchItems);
 		const translatedByKey = new Map(
 			envelope.items.map((item) => [item.fieldKey, item.translated] as const),
 		);
@@ -622,10 +531,7 @@ export class TranslatorService {
 				file.documentSourceLanguage,
 			);
 
-			translatedScalar = this.managers.translationValidator.cleanupTranslatedContent(
-				translatedScalar,
-				snippetFile,
-			);
+			translatedScalar = cleanupTranslatedContent(translatedScalar, snippetFile);
 
 			if (!translatedScalar.length) {
 				file.logger.warn(
@@ -639,190 +545,6 @@ export class TranslatorService {
 		}
 
 		return doc.toString({ lineWidth: 0 });
-	}
-
-	/**
-	 * Translates all requested YAML frontmatter string fields in one LLM completion using JSON schema output.
-	 *
-	 * Uses the same glossary and locale rules as the markdown body pass, encoded in the system prompt, so
-	 * terminology stays consistent between the `description` field and the document body.
-	 *
-	 * @param file Logical document being translated (for logging and resolved source language)
-	 * @param batchItems Field keys and source strings to translate (the `description` field when present)
-	 *
-	 * @throws {ApplicationError} When the model returns empty content, truncates, or JSON that fails schema validation
-	 *
-	 * @returns Parsed envelope matching {@link frontmatterBatchTranslationEnvelopeSchema}
-	 */
-	private async callLanguageModelFrontmatterBatch(
-		file: TranslationFile,
-		batchItems: readonly { fieldKey: FrontmatterBatchFieldKey; source: string }[],
-	) {
-		file.documentSourceLanguage ??= await this.resolveDocumentSourceLanguage(file.content);
-
-		const requestPayload = frontmatterBatchRequestEnvelopeSchema.parse({ items: batchItems });
-		const userMessage = JSON.stringify(requestPayload);
-		const contentLengthForLog = userMessage.length;
-
-		return this.queue.add(async () => {
-			const callStartTime = Date.now();
-			const estimatedInputTokens = this.managers.chunks.estimateTokenCount(userMessage);
-
-			return pRetry(
-				async () => {
-					const attemptStartTime = Date.now();
-
-					try {
-						file.logger.debug(
-							{
-								contentLength: contentLengthForLog,
-								estimatedInputTokens,
-								model: this.model,
-								systemPromptKind: "frontmatterBatch",
-							},
-							"Calling LLM API for batched frontmatter metadata",
-						);
-
-						const completion = await this.openai.chat.completions.create(
-							this.getLLMCompletionParams(
-								file,
-								userMessage,
-								undefined,
-								"frontmatterBatch",
-								FRONTMATTER_BATCH_RESPONSE_FORMAT,
-							),
-						);
-
-						const rawJson = completion.choices[0]?.message.content;
-
-						if (!rawJson) {
-							throw new ApplicationError(
-								"No content returned from language model for frontmatter batch",
-								ErrorCode.NoContent,
-								`${TranslatorService.name}.${this.callLanguageModelFrontmatterBatch.name}`,
-								{ model: this.model, contentLength: contentLengthForLog },
-							);
-						}
-
-						const finishReason = completion.choices[0]?.finish_reason;
-						if (finishReason === "length") {
-							throw new ApplicationError(
-								"Language model response ended at max completion tokens (truncated frontmatter batch JSON)",
-								ErrorCode.TranslationFailed,
-								`${TranslatorService.name}.${this.callLanguageModelFrontmatterBatch.name}`,
-								{
-									model: this.model,
-									contentLength: contentLengthForLog,
-									finishReason,
-									completionTokens: completion.usage?.completion_tokens,
-									promptTokens: completion.usage?.prompt_tokens,
-								},
-							);
-						}
-
-						const parsedEnvelope = frontmatterBatchTranslationEnvelopeSchema.safeParse(
-							JSON.parse(rawJson),
-						);
-
-						if (!parsedEnvelope.success) {
-							throw new ApplicationError(
-								"Frontmatter batch response failed schema validation",
-								ErrorCode.TranslationFailed,
-								`${TranslatorService.name}.${this.callLanguageModelFrontmatterBatch.name}`,
-								{
-									model: this.model,
-									issues: parsedEnvelope.error.issues,
-								},
-							);
-						}
-
-						const requestedKeys = new Set(batchItems.map((item) => item.fieldKey));
-						const responseKeys = new Set(parsedEnvelope.data.items.map((item) => item.fieldKey));
-
-						if (
-							requestedKeys.size !== responseKeys.size ||
-							[...requestedKeys].some((k) => !responseKeys.has(k))
-						) {
-							throw new ApplicationError(
-								"Frontmatter batch response keys do not match requested fields",
-								ErrorCode.TranslationFailed,
-								`${TranslatorService.name}.${this.callLanguageModelFrontmatterBatch.name}`,
-								{
-									requested: [...requestedKeys],
-									received: [...responseKeys],
-								},
-							);
-						}
-
-						file.logger.debug(
-							{
-								model: this.model,
-								durationMs: Date.now() - attemptStartTime,
-								inputTokens: completion.usage?.prompt_tokens,
-								outputTokens: completion.usage?.completion_tokens,
-								totalTokens: completion.usage?.total_tokens,
-								fieldCount: parsedEnvelope.data.items.length,
-							},
-							"LLM frontmatter batch call successful",
-						);
-
-						return parsedEnvelope.data;
-					} catch (error) {
-						if (error instanceof SyntaxError) {
-							throw new ApplicationError(
-								"Frontmatter batch response was not valid JSON",
-								ErrorCode.TranslationFailed,
-								`${TranslatorService.name}.${this.callLanguageModelFrontmatterBatch.name}`,
-								{ model: this.model, parseError: error.message },
-							);
-						}
-
-						if (error instanceof APIError) {
-							if (
-								error.status === StatusCodes.UNAUTHORIZED ||
-								error.status === StatusCodes.BAD_REQUEST
-							) {
-								throw new AbortError(error);
-							}
-
-							if (isOpenRouterDailyFreeModelQuotaError(error)) {
-								file.logger.error(
-									{
-										model: this.model,
-										message: error.message,
-									},
-									"OpenRouter free-models-per-day limit reached; add credits, drop :free, or wait for the daily reset",
-								);
-								throw new AbortError(error);
-							}
-						}
-
-						throw error;
-					}
-				},
-				{
-					...this.retryConfig,
-					onFailedAttempt: async ({ attemptNumber: attempt, error, retriesLeft }) => {
-						file.logger.warn(
-							{
-								attempt,
-								retriesLeft,
-								error: error instanceof Error ? error.message : String(error),
-								totalElapsedMs: Date.now() - callStartTime,
-								contentLength: contentLengthForLog,
-							},
-							`LLM frontmatter batch attempt ${attempt} failed, ${retriesLeft} retries remaining`,
-						);
-
-						const resetWaitMs = getRateLimitResetWaitMs(error);
-						if (resetWaitMs > 0) {
-							file.logger.info({ resetWaitMs }, "Waiting for LLM rate limit window before retry");
-							await new Promise<void>((resolve) => setTimeout(resolve, resetWaitMs));
-						}
-					},
-				},
-			);
-		});
 	}
 
 	/**
@@ -848,7 +570,49 @@ export class TranslatorService {
 	 * console.log('Translation completed:', translated.length);
 	 * ```
 	 */
-	private async translateWithChunking(file: TranslationFile): Promise<string> {
+	/**
+	 * Translates markdown body content (single-shot or chunked) with optional validation retry hints.
+	 *
+	 * @param file Work file whose `content` is the body sent to the LLM (frontmatter already split off)
+	 * @param attemptContext Guard hints from a failed post-translation validation attempt
+	 *
+	 * @returns Translated markdown body before frontmatter merge
+	 */
+	private async translateMarkdownBody(
+		file: TranslationFile,
+		attemptContext: TranslationAttemptContext = emptyTranslationAttemptContext(),
+	) {
+		const contentNeedsChunking = this.managers.chunks.needsChunking(file);
+		if (contentNeedsChunking) {
+			return this.translateWithChunking(file, attemptContext);
+		}
+
+		try {
+			return await this.callLanguageModel(
+				file,
+				undefined,
+				undefined,
+				"markdownDocument",
+				undefined,
+				attemptContext,
+			);
+		} catch (error) {
+			if (!isCompletionLengthTruncationError(error)) {
+				throw error;
+			}
+
+			file.logger.info(
+				{ path: file.path, contentLength: file.content.length },
+				"Completion token limit reached; translating in chunks",
+			);
+			return this.translateWithChunking(file, attemptContext);
+		}
+	}
+
+	private async translateWithChunking(
+		file: TranslationFile,
+		attemptContext: TranslationAttemptContext = emptyTranslationAttemptContext(),
+	): Promise<string> {
 		file.logger.debug({ contentLength: file.content.length }, "Starting chunked translation");
 
 		const { chunks, separators } = await this.managers.chunks.chunkContent(file.content);
@@ -863,7 +627,7 @@ export class TranslatorService {
 		);
 
 		const translatedChunks = await Promise.all(
-			chunks.map((chunk, index) => this.translateChunk(file, chunk, index, chunks)),
+			chunks.map((chunk, index) => this.translateChunk(file, chunk, index, chunks, attemptContext)),
 		);
 
 		file.logger.debug(
@@ -871,7 +635,7 @@ export class TranslatorService {
 			"All chunks translated, reassembling",
 		);
 
-		return this.managers.translationValidator.validateAndReassembleChunks(file, {
+		return validateAndReassembleChunks(file, {
 			original: chunks,
 			translated: translatedChunks,
 			separators,
@@ -893,6 +657,7 @@ export class TranslatorService {
 		chunk: string,
 		index: number,
 		chunks: string[],
+		attemptContext: TranslationAttemptContext = emptyTranslationAttemptContext(),
 	): Promise<string> {
 		const startTime = Date.now();
 		const estimatedTokens = this.managers.chunks.estimateTokenCount(chunk);
@@ -909,7 +674,14 @@ export class TranslatorService {
 
 		const chunkProgress: ChunkTranslationProgress | undefined =
 			chunks.length > 1 ? { index: index + 1, total: chunks.length } : undefined;
-		const translatedChunk = await this.callLanguageModel(file, chunk, chunkProgress);
+		const translatedChunk = await this.callLanguageModel(
+			file,
+			chunk,
+			chunkProgress,
+			"markdownDocument",
+			undefined,
+			attemptContext,
+		);
 
 		const strippedChunk = stripSpuriousOuterMarkdownFencesWhenSourceHadNoFences(
 			chunk,
@@ -931,338 +703,22 @@ export class TranslatorService {
 		return strippedChunk;
 	}
 
-	/**
-	 * Prepares parameters for LLM chat completion API call.
-	 *
-	 * @param file Translation file instance
-	 * @param userMessageContent User message sent to the model
-	 * @param chunkProgress Optional slice position when translating a chunked body in multiple calls
-	 * @param systemPromptKind Which system prompt to build (defaults to full markdown document rules)
-	 *
-	 * @returns Chat completion parameters object
-	 */
-	private getLLMCompletionParams(
-		file: TranslationFile,
-		userMessageContent: string,
-		chunkProgress?: ChunkTranslationProgress,
-		systemPromptKind: TranslationSystemPromptKind = "markdownDocument",
-		responseFormat?: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming["response_format"],
-	): OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming {
-		const params: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming = {
-			model: this.model,
-			temperature: LLM_TEMPERATURE,
-			max_tokens: this.providerCompletionTokenCap ?? env.MAX_TOKENS,
-			messages: [
-				{
-					role: "system",
-					content: this.getSystemPrompt(file, userMessageContent, chunkProgress, systemPromptKind),
-				},
-				{ role: "user", content: userMessageContent },
-			],
-		};
-
-		if (responseFormat) {
-			params.response_format = responseFormat;
-		}
-
-		return params;
-	}
-
-	/**
-	 * Sends content to the language model for translation.
-	 *
-	 * Constructs system and user prompts based on detected language.
-	 * Automatically applies rate limiting to prevent exceeding API limits,
-	 * especially important for free-tier LLM models with strict rate limits.
-	 *
-	 * @param file Translation file instance
-	 * @param content Content to translate (defaults to file.content if not provided)
-	 * @param chunkProgress When set, the system prompt notes this body is slice `index` of `total` from one file
-	 * @param systemPromptKind Which system prompt to use; YAML metadata uses `frontmatterBatch`
-	 *
-	 * @throws {ApplicationError} with {@link ErrorCode.TranslationFailed} if the translation's content is missing/empty
-	 *
-	 * @returns Resolves to the translated content
-	 */
-	private async callLanguageModel(
+	/** @see {@link TranslationLlmClient.callLanguageModel} */
+	private callLanguageModel(
 		file: TranslationFile,
 		content?: string,
 		chunkProgress?: ChunkTranslationProgress,
 		systemPromptKind: TranslationSystemPromptKind = "markdownDocument",
-	): Promise<string> {
-		file.documentSourceLanguage ??= await this.resolveDocumentSourceLanguage(file.content);
-
-		const contentToTranslate = content ?? file.content;
-
-		return this.queue.add(async () => {
-			const callStartTime = Date.now();
-			const estimatedInputTokens = this.managers.chunks.estimateTokenCount(contentToTranslate);
-
-			return pRetry(
-				async () => {
-					const attemptStartTime = Date.now();
-
-					try {
-						file.logger.debug(
-							{
-								contentLength: contentToTranslate.length,
-								estimatedInputTokens,
-								model: this.model,
-								systemPromptKind,
-							},
-							"Calling LLM API",
-						);
-
-						const completion = await this.openai.chat.completions.create(
-							this.getLLMCompletionParams(
-								file,
-								contentToTranslate,
-								chunkProgress,
-								systemPromptKind,
-							),
-						);
-
-						const translatedContent = completion.choices[0]?.message.content;
-
-						if (!translatedContent) {
-							throw new ApplicationError(
-								"No content returned from language model",
-								ErrorCode.NoContent,
-								`${TranslatorService.name}.${this.callLanguageModel.name}`,
-								{ model: this.model, contentLength: contentToTranslate.length },
-							);
-						}
-
-						const finishReason = completion.choices[0]?.finish_reason;
-						if (finishReason === "length") {
-							throw new ApplicationError(
-								"Language model response ended at max completion tokens (truncated output)",
-								ErrorCode.TranslationFailed,
-								`${TranslatorService.name}.${this.callLanguageModel.name}`,
-								{
-									model: this.model,
-									contentLength: contentToTranslate.length,
-									finishReason,
-									completionTokens: completion.usage?.completion_tokens,
-									promptTokens: completion.usage?.prompt_tokens,
-								},
-							);
-						}
-
-						file.logger.debug(
-							{
-								model: this.model,
-								durationMs: Date.now() - attemptStartTime,
-								inputTokens: completion.usage?.prompt_tokens,
-								outputTokens: completion.usage?.completion_tokens,
-								totalTokens: completion.usage?.total_tokens,
-								translatedLength: translatedContent.length,
-							},
-							"LLM API call successful",
-						);
-
-						return translatedContent;
-					} catch (error) {
-						if (error instanceof APIError) {
-							if (
-								error.status === StatusCodes.UNAUTHORIZED ||
-								error.status === StatusCodes.BAD_REQUEST
-							) {
-								throw new AbortError(error);
-							}
-
-							if (isOpenRouterDailyFreeModelQuotaError(error)) {
-								file.logger.error(
-									{
-										model: this.model,
-										message: error.message,
-									},
-									"OpenRouter free-models-per-day limit reached; add credits, drop :free, or wait for the daily reset",
-								);
-								throw new AbortError(error);
-							}
-						}
-
-						throw error;
-					}
-				},
-				{
-					...this.retryConfig,
-					onFailedAttempt: async ({ attemptNumber: attempt, error, retriesLeft }) => {
-						file.logger.warn(
-							{
-								attempt,
-								retriesLeft,
-								error: error.message,
-								totalElapsedMs: Date.now() - callStartTime,
-								contentLength: contentToTranslate.length,
-							},
-							`LLM call attempt ${attempt} failed, ${retriesLeft} retries remaining`,
-						);
-
-						const resetWaitMs = getRateLimitResetWaitMs(error);
-						if (resetWaitMs > 0) {
-							file.logger.info({ resetWaitMs }, "Waiting for LLM rate limit window before retry");
-							await new Promise<void>((resolve) => setTimeout(resolve, resetWaitMs));
-						}
-					},
-				},
-			);
-		});
-	}
-
-	/**
-	 * Creates the system prompt that defines translation rules and requirements.
-	 *
-	 * @param file Translation file instance
-	 * @param userMessageContent User message body for placeholder checks (verbatim fence hints)
-	 * @param chunkProgress When set, documents that `userMessageContent` is one slice of a larger markdown body
-	 * @param systemPromptKind Document translation vs batched YAML metadata JSON (see {@link TranslationSystemPromptKind})
-	 *
-	 * @returns The system prompt string
-	 */
-	private getSystemPrompt(
-		file: TranslationFile,
-		userMessageContent: string,
-		chunkProgress?: ChunkTranslationProgress,
-		systemPromptKind: TranslationSystemPromptKind = "markdownDocument",
+		responseFormat?: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming["response_format"],
+		attemptContext: TranslationAttemptContext = emptyTranslationAttemptContext(),
 	) {
-		const documentSourceLanguage = file.documentSourceLanguage ?? "en";
-
-		this.logger.debug({ systemPromptKind }, "Generating system prompt for translation");
-
-		const languages = {
-			target: this.services.languageDetector.getLanguageName(
-				LanguageDetectorService.languages.target,
-			),
-			source: this.services.languageDetector.getLanguageName(documentSourceLanguage, false),
-		};
-
-		this.logger.debug(
-			{ documentSourceLanguage, languages },
-			"Determined source and target languages for prompt",
+		return this.llmClient.callLanguageModel(
+			file,
+			content,
+			chunkProgress,
+			systemPromptKind,
+			responseFormat,
+			attemptContext,
 		);
-
-		if (systemPromptKind === "frontmatterBatch") {
-			return this.buildFrontmatterBatchSystemPrompt(languages);
-		}
-
-		const translationGuidelinesSection =
-			this.translationGuidelines ?
-				`\n## TRANSLATION GUIDELINES\nApply these exact translations for the specified terms:\n${this.translationGuidelines}\n`
-			:	"";
-
-		const chunkSliceSection =
-			chunkProgress && chunkProgress.total > 1 ?
-				`
-				# DOCUMENT SLICE
-				The user message is slice ${chunkProgress.index} of ${chunkProgress.total} from one continuous markdown file.
-				Keep terminology and structure aligned with a single document; translate only the markdown in the user message.
-				`
-			:	"";
-
-		const builtSystemPrompt = `# ROLE
-				You are an expert technical translator specializing in React documentation.
-	
-				# TASK
-				Translate the provided content from ${languages.source} to ${languages.target} with absolute precision and technical accuracy.
-				${chunkSliceSection}
-				# CRITICAL PRESERVATION RULES
-				1. **Structure & Formatting**: Preserve ALL markdown syntax, HTML tags, code blocks, frontmatter, and line breaks exactly as written
-				2. **Code & identifiers**: Keep ALL code examples, URLs, and every programming identifier (functions, variables, classes, hooks, packages, props as in code) unchanged in every context—fenced blocks, inline code, tables, lists, or prose
-				3. **Content Completeness**: Translate EVERY piece of text content WITHOUT adding, removing, or omitting anything
-				4. **Whitespace Integrity**: ALWAYS preserve blank lines, especially after horizontal rules (---). The pattern '---\n\n##' must remain '---\n\n##' and never become '---\n##'
-	
-				# TRANSLATION GUIDELINES
-				## What to Translate
-				- Natural language text and documentation content
-				- Code comments and string literals (when they contain user-facing text)
-				- Alt text, titles, and descriptive content
-	
-				## What NOT to Translate
-				- API endpoints; URLs, paths, and configuration values; technical terms unless the translation guidelines map them
-				- YAML frontmatter key names; the \`title\` value is not machine-translated; only a string \`description\` value may be translated in a dedicated pass after the body
-	
-				## Quality Standards
-				- Use natural, fluent ${languages.target} while maintaining technical precision
-				- Apply consistent terminology throughout the document
-				- Ensure technical accuracy and clarity for developers
-	
-				# OUTPUT REQUIREMENTS
-				- Return ONLY the translated content
-				- Do NOT add explanatory text, code block wrappers, or prefixes
-				- Maintain exact whitespace patterns, including list formatting and blank lines
-				- Preserve any trailing newlines from the original content
-	
-				${this.services.locale.definitions.rules.specific}
-	
-				${translationGuidelinesSection}
-			`;
-
-		const verbatimPlaceholderSection =
-			userMessageContent.includes("<!-- translate-react:verbatim-fence-") ?
-				`
-				# VERBATIM SOURCE PLACEHOLDERS
-				Some fenced code regions were replaced with HTML comments matching \`<!-- translate-react:verbatim-fence-N -->\`.
-				Copy each placeholder comment EXACTLY into your output at the same position; never translate, remove, reorder, or alter these comments.
-				`
-			:	"";
-
-		return builtSystemPrompt + verbatimPlaceholderSection;
-	}
-
-	/**
-	 * Builds the system prompt for batched YAML frontmatter string translation with structured JSON output.
-	 *
-	 * Embeds the same glossary and locale rules as the markdown body pass (as silent reference) so
-	 * the `description` field stays aligned with body terminology without echoing the glossary into free text.
-	 *
-	 * @param languages Human-readable source and target language names for the TASK section
-	 *
-	 * @returns The system prompt string for the frontmatter batch completion
-	 */
-	private buildFrontmatterBatchSystemPrompt(languages: { source: string; target: string }) {
-		const termReferenceSection =
-			this.translationGuidelines ?
-				`
-				# TERM REFERENCE (DO NOT OUTPUT)
-				Use only for consistent terminology when translating each \`source\` string. Never copy, quote, translate, summarize, or repeat this reference in your reply JSON.
-	
-				${this.translationGuidelines}
-				`
-			:	"";
-
-		return `# ROLE
-				You are an expert technical translator for React documentation YAML metadata.
-	
-				# TASK
-				The user message is a single JSON object with an \`items\` array of length 1. The element has \`fieldKey\` "description" and \`source\` (the English string to translate). Translate \`source\` from ${languages.source} to ${languages.target}.
-	
-				# OUTPUT (STRICT)
-				- Reply with JSON only, matching the response schema: an object \`items\` whose length equals the request, each item having \`fieldKey\` (same as input) and \`translated\` (the translated string only).
-				- Do not add markdown, code fences, or commentary outside the JSON object.
-				- Preserve intentional internal line breaks in a string only when the corresponding \`source\` already uses multiple lines you must keep.
-	
-				# RULES
-				- Translate only natural language in each \`source\` value
-				- Keep programming identifiers, proper nouns, versions, code-like tokens, and URLs unchanged unless the term reference explicitly maps them
-				- Never translate the JSON keys \`fieldKey\`, \`source\`, \`items\`, or \`translated\` themselves
-	
-				${this.services.locale.definitions.rules.specific}
-	
-				${termReferenceSection}
-				`;
 	}
 }
-
-/** Pre-configured instance of {@link TranslatorService} for application-wide use */
-export const translatorService = new TranslatorService({
-	openai,
-	model: env.LLM_MODEL,
-	queue: queue,
-	localeService,
-	languageDetectorService,
-	retryConfig: {
-		retries: env.MAX_RETRY_ATTEMPTS,
-	},
-});

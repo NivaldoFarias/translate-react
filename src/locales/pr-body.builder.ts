@@ -1,6 +1,5 @@
-import type { PullRequestDescriptionMetadata } from "@/services/runner/managers/translation-batch.manager";
-import type { ProcessedFileResult } from "@/services/runner/runner.types";
-import type { TranslationFile } from "@/services/translator/translator.service";
+import type { ProcessedFileResult, PullRequestDescriptionMetadata } from "@/domain/workflow/";
+import type { TranslationFile } from "@/services/translator/";
 
 import type { LocalePRBodyStrings } from "./locale.types";
 
