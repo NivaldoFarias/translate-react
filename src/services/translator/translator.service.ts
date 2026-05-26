@@ -28,7 +28,11 @@ import {
 	restoreMaskedVerbatimFences,
 } from "@/utils/";
 
-import { ChunksManager, TranslationValidatorManager } from "./managers";
+import { ChunksManager } from "./managers";
+import { validateAndReassembleChunks } from "./postprocess/chunk-reassembly";
+import { cleanupTranslatedContent } from "./postprocess/translation-output-cleanup";
+import { PostTranslationValidationService } from "./validation/post-translation-validation.service";
+import { TranslationLanguageCheck } from "./validation/translation-language-check";
 import { SYSTEM_PROMPT_TOKEN_RESERVE } from "./managers/managers.constants";
 import { TranslationPromptBuilder } from "./llm/translation-prompt.builder";
 import type {
@@ -134,9 +138,10 @@ export class TranslatorService {
 	public translationGuidelines: string | null = null;
 
 	public readonly managers: {
-		translationValidator: TranslationValidatorManager;
 		chunks: ChunksManager;
 		pipeline: TranslationPipelineManager;
+		validation: PostTranslationValidationService;
+		languageCheck: TranslationLanguageCheck;
 	};
 
 	private readonly promptBuilder: TranslationPromptBuilder;
@@ -156,9 +161,10 @@ export class TranslatorService {
 		};
 		this.retryConfig = dependencies.retryConfig;
 		this.managers = {
-			translationValidator: new TranslationValidatorManager(this.services.languageDetector),
 			chunks: new ChunksManager(this.model),
 			pipeline: new TranslationPipelineManager(),
+			validation: new PostTranslationValidationService(),
+			languageCheck: new TranslationLanguageCheck(this.services.languageDetector),
 		};
 		this.promptBuilder = new TranslationPromptBuilder(
 			this.services.languageDetector,
@@ -439,14 +445,14 @@ export class TranslatorService {
 				return finalized;
 			},
 			collectIssues: (content) =>
-				this.managers.translationValidator.collectRetryableValidationIssues(file, content),
+				this.managers.validation.collectRetryableValidationIssues(file, content),
 			createFailedError: (content, issues) =>
-				this.managers.translationValidator.createValidationFailedError(file, content, issues),
+				this.managers.validation.createValidationFailedError(file, content, issues),
 		});
 
 		const translationDuration = Date.now() - translationStartTime;
 
-		this.managers.translationValidator.recordSoftValidationWarnings(file, translatedContent);
+		this.managers.validation.recordSoftValidationWarnings(file, translatedContent);
 
 		file.logger.info(
 			{
@@ -459,7 +465,7 @@ export class TranslatorService {
 			"Translation completed successfully",
 		);
 
-		return this.managers.translationValidator.cleanupTranslatedContent(translatedContent, file);
+		return cleanupTranslatedContent(translatedContent, file);
 	}
 
 	/**
@@ -534,10 +540,7 @@ export class TranslatorService {
 				file.documentSourceLanguage,
 			);
 
-			translatedScalar = this.managers.translationValidator.cleanupTranslatedContent(
-				translatedScalar,
-				snippetFile,
-			);
+			translatedScalar = cleanupTranslatedContent(translatedScalar, snippetFile);
 
 			if (!translatedScalar.length) {
 				file.logger.warn(
@@ -827,7 +830,7 @@ export class TranslatorService {
 			"All chunks translated, reassembling",
 		);
 
-		return this.managers.translationValidator.validateAndReassembleChunks(file, {
+		return validateAndReassembleChunks(file, {
 			original: chunks,
 			translated: translatedChunks,
 			separators,
