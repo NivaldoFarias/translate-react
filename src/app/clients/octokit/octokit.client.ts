@@ -6,7 +6,7 @@ import type { Octokit } from "@octokit/rest";
 import type { Options as RetryOptions } from "p-retry";
 
 import { logger as baseLogger, env, MS_PER_SECOND } from "@/app/utils";
-import { createOctokit } from "@/shared/clients/octokit/create-octokit.client";
+import { createOctokit } from "@/shared/clients/octokit/octokit.client";
 import { isUncastRequestError } from "@/shared/errors";
 
 import {

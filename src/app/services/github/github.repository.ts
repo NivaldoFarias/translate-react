@@ -2,7 +2,7 @@ import { Buffer } from "node:buffer";
 
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
-import type { SharedGitHubDependencies } from "./github.types";
+import type { SharedGitHubDependencies } from "./types";
 
 import { env, filterMarkdownFiles, logger, TRANSLATION_GUIDELINES_CANDIDATES } from "@/app/utils/";
 

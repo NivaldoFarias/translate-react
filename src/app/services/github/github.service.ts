@@ -4,12 +4,12 @@ import type {
 	PatchedRepositoryTreeItem,
 	ProcessedFileResult,
 	PullRequestStatus,
-} from "@/app/domain/workflow/";
+} from "@/app/services/github/types";
 import type { CommentBuilderService } from "@/app/services/comment-builder/comment-builder.service";
 import type { TranslationFile } from "@/app/services/translator/";
 
 import type { CommitTranslationOptions, PullRequestOptions } from "./github.content";
-import type { BaseRepositories, SharedGitHubDependencies } from "./github.types";
+import type { BaseRepositories, SharedGitHubDependencies } from "./types";
 
 import { octokit } from "@/app/clients/";
 import { env } from "@/app/utils/";

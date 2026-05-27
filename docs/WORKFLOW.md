@@ -9,7 +9,6 @@ Detailed breakdown of the translation workflow: execution stages, data flow, and
   - [Actual `run()` order](#actual-run-order)
 - [Automated upstream polling](#automated-upstream-polling)
 - [Operating translate-react (forks)](#operating-translate-react-forks)
-- [Local LLM workflow smoke](#local-llm-workflow-smoke)
 - [Pinning translate-react in GitHub Actions](#pinning-translate-react-in-github-actions)
 - [Releases and semantic versioning](#releases-and-semantic-versioning)
 - [Stable 1.x expectations](#stable-1x-expectations)
@@ -90,8 +89,8 @@ Translation runs only when an upstream React docs repository (`reactjs/<lang>.re
 | [`.github/upstream-locales.json`](../.github/upstream-locales.json)             | Registry of locales, upstream/fork repo names, and guidelines file             |
 | [`.github/workflows/upstream-poll.yml`](../.github/workflows/upstream-poll.yml) | Scheduled poll (every 6 hours) and optional `workflow_dispatch` dry run        |
 | [`.github/workflows/workflow.yml`](../.github/workflows/workflow.yml)           | Reusable translation workflow (`workflow_call`) and manual `workflow_dispatch` |
-| [`src/ci/entries/poll-upstream.ts`](../src/ci/entries/poll-upstream.ts)         | Compares upstream SHAs to repository variables; outputs a matrix               |
-| [`src/ci/entries/resolve-matrix.ts`](../src/ci/entries/resolve-matrix.ts)       | Builds a matrix for manual runs (optional `--langs`)                           |
+| [`src/ci/actions/poll-upstream.ts`](../src/ci/actions/poll-upstream.ts)         | Compares upstream SHAs to repository variables; outputs a matrix               |
+| [`src/ci/actions/resolve-matrix.ts`](../src/ci/actions/resolve-matrix.ts)       | Builds a matrix for manual runs (optional `--langs` via `citty`)               |
 
 ```mermaid
 flowchart TD
@@ -108,7 +107,7 @@ For each `lang` in the registry, the workflow stores the processed upstream tip 
 
 - Name: `UPSTREAM_SHA_<LANG>` with hyphens mapped to underscores (e.g. `pt-br` → `UPSTREAM_SHA_PT_BR`)
 - Updated: only after a **successful** matrix job for that locale (`Record upstream SHA` step)
-- Read: poll job via [`UpstreamShaVariableReader`](../src/ci/upstream/upstream-sha-variable.reader.ts)
+- Read: poll job via [`UpstreamShaVariableReader`](../src/ci/services/upstream/upstream-sha-variable.reader.ts)
 
 If a translation run fails, the variable is left unchanged so the next poll still sees a mismatch and can retry.
 
@@ -146,15 +145,15 @@ The translation workflow needs `actions: write` on `GITHUB_TOKEN` (or the bot to
 
 No hosted backend: you set `LLM_API_KEY` (OpenAI-compatible API) and pay or quota-manage with the provider. Translation Actions use the [translate-react bot app](https://github.com/apps/translate-react-bot); secrets such as `BOT_APP_ID`, `BOT_PRIVATE_KEY`, `LLM_API_KEY`, optional `GH_PAT_TOKEN` / `OPENAI_PROJECT_ID`, and variables such as `LLM_MODEL` are wired in [`.github/workflows/workflow.yml`](../.github/workflows/workflow.yml) and [`.github/workflows/upstream-poll.yml`](../.github/workflows/upstream-poll.yml). Review PRs on the locale fork; note this tool’s version (logs, `package.json`, or CI ref) when comparing runs.
 
-Rate and cost knobs: [`src/app/utils/constants.util.ts`](../src/app/utils/constants.util.ts), [`src/app/utils/env.util.ts`](../src/app/utils/env.util.ts) — e.g. `LLM_MAX_REQUESTS_PER_MINUTE`, `MAX_LLM_CONCURRENCY`, `MAX_RETRY_ATTEMPTS`, `BATCH_SIZE`, `MASK_VERBATIM_LARGE_FENCES`.
+Rate and cost knobs: [`src/app/constants/`](../src/app/constants/), [`src/app/schemas/env.schema.ts`](../src/app/schemas/env.schema.ts) — e.g. `LLM_MAX_REQUESTS_PER_MINUTE`, `MAX_LLM_CONCURRENCY`, `MAX_RETRY_ATTEMPTS`, `BATCH_SIZE`, `MASK_VERBATIM_LARGE_FENCES`.
 
-## Local LLM workflow smoke
+## Local LLM exercise (integration tests)
 
-`bun run ci:smoke-llm` runs [`src/ci/smoke-llm.ts`](../src/ci/smoke-llm.ts): one [`RunnerService.run()`](../src/app/services/runner/runner.service.ts) with [`translatorService`](../src/app/composition.ts) from [`composition.ts`](../src/app/composition.ts) and mocked GitHub from [`createWorkflowGitHubServiceFromFiles`](../tests/integration/create-integration-runner.ts). Markdown is loaded via [`loadIntegrationWorkflowFilesFromMdFixtureDir`](../tests/integration/create-integration-runner.ts) with **every** `*.md` under [`tests/fixtures/md/`](../tests/fixtures/md/) (same helper as [`tests/integration/workflow.integration.spec.ts`](../tests/integration/workflow.integration.spec.ts), which selects specific files by name). Use the same `.env` as the main workflow for API tokens (`GH_TOKEN`, `LLM_API_KEY`) and other validated settings. Do not use `bun test` for this path — [`tests/setup.ts`](../tests/setup.ts) replaces `env`, so those keys would not reach the client.
+For a real LLM pass with mocked GitHub, use [`tests/integration/workflow.integration.spec.ts`](../tests/integration/workflow.integration.spec.ts) and helpers in [`create-integration-runner.ts`](../tests/integration/create-integration-runner.ts) (markdown under [`tests/fixtures/md/`](../tests/fixtures/md/)). Configure `LLM_API_KEY` and related vars in `.env` the same way as production runs.
 
 ## Releases and semantic versioning
 
-Semver is [`package.json`](../package.json) `version` (OpenRouter title defaults use `name` + `version` from there; see [`src/app/utils/constants.util.ts`](../src/app/utils/constants.util.ts)).
+Semver is [`package.json`](../package.json) `version` (OpenRouter title defaults use `name` + `version` from there; see [`src/app/constants/`](../src/app/constants/)).
 
 CI on `main` / `dev` fails if `package.json` `version` does not appear as a `## [version]` heading in [`CHANGELOG.md`](../CHANGELOG.md) (see [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)).
 
@@ -356,7 +355,7 @@ Same branch → translate → commit → PR loop as under [Stage 5: Batch Transl
 | `ProcessedFileResult` | Outcome per file               | `filename`, `branch`, `translation`, `pullRequest`, `pullRequestProgress`, `error`                                               |
 | `RunnerState`         | In-memory workflow state       | `repositoryTree`, `filesToTranslate`, `processedResults`, optional `invalidPRsByFile`                                            |
 
-Shared types: [`src/app/domain/workflow/`](../src/app/domain/workflow/). Runner-only types (`RunnerState`, dependencies): [`runner.types.ts`](../src/app/services/runner/runner.types.ts).
+Shared types: [`src/app/services/github/types.ts`](../src/app/services/github/types.ts), [`src/app/locales/types.ts`](../src/app/locales/types.ts). Runner-only types (`RunnerState`, dependencies): [`runner.types.ts`](../src/app/services/runner/runner.types.ts).
 
 ## Error Recovery
 

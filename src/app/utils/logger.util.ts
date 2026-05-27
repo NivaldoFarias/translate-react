@@ -1,6 +1,6 @@
 import type { Logger } from "pino";
 
-import { env } from "@/app/env/app.env";
+import { env } from "@/app/schemas/env.schema";
 import { createLogger } from "@/shared/utils/create-logger.util";
 
 /**

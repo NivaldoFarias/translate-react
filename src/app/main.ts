@@ -1,3 +1,5 @@
+import "@/app/global";
+
 import { runnerService } from "@/app/composition";
 import { logger as baseLogger, env, setupSignalHandlers } from "@/app/utils/";
 import { handleTopLevelError } from "@/shared/errors/";

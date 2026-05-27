@@ -1,4 +1,4 @@
-import type { BaseRepositories } from "@/app/services/github/github.types";
+import type { BaseRepositories } from "@/app/services/github/types";
 
 /**
  * Standard test repositories configuration.

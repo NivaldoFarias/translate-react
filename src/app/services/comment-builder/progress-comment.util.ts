@@ -1,7 +1,21 @@
-import type { ProcessedFileResult } from "@/app/domain/workflow/";
+import type { ProcessedFileResult } from "@/app/services/github/types";
+import { PullRequestProgressAction } from "@/app/services/github/types";
 import type { TranslationFile } from "@/app/services/translator/";
 
-import { filterReportableProgressCommentResults } from "@/app/domain/workflow/";
+/**
+ * Returns processed files whose pull requests should appear in the translation-progress issue comment.
+ *
+ * @param results Batch processing results for the current workflow run
+ *
+ * @returns Results with a newly opened pull request in this run
+ */
+export function filterReportableProgressCommentResults(results: ProcessedFileResult[]) {
+	return results.filter(
+		(result) =>
+			result.pullRequest !== null &&
+			result.pullRequestProgress === PullRequestProgressAction.Created,
+	);
+}
 
 /**
  * Pairs reportable batch results with their translation files for progress-issue comments.

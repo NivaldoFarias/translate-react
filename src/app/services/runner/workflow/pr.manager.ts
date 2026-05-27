@@ -1,6 +1,7 @@
 import type { SetNonNullable } from "type-fest";
 
-import type { ProcessedFileResult, WorkflowStatistics } from "@/app/domain/workflow/";
+import type { ProcessedFileResult } from "@/app/services/github/types";
+import type { WorkflowStatistics } from "@/app/services/runner/types";
 
 import type { RunnerServiceDependencies } from "../runner.types";
 

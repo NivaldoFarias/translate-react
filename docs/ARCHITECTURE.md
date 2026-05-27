@@ -117,7 +117,7 @@ Code under `src/app/services/runner/`. [`RunnerService.run()`](../src/app/servic
 
 ### Shared workflow types
 
-[`src/app/domain/workflow/`](../src/app/domain/workflow/) holds cross-cutting DTOs (`ProcessedFileResult`, tree items, PR status, workflow statistics). **GitHub** and **locales** import from here; they do not import `runner/`.
+[`src/app/services/github/types.ts`](../src/app/services/github/types.ts) and [`src/app/locales/types.ts`](../src/app/locales/types.ts) hold cross-cutting DTOs (`ProcessedFileResult`, tree items, PR status, workflow statistics). **GitHub** and **locales** share these modules; they do not import `runner/`.
 
 ### GitHub Service
 

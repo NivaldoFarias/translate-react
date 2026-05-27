@@ -8,7 +8,7 @@ import {
 	processSignals,
 	REACT_TRANSLATION_LANGUAGES,
 	RuntimeEnvironment,
-} from "@/app/utils/constants.util";
+} from "@/app/constants";
 
 describe("constants.util", () => {
 	describe("errorMessages", () => {

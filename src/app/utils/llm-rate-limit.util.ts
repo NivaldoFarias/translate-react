@@ -1,6 +1,6 @@
 import { StatusCodes } from "http-status-codes";
 
-import { MS_PER_SECOND } from "./constants.util";
+import { MS_PER_SECOND } from "@/app/constants";
 
 /** Extra wait after `x-ratelimit-reset` to absorb clock skew and provider propagation delay */
 const RATE_LIMIT_RESET_BUFFER_MS = 750;

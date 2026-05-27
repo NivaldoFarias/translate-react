@@ -1,4 +1,4 @@
-import type { LanguageCacheEntry } from "@/app/domain/workflow/";
+import type { LanguageCacheEntry } from "@/app/services/cache/types";
 
 import { openai, queue } from "@/app/clients/";
 import { CacheService } from "@/app/services/cache/";

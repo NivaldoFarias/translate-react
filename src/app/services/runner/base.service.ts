@@ -2,11 +2,10 @@ import { sleep } from "bun";
 
 import type {
 	PatchedRepositoryTreeItem,
-	PrFilterResult,
 	ProcessedFileResult,
 	RepositoryTreeItem,
-	WorkflowStatistics,
-} from "@/app/domain/workflow/";
+} from "@/app/services/github/types";
+import type { PrFilterResult, WorkflowStatistics } from "@/app/services/runner/types";
 
 import type { RunnerOptions, RunnerServiceDependencies, RunnerState } from "./runner.types";
 
