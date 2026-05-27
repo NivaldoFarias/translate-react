@@ -60,7 +60,9 @@ export interface CiScriptContext {
  *
  * @returns Repository coordinates and `GITHUB_OUTPUT` path for workflow outputs
  */
-export function resolveCiScriptContext(environment: CiPollResolveEnvironment = getCiPollResolveEnv()) {
+export function resolveCiScriptContext(
+	environment: CiPollResolveEnvironment = getCiPollResolveEnv(),
+) {
 	const [owner = "", repo = ""] = environment.GITHUB_REPOSITORY.split("/");
 
 	return {

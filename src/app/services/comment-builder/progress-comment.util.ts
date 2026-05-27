@@ -1,6 +1,7 @@
 import type { ProcessedFileResult } from "@/app/services/github/types";
-import { PullRequestProgressAction } from "@/app/services/github/types";
 import type { TranslationFile } from "@/app/services/translator/";
+
+import { PullRequestProgressAction } from "@/app/services/github/types";
 
 /**
  * Returns processed files whose pull requests should appear in the translation-progress issue comment.

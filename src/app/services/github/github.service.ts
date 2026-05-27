@@ -1,11 +1,11 @@
 import type { Octokit, RestEndpointMethodTypes } from "@octokit/rest";
 
+import type { CommentBuilderService } from "@/app/services/comment-builder/comment-builder.service";
 import type {
 	PatchedRepositoryTreeItem,
 	ProcessedFileResult,
 	PullRequestStatus,
 } from "@/app/services/github/types";
-import type { CommentBuilderService } from "@/app/services/comment-builder/comment-builder.service";
 import type { TranslationFile } from "@/app/services/translator/";
 
 import type { CommitTranslationOptions, PullRequestOptions } from "./github.content";

@@ -3,9 +3,9 @@ import type { Logger } from "pino";
 
 import type {
 	TranslationMatrixEntry,
+	UpstreamLocaleConfig,
 	UpstreamPollResult,
 } from "@/ci/services/upstream/types";
-import type { UpstreamLocaleConfig } from "@/ci/services/upstream/types";
 
 import type { UpstreamShaVariableReader } from "./upstream-sha-variable.reader";
 

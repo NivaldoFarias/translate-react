@@ -139,14 +139,14 @@ To exercise translation with real LLM calls and mocked GitHub, run the workflow 
 
 ## Documentation
 
-| Document                                            | Description                                      |
-| --------------------------------------------------- | ------------------------------------------------ |
-| [ARCHITECTURE.md](./docs/ARCHITECTURE.md)           | Services, translator pipeline, errors            |
+| Document                                            | Description                                       |
+| --------------------------------------------------- | ------------------------------------------------- |
+| [ARCHITECTURE.md](./docs/ARCHITECTURE.md)           | Services, translator pipeline, errors             |
 | [WORKFLOW.md](./docs/WORKFLOW.md)                   | Run order, forks, releases, CI, integration tests |
-| [PROJECT_STRUCTURE.md](./docs/PROJECT_STRUCTURE.md) | `src/` layout, composition root, domain types    |
-| [CONTRIBUTING.md](./CONTRIBUTING.md)                | Patches and conventions                          |
-| [CHANGELOG.md](./CHANGELOG.md)                      | Release notes                                    |
-| [SECURITY.md](./SECURITY.md)                        | Vulnerability reporting                          |
+| [PROJECT_STRUCTURE.md](./docs/PROJECT_STRUCTURE.md) | `src/` layout, composition root, domain types     |
+| [CONTRIBUTING.md](./CONTRIBUTING.md)                | Patches and conventions                           |
+| [CHANGELOG.md](./CHANGELOG.md)                      | Release notes                                     |
+| [SECURITY.md](./SECURITY.md)                        | Vulnerability reporting                           |
 
 Entry point: [`src/app/main.ts`](./src/app/main.ts) imports `runnerService` from [`src/app/composition.ts`](./src/app/composition.ts), where service singletons are constructed.
 

@@ -1,6 +1,7 @@
 import pino from "pino";
 
 import { MAX_LOG_STRING_LENGTH } from "@/shared/constants/logging.constants";
+
 import { nftsCompatibleDateString } from "./nfts-date.util";
 
 /** Configuration for {@link createLogger} */

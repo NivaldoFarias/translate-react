@@ -1,7 +1,5 @@
 import { z } from "zod";
 
-import { createGithubTokenSchema } from "@/shared/schemas/github-token.schema";
-
 import type { EnvironmentSchemaDefaults } from "@/app/constants";
 
 import {
@@ -10,6 +8,7 @@ import {
 	REACT_TRANSLATION_LANGUAGES,
 	RuntimeEnvironment,
 } from "@/app/constants";
+import { createGithubTokenSchema } from "@/shared/schemas/github-token.schema";
 
 const envDefaults = resolveEnvDefaults();
 

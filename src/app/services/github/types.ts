@@ -1,6 +1,5 @@
-import type { RestEndpointMethodTypes } from "@octokit/rest";
 import type { components } from "@octokit/openapi-types";
-import type { Octokit } from "@octokit/rest";
+import type { Octokit, RestEndpointMethodTypes } from "@octokit/rest";
 import type { SetRequired } from "type-fest";
 
 /** GitHub repository metadata for fork and upstream repositories */

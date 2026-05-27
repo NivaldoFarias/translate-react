@@ -1,14 +1,12 @@
 import prettyBytes from "pretty-bytes";
 
+import type { InvalidFilePullRequest, PullRequestDescriptionMetadata } from "@/app/locales/types";
 import type { ProcessedFileResult } from "@/app/services/github/types";
-import { PullRequestProgressAction } from "@/app/services/github/types";
-import type {
-	InvalidFilePullRequest,
-	PullRequestDescriptionMetadata,
-} from "@/app/locales/types";
 import type { FileProcessingProgress } from "@/app/services/runner/types";
 
 import type { RunnerServiceDependencies } from "../runner.types";
+
+import { PullRequestProgressAction } from "@/app/services/github/types";
 import { LanguageDetectorService } from "@/app/services/language-detector/";
 import { TranslationFile } from "@/app/services/translator/";
 import {
