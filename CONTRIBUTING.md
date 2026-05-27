@@ -4,7 +4,7 @@ MIT. Not a hosted app: forks use their own API keys and Actions config.
 
 - Bun only (`bun install`, `bun run …`); see `engines` in [`package.json`](./package.json).
 - TypeScript strict; match patterns in [`src/`](./src/).
-- Layout: [`docs/PROJECT_STRUCTURE.md`](./docs/PROJECT_STRUCTURE.md). App wiring lives in [`src/composition.ts`](./src/composition.ts).
+- Layout: [`docs/PROJECT_STRUCTURE.md`](./docs/PROJECT_STRUCTURE.md). App wiring lives in [`src/app/composition.ts`](./src/app/composition.ts).
 - Tests: `bun test`; mirror `src/` paths under `tests/`; mock GitHub and LLM.
 - Before push: `bun run lint`, `bun run format`.
 - Commits: [Conventional Commits](https://www.conventionalcommits.org/) (see repo rules).

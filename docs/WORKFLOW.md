@@ -7,6 +7,7 @@ Detailed breakdown of the translation workflow: execution stages, data flow, and
 - [Table of Contents](#table-of-contents)
 - [Overview](#overview)
   - [Actual `run()` order](#actual-run-order)
+- [Automated upstream polling](#automated-upstream-polling)
 - [Operating translate-react (forks)](#operating-translate-react-forks)
 - [Local LLM workflow smoke](#local-llm-workflow-smoke)
 - [Pinning translate-react in GitHub Actions](#pinning-translate-react-in-github-actions)
@@ -67,7 +68,7 @@ flowchart TD
 
 ### Actual `run()` order
 
-Order in [`RunnerService.run()`](../src/services/runner/runner.service.ts), then [`main()`](../src/main.ts):
+Order in [`RunnerService.run()`](../src/app/services/runner/runner.service.ts), then [`main()`](../src/app/main.ts):
 
 1. `verifyLLMConnectivity()`: translator API reachability
 2. `verifyPermissions()`: wraps `verifyTokenPermissions` on fork and upstream
@@ -78,19 +79,82 @@ Order in [`RunnerService.run()`](../src/services/runner/runner.service.ts), then
 7. `updateIssueWithResults()`: `PRManager.updateIssue` → `GitHubService.commentCompiledResultsOnIssue` (see [Stage 6: Progress Reporting](#stage-6-progress-reporting))
 8. `printFinalStatistics()`: returns counts to the caller (zeros when step 6 was skipped); `main` logs them and exits successfully when no exception was thrown
 
+## Automated upstream polling
+
+Translation runs only when an upstream React docs repository (`reactjs/<lang>.react.dev`) has a **new default-branch commit** compared to the last successful workflow run for that locale.
+
+### Components
+
+| Piece                                                                           | Role                                                                           |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| [`.github/upstream-locales.json`](../.github/upstream-locales.json)             | Registry of locales, upstream/fork repo names, and guidelines file             |
+| [`.github/workflows/upstream-poll.yml`](../.github/workflows/upstream-poll.yml) | Scheduled poll (every 6 hours) and optional `workflow_dispatch` dry run        |
+| [`.github/workflows/workflow.yml`](../.github/workflows/workflow.yml)           | Reusable translation workflow (`workflow_call`) and manual `workflow_dispatch` |
+| [`src/ci/entries/poll-upstream.ts`](../src/ci/entries/poll-upstream.ts)         | Compares upstream SHAs to repository variables; outputs a matrix               |
+| [`src/ci/entries/resolve-matrix.ts`](../src/ci/entries/resolve-matrix.ts)       | Builds a matrix for manual runs (optional `--langs`)                           |
+
+```mermaid
+flowchart TD
+  Cron[schedule / manual poll] --> PollJob[poll job]
+  PollJob -->|SHAs changed| Translate[workflow_call translation]
+  PollJob -->|no changes| Done[workflow ends]
+  Translate --> Run[bun run start per matrix.lang]
+  Run -->|success| Var[gh variable set UPSTREAM_SHA_*]
+```
+
+### Stored SHAs
+
+For each `lang` in the registry, the workflow stores the processed upstream tip in a repository variable:
+
+- Name: `UPSTREAM_SHA_<LANG>` with hyphens mapped to underscores (e.g. `pt-br` → `UPSTREAM_SHA_PT_BR`)
+- Updated: only after a **successful** matrix job for that locale (`Record upstream SHA` step)
+- Read: poll job via [`UpstreamShaVariableReader`](../src/ci/upstream/upstream-sha-variable.reader.ts)
+
+If a translation run fails, the variable is left unchanged so the next poll still sees a mismatch and can retry.
+
+### Triggers
+
+| Trigger                             | Workflow            | Behaviour                                                                     |
+| ----------------------------------- | ------------------- | ----------------------------------------------------------------------------- |
+| Cron `0 */6 * * *`                  | `upstream-poll.yml` | Poll all locales; call translation only for changed upstreams                 |
+| Manual **Poll upstream React docs** | `upstream-poll.yml` | Same poll; enable **dry run** to log changes without starting translation     |
+| Manual **Run Translation Workflow** | `workflow.yml`      | Skip poll; run `ci:resolve-matrix` for `langs` input (empty = all configured) |
+
+### Adding a locale
+
+1. Fork `reactjs/<lang>.react.dev` and install the bot on the fork.
+2. Add one object to [`.github/upstream-locales.json`](../.github/upstream-locales.json).
+3. No workflow matrix edit is required; the next poll or manual run picks up the new row.
+
+### Local commands
+
+```bash
+export GH_TOKEN=...
+export GITHUB_OUTPUT=/tmp/github-output
+export GITHUB_REPOSITORY=owner/translate-react
+export GITHUB_REPOSITORY_OWNER=owner
+
+bun run ci:poll-upstream
+bun run ci:resolve-matrix --langs pt-br,ru
+```
+
+### Permissions
+
+The translation workflow needs `actions: write` on `GITHUB_TOKEN` (or the bot token used with `gh variable set`) so successful runs can update repository variables. The poll workflow only reads variables and repositories.
+
 ## Operating translate-react (forks)
 
-No hosted backend: you set `LLM_API_KEY` (OpenAI-compatible API) and pay or quota-manage with the provider. Translation Actions use the [translate-react bot app](https://github.com/apps/translate-react-bot); secrets such as `BOT_APP_ID`, `BOT_PRIVATE_KEY`, `LLM_API_KEY`, optional `GH_PAT_TOKEN` / `OPENAI_PROJECT_ID`, and variables such as `LLM_MODEL` are wired in [`.github/workflows/workflow.yml`](../.github/workflows/workflow.yml). Review PRs on the locale fork; note this tool’s version (logs, `package.json`, or CI ref) when comparing runs.
+No hosted backend: you set `LLM_API_KEY` (OpenAI-compatible API) and pay or quota-manage with the provider. Translation Actions use the [translate-react bot app](https://github.com/apps/translate-react-bot); secrets such as `BOT_APP_ID`, `BOT_PRIVATE_KEY`, `LLM_API_KEY`, optional `GH_PAT_TOKEN` / `OPENAI_PROJECT_ID`, and variables such as `LLM_MODEL` are wired in [`.github/workflows/workflow.yml`](../.github/workflows/workflow.yml) and [`.github/workflows/upstream-poll.yml`](../.github/workflows/upstream-poll.yml). Review PRs on the locale fork; note this tool’s version (logs, `package.json`, or CI ref) when comparing runs.
 
-Rate and cost knobs: [`src/utils/constants.util.ts`](../src/utils/constants.util.ts), [`src/utils/env.util.ts`](../src/utils/env.util.ts) — e.g. `LLM_MAX_REQUESTS_PER_MINUTE`, `MAX_LLM_CONCURRENCY`, `MAX_RETRY_ATTEMPTS`, `BATCH_SIZE`, `MASK_VERBATIM_LARGE_FENCES`.
+Rate and cost knobs: [`src/app/utils/constants.util.ts`](../src/app/utils/constants.util.ts), [`src/app/utils/env.util.ts`](../src/app/utils/env.util.ts) — e.g. `LLM_MAX_REQUESTS_PER_MINUTE`, `MAX_LLM_CONCURRENCY`, `MAX_RETRY_ATTEMPTS`, `BATCH_SIZE`, `MASK_VERBATIM_LARGE_FENCES`.
 
 ## Local LLM workflow smoke
 
-`bun run smoke:llm-workflow` runs [`src/scripts/llm-workflow-smoke.ts`](../src/scripts/llm-workflow-smoke.ts): one [`RunnerService.run()`](../src/services/runner/runner.service.ts) with [`translatorService`](../src/composition.ts) from [`composition.ts`](../src/composition.ts) and mocked GitHub from [`createWorkflowGitHubServiceFromFiles`](../tests/integration/create-integration-runner.ts). Markdown is loaded via [`loadIntegrationWorkflowFilesFromMdFixtureDir`](../tests/integration/create-integration-runner.ts) with **every** `*.md` under [`tests/fixtures/md/`](../tests/fixtures/md/) (same helper as [`tests/integration/workflow.integration.spec.ts`](../tests/integration/workflow.integration.spec.ts), which selects specific files by name). Use the same `.env` as the main workflow for API tokens (`GH_TOKEN`, `LLM_API_KEY`) and other validated settings. Do not use `bun test` for this path — [`tests/setup.ts`](../tests/setup.ts) replaces `env`, so those keys would not reach the client.
+`bun run ci:smoke-llm` runs [`src/ci/smoke-llm.ts`](../src/ci/smoke-llm.ts): one [`RunnerService.run()`](../src/app/services/runner/runner.service.ts) with [`translatorService`](../src/app/composition.ts) from [`composition.ts`](../src/app/composition.ts) and mocked GitHub from [`createWorkflowGitHubServiceFromFiles`](../tests/integration/create-integration-runner.ts). Markdown is loaded via [`loadIntegrationWorkflowFilesFromMdFixtureDir`](../tests/integration/create-integration-runner.ts) with **every** `*.md` under [`tests/fixtures/md/`](../tests/fixtures/md/) (same helper as [`tests/integration/workflow.integration.spec.ts`](../tests/integration/workflow.integration.spec.ts), which selects specific files by name). Use the same `.env` as the main workflow for API tokens (`GH_TOKEN`, `LLM_API_KEY`) and other validated settings. Do not use `bun test` for this path — [`tests/setup.ts`](../tests/setup.ts) replaces `env`, so those keys would not reach the client.
 
 ## Releases and semantic versioning
 
-Semver is [`package.json`](../package.json) `version` (OpenRouter title defaults use `name` + `version` from there; see [`src/utils/constants.util.ts`](../src/utils/constants.util.ts)).
+Semver is [`package.json`](../package.json) `version` (OpenRouter title defaults use `name` + `version` from there; see [`src/app/utils/constants.util.ts`](../src/app/utils/constants.util.ts)).
 
 CI on `main` / `dev` fails if `package.json` `version` does not appear as a `## [version]` heading in [`CHANGELOG.md`](../CHANGELOG.md) (see [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)).
 
@@ -121,7 +185,7 @@ The six stages below match the overview diagram. For conflict handling and branc
 
 ### Stage 1: Initialization
 
-**At import / process startup:** Zod validates `env` when the module loads; [`composition.ts`](../src/composition.ts) constructs service singletons; `BaseRunnerService` registers signal cleanup (`registerCleanup`).
+**At import / process startup:** Zod validates `env` when the module loads; [`composition.ts`](../src/app/composition.ts) constructs service singletons; `BaseRunnerService` registers signal cleanup (`registerCleanup`).
 
 **At `run()` start:** `verifyLLMConnectivity()` runs before any GitHub setup.
 
@@ -200,7 +264,7 @@ stateDiagram-v2
 
 - **Existing PR guard:** Before branch work, `processFile` checks `findPullRequestByBranch` + `checkPullRequestStatus`. Mergeable open PRs skip translate/commit (belt-and-suspenders if a path slipped past discovery).
 - Branch: `createOrGetTranslationBranch` (reuses existing or creates new)
-- Translate: Direct or chunked using the `CHUNKS` budget in [`chunking.constants.ts`](../src/services/translator/chunking/chunking.constants.ts). Optional cost control: when `MASK_VERBATIM_LARGE_FENCES` is enabled, fences at or above `MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS` (tiktoken estimate) are replaced with HTML comment placeholders before the LLM and merged back after translation ([`markdown-verbatim-fences.util.ts`](../src/utils/markdown-verbatim-fences.util.ts)); natural language **inside** those large fences is not translated while they stay masked.
+- Translate: Direct or chunked using the `CHUNKS` budget in [`chunking.constants.ts`](../src/app/services/translator/chunking/chunking.constants.ts). Optional cost control: when `MASK_VERBATIM_LARGE_FENCES` is enabled, fences at or above `MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS` (tiktoken estimate) are replaced with HTML comment placeholders before the LLM and merged back after translation ([`markdown-verbatim-fences.util.ts`](../src/app/utils/markdown-verbatim-fences.util.ts)); natural language **inside** those large fences is not translated while they stay masked.
 - Commit: `commitTranslation` → `createOrUpdatePullRequest` (see [Branch-tip SHA before commit](#branch-tip-sha-before-commit))
 - Error: `cleanupFailedTranslation`, circuit-breaker at `MAX_CONSECUTIVE_FAILURES`
 
@@ -218,7 +282,7 @@ stateDiagram-v2
 
 #### Stale PR conflict handling
 
-**Discovery (`filterByPRs`):** Open PRs are listed; files touched by a PR get `checkPullRequestStatus`. Valid (mergeable) PRs cause the file to be skipped. Conflicted or indeterminate PRs are **kept in the work queue** and summarized in `invalidPRsByFile` for messaging in a **new** PR body (`> [!IMPORTANT]` via [`pr-body.builder.ts`](../src/locales/pr-body.builder.ts)) — the old PR is **not** closed during discovery.
+**Discovery (`filterByPRs`):** Open PRs are listed; files touched by a PR get `checkPullRequestStatus`. Valid (mergeable) PRs cause the file to be skipped. Conflicted or indeterminate PRs are **kept in the work queue** and summarized in `invalidPRsByFile` for messaging in a **new** PR body (`> [!IMPORTANT]` via [`pr-body.builder.ts`](../src/app/locales/pr-body.builder.ts)) — the old PR is **not** closed during discovery.
 
 **Translation (`createOrGetTranslationBranch` / `createOrUpdatePullRequest`):** When an existing branch or upstream PR is conflicted, the workflow closes the PR with a comment, deletes the translation branch, and creates a fresh branch/commit/PR — regardless of who opened the original PR.
 
@@ -286,13 +350,13 @@ Same branch → translate → commit → PR loop as under [Stage 5: Batch Transl
 
 ## Data Structures
 
-| Structure             | Purpose                        | Key fields                                                                                                                   |
-| --------------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| `TranslationFile`     | File candidate for translation | `content`, `filename`, `path`, `sha`, `logger` — see [`translation-file.ts`](../src/services/translator/translation-file.ts) |
-| `ProcessedFileResult` | Outcome per file               | `filename`, `branch`, `translation`, `pullRequest`, `pullRequestProgress`, `error`                                           |
-| `RunnerState`         | In-memory workflow state       | `repositoryTree`, `filesToTranslate`, `processedResults`, optional `invalidPRsByFile`                                        |
+| Structure             | Purpose                        | Key fields                                                                                                                       |
+| --------------------- | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| `TranslationFile`     | File candidate for translation | `content`, `filename`, `path`, `sha`, `logger` — see [`translation-file.ts`](../src/app/services/translator/translation-file.ts) |
+| `ProcessedFileResult` | Outcome per file               | `filename`, `branch`, `translation`, `pullRequest`, `pullRequestProgress`, `error`                                               |
+| `RunnerState`         | In-memory workflow state       | `repositoryTree`, `filesToTranslate`, `processedResults`, optional `invalidPRsByFile`                                            |
 
-Shared types: [`src/domain/workflow/`](../src/domain/workflow/). Runner-only types (`RunnerState`, dependencies): [`runner.types.ts`](../src/services/runner/runner.types.ts).
+Shared types: [`src/app/domain/workflow/`](../src/app/domain/workflow/). Runner-only types (`RunnerState`, dependencies): [`runner.types.ts`](../src/app/services/runner/runner.types.ts).
 
 ## Error Recovery
 

@@ -5,7 +5,7 @@ import {
 	NETWORK_ERROR_PATTERNS,
 	RATE_LIMIT_BUFFER_MS,
 	RATE_LIMIT_MAX_DELAY_MS,
-} from "@/clients/octokit/octokit.constants";
+} from "@/app/clients/octokit/octokit.constants";
 
 describe("octokit.constants", () => {
 	describe("GitHub retry constants", () => {

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { ApplicationError, ErrorCode } from "@/errors/";
+import { ApplicationError, ErrorCode } from "@/shared/errors/";
 
 describe("ApplicationError", () => {
 	describe("Constructor", () => {

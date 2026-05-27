@@ -32,7 +32,7 @@ src/
 ## Import rules
 
 - **`github/`** and **`locales/`** use `@/domain/workflow/` for shared workflow types. They must not import `@/services/runner/`.
-- **New singletons** belong in [`composition.ts`](../src/composition.ts), not at the bottom of individual service files.
+- **New singletons** belong in [`composition.ts`](../src/app/composition.ts), not at the bottom of individual service files.
 - Prefer `@/services/<name>/` or `@/domain/workflow/` over deep relative paths across packages.
 
 ## Tests
@@ -41,11 +41,11 @@ src/
 
 ## Commands
 
-| Task       | Command                      |
-| ---------- | ---------------------------- |
-| Run        | `bun run start`              |
-| Dev        | `bun run dev`                |
-| Test       | `bun run test`               |
-| Type check | `bun run type-check`         |
-| Lint       | `bun run lint`               |
-| LLM smoke  | `bun run smoke:llm-workflow` |
+| Task       | Command                |
+| ---------- | ---------------------- |
+| Run        | `bun run start`        |
+| Dev        | `bun run dev`          |
+| Test       | `bun run test`         |
+| Type check | `bun run type-check`   |
+| Lint       | `bun run lint`         |
+| LLM smoke  | `bun run ci:smoke-llm` |

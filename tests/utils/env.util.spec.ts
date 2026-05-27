@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { RuntimeEnvironment, validateEnv } from "@/utils/";
+import { RuntimeEnvironment, validateEnv } from "@/app/utils/";
 
 import { testEnv as validEnv } from "../setup";
 

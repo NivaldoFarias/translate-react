@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
 
-import type { RunnerServiceDependencies } from "@/services/runner/runner.types";
+import type { RunnerServiceDependencies } from "@/app/services/runner/runner.types";
 
-import { localeService } from "@/composition";
-import { FileDiscoveryManager } from "@/services/runner/workflow/file-discovery.manager";
+import { localeService } from "@/app/composition";
+import { FileDiscoveryManager } from "@/app/services/runner/workflow/file-discovery.manager";
 
 import { createRepositoryTreeItemFixture } from "@tests/fixtures";
 import {

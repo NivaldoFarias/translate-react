@@ -1,0 +1,16 @@
+[
+    {
+        "lang": "pt-br",
+        "upstream_owner": "reactjs",
+        "upstream_name": "pt-br.react.dev",
+        "fork_name": "pt-br.react.dev",
+        "translation_guidelines_file": "GLOSSARY.md"
+    },
+    {
+        "lang": "ru",
+        "upstream_owner": "reactjs",
+        "upstream_name": "ru.react.dev",
+        "fork_name": "ru.react.dev",
+        "translation_guidelines_file": "TRANSLATION.md"
+    }
+]

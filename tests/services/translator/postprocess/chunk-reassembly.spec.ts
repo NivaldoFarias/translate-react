@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
 
-import type { ChunksToReassemble } from "@/services/translator/chunking/chunks.manager";
+import type { ChunksToReassemble } from "@/app/services/translator/chunking/chunks.manager";
 
-import { ApplicationError } from "@/errors";
-import { validateAndReassembleChunks } from "@/services/translator/postprocess/chunk-reassembly";
-import { TranslationFile } from "@/services/translator/translation-file";
+import { validateAndReassembleChunks } from "@/app/services/translator/postprocess/chunk-reassembly";
+import { TranslationFile } from "@/app/services/translator/translation-file";
+import { ApplicationError } from "@/shared/errors";
 
 describe("validateAndReassembleChunks", () => {
 	function makeFile(content: string) {

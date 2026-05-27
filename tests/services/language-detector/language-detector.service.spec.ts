@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 
-import type { ReactLanguageCode } from "@/utils/";
+import type { ReactLanguageCode } from "@/app/utils/";
 
-import { ApplicationError, ErrorCode } from "@/errors/";
-import { LanguageDetectorService } from "@/services/language-detector/language-detector.service";
+import { LanguageDetectorService } from "@/app/services/language-detector/language-detector.service";
+import { ApplicationError, ErrorCode } from "@/shared/errors/";
 
 describe("LanguageDetector", () => {
 	let detector: LanguageDetectorService;

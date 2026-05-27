@@ -4,7 +4,7 @@ import {
 	buildRunnerNewIssueChooserUrl,
 	resolveRunnerNewIssueChooserUrl,
 	WORKFLOW_RUNNER_REPOSITORY_HTML_BASE,
-} from "@/utils/";
+} from "@/app/utils/";
 
 describe("buildRunnerNewIssueChooserUrl", () => {
 	test("uses server and repository slug when slug is valid", () => {

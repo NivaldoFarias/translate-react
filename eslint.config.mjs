@@ -61,15 +61,19 @@ export default defineConfig(
 		},
 	},
 	{
-		files: ["src/services/github/**/*.{ts,tsx}"],
+		files: ["src/shared/**/*.{ts,tsx}"],
 		rules: {
 			"no-restricted-imports": [
 				"error",
 				{
 					patterns: [
 						{
-							group: ["@/services/runner", "@/services/runner/**"],
-							message: "GitHub layer must use @/domain/workflow, not runner.",
+							group: ["@/app", "@/app/**"],
+							message: "Shared code must not import the app runtime.",
+						},
+						{
+							group: ["@/ci", "@/ci/**"],
+							message: "Shared code must not import CI helpers.",
 						},
 					],
 				},
@@ -77,23 +81,73 @@ export default defineConfig(
 		},
 	},
 	{
-		files: ["src/locales/**/*.{ts,tsx}"],
+		files: ["src/app/**/*.{ts,tsx}"],
 		rules: {
 			"no-restricted-imports": [
 				"error",
 				{
 					patterns: [
 						{
-							group: ["@/services/runner", "@/services/runner/**"],
-							message: "Locales must use @/domain/workflow, not runner.",
+							group: ["@/ci", "@/ci/**"],
+							message: "App must not import ci helpers.",
+						},
+					],
+				},
+			],
+		},
+	},
+	{
+		files: ["src/ci/**/*.{ts,tsx}"],
+		ignores: ["src/ci/smoke-llm.ts"],
+		rules: {
+			"no-restricted-imports": [
+				"error",
+				{
+					patterns: [
+						{
+							group: ["@/app/composition", "@/app/services/runner", "@/app/services/runner/**"],
+							message: "CI must not import runner.",
+						},
+					],
+				},
+			],
+		},
+	},
+	{
+		files: ["src/app/services/github/**/*.{ts,tsx}"],
+		rules: {
+			"no-restricted-imports": [
+				"error",
+				{
+					patterns: [
+						{
+							group: ["@/app/services/runner", "@/app/services/runner/**"],
+							message: "GitHub layer must use @/app/domain/workflow, not runner.",
+						},
+					],
+				},
+			],
+		},
+	},
+	{
+		files: ["src/app/locales/**/*.{ts,tsx}"],
+		rules: {
+			"no-restricted-imports": [
+				"error",
+				{
+					patterns: [
+						{
+							group: ["@/app/services/runner", "@/app/services/runner/**"],
+							message: "Locales must use @/app/domain/workflow, not runner.",
 						},
 						{
 							group: [
-								"@/services/github/github.content",
-								"@/services/github/github.repository",
-								"@/services/github/github.branch",
+								"@/app/services/github/github.content",
+								"@/app/services/github/github.repository",
+								"@/app/services/github/github.branch",
 							],
-							message: "Import GitHubService from @/services/github instead of internal modules.",
+							message:
+								"Import GitHubService from @/app/services/github instead of internal modules.",
 						},
 					],
 				},

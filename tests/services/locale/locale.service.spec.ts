@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 
-import type { PullRequestDescriptionMetadata } from "@/domain/workflow/pull-request.types";
+import type { PullRequestDescriptionMetadata } from "@/app/domain/workflow/pull-request.types";
 
-import { ptBrLocale, ruLocale } from "@/locales";
-import { LocaleService } from "@/services/locale/locale.service";
-import { TranslationFile } from "@/services/translator/translation-file";
+import { ptBrLocale, ruLocale } from "@/app/locales";
+import { LocaleService } from "@/app/services/locale/locale.service";
+import { TranslationFile } from "@/app/services/translator/translation-file";
 
 import { createProcessedFileResultsFixture } from "@tests/fixtures";
 
