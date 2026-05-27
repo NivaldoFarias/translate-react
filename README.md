@@ -51,11 +51,11 @@ CLI tool that translates the official React documentation via LLMs, keeps struct
 
 ## GitHub Actions on a fork
 
-Enable Actions on the repo that holds the workflow, install the bot, and set the secrets and variables listed under [Operating translate-react (forks)](./docs/WORKFLOW.md#operating-translate-react-forks) (see [`.github/workflows/workflow.yml`](./.github/workflows/workflow.yml)). Pinning: [Pinning translate-react in GitHub Actions](./docs/WORKFLOW.md#pinning-translate-react-in-github-actions).
+Enable Actions on the repo that holds the workflow, install the bot, and set the secrets and variables listed under [Operating translate-react (forks)](./docs/WORKFLOW.md#operating-translate-react-forks). Scheduled runs use [`.github/workflows/upstream-poll.yml`](./.github/workflows/upstream-poll.yml) to detect new commits on `reactjs/<lang>.react.dev` before starting translation ([Automated upstream polling](./docs/WORKFLOW.md#automated-upstream-polling)). Manual translation: [`.github/workflows/workflow.yml`](./.github/workflows/workflow.yml). Pinning: [Pinning translate-react in GitHub Actions](./docs/WORKFLOW.md#pinning-translate-react-in-github-actions).
 
 ## Configuration
 
-Environment variables are validated at runtime using Zod schemas. See [`src/utils/env.util.ts`](./src/utils/env.util.ts) for complete schema definitions and validation rules.
+Environment variables are validated at runtime using Zod schemas. See [`src/app/utils/env.util.ts`](./src/app/utils/env.util.ts) for complete schema definitions and validation rules.
 
 ### Required Environment Variables
 
@@ -69,7 +69,7 @@ These **must** be set in your `.env` file (or in the GitHub Actions environment 
 ### Optional Environment Variables
 
 > [!IMPORTANT]
-> All optional variables have defaults defined in [`src/utils/constants.util.ts`](./src/utils/constants.util.ts).
+> All optional variables have defaults defined in [`src/app/utils/constants.util.ts`](./src/app/utils/constants.util.ts).
 
 <details>
 <summary><b>GitHub Configuration</b></summary>
@@ -131,7 +131,7 @@ bun run dev   # Development mode (auto-reload)
 bun start     # Production mode
 ```
 
-To exercise translation with real LLM calls and mocked GitHub (fixture markdown under `tests/fixtures/md/`), use `bun run smoke:llm-workflow`. See [Local LLM workflow smoke](./docs/WORKFLOW.md#local-llm-workflow-smoke).
+To exercise translation with real LLM calls and mocked GitHub (fixture markdown under `tests/fixtures/md/`), use `bun run ci:smoke-llm`. See [Local LLM workflow smoke](./docs/WORKFLOW.md#local-llm-workflow-smoke).
 
 ## Versioning and releases
 
@@ -148,7 +148,7 @@ To exercise translation with real LLM calls and mocked GitHub (fixture markdown 
 | [CHANGELOG.md](./CHANGELOG.md)                      | Release notes                                    |
 | [SECURITY.md](./SECURITY.md)                        | Vulnerability reporting                          |
 
-Entry point: [`src/main.ts`](./src/main.ts) imports `runnerService` from [`src/composition.ts`](./src/composition.ts), where service singletons are constructed.
+Entry point: [`src/app/main.ts`](./src/app/main.ts) imports `runnerService` from [`src/app/composition.ts`](./src/app/composition.ts), where service singletons are constructed.
 
 ## Contributing
 

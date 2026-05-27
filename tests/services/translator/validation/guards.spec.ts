@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { collectPostTranslationValidationIssues } from "@/services/translator/validation/guards";
+import { collectPostTranslationValidationIssues } from "@/app/services/translator/validation/guards";
 
 describe("post-translation validation guards", () => {
 	test("collectPostTranslationValidationIssues returns multiple guard hints", () => {

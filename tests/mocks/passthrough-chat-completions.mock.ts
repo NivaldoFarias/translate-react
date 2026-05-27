@@ -2,7 +2,7 @@ import { mock } from "bun:test";
 
 import type OpenAI from "openai";
 
-import { frontmatterBatchRequestEnvelopeSchema } from "@/services/translator/translator-frontmatter-batch.schema";
+import { frontmatterBatchRequestEnvelopeSchema } from "@/app/services/translator/translator-frontmatter-batch.schema";
 
 import { createChatCompletionFixture } from "@tests/fixtures";
 

@@ -2,9 +2,9 @@ import { RequestError } from "@octokit/request-error";
 import { describe, expect, mock, test } from "bun:test";
 import { StatusCodes } from "http-status-codes";
 
-import type { OctokitMethod } from "@/clients";
+import type { OctokitMethod } from "@/app/clients";
 
-import { isForbiddenError, withRetry, wrapMethodWithFallback } from "@/clients";
+import { isForbiddenError, withRetry, wrapMethodWithFallback } from "@/app/clients";
 
 /** Creates a RequestError with the specified status code */
 function createRequestError(status: number, message = "API Error") {

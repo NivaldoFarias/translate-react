@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
 
-import { TranslationFile } from "@/services/translator/";
+import { TranslationFile } from "@/app/services/translator/";
 import {
 	isTranslationEquivalentToCurrentBlob,
 	normalizeForTranslationCompare,
-} from "@/utils/translation-content-compare.util";
+} from "@/app/utils/translation-content-compare.util";
 
 describe("translation-content-compare.util", () => {
 	describe("normalizeForTranslationCompare", () => {

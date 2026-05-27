@@ -5,7 +5,7 @@ import {
 	filterMarkdownFiles,
 	formatElapsedTime,
 	nftsCompatibleDateString,
-} from "@/utils/";
+} from "@/app/utils/";
 
 import { createRepositoryTreeItemFixture } from "@tests/fixtures";
 

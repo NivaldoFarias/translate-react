@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 
-import type { TranslationLlmClientDependencies } from "@/services/translator/llm/translation-llm.client.types";
+import type { TranslationLlmClientDependencies } from "@/app/services/translator/llm/translation-llm.client.types";
 
-import { localeService } from "@/composition";
-import { ApplicationError, ErrorCode, isCompletionLengthTruncationError } from "@/errors/";
-import { TranslationLlmClient } from "@/services/translator/llm/translation-llm.client";
-import { TranslationPromptBuilder } from "@/services/translator/llm/translation-prompt.builder";
+import { localeService } from "@/app/composition";
+import { TranslationLlmClient } from "@/app/services/translator/llm/translation-llm.client";
+import { TranslationPromptBuilder } from "@/app/services/translator/llm/translation-prompt.builder";
+import { ApplicationError, ErrorCode, isCompletionLengthTruncationError } from "@/shared/errors/";
 
 import {
 	createChatCompletionFixture,

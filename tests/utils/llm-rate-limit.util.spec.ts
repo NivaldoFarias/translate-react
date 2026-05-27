@@ -2,11 +2,11 @@ import { describe, expect, test } from "bun:test";
 import { StatusCodes } from "http-status-codes";
 import { APIError } from "openai";
 
-import { MS_PER_SECOND } from "@/utils/constants.util";
+import { MS_PER_SECOND } from "@/app/utils/constants.util";
 import {
 	getRateLimitResetWaitMs,
 	isOpenRouterDailyFreeModelQuotaError,
-} from "@/utils/llm-rate-limit.util";
+} from "@/app/utils/llm-rate-limit.util";
 
 describe("getRateLimitResetWaitMs", () => {
 	test("returns 0 for non-API errors", () => {

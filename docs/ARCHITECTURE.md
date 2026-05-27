@@ -21,7 +21,7 @@ Overview of the `translate-react` CLI: service design, data flow, and error hand
 
 ## System Overview
 
-[`main.ts`](../src/main.ts) imports `runnerService` from [`composition.ts`](../src/composition.ts). **RunnerService** drives GitHub, translator, language detector, and cache (see [WORKFLOW.md](./WORKFLOW.md)). **GitHubService** and **TranslatorService** call the GitHub REST API and the configured LLM endpoint. Errors reach [`handleTopLevelError`](../src/errors/error.helpers.ts) in `main.ts` (Pino, then `process.exit(1)`).
+[`main.ts`](../src/app/main.ts) imports `runnerService` from [`composition.ts`](../src/app/composition.ts). **RunnerService** drives GitHub, translator, language detector, and cache (see [WORKFLOW.md](./WORKFLOW.md)). **GitHubService** and **TranslatorService** call the GitHub REST API and the configured LLM endpoint. Errors reach [`handleTopLevelError`](../src/shared/errors/error.helpers.ts) in `main.ts` (Pino, then `process.exit(1)`).
 
 ```mermaid
 graph TB
@@ -113,11 +113,11 @@ classDiagram
 
 ### Runner Service
 
-Code under `src/services/runner/`. [`RunnerService.run()`](../src/services/runner/runner.service.ts) keeps `RunnerState` in memory and delegates to workflow stages in [`runner/workflow/`](../src/services/runner/workflow/) (discovery, batch, PR). Details: [WORKFLOW.md](./WORKFLOW.md).
+Code under `src/app/services/runner/`. [`RunnerService.run()`](../src/app/services/runner/runner.service.ts) keeps `RunnerState` in memory and delegates to workflow stages in [`runner/workflow/`](../src/app/services/runner/workflow/) (discovery, batch, PR). Details: [WORKFLOW.md](./WORKFLOW.md).
 
 ### Shared workflow types
 
-[`src/domain/workflow/`](../src/domain/workflow/) holds cross-cutting DTOs (`ProcessedFileResult`, tree items, PR status, workflow statistics). **GitHub** and **locales** import from here; they do not import `runner/`.
+[`src/app/domain/workflow/`](../src/app/domain/workflow/) holds cross-cutting DTOs (`ProcessedFileResult`, tree items, PR status, workflow statistics). **GitHub** and **locales** import from here; they do not import `runner/`.
 
 ### GitHub Service
 
@@ -131,15 +131,15 @@ Public methods delegate to the appropriate internal class.
 
 ### Translator Service
 
-[`TranslatorService`](../src/services/translator/translator.service.ts) coordinates translation. Supporting code lives alongside it:
+[`TranslatorService`](../src/app/services/translator/translator.service.ts) coordinates translation. Supporting code lives alongside it:
 
-- [`translation-file.ts`](../src/services/translator/translation-file.ts) — file entity
-- [`pipeline/`](../src/services/translator/pipeline/) — validation retry loop
-- [`llm/`](../src/services/translator/llm/) — prompts, [`TranslationLlmClient`](../src/services/translator/llm/translation-llm.client.ts) (OpenAI + retries)
-- [`validation/`](../src/services/translator/validation/) — post-translation guards
-- [`postprocess/`](../src/services/translator/postprocess/) — cleanup and chunk reassembly
-- [`chunking/`](../src/services/translator/chunking/) — token limits and markdown splitting
-- [`markdown/`](../src/services/translator/markdown/) — frontmatter, fence cleanup, regexes
+- [`translation-file.ts`](../src/app/services/translator/translation-file.ts) — file entity
+- [`pipeline/`](../src/app/services/translator/pipeline/) — validation retry loop
+- [`llm/`](../src/app/services/translator/llm/) — prompts, [`TranslationLlmClient`](../src/app/services/translator/llm/translation-llm.client.ts) (OpenAI + retries)
+- [`validation/`](../src/app/services/translator/validation/) — post-translation guards
+- [`postprocess/`](../src/app/services/translator/postprocess/) — cleanup and chunk reassembly
+- [`chunking/`](../src/app/services/translator/chunking/) — token limits and markdown splitting
+- [`markdown/`](../src/app/services/translator/markdown/) — frontmatter, fence cleanup, regexes
 
 ```mermaid
 graph LR
@@ -155,9 +155,9 @@ graph LR
     I --> J[Output]
 ```
 
-**Large-fence masking (optional, env-driven):** Fenced blocks whose tiktoken estimate meets `MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS` can be replaced by short HTML comment placeholders before any LLM call, then restored from the original source so structure and validators still see real fences. Disabled by default; see [`markdown-verbatim-fences.util.ts`](../src/utils/markdown-verbatim-fences.util.ts).
+**Large-fence masking (optional, env-driven):** Fenced blocks whose tiktoken estimate meets `MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS` can be replaced by short HTML comment placeholders before any LLM call, then restored from the original source so structure and validators still see real fences. Disabled by default; see [`markdown-verbatim-fences.util.ts`](../src/app/utils/markdown-verbatim-fences.util.ts).
 
-**Content chunking** (when input exceeds the safe token budget in [`ChunksManager`](../src/services/translator/chunking/chunks.manager.ts)): LangChain `MarkdownTextSplitter`, then parallel chunk translation and reassembly (`CHUNKS` in [`chunking.constants.ts`](../src/services/translator/chunking/chunking.constants.ts)).
+**Content chunking** (when input exceeds the safe token budget in [`ChunksManager`](../src/app/services/translator/chunking/chunks.manager.ts)): LangChain `MarkdownTextSplitter`, then parallel chunk translation and reassembly (`CHUNKS` in [`chunking.constants.ts`](../src/app/services/translator/chunking/chunking.constants.ts)).
 
 **Post-translation validation:** Guards in `validation/guards/`; failures feed retry hints through `TranslationPipelineManager`.
 
@@ -204,7 +204,7 @@ All errors result in `process.exit(1)`.
 
 ## Dependency Injection
 
-[`composition.ts`](../src/composition.ts) wires service singletons. `main.ts` imports `runnerService` from there. Dependencies are passed via typed constructor arguments. Tests inject mocks via constructors:
+[`composition.ts`](../src/app/composition.ts) wires service singletons. `main.ts` imports `runnerService` from there. Dependencies are passed via typed constructor arguments. Tests inject mocks via constructors:
 
 ```typescript
 const service = new RunnerService({
