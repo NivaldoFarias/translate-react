@@ -1,12 +1,11 @@
 import type { SetRequired } from "type-fest";
 
+import type { PatchedRepositoryTreeItem, PullRequestStatus } from "@/app/services/github/types";
 import type {
 	CacheCheckResult,
 	LanguageDetectionResult,
-	PatchedRepositoryTreeItem,
 	PrFilterResult as PullRequestFilterResult,
-	PullRequestStatus,
-} from "@/app/domain/workflow/";
+} from "@/app/services/runner/types";
 
 import type { RunnerServiceDependencies } from "../runner.types";
 

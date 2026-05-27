@@ -1,4 +1,4 @@
-import type { WorkflowStatistics } from "@/app/domain/workflow/";
+import type { WorkflowStatistics } from "@/app/services/runner/types";
 
 import type { RunnerOptions, RunnerServiceDependencies } from "./runner.types";
 

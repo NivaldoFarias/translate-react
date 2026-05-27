@@ -4,7 +4,7 @@ import type {
 	LocaleDefinition,
 	LocalePRBodyStrings,
 	ProgressCommentRunContext,
-} from "./locale.types";
+} from "./types";
 
 import { createPRBodyBuilder } from "./pr-body.builder";
 

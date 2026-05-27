@@ -1,7 +1,8 @@
-import type { ProcessedFileResult, PullRequestDescriptionMetadata } from "@/app/domain/workflow/";
+import type { ProcessedFileResult } from "@/app/services/github/types";
+import type { PullRequestDescriptionMetadata } from "@/app/locales/types";
 import type { TranslationFile } from "@/app/services/translator/";
 
-import type { LocalePRBodyStrings } from "./locale.types";
+import type { LocalePRBodyStrings } from "./types";
 
 import { formatElapsedTime, resolveGitHubActionsRunContext } from "@/app/utils/";
 

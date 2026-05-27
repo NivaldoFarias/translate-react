@@ -1,4 +1,4 @@
-import type { ProcessedFileResult } from "@/app/domain/workflow/";
+import type { ProcessedFileResult } from "@/app/services/github/types";
 import type { LocaleDefinition } from "@/app/locales";
 
 import { TranslationFile } from "@/app/services/translator/";

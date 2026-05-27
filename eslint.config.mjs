@@ -20,6 +20,7 @@ export default defineConfig(
 			"**/*.json",
 			"**/*.yml",
 			"**/*.yaml",
+			"src/ci/smoke-llm.ts",
 		],
 	},
 	{
@@ -98,7 +99,6 @@ export default defineConfig(
 	},
 	{
 		files: ["src/ci/**/*.{ts,tsx}"],
-		ignores: ["src/ci/smoke-llm.ts"],
 		rules: {
 			"no-restricted-imports": [
 				"error",
@@ -122,7 +122,7 @@ export default defineConfig(
 					patterns: [
 						{
 							group: ["@/app/services/runner", "@/app/services/runner/**"],
-							message: "GitHub layer must use @/app/domain/workflow, not runner.",
+							message: "GitHub layer must use @/app/services/github/types, not runner.",
 						},
 					],
 				},
@@ -138,7 +138,7 @@ export default defineConfig(
 					patterns: [
 						{
 							group: ["@/app/services/runner", "@/app/services/runner/**"],
-							message: "Locales must use @/app/domain/workflow, not runner.",
+							message: "Locales must use @/app/services/github/types, not runner.",
 						},
 						{
 							group: [

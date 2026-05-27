@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { ptBrLocale } from "@/app/locales/pt-br.locale";
-import { resolveGitHubActionsRunContext } from "@/app/utils/github-actions-run.util";
+import { resolveGitHubActionsRunContext } from "@/app/utils/common.util";
 
 const sampleCiEnv = {
 	GITHUB_ACTIONS: true,

@@ -1,9 +1,9 @@
+import type { LanguageCacheEntry } from "@/app/services/cache/types";
 import type {
-	LanguageCacheEntry,
 	PatchedRepositoryTreeItem,
 	ProcessedFileResult,
 	PullRequestStatus,
-} from "@/app/domain/workflow/";
+} from "@/app/services/github/types";
 import type { CacheService } from "@/app/services/cache/";
 import type { GitHubService } from "@/app/services/github/";
 import type { LanguageDetectorService } from "@/app/services/language-detector/";

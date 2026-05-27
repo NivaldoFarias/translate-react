@@ -69,7 +69,7 @@ These **must** be set in your `.env` file (or in the GitHub Actions environment 
 ### Optional Environment Variables
 
 > [!IMPORTANT]
-> All optional variables have defaults defined in [`src/app/utils/constants.util.ts`](./src/app/utils/constants.util.ts).
+> All optional variables have defaults defined in [`src/app/constants/`](./src/app/constants/).
 
 <details>
 <summary><b>GitHub Configuration</b></summary>
@@ -131,7 +131,7 @@ bun run dev   # Development mode (auto-reload)
 bun start     # Production mode
 ```
 
-To exercise translation with real LLM calls and mocked GitHub (fixture markdown under `tests/fixtures/md/`), use `bun run ci:smoke-llm`. See [Local LLM workflow smoke](./docs/WORKFLOW.md#local-llm-workflow-smoke).
+To exercise translation with real LLM calls and mocked GitHub, run the workflow integration tests (`tests/integration/workflow.integration.spec.ts`) with fixture markdown under `tests/fixtures/md/`. See [Local LLM exercise](./docs/WORKFLOW.md#local-llm-exercise-integration-tests).
 
 ## Versioning and releases
 
@@ -142,7 +142,7 @@ To exercise translation with real LLM calls and mocked GitHub (fixture markdown 
 | Document                                            | Description                                      |
 | --------------------------------------------------- | ------------------------------------------------ |
 | [ARCHITECTURE.md](./docs/ARCHITECTURE.md)           | Services, translator pipeline, errors            |
-| [WORKFLOW.md](./docs/WORKFLOW.md)                   | Run order, forks, releases, CI, local smoke test |
+| [WORKFLOW.md](./docs/WORKFLOW.md)                   | Run order, forks, releases, CI, integration tests |
 | [PROJECT_STRUCTURE.md](./docs/PROJECT_STRUCTURE.md) | `src/` layout, composition root, domain types    |
 | [CONTRIBUTING.md](./CONTRIBUTING.md)                | Patches and conventions                          |
 | [CHANGELOG.md](./CHANGELOG.md)                      | Release notes                                    |

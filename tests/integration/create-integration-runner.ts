@@ -8,11 +8,8 @@ import type { Mock } from "bun:test";
 import type OpenAI from "openai";
 import type PQueue from "p-queue";
 
-import type {
-	LanguageCacheEntry,
-	PatchedRepositoryTreeItem,
-	ProcessedFileResult,
-} from "@/app/domain/workflow/";
+import type { LanguageCacheEntry } from "@/app/services/cache/types";
+import type { PatchedRepositoryTreeItem, ProcessedFileResult } from "@/app/services/github/types";
 import type { CacheService } from "@/app/services/cache/";
 import type { GitHubService } from "@/app/services/github/";
 import type {
@@ -27,7 +24,7 @@ import {
 	localeService,
 	openRouterModelLimitsService,
 } from "@/app/composition";
-import { PullRequestProgressAction } from "@/app/domain/workflow/";
+import { PullRequestProgressAction } from "@/app/services/github/types";
 import { RunnerService } from "@/app/services/runner/runner.service";
 import { TranslationFile, TranslatorService } from "@/app/services/translator/";
 
@@ -114,7 +111,7 @@ async function listMdFixtureBasenames(cwd: string) {
 }
 
 /**
- * Loads markdown fixtures from `tests/fixtures/md/` the same way as `ci:smoke-llm`.
+ * Loads markdown fixtures from `tests/fixtures/md/` for integration workflow tests.
  *
  * When `basenames` is omitted or empty, loads every `*.md` in that directory (sorted). When set,
  * loads only those files in the given order; each name must exist.

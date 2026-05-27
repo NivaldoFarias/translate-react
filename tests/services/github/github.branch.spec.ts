@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, mock, test } from "bun:test";
 
 import type { Octokit } from "@octokit/rest";
 
-import type { SharedGitHubDependencies } from "@/app/services/github/github.types";
+import type { SharedGitHubDependencies } from "@/app/services/github/types";
 
 import { GitHubBranch } from "@/app/services/github/github.branch";
 

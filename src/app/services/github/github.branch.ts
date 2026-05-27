@@ -2,9 +2,9 @@ import { RequestError } from "@octokit/request-error";
 
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
-import type { PullRequestStatus } from "@/app/domain/workflow/";
+import type { PullRequestStatus } from "@/app/services/github/types";
 
-import type { SharedGitHubDependencies } from "./github.types";
+import type { SharedGitHubDependencies } from "./types";
 
 import { logger, registerCleanup } from "@/app/utils/";
 

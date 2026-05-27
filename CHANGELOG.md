@@ -9,11 +9,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 - Upstream SHA polling: [`.github/workflows/upstream-poll.yml`](./.github/workflows/upstream-poll.yml), [`.github/upstream-locales.json`](./.github/upstream-locales.json), `ci:poll-upstream`, and `ci:resolve-matrix` so translation runs only when `reactjs/<lang>.react.dev` default branch changes.
 - Repository variables `UPSTREAM_SHA_<LANG>` updated after each successful locale job; documented in [WORKFLOW.md](./docs/WORKFLOW.md#automated-upstream-polling).
 - Source layout: `src/app/` (translation CLI), `src/ci/` (Actions helpers), `src/shared/` (errors, logger factory, bare Octokit); ESLint import boundaries between runtimes.
+- Phase 5 layout: `schemas/`, `constants/`, `ci/actions/` entry scripts; `citty` for `ci:resolve-matrix --langs`; workflow types colocated in `services/github/types.ts`, `services/runner/types.ts`, `locales/types.ts`.
 
 ### Changed
 
 - [`.github/workflows/workflow.yml`](./.github/workflows/workflow.yml) is reusable (`workflow_call`) with a `prepare-matrix` job; matrix rows come from the locale registry instead of hard-coded YAML.
-- **Breaking (contributors):** move app code under `src/app/`, CI helpers under `src/ci/`, shared infra under `src/shared/`; npm scripts `ci:*` replace `workflow:*`; app env is `src/app/env/app.env.ts`, CI env is `src/ci/env/ci.env.ts`.
+- **Breaking (contributors):** app env at `src/app/schemas/env.schema.ts`, CI env at `src/ci/schemas/env.schema.ts`, constants at `src/app/constants/` and `src/shared/constants/`; `ci:*` scripts point to `src/ci/actions/`; dissolved `app/domain/workflow/`.
+
+### Removed
+
+- `ci:smoke-llm` npm script and tracked `src/ci/smoke-llm.ts` (gitignored local-only dev helper; use integration tests instead).
 
 ### Fixed
 

@@ -4,6 +4,6 @@ import { environmentDefaults, RuntimeEnvironment, validateEnv } from "@/app/util
 
 export const testEnv = environmentDefaults[RuntimeEnvironment.Test];
 
-void mock.module("@/app/env/app.env", () => {
+void mock.module("@/app/schemas/env.schema", () => {
 	return { env: testEnv, validateEnv };
 });

@@ -9,10 +9,10 @@ import type {
 	PatchedRepositoryTreeItem,
 	ProcessedFileResult,
 	PullRequestStatus,
-} from "@/app/domain/workflow/";
+} from "@/app/services/github/types";
 import type { CommentBuilderService } from "@/app/services/comment-builder/";
 
-import type { SharedGitHubDependencies } from "./github.types";
+import type { SharedGitHubDependencies } from "./types";
 
 import { selectProgressCommentPayload } from "@/app/services/comment-builder/progress-comment.util";
 import { TranslationFile } from "@/app/services/translator/";

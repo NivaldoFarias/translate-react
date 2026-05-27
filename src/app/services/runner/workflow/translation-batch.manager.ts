@@ -1,15 +1,14 @@
 import prettyBytes from "pretty-bytes";
 
+import type { ProcessedFileResult } from "@/app/services/github/types";
+import { PullRequestProgressAction } from "@/app/services/github/types";
 import type {
-	FileProcessingProgress,
 	InvalidFilePullRequest,
-	ProcessedFileResult,
 	PullRequestDescriptionMetadata,
-} from "@/app/domain/workflow/";
+} from "@/app/locales/types";
+import type { FileProcessingProgress } from "@/app/services/runner/types";
 
 import type { RunnerServiceDependencies } from "../runner.types";
-
-import { PullRequestProgressAction } from "@/app/domain/workflow/";
 import { LanguageDetectorService } from "@/app/services/language-detector/";
 import { TranslationFile } from "@/app/services/translator/";
 import {

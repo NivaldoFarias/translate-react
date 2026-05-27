@@ -6,38 +6,43 @@ Layout of the `translate-react` repository. For behavior and call order, see [WO
 
 ```plaintext
 src/
-├── main.ts                 # CLI entry
-├── composition.ts          # wires service singletons (import from here in app code)
-├── domain/workflow/        # shared PR/tree/workflow types (not runner-specific)
-├── clients/                # Octokit, OpenAI client, rate-limit queue
-├── errors/
-├── locales/                # PR/issue copy per target language
-├── services/
-│   ├── runner/workflow/    # discovery, batch translate, PR manager
-│   ├── translator/
-│   │   ├── chunking/       # ChunksManager, token budgets
-│   │   ├── llm/            # TranslationLlmClient, prompts
-│   │   ├── markdown/       # frontmatter, artifacts, regexes
-│   │   ├── pipeline/       # validation retry loop
-│   │   ├── postprocess/
-│   │   └── validation/     # post-translation guards
-│   ├── github/
-│   ├── language-detector/
-│   ├── comment-builder/
-│   ├── locale/
-│   └── cache/
-└── utils/                  # env, logger, constants; markdown-verbatim-fences stays here
+├── app/                    # translation CLI
+│   ├── main.ts
+│   ├── composition.ts
+│   ├── global.ts
+│   ├── schemas/env.schema.ts
+│   ├── constants/
+│   ├── clients/
+│   ├── services/
+│   │   ├── runner/workflow/
+│   │   ├── translator/
+│   │   ├── github/types.ts
+│   │   └── …
+│   ├── locales/types.ts
+│   └── utils/common.util.ts
+├── ci/                     # GitHub Actions helpers
+│   ├── actions/            # poll-upstream, resolve-matrix
+│   ├── schemas/env.schema.ts
+│   ├── services/upstream/
+│   └── utils/
+└── shared/                 # errors, logger, bare Octokit, shared Zod
+    ├── schemas/
+    ├── constants/
+    ├── clients/octokit/
+    └── utils/
 ```
 
 ## Import rules
 
-- **`github/`** and **`locales/`** use `@/domain/workflow/` for shared workflow types. They must not import `@/services/runner/`.
-- **New singletons** belong in [`composition.ts`](../src/app/composition.ts), not at the bottom of individual service files.
-- Prefer `@/services/<name>/` or `@/domain/workflow/` over deep relative paths across packages.
+- **`github/`** and **`locales/`** use `@/app/services/github/types` and `@/app/locales/types`. They must not import `@/app/services/runner/`.
+- **`ci/**`** must not import `app/**` runner/composition.
+- **`app/**`** must not import `ci/**`.
+- **`shared/**`** must not import `app/**` or `ci/**`.
+- New singletons belong in [`composition.ts`](../src/app/composition.ts).
 
 ## Tests
 
-`tests/` mirrors `src/` where practical (e.g. `tests/services/translator/chunking/`). Shared fixtures: `tests/fixtures/md/`. Mocks: `tests/mocks/`.
+`tests/` mirrors `src/` where practical. CI specs: `tests/ci/schemas/`, `tests/ci/services/upstream/`. Fixtures: `tests/fixtures/md/`.
 
 ## Commands
 
@@ -48,4 +53,3 @@ src/
 | Test       | `bun run test`         |
 | Type check | `bun run type-check`   |
 | Lint       | `bun run lint`         |
-| LLM smoke  | `bun run ci:smoke-llm` |
