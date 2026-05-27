@@ -1,5 +1,5 @@
-import type { ProcessedFileResult } from "@/app/services/github/types";
 import type { PullRequestDescriptionMetadata } from "@/app/locales/types";
+import type { ProcessedFileResult } from "@/app/services/github/types";
 import type { TranslationFile } from "@/app/services/translator/";
 
 import type { LocalePRBodyStrings } from "./types";

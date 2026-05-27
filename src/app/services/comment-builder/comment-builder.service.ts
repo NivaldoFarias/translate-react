@@ -1,5 +1,5 @@
-import type { ProcessedFileResult } from "@/app/services/github/types";
 import type { LocaleDefinition } from "@/app/locales";
+import type { ProcessedFileResult } from "@/app/services/github/types";
 
 import { TranslationFile } from "@/app/services/translator/";
 import { logger, resolveGitHubActionsRunContext } from "@/app/utils/";

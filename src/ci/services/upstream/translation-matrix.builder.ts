@@ -1,8 +1,7 @@
 import type { Octokit } from "@octokit/rest";
 import type { Logger } from "pino";
 
-import type { TranslationMatrixEntry } from "@/ci/services/upstream/types";
-import type { UpstreamLocaleConfig } from "@/ci/services/upstream/types";
+import type { TranslationMatrixEntry, UpstreamLocaleConfig } from "@/ci/services/upstream/types";
 
 import { UpstreamHeadShaService } from "./upstream-head-sha.service";
 

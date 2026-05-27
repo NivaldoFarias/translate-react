@@ -1,11 +1,11 @@
+import type { CacheService } from "@/app/services/cache/";
 import type { LanguageCacheEntry } from "@/app/services/cache/types";
+import type { GitHubService } from "@/app/services/github/";
 import type {
 	PatchedRepositoryTreeItem,
 	ProcessedFileResult,
 	PullRequestStatus,
 } from "@/app/services/github/types";
-import type { CacheService } from "@/app/services/cache/";
-import type { GitHubService } from "@/app/services/github/";
 import type { LanguageDetectorService } from "@/app/services/language-detector/";
 import type { LocaleService } from "@/app/services/locale/";
 import type { TranslationFile, TranslatorService } from "@/app/services/translator/";

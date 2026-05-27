@@ -8,14 +8,14 @@ import type { Mock } from "bun:test";
 import type OpenAI from "openai";
 import type PQueue from "p-queue";
 
-import type { LanguageCacheEntry } from "@/app/services/cache/types";
-import type { PatchedRepositoryTreeItem, ProcessedFileResult } from "@/app/services/github/types";
 import type { CacheService } from "@/app/services/cache/";
+import type { LanguageCacheEntry } from "@/app/services/cache/types";
 import type { GitHubService } from "@/app/services/github/";
 import type {
 	CommitTranslationOptions,
 	PullRequestOptions,
 } from "@/app/services/github/github.content";
+import type { PatchedRepositoryTreeItem, ProcessedFileResult } from "@/app/services/github/types";
 import type { LanguageDetectorService } from "@/app/services/language-detector/";
 import type { RunnerServiceDependencies } from "@/app/services/runner/runner.types";
 

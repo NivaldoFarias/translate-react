@@ -35,9 +35,9 @@ src/
 ## Import rules
 
 - **`github/`** and **`locales/`** use `@/app/services/github/types` and `@/app/locales/types`. They must not import `@/app/services/runner/`.
-- **`ci/**`** must not import `app/**` runner/composition.
-- **`app/**`** must not import `ci/**`.
-- **`shared/**`** must not import `app/**` or `ci/**`.
+- **`ci/**`** must not import `app/\*\*` runner/composition.
+- **`app/**`** must not import `ci/\*\*`.
+- **`shared/**`** must not import `app/**`or`ci/**`.
 - New singletons belong in [`composition.ts`](../src/app/composition.ts).
 
 ## Tests
@@ -46,10 +46,10 @@ src/
 
 ## Commands
 
-| Task       | Command                |
-| ---------- | ---------------------- |
-| Run        | `bun run start`        |
-| Dev        | `bun run dev`          |
-| Test       | `bun run test`         |
-| Type check | `bun run type-check`   |
-| Lint       | `bun run lint`         |
+| Task       | Command              |
+| ---------- | -------------------- |
+| Run        | `bun run start`      |
+| Dev        | `bun run dev`        |
+| Test       | `bun run test`       |
+| Type check | `bun run type-check` |
+| Lint       | `bun run lint`       |

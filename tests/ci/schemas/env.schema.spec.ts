@@ -1,9 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import {
-	parseCiPollResolveEnvironment,
-	resolveCiScriptContext,
-} from "@/ci/schemas/env.schema";
+import { parseCiPollResolveEnvironment, resolveCiScriptContext } from "@/ci/schemas/env.schema";
 
 describe("ci env.schema", () => {
 	test("parseCiPollResolveEnvironment accepts valid workflow script variables", () => {

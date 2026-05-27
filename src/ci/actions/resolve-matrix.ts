@@ -12,6 +12,7 @@
 import { defineCommand, runCommand } from "citty";
 
 import { resolveCiScriptContext } from "@/ci/schemas/env.schema";
+import { TranslationMatrixBuilder } from "@/ci/services/upstream/";
 import {
 	filterUpstreamLocalesByLang,
 	loadUpstreamLocales,
@@ -20,7 +21,6 @@ import {
 	createWorkflowScriptOctokit,
 	writeResolveMatrixWorkflowOutputs,
 } from "@/ci/utils/workflow-script.util";
-import { TranslationMatrixBuilder } from "@/ci/services/upstream/";
 import { createLogger } from "@/shared/utils/create-logger.util";
 
 const log = createLogger({ level: "info", logToConsole: true }).child({

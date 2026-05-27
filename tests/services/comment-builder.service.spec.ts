@@ -3,8 +3,8 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import type { ProcessedFileResult } from "@/app/services/github/types";
 
 import { localeService } from "@/app/composition";
-import { PullRequestProgressAction } from "@/app/services/github/types";
 import { CommentBuilderService } from "@/app/services/comment-builder/comment-builder.service";
+import { PullRequestProgressAction } from "@/app/services/github/types";
 import { TranslationFile } from "@/app/services/translator/translation-file";
 
 import { createMockPullRequestListItem } from "@tests/fixtures";

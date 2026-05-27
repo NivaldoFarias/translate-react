@@ -10,8 +10,8 @@
  */
 
 import { resolveCiScriptContext } from "@/ci/schemas/env.schema";
-import { loadUpstreamLocales } from "@/ci/services/upstream/upstream-locales.util";
 import { UpstreamShaPoller, UpstreamShaVariableReader } from "@/ci/services/upstream/";
+import { loadUpstreamLocales } from "@/ci/services/upstream/upstream-locales.util";
 import {
 	createWorkflowScriptOctokit,
 	writePollWorkflowOutputs,

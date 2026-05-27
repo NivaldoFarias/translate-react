@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
 
-import { filterUpstreamLocalesByLang, loadUpstreamLocales } from "@/ci/services/upstream/upstream-locales.util";
+import {
+	filterUpstreamLocalesByLang,
+	loadUpstreamLocales,
+} from "@/ci/services/upstream/upstream-locales.util";
 
 describe("upstream-locales.util", () => {
 	test("loadUpstreamLocales reads configured registry", () => {

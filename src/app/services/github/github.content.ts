@@ -5,12 +5,12 @@ import { RequestError } from "@octokit/request-error";
 import type { components } from "@octokit/openapi-types";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
+import type { CommentBuilderService } from "@/app/services/comment-builder/";
 import type {
 	PatchedRepositoryTreeItem,
 	ProcessedFileResult,
 	PullRequestStatus,
 } from "@/app/services/github/types";
-import type { CommentBuilderService } from "@/app/services/comment-builder/";
 
 import type { SharedGitHubDependencies } from "./types";
 
