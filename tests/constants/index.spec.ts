@@ -10,7 +10,7 @@ import {
 	RuntimeEnvironment,
 } from "@/app/constants";
 
-describe("constants.util", () => {
+describe("app/constants", () => {
 	describe("errorMessages", () => {
 		test("invalidKey returns message with key", () => {
 			expect(errorMessages.invalidKey("missing")).toBe("Invalid key: missing");
