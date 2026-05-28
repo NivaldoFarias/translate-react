@@ -1,10 +1,10 @@
 import "@/app/global";
 
+import { name, version } from "@package";
+
 import { runnerService } from "@/app/composition";
 import { logger as baseLogger, env, setupSignalHandlers } from "@/app/utils/";
 import { handleTopLevelError } from "@/shared/errors/";
-
-import { name, version } from "../../package.json";
 
 if (import.meta.main) {
 	await main();
