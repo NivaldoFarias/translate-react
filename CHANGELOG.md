@@ -4,6 +4,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-05-31
+
+### Changed
+
+- Refreshed Changelog's links to the project wiki.
+- Removed mentions to local, gitignored files.
+
 ## [0.2.0] - 2026-05-31
 
 ### Added
