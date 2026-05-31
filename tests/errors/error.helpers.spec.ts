@@ -1,7 +1,7 @@
 import { describe, expect, mock, test } from "bun:test";
 import { StatusCodes } from "http-status-codes";
 
-import { ApplicationError, ErrorCode, handleTopLevelError } from "@/errors/";
+import { ApplicationError, ErrorCode, handleTopLevelError } from "@/shared/errors/";
 
 import { createOctokitRequestErrorFixture, createOpenAIApiErrorFixture } from "@tests/fixtures";
 

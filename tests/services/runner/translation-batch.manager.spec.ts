@@ -1,11 +1,11 @@
 import { describe, expect, test } from "bun:test";
 
-import type { LanguageAnalysisResult } from "@/services/language-detector/language-detector.service";
-import type { RunnerServiceDependencies } from "@/services/runner/runner.types";
+import type { LanguageAnalysisResult } from "@/app/services/language-detector/language-detector.service";
+import type { RunnerServiceDependencies } from "@/app/services/runner/runner.types";
 
-import { localeService } from "@/composition";
-import { PullRequestProgressAction } from "@/domain/workflow/";
-import { TranslationBatchManager } from "@/services/runner/workflow/translation-batch.manager";
+import { localeService } from "@/app/composition";
+import { PullRequestProgressAction } from "@/app/services/github/types";
+import { TranslationBatchManager } from "@/app/services/runner/workflow/translation-batch.manager";
 
 import { createMockPullRequestListItem, createTranslationFileFixture } from "@tests/fixtures";
 import {
@@ -26,7 +26,6 @@ function createTestTranslationBatchManager(overrides: Partial<RunnerServiceDepen
 		} as RunnerServiceDependencies,
 		new Map(),
 		Date.now(),
-		{ newIssueChooserUrl: "https://github.com/example/example/issues/new/choose" },
 	);
 }
 

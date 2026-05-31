@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 import {
 	collectFunctionDeclarationNames,
 	findFenceFunctionIdentifierMismatches,
-} from "@/services/translator/validation/analyzers/fence-code-identifier.analyzer";
+} from "@/app/services/translator/validation/analyzers/fence-code-identifier.analyzer";
 
 describe("fence-code-identifier.analyzer", () => {
 	test("collectFunctionDeclarationNames returns unique names in order", () => {

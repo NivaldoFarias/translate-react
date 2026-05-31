@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 
-import type { TranslatorServiceDependencies } from "@/services/translator/translator.service";
+import type { TranslatorServiceDependencies } from "@/app/services/translator/translator.service";
 
-import { localeService } from "@/composition";
-import { ApplicationError } from "@/errors";
-import { OpenRouterModelLimitsService } from "@/services/openrouter/openrouter-model-limits.service";
-import { TranslatorService } from "@/services/translator/translator.service";
+import { localeService } from "@/app/composition";
+import { OpenRouterModelLimitsService } from "@/app/services/openrouter/openrouter-model-limits.service";
+import { TranslatorService } from "@/app/services/translator/translator.service";
+import { ApplicationError } from "@/shared/errors";
 
 import {
 	createChatCompletionFixture,
@@ -198,9 +198,9 @@ describe("TranslatorService", () => {
 
 			let chunkCallIndex = 0;
 			let firstSystemPrompt: string | undefined;
-			const { chunks } = await new (await import("@/services/translator/chunking")).ChunksManager(
-				"test-model",
-			).chunkContent(largeContent);
+			const { chunks } = await new (
+				await import("@/app/services/translator/chunking")
+			).ChunksManager("test-model").chunkContent(largeContent);
 
 			mockChatCompletionsCreate.mockImplementation(async (params: unknown) => {
 				const { messages } = params as { messages: { role: string; content: string }[] };

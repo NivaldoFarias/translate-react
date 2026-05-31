@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
-import { TranslationFile } from "@/services/translator/";
-import { TranslationPipelineManager } from "@/services/translator/pipeline/translation-pipeline.manager";
+import { TranslationFile } from "@/app/services/translator/";
+import { TranslationPipelineManager } from "@/app/services/translator/pipeline/translation-pipeline.manager";
 
 describe("TranslationPipelineManager", () => {
 	test("retries translateBody with accumulated guard hints before succeeding", async () => {

@@ -8,24 +8,25 @@ import type { Mock } from "bun:test";
 import type OpenAI from "openai";
 import type PQueue from "p-queue";
 
-import type {
-	LanguageCacheEntry,
-	PatchedRepositoryTreeItem,
-	ProcessedFileResult,
-} from "@/domain/workflow/";
-import type { CacheService } from "@/services/cache/";
-import type { GitHubService } from "@/services/github/";
+import type { CacheService } from "@/app/services/cache/";
+import type { LanguageCacheEntry } from "@/app/services/cache/types";
+import type { GitHubService } from "@/app/services/github/";
 import type {
 	CommitTranslationOptions,
 	PullRequestOptions,
-} from "@/services/github/github.content";
-import type { LanguageDetectorService } from "@/services/language-detector/";
-import type { RunnerServiceDependencies } from "@/services/runner/runner.types";
+} from "@/app/services/github/github.content";
+import type { PatchedRepositoryTreeItem, ProcessedFileResult } from "@/app/services/github/types";
+import type { LanguageDetectorService } from "@/app/services/language-detector/";
+import type { RunnerServiceDependencies } from "@/app/services/runner/runner.types";
 
-import { commentBuilderService, localeService, openRouterModelLimitsService } from "@/composition";
-import { PullRequestProgressAction } from "@/domain/workflow/";
-import { RunnerService } from "@/services/runner/runner.service";
-import { TranslationFile, TranslatorService } from "@/services/translator/";
+import {
+	commentBuilderService,
+	localeService,
+	openRouterModelLimitsService,
+} from "@/app/composition";
+import { PullRequestProgressAction } from "@/app/services/github/types";
+import { RunnerService } from "@/app/services/runner/runner.service";
+import { TranslationFile, TranslatorService } from "@/app/services/translator/";
 
 import {
 	createMockGitHubService,
@@ -110,7 +111,7 @@ async function listMdFixtureBasenames(cwd: string) {
 }
 
 /**
- * Loads markdown fixtures from `tests/fixtures/md/` the same way as `smoke:llm-workflow`.
+ * Loads markdown fixtures from `tests/fixtures/md/` for integration workflow tests.
  *
  * When `basenames` is omitted or empty, loads every `*.md` in that directory (sorted). When set,
  * loads only those files in the given order; each name must exist.

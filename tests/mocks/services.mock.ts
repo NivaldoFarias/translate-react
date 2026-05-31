@@ -2,9 +2,9 @@ import { mock } from "bun:test";
 
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
-import type { PullRequestStatus } from "@/domain/workflow/";
-import type { LanguageAnalysisResult } from "@/services/language-detector/language-detector.service";
-import type { ReactLanguageCode } from "@/utils/constants.util";
+import type { ReactLanguageCode } from "@/app/constants";
+import type { PullRequestStatus } from "@/app/services/github/types";
+import type { LanguageAnalysisResult } from "@/app/services/language-detector/language-detector.service";
 
 import { createTranslationFileFixture } from "@tests/fixtures";
 

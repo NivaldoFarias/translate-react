@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 
-import type { ProcessedFileResult } from "@/domain/workflow/";
+import type { ProcessedFileResult } from "@/app/services/github/types";
 
-import { localeService } from "@/composition";
-import { PullRequestProgressAction } from "@/domain/workflow/";
-import { CommentBuilderService } from "@/services/comment-builder/comment-builder.service";
-import { TranslationFile } from "@/services/translator/translation-file";
+import { localeService } from "@/app/composition";
+import { CommentBuilderService } from "@/app/services/comment-builder/comment-builder.service";
+import { PullRequestProgressAction } from "@/app/services/github/types";
+import { TranslationFile } from "@/app/services/translator/translation-file";
 
 import { createMockPullRequestListItem } from "@tests/fixtures";
 
