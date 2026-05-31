@@ -4,6 +4,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-05-31
+
 ### Added
 
 - Upstream SHA polling: [`.github/workflows/poll.yml`](./.github/workflows/poll.yml), [`.github/upstream-locales.json`](./.github/upstream-locales.json), `ci:poll-upstream`, and `ci:resolve-matrix` so translation runs only when `reactjs/<lang>.react.dev` default branch changes.
@@ -23,8 +25,6 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 - `ci:smoke-llm` npm script and tracked `src/ci/smoke-llm.ts` (gitignored local-only dev helper; use integration tests instead).
 - `docs/WORKFLOW.md`, `docs/ARCHITECTURE.md`, and `docs/PROJECT_STRUCTURE.md` (content moved to the wiki drafts above).
-
-### Fixed
 
 ## [0.1.30] - 2026-05-26
 
@@ -191,6 +191,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 - README `MAX_RETRY_ATTEMPTS` default matches `src/utils/constants.util.ts` (`3`).
 
+[0.2.0]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.0
 [0.1.30]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.1.30
 [0.1.29]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.1.29
 [0.1.28]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.1.28
