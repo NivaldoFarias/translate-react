@@ -9,7 +9,7 @@ import type { PrFilterResult, WorkflowStatistics } from "@/app/services/runner/t
 
 import type { RunnerOptions, RunnerServiceDependencies, RunnerState } from "./runner.types";
 
-import { env, logger, registerCleanup, resolveRunnerNewIssueChooserUrl } from "@/app/utils/";
+import { env, logger, registerCleanup } from "@/app/utils/";
 import { ApplicationError, ErrorCode } from "@/shared/errors/";
 
 import { FileDiscoveryManager, PRManager, TranslationBatchManager } from "./workflow";
@@ -79,9 +79,7 @@ export abstract class BaseRunnerService {
 	) {
 		this.managers = {
 			fileDiscovery: new FileDiscoveryManager(services),
-			translationBatch: new TranslationBatchManager(services, new Map(), this.metadata.timestamp, {
-				newIssueChooserUrl: resolveRunnerNewIssueChooserUrl(),
-			}),
+			translationBatch: new TranslationBatchManager(services, new Map(), this.metadata.timestamp),
 			prManager: new PRManager(services, this.metadata.timestamp),
 		};
 
@@ -224,20 +222,16 @@ export abstract class BaseRunnerService {
 	}
 
 	/**
-	 * Rebuilds the translation batch workflow stage with {@link resolveRunnerNewIssueChooserUrl} and
-	 * invalid-PR metadata, regardless of whether `filesToTranslate` came from discovery or a
-	 * pre-filled {@link state}.
+	 * Rebuilds the translation batch workflow stage with invalid-PR metadata, regardless of whether
+	 * `filesToTranslate` came from discovery or a pre-filled {@link state}.
 	 *
 	 * @param invalidPRsByFile Paths to open PRs that need conflict messaging in new PR bodies
 	 */
 	private rebuildTranslationBatchManager(invalidPRsByFile: PrFilterResult["invalidPRsByFile"]) {
-		const newIssueChooserUrl = resolveRunnerNewIssueChooserUrl();
-
 		this.managers.translationBatch = new TranslationBatchManager(
 			this.services,
 			invalidPRsByFile,
 			this.metadata.timestamp,
-			{ newIssueChooserUrl },
 		);
 	}
 

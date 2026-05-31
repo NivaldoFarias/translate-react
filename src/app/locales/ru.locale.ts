@@ -52,11 +52,8 @@ const ruPRBodyStrings: LocalePRBodyStrings = {
 		workflowRun: "Запуск workflow",
 	},
 
-	feedbackTip: (issueChooserUrl) =>
-		`Если заметите ошибки или неудачные фрагменты, [создайте issue](${issueChooserUrl}) и укажите:
-- файл
-- строка/фрагмент
-- (по возможности) как бы вы это исправили`,
+	maintainerGuide: (wikiUrl) =>
+		`Руководство для ревьюеров: [For React Docs Maintainers](${wikiUrl}).`,
 
 	timeFormatLocale: "ru-RU",
 };

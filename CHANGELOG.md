@@ -6,19 +6,23 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Added
 
-- Upstream SHA polling: [`.github/workflows/upstream-poll.yml`](./.github/workflows/upstream-poll.yml), [`.github/upstream-locales.json`](./.github/upstream-locales.json), `ci:poll-upstream`, and `ci:resolve-matrix` so translation runs only when `reactjs/<lang>.react.dev` default branch changes.
-- Repository variables `UPSTREAM_SHA_<LANG>` updated after each successful locale job; documented in [WORKFLOW.md](./docs/WORKFLOW.md#automated-upstream-polling).
+- Upstream SHA polling: [`.github/workflows/poll.yml`](./.github/workflows/poll.yml), [`.github/upstream-locales.json`](./.github/upstream-locales.json), `ci:poll-upstream`, and `ci:resolve-matrix` so translation runs only when `reactjs/<lang>.react.dev` default branch changes.
+- Repository variables `UPSTREAM_SHA_<LANG>` updated after each successful locale job; documented in [Wiki: Workflow — Automated upstream polling](https://github.com/NivaldoFarias/translate-react/wiki/Workflow#automated-upstream-polling).
 - Source layout: `src/app/` (translation CLI), `src/ci/` (Actions helpers), `src/shared/` (errors, logger factory, bare Octokit); ESLint import boundaries between runtimes.
 - Phase 5 layout: `schemas/`, `constants/`, `ci/actions/` entry scripts; `citty` for `ci:resolve-matrix --langs`; workflow types colocated in `services/github/types.ts`, `services/runner/types.ts`, `locales/types.ts`.
+- GitHub wiki drafts under `.cursor/wiki/`: [Home](https://github.com/NivaldoFarias/translate-react/wiki), [Workflow](https://github.com/NivaldoFarias/translate-react/wiki/Workflow), [Codebase](https://github.com/NivaldoFarias/translate-react/wiki/Codebase) (merged architecture and project structure), [Configuration](https://github.com/NivaldoFarias/translate-react/wiki/Configuration), [For React Docs Maintainers](https://github.com/NivaldoFarias/translate-react/wiki/For-React-Docs-Maintainers), and [FAQ](https://github.com/NivaldoFarias/translate-react/wiki/FAQ). Publish steps: `.cursor/wiki/SETUP.md`.
 
 ### Changed
 
 - [`.github/workflows/workflow.yml`](./.github/workflows/workflow.yml) is reusable (`workflow_call`) with a `prepare-matrix` job; matrix rows come from the locale registry instead of hard-coded YAML.
 - **Breaking (contributors):** app env at `src/app/schemas/env.schema.ts`, CI env at `src/ci/schemas/env.schema.ts`, constants at `src/app/constants/` and `src/shared/constants/`; `ci:*` scripts point to `src/ci/actions/`; dissolved `app/domain/workflow/`.
+- Documentation: `README.md` is the repo entry hub (Start here table); env tables and troubleshooting live on [Wiki: Configuration](https://github.com/NivaldoFarias/translate-react/wiki/Configuration). `CONTRIBUTING.md` and `SECURITY.md` link to the wiki instead of removed `docs/` paths.
+- Translation PR bodies: link reviewers to [Wiki: For React Docs Maintainers](https://github.com/NivaldoFarias/translate-react/wiki/For-React-Docs-Maintainers) instead of the runner new-issue chooser tip.
 
 ### Removed
 
 - `ci:smoke-llm` npm script and tracked `src/ci/smoke-llm.ts` (gitignored local-only dev helper; use integration tests instead).
+- `docs/WORKFLOW.md`, `docs/ARCHITECTURE.md`, and `docs/PROJECT_STRUCTURE.md` (content moved to the wiki drafts above).
 
 ### Fixed
 
@@ -51,7 +55,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 - Throw `InsufficientPermissions` when the GitHub token scope check fails.
 - Drop dead `RATIOS` alias, `ChunkTranslationMode` enum, and unused validator code.
 - `docs/ARCHITECTURE.md`, `docs/PROJECT_STRUCTURE.md`, `docs/WORKFLOW.md`, and `README.md` updated
-  for the new module layout; `eslint.config.mjs` path rules aligned with `src/`.
+  for the new module layout (now [Wiki: Codebase](https://github.com/NivaldoFarias/translate-react/wiki/Codebase) and [Wiki: Workflow](https://github.com/NivaldoFarias/translate-react/wiki/Workflow)); `eslint.config.mjs` path rules aligned with `src/`.
 
 ## [0.1.29] - 2026-05-19
 
@@ -101,7 +105,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 - PR body: shorter conflict notice copy and placement in `pr-body.builder` and `pt-br` / `ru`
   locales; normalize WIP wording in locale strings.
 - Actions workflow: remove `tool_ref` dispatch input; checkout uses `github.ref` for branches and
-  tags; `docs/WORKFLOW.md` drops the pinning section.
+  tags; workflow documentation drops the pinning section ([Wiki: Workflow](https://github.com/NivaldoFarias/translate-react/wiki/Workflow)).
 - `logger.util`: honor `LOG_TO_CONSOLE` for pretty transport in all environments.
 - `locale.service.spec`: remove hanging unit test for PR `mergeable_state` in conflict notice.
 
@@ -137,7 +141,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 ### Changed
 
 - `TranslatorService`: chunk translation always runs in parallel; remove `CHUNK_TRANSLATION_MODE`
-  from the environment schema and defaults (`env.util`, `constants.util`).
+  from the environment schema and defaults (`env.util` at the time; now `src/app/schemas/env.schema.ts` and `src/app/constants/`).
 - README: minor setup copy tweaks.
 
 ## [0.1.25] - 2026-05-18
@@ -149,7 +153,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
   integration tests) and writes artifacts under `.out/` for review.
 - `.gitignore`: ignore `.out/` (smoke and local inspection output).
 - Markdown fixture `tests/fixtures/md/hydrateRoot.md` for integration smoke and specs.
-- `docs/WORKFLOW.md`: [Local LLM workflow smoke](docs/WORKFLOW.md#local-llm-workflow-smoke) section and ToC entry.
+- `docs/WORKFLOW.md`: Local LLM workflow smoke section and ToC entry (see [Wiki: Workflow — Local LLM exercise](https://github.com/NivaldoFarias/translate-react/wiki/Workflow#local-llm-exercise-integration-tests)).
 
 ### Changed
 
@@ -163,22 +167,22 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 - Integration harness: `tests/integration/create-integration-runner.ts` refactored so smoke script and
   `workflow.integration.spec.ts` share fixture loading and in-memory GitHub wiring; related test and
   mock updates.
-- `docs/PROJECT_STRUCTURE.md`: note that `tests/fixtures/md/` backs smoke runs and specs.
+- `docs/PROJECT_STRUCTURE.md`: note that `tests/fixtures/md/` backs smoke runs and specs ([Wiki: Codebase](https://github.com/NivaldoFarias/translate-react/wiki/Codebase)).
 - `GitHubContent.getFile`: clarify JSDoc `@returns` for `TranslationFile`.
 
 ## [0.1.24] - 2026-05-13
 
 ### Added
 
-- `CHANGELOG.md`; release steps in `docs/WORKFLOW.md`.
+- `CHANGELOG.md`; release steps in workflow documentation ([Wiki: Workflow — Releases](https://github.com/NivaldoFarias/translate-react/wiki/Workflow#releases-and-semantic-versioning)).
 - `CONTRIBUTING.md`, `SECURITY.md`.
-- Actions: `tool_ref` input; workflow `permissions`; maintainer settings checklist in `docs/WORKFLOW.md`.
+- Actions: `tool_ref` input; workflow `permissions`; maintainer settings checklist in [Wiki: Workflow](https://github.com/NivaldoFarias/translate-react/wiki/Workflow).
 - CI: `bun -e` in `lint-and-typecheck` asserts `CHANGELOG.md` has a `## [version]` heading for `package.json` `version`.
 - OpenRouter: `GET /v1/models` metadata via `OpenRouterModelLimitsService` (`src/services/openrouter/`) to size chunk inputs and align `max_tokens` with provider completion caps.
 
 ### Changed
 
-- OpenRouter defaults documented (`HEADER_*` from `package.json`); see README and `src/utils/constants.util.ts`.
+- OpenRouter defaults documented (`HEADER_*` from `package.json`); see README, [Wiki: Configuration](https://github.com/NivaldoFarias/translate-react/wiki/Configuration), and `src/app/constants/environment.constants.ts`.
 - Actions Bun default `1.3` (override with repo variable `BUN_VERSION`); `engines.bun` in `package.json`.
 - OpenRouter models list: Zod types aligned with OpenRouter `ModelsListResponse` / `Model` in `openrouter.schemas.ts`; README footnote links to the [get-models](https://openrouter.ai/docs/api/api-reference/models/get-models) API reference.
 - Removed unused `TOKEN_COUNT_MODE` / `LOG_MAX_STRING_LENGTH` defaults from the environment schema surface (they were never read).
