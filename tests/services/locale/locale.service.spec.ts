@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 
-import type { PullRequestDescriptionMetadata } from "@/domain/workflow/pull-request.types";
+import type { PullRequestDescriptionMetadata } from "@/app/locales/types";
 
-import { ptBrLocale, ruLocale } from "@/locales";
-import { LocaleService } from "@/services/locale/locale.service";
-import { TranslationFile } from "@/services/translator/translation-file";
+import { WIKI_FOR_REACT_DOCS_MAINTAINERS_URL } from "@/app/constants";
+import { ptBrLocale, ruLocale } from "@/app/locales";
+import { LocaleService } from "@/app/services/locale/locale.service";
+import { TranslationFile } from "@/app/services/translator/translation-file";
 
 import { createProcessedFileResultsFixture } from "@tests/fixtures";
 
@@ -24,7 +25,6 @@ function createPullRequestDescriptionMetadata(
 			workflowStart: 1706899000000,
 		},
 		translationModel: "google/gemini-2.0-flash-exp:free",
-		newIssueChooserUrl: "https://github.com/NivaldoFarias/translate-react/issues/new/choose",
 		...overrides,
 	};
 }
@@ -109,7 +109,7 @@ describe("LocaleService", () => {
 			test("should have suffix function that generates observations", () => {
 				const suffix = localeService.definitions.comment.suffix;
 
-				expect(suffix).toContain("> [!IMPORTANT]");
+				expect(suffix).toContain("###### ps.:");
 			});
 		});
 
@@ -279,14 +279,15 @@ describe("ptBrLocale.pullRequest.body", () => {
 			expect(body).toContain("Razão de Conteúdo");
 		});
 
-		test("should end with a TIP linking to the issue chooser", () => {
-			const url = "https://github.com/example/repo/issues/new/choose";
-			const metadata = createPullRequestDescriptionMetadata({ newIssueChooserUrl: url });
+		test("should link to the maintainer wiki guide", () => {
+			const body = buildPullRequestBody(
+				file,
+				processingResult,
+				createPullRequestDescriptionMetadata(),
+			);
 
-			const body = buildPullRequestBody(file, processingResult, metadata);
-
-			expect(body).toContain("> [!TIP]");
-			expect(body).toContain(`](${url})`);
+			expect(body).toContain(WIKI_FOR_REACT_DOCS_MAINTAINERS_URL);
+			expect(body).not.toContain("> [!TIP]");
 		});
 	});
 });

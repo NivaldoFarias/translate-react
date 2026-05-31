@@ -1,12 +1,12 @@
 import { describe, expect, test } from "bun:test";
 
-import type { GitHubService } from "@/services/github/github.service";
-import type { RunnerServiceDependencies } from "@/services/runner/runner.types";
-import type { TranslatorService } from "@/services/translator/translator.service";
+import type { GitHubService } from "@/app/services/github/github.service";
+import type { RunnerServiceDependencies } from "@/app/services/runner/runner.types";
+import type { TranslatorService } from "@/app/services/translator/translator.service";
 
-import { localeService } from "@/composition";
-import { ApplicationError } from "@/errors/";
-import { RunnerService } from "@/services/runner/runner.service";
+import { localeService } from "@/app/composition";
+import { RunnerService } from "@/app/services/runner/runner.service";
+import { ApplicationError } from "@/shared/errors/";
 
 import {
 	createMockGitHubService,

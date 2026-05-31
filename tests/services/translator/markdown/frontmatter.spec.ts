@@ -7,7 +7,7 @@ import {
 	extractTitleScalarFromInnerYaml,
 	mergePreservedYamlFrontmatter,
 	splitLeadingYamlFrontmatter,
-} from "@/services/translator/markdown/frontmatter";
+} from "@/app/services/translator/markdown/frontmatter";
 
 describe("extractFrontmatterParts", () => {
 	test("returns null when string has no leading frontmatter", () => {

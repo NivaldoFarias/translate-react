@@ -1,13 +1,28 @@
 import { describe, expect, test } from "bun:test";
 
+import { ptBrLocale } from "@/app/locales/pt-br.locale";
 import {
+	buildRunnerNewIssueChooserUrl,
 	detectRateLimit,
 	filterMarkdownFiles,
 	formatElapsedTime,
 	nftsCompatibleDateString,
-} from "@/utils/";
+	resolveRunnerNewIssueChooserUrl,
+	WORKFLOW_RUNNER_REPOSITORY_HTML_BASE,
+} from "@/app/utils/";
+import { resolveGitHubActionsRunContext } from "@/app/utils/common.util";
 
 import { createRepositoryTreeItemFixture } from "@tests/fixtures";
+
+const sampleCiEnv = {
+	GITHUB_ACTIONS: true,
+	GITHUB_SERVER_URL: "https://github.com",
+	GITHUB_REPOSITORY: "reactjs/ru.react.dev",
+	GITHUB_RUN_ID: "25802803407",
+	GITHUB_WORKFLOW: "Run Translation Workflow",
+	GITHUB_REF: "refs/heads/main",
+	GITHUB_REF_NAME: "main",
+} as const;
 
 describe("common.util", () => {
 	describe("nftsCompatibleDateString", () => {
@@ -114,6 +129,126 @@ describe("common.util", () => {
 
 		test("returns false when message and status are not rate limit", () => {
 			expect(detectRateLimit("Not found", 404)).toBe(false);
+		});
+	});
+
+	describe("resolveGitHubActionsRunContext", () => {
+		test("returns undefined when Actions is off", () => {
+			expect(
+				resolveGitHubActionsRunContext({
+					...sampleCiEnv,
+					GITHUB_ACTIONS: false,
+				}),
+			).toBeUndefined();
+		});
+
+		test("returns undefined without repository or run id", () => {
+			expect(
+				resolveGitHubActionsRunContext({
+					GITHUB_ACTIONS: true,
+					GITHUB_SERVER_URL: "https://github.com",
+					GITHUB_REPOSITORY: "",
+					GITHUB_RUN_ID: "1",
+					GITHUB_WORKFLOW: "CI",
+					GITHUB_REF: "refs/heads/main",
+					GITHUB_REF_NAME: "main",
+				}),
+			).toBeUndefined();
+		});
+
+		test("returns undefined without ref", () => {
+			expect(
+				resolveGitHubActionsRunContext({
+					...sampleCiEnv,
+					GITHUB_REF: "",
+					GITHUB_REF_NAME: "",
+				}),
+			).toBeUndefined();
+		});
+
+		test("builds URL, labels, and ref from GITHUB_REF_NAME", () => {
+			const context = resolveGitHubActionsRunContext(sampleCiEnv);
+
+			expect(context?.url).toBe("https://github.com/reactjs/ru.react.dev/actions/runs/25802803407");
+			expect(context?.workflowName).toBe("Run Translation Workflow");
+			expect(context?.runId).toBe("25802803407");
+			expect(context?.refLabel).toBe("main");
+		});
+
+		test("parses tag from GITHUB_REF when ref name is missing", () => {
+			const context = resolveGitHubActionsRunContext({
+				...sampleCiEnv,
+				GITHUB_REF: "refs/tags/v0.1.28",
+				GITHUB_REF_NAME: "",
+			});
+
+			expect(context?.refLabel).toBe("v0.1.28");
+		});
+
+		test("pt-br progress comment prefix includes ref and linked workflow run in CI", () => {
+			const context = resolveGitHubActionsRunContext(sampleCiEnv);
+			const prefix = ptBrLocale.comment.prefix(context);
+
+			expect(prefix).toContain("A última execução do `translate-react`");
+			expect(prefix).toContain("**main**");
+			expect(prefix).toContain(
+				"[`Run Translation Workflow` · #25802803407](https://github.com/reactjs/ru.react.dev/actions/runs/25802803407)",
+			);
+		});
+	});
+
+	describe("buildRunnerNewIssueChooserUrl", () => {
+		test("uses server and repository slug when slug is valid", () => {
+			const url = buildRunnerNewIssueChooserUrl({
+				githubServerUrl: "https://github.com",
+				githubRepository: "acme/my-runner-fork",
+			});
+
+			expect(url).toBe("https://github.com/acme/my-runner-fork/issues/new/choose");
+		});
+
+		test("strips trailing slash from server URL", () => {
+			const url = buildRunnerNewIssueChooserUrl({
+				githubServerUrl: "https://git.example.com/",
+				githubRepository: "org/tool",
+			});
+
+			expect(url).toBe("https://git.example.com/org/tool/issues/new/choose");
+		});
+
+		test("falls back to workflow runner base when repository slug is missing", () => {
+			const url = buildRunnerNewIssueChooserUrl({
+				githubServerUrl: "https://github.com",
+				githubRepository: undefined,
+			});
+
+			expect(url).toBe(`${WORKFLOW_RUNNER_REPOSITORY_HTML_BASE}/issues/new/choose`);
+		});
+
+		test("falls back when repository slug has no slash", () => {
+			const url = buildRunnerNewIssueChooserUrl({
+				githubServerUrl: "https://github.com",
+				githubRepository: "invalidslug",
+			});
+
+			expect(url).toBe(`${WORKFLOW_RUNNER_REPOSITORY_HTML_BASE}/issues/new/choose`);
+		});
+
+		test("falls back when repository slug is only owner with trailing slash", () => {
+			const url = buildRunnerNewIssueChooserUrl({
+				githubServerUrl: "https://github.com",
+				githubRepository: "owner/",
+			});
+
+			expect(url).toBe(`${WORKFLOW_RUNNER_REPOSITORY_HTML_BASE}/issues/new/choose`);
+		});
+	});
+
+	describe("resolveRunnerNewIssueChooserUrl", () => {
+		test("matches canonical fallback under test env (no GITHUB_REPOSITORY in defaults)", () => {
+			const url = resolveRunnerNewIssueChooserUrl();
+
+			expect(url).toBe(`${WORKFLOW_RUNNER_REPOSITORY_HTML_BASE}/issues/new/choose`);
 		});
 	});
 });

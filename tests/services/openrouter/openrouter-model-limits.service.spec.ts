@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 
-import { OpenRouterModelLimitsService } from "@/services/openrouter/openrouter-model-limits.service";
+import { OpenRouterModelLimitsService } from "@/app/services/openrouter/openrouter-model-limits.service";
 
 const realFetch = globalThis.fetch;
 

@@ -1,6 +1,6 @@
 import { describe, expect, spyOn, test } from "bun:test";
 
-import { TranslationFile } from "@/services/translator/";
+import { TranslationFile } from "@/app/services/translator/";
 
 import { createTranslationFileFixture } from "@tests/fixtures";
 

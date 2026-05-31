@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 
-import { TranslationFile } from "@/services/translator/translation-file";
-import { PostTranslationValidationService } from "@/services/translator/validation/post-translation-validation.service";
+import { TranslationFile } from "@/app/services/translator/translation-file";
+import { PostTranslationValidationService } from "@/app/services/translator/validation/post-translation-validation.service";
 
 describe("PostTranslationValidationService", () => {
 	let validation: PostTranslationValidationService;

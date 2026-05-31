@@ -3,11 +3,11 @@ import path from "node:path";
 
 import { beforeAll, describe, expect, test } from "bun:test";
 
-import { ChunksManager } from "@/services/translator/chunking";
+import { ChunksManager } from "@/app/services/translator/chunking";
 import {
 	maskLargeVerbatimFencedCodeBlocks,
 	restoreMaskedVerbatimFences,
-} from "@/utils/markdown-verbatim-fences.util";
+} from "@/app/utils/markdown-verbatim-fences.util";
 
 const FIXTURE_PATH = path.resolve(
 	import.meta.dir,

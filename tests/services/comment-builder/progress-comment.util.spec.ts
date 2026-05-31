@@ -2,10 +2,10 @@ import { describe, expect, test } from "bun:test";
 
 import {
 	filterReportableProgressCommentResults,
-	PullRequestProgressAction,
-} from "@/domain/workflow/";
-import { selectProgressCommentPayload } from "@/services/comment-builder/progress-comment.util";
-import { TranslationFile } from "@/services/translator/translation-file";
+	selectProgressCommentPayload,
+} from "@/app/services/comment-builder/progress-comment.util";
+import { PullRequestProgressAction } from "@/app/services/github/types";
+import { TranslationFile } from "@/app/services/translator/translation-file";
 
 import { createMockPullRequestListItem } from "@tests/fixtures";
 

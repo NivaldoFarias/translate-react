@@ -1,9 +1,12 @@
 # Based on https://raw.githubusercontent.com/github/gitignore/main/Node.gitignore
 .snapshots/
 scripts/
-!src/scripts/
+!src/ci/
 *.backup
 .out/
+
+# Local-only dev script (not persisted; use integration tests in CI)
+src/ci/smoke-llm.ts
 
 # Logs
 logs/
@@ -85,6 +88,8 @@ web_modules/
 # dotenv environment variable files
 *.env*
 !.env.example
+!**/*.env.ts
+!**/*.env.spec.ts
 
 # parcel-bundler cache (https://parceljs.org/)
 .parcel-cache

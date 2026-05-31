@@ -4,14 +4,14 @@ import { StatusCodes } from "http-status-codes";
 import type { components } from "@octokit/openapi-types";
 import type { Octokit, RestEndpointMethodTypes } from "@octokit/rest";
 
-import type { PatchedRepositoryTreeItem, ProcessedFileResult } from "@/domain/workflow/";
-import type { GitHubServiceDependencies } from "@/services/github/github.service";
+import type { GitHubServiceDependencies } from "@/app/services/github/github.service";
+import type { PatchedRepositoryTreeItem, ProcessedFileResult } from "@/app/services/github/types";
 
 import type { MockOctokit } from "@tests/mocks";
 
-import { PullRequestProgressAction } from "@/domain/workflow/";
-import { GitHubService } from "@/services/github/github.service";
-import { TranslationFile } from "@/services/translator/translation-file";
+import { GitHubService } from "@/app/services/github/github.service";
+import { PullRequestProgressAction } from "@/app/services/github/types";
+import { TranslationFile } from "@/app/services/translator/translation-file";
 
 import {
 	createOctokitRequestErrorFixture,
@@ -30,7 +30,7 @@ function createTestGitHubService(overrides?: Partial<GitHubServiceDependencies>)
 	} as GitHubServiceDependencies);
 }
 
-void mock.module("@/utils/setup-signal-handlers.util", () => ({
+void mock.module("@/app/utils/setup-signal-handlers.util", () => ({
 	setupSignalHandlers: mock(() => {
 		/* empty */
 	}),

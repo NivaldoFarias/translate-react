@@ -8,6 +8,7 @@
         "@langchain/textsplitters": "^1.0.1",
         "@octokit/request-error": "^7.0.1",
         "@octokit/rest": "^22.0.1",
+        "citty": "^0.2.2",
         "cld": "^2.10.1",
         "http-status-codes": "^2.3.0",
         "js-tiktoken": "^1.0.21",
@@ -189,6 +190,8 @@
     "camelcase": ["camelcase@6.3.0", "", {}, "sha512-Gmy6FhYlCY7uOElZUSbxo2UCDH8owEk996gkbrpsgGtrJLM3J7jGxl9Ic7Qwwj4ivOE5AWZWRMecDdF7hqGjFA=="],
 
     "chalk": ["chalk@4.1.2", "", { "dependencies": { "ansi-styles": "^4.1.0", "supports-color": "^7.1.0" } }, "sha512-oKnbhFyRIXpUuez8iBMmyEa4nbj4IOQyuhc/wy9kY7/WVPcwIO9VA668Pu8RkO7+0G76SLROeyw9CpQ061i4mA=="],
+
+    "citty": ["citty@0.2.2", "", {}, "sha512-+6vJA3L98yv+IdfKGZHBNiGW5KHn22e/JwID0Strsz8h4S/csAu/OuICwxrg44k5MRiZHWIo8XXuJgQTriRP4w=="],
 
     "cld": ["cld@2.10.1", "", { "dependencies": { "glob": "7", "node-addon-api": "*", "underscore": "^1.12.1" } }, "sha512-dvORTZwSFsaN9xC2seihcmo1gqQtfh2wSuhJ7vgDpzIHVOTMKM/cErSK8mCFZnxYRw+hzaZUCNH6VWh1OxGNkQ=="],
 
