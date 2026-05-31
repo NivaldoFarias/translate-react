@@ -52,11 +52,7 @@ const ptBrPRBodyStrings: LocalePRBodyStrings = {
 		workflowRun: "Execução do workflow",
 	},
 
-	feedbackTip: (issueChooserUrl) =>
-		`Caso encontre erros ou trechos ruins, [abra uma issue](${issueChooserUrl}) com:
-- arquivo
-- linha/trecho
-- (se possível) como você corrigiria`,
+	maintainerGuide: (wikiUrl) => `Guia para revisores: [For React Docs Maintainers](${wikiUrl}).`,
 
 	timeFormatLocale: "pt-BR",
 };

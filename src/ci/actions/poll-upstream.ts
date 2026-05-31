@@ -1,7 +1,7 @@
 /**
  * Compares upstream default-branch SHAs to repository variables and writes a translation matrix to `GITHUB_OUTPUT`.
  *
- * Invoked by [`.github/workflows/upstream-poll.yml`](../../.github/workflows/upstream-poll.yml).
+ * Invoked by [`.github/workflows/poll.yml`](../../.github/workflows/poll.yml).
  *
  * @example
  * ```bash

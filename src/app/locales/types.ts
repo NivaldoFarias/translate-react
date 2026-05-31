@@ -22,8 +22,6 @@ export interface PullRequestDescriptionMetadata {
 	};
 	/** LLM model id used for translation (from `LLM_MODEL`) */
 	translationModel: string;
-	/** GitHub “new issue” chooser URL for the translate-react runner repo */
-	newIssueChooserUrl: string;
 }
 
 /**
@@ -164,13 +162,13 @@ export interface LocalePRBodyStrings {
 	};
 
 	/**
-	 * Renders the TIP block body with a link to the repository issue chooser.
+	 * Link text for the maintainer guide (wiki URL is fixed in the PR body builder).
 	 *
-	 * @param issueChooserUrl Absolute URL to `/issues/new/choose`
+	 * @param wikiUrl Absolute URL to the For React Docs Maintainers wiki page
 	 *
-	 * @returns Markdown for the tip (one or more lines; each line is prefixed with `>` by the builder)
+	 * @returns Markdown link line
 	 */
-	readonly feedbackTip: (issueChooserUrl: string) => string;
+	readonly maintainerGuide: (wikiUrl: string) => string;
 
 	/** BCP 47 locale string for time formatting (e.g., "pt-BR", "ru-RU") */
 	readonly timeFormatLocale: string;

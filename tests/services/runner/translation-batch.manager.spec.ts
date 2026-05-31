@@ -26,7 +26,6 @@ function createTestTranslationBatchManager(overrides: Partial<RunnerServiceDepen
 		} as RunnerServiceDependencies,
 		new Map(),
 		Date.now(),
-		{ newIssueChooserUrl: "https://github.com/example/example/issues/new/choose" },
 	);
 }
 

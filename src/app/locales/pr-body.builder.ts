@@ -4,6 +4,7 @@ import type { TranslationFile } from "@/app/services/translator/";
 
 import type { LocalePRBodyStrings } from "./types";
 
+import { WIKI_FOR_REACT_DOCS_MAINTAINERS_URL } from "@/app/constants";
 import { formatElapsedTime, resolveGitHubActionsRunContext } from "@/app/utils/";
 
 /**
@@ -77,11 +78,7 @@ export function createPRBodyBuilder(strings: LocalePRBodyStrings) {
 			runContext ?
 				`- **${strings.techInfo.workflowRun}**: [\`${runContext.workflowName}\` · #${runContext.runId}](${runContext.url})`
 			:	"";
-		const feedbackTipQuoted = strings
-			.feedbackTip(metadata.newIssueChooserUrl)
-			.split("\n")
-			.map((line) => `> ${line}`)
-			.join("\n");
+		const maintainerGuideLine = strings.maintainerGuide(WIKI_FOR_REACT_DOCS_MAINTAINERS_URL);
 
 		return `${strings.intro(metadata.languageName)}
 
@@ -112,8 +109,7 @@ ${workflowRunLine ? `${workflowRunLine}\n` : ""}
 
 </details>
 
-> [!TIP]
-${feedbackTipQuoted}
+${maintainerGuideLine}
 
 ---
 

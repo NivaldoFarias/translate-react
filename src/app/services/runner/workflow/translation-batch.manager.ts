@@ -21,13 +21,6 @@ import { TranslationPullRequestValidityManager } from "./translation-pull-reques
 import { MAX_CONSECUTIVE_FAILURES } from "./workflow.constants";
 
 /**
- * URLs and other values injected into automated translation PR bodies.
- */
-export interface TranslationBatchPullRequestContext {
-	readonly newIssueChooserUrl: string;
-}
-
-/**
  * Manages batch processing and progress tracking for file translations.
  *
  * Coordinates concurrent translation of multiple files with progress reporting,
@@ -65,13 +58,11 @@ export class TranslationBatchManager {
 	 * @param services Injected service dependencies for GitHub and translation
 	 * @param invalidPRsByFile Map of files with invalid PRs for notification
 	 * @param workflowStartTimestamp Timestamp when workflow started for timing calculations
-	 * @param pullRequestContext URLs and values merged into generated PR bodies (issue chooser link)
 	 */
 	constructor(
 		private readonly services: RunnerServiceDependencies,
 		private readonly invalidPRsByFile: Map<string, InvalidFilePullRequest>,
 		private readonly workflowStartTimestamp: number,
-		private readonly pullRequestContext: TranslationBatchPullRequestContext,
 	) {
 		this.translationPullRequestValidity = new TranslationPullRequestValidityManager(services);
 	}
@@ -564,7 +555,7 @@ export class TranslationBatchManager {
 	 *
 	 * Generates a detailed PR body including translation metadata, review guidelines,
 	 * processing statistics (with GFM footnotes for metric explanations), optional conflict notices,
-	 * technical info including the configured LLM model, and a feedback TIP linking to the issue chooser.
+	 * technical info including the configured LLM model, and a link to the maintainer wiki guide.
 	 * When a file has an existing invalid PR (with merge conflicts), includes a GitHub Flavored Markdown
 	 * alert to inform maintainers about the duplicate PR situation.
 	 *
@@ -600,7 +591,6 @@ export class TranslationBatchManager {
 				workflowStart: this.workflowStartTimestamp,
 			},
 			translationModel: env.LLM_MODEL,
-			newIssueChooserUrl: this.pullRequestContext.newIssueChooserUrl,
 		};
 		return this.services.locale.definitions.pullRequest.body(
 			file,
