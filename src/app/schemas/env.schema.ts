@@ -87,8 +87,8 @@ const envSchema = z.object({
 	/**
 	 * The target language for translation.
 	 *
-	 * Must be one of the 38 supported React translation languages. GitHub Actions maps
-	 * `matrix.lang` to this value when generating `.env` (see `.github/workflows/workflow.yml`).
+	 * Must be one of the 38 supported React translation languages. GitHub Actions passes
+	 * `matrix.lang` via `--lang` (see `.github/workflows/workflow.yml` and `translation-cli.util.ts`).
 	 *
 	 * @see {@link REACT_TRANSLATION_LANGUAGES}
 	 */

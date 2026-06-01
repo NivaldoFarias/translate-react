@@ -26,6 +26,7 @@
 		"test": "bun test",
 		"ci:poll-upstream": "bun src/ci/actions/poll-upstream.ts",
 		"ci:resolve-matrix": "bun src/ci/actions/resolve-matrix.ts",
+		"ci:verify-changelog": "bun src/ci/actions/verify-changelog.ts",
 		"test:watch": "bun test --watch",
 		"test:coverage": "bun test --coverage"
 	},

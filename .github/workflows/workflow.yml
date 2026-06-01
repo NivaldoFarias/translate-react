@@ -33,7 +33,7 @@ permissions:
   actions: write
 
 concurrency:
-  group: translation-${{ inputs.langs }}-${{ github.ref }}
+  group: translation-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -45,25 +45,19 @@ jobs:
       has_matrix: ${{ steps.publish.outputs.has_matrix }}
     steps:
       - name: Checkout repository
+        if: github.event_name == 'workflow_dispatch'
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - name: Setup Bun dependencies
+        if: github.event_name == 'workflow_dispatch'
+        uses: ./.github/actions/setup-bun-deps
         with:
           bun-version: ${{ vars.BUN_VERSION || '1.3' }}
 
-      - name: Cache node_modules
-        id: cache-deps
-        uses: actions/cache@v4
-        with:
-          path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('bun.lock') }}
-
-      - name: Install dependencies
-        if: steps.cache-deps.outputs.cache-hit != 'true'
-        run: bun install --frozen-lockfile
-
       - name: Generate Bot Token
+        if: github.event_name == 'workflow_dispatch'
         id: generate-token
         uses: actions/create-github-app-token@v1
         with:
@@ -101,6 +95,7 @@ jobs:
     needs: prepare-matrix
     if: needs.prepare-matrix.outputs.has_matrix == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 130
     environment: ${{ inputs.environment || 'production' }}
     strategy:
       fail-fast: false
@@ -120,25 +115,17 @@ jobs:
         with:
           token: ${{ steps.generate-token.outputs.token }}
           ref: ${{ github.ref }}
+          fetch-depth: 1
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - name: Setup Bun dependencies
+        uses: ./.github/actions/setup-bun-deps
         with:
           bun-version: ${{ vars.BUN_VERSION || '1.3' }}
 
-      - name: Cache node_modules
-        id: cache-deps
-        uses: actions/cache@v4
-        with:
-          path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('bun.lock') }}
-
-      - name: Install dependencies
-        if: steps.cache-deps.outputs.cache-hit != 'true'
-        run: bun install --frozen-lockfile
-
-      - name: Create `.env` file
+      - name: Run translation workflow (${{ matrix.lang }})
         env:
+          GH_TOKEN: ${{ steps.generate-token.outputs.token }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           NODE_ENV: ${{ vars.NODE_ENV }}
           LOG_LEVEL: ${{ vars.LOG_LEVEL }}
           LOG_TO_CONSOLE: ${{ vars.LOG_TO_CONSOLE }}
@@ -155,37 +142,23 @@ jobs:
           HEADER_APP_TITLE: ${{ vars.HEADER_APP_TITLE }}
           GITHUB_REF: ${{ github.ref }}
           GITHUB_REF_NAME: ${{ github.ref_name }}
+          GITHUB_ACTIONS: true
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_WORKFLOW: ${{ github.workflow }}
         run: |
-          cat > .env << EOF
-          GH_TOKEN=${{ steps.generate-token.outputs.token }}
-          LLM_API_KEY=${{ secrets.LLM_API_KEY }}
-          TARGET_LANGUAGE=${{ matrix.lang }}
-          REPO_FORK_OWNER=${{ matrix.fork_owner }}
-          REPO_FORK_NAME=${{ matrix.fork_name }}
-          REPO_UPSTREAM_OWNER=${{ matrix.upstream_owner }}
-          REPO_UPSTREAM_NAME=${{ matrix.upstream_name }}
-          EOF
-
-          [ -n "$NODE_ENV" ] && echo "NODE_ENV=$NODE_ENV" >> .env || true
-          [ -n "$LOG_LEVEL" ] && echo "LOG_LEVEL=$LOG_LEVEL" >> .env || true
-          [ -n "$LOG_TO_CONSOLE" ] && echo "LOG_TO_CONSOLE=$LOG_TO_CONSOLE" >> .env || true
-          [ -n "$LLM_MODEL" ] && echo "LLM_MODEL=$LLM_MODEL" >> .env || true
-          [ -n "$LLM_API_BASE_URL" ] && echo "LLM_API_BASE_URL=$LLM_API_BASE_URL" >> .env || true
-          [ -n "$MAX_RETRY_ATTEMPTS" ] && echo "MAX_RETRY_ATTEMPTS=$MAX_RETRY_ATTEMPTS" >> .env || true
-          [ -n "$MAX_LLM_CONCURRENCY" ] && echo "MAX_LLM_CONCURRENCY=$MAX_LLM_CONCURRENCY" >> .env || true
-          [ -n "$OPENAI_PROJECT_ID" ] && echo "OPENAI_PROJECT_ID=$OPENAI_PROJECT_ID" >> .env || true
-          [ -n "$GH_PAT_TOKEN" ] && echo "GH_PAT_TOKEN=$GH_PAT_TOKEN" >> .env || true
-          [ -n "$MAX_TOKENS" ] && echo "MAX_TOKENS=$MAX_TOKENS" >> .env || true
-          [ -n "$BATCH_SIZE" ] && echo "BATCH_SIZE=$BATCH_SIZE" >> .env || true
-          [ -n "$GH_REQUEST_TIMEOUT" ] && echo "GH_REQUEST_TIMEOUT=$GH_REQUEST_TIMEOUT" >> .env || true
-          [ -n "$HEADER_APP_URL" ] && echo "HEADER_APP_URL=$HEADER_APP_URL" >> .env || true
-          [ -n "$HEADER_APP_TITLE" ] && echo "HEADER_APP_TITLE=$HEADER_APP_TITLE" >> .env || true
-          [ -n "${{ matrix.translation_guidelines_file }}" ] && echo "TRANSLATION_GUIDELINES_FILE=${{ matrix.translation_guidelines_file }}" >> .env || true
-          echo "GITHUB_REF=${GITHUB_REF}" >> .env
-          echo "GITHUB_REF_NAME=${GITHUB_REF_NAME}" >> .env
-
-      - name: Run translation workflow (${{ matrix.lang }})
-        run: bun run start
+          ARGS=(
+            --lang "${{ matrix.lang }}"
+            --fork-owner "${{ matrix.fork_owner }}"
+            --fork-name "${{ matrix.fork_name }}"
+            --upstream-owner "${{ matrix.upstream_owner }}"
+            --upstream-name "${{ matrix.upstream_name }}"
+          )
+          if [ -n "${{ matrix.translation_guidelines_file }}" ]; then
+            ARGS+=(--translation-guidelines-file "${{ matrix.translation_guidelines_file }}")
+          fi
+          bun run start -- "${ARGS[@]}"
         timeout-minutes: 120
 
       - name: Record upstream SHA (${{ matrix.lang }})
@@ -202,4 +175,4 @@ jobs:
         with:
           name: translation-logs-${{ matrix.lang }}-${{ github.run_id }}
           path: logs/
-          retention-days: 7
+          retention-days: 30

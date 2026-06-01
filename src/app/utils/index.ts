@@ -1,4 +1,4 @@
-export { env, validateEnv, type Environment } from "@/app/schemas/env.schema";
+export * from "@/app/schemas/env.schema";
 export * from "@/app/constants";
 export * from "./common.util";
 export * from "./llm-rate-limit.util";

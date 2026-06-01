@@ -1,3 +1,4 @@
+import "@/app/utils/bootstrap-cli-overrides.util";
 import "@/app/global";
 
 import { name, version } from "@package";

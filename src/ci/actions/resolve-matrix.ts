@@ -1,7 +1,7 @@
 /**
  * Builds the translation workflow matrix for manual `workflow_dispatch` runs.
  *
- * Reads `.github/upstream-locales.json`, optional `--langs`, and writes `matrix` / `has_matrix` to `GITHUB_OUTPUT`.
+ * Reads `.github/locales.json`, optional `--langs`, and writes `matrix` / `has_matrix` to `GITHUB_OUTPUT`.
  *
  * @example
  * ```bash

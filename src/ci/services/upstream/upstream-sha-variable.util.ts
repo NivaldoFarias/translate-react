@@ -3,7 +3,7 @@
  *
  * GitHub variable names allow letters, digits, and underscores only (`pt-br` → `PT_BR`).
  *
- * @param lang Locale id from `.github/upstream-locales.json` (e.g. `pt-br`, `ru`)
+ * @param lang Locale id from `.github/locales.json` (e.g. `pt-br`, `ru`)
  *
  * @returns Variable name such as `UPSTREAM_SHA_PT_BR`
  *
