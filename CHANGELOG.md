@@ -4,6 +4,21 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-06-01
+
+### Added
+
+- `setup-bun-deps` composite action and `ci:verify-changelog`.
+- Translation CLI flags for matrix locale/repo (`--lang`, fork/upstream flags).
+- Workflow job timeouts; log artifacts `retention-days: 30`.
+
+### Changed
+
+- Rename `.github/upstream-locales.json` to `.github/locales.json`.
+- Workflows use composite setup, shallow checkout; matrix values via CLI, secrets in step `env`.
+- Poll jobs: `actions: write` for reusable workflow calls.
+- Translation workflow: concurrency by event/ref; leaner `prepare-matrix` on `workflow_call`.
+
 ## [0.2.1] - 2026-05-31
 
 ### Changed
@@ -198,6 +213,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 - README `MAX_RETRY_ATTEMPTS` default matches `src/utils/constants.util.ts` (`3`).
 
+[0.2.2]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.2
+[0.2.1]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.1
 [0.2.0]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.0
 [0.1.30]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.1.30
 [0.1.29]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.1.29

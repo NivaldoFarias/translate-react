@@ -1,6 +1,6 @@
 {
 	"name": "translate-react",
-	"version": "0.2.1",
+	"version": "0.2.2",
 	"contributors": [
 		{
 			"name": "Nivaldo Farias",
@@ -9,7 +9,7 @@
 	],
 	"license": "MIT",
 	"homepage": "https://github.com/NivaldoFarias/translate-react",
-	"description": "A tool to translate React docs to any language",
+	"description": "Translate react.dev locale repos when upstream changes",
 	"type": "module",
 	"engines": {
 		"bun": ">=1.3.0"
