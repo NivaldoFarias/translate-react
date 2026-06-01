@@ -11,6 +11,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 - `setup-bun-deps` composite action and `ci:verify-changelog`.
 - Translation CLI flags for matrix locale/repo (`--lang`, fork/upstream flags).
 - Workflow job timeouts; log artifacts `retention-days: 30`.
+- GitHub Sponsors (`FUNDING.yml`), Dependabot for npm and Actions, bug/feature issue forms, PR template, and `CODEOWNERS`.
+- `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1).
 
 ### Changed
 
@@ -18,6 +20,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 - Workflows use composite setup, shallow checkout; matrix values via CLI, secrets in step `env`.
 - Poll jobs: `actions: write` for reusable workflow calls.
 - Translation workflow: concurrency by event/ref; leaner `prepare-matrix` on `workflow_call`.
+- `README.md`: tagline, badge row, How it works, Sponsor section; Security/Troubleshooting folded into Contributing.
+- `package.json` description aligned with the repo tagline.
 
 ## [0.2.1] - 2026-05-31
 
