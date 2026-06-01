@@ -46,7 +46,7 @@ import { CONNECTIVITY_TEST_MAX_TOKENS, LLM_TEMPERATURE } from "./translator.cons
 import { PostTranslationValidationService } from "./validation/post-translation-validation.service";
 import { TranslationLanguageCheck } from "./validation/translation-language-check";
 
-export { TranslationFile } from "./translation-file";
+export * from "./translation-file";
 
 export type {
 	ChunkTranslationProgress,

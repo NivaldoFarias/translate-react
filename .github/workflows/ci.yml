@@ -18,30 +18,21 @@ jobs:
   lint-and-typecheck:
     name: Lint, Check Formatting, and Type Check
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - name: Setup Bun dependencies
+        uses: ./.github/actions/setup-bun-deps
         with:
           bun-version: ${{ vars.BUN_VERSION || '1.3' }}
 
       - name: Verify CHANGELOG.md lists current package version
-        run: |
-          bun -e 'import { readFileSync } from "node:fs"; const pkg = JSON.parse(readFileSync("package.json", "utf8")); const changelog = readFileSync("CHANGELOG.md", "utf8"); const heading = "## [" + pkg.version + "]"; if (!changelog.includes(heading)) { console.error("Add " + JSON.stringify(heading) + " section to CHANGELOG.md when you bump package.json version."); process.exit(1); }'
-
-      - name: Cache node_modules
-        id: cache-deps
-        uses: actions/cache@v4
-        with:
-          path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('bun.lock') }}
-
-      - name: Install dependencies
-        if: steps.cache-deps.outputs.cache-hit != 'true'
-        run: bun install --frozen-lockfile
+        run: bun run ci:verify-changelog
 
       - name: Run linter
         run: bun run lint
@@ -55,26 +46,18 @@ jobs:
   test:
     name: Run Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - name: Setup Bun dependencies
+        uses: ./.github/actions/setup-bun-deps
         with:
           bun-version: ${{ vars.BUN_VERSION || '1.3' }}
-
-      - name: Cache node_modules
-        id: cache-deps
-        uses: actions/cache@v4
-        with:
-          path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('bun.lock') }}
-
-      - name: Install dependencies
-        if: steps.cache-deps.outputs.cache-hit != 'true'
-        run: bun install --frozen-lockfile
 
       - name: Run tests
         run: bun run test

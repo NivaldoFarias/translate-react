@@ -15,7 +15,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Added
 
-- Upstream SHA polling: [`.github/workflows/poll.yml`](./.github/workflows/poll.yml), [`.github/upstream-locales.json`](./.github/upstream-locales.json), `ci:poll-upstream`, and `ci:resolve-matrix` so translation runs only when `reactjs/<lang>.react.dev` default branch changes.
+- Upstream SHA polling: [`.github/workflows/poll.yml`](./.github/workflows/poll.yml), [`.github/locales.json`](./.github/locales.json), `ci:poll-upstream`, and `ci:resolve-matrix` so translation runs only when `reactjs/<lang>.react.dev` default branch changes.
 - Repository variables `UPSTREAM_SHA_<LANG>` updated after each successful locale job.
 - Source layout: `src/app/` (translation CLI), `src/ci/` (Actions helpers), `src/shared/` (errors, logger factory, bare Octokit); ESLint import boundaries between runtimes.
 - Phase 5 layout: `schemas/`, `constants/`, `ci/actions/` entry scripts; `citty` for `ci:resolve-matrix --langs`; workflow types colocated in `services/github/types.ts`, `services/runner/types.ts`, `locales/types.ts`.

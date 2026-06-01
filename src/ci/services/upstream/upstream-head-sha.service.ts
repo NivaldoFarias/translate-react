@@ -15,7 +15,7 @@ export class UpstreamHeadShaService {
 	/**
 	 * Fetches the tip commit SHA for the upstream repository default branch.
 	 *
-	 * @param locale Upstream coordinates from `.github/upstream-locales.json`
+	 * @param locale Upstream coordinates from `.github/locales.json`
 	 *
 	 * @returns Full commit SHA for the default branch head
 	 *

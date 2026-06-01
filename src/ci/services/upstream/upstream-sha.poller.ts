@@ -28,7 +28,7 @@ export class UpstreamShaPoller {
 	/**
 	 * Returns matrix rows only for locales whose upstream default-branch tip changed.
 	 *
-	 * @param locales Rows from `.github/upstream-locales.json`
+	 * @param locales Rows from `.github/locales.json`
 	 * @param forkOwner GitHub owner for locale forks (typically `GITHUB_REPOSITORY_OWNER`)
 	 *
 	 * @returns Locales that need translation and whether any changes were detected
