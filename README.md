@@ -2,11 +2,26 @@
 
 <div align="center">
 
+**Translate react.dev locale repos when upstream changes**
+
 [![CI Status](https://github.com/NivaldoFarias/translate-react/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/NivaldoFarias/translate-react/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/NivaldoFarias/translate-react?sort=semver)](https://github.com/NivaldoFarias/translate-react/releases)
+[![Runtime: Bun](https://img.shields.io/badge/runtime-Bun-000?logo=bun&logoColor=white)](https://bun.sh)
+[![GitHub App](https://img.shields.io/badge/GitHub%20App-translate--react--bot-2ea44f?logo=github)](https://github.com/apps/translate-react-bot)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
+[![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-db61a2?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/NivaldoFarias)
 
 </div>
 
-CLI tool that translates the official React documentation via LLMs, keeps structure intact, and opens PRs through the [`translate-react` bot](https://github.com/apps/translate-react-bot).
+When react.dev changes in English, this tool translates the updates into the user fork and opens PRs for review via the [`translate-react` bot](https://github.com/apps/translate-react-bot)[^1].
+
+## How it works
+
+1. **Poll** — scheduled runs compare each `reactjs/<lang>.react.dev` upstream against the last translated commit SHA.
+2. **Translate** — changed pages pass through an LLM with guards that keep Markdown structure, frontmatter, and code samples intact.
+3. **Open PRs** — translated content lands on the locale fork as review-ready PRs through the `translate-react` bot.
+
+Locales are defined in [`.github/locales.json`](./.github/locales.json) — currently `pt-br` and `ru`.
 
 ## Start here
 
@@ -19,22 +34,6 @@ CLI tool that translates the official React documentation via LLMs, keeps struct
 
 Full wiki index: [Home](https://github.com/NivaldoFarias/translate-react/wiki).
 
-## Table of Contents
-
-- [Table of Contents](#table-of-contents)
-- [Start here](#start-here)
-- [Prerequisites](#prerequisites)
-- [Quick Start](#quick-start)
-- [GitHub Actions on a fork](#github-actions-on-a-fork)
-- [Configuration](#configuration)
-- [Usage](#usage)
-- [Versioning and releases](#versioning-and-releases)
-- [Documentation](#documentation)
-- [Contributing](#contributing)
-- [Security](#security)
-- [Troubleshooting](#troubleshooting)
-- [License](#license)
-
 ## Prerequisites
 
 - [**Bun**](https://bun.sh/) (see `engines` in [`package.json`](./package.json)) and [**Git**](https://git-scm.com/)
@@ -42,16 +41,16 @@ Full wiki index: [Home](https://github.com/NivaldoFarias/translate-react/wiki).
 - **LLM API Key** (OpenAI, OpenRouter, or compatible)
 - Fork of target React documentation repository with write access
 
-## Quick Start
+## Quick start
 
 1. Clone and enter the repo (replace the URL if you use a fork): `git clone https://github.com/NivaldoFarias/translate-react.git && cd translate-react`
-2. Install Dependencies: `bun install`
-3. Setup the forks of the target React documentation repositories:
-   - For the Portuguese (Brazil) repository, fork [`reactjs/pt-br.react.dev`](https://github.com/reactjs/pt-br.react.dev/) to your GitHub account
-   - (Optional) For the Russian repository, fork [`reactjs/ru.react.dev`](https://github.com/reactjs/ru.react.dev/) to your GitHub account
-4. Install the [`translate-react-bot`](https://github.com/apps/translate-react-bot) GitHub App on the forks of the target React documentation repositories:
+2. Install dependencies: `bun install`
+3. Fork the target React documentation repositories:
+   - For Portuguese (Brazil), fork [`reactjs/pt-br.react.dev`](https://github.com/reactjs/pt-br.react.dev/) to your GitHub account
+   - (Optional) For Russian, fork [`reactjs/ru.react.dev`](https://github.com/reactjs/ru.react.dev/) to your GitHub account
+4. Install the [`translate-react-bot`](https://github.com/apps/translate-react-bot) GitHub App on those forks
 5. Configure environment: `cp .env.example .env`, then set secrets per [Wiki: Configuration](https://github.com/NivaldoFarias/translate-react/wiki/Configuration)
-6. Run in Development Mode: `bun run dev`
+6. Run in development mode: `bun run dev`
 
 > [!TIP]
 > Run order, fork setup, and polling: [Wiki: Workflow](https://github.com/NivaldoFarias/translate-react/wiki/Workflow).
@@ -101,16 +100,16 @@ To exercise translation with real LLM calls and mocked GitHub, run the workflow 
 
 ## Contributing
 
-See [`CONTRIBUTING.md`](./CONTRIBUTING.md). Layout and services: [Wiki: Codebase](https://github.com/NivaldoFarias/translate-react/wiki/Codebase).
+See [`CONTRIBUTING.md`](./CONTRIBUTING.md). Layout and services: [Wiki: Codebase](https://github.com/NivaldoFarias/translate-react/wiki/Codebase). Security policy: [`SECURITY.md`](./SECURITY.md). Common errors and debug logging: [Wiki: Configuration — Troubleshooting](https://github.com/NivaldoFarias/translate-react/wiki/Configuration#troubleshooting).
 
-## Security
+## Sponsor
 
-[`SECURITY.md`](./SECURITY.md)
-
-## Troubleshooting
-
-Common errors, debug logging, and CI notes: [Wiki: Configuration — Troubleshooting](https://github.com/NivaldoFarias/translate-react/wiki/Configuration#troubleshooting).
+If this saves your locale team manual translation work, consider [sponsoring the project](https://github.com/sponsors/NivaldoFarias). It funds maintenance, dependency upkeep, and support for new locales.
 
 ## License
 
 MIT License - see [LICENSE](./LICENSE) file for details.
+
+---
+
+[^1]: Upstream PRs _(as well as comments on issues, etc.)_ can only be opened by a GitHub App if it is installed on the repository. Because of this, these specific actions are done by the user via PAT tokens instead of the bot.

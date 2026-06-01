@@ -1,0 +1,54 @@
+name: Bug report
+description: Report a problem with the CLI, workflow, or bot PRs.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Please include the tool version so a run can be traced.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: "`package.json` version, tag, or commit SHA the run used."
+      placeholder: "0.2.2"
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Where did it happen?
+      options:
+        - Local CLI (bun run dev / start)
+        - GitHub Actions (poll.yml)
+        - GitHub Actions (workflow.yml)
+        - Bot PR on a locale repo
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: locale
+    attributes:
+      label: Locale
+      description: Affected locale, if applicable.
+      placeholder: "pt-br"
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you expected versus what occurred.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps. Link a failing run if it is public.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Relevant log output. Redact tokens and secrets.
+      render: text
