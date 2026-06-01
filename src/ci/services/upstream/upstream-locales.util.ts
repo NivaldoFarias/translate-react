@@ -6,10 +6,10 @@ import type { UpstreamLocaleConfig } from "./types";
 import { upstreamLocalesFileSchema } from "./types";
 
 /** Default path to the Actions locale registry (repo root relative). */
-export const DEFAULT_UPSTREAM_LOCALES_PATH = ".github/upstream-locales.json";
+export const DEFAULT_UPSTREAM_LOCALES_PATH = ".github/locales.json";
 
 /**
- * Loads and validates `.github/upstream-locales.json`.
+ * Loads and validates `.github/locales.json`.
  *
  * @param configPath Path to the JSON file (defaults to {@link DEFAULT_UPSTREAM_LOCALES_PATH})
  *

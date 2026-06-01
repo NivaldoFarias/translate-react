@@ -4,6 +4,25 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-06-01
+
+### Added
+
+- `setup-bun-deps` composite action and `ci:verify-changelog`.
+- Translation CLI flags for matrix locale/repo (`--lang`, fork/upstream flags).
+- Workflow job timeouts; log artifacts `retention-days: 30`.
+- GitHub Sponsors (`FUNDING.yml`), Dependabot for npm and Actions, bug/feature issue forms, PR template, and `CODEOWNERS`.
+- `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1).
+
+### Changed
+
+- Rename `.github/upstream-locales.json` to `.github/locales.json`.
+- Workflows use composite setup, shallow checkout; matrix values via CLI, secrets in step `env`.
+- Poll jobs: `actions: write` for reusable workflow calls.
+- Translation workflow: concurrency by event/ref; leaner `prepare-matrix` on `workflow_call`.
+- `README.md`: tagline, badge row, How it works, Sponsor section; Security/Troubleshooting folded into Contributing.
+- `package.json` description aligned with the repo tagline.
+
 ## [0.2.1] - 2026-05-31
 
 ### Changed
@@ -15,7 +34,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Added
 
-- Upstream SHA polling: [`.github/workflows/poll.yml`](./.github/workflows/poll.yml), [`.github/upstream-locales.json`](./.github/upstream-locales.json), `ci:poll-upstream`, and `ci:resolve-matrix` so translation runs only when `reactjs/<lang>.react.dev` default branch changes.
+- Upstream SHA polling: [`.github/workflows/poll.yml`](./.github/workflows/poll.yml), [`.github/locales.json`](./.github/locales.json), `ci:poll-upstream`, and `ci:resolve-matrix` so translation runs only when `reactjs/<lang>.react.dev` default branch changes.
 - Repository variables `UPSTREAM_SHA_<LANG>` updated after each successful locale job.
 - Source layout: `src/app/` (translation CLI), `src/ci/` (Actions helpers), `src/shared/` (errors, logger factory, bare Octokit); ESLint import boundaries between runtimes.
 - Phase 5 layout: `schemas/`, `constants/`, `ci/actions/` entry scripts; `citty` for `ci:resolve-matrix --langs`; workflow types colocated in `services/github/types.ts`, `services/runner/types.ts`, `locales/types.ts`.
@@ -198,6 +217,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 - README `MAX_RETRY_ATTEMPTS` default matches `src/utils/constants.util.ts` (`3`).
 
+[0.2.2]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.2
+[0.2.1]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.1
 [0.2.0]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.0
 [0.1.30]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.1.30
 [0.1.29]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.1.29

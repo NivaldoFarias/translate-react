@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-/** Zod schema for one row in `.github/upstream-locales.json`. */
+/** Zod schema for one row in `.github/locales.json`. */
 export const upstreamLocaleConfigSchema = z.object({
 	lang: z.string().min(1),
 	upstream_owner: z.string().min(1),
@@ -9,7 +9,7 @@ export const upstreamLocaleConfigSchema = z.object({
 	translation_guidelines_file: z.string().min(1),
 });
 
-/** Validated locale row from `.github/upstream-locales.json`. */
+/** Validated locale row from `.github/locales.json`. */
 export type UpstreamLocaleConfig = z.infer<typeof upstreamLocaleConfigSchema>;
 
 /** Full list of configured upstream locales. */

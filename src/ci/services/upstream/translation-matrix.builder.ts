@@ -21,7 +21,7 @@ export class TranslationMatrixBuilder {
 	/**
 	 * Resolves matrix rows for every locale in `locales`, fetching each upstream default-branch tip.
 	 *
-	 * @param locales Filtered rows from `.github/upstream-locales.json`
+	 * @param locales Filtered rows from `.github/locales.json`
 	 * @param forkOwner GitHub owner for locale forks
 	 *
 	 * @returns Matrix rows including current `upstream_sha` per locale
