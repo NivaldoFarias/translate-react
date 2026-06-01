@@ -12,7 +12,7 @@ import {
 } from "@/app/constants";
 import { env } from "@/app/schemas/env.schema";
 
-export { nftsCompatibleDateString } from "@/shared/utils/nfts-date.util";
+export * from "@/shared/utils/nfts-date.util";
 
 /**
  * Formats a time duration in milliseconds to a human-readable string.

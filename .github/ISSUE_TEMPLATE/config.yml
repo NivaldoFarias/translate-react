@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or usage help
+    url: https://github.com/NivaldoFarias/translate-react/wiki/FAQ
+    about: Check the FAQ and Configuration wiki pages before opening an issue.
+  - name: Security report
+    url: https://github.com/NivaldoFarias/translate-react/security/advisories/new
+    about: Report vulnerabilities privately via GitHub Security Advisories.
