@@ -25,12 +25,12 @@ Locales are defined in [`.github/locales.json`](./.github/locales.json). Current
 
 ## Start here
 
-| You are…                                | Read                                                                                                                                                                                                                        |
-| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| You are…                                | Read                                                                                                                                                                                                                       |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Configuring a fork or GitHub Actions    | [Wiki: Configuration](https://github.com/NivaldoFarias/translate-react/wiki/Configuration) and [Workflow: operating forks](https://github.com/NivaldoFarias/translate-react/wiki/Workflow#operating-translate-react-forks) |
-| Reviewing a bot PR on a locale repo     | [Wiki: For React Docs Maintainers](https://github.com/NivaldoFarias/translate-react/wiki/For-React-Docs-Maintainers)                                                                                                        |
-| Understanding run order, polling, or CI | [Wiki: Workflow](https://github.com/NivaldoFarias/translate-react/wiki/Workflow)                                                                                                                                            |
-| Exploring `src/` layout and services    | [Wiki: Codebase](https://github.com/NivaldoFarias/translate-react/wiki/Codebase)                                                                                                                                            |
+| Reviewing a bot PR on a locale repo     | [Wiki: For React Docs Maintainers](https://github.com/NivaldoFarias/translate-react/wiki/For-React-Docs-Maintainers)                                                                                                       |
+| Understanding run order, polling, or CI | [Wiki: Workflow](https://github.com/NivaldoFarias/translate-react/wiki/Workflow)                                                                                                                                           |
+| Exploring `src/` layout and services    | [Wiki: Codebase](https://github.com/NivaldoFarias/translate-react/wiki/Codebase)                                                                                                                                           |
 
 Full wiki index: [Home](https://github.com/NivaldoFarias/translate-react/wiki).
 
