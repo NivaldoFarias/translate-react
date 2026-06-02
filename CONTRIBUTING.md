@@ -14,7 +14,7 @@ MIT. Not a hosted app: forks use their own API keys and Actions config.
 
 ## Releasing
 
-1. `bun run release:draft` — print a grouped draft of commits since the last tag; condense it into `## [Unreleased]`.
-2. `bun run release:prepare patch|minor|major` — bump `package.json` and promote `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD` with a footer link (no git tag).
+1. `bun run release:draft`: print a grouped draft of commits since the last tag; condense it into `## [Unreleased]`.
+2. `bun run release:prepare patch|minor|major`: bump `package.json` and promote `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD` with a footer link (no git tag).
 3. Open a `dev` → `main` PR titled `release X.Y.Z`; CI enforces changelog compliance.
 4. Merge. [`release.yml`](./.github/workflows/release.yml) tags the merge commit `vX.Y.Z` and publishes the GitHub Release from the curated section. Non-release merges are a no-op; use the workflow's manual trigger to re-run.
