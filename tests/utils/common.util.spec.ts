@@ -11,7 +11,7 @@ import {
 	resolveString,
 	WORKFLOW_RUNNER_REPOSITORY_HTML_BASE,
 } from "@/app/utils/";
-import { resolveGitHubActionsRunContext } from "@/app/utils/common.util";
+import { buildRunnerReleaseUrl, resolveGitHubActionsRunContext } from "@/app/utils/common.util";
 
 import { createRepositoryTreeItemFixture } from "@tests/fixtures";
 
@@ -187,22 +187,24 @@ describe("common.util", () => {
 			).toBeUndefined();
 		});
 
-		test("builds URL, version, and workflow metadata from CI env", () => {
+		test("builds URL, version, release URL, and workflow metadata from CI env", () => {
 			const context = resolveGitHubActionsRunContext(sampleCiEnv);
 
 			expect(context?.url).toBe("https://github.com/reactjs/ru.react.dev/actions/runs/25802803407");
 			expect(context?.workflowName).toBe("Run Translation Workflow");
 			expect(context?.runId).toBe("25802803407");
 			expect(context?.version).toMatch(/^v\d+\.\d+\.\d+/);
+			expect(context?.releaseUrl).toBe(buildRunnerReleaseUrl(context!.version));
 		});
 
-		test("pt-br progress comment prefix includes runner version in CI", () => {
+		test("pt-br progress comment prefix links workflow run and release tag", () => {
 			const context = resolveGitHubActionsRunContext(sampleCiEnv);
 			const prefix = ptBrLocale.comment.prefix(context);
 
-			expect(prefix).toContain("A última execução do `translate-react`");
-			expect(prefix).toMatch(/`v\d+\.\d+\.\d+`/);
-			expect(prefix).not.toContain("actions/runs/");
+			expect(prefix).toContain(`[última execução](${context!.url})`);
+			expect(prefix).toContain(
+				`[\`translate-react@${context!.version}\`](${context!.releaseUrl})`,
+			);
 		});
 	});
 

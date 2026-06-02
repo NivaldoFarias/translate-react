@@ -242,6 +242,17 @@ type GitHubActionsRunEnvSlice = Pick<
 >;
 
 /**
+ * Builds the GitHub release page URL for a `translate-react` version tag.
+ *
+ * @param runnerVersion Semantic version tag (e.g. `v0.2.2`)
+ *
+ * @returns Absolute URL to `releases/tag/<runnerVersion>` on the runner repository
+ */
+export function buildRunnerReleaseUrl(runnerVersion: string) {
+	return `${WORKFLOW_RUNNER_REPOSITORY_HTML_BASE}/releases/tag/${runnerVersion}`;
+}
+
+/**
  * Resolves metadata for the current GitHub Actions workflow run when available.
  *
  * @param runtimeEnv Environment slice to read; defaults to the process {@link env}
@@ -270,8 +281,15 @@ export function resolveGitHubActionsRunContext(
 	const url = `${serverBase}/${repository}/actions/runs/${runId}`;
 	const namedWorkflow = runtimeEnv.GITHUB_WORKFLOW?.trim();
 	const workflowName = namedWorkflow && namedWorkflow.length > 0 ? namedWorkflow : "GitHub Actions";
+	const runnerVersion = `v${version}`;
 
-	return { version: `v${version}`, url, workflowName, runId };
+	return {
+		version: runnerVersion,
+		releaseUrl: buildRunnerReleaseUrl(runnerVersion),
+		url,
+		workflowName,
+		runId,
+	};
 }
 
 function isGithubRepositorySlug(value: string | undefined): value is string {
