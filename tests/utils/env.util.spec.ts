@@ -34,6 +34,19 @@ describe("Environment Utilities", () => {
 			expect(env.LLM_API_BASE_URL).toBe("https://openrouter.ai/api/v1");
 		});
 
+		test("should use defaults when optional OpenRouter header env vars are empty strings", () => {
+			const envWithEmptyHeaders = {
+				...validEnv,
+				HEADER_APP_URL: "",
+				HEADER_APP_TITLE: "",
+			};
+
+			const env = validateEnv(envWithEmptyHeaders);
+
+			expect(env.HEADER_APP_URL).toBe(validEnv.HEADER_APP_URL);
+			expect(env.HEADER_APP_TITLE).toBe(validEnv.HEADER_APP_TITLE);
+		});
+
 		test("should throw error when token is too short", () => {
 			const invalidEnv = { ...validEnv, GH_TOKEN: "short" };
 
