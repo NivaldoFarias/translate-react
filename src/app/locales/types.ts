@@ -49,6 +49,9 @@ export interface ProgressCommentRunContext {
 	/** Package version from `package.json` */
 	readonly version: string;
 
+	/** Absolute URL to the matching GitHub release tag for {@link ProgressCommentRunContext.version} */
+	readonly releaseUrl: string;
+
 	/** Workflow display name from the workflow file `name` field */
 	readonly workflowName: string;
 

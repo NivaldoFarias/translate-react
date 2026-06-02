@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import type { PullRequestDescriptionMetadata } from "@/app/locales/types";
 
 import { WIKI_FOR_REACT_DOCS_MAINTAINERS_URL } from "@/app/constants";
+import { buildRunnerReleaseUrl } from "@/app/utils/common.util";
 import { ptBrLocale, ruLocale } from "@/app/locales";
 import { LocaleService } from "@/app/services/locale/locale.service";
 import { TranslationFile } from "@/app/services/translator/translation-file";
@@ -96,17 +97,19 @@ describe("LocaleService", () => {
 				);
 			});
 
-			test("should build CI prefix with runner version only", () => {
+			test("should build CI prefix with workflow run and release tag links", () => {
+				const workflowRunUrl = "https://github.com/o/r/actions/runs/1";
 				const prefix = localeService.definitions.comment.prefix({
 					version: "v0.1.28",
+					releaseUrl: buildRunnerReleaseUrl("v0.1.28"),
 					workflowName: "Run Translation Workflow",
 					runId: "1",
-					url: "https://github.com/o/r/actions/runs/1",
+					url: workflowRunUrl,
 				});
 
-				expect(prefix).toContain("A última execução do `translate-react`");
-				expect(prefix).toContain("(`v0.1.28`)");
-				expect(prefix).not.toContain("actions/runs/");
+				expect(prefix).toContain(`[última execução](${workflowRunUrl})`);
+				expect(prefix).toContain("[`translate-react@v0.1.28`]");
+				expect(prefix).toContain(buildRunnerReleaseUrl("v0.1.28"));
 			});
 
 			test("should have suffix function that generates observations", () => {

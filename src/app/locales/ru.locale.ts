@@ -81,7 +81,7 @@ export const ruLocale: LocaleDefinition = {
 				return "Следующие страницы были переведены и созданы PR:";
 			}
 
-			return `Последний запуск \`translate-react\` (\`${runContext.version}\`) перевёл следующие страницы и создал эти PR:`;
+			return `[Последний запуск](${runContext.url}) [\`translate-react@${runContext.version}\`](${runContext.releaseUrl}) перевёл следующие страницы и создал эти PR:`;
 		},
 		suffix: `###### ps.: переводы были сгенерированы с использованием LLM и требуют проверки человеком для обеспечения точности, культурного контекста и технической терминологии.`,
 	},
