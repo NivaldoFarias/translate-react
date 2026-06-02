@@ -194,17 +194,15 @@ describe("common.util", () => {
 			expect(context?.workflowName).toBe("Run Translation Workflow");
 			expect(context?.runId).toBe("25802803407");
 			expect(context?.version).toMatch(/^v\d+\.\d+\.\d+/);
-			expect(context?.releaseUrl).toBe(buildRunnerReleaseUrl(context!.version));
+			expect(context?.releaseUrl).toBe(buildRunnerReleaseUrl(context?.version ?? ""));
 		});
 
 		test("pt-br progress comment prefix links workflow run and release tag", () => {
 			const context = resolveGitHubActionsRunContext(sampleCiEnv);
 			const prefix = ptBrLocale.comment.prefix(context);
 
-			expect(prefix).toContain(`[última execução](${context!.url})`);
-			expect(prefix).toContain(
-				`[\`translate-react@${context!.version}\`](${context!.releaseUrl})`,
-			);
+			expect(prefix).toContain(`[última execução](${context?.url})`);
+			expect(prefix).toContain(`[\`translate-react@${context?.version}\`](${context?.releaseUrl})`);
 		});
 	});
 

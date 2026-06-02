@@ -3,10 +3,10 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import type { PullRequestDescriptionMetadata } from "@/app/locales/types";
 
 import { WIKI_FOR_REACT_DOCS_MAINTAINERS_URL } from "@/app/constants";
-import { buildRunnerReleaseUrl } from "@/app/utils/common.util";
 import { ptBrLocale, ruLocale } from "@/app/locales";
 import { LocaleService } from "@/app/services/locale/locale.service";
 import { TranslationFile } from "@/app/services/translator/translation-file";
+import { buildRunnerReleaseUrl } from "@/app/utils/common.util";
 
 import { createProcessedFileResultsFixture } from "@tests/fixtures";
 
@@ -115,7 +115,7 @@ describe("LocaleService", () => {
 			test("should have suffix function that generates observations", () => {
 				const suffix = localeService.definitions.comment.suffix;
 
-				expect(suffix).toContain("###### ps.:");
+				expect(suffix).toContain("[^1]:");
 			});
 		});
 
