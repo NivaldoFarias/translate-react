@@ -2,8 +2,9 @@ import { RequestError } from "@octokit/request-error";
 import { StatusCodes } from "http-status-codes";
 import { APIError } from "openai";
 
-import type { RequestErrorOptions } from "node_modules/@octokit/request-error/dist-types/types";
 import type { PartialDeep } from "type-fest";
+
+type RequestErrorOptions = ConstructorParameters<typeof RequestError>[2];
 
 /**
  * Creates a fixture for an {@link APIError} from OpenAI
@@ -60,6 +61,6 @@ export function createOctokitRequestErrorFixture(overrides?: {
 				data: overrides?.options?.response?.data ?? {},
 			},
 			cause: overrides?.options?.cause ?? new Error("Internal server error").cause,
-		} as RequestErrorOptions,
+		},
 	);
 }

@@ -23,7 +23,7 @@ function isOpenAiCompatible429Error(
 		typeof error === "object" &&
 		error !== null &&
 		"status" in error &&
-		(error as { status: unknown }).status === StatusCodes.TOO_MANY_REQUESTS &&
+		error.status === StatusCodes.TOO_MANY_REQUESTS &&
 		"message" in error &&
 		typeof (error as { message: unknown }).message === "string"
 	);
