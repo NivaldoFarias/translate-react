@@ -65,13 +65,6 @@ jobs:
           private-key: ${{ secrets.BOT_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
 
-      - name: Use polled matrix
-        if: github.event_name == 'workflow_call'
-        id: polled
-        run: |
-          echo "matrix=${{ inputs.matrix_json }}" >> "$GITHUB_OUTPUT"
-          echo "has_matrix=true" >> "$GITHUB_OUTPUT"
-
       - name: Resolve matrix for manual run
         if: github.event_name == 'workflow_dispatch'
         id: resolve
@@ -81,14 +74,25 @@ jobs:
 
       - name: Publish matrix outputs
         id: publish
+        env:
+          POLLED_MATRIX: ${{ inputs.matrix_json }}
+          RESOLVED_MATRIX: ${{ steps.resolve.outputs.matrix }}
+          RESOLVED_HAS_MATRIX: ${{ steps.resolve.outputs.has_matrix }}
         run: |
           if [ "${{ github.event_name }}" = "workflow_call" ]; then
-            echo "matrix=${{ steps.polled.outputs.matrix }}" >> "$GITHUB_OUTPUT"
-            echo "has_matrix=${{ steps.polled.outputs.has_matrix }}" >> "$GITHUB_OUTPUT"
+            MATRIX="$POLLED_MATRIX"
+            HAS_MATRIX="true"
           else
-            echo "matrix=${{ steps.resolve.outputs.matrix }}" >> "$GITHUB_OUTPUT"
-            echo "has_matrix=${{ steps.resolve.outputs.has_matrix }}" >> "$GITHUB_OUTPUT"
+            MATRIX="$RESOLVED_MATRIX"
+            HAS_MATRIX="$RESOLVED_HAS_MATRIX"
           fi
+
+          {
+            echo "matrix<<EOFMATRIX"
+            echo "$MATRIX"
+            echo "EOFMATRIX"
+          } >> "$GITHUB_OUTPUT"
+          echo "has_matrix=$HAS_MATRIX" >> "$GITHUB_OUTPUT"
 
   workflow:
     name: Sync & Translate
