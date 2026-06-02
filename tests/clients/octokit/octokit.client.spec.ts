@@ -2,8 +2,6 @@ import { RequestError } from "@octokit/request-error";
 import { describe, expect, mock, test } from "bun:test";
 import { StatusCodes } from "http-status-codes";
 
-import type { OctokitMethod } from "@/app/clients";
-
 import { isForbiddenError, withRetry, wrapMethodWithFallback } from "@/app/clients";
 
 /** Creates a RequestError with the specified status code */
@@ -58,12 +56,7 @@ describe("octokit.client", () => {
 			const primaryMethod = mock(() => Promise.resolve({ data: "primary-result" }));
 			const fallbackMethod = mock(() => Promise.resolve({ data: "fallback-result" }));
 
-			const wrapped = wrapMethodWithFallback(
-				primaryMethod as OctokitMethod,
-				fallbackMethod as OctokitMethod,
-				"repos",
-				"get",
-			);
+			const wrapped = wrapMethodWithFallback(primaryMethod, fallbackMethod, "repos", "get");
 
 			const result = await wrapped();
 
@@ -77,12 +70,7 @@ describe("octokit.client", () => {
 			const primaryMethod = mock(() => Promise.reject(forbiddenError));
 			const fallbackMethod = mock(() => Promise.resolve({ data: "fallback-result" }));
 
-			const wrapped = wrapMethodWithFallback(
-				primaryMethod as OctokitMethod,
-				fallbackMethod as OctokitMethod,
-				"repos",
-				"get",
-			);
+			const wrapped = wrapMethodWithFallback(primaryMethod, fallbackMethod, "repos", "get");
 
 			const result = await wrapped();
 
@@ -96,12 +84,7 @@ describe("octokit.client", () => {
 			const primaryMethod = mock(() => Promise.reject(notFoundError));
 			const fallbackMethod = mock(() => Promise.resolve({ data: "fallback-result" }));
 
-			const wrapped = wrapMethodWithFallback(
-				primaryMethod as OctokitMethod,
-				fallbackMethod as OctokitMethod,
-				"repos",
-				"get",
-			);
+			const wrapped = wrapMethodWithFallback(primaryMethod, fallbackMethod, "repos", "get");
 
 			expect(wrapped()).rejects.toThrow(notFoundError);
 			expect(fallbackMethod).not.toHaveBeenCalled();
@@ -111,12 +94,7 @@ describe("octokit.client", () => {
 			const forbiddenError = createRequestError(StatusCodes.FORBIDDEN);
 			const primaryMethod = mock(() => Promise.reject(forbiddenError));
 
-			const wrapped = wrapMethodWithFallback(
-				primaryMethod as OctokitMethod,
-				undefined,
-				"repos",
-				"get",
-			);
+			const wrapped = wrapMethodWithFallback(primaryMethod, undefined, "repos", "get");
 
 			expect(wrapped()).rejects.toThrow(forbiddenError);
 		});
@@ -124,12 +102,7 @@ describe("octokit.client", () => {
 		test("passes arguments to primary method", async () => {
 			const primaryMethod = mock(() => Promise.resolve({ data: "result" }));
 
-			const wrapped = wrapMethodWithFallback(
-				primaryMethod as OctokitMethod,
-				undefined,
-				"repos",
-				"get",
-			);
+			const wrapped = wrapMethodWithFallback(primaryMethod, undefined, "repos", "get");
 
 			await wrapped({ owner: "test", repo: "repo" } as never);
 
@@ -141,12 +114,7 @@ describe("octokit.client", () => {
 			const primaryMethod = mock(() => Promise.reject(forbiddenError));
 			const fallbackMethod = mock(() => Promise.resolve({ data: "result" }));
 
-			const wrapped = wrapMethodWithFallback(
-				primaryMethod as OctokitMethod,
-				fallbackMethod as OctokitMethod,
-				"repos",
-				"get",
-			);
+			const wrapped = wrapMethodWithFallback(primaryMethod, fallbackMethod, "repos", "get");
 
 			await wrapped({ owner: "test", repo: "repo" } as never);
 
@@ -158,12 +126,7 @@ describe("octokit.client", () => {
 			const primaryMethod = mock(() => Promise.reject(genericError));
 			const fallbackMethod = mock(() => Promise.resolve({ data: "fallback-result" }));
 
-			const wrapped = wrapMethodWithFallback(
-				primaryMethod as OctokitMethod,
-				fallbackMethod as OctokitMethod,
-				"repos",
-				"get",
-			);
+			const wrapped = wrapMethodWithFallback(primaryMethod, fallbackMethod, "repos", "get");
 
 			expect(wrapped()).rejects.toThrow(genericError);
 			expect(fallbackMethod).not.toHaveBeenCalled();

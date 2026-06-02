@@ -4,6 +4,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-06-02
+
+### Changed
+
+- Dependabot opens PRs against `dev` instead of `main`.
+- Bump `p-retry` to 8, GitHub Actions (`checkout` 6, `create-github-app-token` 3, `upload-artifact` 7), and dev deps (`eslint` 10, `typescript` 6, `@types/node` 25).
+- Upgrade `typescript-eslint` to 8.60 for ESLint 10 compatibility; drop deprecated `baseUrl` from `tsconfig.json`.
+
+### Fixed
+
+- Bun test preload path in `bunfig.toml` after dev-dependency upgrades.
+
 ## [0.2.4] - 2026-06-02
 
 ### Changed
@@ -239,6 +251,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 - README `MAX_RETRY_ATTEMPTS` default matches `src/utils/constants.util.ts` (`3`).
 
+[0.2.5]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.5
 [0.2.5]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.5
 [0.2.4]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.4
 [0.2.3]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.3

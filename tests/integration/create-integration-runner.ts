@@ -17,7 +17,6 @@ import type {
 } from "@/app/services/github/github.content";
 import type { PatchedRepositoryTreeItem, ProcessedFileResult } from "@/app/services/github/types";
 import type { LanguageDetectorService } from "@/app/services/language-detector/";
-import type { RunnerServiceDependencies } from "@/app/services/runner/runner.types";
 
 import {
 	commentBuilderService,
@@ -86,7 +85,7 @@ export function installOpenRouterModelLimitsStub() {
 	openRouterLimitsSpy = spyOn(
 		openRouterModelLimitsService,
 		"fetchLimitsForModel",
-	).mockResolvedValue(null) as { mockRestore: () => void };
+	).mockResolvedValue(null);
 }
 
 /** Restores the OpenRouter limits spy installed by {@link installOpenRouterModelLimitsStub} */
@@ -336,7 +335,7 @@ export function createIntegrationRunner(file: IntegrationWorkflowFile) {
 				createMockLanguageCacheService() as unknown as CacheService<LanguageCacheEntry>,
 			locale: localeService,
 			languageDetector: createMockLanguageDetectorService() as unknown as LanguageDetectorService,
-		} as RunnerServiceDependencies,
+		},
 		{ batchSize: 1 },
 	);
 
