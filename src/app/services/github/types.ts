@@ -2,6 +2,8 @@ import type { components } from "@octokit/openapi-types";
 import type { Octokit, RestEndpointMethodTypes } from "@octokit/rest";
 import type { SetRequired } from "type-fest";
 
+import type { TranslationRetryInfo } from "@/app/services/translator/";
+
 /** GitHub repository metadata for fork and upstream repositories */
 export interface RepositoryMetadata {
 	owner: components["parameters"]["owner"];
@@ -47,6 +49,9 @@ export interface ProcessedFileResult {
 
 	/** Translated content (null if translation failed) */
 	translation: string | null;
+
+	/** Post-translation validation retries that occurred (empty if none) */
+	retries: readonly TranslationRetryInfo[];
 
 	/** Pull request created or updated for this translation */
 	pullRequest:

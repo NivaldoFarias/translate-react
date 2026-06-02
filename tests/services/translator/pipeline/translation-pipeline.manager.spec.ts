@@ -33,7 +33,10 @@ describe("TranslationPipelineManager", () => {
 			},
 		});
 
-		expect(result).toBe("good");
+		expect(result.content).toBe("good");
+		expect(result.retries).toEqual([
+			{ guardId: "fenceFunctionIdentifiers", message: "identifiers changed" },
+		]);
 		expect(callCount).toBe(2);
 		expect(lastHints).toEqual(["keep `Foo` unchanged"]);
 	});

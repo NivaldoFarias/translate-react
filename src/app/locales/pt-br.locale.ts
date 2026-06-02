@@ -33,12 +33,11 @@ const ptBrPRBodyStrings: LocalePRBodyStrings = {
 			sourceSize: "Tamanho do Arquivo Fonte",
 			translationSize: "Tamanho da Tradução",
 			contentRatio: "Razão de Conteúdo",
-			filePath: "Caminho do Arquivo",
 			processingTime: "Tempo de Processamento",
 		},
 		notes: {
 			contentRatio:
-				"`Razão de Conteúdo` indica como o comprimento da tradução se compara à fonte (~1.0x: mesmo comprimento, >1.0x: tradução é mais longa). Diferentes idiomas naturalmente têm níveis variados de verbosidade.",
+				"`Razão de Conteúdo` indica como o comprimento da tradução se compara à fonte (~1.0x: mesmo comprimento, >1.0x: tradução é mais longa). Valores muito baixos ou altos podem indicar truncamento ou conteúdo incompleto.",
 			processingTime:
 				"`Tempo de Processamento` baseia-se no cálculo do tempo total desde o início do fluxo até a conclusão da tradução deste arquivo específico.",
 		},
@@ -46,10 +45,21 @@ const ptBrPRBodyStrings: LocalePRBodyStrings = {
 
 	techInfo: {
 		header: "Informações Técnicas",
-		generationDate: "Data de Geração",
-		branch: "Branch",
+		runnerVersion: "Versão do translate-react",
 		translationModel: "Modelo de tradução (LLM)",
+		llmApiHost: "Endpoint LLM",
+		nodeEnv: "Ambiente (`NODE_ENV`)",
+		maskVerbatimLargeFences: "Máscara de blocos de código grandes",
 		workflowRun: "Execução do workflow",
+	},
+
+	retries: {
+		header: "Tentativas de Validação",
+		columns: {
+			guardColumn: "Validador",
+			reasonColumn: "Motivo",
+		},
+		note: "A tradução precisou de tentativas adicionais para passar nas validações pós-tradução. Os validadores acima detectaram problemas que foram corrigidos automaticamente pelo LLM em tentativas subsequentes.",
 	},
 
 	maintainerGuide: (wikiUrl) => `Guia para revisores: [For React Docs Maintainers](${wikiUrl}).`,
@@ -70,7 +80,7 @@ export const ptBrLocale: LocaleDefinition = {
 				return "As seguintes páginas foram traduzidas e PRs foram criados:";
 			}
 
-			return `A última execução do \`translate-react\` (**${runContext.refLabel}**, workflow [\`${runContext.workflowName}\` · #${runContext.runId}](${runContext.url})) traduziu as seguintes páginas e criou estes PRs:`;
+			return `A última execução do \`translate-react\` (\`${runContext.version}\`) traduziu as seguintes páginas e criou estes PRs:`;
 		},
 		suffix: `###### ps.: as traduções foram geradas por uma LLM e requerem revisão humana para garantir precisão técnica e fluência.`,
 	},

@@ -30,10 +30,13 @@ export const CHUNKS = {
 export const CHUNK_OUTPUT_COMPLETION_RESERVE = 384;
 
 /**
- * Conservative upper bound on completion tokens per source token for markdown translation
- * (some target languages expand versus English source).
+ * Conservative upper bound on completion tokens per source token for markdown translation.
+ *
+ * Some target languages (German, Russian, pt-BR) expand significantly versus English source,
+ * and Gemini's tokenizer differs from tiktoken. A 1.5x ratio provides headroom to avoid
+ * hitting `max_tokens` mid-translation on large chunks.
  */
-export const TRANSLATION_OUTPUT_TO_INPUT_TOKEN_RATIO = 1.2;
+export const TRANSLATION_OUTPUT_TO_INPUT_TOKEN_RATIO = 1.5;
 
 /** Default tiktoken model to use for token counting */
 export const DEFAULT_TIKTOKEN_MODEL = "gpt-5";

@@ -1074,6 +1074,7 @@ describe("GitHubService", () => {
 						branch: null,
 						filename: "legacy.md",
 						translation: null,
+						retries: [],
 						pullRequest: { number: 1090 } as ProcessedFileResult["pullRequest"],
 						pullRequestProgress: PullRequestProgressAction.Reused,
 						error: null,
