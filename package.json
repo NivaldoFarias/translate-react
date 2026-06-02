@@ -43,7 +43,7 @@
 		"js-tiktoken": "^1.0.21",
 		"openai": "^6.17.0",
 		"p-queue": "^9.1.0",
-		"p-retry": "^7.1.1",
+		"p-retry": "^8.0.0",
 		"pino": "^10.3.0",
 		"pretty-bytes": "^7.1.0",
 		"yaml": "^2.9.0",
