@@ -4,6 +4,23 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+### Added
+
+- `translator`: Add content-ratio guard and PR retry metadata
+- `locales`: Link progress comments to workflow run and release
+- `ci`: Add git-cliff release tooling and auto-publish workflow
+
+### Changed
+
+- `env`: Treat openRouter metadata overrides as empty
+- `locales`: Use footnote for the progress issue's comment suffix
+- `ci`: Run formatter; fix linting and test suite issues
+
+### Fixed
+
+- `ci`: Pass polled matrix JSON via heredoc in `workflow.yml`
+- `env`: Make OpenRouter metadata env vars optional
+
 ## [0.2.2] - 2026-06-01
 
 ### Added
