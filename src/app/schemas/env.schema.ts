@@ -72,14 +72,14 @@ const envSchema = z.object({
 	 *
 	 * Used for activity tracking on {@link https://openrouter.ai/|OpenRouter}.
 	 */
-	HEADER_APP_URL: z.url().default(envDefaults.HEADER_APP_URL),
+	HEADER_APP_URL: z.url().optional().default(envDefaults.HEADER_APP_URL),
 
 	/**
 	 * The title of the application to override the default title.
 	 *
 	 * Used for activity tracking on {@link https://openrouter.ai/|OpenRouter}.
 	 */
-	HEADER_APP_TITLE: z.string().default(envDefaults.HEADER_APP_TITLE),
+	HEADER_APP_TITLE: z.string().optional().default(envDefaults.HEADER_APP_TITLE),
 
 	/** The number of items to process in each batch */
 	BATCH_SIZE: z.coerce.number().positive().default(envDefaults.BATCH_SIZE),
