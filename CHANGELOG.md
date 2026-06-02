@@ -4,6 +4,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-06-02
+
 ### Changed
 
 - Dependabot opens PRs against `dev` instead of `main`.
@@ -249,6 +251,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 - README `MAX_RETRY_ATTEMPTS` default matches `src/utils/constants.util.ts` (`3`).
 
+[0.2.5]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.5
 [0.2.5]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.5
 [0.2.4]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.4
 [0.2.3]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.3
