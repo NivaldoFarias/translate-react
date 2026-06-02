@@ -17,17 +17,17 @@ When react.dev changes in English, this tool translates the updates into the use
 
 ## How it works
 
-1. **Poll** — scheduled runs compare each `reactjs/<lang>.react.dev` upstream against the last translated commit SHA.
-2. **Translate** — changed pages pass through an LLM with guards that keep Markdown structure, frontmatter, and code samples intact.
-3. **Open PRs** — translated content lands on the locale fork as review-ready PRs through the `translate-react` bot.
+1. **Poll**: scheduled runs compare each `reactjs/<lang>.react.dev` upstream against the last translated commit SHA
+2. **Translate**: changed pages pass through an LLM with guards that keep Markdown structure, frontmatter, and code samples intact
+3. **Open PRs**: translated content lands on the locale fork as review-ready PRs through the `translate-react` bot
 
-Locales are defined in [`.github/locales.json`](./.github/locales.json) — currently `pt-br` and `ru`.
+Locales are defined in [`.github/locales.json`](./.github/locales.json). Currently, `pt-br` and `ru`.
 
 ## Start here
 
 | You are…                                | Read                                                                                                                                                                                                                        |
 | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Configuring a fork or GitHub Actions    | [Wiki: Configuration](https://github.com/NivaldoFarias/translate-react/wiki/Configuration) and [Workflow — Operating forks](https://github.com/NivaldoFarias/translate-react/wiki/Workflow#operating-translate-react-forks) |
+| Configuring a fork or GitHub Actions    | [Wiki: Configuration](https://github.com/NivaldoFarias/translate-react/wiki/Configuration) and [Workflow: operating forks](https://github.com/NivaldoFarias/translate-react/wiki/Workflow#operating-translate-react-forks) |
 | Reviewing a bot PR on a locale repo     | [Wiki: For React Docs Maintainers](https://github.com/NivaldoFarias/translate-react/wiki/For-React-Docs-Maintainers)                                                                                                        |
 | Understanding run order, polling, or CI | [Wiki: Workflow](https://github.com/NivaldoFarias/translate-react/wiki/Workflow)                                                                                                                                            |
 | Exploring `src/` layout and services    | [Wiki: Codebase](https://github.com/NivaldoFarias/translate-react/wiki/Codebase)                                                                                                                                            |
@@ -100,7 +100,7 @@ To exercise translation with real LLM calls and mocked GitHub, run the workflow 
 
 ## Contributing
 
-See [`CONTRIBUTING.md`](./CONTRIBUTING.md). Layout and services: [Wiki: Codebase](https://github.com/NivaldoFarias/translate-react/wiki/Codebase). Security policy: [`SECURITY.md`](./SECURITY.md). Common errors and debug logging: [Wiki: Configuration — Troubleshooting](https://github.com/NivaldoFarias/translate-react/wiki/Configuration#troubleshooting).
+See [`CONTRIBUTING.md`](./CONTRIBUTING.md). Layout and services: [Wiki: Codebase](https://github.com/NivaldoFarias/translate-react/wiki/Codebase). Security policy: [`SECURITY.md`](./SECURITY.md). Common errors and debug logging: [Wiki: Configuration](https://github.com/NivaldoFarias/translate-react/wiki/Configuration#troubleshooting).
 
 ## Sponsor
 
