@@ -216,9 +216,7 @@ export abstract class BaseRunnerService {
 
 				return { ...item, filename };
 			})
-			.filter(
-				(item) => !!item.filename && !!item.sha && !!item.path,
-			) as PatchedRepositoryTreeItem[];
+			.filter((item) => !!item.filename && !!item.sha && !!item.path);
 	}
 
 	/**

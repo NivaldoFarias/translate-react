@@ -19,6 +19,16 @@ import {
 /** Octokit-specific logger for GitHub API debugging */
 const logger = baseLogger.child({ component: "octokit" });
 
+/** Compares a numeric HTTP status from Octokit errors against http-status-codes values. */
+function hasHttpStatus(status: number, expected: number): boolean {
+	return status === expected;
+}
+
+/** Checks whether a numeric HTTP status falls within an inclusive min and exclusive max. */
+function isHttpStatusInRange(status: number, min: number, max: number): boolean {
+	return status >= min && status < max;
+}
+
 const octokitLogHooks = {
 	debug: (message: string) => {
 		logger.debug(message);
@@ -66,11 +76,13 @@ const fallbackOctokit =
  */
 function isRetryableError(error: unknown): boolean {
 	if (error instanceof RequestError || isUncastRequestError(error)) {
-		const status = error.status as StatusCodes;
-		const isRateLimited = status === StatusCodes.TOO_MANY_REQUESTS;
-		const isServerError =
-			status >= StatusCodes.INTERNAL_SERVER_ERROR &&
-			status < StatusCodes.NETWORK_AUTHENTICATION_REQUIRED;
+		const status = error.status;
+		const isRateLimited = hasHttpStatus(status, StatusCodes.TOO_MANY_REQUESTS);
+		const isServerError = isHttpStatusInRange(
+			status,
+			StatusCodes.INTERNAL_SERVER_ERROR,
+			StatusCodes.NETWORK_AUTHENTICATION_REQUIRED,
+		);
 
 		return isRateLimited || isServerError;
 	}
@@ -203,7 +215,7 @@ export async function withRetry<T>(
 export function isForbiddenError(error: unknown): error is RequestError {
 	return (
 		(error instanceof RequestError || isUncastRequestError(error)) &&
-		(error.status as StatusCodes) === StatusCodes.FORBIDDEN
+		hasHttpStatus(error.status, StatusCodes.FORBIDDEN)
 	);
 }
 

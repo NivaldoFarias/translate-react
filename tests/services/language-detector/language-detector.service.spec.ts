@@ -225,14 +225,14 @@ mesmo com a presença deste código em inglês no meio do documento.
 
 	describe("getLanguageName", () => {
 		test("returns human-readable name for valid target language code", () => {
-			const result = detector.getLanguageName("pt-br" as ReactLanguageCode);
+			const result = detector.getLanguageName("pt-br");
 
 			expect(typeof result).toBe("string");
 			expect(result.length).toBeGreaterThan(0);
 		});
 
 		test("uses source displayNames when isTargetLanguage is false", () => {
-			const result = detector.getLanguageName("en" as ReactLanguageCode, false);
+			const result = detector.getLanguageName("en", false);
 
 			expect(typeof result).toBe("string");
 			expect(result.length).toBeGreaterThan(0);
