@@ -1,5 +1,6 @@
 import type { TranslationValidationIssue } from "../validation.types";
 
+import { contentRatioGuard } from "./content-ratio.guard";
 import { fenceFunctionIdentifiersGuard } from "./fence-function-identifiers.guard";
 import { frontmatterPreservedGuard } from "./frontmatter-preserved.guard";
 import { headingsPreservedGuard } from "./headings-preserved.guard";
@@ -8,6 +9,7 @@ import { nonEmptyContentGuard } from "./non-empty-content.guard";
 /** Ordered post-translation guards; each may contribute one retry hint */
 export const POST_TRANSLATION_VALIDATION_GUARDS = [
 	nonEmptyContentGuard,
+	contentRatioGuard,
 	headingsPreservedGuard,
 	frontmatterPreservedGuard,
 	fenceFunctionIdentifiersGuard,

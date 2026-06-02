@@ -5,19 +5,7 @@ import type { TranslationFile } from "@/app/services/translator/";
 import type { LocalePRBodyStrings } from "./types";
 
 import { WIKI_FOR_REACT_DOCS_MAINTAINERS_URL } from "@/app/constants";
-import { formatElapsedTime, resolveGitHubActionsRunContext } from "@/app/utils/";
-
-/**
- * Formats a timestamp as an ISO date string.
- *
- * @param timestamp Unix timestamp in milliseconds
- *
- * @returns ISO date string (YYYY-MM-DD) or "unknown" if formatting fails
- */
-function formatGenerationDate(timestamp: number): string {
-	const dateString = new Date(timestamp).toISOString().split("T")[0];
-	return dateString ?? "unknown";
-}
+import { formatElapsedTime, resolveGitHubActionsRunContext, resolveString } from "@/app/utils/";
 
 /**
  * Builds the conflict notice section for PR body when a stale PR was closed.
@@ -36,6 +24,34 @@ function buildConflictNotice(
 	if (!invalidFilePR) return "";
 
 	return `**${strings.title}**. ${strings.body(invalidFilePR.prNumber)}`;
+}
+
+/**
+ * Builds the validation retries section for PR body when retries occurred.
+ *
+ * @param retries List of retries that occurred during translation
+ * @param strings Locale-specific strings for the retries section
+ *
+ * @returns Markdown-formatted retries section or empty string if no retries
+ */
+function buildRetriesSection(
+	retries: PullRequestDescriptionMetadata["retries"],
+	strings: LocalePRBodyStrings["retries"],
+) {
+	if (retries.length === 0) return "";
+
+	const tableRows = retries
+		.map((retry) => `| \`${retry.guardId}\` | ${retry.message} |`)
+		.join("\n");
+
+	return `### ${strings.header}
+
+| ${strings.columns.guardColumn} | ${strings.columns.reasonColumn} |
+|-------|--------|
+${tableRows}
+
+[^retries]: ${strings.note}
+`;
 }
 
 /**
@@ -65,19 +81,27 @@ function buildConflictNotice(
  */
 export function createPRBodyBuilder(strings: LocalePRBodyStrings) {
 	return (
-		file: TranslationFile,
-		processingResult: ProcessedFileResult,
+		_file: TranslationFile,
+		_processingResult: ProcessedFileResult,
 		metadata: PullRequestDescriptionMetadata,
 	): string => {
 		const processingTime = metadata.timestamps.now - metadata.timestamps.workflowStart;
 		const conflictNotice = buildConflictNotice(metadata.invalidFilePR, strings.conflictNotice);
-		const generationDate = formatGenerationDate(metadata.timestamps.now);
-		const branchRef = processingResult.branch?.ref ?? "unknown";
+		const retriesSection = buildRetriesSection(metadata.retries, strings.retries);
 		const runContext = resolveGitHubActionsRunContext();
-		const workflowRunLine =
-			runContext ?
-				`- **${strings.techInfo.workflowRun}**: [\`${runContext.workflowName}\` · #${runContext.runId}](${runContext.url})`
-			:	"";
+		const workflowRunLine = resolveString(
+			runContext,
+			(ctx) =>
+				`- **${strings.techInfo.workflowRun}**: [\`${ctx.workflowName}\` #${ctx.runId}](${ctx.url})`,
+		);
+		const maskVerbatimLine = resolveString(
+			metadata.maskVerbatimLargeFences,
+			`- **${strings.techInfo.maskVerbatimLargeFences}**: \`true\`\n`,
+		);
+		const retriesFootnote = resolveString(
+			metadata.retries.length > 0,
+			`[^retries]: ${strings.retries.note}\n`,
+		);
 		const maintainerGuideLine = strings.maintainerGuide(WIKI_FOR_REACT_DOCS_MAINTAINERS_URL);
 
 		return `${strings.intro(metadata.languageName)}
@@ -97,24 +121,22 @@ ${conflictNotice}
 | **${strings.stats.metrics.sourceSize}** | ${metadata.content.source} |
 | **${strings.stats.metrics.translationSize}** | ${metadata.content.translation} |
 | **${strings.stats.metrics.contentRatio}** | ${metadata.content.compressionRatio}x [^content-ratio] |
-| **${strings.stats.metrics.filePath}** | \`${file.path}\` |
 | **${strings.stats.metrics.processingTime}** | ~${formatElapsedTime(processingTime, strings.timeFormatLocale)} [^processing-time] |
 
-### ${strings.techInfo.header}
+${retriesSection}### ${strings.techInfo.header}
 
-- **${strings.techInfo.generationDate}**: ${generationDate}
-- **${strings.techInfo.branch}**: \`${branchRef}\`
+- **${strings.techInfo.runnerVersion}**: \`${metadata.runnerVersion}\`
 - **${strings.techInfo.translationModel}**: \`${metadata.translationModel}\`
-${workflowRunLine ? `${workflowRunLine}\n` : ""}
+- **${strings.techInfo.llmApiHost}**: \`${metadata.llmApiHost}\`
+- **${strings.techInfo.nodeEnv}**: \`${metadata.nodeEnv}\`
+${maskVerbatimLine}${resolveString(workflowRunLine, (line) => `${line}\n`)}
 
 </details>
 
 ${maintainerGuideLine}
 
----
-
 [^content-ratio]: ${strings.stats.notes.contentRatio}
 [^processing-time]: ${strings.stats.notes.processingTime}
-`;
+${retriesFootnote}`;
 	};
 }

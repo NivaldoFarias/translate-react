@@ -33,12 +33,11 @@ const ruPRBodyStrings: LocalePRBodyStrings = {
 			sourceSize: "Размер исходного файла",
 			translationSize: "Размер перевода",
 			contentRatio: "Соотношение контента",
-			filePath: "Путь к файлу",
 			processingTime: "Время обработки",
 		},
 		notes: {
 			contentRatio:
-				"`Соотношение контента` показывает, как длина перевода соотносится с исходником (~1.0x: одинаковая длина, >1.0x: перевод длиннее). Разные языки естественно имеют разный уровень многословности.",
+				"`Соотношение контента` показывает, как длина перевода соотносится с исходником (~1.0x: одинаковая длина, >1.0x: перевод длиннее). Слишком низкие или высокие значения могут указывать на усечение или неполный перевод.",
 			processingTime:
 				"`Время обработки` рассчитывается как общее время от начала процесса до завершения перевода этого конкретного файла.",
 		},
@@ -46,10 +45,21 @@ const ruPRBodyStrings: LocalePRBodyStrings = {
 
 	techInfo: {
 		header: "Техническая информация",
-		generationDate: "Дата генерации",
-		branch: "Ветка",
+		runnerVersion: "Версия translate-react",
 		translationModel: "Модель перевода (LLM)",
+		llmApiHost: "LLM endpoint",
+		nodeEnv: "Окружение (`NODE_ENV`)",
+		maskVerbatimLargeFences: "Маскировка больших блоков кода",
 		workflowRun: "Запуск workflow",
+	},
+
+	retries: {
+		header: "Попытки валидации",
+		columns: {
+			guardColumn: "Валидатор",
+			reasonColumn: "Причина",
+		},
+		note: "Перевод потребовал дополнительных попыток для прохождения пост-переводческих валидаций. Указанные валидаторы обнаружили проблемы, которые были автоматически исправлены LLM в последующих попытках.",
 	},
 
 	maintainerGuide: (wikiUrl) =>
@@ -71,7 +81,7 @@ export const ruLocale: LocaleDefinition = {
 				return "Следующие страницы были переведены и созданы PR:";
 			}
 
-			return `Последний запуск \`translate-react\` (**${runContext.refLabel}**, workflow [\`${runContext.workflowName}\` · #${runContext.runId}](${runContext.url})) перевёл следующие страницы и создал эти PR:`;
+			return `Последний запуск \`translate-react\` (\`${runContext.version}\`) перевёл следующие страницы и создал эти PR:`;
 		},
 		suffix: `###### ps.: переводы были сгенерированы с использованием LLM и требуют проверки человеком для обеспечения точности, культурного контекста и технической терминологии.`,
 	},

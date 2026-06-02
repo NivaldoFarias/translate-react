@@ -134,9 +134,10 @@ describe("TranslatorService", () => {
 
 			const file = createTranslationFileFixture({ content: "Hello world" });
 
-			const translation = await translatorService.translateContent(file);
+			const result = await translatorService.translateContent(file);
 
-			expect(translation).toBe("Olá mundo");
+			expect(result.content).toBe("Olá mundo");
+			expect(result.retries).toEqual([]);
 			expect(mockChatCompletionsCreate).toHaveBeenCalledTimes(1);
 		});
 
@@ -164,12 +165,12 @@ describe("TranslatorService", () => {
 
 			const file = createTranslationFileFixture({ content: sourceContent }, title);
 
-			const translation = await translatorService.translateContent(file);
+			const result = await translatorService.translateContent(file);
 
-			expect(translation).toContain("Título");
-			expect(translation).toContain("Comentário traduzido");
-			expect(translation).toContain('const example = "test"');
-			expect(translation).toContain("```javascript");
+			expect(result.content).toContain("Título");
+			expect(result.content).toContain("Comentário traduzido");
+			expect(result.content).toContain('const example = "test"');
+			expect(result.content).toContain("```javascript");
 		});
 
 		test("should handle API errors gracefully", () => {
@@ -191,26 +192,26 @@ describe("TranslatorService", () => {
 			);
 			const largeContent = sections.join("\n\n");
 
-			const translatedSections = Array.from(
-				{ length: 30 },
-				(_, i) => `## Seção ${i + 1}\n\n${"Parágrafo de documentação. ".repeat(60)}`,
-			);
-
-			let chunkCallIndex = 0;
-			let firstSystemPrompt: string | undefined;
 			const { chunks } = await new (
 				await import("@/app/services/translator/chunking")
 			).ChunksManager("test-model").chunkContent(largeContent);
 
+			let chunkCallIndex = 0;
+			let firstSystemPrompt: string | undefined;
+
 			mockChatCompletionsCreate.mockImplementation(async (params: unknown) => {
 				const { messages } = params as { messages: { role: string; content: string }[] };
 				const systemMessage = messages.find((message) => message.role === "system");
+				const userMessage = messages.find((message) => message.role === "user");
 				if (chunkCallIndex === 0) {
 					firstSystemPrompt = systemMessage?.content;
 				}
-				const idx = chunkCallIndex++;
+				chunkCallIndex++;
 				const translatedChunk =
-					translatedSections[idx] ?? `## Seção\n\nConteúdo traduzido fragmento ${idx + 1}.`;
+					userMessage?.content
+						.replace(/Section/g, "Seção")
+						.replace(/Documentation paragraph/g, "Parágrafo de documentação") ??
+					`## Seção\n\nParágrafo de documentação.`;
 				return Promise.resolve(createChatCompletionFixture(translatedChunk));
 			});
 
@@ -219,11 +220,11 @@ describe("TranslatorService", () => {
 			const needsChunking = translatorService.managers.chunks.needsChunking(file);
 			expect(needsChunking).toBe(true);
 
-			const translation = await translatorService.translateContent(file);
+			const result = await translatorService.translateContent(file);
 
-			expect(translation).toBeDefined();
-			expect(typeof translation).toBe("string");
-			expect(translation.length).toBeGreaterThan(0);
+			expect(result).toBeDefined();
+			expect(typeof result.content).toBe("string");
+			expect(result.content.length).toBeGreaterThan(0);
 			expect(mockChatCompletionsCreate.mock.calls.length).toBe(chunks.length);
 			expect(firstSystemPrompt).toBeDefined();
 			expect(firstSystemPrompt).toContain("DOCUMENT SLICE");
@@ -309,8 +310,8 @@ describe("TranslatorService", () => {
 
 				expect(capturedUserContent).toBeDefined();
 				expect(capturedUserContent).not.toContain(secretSentence);
-				expect(result).toContain(secretSentence);
-				expect(result).toContain("# Doc");
+				expect(result.content).toContain(secretSentence);
+				expect(result.content).toContain("# Doc");
 			});
 
 			test("when masking is on but the threshold is very high, small fences still reach the LLM", async () => {
@@ -402,15 +403,15 @@ describe("TranslatorService", () => {
 
 			const file = createTranslationFileFixture({ content: sourceContent }, title);
 
-			const translation = await translatorService.translateContent(file);
+			const result = await translatorService.translateContent(file);
 
-			expect(translation).toContain(translatedContent);
-			expect(translation).toContain("title:");
+			expect(result.content).toContain(translatedContent);
+			expect(result.content).toContain("title:");
 		});
 
 		test("should warn when code blocks are lost during translation", async () => {
 			const sourceContent = `# Title\n\n\`\`\`javascript\nconst x = 1;\n\`\`\`\n\nText\n\n\`\`\`python\nprint("hello")\n\`\`\``;
-			const translatedContent = `# Título\n\nTexto traduzido sem blocos de código`;
+			const translatedContent = `# Título\n\nTexto traduzido sem blocos de código mas com tamanho similar ao fonte`;
 
 			mockChatCompletionsCreate.mockResolvedValue(createChatCompletionFixture(translatedContent));
 
@@ -422,7 +423,7 @@ describe("TranslatorService", () => {
 
 		test("should warn when code block count differs significantly (>20%)", async () => {
 			const sourceContent = `# Title\n\n\`\`\`js\n1\n\`\`\`\n\n\`\`\`js\n2\n\`\`\`\n\n\`\`\`js\n3\n\`\`\`\n\n\`\`\`js\n4\n\`\`\`\n\n\`\`\`js\n5\n\`\`\``;
-			const translatedContent = `# Título\n\n\`\`\`js\n1\n\`\`\`\n\n\`\`\`js\n2\n\`\`\`\n\n\`\`\`js\n3\n\`\`\``;
+			const translatedContent = `# Título\n\n\`\`\`js\n1\n\`\`\`\n\n\`\`\`js\n2\n\`\`\`\n\n\`\`\`js\n3\n\`\`\`\n\nTexto extra para manter razão`;
 
 			mockChatCompletionsCreate.mockResolvedValue(createChatCompletionFixture(translatedContent));
 
@@ -465,16 +466,16 @@ describe("TranslatorService", () => {
 
 			const file = createTranslationFileFixture({ content: sourceContent }, title);
 
-			const translation = await translatorService.translateContent(file);
+			const result = await translatorService.translateContent(file);
 
-			expect(translation).toContain(translatedContent);
-			expect(translation).toContain("title:");
+			expect(result.content).toContain(translatedContent);
+			expect(result.content).toContain("title:");
 		});
 
 		test("should log warning when links are lost during translation", async () => {
 			const title = "Title";
 			const sourceContent = `# Title\n\n[Link 1](https://example.com/1)\n[Link 2](https://example.com/2)\n[Link 3](https://example.com/3)`;
-			const translatedContent = `# Título\n\nTexto traduzido sem links`;
+			const translatedContent = `# Título\n\nTexto traduzido sem links mas com conteúdo suficiente para manter a razão de conteúdo aceitável`;
 
 			queueOpenAiTranslationResponses(translatedContent);
 
@@ -545,8 +546,8 @@ describe("TranslatorService", () => {
 
 			const file = createTranslationFileFixture({ content: sourceContent });
 			const result = await translatorService.translateContent(file);
-			expect(result).toContain("Bem-vindo");
-			expect(result).toContain("Hello");
+			expect(result.content).toContain("Bem-vindo");
+			expect(result.content).toContain("Hello");
 		});
 
 		test("should preserve original title in YAML when the model returns body without frontmatter", async () => {
@@ -557,10 +558,10 @@ describe("TranslatorService", () => {
 
 			const file = createTranslationFileFixture({ content: sourceContent });
 			const result = await translatorService.translateContent(file);
-			expect(result.startsWith("---\n")).toBe(true);
-			expect(result).toContain("Hello");
-			expect(result).not.toContain("Olá");
-			expect(result).toContain("# Conteúdo");
+			expect(result.content.startsWith("---\n")).toBe(true);
+			expect(result.content).toContain("Hello");
+			expect(result.content).not.toContain("Olá");
+			expect(result.content).toContain("# Conteúdo");
 		});
 
 		test("should keep non-translated keys and preserve title when the model emits a shorter YAML block", async () => {
@@ -571,11 +572,11 @@ describe("TranslatorService", () => {
 
 			const file = createTranslationFileFixture({ content: sourceContent });
 			const result = await translatorService.translateContent(file);
-			expect(result).toContain("custom_key: 'value'");
-			expect(result).toContain("author: 'John'");
-			expect(result).toContain("# Conteúdo");
-			expect(result).toContain("Hello");
-			expect(result).not.toContain("Olá");
+			expect(result.content).toContain("custom_key: 'value'");
+			expect(result.content).toContain("author: 'John'");
+			expect(result.content).toContain("# Conteúdo");
+			expect(result.content).toContain("Hello");
+			expect(result.content).not.toContain("Olá");
 		});
 
 		test("should keep long non-translated YAML scalars on one physical line in frontmatter", async () => {
@@ -588,7 +589,7 @@ describe("TranslatorService", () => {
 			const file = createTranslationFileFixture({ content: sourceContent });
 			const result = await translatorService.translateContent(file);
 
-			const frontmatterMatch = /^---\r?\n([\s\S]*?)\r?\n---/.exec(result);
+			const frontmatterMatch = /^---\r?\n([\s\S]*?)\r?\n---/.exec(result.content);
 			expect(frontmatterMatch).not.toBeNull();
 			if (frontmatterMatch === null) {
 				throw new Error("expected leading YAML frontmatter block");
@@ -627,8 +628,8 @@ describe("TranslatorService", () => {
 
 			const file = createTranslationFileFixture({ content: sourceContent });
 			const result = await translatorService.translateContent(file);
-			expect(result).toContain("Test");
-			expect(result).not.toContain("Teste");
+			expect(result.content).toContain("Test");
+			expect(result.content).not.toContain("Teste");
 		});
 	});
 
@@ -647,10 +648,10 @@ describe("TranslatorService", () => {
 
 			const file = createTranslationFileFixture({ content: contentWithEmojis });
 
-			const translation = await translatorService.translateContent(file);
+			const result = await translatorService.translateContent(file);
 
-			expect(translation).toContain("🌍");
-			expect(translation).toContain("àáâãäåæçèéêë");
+			expect(result.content).toContain("🌍");
+			expect(result.content).toContain("àáâãäåæçèéêë");
 		});
 
 		test("should handle translation guidelines integration", () => {

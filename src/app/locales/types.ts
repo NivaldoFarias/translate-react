@@ -1,5 +1,7 @@
 import type { ProcessedFileResult, PullRequestStatus } from "@/app/services/github/types";
-import type { TranslationFile } from "@/app/services/translator/";
+import type { TranslationFile, TranslationRetryInfo } from "@/app/services/translator/";
+
+export type { TranslationRetryInfo };
 
 /** Prior invalid PR for the same file path */
 export interface InvalidFilePullRequest {
@@ -20,16 +22,32 @@ export interface PullRequestDescriptionMetadata {
 		now: number;
 		workflowStart: number;
 	};
+
+	/** `translate-react` version from `package.json` (e.g. `v0.1.28`) */
+	runnerVersion: string;
+
 	/** LLM model id used for translation (from `LLM_MODEL`) */
 	translationModel: string;
+
+	/** Hostname of `LLM_API_BASE_URL` (no path or credentials) */
+	llmApiHost: string;
+
+	/** Process `NODE_ENV` when the translation ran */
+	nodeEnv: string;
+
+	/** Whether large verbatim fences were masked before translation */
+	maskVerbatimLargeFences: boolean;
+
+	/** Post-translation validation retries that occurred (empty if none) */
+	retries: readonly TranslationRetryInfo[];
 }
 
 /**
  * GitHub Actions metadata for the translation-progress issue comment opener.
  */
 export interface ProgressCommentRunContext {
-	/** Short ref from `github.ref` (branch or tag name) */
-	readonly refLabel: string;
+	/** Package version from `package.json` */
+	readonly version: string;
 
 	/** Workflow display name from the workflow file `name` field */
 	readonly workflowName: string;
@@ -127,7 +145,6 @@ export interface LocalePRBodyStrings {
 			readonly sourceSize: string;
 			readonly translationSize: string;
 			readonly contentRatio: string;
-			readonly filePath: string;
 			readonly processingTime: string;
 		};
 
@@ -148,17 +165,38 @@ export interface LocalePRBodyStrings {
 		/** Section header text */
 		readonly header: string;
 
-		/** Label for generation date */
-		readonly generationDate: string;
-
-		/** Label for branch name */
-		readonly branch: string;
+		/** Label for `translate-react` package version */
+		readonly runnerVersion: string;
 
 		/** Label for the configured LLM translation model id */
 		readonly translationModel: string;
 
+		/** Label for the LLM API host */
+		readonly llmApiHost: string;
+
+		/** Label for process `NODE_ENV` */
+		readonly nodeEnv: string;
+
+		/** Label when `MASK_VERBATIM_LARGE_FENCES` is enabled */
+		readonly maskVerbatimLargeFences: string;
+
 		/** Label for the GitHub Actions workflow run link */
 		readonly workflowRun: string;
+	};
+
+	/** Post-translation validation retry section (shown only when retries occurred) */
+	readonly retries: {
+		/** Section header text */
+		readonly header: string;
+
+		/** Table column headers */
+		readonly columns: {
+			readonly guardColumn: string;
+			readonly reasonColumn: string;
+		};
+
+		/** Footnote body explaining what retries mean */
+		readonly note: string;
 	};
 
 	/**
