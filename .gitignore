@@ -20,6 +20,9 @@ lerna-debug.log*
 # Caches
 .cache
 
+# Generated release notes (built in CI by ci:changelog-notes)
+release-notes.md
+
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 

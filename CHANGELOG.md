@@ -4,6 +4,22 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-06-02
+
+### Added
+
+- Content-ratio guard and PR retry metadata in the translator's post-translation validation.
+- git-cliff release tooling (`release:draft`, `release:prepare`) and `release.yml` to tag and publish on merge to `main`.
+
+### Changed
+
+- Translation-progress comments link to the workflow run and release, with a footnote for the comment suffix.
+
+### Fixed
+
+- Polled matrix JSON passed via heredoc in `workflow.yml`.
+- Blank OpenRouter metadata env vars no longer fail validation.
+
 ## [0.2.2] - 2026-06-01
 
 ### Added
@@ -217,6 +233,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 - README `MAX_RETRY_ATTEMPTS` default matches `src/utils/constants.util.ts` (`3`).
 
+[0.2.3]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.3
 [0.2.2]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.2
 [0.2.1]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.1
 [0.2.0]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.0

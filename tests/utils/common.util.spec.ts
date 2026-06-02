@@ -8,9 +8,10 @@ import {
 	formatElapsedTime,
 	nftsCompatibleDateString,
 	resolveRunnerNewIssueChooserUrl,
+	resolveString,
 	WORKFLOW_RUNNER_REPOSITORY_HTML_BASE,
 } from "@/app/utils/";
-import { resolveGitHubActionsRunContext } from "@/app/utils/common.util";
+import { buildRunnerReleaseUrl, resolveGitHubActionsRunContext } from "@/app/utils/common.util";
 
 import { createRepositoryTreeItemFixture } from "@tests/fixtures";
 
@@ -20,8 +21,6 @@ const sampleCiEnv = {
 	GITHUB_REPOSITORY: "reactjs/ru.react.dev",
 	GITHUB_RUN_ID: "25802803407",
 	GITHUB_WORKFLOW: "Run Translation Workflow",
-	GITHUB_REF: "refs/heads/main",
-	GITHUB_REF_NAME: "main",
 } as const;
 
 describe("common.util", () => {
@@ -38,6 +37,40 @@ describe("common.util", () => {
 			const result = nftsCompatibleDateString(date);
 
 			expect(result).toBe("2024-01-01T00-00-00.123Z");
+		});
+	});
+
+	describe("resolveString", () => {
+		test("returns whenTrue for a truthy condition", () => {
+			expect(resolveString(true, "included")).toBe("included");
+		});
+
+		test("returns whenFalse for a falsy condition", () => {
+			expect(resolveString(false, "included", "fallback")).toBe("fallback");
+		});
+
+		test("defaults whenFalse to an empty string", () => {
+			expect(resolveString(0, "included")).toBe("");
+		});
+
+		test("evaluates a lazy factory only when the value is truthy", () => {
+			let buildCount = 0;
+
+			expect(
+				resolveString(false, () => {
+					buildCount += 1;
+					return "built";
+				}),
+			).toBe("");
+			expect(buildCount).toBe(0);
+
+			expect(
+				resolveString("ctx", (ctx) => {
+					buildCount += 1;
+					return `built-${ctx}`;
+				}),
+			).toBe("built-ctx");
+			expect(buildCount).toBe(1);
 		});
 	});
 
@@ -150,50 +183,26 @@ describe("common.util", () => {
 					GITHUB_REPOSITORY: "",
 					GITHUB_RUN_ID: "1",
 					GITHUB_WORKFLOW: "CI",
-					GITHUB_REF: "refs/heads/main",
-					GITHUB_REF_NAME: "main",
 				}),
 			).toBeUndefined();
 		});
 
-		test("returns undefined without ref", () => {
-			expect(
-				resolveGitHubActionsRunContext({
-					...sampleCiEnv,
-					GITHUB_REF: "",
-					GITHUB_REF_NAME: "",
-				}),
-			).toBeUndefined();
-		});
-
-		test("builds URL, labels, and ref from GITHUB_REF_NAME", () => {
+		test("builds URL, version, release URL, and workflow metadata from CI env", () => {
 			const context = resolveGitHubActionsRunContext(sampleCiEnv);
 
 			expect(context?.url).toBe("https://github.com/reactjs/ru.react.dev/actions/runs/25802803407");
 			expect(context?.workflowName).toBe("Run Translation Workflow");
 			expect(context?.runId).toBe("25802803407");
-			expect(context?.refLabel).toBe("main");
+			expect(context?.version).toMatch(/^v\d+\.\d+\.\d+/);
+			expect(context?.releaseUrl).toBe(buildRunnerReleaseUrl(context?.version ?? ""));
 		});
 
-		test("parses tag from GITHUB_REF when ref name is missing", () => {
-			const context = resolveGitHubActionsRunContext({
-				...sampleCiEnv,
-				GITHUB_REF: "refs/tags/v0.1.28",
-				GITHUB_REF_NAME: "",
-			});
-
-			expect(context?.refLabel).toBe("v0.1.28");
-		});
-
-		test("pt-br progress comment prefix includes ref and linked workflow run in CI", () => {
+		test("pt-br progress comment prefix links workflow run and release tag", () => {
 			const context = resolveGitHubActionsRunContext(sampleCiEnv);
 			const prefix = ptBrLocale.comment.prefix(context);
 
-			expect(prefix).toContain("A última execução do `translate-react`");
-			expect(prefix).toContain("**main**");
-			expect(prefix).toContain(
-				"[`Run Translation Workflow` · #25802803407](https://github.com/reactjs/ru.react.dev/actions/runs/25802803407)",
-			);
+			expect(prefix).toContain(`[última execução](${context?.url})`);
+			expect(prefix).toContain(`[\`translate-react@${context?.version}\`](${context?.releaseUrl})`);
 		});
 	});
 

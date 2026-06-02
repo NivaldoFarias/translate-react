@@ -17,6 +17,7 @@ import type {
 } from "./llm/translation-system-prompt.types";
 import type { TranslationAttemptContext } from "./pipeline/translation-attempt.context";
 import type { FrontmatterBatchFieldKey } from "./translator-frontmatter-batch.schema";
+import type { TranslationRetryInfo } from "./validation/validation.types";
 
 import {
 	env,
@@ -52,6 +53,17 @@ export type {
 	ChunkTranslationProgress,
 	TranslationSystemPromptKind,
 } from "./llm/translation-system-prompt.types";
+
+export type { TranslationRetryInfo } from "./validation/validation.types";
+
+/** Result from translating a file, including retry metadata */
+export interface TranslationResult {
+	/** The translated content */
+	content: string;
+
+	/** Retries that occurred during post-translation validation (empty if none) */
+	retries: readonly TranslationRetryInfo[];
+}
 
 /** Dependency injection interface for {@link TranslatorService} */
 export interface TranslatorServiceDependencies {
@@ -346,7 +358,7 @@ export class TranslatorService {
 	 * console.log(translated); // '# Olá\n\nBem-vindo ao React!'
 	 * ```
 	 */
-	public async translateContent(file: TranslationFile): Promise<string> {
+	public async translateContent(file: TranslationFile): Promise<TranslationResult> {
 		file.logger.info({ file: file.getLogContext() }, "Translating content for file");
 
 		if (!file.content.length) {
@@ -406,7 +418,7 @@ export class TranslatorService {
 		const sourceBodyForArtifacts =
 			fileBodySplit.rest.length > 0 ? fileBodySplit.rest : file.content;
 
-		const translatedContent = await this.managers.pipeline.translateWithValidationRetries({
+		const pipelineResult = await this.managers.pipeline.translateWithValidationRetries({
 			file,
 			translateBody: (attemptContext) =>
 				this.translateMarkdownBody(translationWorkFile, attemptContext),
@@ -446,20 +458,24 @@ export class TranslatorService {
 
 		const translationDuration = Date.now() - translationStartTime;
 
-		this.managers.validation.recordSoftValidationWarnings(file, translatedContent);
+		this.managers.validation.recordSoftValidationWarnings(file, pipelineResult.content);
 
 		file.logger.info(
 			{
 				filename: file.filename,
 				originalLength: file.content.length,
-				translatedLength: translatedContent.length,
+				translatedLength: pipelineResult.content.length,
 				durationMs: translationDuration,
-				sizeRatio: (translatedContent.length / file.content.length).toFixed(2),
+				sizeRatio: (pipelineResult.content.length / file.content.length).toFixed(2),
+				retryCount: pipelineResult.retries.length,
 			},
 			"Translation completed successfully",
 		);
 
-		return cleanupTranslatedContent(translatedContent, file);
+		return {
+			content: cleanupTranslatedContent(pipelineResult.content, file),
+			retries: pipelineResult.retries,
+		};
 	}
 
 	/**
@@ -645,13 +661,21 @@ export class TranslatorService {
 		});
 	}
 
+	/** Reduction factor for re-chunking when a chunk hits completion token limits */
+	private static readonly RECHUNK_BUDGET_FACTOR = 0.5;
+
 	/**
 	 * Translates a single chunk of content using the language model.
+	 *
+	 * When the LLM truncates output due to completion token limits, the chunk is
+	 * automatically split into smaller sub-chunks and translated recursively.
 	 *
 	 * @param file File instance for logger context
 	 * @param chunk Content to translate
 	 * @param index Index of the chunk
 	 * @param chunks Array of all chunks
+	 * @param attemptContext Guard hints from a failed post-translation validation attempt
+	 * @param tokenBudget Maximum tokens per sub-chunk (used during recursive re-chunking)
 	 *
 	 * @returns Promise resolving to the translated chunk
 	 */
@@ -661,6 +685,7 @@ export class TranslatorService {
 		index: number,
 		chunks: string[],
 		attemptContext: TranslationAttemptContext = emptyTranslationAttemptContext(),
+		tokenBudget?: number,
 	): Promise<string> {
 		const startTime = Date.now();
 		const estimatedTokens = this.managers.chunks.estimateTokenCount(chunk);
@@ -671,39 +696,116 @@ export class TranslatorService {
 				totalChunks: chunks.length,
 				chunkSize: chunk.length,
 				estimatedTokens,
+				tokenBudget,
 			},
 			`Translating chunk ${index + 1}/${chunks.length}`,
 		);
 
 		const chunkProgress: ChunkTranslationProgress | undefined =
 			chunks.length > 1 ? { index: index + 1, total: chunks.length } : undefined;
-		const translatedChunk = await this.callLanguageModel(
-			file,
-			chunk,
-			chunkProgress,
-			"markdownDocument",
-			undefined,
-			attemptContext,
+
+		try {
+			const translatedChunk = await this.callLanguageModel(
+				file,
+				chunk,
+				chunkProgress,
+				"markdownDocument",
+				undefined,
+				attemptContext,
+			);
+
+			const strippedChunk = stripSpuriousOuterMarkdownFencesWhenSourceHadNoFences(
+				chunk,
+				translatedChunk,
+				file.logger,
+			);
+
+			file.logger.debug(
+				{
+					chunkIndex: index + 1,
+					totalChunks: chunks.length,
+					originalSize: chunk.length,
+					translatedSize: strippedChunk.length,
+					durationMs: Date.now() - startTime,
+				},
+				`Chunk ${index + 1}/${chunks.length} translation complete`,
+			);
+
+			return strippedChunk;
+		} catch (error) {
+			if (!isCompletionLengthTruncationError(error)) {
+				throw error;
+			}
+
+			return this.handleChunkTruncation(file, chunk, index, chunks, attemptContext, tokenBudget);
+		}
+	}
+
+	/**
+	 * Handles chunk truncation by re-chunking with a reduced token budget and translating recursively.
+	 *
+	 * @param file File instance for logger context
+	 * @param chunk The chunk that was truncated
+	 * @param index Index of the chunk in the parent array
+	 * @param chunks Parent chunk array
+	 * @param attemptContext Guard hints from a failed post-translation validation attempt
+	 * @param currentBudget Current token budget (if already in a re-chunk pass)
+	 *
+	 * @returns Translated content assembled from sub-chunks
+	 */
+	private async handleChunkTruncation(
+		file: TranslationFile,
+		chunk: string,
+		index: number,
+		chunks: string[],
+		attemptContext: TranslationAttemptContext,
+		currentBudget?: number,
+	) {
+		const baseBudget = currentBudget ?? this.managers.chunks.getMarkdownChunkSplitterTokenBudget();
+		const reducedBudget = Math.max(
+			256,
+			Math.floor(baseBudget * TranslatorService.RECHUNK_BUDGET_FACTOR),
 		);
 
-		const strippedChunk = stripSpuriousOuterMarkdownFencesWhenSourceHadNoFences(
-			chunk,
-			translatedChunk,
-			file.logger,
-		);
-
-		file.logger.debug(
+		file.logger.info(
 			{
 				chunkIndex: index + 1,
 				totalChunks: chunks.length,
-				originalSize: chunk.length,
-				translatedSize: strippedChunk.length,
-				durationMs: Date.now() - startTime,
+				chunkLength: chunk.length,
+				baseBudget,
+				reducedBudget,
 			},
-			`Chunk ${index + 1}/${chunks.length} translation complete`,
+			"Chunk hit completion token limit; re-chunking with reduced budget",
 		);
 
-		return strippedChunk;
+		const { chunks: subChunks, separators } = await this.managers.chunks.chunkContent(
+			chunk,
+			reducedBudget,
+		);
+
+		if (subChunks.length <= 1) {
+			file.logger.warn(
+				{ chunkIndex: index + 1, reducedBudget },
+				"Re-chunking produced single chunk; content may still truncate",
+			);
+		}
+
+		file.logger.debug(
+			{ subChunkCount: subChunks.length, reducedBudget },
+			"Re-chunking complete; translating sub-chunks",
+		);
+
+		const translatedSubChunks = await Promise.all(
+			subChunks.map((subChunk, subIndex) =>
+				this.translateChunk(file, subChunk, subIndex, subChunks, attemptContext, reducedBudget),
+			),
+		);
+
+		return validateAndReassembleChunks(file, {
+			original: subChunks,
+			translated: translatedSubChunks,
+			separators,
+		});
 	}
 
 	/** @see {@link TranslationLlmClient.callLanguageModel} */

@@ -12,6 +12,9 @@ export interface TranslationValidationIssue {
 	retryHint: string;
 }
 
+/** Retry info for logging and PR metadata (excludes internal LLM hints) */
+export type TranslationRetryInfo = Pick<TranslationValidationIssue, "guardId" | "message">;
+
 /**
  * Post-translation check that may return a retryable issue with an LLM hint.
  */
