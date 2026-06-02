@@ -4,6 +4,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-06-02
+
 ### Added
 
 - `translator`: Add content-ratio guard and PR retry metadata
@@ -234,6 +236,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 - README `MAX_RETRY_ATTEMPTS` default matches `src/utils/constants.util.ts` (`3`).
 
+[0.2.3]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.3
 [0.2.2]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.2
 [0.2.1]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.1
 [0.2.0]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.0
