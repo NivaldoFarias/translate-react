@@ -110,6 +110,4 @@ If this saves your locale team manual translation work, consider [sponsoring the
 
 MIT License - see [LICENSE](./LICENSE) file for details.
 
----
-
 [^1]: Upstream PRs _(as well as comments on issues, etc.)_ can only be opened by a GitHub App if it is installed on the repository. Because of this, these specific actions are done by the user via PAT tokens instead of the bot.

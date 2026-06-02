@@ -1,0 +1,60 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Tag and publish release
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun dependencies
+        uses: ./.github/actions/setup-bun-deps
+        with:
+          bun-version: ${{ vars.BUN_VERSION || '1.3' }}
+
+      - name: Resolve release tag
+        id: version
+        run: echo "tag=v$(bun pm pkg get version | tr -d '\"')" >> "$GITHUB_OUTPUT"
+
+      - name: Check whether the release already exists
+        id: guard
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "${{ steps.version.outputs.tag }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Release ${{ steps.version.outputs.tag }} already exists; nothing to publish."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build release notes
+        if: steps.guard.outputs.exists == 'false'
+        run: bun run ci:changelog-notes "${{ steps.version.outputs.tag }}"
+
+      - name: Publish GitHub Release
+        if: steps.guard.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
+          body_path: release-notes.md
+          generate_release_notes: true
+          make_latest: true
