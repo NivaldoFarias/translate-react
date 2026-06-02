@@ -119,6 +119,9 @@ export class ChunksManager {
 		return this.cachedEncoder;
 	}
 
+	/** Tracks whether the configured model uses tiktoken fallback (non-OpenAI model) */
+	private usesTiktokenFallback: boolean | null = null;
+
 	/**
 	 * Maps the configured LLM model to a compatible `tiktoken` model for token counting.
 	 *
@@ -134,15 +137,25 @@ export class ChunksManager {
 		const supportedModel = SUPPORTED_TIKTOKEN_MODELS.find((supportedModel) =>
 			model.includes(supportedModel),
 		);
-		if (supportedModel) return supportedModel;
 
-		this.logger.debug(
-			{ model, fallback: DEFAULT_TIKTOKEN_MODEL },
-			"Model not supported by tiktoken, using fallback for token counting",
-		);
+		if (supportedModel) {
+			this.usesTiktokenFallback = false;
+			return supportedModel;
+		}
 
+		if (this.usesTiktokenFallback === null) {
+			this.logger.warn(
+				{ model, fallback: DEFAULT_TIKTOKEN_MODEL },
+				"Model not supported by tiktoken; using fallback with 20% safety margin for token estimates",
+			);
+		}
+
+		this.usesTiktokenFallback = true;
 		return DEFAULT_TIKTOKEN_MODEL;
 	}
+
+	/** Safety margin multiplier applied when using tiktoken fallback model */
+	private static readonly TIKTOKEN_FALLBACK_SAFETY_MARGIN = 1.2;
 
 	/**
 	 * Estimates token count for content using tiktoken encoding.
@@ -151,22 +164,30 @@ export class ChunksManager {
 	 * for the specific LLM being used. Required for proper chunking
 	 * and avoiding API limits.
 	 *
+	 * When the configured model has no direct tiktoken support (e.g., Gemini),
+	 * a 20% safety margin is applied to account for tokenizer differences.
+	 *
 	 * @param content Content to estimate tokens for
 	 *
-	 * @returns Accurate token count using model-specific encoding
+	 * @returns Token count using model-specific encoding (with safety margin if using fallback)
 	 *
 	 * @example
 	 * ```typescript
 	 * const translator = new TranslatorService({ source: 'en', target: 'pt-br' });
 	 * const tokenCount = translator.estimateTokenCount('# Hello World\n\nWelcome!');
-	 * console.log(tokenCount); // ~8 tokens
+	 * console.log(tokenCount); // ~8 tokens (or ~10 with fallback safety margin)
 	 * ```
 	 */
 	public estimateTokenCount(content: string): number {
 		try {
 			const tokens = this.encoder.encode(content);
+			const baseCount = tokens.length;
 
-			return tokens.length;
+			if (this.usesTiktokenFallback) {
+				return Math.ceil(baseCount * ChunksManager.TIKTOKEN_FALLBACK_SAFETY_MARGIN);
+			}
+
+			return baseCount;
 		} catch (error) {
 			const fallback = Math.ceil(content.length / TOKEN_ESTIMATION_FALLBACK_DIVISOR);
 			this.logger.error({ error }, "Error estimating token count, using fallback");

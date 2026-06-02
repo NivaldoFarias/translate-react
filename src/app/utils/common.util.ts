@@ -1,3 +1,4 @@
+import { version } from "@package";
 import { StatusCodes } from "http-status-codes";
 
 import type { ProgressCommentRunContext } from "@/app/locales/types";
@@ -13,6 +14,43 @@ import {
 import { env } from "@/app/schemas/env.schema";
 
 export * from "@/shared/utils/nfts-date.util";
+
+type ResolveStringTruthy<Value> = Value extends false | null | undefined | 0 | "" ? never : Value;
+
+/**
+ * Returns `whenTrue` when `value` is truthy, otherwise `whenFalse`.
+ *
+ * Pass a function for `whenTrue` to receive the narrowed `value` or to defer
+ * building the string until the value is known to be truthy.
+ *
+ * @param value Truthy check for including `whenTrue`
+ * @param whenTrue String to return, or a factory receiving the narrowed `value`
+ * @param whenFalse Value when `value` is falsy (default empty string)
+ *
+ * @returns `whenTrue` or its result when `value` is truthy, else `whenFalse`
+ *
+ * @example
+ * ```typescript
+ * resolveString(hasRetries, `[^retries]: ${note}\n`);
+ * resolveString(runContext, (ctx) => `[${ctx.runId}](${ctx.url})`);
+ * resolveString(workflowRunLine, (line) => `${line}\n`);
+ * ```
+ */
+export function resolveString<Value>(
+	value: Value,
+	whenTrue: string | ((resolved: ResolveStringTruthy<Value>) => string),
+	whenFalse = "",
+) {
+	if (!value) {
+		return whenFalse;
+	}
+
+	if (typeof whenTrue === "function") {
+		return whenTrue(value as ResolveStringTruthy<Value>);
+	}
+
+	return whenTrue;
+}
 
 /**
  * Formats a time duration in milliseconds to a human-readable string.
@@ -111,7 +149,7 @@ export function filterMarkdownFiles(tree: RepositoryTreeItem[]): RepositoryTreeI
 		if (!item.path) return false;
 		if (!item.path.endsWith(".md")) return false;
 		if (!item.path.includes("/")) return false;
-		if (!item.path.includes("src/")) return false;
+		if (!item.path.startsWith("src/")) return false;
 
 		return true;
 	});
@@ -200,37 +238,18 @@ export function resolveRunnerNewIssueChooserUrl() {
 
 type GitHubActionsRunEnvSlice = Pick<
 	Environment,
-	| "GITHUB_ACTIONS"
-	| "GITHUB_SERVER_URL"
-	| "GITHUB_REPOSITORY"
-	| "GITHUB_RUN_ID"
-	| "GITHUB_WORKFLOW"
-	| "GITHUB_REF"
-	| "GITHUB_REF_NAME"
+	"GITHUB_ACTIONS" | "GITHUB_SERVER_URL" | "GITHUB_REPOSITORY" | "GITHUB_RUN_ID" | "GITHUB_WORKFLOW"
 >;
 
-function resolveGitHubRefLabel(runtimeEnv: GitHubActionsRunEnvSlice) {
-	const refName = runtimeEnv.GITHUB_REF_NAME?.trim();
-
-	if (refName && refName.length > 0) {
-		return refName;
-	}
-
-	const fullRef = runtimeEnv.GITHUB_REF?.trim();
-
-	if (!fullRef) {
-		return;
-	}
-
-	if (fullRef.startsWith("refs/heads/")) {
-		return fullRef.slice("refs/heads/".length);
-	}
-
-	if (fullRef.startsWith("refs/tags/")) {
-		return fullRef.slice("refs/tags/".length);
-	}
-
-	return fullRef;
+/**
+ * Builds the GitHub release page URL for a `translate-react` version tag.
+ *
+ * @param runnerVersion Semantic version tag (e.g. `v0.2.2`)
+ *
+ * @returns Absolute URL to `releases/tag/<runnerVersion>` on the runner repository
+ */
+export function buildRunnerReleaseUrl(runnerVersion: string) {
+	return `${WORKFLOW_RUNNER_REPOSITORY_HTML_BASE}/releases/tag/${runnerVersion}`;
 }
 
 /**
@@ -254,12 +273,6 @@ export function resolveGitHubActionsRunContext(
 		return;
 	}
 
-	const refLabel = resolveGitHubRefLabel(runtimeEnv);
-
-	if (!refLabel) {
-		return;
-	}
-
 	const serverFromEnv = runtimeEnv.GITHUB_SERVER_URL?.trim();
 	const serverBase = (
 		serverFromEnv && serverFromEnv.length > 0 ?
@@ -268,8 +281,15 @@ export function resolveGitHubActionsRunContext(
 	const url = `${serverBase}/${repository}/actions/runs/${runId}`;
 	const namedWorkflow = runtimeEnv.GITHUB_WORKFLOW?.trim();
 	const workflowName = namedWorkflow && namedWorkflow.length > 0 ? namedWorkflow : "GitHub Actions";
+	const runnerVersion = `v${version}`;
 
-	return { refLabel, url, workflowName, runId };
+	return {
+		version: runnerVersion,
+		releaseUrl: buildRunnerReleaseUrl(runnerVersion),
+		url,
+		workflowName,
+		runId,
+	};
 }
 
 function isGithubRepositorySlug(value: string | undefined): value is string {

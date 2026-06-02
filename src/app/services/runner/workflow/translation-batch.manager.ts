@@ -1,3 +1,4 @@
+import { version } from "@package";
 import prettyBytes from "pretty-bytes";
 
 import type { InvalidFilePullRequest, PullRequestDescriptionMetadata } from "@/app/locales/types";
@@ -19,6 +20,15 @@ import { ApplicationError, ErrorCode } from "@/shared/errors/";
 
 import { TranslationPullRequestValidityManager } from "./translation-pull-request-validity.manager";
 import { MAX_CONSECUTIVE_FAILURES } from "./workflow.constants";
+
+/** Returns the hostname of the configured LLM API base URL for PR metadata */
+function resolveLlmApiHost(baseUrl: string) {
+	try {
+		return new URL(baseUrl).host;
+	} catch {
+		return baseUrl;
+	}
+}
 
 /**
  * Manages batch processing and progress tracking for file translations.
@@ -223,6 +233,7 @@ export class TranslationBatchManager {
 			branch: null,
 			filename: file.filename,
 			translation: null,
+			retries: [],
 			pullRequest: null,
 			pullRequestProgress: null,
 			error: null,
@@ -265,9 +276,15 @@ export class TranslationBatchManager {
 			);
 
 			const translationStart = Date.now();
-			metadata.translation = await this.services.translator.translateContent(file);
+			const translationResult = await this.services.translator.translateContent(file);
+			metadata.translation = translationResult.content;
+			metadata.retries = translationResult.retries;
 			file.logger.debug(
-				{ translationSize: metadata.translation.length, durationMs: Date.now() - translationStart },
+				{
+					translationSize: metadata.translation.length,
+					durationMs: Date.now() - translationStart,
+					retryCount: metadata.retries.length,
+				},
 				"Step 3/5: Translation complete",
 			);
 
@@ -553,9 +570,8 @@ export class TranslationBatchManager {
 	/**
 	 * Creates a pull request description for translated content.
 	 *
-	 * Generates a detailed PR body including translation metadata, review guidelines,
-	 * processing statistics (with GFM footnotes for metric explanations), optional conflict notices,
-	 * technical info including the configured LLM model, and a link to the maintainer wiki guide.
+	 * Generates a detailed PR body including translation outcome metrics, runner and LLM
+	 * configuration, optional conflict notices, and a link to the maintainer wiki guide.
 	 * When a file has an existing invalid PR (with merge conflicts), includes a GitHub Flavored Markdown
 	 * alert to inform maintainers about the duplicate PR situation.
 	 *
@@ -590,7 +606,12 @@ export class TranslationBatchManager {
 				now: Date.now(),
 				workflowStart: this.workflowStartTimestamp,
 			},
+			runnerVersion: `v${version}`,
 			translationModel: env.LLM_MODEL,
+			llmApiHost: resolveLlmApiHost(env.LLM_API_BASE_URL),
+			nodeEnv: env.NODE_ENV,
+			maskVerbatimLargeFences: env.MASK_VERBATIM_LARGE_FENCES,
+			retries: processingResult.retries,
 		};
 		return this.services.locale.definitions.pullRequest.body(
 			file,

@@ -72,14 +72,14 @@ const envSchema = z.object({
 	 *
 	 * Used for activity tracking on {@link https://openrouter.ai/|OpenRouter}.
 	 */
-	HEADER_APP_URL: z.url().default(envDefaults.HEADER_APP_URL),
+	HEADER_APP_URL: optionalEnvUrl(envDefaults.HEADER_APP_URL),
 
 	/**
 	 * The title of the application to override the default title.
 	 *
 	 * Used for activity tracking on {@link https://openrouter.ai/|OpenRouter}.
 	 */
-	HEADER_APP_TITLE: z.string().default(envDefaults.HEADER_APP_TITLE),
+	HEADER_APP_TITLE: optionalEnvString(envDefaults.HEADER_APP_TITLE),
 
 	/** The number of items to process in each batch */
 	BATCH_SIZE: z.coerce.number().positive().default(envDefaults.BATCH_SIZE),
@@ -240,4 +240,27 @@ function resolveEnvDefaults(): EnvironmentSchemaDefaults {
 /** Detects if running in test environment */
 function isTestEnvironment(): boolean {
 	return import.meta.env.NODE_ENV === RuntimeEnvironment.Test;
+}
+
+/**
+ * Treats unset GitHub Actions / `.env` values as missing so schema defaults apply.
+ *
+ * `vars.HEADER_APP_*` and `KEY=` in `.env` often become `""`, which bypasses Zod `.default()`.
+ */
+function emptyEnvValueToUndefined(value: unknown): unknown {
+	if (value === "" || value === undefined) {
+		return undefined;
+	}
+
+	return value;
+}
+
+/** Optional env string with production defaults when unset or empty */
+function optionalEnvString(defaultValue: string) {
+	return z.preprocess(emptyEnvValueToUndefined, z.string().optional().default(defaultValue));
+}
+
+/** Optional env URL with production defaults when unset or empty */
+function optionalEnvUrl(defaultValue: string) {
+	return z.preprocess(emptyEnvValueToUndefined, z.url().optional().default(defaultValue));
 }

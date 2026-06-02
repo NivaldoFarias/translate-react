@@ -1,7 +1,10 @@
 import type { ApplicationError } from "@/shared/errors";
 
 import type { TranslationFile } from "../translation-file";
-import type { TranslationValidationIssue } from "../validation/validation.types";
+import type {
+	TranslationRetryInfo,
+	TranslationValidationIssue,
+} from "../validation/validation.types";
 
 import type { TranslationAttemptContext } from "./translation-attempt.context";
 
@@ -11,6 +14,15 @@ import {
 	emptyTranslationAttemptContext,
 	translationAttemptContextFromHints,
 } from "./translation-attempt.context";
+
+/** Result from the translation pipeline with retry metadata */
+export interface TranslationPipelineResult {
+	/** The translated content that passed all validation guards */
+	content: string;
+
+	/** Retries that occurred during validation (empty if translation passed on first attempt) */
+	retries: readonly TranslationRetryInfo[];
+}
 
 /** Dependencies for one validated translation pass with optional LLM retries */
 export interface TranslationPipelineRunParams {
@@ -47,13 +59,16 @@ export class TranslationPipelineManager {
 	 *
 	 * @param params Pipeline callbacks and the source file for logging
 	 *
-	 * @returns Assembled translated document that passed all guards
+	 * @returns Result with translated content and retry metadata
 	 */
-	public async translateWithValidationRetries(params: TranslationPipelineRunParams) {
+	public async translateWithValidationRetries(
+		params: TranslationPipelineRunParams,
+	): Promise<TranslationPipelineResult> {
 		const { file, translateBody, finalizeTranslation, collectIssues, createFailedError } = params;
 
 		let attemptContext = emptyTranslationAttemptContext();
 		let translatedContent = "";
+		const retries: TranslationRetryInfo[] = [];
 
 		for (let attempt = 1; attempt <= this.maxAttempts; attempt++) {
 			const bodyTranslation = await translateBody(attemptContext);
@@ -67,6 +82,10 @@ export class TranslationPipelineManager {
 
 			if (attempt >= this.maxAttempts) {
 				throw createFailedError(translatedContent, validationIssues);
+			}
+
+			for (const issue of validationIssues) {
+				retries.push({ guardId: issue.guardId, message: issue.message });
 			}
 
 			attemptContext = translationAttemptContextFromHints(
@@ -83,6 +102,6 @@ export class TranslationPipelineManager {
 			);
 		}
 
-		return translatedContent;
+		return { content: translatedContent, retries };
 	}
 }

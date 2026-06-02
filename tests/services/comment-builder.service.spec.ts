@@ -29,6 +29,7 @@ describe("CommentBuilderService", () => {
 			branch: null,
 			filename,
 			translation: `Translated content of ${filename}`,
+			retries: [],
 			pullRequest: prNumber ? createMockPrData(prNumber) : null,
 			pullRequestProgress,
 			error: null,
@@ -109,6 +110,7 @@ describe("CommentBuilderService", () => {
 				{
 					filename: "post.md",
 					translation: "# Blog Post",
+					retries: [],
 					branch: null,
 					pullRequestProgress: PullRequestProgressAction.Created,
 					pullRequest: createMockPrData(126),
@@ -181,6 +183,7 @@ describe("CommentBuilderService", () => {
 				{
 					filename: "test.md",
 					translation: "# Test",
+					retries: [],
 					branch: null,
 					pullRequestProgress: PullRequestProgressAction.Created,
 					pullRequest: createMockPrData(127),
@@ -204,6 +207,7 @@ describe("CommentBuilderService", () => {
 				{
 					filename: "article.md",
 					translation: "# Article",
+					retries: [],
 					branch: null,
 					pullRequestProgress: PullRequestProgressAction.Created,
 					pullRequest: createMockPrData(128),
@@ -236,6 +240,7 @@ describe("CommentBuilderService", () => {
 				{
 					filename: "intro.md",
 					translation: "# Introduction",
+					retries: [],
 					branch: null,
 					pullRequestProgress: PullRequestProgressAction.Created,
 					pullRequest: createMockPrData(129),
@@ -244,6 +249,7 @@ describe("CommentBuilderService", () => {
 				{
 					filename: "advanced.md",
 					translation: "# Advanced",
+					retries: [],
 					branch: null,
 					pullRequestProgress: PullRequestProgressAction.Created,
 					pullRequest: createMockPrData(130),
@@ -252,6 +258,7 @@ describe("CommentBuilderService", () => {
 				{
 					filename: "api.md",
 					translation: "# API",
+					retries: [],
 					branch: null,
 					pullRequestProgress: PullRequestProgressAction.Created,
 					pullRequest: createMockPrData(131),
@@ -290,6 +297,7 @@ describe("CommentBuilderService", () => {
 				{
 					filename: "zebra.md",
 					translation: "# Zebra",
+					retries: [],
 					branch: null,
 					pullRequestProgress: PullRequestProgressAction.Created,
 					pullRequest: createMockPrData(132),
@@ -298,6 +306,7 @@ describe("CommentBuilderService", () => {
 				{
 					filename: "alpha.md",
 					translation: "# Alpha",
+					retries: [],
 					branch: null,
 					pullRequestProgress: PullRequestProgressAction.Created,
 					pullRequest: createMockPrData(133),
@@ -322,6 +331,7 @@ describe("CommentBuilderService", () => {
 				{
 					filename: "deep.md",
 					translation: "# Deep",
+					retries: [],
 					branch: null,
 					pullRequestProgress: PullRequestProgressAction.Created,
 					pullRequest: createMockPrData(134),
@@ -354,6 +364,7 @@ describe("CommentBuilderService", () => {
 				{
 					filename: "",
 					translation: "# Empty",
+					retries: [],
 					branch: null,
 					pullRequestProgress: PullRequestProgressAction.Created,
 					pullRequest: createMockPrData(135),
@@ -375,6 +386,7 @@ describe("CommentBuilderService", () => {
 				{
 					filename: "special-file_name.with.dots.md",
 					translation: "# Special",
+					retries: [],
 					branch: null,
 					pullRequestProgress: PullRequestProgressAction.Created,
 					pullRequest: createMockPrData(136),
@@ -405,6 +417,7 @@ describe("CommentBuilderService", () => {
 					filename: `file-${index.toString().padStart(2, "0")}.md`,
 					branch: null,
 					translation: `# File ${index}`,
+					retries: [],
 					pullRequestProgress: PullRequestProgressAction.Created,
 					pullRequest: createMockPrData(100 + index),
 					error: null,

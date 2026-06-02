@@ -6,6 +6,7 @@ import { WIKI_FOR_REACT_DOCS_MAINTAINERS_URL } from "@/app/constants";
 import { ptBrLocale, ruLocale } from "@/app/locales";
 import { LocaleService } from "@/app/services/locale/locale.service";
 import { TranslationFile } from "@/app/services/translator/translation-file";
+import { buildRunnerReleaseUrl } from "@/app/utils/common.util";
 
 import { createProcessedFileResultsFixture } from "@tests/fixtures";
 
@@ -24,7 +25,12 @@ function createPullRequestDescriptionMetadata(
 			now: 1706900000000,
 			workflowStart: 1706899000000,
 		},
+		runnerVersion: "v0.1.28",
 		translationModel: "google/gemini-2.0-flash-exp:free",
+		llmApiHost: "openrouter.ai",
+		nodeEnv: "test",
+		maskVerbatimLargeFences: false,
+		retries: [],
 		...overrides,
 	};
 }
@@ -91,25 +97,25 @@ describe("LocaleService", () => {
 				);
 			});
 
-			test("should build CI prefix with ref and workflow run link", () => {
+			test("should build CI prefix with workflow run and release tag links", () => {
+				const workflowRunUrl = "https://github.com/o/r/actions/runs/1";
 				const prefix = localeService.definitions.comment.prefix({
-					refLabel: "v0.1.28",
+					version: "v0.1.28",
+					releaseUrl: buildRunnerReleaseUrl("v0.1.28"),
 					workflowName: "Run Translation Workflow",
 					runId: "1",
-					url: "https://github.com/o/r/actions/runs/1",
+					url: workflowRunUrl,
 				});
 
-				expect(prefix).toContain("A última execução do `translate-react`");
-				expect(prefix).toContain("**v0.1.28**");
-				expect(prefix).toContain(
-					"[`Run Translation Workflow` · #1](https://github.com/o/r/actions/runs/1)",
-				);
+				expect(prefix).toContain(`[última execução](${workflowRunUrl})`);
+				expect(prefix).toContain("[`translate-react@v0.1.28`]");
+				expect(prefix).toContain(buildRunnerReleaseUrl("v0.1.28"));
 			});
 
 			test("should have suffix function that generates observations", () => {
 				const suffix = localeService.definitions.comment.suffix;
 
-				expect(suffix).toContain("###### ps.:");
+				expect(suffix).toContain("[^1]:");
 			});
 		});
 
@@ -264,6 +270,37 @@ describe("ptBrLocale.pullRequest.body", () => {
 
 			expect(body).toContain("Modelo de tradução (LLM)");
 			expect(body).toContain("`anthropic/claude-3.5-sonnet`");
+		});
+
+		test("should include runner version and runtime config under technical info", () => {
+			const metadata = createPullRequestDescriptionMetadata({
+				runnerVersion: "v0.2.0",
+				llmApiHost: "openrouter.ai",
+				nodeEnv: "production",
+			});
+
+			const body = buildPullRequestBody(file, processingResult, metadata);
+
+			expect(body).toContain("Versão do translate-react");
+			expect(body).toContain("`v0.2.0`");
+			expect(body).toContain("`openrouter.ai`");
+			expect(body).toContain("`production`");
+		});
+
+		test("should list mask verbatim fences only when enabled", () => {
+			const enabled = buildPullRequestBody(
+				file,
+				processingResult,
+				createPullRequestDescriptionMetadata({ maskVerbatimLargeFences: true }),
+			);
+			const disabled = buildPullRequestBody(
+				file,
+				processingResult,
+				createPullRequestDescriptionMetadata({ maskVerbatimLargeFences: false }),
+			);
+
+			expect(enabled).toContain("Máscara de blocos de código grandes");
+			expect(disabled).not.toContain("Máscara de blocos de código grandes");
 		});
 
 		test("should use footnotes for content ratio and processing time metrics", () => {
