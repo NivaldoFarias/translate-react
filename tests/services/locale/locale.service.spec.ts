@@ -139,6 +139,11 @@ describe("LocaleService", () => {
 				expect(localeService.definitions.rules.specific).toContain("developer.mozilla.org");
 				expect(localeService.definitions.rules.specific).toContain("pt-BR");
 			});
+
+			test("should include fenced code and MDX rules for pt-br", () => {
+				expect(localeService.definitions.rules.specific).toContain("FENCED CODE AND MDX");
+				expect(localeService.definitions.rules.specific).toContain("ConsoleLogLine");
+			});
 		});
 	});
 });
