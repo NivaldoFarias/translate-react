@@ -10,6 +10,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 - pt-br fenced-code policy: locale rules, prompt scope override, and `fencePreservedDemoContent` guard for demo UI strings and React terms in code comments.
 - pt-br glossary terminology: `glossaryTerminology` guard with glossary parsing, protected product names, intra-document consistency checks, and locale prompt rules.
 - Markdown link and pt-br heading guards: `markdownLinksPreserved` for `[text](url)` integrity, `ptBrHeadingSentenceCase` for sentence-case headings, plus locale prompt rules.
+- Chunk reassembly terminology audit: after chunked pt-br translation, detect cross-slice terminology drift and re-translate only affected slices with targeted hints before full-document validation.
 
 ### Fixed
 
