@@ -1,6 +1,9 @@
 import type { TranslationFile } from "../translation-file";
 
-import type { TranslationValidationIssue } from "./validation.types";
+import type {
+	PostTranslationValidationOptions,
+	TranslationValidationIssue,
+} from "./validation.types";
 
 import { collectTopLevelKeysFromInnerYaml } from "@/app/services/translator/markdown/frontmatter";
 import { ApplicationError, ErrorCode } from "@/shared/errors";
@@ -12,10 +15,25 @@ import { VALIDATION_RATIOS } from "./validation.constants";
 
 export type { TranslationValidationIssue } from "./validation.types";
 
+/** Dependencies for {@link PostTranslationValidationService} */
+export interface PostTranslationValidationServiceDependencies {
+	/** Upstream glossary markdown when loaded on the translator */
+	readonly getTranslationGuidelines?: () => string | null;
+}
+
 /**
  * Runs post-translation guards and records soft validation warnings.
  */
 export class PostTranslationValidationService {
+	private readonly getTranslationGuidelines: () => string | null;
+
+	/**
+	 * @param dependencies Optional glossary provider for terminology guards
+	 */
+	constructor(dependencies: PostTranslationValidationServiceDependencies = {}) {
+		this.getTranslationGuidelines = dependencies.getTranslationGuidelines ?? (() => null);
+	}
+
 	/**
 	 * Runs post-translation guards that can trigger an LLM retry with hints.
 	 *
@@ -28,7 +46,9 @@ export class PostTranslationValidationService {
 		file: TranslationFile,
 		translatedContent: string,
 	): TranslationValidationIssue[] {
-		return collectPostTranslationValidationIssues(file.content, translatedContent);
+		return collectPostTranslationValidationIssues(file.content, translatedContent, {
+			translationGuidelines: this.getTranslationGuidelines(),
+		} satisfies PostTranslationValidationOptions);
 	}
 
 	/**
