@@ -7,6 +7,8 @@ import type { FileProcessingProgress } from "@/app/services/runner/types";
 
 import type { RunnerServiceDependencies } from "../runner.types";
 
+import type { TranslationPullRequestValidity } from "./translation-pull-request-validity.manager";
+
 import { PullRequestProgressAction } from "@/app/services/github/types";
 import { TranslationFile } from "@/app/services/translator/";
 import {
@@ -17,6 +19,8 @@ import {
 } from "@/app/utils/";
 import { ApplicationError, ErrorCode } from "@/shared/errors/";
 
+import { MaintainerFeedbackRemediationManager } from "./maintainer-feedback-remediation.manager";
+import { getMaintainerFeedbackCommentBodies } from "./maintainer-feedback.util";
 import { TranslationPullRequestValidityManager } from "./translation-pull-request-validity.manager";
 import { MAX_CONSECUTIVE_FAILURES } from "./workflow.constants";
 
@@ -67,6 +71,8 @@ export class TranslationBatchManager {
 
 	private readonly translationPullRequestValidity: TranslationPullRequestValidityManager;
 
+	private readonly maintainerFeedbackRemediation: MaintainerFeedbackRemediationManager;
+
 	/**
 	 * Initializes the batch manager with service dependencies.
 	 *
@@ -80,6 +86,9 @@ export class TranslationBatchManager {
 		private readonly workflowStartTimestamp: number,
 	) {
 		this.translationPullRequestValidity = new TranslationPullRequestValidityManager(services);
+		this.maintainerFeedbackRemediation = new MaintainerFeedbackRemediationManager(
+			services.translator,
+		);
 	}
 
 	/**
@@ -266,10 +275,13 @@ export class TranslationBatchManager {
 				);
 			}
 
-			const skippedForValidTranslationPullRequest = await this.skipIfValidTranslationPullRequest(
+			const pullRequestValidity = await this.translationPullRequestValidity.evaluate(file.path);
+
+			const skippedForValidTranslationPullRequest = this.skipIfValidTranslationPullRequest(
 				file,
 				metadata,
 				startTime,
+				pullRequestValidity,
 			);
 
 			if (skippedForValidTranslationPullRequest) {
@@ -277,14 +289,14 @@ export class TranslationBatchManager {
 			}
 
 			const branchStart = Date.now();
-			metadata.branch = await this.resetTranslationBranch(file);
+			metadata.branch = await this.prepareTranslationBranch(file, pullRequestValidity);
 			file.logger.debug(
 				{ branchRef: metadata.branch.ref, durationMs: Date.now() - branchStart },
 				"Step 1/5: Translation branch reset for single-commit workflow",
 			);
 
 			const translationStart = Date.now();
-			const translationResult = await this.services.translator.translateContent(file);
+			const translationResult = await this.resolveTranslation(file, pullRequestValidity);
 			metadata.translation = translationResult.content;
 			metadata.retries = translationResult.retries;
 			file.logger.debug(
@@ -292,6 +304,7 @@ export class TranslationBatchManager {
 					translationSize: metadata.translation.length,
 					durationMs: Date.now() - translationStart,
 					retryCount: metadata.retries.length,
+					remediationKind: translationResult.remediationKind,
 				},
 				"Step 3/5: Translation complete",
 			);
@@ -332,7 +345,11 @@ export class TranslationBatchManager {
 			file.logger.debug({ durationMs: Date.now() - commitStart }, "Step 4/5: Commit complete");
 
 			const prStart = Date.now();
-			const pullRequestOutcome = await this.openTranslationPullRequest(file, metadata);
+			const pullRequestOutcome = await this.openTranslationPullRequest(
+				file,
+				metadata,
+				pullRequestValidity,
+			);
 			metadata.pullRequest = pullRequestOutcome.pullRequest;
 			metadata.pullRequestProgress = pullRequestOutcome.progress;
 			file.logger.debug(
@@ -403,21 +420,83 @@ export class TranslationBatchManager {
 	}
 
 	/**
+	 * Resolves translated content: maintainer tiers first when applicable, otherwise full re-translation.
+	 *
+	 * @param file Upstream English source file for the workflow
+	 * @param validity Pull request validity from the start of file processing
+	 *
+	 * @returns Translated content, retries, and which remediation tier ran
+	 */
+	private async resolveTranslation(
+		file: TranslationFile,
+		validity: TranslationPullRequestValidity,
+	) {
+		if (validity.invalidReason !== "needs_maintainer_fix" || !validity.pullRequest) {
+			const result = await this.services.translator.translateContent(file);
+
+			return { ...result, remediationKind: "full" as const };
+		}
+
+		const branchName = getTranslationBranchNameFromPath(file.path);
+		const [forkContent, comments, runnerCommitAt] = await Promise.all([
+			this.services.github.getForkFileContentAtBranch(file.path, branchName),
+			this.services.github.listPullRequestIssueComments(validity.pullRequest.number),
+			this.services.github.getLatestTranslationCommitTimestamp(branchName),
+		]);
+
+		if (!forkContent?.trim()) {
+			const result = await this.services.translator.translateContent(file);
+
+			return { ...result, remediationKind: "full" as const };
+		}
+
+		const commentBodies = getMaintainerFeedbackCommentBodies(comments, runnerCommitAt);
+		const remediated = await this.maintainerFeedbackRemediation.tryRemediate(
+			forkContent,
+			file.content,
+			commentBodies,
+			file,
+		);
+
+		if (remediated) {
+			file.logger.info(
+				{ path: file.path, prNumber: validity.pullRequest.number, kind: remediated.kind },
+				"Applied maintainer feedback remediation",
+			);
+
+			return {
+				content: remediated.content,
+				retries: remediated.retries,
+				remediationKind: remediated.kind,
+			};
+		}
+
+		file.logger.info(
+			{ path: file.path, prNumber: validity.pullRequest.number },
+			"No targeted maintainer remediation; falling back to full re-translation",
+		);
+
+		const result = await this.services.translator.translateContent(file);
+
+		return { ...result, remediationKind: "full" as const };
+	}
+
+	/**
 	 * Returns completed metadata when an open translation pull request is already valid.
 	 *
 	 * @param file Translation file being processed
 	 * @param metadata In-progress processing result to populate when skipping
 	 * @param startTime Workflow step start time for duration logging
+	 * @param validity Pull request validity evaluated at the start of file processing
 	 *
 	 * @returns Filled metadata when skipped, or `null` to continue translation
 	 */
-	private async skipIfValidTranslationPullRequest(
+	private skipIfValidTranslationPullRequest(
 		file: TranslationFile,
 		metadata: ProcessedFileResult,
 		startTime: number,
+		validity: TranslationPullRequestValidity,
 	) {
-		const validity = await this.translationPullRequestValidity.evaluate(file.path);
-
 		if (!validity.isValid || !validity.pullRequest) {
 			return null;
 		}
@@ -479,6 +558,40 @@ export class TranslationBatchManager {
 	}
 
 	/**
+	 * Resolves the fork branch for translation: reuses an existing branch when addressing
+	 * maintainer feedback, otherwise resets from the fork default tip.
+	 *
+	 * @param file Translation file being processed
+	 * @param validity Pull request validity from the start of file processing
+	 *
+	 * @returns Branch reference to commit the translation on
+	 */
+	private async prepareTranslationBranch(
+		file: TranslationFile,
+		validity: TranslationPullRequestValidity,
+	) {
+		if (validity.invalidReason === "needs_maintainer_fix" && validity.pullRequest) {
+			const branchName = getTranslationBranchNameFromPath(file.path);
+			const existingBranch = await this.services.github.getBranch(branchName);
+
+			if (existingBranch) {
+				this.logger.info(
+					{
+						filename: file.filename,
+						prNumber: validity.pullRequest.number,
+						branchName,
+					},
+					"Reusing translation branch for maintainer feedback remediation",
+				);
+
+				return existingBranch.data;
+			}
+		}
+
+		return this.resetTranslationBranch(file);
+	}
+
+	/**
 	 * Closes any open translation PR and recreates the branch from the fork default tip.
 	 *
 	 * Ensures the subsequent translation commit is the only commit on the topic branch.
@@ -529,16 +642,33 @@ export class TranslationBatchManager {
 	 *
 	 * @param file Translation file being processed
 	 * @param processingResult Processing metadata including translation and timing
+	 * @param validity Pull request validity evaluated at the start of file processing
 	 *
-	 * @returns Newly created pull request metadata for progress reporting
+	 * @returns Pull request metadata for progress reporting
 	 */
 	private async openTranslationPullRequest(
 		file: TranslationFile,
 		processingResult: ProcessedFileResult,
+		validity: TranslationPullRequestValidity,
 	): Promise<{
 		pullRequest: NonNullable<ProcessedFileResult["pullRequest"]>;
-		progress: PullRequestProgressAction.Created;
+		progress: PullRequestProgressAction;
 	}> {
+		if (validity.invalidReason === "needs_maintainer_fix" && validity.pullRequest) {
+			this.logger.info(
+				{
+					path: file.path,
+					prNumber: validity.pullRequest.number,
+				},
+				"Keeping open translation pull request after maintainer feedback remediation",
+			);
+
+			return {
+				pullRequest: validity.pullRequest,
+				progress: PullRequestProgressAction.Reused,
+			};
+		}
+
 		const branchName = getTranslationBranchNameFromPath(file.path);
 		const languageName = this.services.languageDetector.getLanguageName(
 			this.services.languageDetector.languages.target,
