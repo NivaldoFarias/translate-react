@@ -9,6 +9,7 @@ import type { CommentBuilderService } from "@/app/services/comment-builder/";
 import type {
 	PatchedRepositoryTreeItem,
 	ProcessedFileResult,
+	PullRequestIssueCommentSnapshot,
 	PullRequestStatus,
 	RepositoryMarkdownBlob,
 	TranslationProgressFileRef,
@@ -16,6 +17,7 @@ import type {
 
 import type { SharedGitHubDependencies } from "./types";
 
+import { TRANSLATION_COMMIT_MESSAGE_PREFIX } from "@/app/constants/maintainer-feedback.constants";
 import { selectProgressCommentPayload } from "@/app/services/comment-builder/progress-comment.util";
 import { logger } from "@/app/utils/";
 import { ApplicationError, ErrorCode } from "@/shared/errors/";
@@ -639,6 +641,59 @@ export class GitHubContent {
 		});
 
 		return response.data;
+	}
+
+	/**
+	 * Lists issue comments on an open translation pull request (upstream repo).
+	 *
+	 * @param prNumber Pull request number on the upstream repository
+	 *
+	 * @returns Normalized issue comments, oldest first
+	 */
+	public async listPullRequestIssueComments(
+		prNumber: number,
+	): Promise<PullRequestIssueCommentSnapshot[]> {
+		const comments = await this.deps.octokit.paginate(this.deps.octokit.issues.listComments, {
+			...this.deps.repositories.upstream,
+			issue_number: prNumber,
+			per_page: 100,
+		});
+
+		return comments.map((comment) => ({
+			login: comment.user?.login ?? "",
+			authorAssociation: comment.author_association,
+			userType: comment.user?.type ?? "User",
+			createdAt: new Date(comment.created_at),
+			body: comment.body ?? "",
+		}));
+	}
+
+	/**
+	 * Returns the committer timestamp of the latest runner translation commit on a fork branch.
+	 *
+	 * @param branchName Translation branch name without `refs/heads/` prefix
+	 *
+	 * @returns Committer date of the newest `docs: translate` commit, or `undefined` when none exist
+	 */
+	public async getLatestTranslationCommitTimestamp(branchName: string): Promise<Date | undefined> {
+		const response = await this.deps.octokit.repos.listCommits({
+			...this.deps.repositories.fork,
+			sha: branchName,
+			per_page: 30,
+		});
+
+		const translationCommit = response.data.find((commit) =>
+			commit.commit.message.startsWith(TRANSLATION_COMMIT_MESSAGE_PREFIX),
+		);
+
+		if (!translationCommit) {
+			return undefined;
+		}
+
+		const timestamp =
+			translationCommit.commit.committer?.date ?? translationCommit.commit.author?.date;
+
+		return timestamp ? new Date(timestamp) : undefined;
 	}
 
 	/**

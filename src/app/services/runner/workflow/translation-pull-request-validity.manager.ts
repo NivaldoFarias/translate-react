@@ -6,8 +6,17 @@ import type { RunnerServiceDependencies } from "../runner.types";
 
 import { getTranslationBranchNameFromPath, logger } from "@/app/utils/";
 
+import {
+	hasMaintainerFeedbackAfterRunnerCommit,
+	isMaintainerFeedbackComment,
+} from "./maintainer-feedback.util";
+
 /** Why an open translation pull request is not treated as workflow-complete */
-export type TranslationPullRequestInvalidReason = "no_open_pr" | "out_of_sync" | "not_translated";
+export type TranslationPullRequestInvalidReason =
+	| "no_open_pr"
+	| "out_of_sync"
+	| "not_translated"
+	| "needs_maintainer_fix";
 
 /** Outcome of evaluating an open translation pull request for a repository path */
 export interface TranslationPullRequestValidity {
@@ -28,7 +37,8 @@ export interface TranslationPullRequestValidity {
  * Decides whether an open translation PR already satisfies the workflow for a path.
  *
  * Valid when there is an open PR on the `translate/…` branch, fork content is in the
- * target language, and the PR is in sync with its base (no merge conflicts).
+ * target language, the PR is in sync with its base (no merge conflicts), and no maintainer
+ * left review feedback on the PR after the latest runner translation commit.
  */
 export class TranslationPullRequestValidityManager {
 	private readonly logger = logger.child({
@@ -117,6 +127,30 @@ export class TranslationPullRequestValidityManager {
 			};
 		}
 
+		const maintainerFeedback = await this.detectUnresolvedMaintainerFeedback(
+			openPullRequest.number,
+			branchName,
+		);
+
+		if (maintainerFeedback) {
+			this.logger.debug(
+				{
+					filePath,
+					prNumber: openPullRequest.number,
+					latestRunnerCommitAt: maintainerFeedback.latestRunnerCommitAt?.toISOString(),
+					maintainerCommentAt: maintainerFeedback.maintainerCommentAt.toISOString(),
+				},
+				"Translation pull request has maintainer feedback after the latest runner commit",
+			);
+
+			return {
+				isValid: false,
+				pullRequest: openPullRequest,
+				invalidReason: "needs_maintainer_fix",
+				pullRequestStatus,
+			};
+		}
+
 		this.logger.debug(
 			{
 				filePath,
@@ -131,5 +165,38 @@ export class TranslationPullRequestValidityManager {
 			pullRequest: openPullRequest,
 			pullRequestStatus,
 		};
+	}
+
+	/**
+	 * Detects maintainer issue comments posted after the latest runner commit on the branch.
+	 *
+	 * @param prNumber Open translation pull request number
+	 * @param branchName Fork branch backing the pull request
+	 *
+	 * @returns Feedback timing when unresolved maintainer comments exist, otherwise `undefined`
+	 */
+	private async detectUnresolvedMaintainerFeedback(prNumber: number, branchName: string) {
+		const [comments, latestRunnerCommitAt] = await Promise.all([
+			this.services.github.listPullRequestIssueComments(prNumber),
+			this.services.github.getLatestTranslationCommitTimestamp(branchName),
+		]);
+
+		if (!hasMaintainerFeedbackAfterRunnerCommit(comments, latestRunnerCommitAt)) {
+			return undefined;
+		}
+
+		const maintainerCommentAt = comments
+			.filter(
+				(comment) =>
+					latestRunnerCommitAt !== undefined &&
+					isMaintainerFeedbackComment(comment) &&
+					comment.createdAt > latestRunnerCommitAt,
+			)
+			.reduce(
+				(latest, comment) => (comment.createdAt > latest ? comment.createdAt : latest),
+				latestRunnerCommitAt ?? new Date(0),
+			);
+
+		return { latestRunnerCommitAt, maintainerCommentAt };
 	}
 }

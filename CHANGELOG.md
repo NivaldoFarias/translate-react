@@ -6,6 +6,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Added
 
+- Maintainer feedback workflow: detect member review after the latest runner commit, apply mechanical `diff`/suggestion patches or section-scoped re-translation with comment hints, then fall back to full re-translation; reuse branch and PR instead of reset.
 - pt-br fenced-code policy: locale rules, prompt scope override, and `fencePreservedDemoContent` guard for demo UI strings and React terms in code comments.
 
 ### Fixed
