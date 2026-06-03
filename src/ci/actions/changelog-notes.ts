@@ -23,7 +23,13 @@ const log = createLogger({ level: "info", logToConsole: true }).child({
 	component: "changelog-notes",
 });
 
-/** Strips a leading `v` so `v0.2.3` and `0.2.3` both resolve to a semver */
+/**
+ * Strips a leading `v` so `v0.2.3` and `0.2.3` both resolve to a semver
+ *
+ * @param tag Release tag from GitHub (with or without leading `v`)
+ *
+ * @returns Semver string without the `v` prefix
+ */
 function normalizeVersion(tag: string) {
 	return tag.startsWith("v") ? tag.slice(1) : tag;
 }

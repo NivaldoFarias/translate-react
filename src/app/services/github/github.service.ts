@@ -5,8 +5,9 @@ import type {
 	PatchedRepositoryTreeItem,
 	ProcessedFileResult,
 	PullRequestStatus,
+	RepositoryMarkdownBlob,
+	TranslationProgressFileRef,
 } from "@/app/services/github/types";
-import type { TranslationFile } from "@/app/services/translator/";
 
 import type { CommitTranslationOptions, PullRequestOptions } from "./github.content";
 import type { BaseRepositories, SharedGitHubDependencies } from "./types";
@@ -120,6 +121,8 @@ export class GitHubService {
 	 * Checks if the fork repository exists.
 	 *
 	 * If it does not exist, an error is thrown.
+	 *
+	 * @returns Resolves when the fork repo is reachable via the API
 	 */
 	public async forkExists(): Promise<void> {
 		return this.repository.forkExists();
@@ -273,7 +276,7 @@ export class GitHubService {
 	 *
 	 * @returns Translation file with upstream content and blob `sha`
 	 */
-	public async getFile(file: PatchedRepositoryTreeItem): Promise<TranslationFile> {
+	public async getFile(file: PatchedRepositoryTreeItem): Promise<RepositoryMarkdownBlob> {
 		return this.content.getFile(file);
 	}
 
@@ -336,7 +339,7 @@ export class GitHubService {
 	 */
 	public async commentCompiledResultsOnIssue(
 		results: ProcessedFileResult[],
-		filesToTranslate: TranslationFile[],
+		filesToTranslate: readonly TranslationProgressFileRef[],
 	): Promise<RestEndpointMethodTypes["issues"]["createComment"]["response"]["data"] | undefined> {
 		return this.content.commentCompiledResultsOnIssue(results, filesToTranslate);
 	}

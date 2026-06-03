@@ -100,7 +100,13 @@ export function buildFenceFunctionIdentifierRetryHint(
 	return `In fenced code blocks, do not translate or rename programming identifiers (function, class, variable, hook, and prop names as written in code). ${examples}.`;
 }
 
-/** Escapes special characters in a string for safe use inside a `RegExp` */
+/**
+ * Escapes special characters in a string for safe use inside a `RegExp`.
+ *
+ * @param value Raw substring to embed in a regex pattern
+ *
+ * @returns Literal-safe string for `RegExp` construction
+ */
 function escapeRegExp(value: string) {
 	return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

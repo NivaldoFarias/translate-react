@@ -22,6 +22,9 @@ const log = createLogger({ level: "info", logToConsole: true }).child({
 	component: "poll-upstream",
 });
 
+/**
+ *
+ */
 async function main() {
 	const context = resolveCiScriptContext();
 

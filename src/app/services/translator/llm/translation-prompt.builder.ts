@@ -42,7 +42,7 @@ export class TranslationPromptBuilder {
 	/**
 	 * @param languageDetector Resolves human-readable language names for prompts
 	 * @param locale Locale-specific translation rules embedded in prompts
-	 * @param componentLogger Optional logger override for tests
+	 * @param componentLoggerOverride Optional logger override for tests
 	 */
 	constructor(
 		private readonly languageDetector: LanguageDetectorService,
@@ -67,7 +67,7 @@ export class TranslationPromptBuilder {
 		this.getLogger().debug({ systemPromptKind }, "Generating system prompt for translation");
 
 		const languages = {
-			target: this.languageDetector.getLanguageName(LanguageDetectorService.languages.target),
+			target: this.languageDetector.getLanguageName(this.languageDetector.languages.target),
 			source: this.languageDetector.getLanguageName(documentSourceLanguage, false),
 		};
 
@@ -87,7 +87,9 @@ export class TranslationPromptBuilder {
 	 * Builds the markdown document system prompt with preservation rules and optional retry hints.
 	 *
 	 * @param params Markdown prompt parameters
-	 * @param languages Human-readable source and target language names
+	 * @param languages Human-readable language names for the prompt
+	 * @param languages.source Source language display name
+	 * @param languages.target Target language display name
 	 *
 	 * @returns The system prompt string
 	 */
@@ -165,7 +167,9 @@ export class TranslationPromptBuilder {
 	/**
 	 * Builds the system prompt for batched YAML frontmatter string translation with structured JSON output.
 	 *
-	 * @param languages Human-readable source and target language names for the TASK section
+	 * @param languages Human-readable language names for the TASK section
+	 * @param languages.source Source language display name
+	 * @param languages.target Target language display name
 	 * @param translationGuidelines Optional glossary for terminology alignment
 	 *
 	 * @returns The system prompt string for the frontmatter batch completion

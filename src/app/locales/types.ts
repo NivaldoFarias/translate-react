@@ -1,5 +1,9 @@
-import type { ProcessedFileResult, PullRequestStatus } from "@/app/services/github/types";
-import type { TranslationFile, TranslationRetryInfo } from "@/app/services/translator/";
+import type {
+	ProcessedFileResult,
+	PullRequestStatus,
+	TranslationRetryInfo,
+} from "@/app/services/github/types";
+import type { TranslationFile } from "@/app/services/translator/";
 
 export type { TranslationRetryInfo };
 

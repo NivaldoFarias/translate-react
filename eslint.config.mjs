@@ -1,6 +1,7 @@
 import { defineConfig } from "@eslint/config-helpers";
 import eslint from "@eslint/js";
 import eslintConfigPrettier from "eslint-config-prettier";
+import jsdoc from "eslint-plugin-jsdoc";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
@@ -27,11 +28,13 @@ export default defineConfig(
 		files: ["**/*.{js,cjs,mjs,ts,mts,cts,d.ts}"],
 		plugins: {
 			"@typescript-eslint": tseslint.plugin,
+			jsdoc,
 		},
 		extends: [
 			eslint.configs.recommended,
 			tseslint.configs.strictTypeChecked,
 			tseslint.configs.stylisticTypeChecked,
+			jsdoc.configs["flat/recommended-mixed"],
 		],
 		languageOptions: {
 			globals: {
@@ -59,6 +62,26 @@ export default defineConfig(
 				{ argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
 			],
 			"@typescript-eslint/restrict-template-expressions": ["error", { allowNumber: true }],
+
+			/* JSDoc */
+			"jsdoc/no-undefined-types": ["error", { disableReporting: true, markVariablesAsUsed: true }],
+			"jsdoc/tag-lines": ["error", "any", { startLines: 1 }],
+			"jsdoc/sort-tags": [
+				"error",
+				{
+					linesBetween: 1,
+					reportIntraTagGroupSpacing: true,
+					reportTagGroupSpacing: true,
+					tagSequence: [
+						{ tags: ["param", "arg", "argument"] },
+						{ tags: ["returns", "return"] },
+						{ tags: ["throws", "exception"] },
+						{ tags: ["see"] },
+						{ tags: ["example"] },
+						{ tags: ["-other"] },
+					],
+				},
+			],
 		},
 	},
 	{
@@ -71,10 +94,12 @@ export default defineConfig(
 						{
 							group: ["@/app", "@/app/**"],
 							message: "Shared code must not import the app runtime.",
+							allowTypeImports: true,
 						},
 						{
 							group: ["@/ci", "@/ci/**"],
 							message: "Shared code must not import CI helpers.",
+							allowTypeImports: true,
 						},
 					],
 				},
@@ -91,6 +116,7 @@ export default defineConfig(
 						{
 							group: ["@/ci", "@/ci/**"],
 							message: "App must not import ci helpers.",
+							allowTypeImports: true,
 						},
 					],
 				},
@@ -107,6 +133,7 @@ export default defineConfig(
 						{
 							group: ["@/app/composition", "@/app/services/runner", "@/app/services/runner/**"],
 							message: "CI must not import runner.",
+							allowTypeImports: true,
 						},
 					],
 				},
@@ -123,6 +150,13 @@ export default defineConfig(
 						{
 							group: ["@/app/services/runner", "@/app/services/runner/**"],
 							message: "GitHub layer must use @/app/services/github/types, not runner.",
+							allowTypeImports: true,
+						},
+						{
+							group: ["@/app/services/translator", "@/app/services/translator/**"],
+							message:
+								"GitHub layer must not import translator; use github/types DTOs and map in runner.",
+							allowTypeImports: true,
 						},
 					],
 				},
@@ -139,6 +173,7 @@ export default defineConfig(
 						{
 							group: ["@/app/services/runner", "@/app/services/runner/**"],
 							message: "Locales must use @/app/services/github/types, not runner.",
+							allowTypeImports: true,
 						},
 						{
 							group: [
@@ -148,6 +183,7 @@ export default defineConfig(
 							],
 							message:
 								"Import GitHubService from @/app/services/github instead of internal modules.",
+							allowTypeImports: true,
 						},
 					],
 				},
@@ -156,7 +192,9 @@ export default defineConfig(
 	},
 	{
 		files: ["tests/**"],
-		rules: {},
+		rules: Object.fromEntries(
+			Object.keys(jsdoc.rules ?? {}).map((rule) => [`jsdoc/${rule}`, "off"]),
+		),
 	},
 	{
 		files: ["*.cjs"],

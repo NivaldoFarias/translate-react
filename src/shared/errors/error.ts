@@ -72,7 +72,11 @@ export class ApplicationError<
 		Object.setPrototypeOf(this, new.target.prototype);
 	}
 
-	/** Extracts a human-readable message from the error */
+	/**
+	 * Extracts a human-readable message from the error.
+	 *
+	 * @returns Human-readable error message
+	 */
 	public get displayMessage(): string {
 		const operationSuffix = this.operation ? ` (in ${this.operation})` : "";
 

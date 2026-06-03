@@ -84,15 +84,12 @@ export class LanguageDetectorService {
 	private readonly logger = logger.child({ component: LanguageDetectorService.name });
 
 	/** Current language configuration using React language codes */
-	public static readonly languages: LanguageConfig = {
-		source: env.SOURCE_LANGUAGE,
-		target: env.TARGET_LANGUAGE,
-	};
+	public readonly languages: LanguageConfig;
 
 	/** {@link Intl.DisplayNames} instance for human-readable language names */
-	private readonly displayNames = {
-		source: new Intl.DisplayNames([env.SOURCE_LANGUAGE], { type: "language" }),
-		target: new Intl.DisplayNames([env.TARGET_LANGUAGE], { type: "language" }),
+	private readonly displayNames: {
+		source: Intl.DisplayNames;
+		target: Intl.DisplayNames;
 	};
 
 	/**
@@ -108,6 +105,24 @@ export class LanguageDetectorService {
 	private readonly TRANSLATION_THRESHOLD = TRANSLATION_RATIO_THRESHOLD;
 
 	/**
+	 * Creates a language detector for the given source and target React language codes.
+	 *
+	 * @param config Source and target language codes (defaults from validated env)
+	 */
+	constructor(
+		config: LanguageConfig = {
+			source: env.SOURCE_LANGUAGE,
+			target: env.TARGET_LANGUAGE,
+		},
+	) {
+		this.languages = config;
+		this.displayNames = {
+			source: new Intl.DisplayNames([config.source], { type: "language" }),
+			target: new Intl.DisplayNames([config.target], { type: "language" }),
+		};
+	}
+
+	/**
 	 * Gets the human-readable display name for a {@link REACT_TRANSLATION_LANGUAGES|React language code}.
 	 *
 	 * Uses {@link Intl.DisplayNames} for automatic localization support. Only works with
@@ -116,9 +131,9 @@ export class LanguageDetectorService {
 	 * @param code React language code (e.g., `"en"`, `"pt-br"`, `"zh-hans"`)
 	 * @param isTargetLanguage Whether the code is for the target language (default: `true`)
 	 *
-	 * @throws {ApplicationError} with {@link ErrorCode.LanguageCodeNotSupported} If the language code is not supported
-	 *
 	 * @returns Human-readable language name or `"Unknown"` if not found/invalid
+	 *
+	 * @throws {ApplicationError} with {@link ErrorCode.LanguageCodeNotSupported|`"LANGUAGE_CODE_NOT_SUPPORTED"`} If the language code is not supported
 	 *
 	 * @example
 	 * ```typescript
@@ -130,11 +145,8 @@ export class LanguageDetectorService {
 	public getLanguageName(code: ReactLanguageCode, isTargetLanguage = true): string {
 		const displayNames = isTargetLanguage ? this.displayNames.target : this.displayNames.source;
 		const fallbackLanguageName =
-			displayNames.of(
-				isTargetLanguage ?
-					LanguageDetectorService.languages.target
-				:	LanguageDetectorService.languages.source,
-			) ?? "Unknown";
+			displayNames.of(isTargetLanguage ? this.languages.target : this.languages.source) ??
+			"Unknown";
 
 		try {
 			this.logger.info({ code }, "Getting human-readable language name");
@@ -201,6 +213,9 @@ export class LanguageDetectorService {
 	 * @returns Resolves to a detailed {@link LanguageAnalysisResult} with confidence scores,
 	 *   translation status, detected language, and raw CLD results
 	 *
+	 * @see {@link cleanContent} for content preprocessing logic
+	 * @see {@link findLanguageScore} for confidence score calculation
+	 *
 	 * @example
 	 * ```typescript
 	 * const detector = new LanguageDetector({ source: 'en', target: 'pt-br' });
@@ -210,9 +225,6 @@ export class LanguageDetectorService {
 	 * console.log(analysis.ratio); 						// 0.85 (85% target language confidence)
 	 * console.log(analysis.detectedLanguage); 	// "pt"
 	 * ```
-	 *
-	 * @see {@link cleanContent} for content preprocessing logic
-	 * @see {@link findLanguageScore} for confidence score calculation
 	 */
 	public async analyzeLanguage(filename: string, content: string): Promise<LanguageAnalysisResult> {
 		const fallbackLanguageAnalysisResult: LanguageAnalysisResult = {
@@ -257,14 +269,8 @@ export class LanguageDetectorService {
 			const primaryLanguage = detection.languages[0];
 			const detectedLanguage = primaryLanguage?.code ?? "und";
 
-			const targetScore = this.findLanguageScore(
-				detection.languages,
-				LanguageDetectorService.languages.target,
-			);
-			const sourceScore = this.findLanguageScore(
-				detection.languages,
-				LanguageDetectorService.languages.source,
-			);
+			const targetScore = this.findLanguageScore(detection.languages, this.languages.target);
+			const sourceScore = this.findLanguageScore(detection.languages, this.languages.source);
 
 			const ratio = targetScore / (targetScore + sourceScore || 1);
 
