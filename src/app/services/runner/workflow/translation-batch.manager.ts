@@ -8,7 +8,6 @@ import type { FileProcessingProgress } from "@/app/services/runner/types";
 import type { RunnerServiceDependencies } from "../runner.types";
 
 import { PullRequestProgressAction } from "@/app/services/github/types";
-import { LanguageDetectorService } from "@/app/services/language-detector/";
 import { TranslationFile } from "@/app/services/translator/";
 import {
 	env,
@@ -21,7 +20,13 @@ import { ApplicationError, ErrorCode } from "@/shared/errors/";
 import { TranslationPullRequestValidityManager } from "./translation-pull-request-validity.manager";
 import { MAX_CONSECUTIVE_FAILURES } from "./workflow.constants";
 
-/** Returns the hostname of the configured LLM API base URL for PR metadata */
+/**
+ * Returns the hostname of the configured LLM API base URL for PR metadata.
+ *
+ * @param baseUrl LLM API base URL from environment
+ *
+ * @returns Parsed hostname, or the original string when URL parsing fails
+ */
 function resolveLlmApiHost(baseUrl: string) {
 	try {
 		return new URL(baseUrl).host;
@@ -152,7 +157,10 @@ export class TranslationBatchManager {
 	 * Processes a single batch of files concurrently.
 	 *
 	 * @param batch Files in the current batch
-	 * @param batchInfo Information about the batch's position in the overall process
+	 * @param batchInfo Batch position metadata
+	 * @param batchInfo.currentBatch One-based index of the batch being processed
+	 * @param batchInfo.totalBatches Total number of batches in the run
+	 * @param batchInfo.batchSize Number of files in this batch
 	 *
 	 * @returns Map of filename to processing result for this batch
 	 */
@@ -220,10 +228,10 @@ export class TranslationBatchManager {
 	 * @param file File to process through translation workflow
 	 * @param _progress Progress tracking information for batch processing
 	 *
-	 * @throws {ApplicationError} with {@link ErrorCode.TranslationFailed}
-	 * If circuit breaker threshold is reached due to consecutive failures
-	 *
 	 * @returns Processing result metadata including branch, translation, PR, and error info
+	 *
+	 * @throws {ApplicationError} with {@link ErrorCode.TranslationFailed|`"TRANSLATION_FAILED"`}
+	 * If circuit breaker threshold is reached due to consecutive failures
 	 */
 	private async processFile(
 		file: TranslationFile,
@@ -311,7 +319,7 @@ export class TranslationBatchManager {
 			}
 
 			const languageName = this.services.languageDetector.getLanguageName(
-				LanguageDetectorService.languages.target,
+				this.services.languageDetector.languages.target,
 			);
 
 			const commitStart = Date.now();
@@ -533,7 +541,7 @@ export class TranslationBatchManager {
 	}> {
 		const branchName = getTranslationBranchNameFromPath(file.path);
 		const languageName = this.services.languageDetector.getLanguageName(
-			LanguageDetectorService.languages.target,
+			this.services.languageDetector.languages.target,
 		);
 		const pullRequestOptions = {
 			title: this.services.locale.definitions.pullRequest.title(file),

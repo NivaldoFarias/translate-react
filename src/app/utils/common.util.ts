@@ -143,6 +143,8 @@ export function setupSignalHandlers(
  * Filters repository tree for markdown files.
  *
  * @param tree Repository tree from GitHub API
+ *
+ * @returns Tree items for translatable `.md` files under `src/`
  */
 export function filterMarkdownFiles(tree: RepositoryTreeItem[]): RepositoryTreeItem[] {
 	return tree.filter((item) => {
@@ -292,6 +294,13 @@ export function resolveGitHubActionsRunContext(
 	};
 }
 
+/**
+ * Type guard for `owner/repo` GitHub repository slugs.
+ *
+ * @param value Candidate slug from environment or config
+ *
+ * @returns `true` when `value` contains exactly one `/` with non-empty owner and repo
+ */
 function isGithubRepositorySlug(value: string | undefined): value is string {
 	if (!value) {
 		return false;

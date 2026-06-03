@@ -26,6 +26,8 @@ export class UpstreamShaVariableReader {
 	 *
 	 * @param lang Locale id (e.g. `pt-br`)
 	 *
+	 * @returns Stored upstream SHA, or `undefined` when the Actions variable is unset
+	 *
 	 * @example
 	 * ```typescript
 	 * const stored = await reader.readStoredSha("pt-br");

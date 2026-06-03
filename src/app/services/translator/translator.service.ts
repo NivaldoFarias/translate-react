@@ -808,7 +808,20 @@ export class TranslatorService {
 		});
 	}
 
-	/** @see {@link TranslationLlmClient.callLanguageModel} */
+	/**
+	 * Delegates a single LLM translation call to {@link TranslationLlmClient.callLanguageModel}.
+	 *
+	 * @param file File under translation (logging and prompt context)
+	 * @param content Optional markdown slice; defaults to `file.content`
+	 * @param chunkProgress Slice index when translating a chunked document
+	 * @param systemPromptKind Markdown body vs frontmatter batch prompt
+	 * @param responseFormat Optional structured output format for the completion
+	 * @param attemptContext Guard retry hints from prior validation failures
+	 *
+	 * @returns LLM completion text from the shared client
+	 *
+	 * @see {@link TranslationLlmClient.callLanguageModel}
+	 */
 	private callLanguageModel(
 		file: TranslationFile,
 		content?: string,

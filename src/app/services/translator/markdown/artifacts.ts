@@ -19,6 +19,8 @@ const TRAILING_FENCE_LINE = new RegExp("(\\r?\\n)[\\t ]*(```+|~~~+)\\s*$");
  * Counts consecutive newline characters from the start of `s` (treats `\r\n` as one logical break).
  *
  * @param s String whose leading newline run is measured (optional UTF-8 BOM is skipped before counting)
+ *
+ * @returns Number of leading newline characters
  */
 export function leadingNewlineRunLength(s: string): number {
 	let index = 0;
@@ -43,7 +45,11 @@ export function leadingNewlineRunLength(s: string): number {
 }
 
 /**
- * Removes the first line when it is only an opening markdown fence (` ``` ` / `~~~` with optional info string).
+ * Removes the first line when it is only an opening markdown fence (backtick or tilde fences with optional info string).
+ *
+ * @param slice Markdown fragment to trim
+ *
+ * @returns Remaining text after the opening fence line, or `null` when no leading fence is present
  */
 function stripLeadingFenceLineOnce(slice: string): string | null {
 	const match = LEADING_FENCE_LINE.exec(slice);
@@ -55,7 +61,11 @@ function stripLeadingFenceLineOnce(slice: string): string | null {
 }
 
 /**
- * Removes a trailing closing fence line when it is only a fence token (` ``` ` / `~~~`).
+ * Removes a trailing closing fence line when it is only a fence token (backtick or tilde fences).
+ *
+ * @param slice Markdown fragment to trim
+ *
+ * @returns Text before the closing fence line, or `null` when no trailing fence is present
  */
 function stripTrailingFenceLineOnce(slice: string): string | null {
 	const match = TRAILING_FENCE_LINE.exec(slice);
@@ -69,6 +79,11 @@ function stripTrailingFenceLineOnce(slice: string): string | null {
 /**
  * When the model replaced leading blank lines with a spurious fence, restores at least as many
  * leading newlines as the source had so the first MDX/markdown line matches the original layout.
+ *
+ * @param sourceMarkdown Original markdown whose leading newline prefix is the reference
+ * @param translatedMarkdown Model output that may have lost leading blank lines
+ *
+ * @returns `translatedMarkdown` padded with leading newlines to match the source prefix
  */
 function padTranslatedLeadingNewlinesToSourcePrefix(
 	sourceMarkdown: string,

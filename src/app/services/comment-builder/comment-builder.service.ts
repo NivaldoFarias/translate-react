@@ -1,13 +1,14 @@
 import type { LocaleDefinition } from "@/app/locales";
-import type { ProcessedFileResult } from "@/app/services/github/types";
+import type { ProcessedFileResult, TranslationProgressFileRef } from "@/app/services/github/types";
 
+import { PullRequestProgressAction } from "@/app/services/github/types";
 import { TranslationFile } from "@/app/services/translator/";
 import { logger, resolveGitHubActionsRunContext } from "@/app/utils/";
 
 import { selectProgressCommentPayload } from "./progress-comment.util";
 
 export interface FileEntry {
-	file: TranslationFile;
+	file: TranslationProgressFileRef;
 	prNumber: number;
 }
 
@@ -39,7 +40,7 @@ export class CommentBuilderService {
 	 *
 	 * Processes translation results and file data to create a structured comment
 	 * that organizes translated files by their directory hierarchy for better readability.
-	 * Only results with {@link PullRequestProgressAction.Created} are included (reused PRs are omitted).
+	 * Only results with {@link PullRequestProgressAction.Created|`"created"`} are included (reused PRs are omitted).
 	 *
 	 * @param results Translation processing results containing PR information
 	 * @param filesToTranslate Original files that were processed for translation
@@ -63,14 +64,14 @@ export class CommentBuilderService {
 	/**
 	 * Builds a progress-issue comment from already-filtered reportable results.
 	 *
-	 * @param reportableResults Results with {@link PullRequestProgressAction.Created}
+	 * @param reportableResults Results with {@link PullRequestProgressAction.Created|`"created"`}
 	 * @param reportableFiles Translation files matching `reportableResults`
 	 *
 	 * @returns Formatted hierarchical comment string for GitHub issue posting
 	 */
 	public buildReportableComment(
 		reportableResults: ProcessedFileResult[],
-		reportableFiles: TranslationFile[],
+		reportableFiles: readonly TranslationProgressFileRef[],
 	) {
 		const concattedData = reportableResults
 			.map((result) => {
@@ -283,7 +284,11 @@ export class CommentBuilderService {
 		return lines.join("\n");
 	}
 
-	/** Comment template for issue comments */
+	/**
+	 * Comment template for issue comments.
+	 *
+	 * @returns Locale-specific `prefix` and `suffix` strings for progress comments
+	 */
 	public get comment() {
 		return {
 			prefix: this.locale.comment.prefix(),

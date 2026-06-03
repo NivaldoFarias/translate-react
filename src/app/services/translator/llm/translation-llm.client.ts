@@ -142,9 +142,9 @@ export class TranslationLlmClient {
 	 * @param responseFormat Optional structured output format
 	 * @param attemptContext Guard hints from a failed validation attempt
 	 *
-	 * @throws {ApplicationError} When the model returns empty or truncated content
-	 *
 	 * @returns Resolves to the translated content
+	 *
+	 * @throws {ApplicationError} When the model returns empty or truncated content
 	 */
 	public async callLanguageModel(
 		file: TranslationFile,
@@ -254,9 +254,9 @@ export class TranslationLlmClient {
 	 * @param file Logical document being translated
 	 * @param batchItems Field keys and source strings to translate
 	 *
-	 * @throws {ApplicationError} When the model returns empty, truncated, or invalid JSON
-	 *
 	 * @returns Parsed envelope matching {@link frontmatterBatchTranslationEnvelopeSchema}
+	 *
+	 * @throws {ApplicationError} When the model returns empty, truncated, or invalid JSON
 	 */
 	public async callLanguageModelFrontmatterBatch(
 		file: TranslationFile,
@@ -430,6 +430,8 @@ export class TranslationLlmClient {
 	 * @param callStartTime Timestamp when the queued call started
 	 * @param contentLength Content length included in retry logs
 	 * @param attemptLabel Short label for log messages
+	 *
+	 * @returns `p-retry` `onFailedAttempt` callback that honors rate-limit reset headers
 	 */
 	private createRateLimitAwareRetryHandler(
 		file: TranslationFile,

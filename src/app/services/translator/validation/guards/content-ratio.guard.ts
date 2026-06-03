@@ -22,6 +22,11 @@ const MAX_CONTENT_RATIO = 1.4;
  * A very low ratio (< 0.65) typically indicates truncated output from the LLM
  * hitting completion token limits. A very high ratio (> 2.5) suggests the model
  * hallucinated excessive content or duplicated sections.
+ *
+ * @param source Original markdown before translation
+ * @param translated Model output to validate
+ *
+ * @returns Guard failure with retry hint, or `null` when the ratio is acceptable
  */
 export const contentRatioGuard: PostTranslationValidationGuard = (source, translated) => {
 	const sourceLength = source.trim().length;

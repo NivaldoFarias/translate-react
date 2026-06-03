@@ -67,7 +67,9 @@ export class GitHubBranch {
 	 * Tracks the branch for cleanup if created successfully.
 	 *
 	 * @param branchName Name for the new branch
-	 * @param baseBranch Branch to create from
+	 * @param baseBranch Branch to create from (fork default when omitted)
+	 *
+	 * @returns Octokit `git.createRef` response for the new branch
 	 *
 	 * @example
 	 * ```typescript
@@ -116,6 +118,8 @@ export class GitHubBranch {
 	 *
 	 * @param branchName Name of branch to retrieve
 	 *
+	 * @returns Branch ref response, or `undefined` when the branch does not exist (404)
+	 *
 	 * @example
 	 * ```typescript
 	 * const branch = await branch.getBranch('main');
@@ -151,6 +155,8 @@ export class GitHubBranch {
 	 * Always removes from tracking even if deletion fails.
 	 *
 	 * @param branchName Name of branch to delete
+	 *
+	 * @returns Octokit `git.deleteRef` response
 	 *
 	 * @example
 	 * ```typescript

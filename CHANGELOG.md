@@ -4,6 +4,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+### Fixed
+
+- `LocaleService` fails fast when a locale definition is missing instead of falling back to `pt-br`.
+- `LanguageDetectorService` reads source/target languages from instance config rather than static class fields.
+
+### Changed
+
+- GitHub content APIs return `RepositoryMarkdownBlob` DTOs; runner maps them to `TranslationFile`.
+- `TranslationRetryInfo` lives in `github/types` for workflow metadata shared across layers.
+- CI test enforces parity between `.github/locales.json` and `LocaleService` registrations.
+
 ## [0.2.5] - 2026-06-02
 
 ### Changed

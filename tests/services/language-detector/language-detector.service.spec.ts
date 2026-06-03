@@ -16,9 +16,9 @@ describe("LanguageDetector", () => {
 		test("should initialize with valid language configuration from env", () => {
 			expect(detector).toBeInstanceOf(LanguageDetectorService);
 			expect(detector.detected).toBeInstanceOf(Map);
-			expect(LanguageDetectorService.languages).toBeDefined();
-			expect(LanguageDetectorService.languages.source).toBeDefined();
-			expect(LanguageDetectorService.languages.target).toBeDefined();
+			expect(detector.languages).toBeDefined();
+			expect(detector.languages.source).toBeDefined();
+			expect(detector.languages.target).toBeDefined();
 		});
 	});
 

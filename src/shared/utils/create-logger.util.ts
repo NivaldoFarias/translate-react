@@ -17,6 +17,8 @@ export interface CreateLoggerOptions {
  * @param value Value to serialize
  * @param fieldName Field name for the truncation summary
  * @param maxLength Maximum length before truncation
+ *
+ * @returns Truncated string or original value if not a string or too short
  */
 function truncateString(
 	value: unknown,

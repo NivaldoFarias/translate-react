@@ -194,6 +194,8 @@ export class GitHubRepository {
 	/**
 	 * Checks if the fork is synchronized with upstream.
 	 *
+	 * @returns `true` when the fork default branch tip matches upstream
+	 *
 	 * @example
 	 * ```typescript
 	 * const isSynced = await repository.isForkSynced();
@@ -263,6 +265,8 @@ export class GitHubRepository {
 	 * Synchronizes the fork with the upstream repository.
 	 *
 	 * Creates a merge commit to update the fork.
+	 *
+	 * @returns `true` when the merge-upstream API call succeeds
 	 *
 	 * @example
 	 * ```typescript

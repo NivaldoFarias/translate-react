@@ -7,11 +7,11 @@ import {
 	LogLevel,
 	REACT_TRANSLATION_LANGUAGES,
 	RuntimeEnvironment,
+	TRANSLATION_GUIDELINES_CANDIDATES,
 } from "@/app/constants";
 import { createGithubTokenSchema } from "@/shared/schemas/github-token.schema";
 
 const envDefaults = resolveEnvDefaults();
-
 /** Environment configuration schema for runtime validation */
 const envSchema = z.object({
 	/** Node.js's runtime environment */
@@ -205,6 +205,8 @@ export const env = validateEnv();
  *
  * @param env Optional environment object to validate (defaults to `import.meta.env`)
  *
+ * @returns Parsed and typed environment configuration
+ *
  * @throws {Error} Detailed validation errors if environment variables are invalid
  */
 export function validateEnv(env?: Environment): Environment {
@@ -223,9 +225,11 @@ export function validateEnv(env?: Environment): Environment {
 }
 
 /**
- * Resolves the environment defaults based on the current {@link import.meta.env.NODE_ENV}.
+ * Resolves the environment defaults based on the current {@link Environment.NODE_ENV|`import.meta.env.NODE_ENV`}.
  *
- * If the environment variable is not set or is invalid, defaults to {@link RuntimeEnvironment.Development}.
+ * If the environment variable is not set or is invalid, defaults to {@link RuntimeEnvironment.Development|`"development"`}.
+ *
+ * @returns Default values for the active or fallback runtime environment
  */
 function resolveEnvDefaults(): EnvironmentSchemaDefaults {
 	const nodeEnv = import.meta.env.NODE_ENV as RuntimeEnvironment | undefined;
@@ -237,7 +241,11 @@ function resolveEnvDefaults(): EnvironmentSchemaDefaults {
 	return environmentDefaults[RuntimeEnvironment.Development];
 }
 
-/** Detects if running in test environment */
+/**
+ * Detects if running in test environment.
+ *
+ * @returns `true` when {@link Environment.NODE_ENV|`NODE_ENV`} is {@link RuntimeEnvironment.Test|`"test"`}
+ */
 function isTestEnvironment(): boolean {
 	return import.meta.env.NODE_ENV === RuntimeEnvironment.Test;
 }
@@ -246,6 +254,10 @@ function isTestEnvironment(): boolean {
  * Treats unset GitHub Actions / `.env` values as missing so schema defaults apply.
  *
  * `vars.HEADER_APP_*` and `KEY=` in `.env` often become `""`, which bypasses Zod `.default()`.
+ *
+ * @param value Raw env value from `import.meta.env` or CI inputs
+ *
+ * @returns `undefined` for empty strings so Zod defaults apply, otherwise `value`
  */
 function emptyEnvValueToUndefined(value: unknown): unknown {
 	if (value === "" || value === undefined) {
@@ -255,12 +267,24 @@ function emptyEnvValueToUndefined(value: unknown): unknown {
 	return value;
 }
 
-/** Optional env string with production defaults when unset or empty */
+/**
+ * Optional env string with production defaults when unset or empty.
+ *
+ * @param defaultValue Value used when the variable is missing or `""`
+ *
+ * @returns Zod string schema with preprocess and default
+ */
 function optionalEnvString(defaultValue: string) {
 	return z.preprocess(emptyEnvValueToUndefined, z.string().optional().default(defaultValue));
 }
 
-/** Optional env URL with production defaults when unset or empty */
+/**
+ * Optional env URL with production defaults when unset or empty.
+ *
+ * @param defaultValue URL used when the variable is missing or `""`
+ *
+ * @returns Zod URL schema with preprocess and default
+ */
 function optionalEnvUrl(defaultValue: string) {
 	return z.preprocess(emptyEnvValueToUndefined, z.url().optional().default(defaultValue));
 }

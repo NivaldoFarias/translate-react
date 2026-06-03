@@ -7,6 +7,7 @@ import { ptBrLocale, ruLocale } from "@/app/locales";
 import { LocaleService } from "@/app/services/locale/locale.service";
 import { TranslationFile } from "@/app/services/translator/translation-file";
 import { buildRunnerReleaseUrl } from "@/app/utils/common.util";
+import { ApplicationError } from "@/shared/errors/";
 
 import { createProcessedFileResultsFixture } from "@tests/fixtures";
 
@@ -52,8 +53,11 @@ describe("LocaleService", () => {
 			expect(localeService.definitions).toBe(ptBrLocale);
 		});
 
-		test("should fallback to pt-br when language is not registered", () => {
-			expect(localeService.definitions).toBe(ptBrLocale);
+		test("throws when language is not registered", () => {
+			expect(() => {
+				// @ts-expect-error - exercising unregistered locale code
+				new LocaleService("es");
+			}).toThrow(ApplicationError);
 		});
 	});
 
