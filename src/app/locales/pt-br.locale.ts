@@ -90,7 +90,13 @@ export const ptBrLocale: LocaleDefinition = {
 - ALWAYS translate 'deprecated' and related terms (deprecation, deprecating, deprecates) to 'descontinuado(a)', 'descontinuada', 'obsoleto(a)' or 'obsoleta' in ALL contexts (documentation text, comments, headings, lists, etc.)
 	- Exception: Do NOT translate 'deprecated' in HTML comment IDs like {/*deprecated-something*/} - keep these exactly as-is
 	- Exception: Do NOT translate 'deprecated' in URLs, anchor links, or code variable names
-- When a MDN document is referenced, update the language slug to the Brazilian Portuguese version ('https://developer.mozilla.org/<slug>/*' => 'https://developer.mozilla.org/pt-BR/*')`,
+- When a MDN document is referenced, update the language slug to the Brazilian Portuguese version ('https://developer.mozilla.org/<slug>/*' => 'https://developer.mozilla.org/pt-BR/*')
+
+## FENCED CODE AND MDX (pt-br.react.dev)
+- Inside fenced code blocks: do NOT translate string literals or JSX text used as demo UI copy (labels like \`Created at:\`, button text, \`<h1>\` headings in examples). Copy them exactly from the source in English.
+- Keep React API vocabulary in \`//\` and \`/* */\` code comments in English (\`state\`, \`effect\`, \`ref\`, \`props\`, \`reducer\`, \`dispatch\`, \`context\`, \`memo\`, \`render\`, \`suspense\`, etc.) unless the translation guidelines explicitly map the term.
+- When you translate a code comment into Portuguese, translate the full comment. Do not mix English words into Portuguese sentences except for official API names from the list above.
+- \`<ConsoleLogLine>\` and similar MDX console output: keep message text in English to match runtime console output; do not localize error strings.`,
 	},
 	pullRequest: {
 		title: (file: TranslationFile) => `Tradução de \`${file.filename}\` para Português (Brasil)`,
