@@ -38,7 +38,10 @@ import {
 	mergePreservedYamlFrontmatter,
 	splitLeadingYamlFrontmatter,
 } from "./markdown/frontmatter";
-import { emptyTranslationAttemptContext } from "./pipeline/translation-attempt.context";
+import {
+	emptyTranslationAttemptContext,
+	translationAttemptContextFromHints,
+} from "./pipeline/translation-attempt.context";
 import { TranslationPipelineManager } from "./pipeline/translation-pipeline.manager";
 import { validateAndReassembleChunks } from "./postprocess/chunk-reassembly";
 import { cleanupTranslatedContent } from "./postprocess/translation-output-cleanup";
@@ -55,6 +58,12 @@ export type {
 } from "./llm/translation-system-prompt.types";
 
 export type { TranslationRetryInfo } from "./validation/validation.types";
+
+/** Optional inputs for {@link TranslatorService.translateContent} */
+export interface TranslateContentOptions {
+	/** Extra retry hints from maintainer review (section-scoped remediation) */
+	readonly validationRetryHints?: readonly string[];
+}
 
 /** Result from translating a file, including retry metadata */
 export interface TranslationResult {
@@ -340,6 +349,7 @@ export class TranslatorService {
 	 * 8. Cleans up and returns translated content
 	 *
 	 * @param file File containing content to translate
+	 * @param options Optional maintainer retry hints for the first attempt
 	 *
 	 * @returns Promise resolving to translated content
 	 *
@@ -358,7 +368,10 @@ export class TranslatorService {
 	 * console.log(translated); // '# Olá\n\nBem-vindo ao React!'
 	 * ```
 	 */
-	public async translateContent(file: TranslationFile): Promise<TranslationResult> {
+	public async translateContent(
+		file: TranslationFile,
+		options?: TranslateContentOptions,
+	): Promise<TranslationResult> {
 		file.logger.info({ file: file.getLogContext() }, "Translating content for file");
 
 		if (!file.content.length) {
@@ -418,10 +431,16 @@ export class TranslatorService {
 		const sourceBodyForArtifacts =
 			fileBodySplit.rest.length > 0 ? fileBodySplit.rest : file.content;
 
+		const initialAttemptContext =
+			options?.validationRetryHints?.length ?
+				translationAttemptContextFromHints(options.validationRetryHints)
+			:	emptyTranslationAttemptContext();
+
 		const pipelineResult = await this.managers.pipeline.translateWithValidationRetries({
 			file,
 			translateBody: (attemptContext) =>
 				this.translateMarkdownBody(translationWorkFile, attemptContext),
+			initialAttemptContext,
 			finalizeTranslation: async (bodyTranslation) => {
 				let finalized = bodyTranslation;
 
