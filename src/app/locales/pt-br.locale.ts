@@ -102,7 +102,11 @@ export const ptBrLocale: LocaleDefinition = {
 - Apply upstream \`GLOSSARY.md\` terms consistently in every section and chunk (e.g. "reset" → "redefinir", not "resetar"; "troubleshooting" → "Solução de Problemas" with capital P in headings).
 - Keep official product names in English when cited: "React Server Components", "React Flight" / "Flight" (never "Voo"), "Effect Event" (prefer "Evento de Effect" or English; never "Evento de Efeito").
 - "opt-out" means opting out of a feature: use "desativar" or keep "opt-out"; never "otimizar para fora".
-- Use one Portuguese rendering per English concept in the same file (do not mix "lógica" and "lógica de conexão" for "wiring").`,
+- Use one Portuguese rendering per English concept in the same file (do not mix "lógica" and "lógica de conexão" for "wiring").
+
+## HEADINGS (pt-br.react.dev)
+- Use Portuguese sentence case in headings: capitalize only the first word and proper nouns (React, JSX, DOM, product names). Do not use English Title Case on common words (e.g. "Novos recursos do React", not "Novos Recursos do React").
+- Preserve every markdown link as \`[label](same-url)\` with balanced brackets; translate link text inside brackets only.`,
 	},
 	pullRequest: {
 		title: (file: TranslationFile) => `Tradução de \`${file.filename}\` para Português (Brasil)`,
