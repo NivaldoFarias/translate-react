@@ -110,6 +110,24 @@ export interface PatchedRepositoryTreeItem extends SetRequired<RepositoryTreeIte
 	filename: string;
 }
 
+/** Normalized pull request issue comment for maintainer-feedback detection */
+export interface PullRequestIssueCommentSnapshot {
+	/** GitHub login of the comment author */
+	readonly login: string;
+
+	/** GitHub `author_association` for the comment */
+	readonly authorAssociation: string;
+
+	/** GitHub user `type` (`User`, `Bot`, etc.) */
+	readonly userType: string;
+
+	/** When the comment was created */
+	readonly createdAt: Date;
+
+	/** Issue comment body markdown */
+	readonly body: string;
+}
+
 /** Pull request mergeability and conflict status */
 export interface PullRequestStatus {
 	/** Whether the PR has actual merge conflicts (dirty state) */
