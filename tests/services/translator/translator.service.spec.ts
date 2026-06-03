@@ -472,7 +472,7 @@ describe("TranslatorService", () => {
 			expect(result.content).toContain("title:");
 		});
 
-		test("should log warning when links are lost during translation", async () => {
+		test("should fail validation when links are lost during translation", () => {
 			const title = "Title";
 			const sourceContent = `# Title\n\n[Link 1](https://example.com/1)\n[Link 2](https://example.com/2)\n[Link 3](https://example.com/3)`;
 			const translatedContent = `# Título\n\nTexto traduzido sem links mas com conteúdo suficiente para manter a razão de conteúdo aceitável`;
@@ -480,13 +480,11 @@ describe("TranslatorService", () => {
 			queueOpenAiTranslationResponses(translatedContent);
 
 			const file = createTranslationFileFixture({ content: sourceContent }, title);
-			const warnSpy = spyOn(file.logger, "warn");
-			await translatorService.translateContent(file);
 
-			expect(warnSpy).toHaveBeenCalled();
+			expect(translatorService.translateContent(file)).rejects.toThrow(ApplicationError);
 		});
 
-		test("should log warning when link count differs significantly (>20%)", async () => {
+		test("should fail validation when required link URLs are missing", () => {
 			const title = "Title";
 			const sourceContent = `# Title\n\n[1](u1) [2](u2) [3](u3) [4](u4) [5](u5)`;
 			const translatedContent = `# Título\n\n[1](u1) [2](u2) [3](u3)`;
@@ -494,10 +492,8 @@ describe("TranslatorService", () => {
 			queueOpenAiTranslationResponses(translatedContent);
 
 			const file = createTranslationFileFixture({ content: sourceContent }, title);
-			const warnSpy = spyOn(file.logger, "warn");
-			await translatorService.translateContent(file);
 
-			expect(warnSpy).toHaveBeenCalled();
+			expect(translatorService.translateContent(file)).rejects.toThrow(ApplicationError);
 		});
 
 		test("should not throw Error when source has no links", () => {
@@ -511,10 +507,10 @@ describe("TranslatorService", () => {
 			expect(translatorService.translateContent(file)).resolves.not.toThrow(ApplicationError);
 		});
 
-		test("should not throw Error when link ratio is within acceptable range", () => {
+		test("should not throw Error when every source link URL is preserved", () => {
 			const title = "Title";
 			const sourceContent = `# Title\n\n[1](u1) [2](u2) [3](u3) [4](u4) [5](u5)`;
-			const translatedContent = `# Título\n\n[1](u1) [2](u2) [3](u3) [4](u4)`;
+			const translatedContent = `# Título\n\n[1](u1) [2](u2) [3](u3) [4](u4) [5](u5)`;
 
 			queueOpenAiTranslationResponses(translatedContent);
 

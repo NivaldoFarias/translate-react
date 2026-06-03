@@ -11,17 +11,20 @@ import { fencePreservedDemoContentGuard } from "./fence-preserved-demo-content.g
 import { frontmatterPreservedGuard } from "./frontmatter-preserved.guard";
 import { glossaryTerminologyGuard } from "./glossary-terminology.guard";
 import { headingsPreservedGuard } from "./headings-preserved.guard";
+import { markdownLinksPreservedGuard } from "./markdown-links-preserved.guard";
 import { nonEmptyContentGuard } from "./non-empty-content.guard";
+import { ptBrHeadingSentenceCaseGuard } from "./pt-br-heading-sentence-case.guard";
 
 /** Ordered post-translation guards; each may contribute one retry hint */
 export const POST_TRANSLATION_VALIDATION_GUARDS = [
 	nonEmptyContentGuard,
 	contentRatioGuard,
 	headingsPreservedGuard,
+	markdownLinksPreservedGuard,
 	frontmatterPreservedGuard,
 	fenceFunctionIdentifiersGuard,
 	...(env.TARGET_LANGUAGE === "pt-br" ?
-		[fencePreservedDemoContentGuard, glossaryTerminologyGuard]
+		[fencePreservedDemoContentGuard, glossaryTerminologyGuard, ptBrHeadingSentenceCaseGuard]
 	:	[]),
 ] as const;
 
