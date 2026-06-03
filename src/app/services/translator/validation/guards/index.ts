@@ -1,7 +1,10 @@
 import type { TranslationValidationIssue } from "../validation.types";
 
+import { env } from "@/app/utils/";
+
 import { contentRatioGuard } from "./content-ratio.guard";
 import { fenceFunctionIdentifiersGuard } from "./fence-function-identifiers.guard";
+import { fencePreservedDemoContentGuard } from "./fence-preserved-demo-content.guard";
 import { frontmatterPreservedGuard } from "./frontmatter-preserved.guard";
 import { headingsPreservedGuard } from "./headings-preserved.guard";
 import { nonEmptyContentGuard } from "./non-empty-content.guard";
@@ -13,6 +16,7 @@ export const POST_TRANSLATION_VALIDATION_GUARDS = [
 	headingsPreservedGuard,
 	frontmatterPreservedGuard,
 	fenceFunctionIdentifiersGuard,
+	...(env.TARGET_LANGUAGE === "pt-br" ? [fencePreservedDemoContentGuard] : []),
 ] as const;
 
 /**

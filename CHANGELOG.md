@@ -4,6 +4,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+### Added
+
+- pt-br fenced-code policy: locale rules, prompt scope override, and `fencePreservedDemoContent` guard for demo UI strings and React terms in code comments.
+
 ### Fixed
 
 - `LocaleService` fails fast when a locale definition is missing instead of falling back to `pt-br`.

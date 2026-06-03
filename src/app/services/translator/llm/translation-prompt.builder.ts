@@ -127,10 +127,7 @@ export class TranslationPromptBuilder {
 				4. **Whitespace Integrity**: ALWAYS preserve blank lines, especially after horizontal rules (---). The pattern '---\n\n##' must remain '---\n\n##' and never become '---\n##'
 	
 				# TRANSLATION GUIDELINES
-				## What to Translate
-				- Natural language text and documentation content
-				- Code comments and string literals (when they contain user-facing text)
-				- Alt text, titles, and descriptive content
+				${this.buildMarkdownTranslationScopeSection()}
 	
 				## What NOT to Translate
 				- API endpoints; URLs, paths, and configuration values; technical terms unless the translation guidelines map them
@@ -225,6 +222,36 @@ export class TranslationPromptBuilder {
 				A previous translation of this content was rejected. Apply every correction below in a new full translation of the user message:
 				${attemptContext.validationRetryHints.map((hint) => `- ${hint}`).join("\n")}
 				`;
+	}
+
+	/**
+	 * Builds the "What to Translate" scope for markdown body translation.
+	 *
+	 * pt-br uses stricter fenced-code rules aligned with pt-br.react.dev; other locales keep the default scope.
+	 *
+	 * @returns Markdown bullet sections for translation scope
+	 */
+	private buildMarkdownTranslationScopeSection() {
+		if (this.locale.languageCode === "pt-br") {
+			return `
+				## What to Translate
+				- Natural language text and documentation content outside fenced code blocks
+				- Alt text, titles, and descriptive content in prose
+	
+				## Fenced code blocks and MDX in examples
+				- Do NOT translate demo UI strings: quoted literals and JSX text between tags inside fenced code. Copy them exactly from the source.
+				- Keep programming identifiers unchanged in every fenced block.
+				- For \`//\` and \`/* */\` comments in fenced code, follow the locale-specific fenced-code rules below (React API terms stay in English; translate full comment text when translating).
+				- Keep \`<ConsoleLogLine>\` and similar MDX console message text in English to match runtime output.
+			`;
+		}
+
+		return `
+				## What to Translate
+				- Natural language text and documentation content
+				- Code comments and string literals (when they contain user-facing text)
+				- Alt text, titles, and descriptive content
+			`;
 	}
 
 	private getLogger() {
