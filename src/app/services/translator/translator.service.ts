@@ -180,7 +180,9 @@ export class TranslatorService {
 		this.managers = {
 			chunks: new ChunksManager(this.model),
 			pipeline: new TranslationPipelineManager(),
-			validation: new PostTranslationValidationService(),
+			validation: new PostTranslationValidationService({
+				getTranslationGuidelines: () => this.translationGuidelines,
+			}),
 			languageCheck: new TranslationLanguageCheck(this.services.languageDetector),
 		};
 		this.promptBuilder = new TranslationPromptBuilder(

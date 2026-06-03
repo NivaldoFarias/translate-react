@@ -10,10 +10,17 @@ export interface TranslationValidationIssue extends TranslationRetryInfo {
 	retryHint: string;
 }
 
+/** Optional context for post-translation guards */
+export interface PostTranslationValidationOptions {
+	/** Upstream glossary markdown (`GLOSSARY.md`) when loaded */
+	readonly translationGuidelines?: string | null;
+}
+
 /**
  * Post-translation check that may return a retryable issue with an LLM hint.
  */
 export type PostTranslationValidationGuard = (
 	sourceContent: string,
 	translatedContent: string,
+	options?: PostTranslationValidationOptions,
 ) => TranslationValidationIssue | null;
