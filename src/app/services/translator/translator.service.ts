@@ -28,7 +28,7 @@ import {
 import { ApplicationError, ErrorCode, isCompletionLengthTruncationError } from "@/shared/errors/";
 
 import { ChunksManager } from "./chunking";
-import { CHUNKS, SYSTEM_PROMPT_TOKEN_RESERVE } from "./chunking/chunking.constants";
+import { SYSTEM_PROMPT_TOKEN_RESERVE } from "./chunking/chunking.constants";
 import { TranslationLlmClient } from "./llm/translation-llm.client";
 import { TranslationPromptBuilder } from "./llm/translation-prompt.builder";
 import { stripSpuriousOuterMarkdownFencesWhenSourceHadNoFences } from "./markdown/artifacts";
@@ -41,13 +41,10 @@ import {
 import {
 	emptyTranslationAttemptContext,
 	translationAttemptContextFromHints,
+	translationAttemptContextFromMaintainerReview,
 } from "./pipeline/translation-attempt.context";
 import { TranslationPipelineManager } from "./pipeline/translation-pipeline.manager";
 import { validateAndReassembleChunks } from "./postprocess/chunk-reassembly";
-import {
-	buildChunkTerminologyRetryHints,
-	findChunkTerminologyConsistencyDrift,
-} from "./postprocess/chunk-terminology-consistency";
 import { cleanupTranslatedContent } from "./postprocess/translation-output-cleanup";
 import { TranslationFile } from "./translation-file";
 import { CONNECTIVITY_TEST_MAX_TOKENS, LLM_TEMPERATURE } from "./translator.constants";
@@ -65,8 +62,11 @@ export type { TranslationRetryInfo } from "./validation/validation.types";
 
 /** Optional inputs for {@link TranslatorService.translateContent} */
 export interface TranslateContentOptions {
-	/** Extra retry hints from maintainer review (section-scoped remediation) */
+	/** Extra retry hints (e.g. from a prior validation pass) */
 	readonly validationRetryHints?: readonly string[];
+
+	/** Maintainer PR review bodies to include in the translation system prompt */
+	readonly maintainerFeedbackComments?: readonly string[];
 }
 
 /** Result from translating a file, including retry metadata */
@@ -437,10 +437,23 @@ export class TranslatorService {
 		const sourceBodyForArtifacts =
 			fileBodySplit.rest.length > 0 ? fileBodySplit.rest : file.content;
 
-		const initialAttemptContext =
-			options?.validationRetryHints?.length ?
-				translationAttemptContextFromHints(options.validationRetryHints)
-			:	emptyTranslationAttemptContext();
+		const maintainerComments = options?.maintainerFeedbackComments?.filter(
+			(body) => body.trim().length > 0,
+		);
+		const validationHints = options?.validationRetryHints ?? [];
+
+		const initialAttemptContext = (() => {
+			if (maintainerComments && maintainerComments.length > 0) {
+				const base = translationAttemptContextFromMaintainerReview(maintainerComments);
+				return validationHints.length > 0 ?
+						translationAttemptContextFromHints(validationHints, base)
+					:	base;
+			}
+
+			return validationHints.length > 0 ?
+					translationAttemptContextFromHints(validationHints)
+				:	emptyTranslationAttemptContext();
+		})();
 
 		const pipelineResult = await this.managers.pipeline.translateWithValidationRetries({
 			file,
@@ -670,15 +683,8 @@ export class TranslatorService {
 			"Content split into chunks",
 		);
 
-		let translatedChunks = await Promise.all(
+		const translatedChunks = await Promise.all(
 			chunks.map((chunk, index) => this.translateChunk(file, chunk, index, chunks, attemptContext)),
-		);
-
-		translatedChunks = await this.retryChunksWithTerminologyDrift(
-			file,
-			chunks,
-			translatedChunks,
-			attemptContext,
 		);
 
 		file.logger.debug(
@@ -691,80 +697,6 @@ export class TranslatorService {
 			translated: translatedChunks,
 			separators,
 		});
-	}
-
-	/**
-	 * Re-translates only slices that disagree on pt-br terminology after the initial chunk pass.
-	 *
-	 * @param file File under translation
-	 * @param sourceChunks Original markdown slices
-	 * @param translatedChunks Current translated slices
-	 * @param attemptContext Pipeline guard hints to preserve across slice retries
-	 *
-	 * @returns Updated translated slices (unchanged when drift is absent or locale is not pt-br)
-	 */
-	private async retryChunksWithTerminologyDrift(
-		file: TranslationFile,
-		sourceChunks: readonly string[],
-		translatedChunks: readonly string[],
-		attemptContext: TranslationAttemptContext,
-	) {
-		if (env.TARGET_LANGUAGE !== "pt-br" || sourceChunks.length < 2) {
-			return [...translatedChunks];
-		}
-
-		let currentChunks = [...translatedChunks];
-
-		for (let pass = 1; pass < CHUNKS.terminologyConsistencyMaxPasses; pass++) {
-			const drifts = findChunkTerminologyConsistencyDrift(sourceChunks, currentChunks);
-			if (drifts.length === 0) break;
-
-			const chunkIndices = [
-				...new Set(drifts.flatMap((drift) => drift.offendingChunkIndices)),
-			].sort((left, right) => left - right);
-
-			const driftHints = buildChunkTerminologyRetryHints(drifts);
-			const sliceAttemptContext = translationAttemptContextFromHints([
-				...attemptContext.validationRetryHints,
-				...driftHints,
-			]);
-
-			file.logger.warn(
-				{
-					pass,
-					maxPasses: CHUNKS.terminologyConsistencyMaxPasses,
-					chunkIndices,
-					driftCount: drifts.length,
-				},
-				"Chunk terminology drift detected; re-translating affected slices",
-			);
-
-			const retried = await Promise.all(
-				chunkIndices.map(async (index) => {
-					const sourceChunk = sourceChunks[index];
-					if (sourceChunk === undefined) return currentChunks[index] ?? "";
-
-					return this.translateChunk(
-						file,
-						sourceChunk,
-						index,
-						[...sourceChunks],
-						sliceAttemptContext,
-					);
-				}),
-			);
-
-			const nextChunks = [...currentChunks];
-			for (const [offset, index] of chunkIndices.entries()) {
-				const translated = retried[offset];
-				if (translated !== undefined) {
-					nextChunks[index] = translated;
-				}
-			}
-			currentChunks = nextChunks;
-		}
-
-		return currentChunks;
 	}
 
 	/** Reduction factor for re-chunking when a chunk hits completion token limits */

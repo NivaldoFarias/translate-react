@@ -100,6 +100,7 @@ export class TranslationPipelineManager {
 
 			attemptContext = translationAttemptContextFromHints(
 				validationIssues.map((issue) => issue.retryHint),
+				attemptContext,
 			);
 
 			file.logger.warn(

@@ -111,6 +111,7 @@ export class TranslationPromptBuilder {
 				`
 			:	"";
 
+		const maintainerReviewSection = this.buildMaintainerReviewSection(params.attemptContext);
 		const validationRetrySection = this.buildValidationRetrySection(params.attemptContext);
 
 		const builtSystemPrompt = `# ROLE
@@ -119,6 +120,7 @@ export class TranslationPromptBuilder {
 				# TASK
 				Translate the provided content from ${languages.source} to ${languages.target} with absolute precision and technical accuracy.
 				${chunkSliceSection}
+				${maintainerReviewSection}
 				${validationRetrySection}
 				# CRITICAL PRESERVATION RULES
 				1. **Structure & Formatting**: Preserve ALL markdown syntax, HTML tags, code blocks, frontmatter, and line breaks exactly as written
@@ -225,25 +227,44 @@ export class TranslationPromptBuilder {
 	}
 
 	/**
+	 * Builds the maintainer review section for re-translations after human feedback on a PR.
+	 *
+	 * @param attemptContext Attempt context with maintainer comment bodies
+	 *
+	 * @returns Markdown section for the system prompt, or empty when no comments
+	 */
+	public buildMaintainerReviewSection(attemptContext: TranslationAttemptContext) {
+		const comments = attemptContext.maintainerReviewComments ?? [];
+		if (comments.length === 0) return "";
+
+		const formattedComments = comments
+			.map((body, index) => {
+				const trimmed = body.trim();
+				if (comments.length === 1) return trimmed;
+
+				return `### Review note ${index + 1}\n\n${trimmed}`;
+			})
+			.join("\n\n");
+
+		return `
+				# MAINTAINER REVIEW (previous automated translation)
+				A repository maintainer reviewed the last automated translation on the pull request and reported problems. The user message is still the English source; produce a new ${this.languageDetector.getLanguageName(this.languageDetector.languages.target)} translation that fixes every issue below.
+				
+				${formattedComments}
+				`;
+	}
+
+	/**
 	 * Builds the "What to Translate" scope for markdown body translation.
 	 *
-	 * pt-br uses stricter fenced-code rules aligned with pt-br.react.dev; other locales keep the default scope.
+	 * Locales may override the default scope via {@link LocaleRulesConfig.markdownTranslationScopeSection}.
 	 *
 	 * @returns Markdown bullet sections for translation scope
 	 */
 	private buildMarkdownTranslationScopeSection() {
-		if (this.locale.languageCode === "pt-br") {
-			return `
-				## What to Translate
-				- Natural language text and documentation content outside fenced code blocks
-				- Alt text, titles, and descriptive content in prose
-	
-				## Fenced code blocks and MDX in examples
-				- Do NOT translate demo UI strings: quoted literals and JSX text between tags inside fenced code. Copy them exactly from the source.
-				- Keep programming identifiers unchanged in every fenced block.
-				- For \`//\` and \`/* */\` comments in fenced code, follow the locale-specific fenced-code rules below (React API terms stay in English; translate full comment text when translating).
-				- Keep \`<ConsoleLogLine>\` and similar MDX console message text in English to match runtime output.
-			`;
+		const localeScope = this.locale.definitions.rules.markdownTranslationScopeSection;
+		if (localeScope) {
+			return localeScope;
 		}
 
 		return `

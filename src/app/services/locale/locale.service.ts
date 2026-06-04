@@ -10,13 +10,9 @@ import { ApplicationError, ErrorCode } from "@/shared/errors/";
  *
  * @example
  * ```typescript
- * // Via DI (preferred for services requiring testability)
- * const localeService = new LocaleService('pt-br');
- * const commentPrefix = localeService.locale.comment.prefix;
- *
- * // Via static accessor (simpler, uses env.TARGET_LANGUAGE)
- * const locale = LocaleService.get();
- * const rules = locale.rules.specific;
+ * const localeService = new LocaleService(env.TARGET_LANGUAGE);
+ * const commentPrefix = localeService.definitions.comment.prefix();
+ * const rules = localeService.definitions.rules.specific;
  * ```
  */
 export class LocaleService {

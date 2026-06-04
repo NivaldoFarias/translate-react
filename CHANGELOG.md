@@ -6,11 +6,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Added
 
-- Maintainer feedback workflow: detect member review after the latest runner commit, apply mechanical `diff`/suggestion patches or section-scoped re-translation with comment hints, then fall back to full re-translation; reuse branch and PR instead of reset.
-- pt-br fenced-code policy: locale rules, prompt scope override, and `fencePreservedDemoContent` guard for demo UI strings and React terms in code comments.
-- pt-br glossary terminology: `glossaryTerminology` guard with glossary parsing, protected product names, intra-document consistency checks, and locale prompt rules.
-- Markdown link and pt-br heading guards: `markdownLinksPreserved` for `[text](url)` integrity, `ptBrHeadingSentenceCase` for sentence-case headings, plus locale prompt rules.
-- Chunk reassembly terminology audit: after chunked pt-br translation, detect cross-slice terminology drift and re-translate only affected slices with targeted hints before full-document validation.
+- Maintainer feedback detection: invalidate open translation PRs when a member comments after the latest runner commit, then full re-translate on the existing branch and PR with those comments in the LLM system prompt.
+- pt-br translation rules in `pt-br.locale.ts` (fenced-code policy, terminology from maintainer review, heading sentence case, link preservation) plus a markdown scope override for document prompts.
+- `markdownLinksPreserved` post-translation guard for `[text](url)` integrity across locales.
+- `contentRatio` post-translation guard (70%–140% of source length) with retry metadata in PR bodies.
 
 ### Fixed
 

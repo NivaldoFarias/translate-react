@@ -112,7 +112,7 @@ describe("TranslationBatchManager", () => {
 			expect(github.createPullRequest).toHaveBeenCalled();
 		});
 
-		test("applies mechanical maintainer diff without full re-translation", async () => {
+		test("runs full re-translation when maintainer left feedback after the runner commit", async () => {
 			const github = createMockGitHubService();
 			const translator = createMockTranslatorService();
 			const languageDetector = createMockLanguageDetectorService();
@@ -170,9 +170,12 @@ describe("TranslationBatchManager", () => {
 
 			const results = await manager.processBatches([file], 1);
 
-			expect(translator.translateContent).not.toHaveBeenCalled();
+			expect(translator.translateContent).toHaveBeenCalledWith(file, {
+				maintainerFeedbackComments: [diffComment],
+			});
 			expect(github.commitTranslation).toHaveBeenCalled();
-			expect(results.get(file.filename)?.translation).toContain("Solução de Problemas");
+			expect(github.createPullRequest).not.toHaveBeenCalled();
+			expect(results.get(file.filename)?.pullRequest).toEqual(existingPR);
 		});
 
 		test("reprocesses maintainer feedback without closing the pull request or resetting the branch", async () => {
