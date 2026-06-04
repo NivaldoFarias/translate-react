@@ -10,6 +10,7 @@ import type { TranslationFile } from "@/app/services/translator/translation-file
 import type { FrontmatterBatchFieldKey } from "@/app/services/translator/translator-frontmatter-batch.schema";
 
 import type { TranslationLlmClientDependencies } from "./translation-llm.client.types";
+import type { TranslationLlmUsageSnapshot } from "./translation-llm.usage";
 import type {
 	ChunkTranslationProgress,
 	TranslationSystemPromptKind,
@@ -24,6 +25,17 @@ import { ApplicationError, ErrorCode } from "@/shared/errors/";
 
 import { emptyTranslationAttemptContext } from "../pipeline/translation-attempt.context";
 import { LLM_TEMPERATURE } from "../translator.constants";
+
+import { extractTranslationLlmUsageFromCompletion } from "./translation-llm.usage";
+
+/** LLM completion text plus optional usage for run statistics */
+export interface TranslationLlmCallResult {
+	/** Model output text */
+	content: string;
+
+	/** Token and cost usage when the provider returned it */
+	usage: TranslationLlmUsageSnapshot | null;
+}
 
 /** Structured-output schema for batched YAML `description` translation (OpenRouter/OpenAI JSON mode). */
 const FRONTMATTER_BATCH_RESPONSE_FORMAT = zodResponseFormat(
@@ -217,19 +229,22 @@ export class TranslationLlmClient {
 							);
 						}
 
+						const usage = extractTranslationLlmUsageFromCompletion(completion.usage);
+
 						file.logger.debug(
 							{
 								model: this.model,
 								durationMs: Date.now() - attemptStartTime,
-								inputTokens: completion.usage?.prompt_tokens,
-								outputTokens: completion.usage?.completion_tokens,
-								totalTokens: completion.usage?.total_tokens,
+								inputTokens: usage?.promptTokens,
+								outputTokens: usage?.completionTokens,
+								totalTokens: usage?.totalTokens,
+								costUsd: usage?.costUsd,
 								translatedLength: translatedContent.length,
 							},
 							"LLM API call successful",
 						);
 
-						return translatedContent;
+						return { content: translatedContent, usage };
 					} catch (error) {
 						this.rethrowNonRetryableApiError(error, file);
 						throw error;
@@ -358,19 +373,22 @@ export class TranslationLlmClient {
 							);
 						}
 
+						const usage = extractTranslationLlmUsageFromCompletion(completion.usage);
+
 						file.logger.debug(
 							{
 								model: this.model,
 								durationMs: Date.now() - attemptStartTime,
-								inputTokens: completion.usage?.prompt_tokens,
-								outputTokens: completion.usage?.completion_tokens,
-								totalTokens: completion.usage?.total_tokens,
+								inputTokens: usage?.promptTokens,
+								outputTokens: usage?.completionTokens,
+								totalTokens: usage?.totalTokens,
+								costUsd: usage?.costUsd,
 								fieldCount: parsedEnvelope.data.items.length,
 							},
 							"LLM frontmatter batch call successful",
 						);
 
-						return parsedEnvelope.data;
+						return { envelope: parsedEnvelope.data, usage };
 					} catch (error) {
 						if (error instanceof SyntaxError) {
 							throw new ApplicationError(

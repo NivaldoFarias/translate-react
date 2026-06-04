@@ -128,7 +128,18 @@ export function createMockGitHubService() {
  */
 export function createMockTranslatorService() {
 	return {
-		translateContent: mock(() => Promise.resolve({ content: "Conteúdo traduzido", retries: [] })),
+		translateContent: mock(() =>
+			Promise.resolve({
+				content: "Conteúdo traduzido",
+				reviewerNotices: [],
+				llmUsage: {
+					promptTokens: 0,
+					completionTokens: 0,
+					totalTokens: 0,
+					costUsd: null,
+				},
+			}),
+		),
 		isContentTranslated: mock(() => Promise.resolve(false)),
 		testConnectivity: mock(() => Promise.resolve()),
 		getLanguageAnalysis: mock(() =>

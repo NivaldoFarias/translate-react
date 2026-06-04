@@ -12,12 +12,16 @@ import type {
 } from "@/app/services/openrouter/";
 
 import type {
+	TranslationLlmUsageSnapshot,
+	TranslationLlmUsageTotals,
+} from "./llm/translation-llm.usage";
+import type {
 	ChunkTranslationProgress,
 	TranslationSystemPromptKind,
 } from "./llm/translation-system-prompt.types";
 import type { TranslationAttemptContext } from "./pipeline/translation-attempt.context";
 import type { FrontmatterBatchFieldKey } from "./translator-frontmatter-batch.schema";
-import type { TranslationRetryInfo } from "./validation/validation.types";
+import type { ReviewerValidationNotice } from "./validation/validation.types";
 
 import {
 	env,
@@ -30,6 +34,10 @@ import { ApplicationError, ErrorCode, isCompletionLengthTruncationError } from "
 import { ChunksManager } from "./chunking";
 import { SYSTEM_PROMPT_TOKEN_RESERVE } from "./chunking/chunking.constants";
 import { TranslationLlmClient } from "./llm/translation-llm.client";
+import {
+	emptyTranslationLlmUsageTotals,
+	mergeTranslationLlmUsage,
+} from "./llm/translation-llm.usage";
 import { TranslationPromptBuilder } from "./llm/translation-prompt.builder";
 import { stripSpuriousOuterMarkdownFencesWhenSourceHadNoFences } from "./markdown/artifacts";
 import {
@@ -58,7 +66,8 @@ export type {
 	TranslationSystemPromptKind,
 } from "./llm/translation-system-prompt.types";
 
-export type { TranslationRetryInfo } from "./validation/validation.types";
+export type { ReviewerValidationNotice } from "./validation/validation.types";
+export type { TranslationLlmUsageTotals } from "./llm/translation-llm.usage";
 
 /** Optional inputs for {@link TranslatorService.translateContent} */
 export interface TranslateContentOptions {
@@ -74,8 +83,11 @@ export interface TranslationResult {
 	/** The translated content */
 	content: string;
 
-	/** Retries that occurred during post-translation validation (empty if none) */
-	retries: readonly TranslationRetryInfo[];
+	/** Advisory post-translation guard hints for maintainers (empty if clean) */
+	reviewerNotices: readonly ReviewerValidationNotice[];
+
+	/** Aggregated LLM token and cost usage for this file */
+	llmUsage: TranslationLlmUsageTotals;
 }
 
 /** Dependency injection interface for {@link TranslatorService} */
@@ -165,6 +177,9 @@ export class TranslatorService {
 
 	/** Resolves OpenRouter `GET /v1/models` limits for chunk and completion caps */
 	private readonly openRouterModelLimitsService: OpenRouterModelLimitsService;
+
+	/** Per-file LLM usage accumulator reset at the start of each {@link translateContent} call */
+	private currentFileLlmUsage = emptyTranslationLlmUsageTotals();
 
 	/**
 	 * Creates a new TranslatorService instance with injected dependencies.
@@ -392,6 +407,7 @@ export class TranslatorService {
 		}
 
 		const translationStartTime = Date.now();
+		this.currentFileLlmUsage = emptyTranslationLlmUsageTotals();
 
 		const verbatimMask =
 			env.MASK_VERBATIM_LARGE_FENCES ?
@@ -455,7 +471,7 @@ export class TranslatorService {
 				:	emptyTranslationAttemptContext();
 		})();
 
-		const pipelineResult = await this.managers.pipeline.translateWithValidationRetries({
+		const pipelineResult = await this.managers.pipeline.translateWithValidation({
 			file,
 			translateBody: (attemptContext) =>
 				this.translateMarkdownBody(translationWorkFile, attemptContext),
@@ -498,6 +514,19 @@ export class TranslatorService {
 
 		this.managers.validation.recordSoftValidationWarnings(file, pipelineResult.content);
 
+		const advisoryGuardCount = pipelineResult.reviewerNotices.length;
+
+		if (advisoryGuardCount > 0) {
+			file.logger.warn(
+				{ guardIds: pipelineResult.reviewerNotices.map((notice) => notice.guardId) },
+				"Translation completed with advisory validation notices",
+			);
+			file.logger.debug(
+				{ reviewerNotices: pipelineResult.reviewerNotices },
+				"Advisory validation hints for maintainers",
+			);
+		}
+
 		file.logger.info(
 			{
 				filename: file.filename,
@@ -505,15 +534,25 @@ export class TranslatorService {
 				translatedLength: pipelineResult.content.length,
 				durationMs: translationDuration,
 				sizeRatio: (pipelineResult.content.length / file.content.length).toFixed(2),
-				retryCount: pipelineResult.retries.length,
+				advisoryGuardCount,
 			},
 			"Translation completed successfully",
 		);
 
 		return {
 			content: cleanupTranslatedContent(pipelineResult.content, file),
-			retries: pipelineResult.retries,
+			reviewerNotices: pipelineResult.reviewerNotices,
+			llmUsage: this.currentFileLlmUsage,
 		};
+	}
+
+	/**
+	 * Adds one completion's usage into the per-file accumulator for {@link translateContent}.
+	 *
+	 * @param usage Token and cost snapshot from an LLM call, if reported
+	 */
+	private recordLlmUsage(usage: TranslationLlmUsageSnapshot | null): void {
+		this.currentFileLlmUsage = mergeTranslationLlmUsage(this.currentFileLlmUsage, usage);
 	}
 
 	/**
@@ -564,7 +603,11 @@ export class TranslatorService {
 			"Translating YAML frontmatter string fields in one structured LLM call",
 		);
 
-		const envelope = await this.llmClient.callLanguageModelFrontmatterBatch(file, batchItems);
+		const { envelope, usage } = await this.llmClient.callLanguageModelFrontmatterBatch(
+			file,
+			batchItems,
+		);
+		this.recordLlmUsage(usage);
 		const translatedByKey = new Map(
 			envelope.items.map((item) => [item.fieldKey, item.translated] as const),
 		);
@@ -860,7 +903,7 @@ export class TranslatorService {
 	 *
 	 * @see {@link TranslationLlmClient.callLanguageModel}
 	 */
-	private callLanguageModel(
+	private async callLanguageModel(
 		file: TranslationFile,
 		content?: string,
 		chunkProgress?: ChunkTranslationProgress,
@@ -868,7 +911,7 @@ export class TranslatorService {
 		responseFormat?: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming["response_format"],
 		attemptContext: TranslationAttemptContext = emptyTranslationAttemptContext(),
 	) {
-		return this.llmClient.callLanguageModel(
+		const result = await this.llmClient.callLanguageModel(
 			file,
 			content,
 			chunkProgress,
@@ -876,5 +919,7 @@ export class TranslatorService {
 			responseFormat,
 			attemptContext,
 		);
+		this.recordLlmUsage(result.usage);
+		return result.content;
 	}
 }

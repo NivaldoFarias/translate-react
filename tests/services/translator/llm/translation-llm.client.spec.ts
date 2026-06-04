@@ -107,7 +107,7 @@ describe("TranslationLlmClient", () => {
 
 			const translated = await clientWithRetry.callLanguageModel(file);
 
-			expect(translated).toBe("Olá mundo");
+			expect(translated.content).toBe("Olá mundo");
 			expect(mockChatCompletionsCreate).toHaveBeenCalledTimes(2);
 		});
 
@@ -163,7 +163,7 @@ describe("TranslationLlmClient", () => {
 				content: "---\ndescription: Welcome\n---\n\n# Hi",
 			});
 
-			const envelope = await llmClient.callLanguageModelFrontmatterBatch(file, [
+			const { envelope } = await llmClient.callLanguageModelFrontmatterBatch(file, [
 				{ fieldKey: "description", source: "Welcome" },
 			]);
 

@@ -1,11 +1,11 @@
 import type {
 	ProcessedFileResult,
 	PullRequestStatus,
-	TranslationRetryInfo,
+	ReviewerValidationNotice,
 } from "@/app/services/github/types";
 import type { TranslationFile } from "@/app/services/translator/";
 
-export type { TranslationRetryInfo };
+export type { ReviewerValidationNotice };
 
 /** Prior invalid PR for the same file path */
 export interface InvalidFilePullRequest {
@@ -17,33 +17,9 @@ export interface InvalidFilePullRequest {
 export interface PullRequestDescriptionMetadata {
 	languageName: string;
 	invalidFilePR: InvalidFilePullRequest | undefined;
-	content: {
-		source: string;
-		translation: string;
-		compressionRatio: string;
-	};
-	timestamps: {
-		now: number;
-		workflowStart: number;
-	};
 
-	/** `translate-react` version from `package.json` (e.g. `v0.1.28`) */
-	runnerVersion: string;
-
-	/** LLM model id used for translation (from `LLM_MODEL`) */
-	translationModel: string;
-
-	/** Hostname of `LLM_API_BASE_URL` (no path or credentials) */
-	llmApiHost: string;
-
-	/** Process `NODE_ENV` when the translation ran */
-	nodeEnv: string;
-
-	/** Whether large verbatim fences were masked before translation */
-	maskVerbatimLargeFences: boolean;
-
-	/** Post-translation validation retries that occurred (empty if none) */
-	retries: readonly TranslationRetryInfo[];
+	/** Advisory post-translation guard hints for maintainers (empty if clean) */
+	reviewerNotices: readonly ReviewerValidationNotice[];
 }
 
 /**
@@ -150,73 +126,16 @@ export interface LocalePRBodyStrings {
 	/** Important notice about human review requirement */
 	readonly humanReviewNotice: string;
 
-	/** Text for the collapsible details summary */
-	readonly detailsSummary: string;
+	/** Advisory validation warnings (shown only when `reviewerNotices` is non-empty) */
+	readonly reviewerWarnings: {
+		/** Intro line inside the `[!WARNING]` callout */
+		readonly intro: string;
 
-	/** Processing statistics section */
-	readonly stats: {
-		/** Section header text */
-		readonly header: string;
-
-		/** Table column headers and row labels */
-		readonly metrics: {
-			readonly metricColumn: string;
-			readonly valueColumn: string;
-			readonly sourceSize: string;
-			readonly translationSize: string;
-			readonly contentRatio: string;
-			readonly processingTime: string;
-		};
-
-		/**
-		 * Footnote definitions for statistics rows in the PR template.
-		 */
-		readonly notes: {
-			/** Footnote body for the content ratio metric */
-			readonly contentRatio: string;
-
-			/** Footnote body for the processing time metric */
-			readonly processingTime: string;
-		};
-	};
-
-	/** Technical information section */
-	readonly techInfo: {
-		/** Section header text */
-		readonly header: string;
-
-		/** Label for `translate-react` package version */
-		readonly runnerVersion: string;
-
-		/** Label for the configured LLM translation model id */
-		readonly translationModel: string;
-
-		/** Label for the LLM API host */
-		readonly llmApiHost: string;
-
-		/** Label for process `NODE_ENV` */
-		readonly nodeEnv: string;
-
-		/** Label when `MASK_VERBATIM_LARGE_FENCES` is enabled */
-		readonly maskVerbatimLargeFences: string;
-
-		/** Label for the GitHub Actions workflow run link */
-		readonly workflowRun: string;
-	};
-
-	/** Post-translation validation retry section (shown only when retries occurred) */
-	readonly retries: {
-		/** Section header text */
-		readonly header: string;
-
-		/** Table column headers */
+		/** Table column headers for guard id and maintainer fix text */
 		readonly columns: {
 			readonly guardColumn: string;
-			readonly reasonColumn: string;
+			readonly whatToFixColumn: string;
 		};
-
-		/** Footnote body explaining what retries mean */
-		readonly note: string;
 	};
 
 	/**
@@ -227,9 +146,6 @@ export interface LocalePRBodyStrings {
 	 * @returns Markdown link line
 	 */
 	readonly maintainerGuide: (wikiUrl: string) => string;
-
-	/** BCP 47 locale string for time formatting (e.g., "pt-BR", "ru-RU") */
-	readonly timeFormatLocale: string;
 }
 
 export interface LocalePullRequestConfig {

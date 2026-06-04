@@ -23,48 +23,16 @@ const ptBrPRBodyStrings: LocalePRBodyStrings = {
 	humanReviewNotice:
 		"Esta tradução foi gerada usando LLMs e **requer revisão humana** para garantir precisão, contexto cultural e terminologia técnica.",
 
-	detailsSummary: "Detalhes",
-
-	stats: {
-		header: "Estatísticas de Processamento",
-		metrics: {
-			metricColumn: "Métrica",
-			valueColumn: "Valor",
-			sourceSize: "Tamanho do Arquivo Fonte",
-			translationSize: "Tamanho da Tradução",
-			contentRatio: "Razão de Conteúdo",
-			processingTime: "Tempo de Processamento",
-		},
-		notes: {
-			contentRatio:
-				"`Razão de Conteúdo` indica como o comprimento da tradução se compara à fonte (~1.0x: mesmo comprimento, >1.0x: tradução é mais longa). Valores muito baixos ou altos podem indicar truncamento ou conteúdo incompleto.",
-			processingTime:
-				"`Tempo de Processamento` baseia-se no cálculo do tempo total desde o início do fluxo até a conclusão da tradução deste arquivo específico.",
-		},
-	},
-
-	techInfo: {
-		header: "Informações Técnicas",
-		runnerVersion: "Versão do translate-react",
-		translationModel: "Modelo de tradução (LLM)",
-		llmApiHost: "Endpoint LLM",
-		nodeEnv: "Ambiente (`NODE_ENV`)",
-		maskVerbatimLargeFences: "Máscara de blocos de código grandes",
-		workflowRun: "Execução do workflow",
-	},
-
-	retries: {
-		header: "Tentativas de Validação",
+	reviewerWarnings: {
+		intro:
+			"A validação automática detectou problemas mecânicos que precisam de correção manual antes do merge:",
 		columns: {
 			guardColumn: "Validador",
-			reasonColumn: "Motivo",
+			whatToFixColumn: "O que corrigir",
 		},
-		note: "A tradução precisou de tentativas adicionais para passar nas validações pós-tradução. Os validadores acima detectaram problemas que foram corrigidos automaticamente pelo LLM em tentativas subsequentes.",
 	},
 
 	maintainerGuide: (wikiUrl) => `Guia para revisores: [For React Docs Maintainers](${wikiUrl}).`,
-
-	timeFormatLocale: "pt-BR",
 };
 
 /**

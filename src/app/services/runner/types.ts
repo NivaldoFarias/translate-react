@@ -66,4 +66,19 @@ export interface WorkflowStatistics {
 
 	/** Success rate as a decimal (0-1) */
 	successRate: number;
+
+	/** Sum of prompt tokens across successful file translations */
+	totalPromptTokens: number;
+
+	/** Sum of completion tokens across successful file translations */
+	totalCompletionTokens: number;
+
+	/** Sum of OpenRouter `usage.cost` when reported; `null` when no cost data */
+	totalEstimatedCostUsd: number | null;
+
+	/** Files whose PRs include advisory post-translation reviewer notices */
+	filesWithReviewerWarnings: number;
+
+	/** Count of advisory issues per guard id across the run */
+	advisoryIssuesByGuardId: Readonly<Record<string, number>>;
 }
