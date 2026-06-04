@@ -1,6 +1,5 @@
 export * from "./error-messages.constants";
 export * from "./maintainer-feedback.constants";
-export * from "./pt-br-terminology.constants";
 export * from "./environment.constants";
 export * from "./rate-limit.constants";
 export * from "./react-translation.constants";

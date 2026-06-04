@@ -19,7 +19,6 @@ import {
 } from "@/app/utils/";
 import { ApplicationError, ErrorCode } from "@/shared/errors/";
 
-import { MaintainerFeedbackRemediationManager } from "./maintainer-feedback-remediation.manager";
 import { getMaintainerFeedbackCommentBodies } from "./maintainer-feedback.util";
 import { TranslationPullRequestValidityManager } from "./translation-pull-request-validity.manager";
 import { MAX_CONSECUTIVE_FAILURES } from "./workflow.constants";
@@ -71,8 +70,6 @@ export class TranslationBatchManager {
 
 	private readonly translationPullRequestValidity: TranslationPullRequestValidityManager;
 
-	private readonly maintainerFeedbackRemediation: MaintainerFeedbackRemediationManager;
-
 	/**
 	 * Initializes the batch manager with service dependencies.
 	 *
@@ -86,9 +83,6 @@ export class TranslationBatchManager {
 		private readonly workflowStartTimestamp: number,
 	) {
 		this.translationPullRequestValidity = new TranslationPullRequestValidityManager(services);
-		this.maintainerFeedbackRemediation = new MaintainerFeedbackRemediationManager(
-			services.translator,
-		);
 	}
 
 	/**
@@ -304,7 +298,6 @@ export class TranslationBatchManager {
 					translationSize: metadata.translation.length,
 					durationMs: Date.now() - translationStart,
 					retryCount: metadata.retries.length,
-					remediationKind: translationResult.remediationKind,
 				},
 				"Step 3/5: Translation complete",
 			);
@@ -420,65 +413,41 @@ export class TranslationBatchManager {
 	}
 
 	/**
-	 * Resolves translated content: maintainer tiers first when applicable, otherwise full re-translation.
+	 * Resolves translated content via full document re-translation.
+	 *
+	 * When {@link TranslationPullRequestValidity.invalidReason} is `needs_maintainer_fix`,
+	 * the open PR and branch are reused and maintainer issue comments are passed into the LLM prompt.
 	 *
 	 * @param file Upstream English source file for the workflow
 	 * @param validity Pull request validity from the start of file processing
 	 *
-	 * @returns Translated content, retries, and which remediation tier ran
+	 * @returns Translated content and validation retries from the translator
 	 */
 	private async resolveTranslation(
 		file: TranslationFile,
 		validity: TranslationPullRequestValidity,
 	) {
 		if (validity.invalidReason !== "needs_maintainer_fix" || !validity.pullRequest) {
-			const result = await this.services.translator.translateContent(file);
-
-			return { ...result, remediationKind: "full" as const };
+			return this.services.translator.translateContent(file);
 		}
 
 		const branchName = getTranslationBranchNameFromPath(file.path);
-		const [forkContent, comments, runnerCommitAt] = await Promise.all([
-			this.services.github.getForkFileContentAtBranch(file.path, branchName),
+		const [comments, runnerCommitAt] = await Promise.all([
 			this.services.github.listPullRequestIssueComments(validity.pullRequest.number),
 			this.services.github.getLatestTranslationCommitTimestamp(branchName),
 		]);
-
-		if (!forkContent?.trim()) {
-			const result = await this.services.translator.translateContent(file);
-
-			return { ...result, remediationKind: "full" as const };
-		}
-
-		const commentBodies = getMaintainerFeedbackCommentBodies(comments, runnerCommitAt);
-		const remediated = await this.maintainerFeedbackRemediation.tryRemediate(
-			forkContent,
-			file.content,
-			commentBodies,
-			file,
-		);
-
-		if (remediated) {
-			file.logger.info(
-				{ path: file.path, prNumber: validity.pullRequest.number, kind: remediated.kind },
-				"Applied maintainer feedback remediation",
-			);
-
-			return {
-				content: remediated.content,
-				retries: remediated.retries,
-				remediationKind: remediated.kind,
-			};
-		}
+		const maintainerFeedbackComments = getMaintainerFeedbackCommentBodies(comments, runnerCommitAt);
 
 		file.logger.info(
-			{ path: file.path, prNumber: validity.pullRequest.number },
-			"No targeted maintainer remediation; falling back to full re-translation",
+			{
+				path: file.path,
+				prNumber: validity.pullRequest.number,
+				maintainerCommentCount: maintainerFeedbackComments.length,
+			},
+			"Maintainer feedback after latest runner commit; running full re-translation with review comments in prompt",
 		);
 
-		const result = await this.services.translator.translateContent(file);
-
-		return { ...result, remediationKind: "full" as const };
+		return this.services.translator.translateContent(file, { maintainerFeedbackComments });
 	}
 
 	/**

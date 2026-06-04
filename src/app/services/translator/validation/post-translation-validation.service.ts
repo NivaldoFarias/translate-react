@@ -28,7 +28,7 @@ export class PostTranslationValidationService {
 	private readonly getTranslationGuidelines: () => string | null;
 
 	/**
-	 * @param dependencies Optional glossary provider for terminology guards
+	 * @param dependencies Optional glossary provider (reserved for future guards)
 	 */
 	constructor(dependencies: PostTranslationValidationServiceDependencies = {}) {
 		this.getTranslationGuidelines = dependencies.getTranslationGuidelines ?? (() => null);

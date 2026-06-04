@@ -101,6 +101,13 @@ export interface LocaleRulesConfig {
 	 * URL locale adjustments, style conventions).
 	 */
 	readonly specific: string;
+
+	/**
+	 * Optional override for the markdown "What to Translate" scope section.
+	 *
+	 * When set, replaces the default scope bullets in document prompts.
+	 */
+	readonly markdownTranslationScopeSection?: string;
 }
 
 /**

@@ -16,14 +16,6 @@ export const CHUNKS = {
 	 */
 	overlap: 0,
 
-	/**
-	 * Maximum translate passes over chunked markdown when slice-level terminology drift is detected.
-	 *
-	 * Initial parallel translation counts as pass one; one selective slice retry is pass two.
-	 * Further drift is left to full-document post-translation guards and pipeline retries.
-	 */
-	terminologyConsistencyMaxPasses: 2,
-
 	/** Token buffer reserved for chunk processing overhead when splitting content */
 	tokenBuffer: 500,
 

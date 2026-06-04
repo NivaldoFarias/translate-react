@@ -51,7 +51,7 @@ export function hasMaintainerFeedbackAfterRunnerCommit(
  * @param comments Issue comments on the translation pull request
  * @param runnerCommitAt Timestamp of the latest `docs: translate` commit on the branch
  *
- * @returns Markdown bodies to parse for mechanical or section remediation
+ * @returns Markdown bodies for the maintainer review section in the translation prompt
  */
 export function getMaintainerFeedbackCommentBodies(
 	comments: readonly PullRequestIssueCommentSnapshot[],
