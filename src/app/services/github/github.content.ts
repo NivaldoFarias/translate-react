@@ -18,7 +18,10 @@ import type {
 import type { SharedGitHubDependencies } from "./types";
 
 import { TRANSLATION_COMMIT_MESSAGE_PREFIX } from "@/app/constants/maintainer-feedback.constants";
-import { selectProgressCommentPayload } from "@/app/services/comment-builder/progress-comment.util";
+import {
+	hasReportableProgressComment,
+	selectProgressCommentPayload,
+} from "@/app/services/comment-builder/progress-comment.util";
 import { logger } from "@/app/utils/";
 import { ApplicationError, ErrorCode } from "@/shared/errors/";
 
@@ -523,12 +526,9 @@ export class GitHubContent {
 			return;
 		}
 
-		const { reportableResults, reportableFiles } = selectProgressCommentPayload(
-			results,
-			filesToTranslate,
-		);
+		const payload = selectProgressCommentPayload(results, filesToTranslate);
 
-		if (reportableResults.length === 0) {
+		if (!hasReportableProgressComment(payload)) {
 			this.logger.info(
 				{ resultCount: results.length },
 				"No pull requests were opened or updated in this run; skipping translation progress issue comment",
@@ -547,7 +547,7 @@ export class GitHubContent {
 		const createCommentResponse = await this.deps.octokit.issues.createComment({
 			...this.deps.repositories.upstream,
 			issue_number: translationProgressIssue.number,
-			body: this.commentBuilder.buildReportableComment(reportableResults, reportableFiles),
+			body: this.commentBuilder.buildProgressComment(payload),
 		});
 
 		this.logger.info(

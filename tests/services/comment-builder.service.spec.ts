@@ -83,7 +83,7 @@ describe("CommentBuilderService", () => {
 			expect(result.trim()).not.toBe("");
 		});
 
-		test("should omit pull requests only reused without a new commit in this run", () => {
+		test("lists created and updated pull requests in separate sections", () => {
 			const results: ProcessedFileResult[] = [
 				createMockResult("intro.md", 123, PullRequestProgressAction.Created),
 				createMockResult("api.md", 124, PullRequestProgressAction.Reused),
@@ -92,7 +92,9 @@ describe("CommentBuilderService", () => {
 			const result = commentBuilderService.buildComment(results, filesToTranslate);
 
 			expect(result).toContain("#123");
-			expect(result).not.toContain("#124");
+			expect(result).toContain("#124");
+			expect(result).toContain("### PRs criados");
+			expect(result).toContain("### PRs atualizados");
 		});
 
 		test("should handle empty results array", () => {
@@ -141,7 +143,7 @@ describe("CommentBuilderService", () => {
 			const result = commentBuilderService.concatComment(content);
 
 			expect(result).toBeString();
-			expect(result).toContain("As seguintes páginas foram traduzidas");
+			expect(result).toContain("As seguintes páginas foram traduzidas nesta execução");
 			expect(result).toContain(content);
 		});
 
@@ -152,7 +154,7 @@ describe("CommentBuilderService", () => {
 			const result = commentBuilderService.concatComment(content);
 
 			expect(result).toBeString();
-			expect(result).toContain("As seguintes páginas foram traduzidas");
+			expect(result).toContain("As seguintes páginas foram traduzidas nesta execução");
 		});
 
 		test("should handle multiline content", () => {
@@ -171,9 +173,9 @@ describe("CommentBuilderService", () => {
 		test("should return comment template with prefix and suffix", () => {
 			const comment = commentBuilderService.comment;
 
-			expect(comment).toHaveProperty("prefix");
-			expect(comment).toHaveProperty("suffix");
-			expect(comment.prefix).toContain("As seguintes páginas foram traduzidas");
+			expect(comment).toHaveProperty("createdSectionHeader");
+			expect(comment).toHaveProperty("updatedSectionHeader");
+			expect(comment.prefix).toContain("As seguintes páginas foram traduzidas nesta execução");
 		});
 	});
 

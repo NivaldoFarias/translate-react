@@ -19,11 +19,14 @@ export function createMockCommentBuilderService() {
 	return {
 		build: mockCommentBody,
 		buildComment: mockCommentBody,
+		buildProgressComment: mockCommentBody,
 		buildReportableComment: mockCommentBody,
 		concatComment: mock((content: string) => `prefix\n\n${content}\n\nsuffix`),
 		comment: {
 			suffix: "suffix",
-			prefix: "As seguintes páginas foram traduzidas e PRs foram criados:",
+			prefix: "As seguintes páginas foram traduzidas nesta execução:",
+			createdSectionHeader: "**PRs criados**",
+			updatedSectionHeader: "**PRs atualizados**",
 		},
 	};
 }

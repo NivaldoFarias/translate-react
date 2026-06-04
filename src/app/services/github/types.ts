@@ -55,13 +55,14 @@ export interface SharedGitHubDependencies {
 /**
  * How this workflow run affected the pull request for a translated file.
  *
- * Only {@link PullRequestProgressAction.Created} belongs in the translation-progress issue comment.
+ * Only {@link PullRequestProgressAction.Created} and {@link PullRequestProgressAction.Reused}
+ * belong in the translation-progress issue comment (in separate sections).
  */
 export enum PullRequestProgressAction {
 	/** A new pull request was opened after committing the translation */
 	Created = "created",
 
-	/** An open translation pull request was already valid; this run did not translate or commit */
+	/** An existing open translation pull request received a new commit in this run */
 	Reused = "reused",
 }
 

@@ -1097,7 +1097,20 @@ describe("GitHubService", () => {
 				expect(octokitMock.issues.createComment).not.toHaveBeenCalled();
 			});
 
-			test("should skip commenting when only existing pull requests were reused", async () => {
+			test("should create a comment when only existing pull requests were updated", async () => {
+				octokitMock.rest.search.issuesAndPullRequests.mockResolvedValueOnce({
+					data: {
+						items: [
+							{ number: 123, state: "open" } as components["schemas"]["issue-search-result-item"],
+						],
+						total_count: 1,
+					},
+				});
+
+				octokitMock.issues.createComment.mockResolvedValueOnce({
+					data: { id: 1, html_url: "https://github.com/test/test/issues/123#comment-1" },
+				});
+
 				const reusedOnly: ProcessedFileResult[] = [
 					{
 						branch: null,
@@ -1115,8 +1128,12 @@ describe("GitHubService", () => {
 					fixtures.translationFiles,
 				);
 
-				expect(result).toBeUndefined();
-				expect(octokitMock.issues.createComment).not.toHaveBeenCalled();
+				expect(result).toBeDefined();
+				expect(octokitMock.issues.createComment).toHaveBeenCalledWith(
+					expect.objectContaining({
+						issue_number: 123,
+					}),
+				);
 			});
 
 			test("should skip commenting when no results to report", async () => {

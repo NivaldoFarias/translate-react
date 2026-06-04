@@ -78,11 +78,13 @@ export const ruLocale: LocaleDefinition = {
 	comment: {
 		prefix: (runContext?: ProgressCommentRunContext) => {
 			if (!runContext) {
-				return "Следующие страницы были переведены и созданы PR:";
+				return "Следующие страницы были переведены в этом запуске:";
 			}
 
-			return `[Последний запуск](${runContext.url}) [\`translate-react@${runContext.version}\`](${runContext.releaseUrl}) перевёл следующие страницы и создал эти PR[^1]:`;
+			return `[Последний запуск](${runContext.url}) [\`translate-react@${runContext.version}\`](${runContext.releaseUrl}) завершил переводы в этом запуске[^1]:`;
 		},
+		createdSectionHeader: "### Созданные PR",
+		updatedSectionHeader: "### Обновлённые PR",
 		suffix: `[^1]: переводы были сгенерированы с использованием LLM и требуют проверки человеком для обеспечения точности, культурного контекста и технической терминологии.`,
 	},
 	rules: {

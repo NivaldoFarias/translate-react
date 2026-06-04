@@ -97,7 +97,7 @@ describe("LocaleService", () => {
 		describe("comment", () => {
 			test("should build fallback prefix without workflow run context", () => {
 				expect(localeService.definitions.comment.prefix()).toBe(
-					"As seguintes páginas foram traduzidas e PRs foram criados:",
+					"As seguintes páginas foram traduzidas nesta execução:",
 				);
 			});
 

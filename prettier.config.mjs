@@ -1,6 +1,5 @@
-import type { PrettierConfig } from "@ianvs/prettier-plugin-sort-imports";
-
-const config: PrettierConfig = {
+/** @type {import("prettier").Config & import("@ianvs/prettier-plugin-sort-imports").PluginConfig } */
+export default {
 	semi: true,
 	tabWidth: 2,
 	useTabs: true,
@@ -51,5 +50,3 @@ const config: PrettierConfig = {
 		"^[.]/",
 	],
 };
-
-export default config;

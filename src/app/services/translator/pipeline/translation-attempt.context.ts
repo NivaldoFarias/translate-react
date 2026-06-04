@@ -26,10 +26,16 @@ export const emptyTranslationAttemptContext = (): TranslationAttemptContext => (
 export const translationAttemptContextFromHints = (
 	hints: readonly string[],
 	base: TranslationAttemptContext = emptyTranslationAttemptContext(),
-): TranslationAttemptContext => ({
-	...base,
-	validationRetryHints: hints,
-});
+): TranslationAttemptContext => {
+	const mergedHints = [...base.validationRetryHints, ...hints].filter(
+		(hint) => hint.trim().length > 0,
+	);
+
+	return {
+		...base,
+		validationRetryHints: [...new Set(mergedHints)],
+	};
+};
 
 /**
  * Builds an attempt context that carries maintainer PR review feedback into the LLM prompt.
