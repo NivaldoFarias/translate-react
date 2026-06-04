@@ -19,12 +19,27 @@ import {
 /** Octokit-specific logger for GitHub API debugging */
 const logger = baseLogger.child({ component: "octokit" });
 
-/** Compares a numeric HTTP status from Octokit errors against http-status-codes values. */
+/**
+ * Compares a numeric HTTP status from Octokit errors against http-status-codes values.
+ *
+ * @param status HTTP status code from an Octokit `RequestError`
+ * @param expected Status code constant to match (for example `StatusCodes.FORBIDDEN`)
+ *
+ * @returns `true` when `status` equals `expected`
+ */
 function hasHttpStatus(status: number, expected: number): boolean {
 	return status === expected;
 }
 
-/** Checks whether a numeric HTTP status falls within an inclusive min and exclusive max. */
+/**
+ * Checks whether a numeric HTTP status falls within an inclusive min and exclusive max.
+ *
+ * @param status HTTP status code to test
+ * @param min Inclusive lower bound
+ * @param max Exclusive upper bound
+ *
+ * @returns `true` when `min <= status < max`
+ */
 function isHttpStatusInRange(status: number, min: number, max: number): boolean {
 	return status >= min && status < max;
 }
@@ -211,7 +226,13 @@ export async function withRetry<T>(
 	);
 }
 
-/** Checks if an error is a 403 Forbidden response */
+/**
+ * Checks if an error is a 403 Forbidden response.
+ *
+ * @param error Thrown value from an Octokit API call
+ *
+ * @returns `true` when `error` is a `RequestError` (or uncast equivalent) with status 403
+ */
 export function isForbiddenError(error: unknown): error is RequestError {
 	return (
 		(error instanceof RequestError || isUncastRequestError(error)) &&
@@ -233,6 +254,8 @@ export type OctokitMethod = (...args: never[]) => Promise<unknown>;
  * @param fallbackMethod The equivalent method from fallback client
  * @param namespace The API namespace (e.g., "repos", "pulls") for logging
  * @param methodName The method name for logging
+ *
+ * @returns Wrapped method that retries transient failures and falls back on 403
  */
 export function wrapMethodWithFallback(
 	method: OctokitMethod,
@@ -269,6 +292,8 @@ export function wrapMethodWithFallback(
  * @param primaryNamespace The namespace from the primary Octokit instance
  * @param fallbackNamespace The equivalent namespace from the fallback instance (if available)
  * @param namespaceName The namespace name for logging
+ *
+ * @returns Proxy that wraps each namespace method with retry and PAT fallback
  */
 function createNamespaceProxy<T extends object>(
 	primaryNamespace: T,
@@ -315,6 +340,8 @@ type RestNamespace = (typeof REST_NAMESPACES)[number];
  *
  * The proxy intercepts calls to REST API namespaces (repos, pulls, git, issues) and
  * retries with the fallback client when the primary client receives a 403 Forbidden response.
+ *
+ * @returns Primary Octokit instance, or a proxied instance when a PAT fallback client is configured
  */
 function createOctokitWithFallback(): Octokit {
 	if (!fallbackOctokit) return primaryOctokit;

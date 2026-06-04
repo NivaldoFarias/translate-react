@@ -7,6 +7,7 @@ import { ptBrLocale, ruLocale } from "@/app/locales";
 import { LocaleService } from "@/app/services/locale/locale.service";
 import { TranslationFile } from "@/app/services/translator/translation-file";
 import { buildRunnerReleaseUrl } from "@/app/utils/common.util";
+import { ApplicationError } from "@/shared/errors/";
 
 import { createProcessedFileResultsFixture } from "@tests/fixtures";
 
@@ -52,8 +53,11 @@ describe("LocaleService", () => {
 			expect(localeService.definitions).toBe(ptBrLocale);
 		});
 
-		test("should fallback to pt-br when language is not registered", () => {
-			expect(localeService.definitions).toBe(ptBrLocale);
+		test("throws when language is not registered", () => {
+			expect(() => {
+				// @ts-expect-error - exercising unregistered locale code
+				new LocaleService("es");
+			}).toThrow(ApplicationError);
 		});
 	});
 
@@ -134,6 +138,11 @@ describe("LocaleService", () => {
 			test("should include MDN URL localization rule", () => {
 				expect(localeService.definitions.rules.specific).toContain("developer.mozilla.org");
 				expect(localeService.definitions.rules.specific).toContain("pt-BR");
+			});
+
+			test("should include fenced code and MDX rules for pt-br", () => {
+				expect(localeService.definitions.rules.specific).toContain("FENCED CODE AND MDX");
+				expect(localeService.definitions.rules.specific).toContain("ConsoleLogLine");
 			});
 		});
 	});

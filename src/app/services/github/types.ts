@@ -2,7 +2,38 @@ import type { components } from "@octokit/openapi-types";
 import type { Octokit, RestEndpointMethodTypes } from "@octokit/rest";
 import type { SetRequired } from "type-fest";
 
-import type { TranslationRetryInfo } from "@/app/services/translator/";
+/** Post-translation validation retry surfaced on processed file results and PR metadata */
+export interface TranslationRetryInfo {
+	/** Stable guard id for logs and error context */
+	guardId: string;
+
+	/** Short description for operators and error messages */
+	message: string;
+}
+
+/** Markdown blob fetched from a repository default branch or fork ref */
+export interface RepositoryMarkdownBlob {
+	/** File body as UTF-8 text */
+	content: string;
+
+	/** Display filename extracted from the repository path */
+	filename: string;
+
+	/** Repository path of the blob */
+	path: string;
+
+	/** Git object id for the blob */
+	sha: string;
+}
+
+/** Minimal file identity for progress-issue comment pairing */
+export interface TranslationProgressFileRef {
+	/** Display filename used to match {@link ProcessedFileResult.filename} */
+	filename: string;
+
+	/** Repository path used to build hierarchical progress comments */
+	path: string;
+}
 
 /** GitHub repository metadata for fork and upstream repositories */
 export interface RepositoryMetadata {
@@ -77,6 +108,24 @@ export type RepositoryTreeItem =
 export interface PatchedRepositoryTreeItem extends SetRequired<RepositoryTreeItem, "path" | "sha"> {
 	/** Filename extracted from the file path */
 	filename: string;
+}
+
+/** Normalized pull request issue comment for maintainer-feedback detection */
+export interface PullRequestIssueCommentSnapshot {
+	/** GitHub login of the comment author */
+	readonly login: string;
+
+	/** GitHub `author_association` for the comment */
+	readonly authorAssociation: string;
+
+	/** GitHub user `type` (`User`, `Bot`, etc.) */
+	readonly userType: string;
+
+	/** When the comment was created */
+	readonly createdAt: Date;
+
+	/** Issue comment body markdown */
+	readonly body: string;
 }
 
 /** Pull request mergeability and conflict status */

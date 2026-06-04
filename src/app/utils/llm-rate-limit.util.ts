@@ -15,6 +15,8 @@ const OPENROUTER_FREE_MODELS_PER_DAY = "free-models-per-day";
  * Narrows unknown failures to OpenAI-compatible 429 responses without relying on `instanceof` across package entry points.
  *
  * @param error The thrown value from the OpenAI-compatible client
+ *
+ * @returns `true` when `error` is an object with HTTP 429 status and string message
  */
 function isOpenAiCompatible429Error(
 	error: unknown,

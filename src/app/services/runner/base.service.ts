@@ -12,6 +12,8 @@ import type { RunnerOptions, RunnerServiceDependencies, RunnerState } from "./ru
 import { env, logger, registerCleanup } from "@/app/utils/";
 import { ApplicationError, ErrorCode } from "@/shared/errors/";
 
+import { TranslatorService } from "../translator";
+
 import { FileDiscoveryManager, PRManager, TranslationBatchManager } from "./workflow";
 
 /**
@@ -104,7 +106,7 @@ export abstract class BaseRunnerService {
 	/**
 	 * Verifies GitHub token permissions
 	 *
-	 * @throws {ApplicationError} with {@link ErrorCode.InsufficientPermissions} when the token lacks required scopes
+	 * @throws {ApplicationError} with {@link ErrorCode.InsufficientPermissions|`"INSUFFICIENT_PERMISSIONS"`} when the token lacks required scopes
 	 */
 	protected async verifyPermissions(): Promise<void> {
 		const hasPermissions = await this.services.github.verifyTokenPermissions();
@@ -126,9 +128,9 @@ export abstract class BaseRunnerService {
 	/**
 	 * Synchronizes the fork with the upstream repository
 	 *
-	 * @throws {ApplicationError} with {@link ErrorCode.InitializationError} If the fork synchronization fails
-	 *
 	 * @returns `true` if the fork is up to date, `false` otherwise
+	 *
+	 * @throws {ApplicationError} with {@link ErrorCode.InitializationError|`"INITIALIZATION_ERROR"`} If the fork synchronization fails
 	 */
 	protected async syncFork(): Promise<boolean> {
 		await this.services.github.forkExists();

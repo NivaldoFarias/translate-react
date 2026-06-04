@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 
 import type { Logger } from "pino";
 
+import type { RepositoryMarkdownBlob } from "@/app/services/github/types";
 import type { ReactLanguageCode } from "@/app/utils/";
 
 import { logger } from "@/app/utils/";
@@ -63,6 +64,17 @@ export class TranslationFile {
 	}
 
 	/**
+	 * Builds a translation unit from a markdown blob fetched via the GitHub layer.
+	 *
+	 * @param blob Upstream or fork file content returned by {@link GitHubService.getFile}
+	 *
+	 * @returns A new translation file for the workflow pipeline
+	 */
+	public static fromRepositoryBlob(blob: RepositoryMarkdownBlob): TranslationFile {
+		return new TranslationFile(blob.content, blob.filename, blob.path, blob.sha);
+	}
+
+	/**
 	 * Extracts the document title from leading YAML frontmatter by parsing the inner block with {@link extractTitleScalarFromInnerYaml}.
 	 *
 	 * @param content The content of the document
@@ -82,6 +94,8 @@ export class TranslationFile {
 	 *
 	 * Pino `serializers.content` only applies to a top-level `content` key; logging `{ file: this }`
 	 * still serializes `file.content` in full, so use this for structured logs.
+	 *
+	 * @returns Metadata fields safe for structured logging (excludes file body)
 	 */
 	public getLogContext(): {
 		filename: string;

@@ -140,12 +140,20 @@ export class CacheService<T> {
 		this.cache.clear();
 	}
 
-	/** Returns the current number of cache entries (including expired) */
+	/**
+	 * Returns the current number of cache entries (including expired).
+	 *
+	 * @returns Map size, including entries not yet removed by cleanup
+	 */
 	public get size(): number {
 		return this.cache.size;
 	}
 
-	/** Removes all expired entries from cache */
+	/**
+	 * Removes all expired entries from cache.
+	 *
+	 * @returns Count of entries deleted during this cleanup pass
+	 */
 	public cleanupExpired(): number {
 		const now = this.getNow();
 		let removed = 0;

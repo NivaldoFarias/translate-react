@@ -2,7 +2,14 @@ import type { PostTranslationValidationGuard } from "../validation.types";
 
 import { MARKDOWN_REGEXES } from "../../markdown/markdown.regexes";
 
-/** Rejects translations that dropped YAML frontmatter */
+/**
+ * Rejects translations that dropped YAML frontmatter
+ *
+ * @param source Original markdown before translation
+ * @param translated Model output to validate
+ *
+ * @returns Guard failure with retry hint, or `null` when frontmatter is preserved
+ */
 export const frontmatterPreservedGuard: PostTranslationValidationGuard = (source, translated) => {
 	const originalMatch = MARKDOWN_REGEXES.frontmatter.exec(source)?.groups?.["content"];
 	if (!originalMatch) return null;

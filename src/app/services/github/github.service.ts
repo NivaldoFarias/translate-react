@@ -5,8 +5,9 @@ import type {
 	PatchedRepositoryTreeItem,
 	ProcessedFileResult,
 	PullRequestStatus,
+	RepositoryMarkdownBlob,
+	TranslationProgressFileRef,
 } from "@/app/services/github/types";
-import type { TranslationFile } from "@/app/services/translator/";
 
 import type { CommitTranslationOptions, PullRequestOptions } from "./github.content";
 import type { BaseRepositories, SharedGitHubDependencies } from "./types";
@@ -120,6 +121,8 @@ export class GitHubService {
 	 * Checks if the fork repository exists.
 	 *
 	 * If it does not exist, an error is thrown.
+	 *
+	 * @returns Resolves when the fork repo is reachable via the API
 	 */
 	public async forkExists(): Promise<void> {
 		return this.repository.forkExists();
@@ -273,7 +276,7 @@ export class GitHubService {
 	 *
 	 * @returns Translation file with upstream content and blob `sha`
 	 */
-	public async getFile(file: PatchedRepositoryTreeItem): Promise<TranslationFile> {
+	public async getFile(file: PatchedRepositoryTreeItem): Promise<RepositoryMarkdownBlob> {
 		return this.content.getFile(file);
 	}
 
@@ -327,6 +330,28 @@ export class GitHubService {
 	}
 
 	/**
+	 * Lists issue comments on a translation pull request.
+	 *
+	 * @param prNumber Pull request number on the upstream repository
+	 *
+	 * @returns Normalized issue comments for maintainer-feedback detection
+	 */
+	public async listPullRequestIssueComments(prNumber: number) {
+		return this.content.listPullRequestIssueComments(prNumber);
+	}
+
+	/**
+	 * Returns the timestamp of the latest runner translation commit on a fork branch.
+	 *
+	 * @param branchName Translation branch name without `refs/heads/` prefix
+	 *
+	 * @returns Committer date of the newest translation commit, if present
+	 */
+	public async getLatestTranslationCommitTimestamp(branchName: string) {
+		return this.content.getLatestTranslationCommitTimestamp(branchName);
+	}
+
+	/**
 	 * Posts translation results as comments on GitHub issues.
 	 *
 	 * @param results Translation results to report
@@ -336,7 +361,7 @@ export class GitHubService {
 	 */
 	public async commentCompiledResultsOnIssue(
 		results: ProcessedFileResult[],
-		filesToTranslate: TranslationFile[],
+		filesToTranslate: readonly TranslationProgressFileRef[],
 	): Promise<RestEndpointMethodTypes["issues"]["createComment"]["response"]["data"] | undefined> {
 		return this.content.commentCompiledResultsOnIssue(results, filesToTranslate);
 	}

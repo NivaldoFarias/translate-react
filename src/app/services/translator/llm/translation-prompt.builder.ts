@@ -42,7 +42,7 @@ export class TranslationPromptBuilder {
 	/**
 	 * @param languageDetector Resolves human-readable language names for prompts
 	 * @param locale Locale-specific translation rules embedded in prompts
-	 * @param componentLogger Optional logger override for tests
+	 * @param componentLoggerOverride Optional logger override for tests
 	 */
 	constructor(
 		private readonly languageDetector: LanguageDetectorService,
@@ -67,7 +67,7 @@ export class TranslationPromptBuilder {
 		this.getLogger().debug({ systemPromptKind }, "Generating system prompt for translation");
 
 		const languages = {
-			target: this.languageDetector.getLanguageName(LanguageDetectorService.languages.target),
+			target: this.languageDetector.getLanguageName(this.languageDetector.languages.target),
 			source: this.languageDetector.getLanguageName(documentSourceLanguage, false),
 		};
 
@@ -87,7 +87,9 @@ export class TranslationPromptBuilder {
 	 * Builds the markdown document system prompt with preservation rules and optional retry hints.
 	 *
 	 * @param params Markdown prompt parameters
-	 * @param languages Human-readable source and target language names
+	 * @param languages Human-readable language names for the prompt
+	 * @param languages.source Source language display name
+	 * @param languages.target Target language display name
 	 *
 	 * @returns The system prompt string
 	 */
@@ -109,6 +111,7 @@ export class TranslationPromptBuilder {
 				`
 			:	"";
 
+		const maintainerReviewSection = this.buildMaintainerReviewSection(params.attemptContext);
 		const validationRetrySection = this.buildValidationRetrySection(params.attemptContext);
 
 		const builtSystemPrompt = `# ROLE
@@ -117,6 +120,7 @@ export class TranslationPromptBuilder {
 				# TASK
 				Translate the provided content from ${languages.source} to ${languages.target} with absolute precision and technical accuracy.
 				${chunkSliceSection}
+				${maintainerReviewSection}
 				${validationRetrySection}
 				# CRITICAL PRESERVATION RULES
 				1. **Structure & Formatting**: Preserve ALL markdown syntax, HTML tags, code blocks, frontmatter, and line breaks exactly as written
@@ -125,10 +129,7 @@ export class TranslationPromptBuilder {
 				4. **Whitespace Integrity**: ALWAYS preserve blank lines, especially after horizontal rules (---). The pattern '---\n\n##' must remain '---\n\n##' and never become '---\n##'
 	
 				# TRANSLATION GUIDELINES
-				## What to Translate
-				- Natural language text and documentation content
-				- Code comments and string literals (when they contain user-facing text)
-				- Alt text, titles, and descriptive content
+				${this.buildMarkdownTranslationScopeSection()}
 	
 				## What NOT to Translate
 				- API endpoints; URLs, paths, and configuration values; technical terms unless the translation guidelines map them
@@ -165,7 +166,9 @@ export class TranslationPromptBuilder {
 	/**
 	 * Builds the system prompt for batched YAML frontmatter string translation with structured JSON output.
 	 *
-	 * @param languages Human-readable source and target language names for the TASK section
+	 * @param languages Human-readable language names for the TASK section
+	 * @param languages.source Source language display name
+	 * @param languages.target Target language display name
 	 * @param translationGuidelines Optional glossary for terminology alignment
 	 *
 	 * @returns The system prompt string for the frontmatter batch completion
@@ -221,6 +224,55 @@ export class TranslationPromptBuilder {
 				A previous translation of this content was rejected. Apply every correction below in a new full translation of the user message:
 				${attemptContext.validationRetryHints.map((hint) => `- ${hint}`).join("\n")}
 				`;
+	}
+
+	/**
+	 * Builds the maintainer review section for re-translations after human feedback on a PR.
+	 *
+	 * @param attemptContext Attempt context with maintainer comment bodies
+	 *
+	 * @returns Markdown section for the system prompt, or empty when no comments
+	 */
+	public buildMaintainerReviewSection(attemptContext: TranslationAttemptContext) {
+		const comments = attemptContext.maintainerReviewComments ?? [];
+		if (comments.length === 0) return "";
+
+		const formattedComments = comments
+			.map((body, index) => {
+				const trimmed = body.trim();
+				if (comments.length === 1) return trimmed;
+
+				return `### Review note ${index + 1}\n\n${trimmed}`;
+			})
+			.join("\n\n");
+
+		return `
+				# MAINTAINER REVIEW (previous automated translation)
+				A repository maintainer reviewed the last automated translation on the pull request and reported problems. The user message is still the English source; produce a new ${this.languageDetector.getLanguageName(this.languageDetector.languages.target)} translation that fixes every issue below.
+				
+				${formattedComments}
+				`;
+	}
+
+	/**
+	 * Builds the "What to Translate" scope for markdown body translation.
+	 *
+	 * Locales may override the default scope via {@link LocaleRulesConfig.markdownTranslationScopeSection}.
+	 *
+	 * @returns Markdown bullet sections for translation scope
+	 */
+	private buildMarkdownTranslationScopeSection() {
+		const localeScope = this.locale.definitions.rules.markdownTranslationScopeSection;
+		if (localeScope) {
+			return localeScope;
+		}
+
+		return `
+				## What to Translate
+				- Natural language text and documentation content
+				- Code comments and string literals (when they contain user-facing text)
+				- Alt text, titles, and descriptive content
+			`;
 	}
 
 	private getLogger() {

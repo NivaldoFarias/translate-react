@@ -4,6 +4,8 @@ import { AbortError } from "p-retry";
 
 import type { Logger } from "pino";
 
+import type { TranslatorService } from "@/app/services/translator";
+
 import { ApplicationError, ErrorCode } from "./error";
 
 /**

@@ -7,8 +7,9 @@ import type { FileProcessingProgress } from "@/app/services/runner/types";
 
 import type { RunnerServiceDependencies } from "../runner.types";
 
+import type { TranslationPullRequestValidity } from "./translation-pull-request-validity.manager";
+
 import { PullRequestProgressAction } from "@/app/services/github/types";
-import { LanguageDetectorService } from "@/app/services/language-detector/";
 import { TranslationFile } from "@/app/services/translator/";
 import {
 	env,
@@ -18,10 +19,17 @@ import {
 } from "@/app/utils/";
 import { ApplicationError, ErrorCode } from "@/shared/errors/";
 
+import { getMaintainerFeedbackCommentBodies } from "./maintainer-feedback.util";
 import { TranslationPullRequestValidityManager } from "./translation-pull-request-validity.manager";
 import { MAX_CONSECUTIVE_FAILURES } from "./workflow.constants";
 
-/** Returns the hostname of the configured LLM API base URL for PR metadata */
+/**
+ * Returns the hostname of the configured LLM API base URL for PR metadata.
+ *
+ * @param baseUrl LLM API base URL from environment
+ *
+ * @returns Parsed hostname, or the original string when URL parsing fails
+ */
 function resolveLlmApiHost(baseUrl: string) {
 	try {
 		return new URL(baseUrl).host;
@@ -152,7 +160,10 @@ export class TranslationBatchManager {
 	 * Processes a single batch of files concurrently.
 	 *
 	 * @param batch Files in the current batch
-	 * @param batchInfo Information about the batch's position in the overall process
+	 * @param batchInfo Batch position metadata
+	 * @param batchInfo.currentBatch One-based index of the batch being processed
+	 * @param batchInfo.totalBatches Total number of batches in the run
+	 * @param batchInfo.batchSize Number of files in this batch
 	 *
 	 * @returns Map of filename to processing result for this batch
 	 */
@@ -220,10 +231,10 @@ export class TranslationBatchManager {
 	 * @param file File to process through translation workflow
 	 * @param _progress Progress tracking information for batch processing
 	 *
-	 * @throws {ApplicationError} with {@link ErrorCode.TranslationFailed}
-	 * If circuit breaker threshold is reached due to consecutive failures
-	 *
 	 * @returns Processing result metadata including branch, translation, PR, and error info
+	 *
+	 * @throws {ApplicationError} with {@link ErrorCode.TranslationFailed|`"TRANSLATION_FAILED"`}
+	 * If circuit breaker threshold is reached due to consecutive failures
 	 */
 	private async processFile(
 		file: TranslationFile,
@@ -258,10 +269,13 @@ export class TranslationBatchManager {
 				);
 			}
 
-			const skippedForValidTranslationPullRequest = await this.skipIfValidTranslationPullRequest(
+			const pullRequestValidity = await this.translationPullRequestValidity.evaluate(file.path);
+
+			const skippedForValidTranslationPullRequest = this.skipIfValidTranslationPullRequest(
 				file,
 				metadata,
 				startTime,
+				pullRequestValidity,
 			);
 
 			if (skippedForValidTranslationPullRequest) {
@@ -269,14 +283,14 @@ export class TranslationBatchManager {
 			}
 
 			const branchStart = Date.now();
-			metadata.branch = await this.resetTranslationBranch(file);
+			metadata.branch = await this.prepareTranslationBranch(file, pullRequestValidity);
 			file.logger.debug(
 				{ branchRef: metadata.branch.ref, durationMs: Date.now() - branchStart },
 				"Step 1/5: Translation branch reset for single-commit workflow",
 			);
 
 			const translationStart = Date.now();
-			const translationResult = await this.services.translator.translateContent(file);
+			const translationResult = await this.resolveTranslation(file, pullRequestValidity);
 			metadata.translation = translationResult.content;
 			metadata.retries = translationResult.retries;
 			file.logger.debug(
@@ -311,7 +325,7 @@ export class TranslationBatchManager {
 			}
 
 			const languageName = this.services.languageDetector.getLanguageName(
-				LanguageDetectorService.languages.target,
+				this.services.languageDetector.languages.target,
 			);
 
 			const commitStart = Date.now();
@@ -324,7 +338,11 @@ export class TranslationBatchManager {
 			file.logger.debug({ durationMs: Date.now() - commitStart }, "Step 4/5: Commit complete");
 
 			const prStart = Date.now();
-			const pullRequestOutcome = await this.openTranslationPullRequest(file, metadata);
+			const pullRequestOutcome = await this.openTranslationPullRequest(
+				file,
+				metadata,
+				pullRequestValidity,
+			);
 			metadata.pullRequest = pullRequestOutcome.pullRequest;
 			metadata.pullRequestProgress = pullRequestOutcome.progress;
 			file.logger.debug(
@@ -395,21 +413,59 @@ export class TranslationBatchManager {
 	}
 
 	/**
+	 * Resolves translated content via full document re-translation.
+	 *
+	 * When {@link TranslationPullRequestValidity.invalidReason} is `needs_maintainer_fix`,
+	 * the open PR and branch are reused and maintainer issue comments are passed into the LLM prompt.
+	 *
+	 * @param file Upstream English source file for the workflow
+	 * @param validity Pull request validity from the start of file processing
+	 *
+	 * @returns Translated content and validation retries from the translator
+	 */
+	private async resolveTranslation(
+		file: TranslationFile,
+		validity: TranslationPullRequestValidity,
+	) {
+		if (validity.invalidReason !== "needs_maintainer_fix" || !validity.pullRequest) {
+			return this.services.translator.translateContent(file);
+		}
+
+		const branchName = getTranslationBranchNameFromPath(file.path);
+		const [comments, runnerCommitAt] = await Promise.all([
+			this.services.github.listPullRequestIssueComments(validity.pullRequest.number),
+			this.services.github.getLatestTranslationCommitTimestamp(branchName),
+		]);
+		const maintainerFeedbackComments = getMaintainerFeedbackCommentBodies(comments, runnerCommitAt);
+
+		file.logger.info(
+			{
+				path: file.path,
+				prNumber: validity.pullRequest.number,
+				maintainerCommentCount: maintainerFeedbackComments.length,
+			},
+			"Maintainer feedback after latest runner commit; running full re-translation with review comments in prompt",
+		);
+
+		return this.services.translator.translateContent(file, { maintainerFeedbackComments });
+	}
+
+	/**
 	 * Returns completed metadata when an open translation pull request is already valid.
 	 *
 	 * @param file Translation file being processed
 	 * @param metadata In-progress processing result to populate when skipping
 	 * @param startTime Workflow step start time for duration logging
+	 * @param validity Pull request validity evaluated at the start of file processing
 	 *
 	 * @returns Filled metadata when skipped, or `null` to continue translation
 	 */
-	private async skipIfValidTranslationPullRequest(
+	private skipIfValidTranslationPullRequest(
 		file: TranslationFile,
 		metadata: ProcessedFileResult,
 		startTime: number,
+		validity: TranslationPullRequestValidity,
 	) {
-		const validity = await this.translationPullRequestValidity.evaluate(file.path);
-
 		if (!validity.isValid || !validity.pullRequest) {
 			return null;
 		}
@@ -471,6 +527,40 @@ export class TranslationBatchManager {
 	}
 
 	/**
+	 * Resolves the fork branch for translation: reuses an existing branch when addressing
+	 * maintainer feedback, otherwise resets from the fork default tip.
+	 *
+	 * @param file Translation file being processed
+	 * @param validity Pull request validity from the start of file processing
+	 *
+	 * @returns Branch reference to commit the translation on
+	 */
+	private async prepareTranslationBranch(
+		file: TranslationFile,
+		validity: TranslationPullRequestValidity,
+	) {
+		if (validity.invalidReason === "needs_maintainer_fix" && validity.pullRequest) {
+			const branchName = getTranslationBranchNameFromPath(file.path);
+			const existingBranch = await this.services.github.getBranch(branchName);
+
+			if (existingBranch) {
+				this.logger.info(
+					{
+						filename: file.filename,
+						prNumber: validity.pullRequest.number,
+						branchName,
+					},
+					"Reusing translation branch for maintainer feedback remediation",
+				);
+
+				return existingBranch.data;
+			}
+		}
+
+		return this.resetTranslationBranch(file);
+	}
+
+	/**
 	 * Closes any open translation PR and recreates the branch from the fork default tip.
 	 *
 	 * Ensures the subsequent translation commit is the only commit on the topic branch.
@@ -521,19 +611,36 @@ export class TranslationBatchManager {
 	 *
 	 * @param file Translation file being processed
 	 * @param processingResult Processing metadata including translation and timing
+	 * @param validity Pull request validity evaluated at the start of file processing
 	 *
-	 * @returns Newly created pull request metadata for progress reporting
+	 * @returns Pull request metadata for progress reporting
 	 */
 	private async openTranslationPullRequest(
 		file: TranslationFile,
 		processingResult: ProcessedFileResult,
+		validity: TranslationPullRequestValidity,
 	): Promise<{
 		pullRequest: NonNullable<ProcessedFileResult["pullRequest"]>;
-		progress: PullRequestProgressAction.Created;
+		progress: PullRequestProgressAction;
 	}> {
+		if (validity.invalidReason === "needs_maintainer_fix" && validity.pullRequest) {
+			this.logger.info(
+				{
+					path: file.path,
+					prNumber: validity.pullRequest.number,
+				},
+				"Keeping open translation pull request after maintainer feedback remediation",
+			);
+
+			return {
+				pullRequest: validity.pullRequest,
+				progress: PullRequestProgressAction.Reused,
+			};
+		}
+
 		const branchName = getTranslationBranchNameFromPath(file.path);
 		const languageName = this.services.languageDetector.getLanguageName(
-			LanguageDetectorService.languages.target,
+			this.services.languageDetector.languages.target,
 		);
 		const pullRequestOptions = {
 			title: this.services.locale.definitions.pullRequest.title(file),

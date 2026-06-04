@@ -1,5 +1,4 @@
-import type { ProcessedFileResult } from "@/app/services/github/types";
-import type { TranslationFile } from "@/app/services/translator/";
+import type { ProcessedFileResult, TranslationProgressFileRef } from "@/app/services/github/types";
 
 import { PullRequestProgressAction } from "@/app/services/github/types";
 
@@ -28,13 +27,13 @@ export function filterReportableProgressCommentResults(results: ProcessedFileRes
  */
 export function selectProgressCommentPayload(
 	results: ProcessedFileResult[],
-	filesToTranslate: TranslationFile[],
+	filesToTranslate: readonly TranslationProgressFileRef[],
 ) {
 	const reportableResults = filterReportableProgressCommentResults(results);
 
 	const reportableFiles = reportableResults
 		.map((result) => filesToTranslate.find((file) => file.filename === result.filename))
-		.filter((file): file is TranslationFile => file !== undefined);
+		.filter((file): file is TranslationProgressFileRef => file !== undefined);
 
 	return { reportableResults, reportableFiles };
 }
