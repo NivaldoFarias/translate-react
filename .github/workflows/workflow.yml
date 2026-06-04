@@ -32,10 +32,6 @@ permissions:
   contents: read
   actions: write
 
-concurrency:
-  group: translation-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   prepare-matrix:
     name: Prepare matrix
@@ -105,6 +101,9 @@ jobs:
       fail-fast: false
       matrix:
         include: ${{ fromJson(needs.prepare-matrix.outputs.matrix) }}
+    concurrency:
+      group: translation-${{ matrix.lang }}-${{ github.ref }}
+      cancel-in-progress: true
     steps:
       - name: Generate Bot Token
         id: generate-token

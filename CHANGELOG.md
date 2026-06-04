@@ -4,6 +4,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+### Changed
+
+- Translation workflow concurrency is per matrix locale on the same ref: a new run cancels only the in-flight job for that locale, not sibling locales in the same matrix.
+- Poll workflow no longer cancels an in-progress upstream SHA check when another poll starts on the same ref.
+- Wiki: locale onboarding checklist, translation workflow concurrency policy, and parallel matrix capacity guidance for LLM and GitHub limits.
+
 ## [0.2.6] - 2026-06-04
 
 ### Added
