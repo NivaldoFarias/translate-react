@@ -16,6 +16,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Changed
 
+- Removed guard-driven LLM retry hints from attempt context and prompts; `collectPostTranslationValidationIssues` replaces `collectRetryableValidationIssues`; `MAX_RETRY_ATTEMPTS` documents LLM API p-retry only.
 - `markdownLinksPreserved` and `fenceFunctionIdentifiers` guards and retry hints list every violation (no arbitrary slice caps).
 - Post-translation validation uses one LLM pass: only `contentRatio` and `nonEmptyContent` fail the workflow; other guard failures open or update the PR with a `[!WARNING]` hint table (no guard-driven LLM retries).
 - Translation PR bodies drop stats/tech `<details>`; operator metadata (model, tokens, ratio) logs at `debug` when the PR is built.

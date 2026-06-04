@@ -123,7 +123,7 @@ const envSchema = z.object({
 	 */
 	GH_REQUEST_TIMEOUT: z.coerce.number().positive().default(envDefaults.GH_REQUEST_TIMEOUT),
 
-	/** Maximum retry attempts for translation errors */
+	/** Maximum p-retry attempts per LLM chat completion on transient API errors */
 	MAX_RETRY_ATTEMPTS: z.coerce.number().positive().default(envDefaults.MAX_RETRY_ATTEMPTS),
 
 	/** Concurrency limit for LLM requests */

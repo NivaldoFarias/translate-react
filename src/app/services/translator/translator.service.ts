@@ -48,7 +48,6 @@ import {
 } from "./markdown/frontmatter";
 import {
 	emptyTranslationAttemptContext,
-	translationAttemptContextFromHints,
 	translationAttemptContextFromMaintainerReview,
 } from "./pipeline/translation-attempt.context";
 import { TranslationPipelineManager } from "./pipeline/translation-pipeline.manager";
@@ -71,14 +70,11 @@ export type { TranslationLlmUsageTotals } from "./llm/translation-llm.usage";
 
 /** Optional inputs for {@link TranslatorService.translateContent} */
 export interface TranslateContentOptions {
-	/** Extra retry hints (e.g. from a prior validation pass) */
-	readonly validationRetryHints?: readonly string[];
-
 	/** Maintainer PR review bodies to include in the translation system prompt */
 	readonly maintainerFeedbackComments?: readonly string[];
 }
 
-/** Result from translating a file, including retry metadata */
+/** Result from translating a file */
 export interface TranslationResult {
 	/** The translated content */
 	content: string;
@@ -370,7 +366,7 @@ export class TranslatorService {
 	 * 8. Cleans up and returns translated content
 	 *
 	 * @param file File containing content to translate
-	 * @param options Optional maintainer retry hints for the first attempt
+	 * @param options Optional maintainer feedback for re-translation
 	 *
 	 * @returns Promise resolving to translated content
 	 *
@@ -456,20 +452,11 @@ export class TranslatorService {
 		const maintainerComments = options?.maintainerFeedbackComments?.filter(
 			(body) => body.trim().length > 0,
 		);
-		const validationHints = options?.validationRetryHints ?? [];
 
-		const initialAttemptContext = (() => {
-			if (maintainerComments && maintainerComments.length > 0) {
-				const base = translationAttemptContextFromMaintainerReview(maintainerComments);
-				return validationHints.length > 0 ?
-						translationAttemptContextFromHints(validationHints, base)
-					:	base;
-			}
-
-			return validationHints.length > 0 ?
-					translationAttemptContextFromHints(validationHints)
-				:	emptyTranslationAttemptContext();
-		})();
+		const initialAttemptContext =
+			maintainerComments && maintainerComments.length > 0 ?
+				translationAttemptContextFromMaintainerReview(maintainerComments)
+			:	emptyTranslationAttemptContext();
 
 		const pipelineResult = await this.managers.pipeline.translateWithValidation({
 			file,
@@ -505,7 +492,7 @@ export class TranslatorService {
 				return finalized;
 			},
 			collectIssues: (content) =>
-				this.managers.validation.collectRetryableValidationIssues(file, content),
+				this.managers.validation.collectPostTranslationValidationIssues(file, content),
 			createFailedError: (content, issues) =>
 				this.managers.validation.createValidationFailedError(file, content, issues),
 		});
@@ -671,10 +658,10 @@ export class TranslatorService {
 	 * ```
 	 */
 	/**
-	 * Translates markdown body content (single-shot or chunked) with optional validation retry hints.
+	 * Translates markdown body content (single-shot or chunked).
 	 *
 	 * @param file Work file whose `content` is the body sent to the LLM (frontmatter already split off)
-	 * @param attemptContext Guard hints from a failed post-translation validation attempt
+	 * @param attemptContext Maintainer feedback for the system prompt, when present
 	 *
 	 * @returns Translated markdown body before frontmatter merge
 	 */
@@ -755,7 +742,7 @@ export class TranslatorService {
 	 * @param chunk Content to translate
 	 * @param index Index of the chunk
 	 * @param chunks Array of all chunks
-	 * @param attemptContext Guard hints from a failed post-translation validation attempt
+	 * @param attemptContext Maintainer feedback for the system prompt, when present
 	 * @param tokenBudget Maximum tokens per sub-chunk (used during recursive re-chunking)
 	 *
 	 * @returns Promise resolving to the translated chunk
@@ -829,7 +816,7 @@ export class TranslatorService {
 	 * @param chunk The chunk that was truncated
 	 * @param index Index of the chunk in the parent array
 	 * @param chunks Parent chunk array
-	 * @param attemptContext Guard hints from a failed post-translation validation attempt
+	 * @param attemptContext Maintainer feedback for the system prompt, when present
 	 * @param currentBudget Current token budget (if already in a re-chunk pass)
 	 *
 	 * @returns Translated content assembled from sub-chunks
@@ -897,7 +884,7 @@ export class TranslatorService {
 	 * @param chunkProgress Slice index when translating a chunked document
 	 * @param systemPromptKind Markdown body vs frontmatter batch prompt
 	 * @param responseFormat Optional structured output format for the completion
-	 * @param attemptContext Guard retry hints from prior validation failures
+	 * @param attemptContext Maintainer feedback for the system prompt, when present
 	 *
 	 * @returns LLM completion text from the shared client
 	 *

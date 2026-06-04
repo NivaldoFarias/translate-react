@@ -15,7 +15,7 @@ export interface PostTranslationValidationPartition {
  * Issue raised by a post-translation guard when output fails validation.
  */
 export interface TranslationValidationIssue extends TranslationRetryInfo {
-	/** Instruction for maintainers and (historically) LLM retries */
+	/** Actionable hint for maintainers (also surfaced on the translation PR when advisory) */
 	retryHint: string;
 }
 

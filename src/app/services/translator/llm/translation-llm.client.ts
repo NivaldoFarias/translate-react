@@ -103,7 +103,7 @@ export class TranslationLlmClient {
 	 * @param chunkProgress Optional slice position when translating a chunked body
 	 * @param systemPromptKind Which system prompt to build
 	 * @param responseFormat Optional structured output format
-	 * @param attemptContext Guard hints from a failed validation attempt
+	 * @param attemptContext Maintainer feedback for the system prompt, when present
 	 *
 	 * @returns Chat completion parameters object
 	 */
@@ -152,7 +152,7 @@ export class TranslationLlmClient {
 	 * @param chunkProgress When set, notes this body is slice `index` of `total`
 	 * @param systemPromptKind Which system prompt to use
 	 * @param responseFormat Optional structured output format
-	 * @param attemptContext Guard hints from a failed validation attempt
+	 * @param attemptContext Maintainer feedback for the system prompt, when present
 	 *
 	 * @returns Resolves to the translated content
 	 *

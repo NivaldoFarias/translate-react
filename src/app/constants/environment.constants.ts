@@ -25,6 +25,7 @@ export interface EnvironmentSchemaDefaults {
 	LOG_TO_CONSOLE: boolean;
 	GH_REQUEST_TIMEOUT: number;
 	MAX_LLM_CONCURRENCY: number;
+	/** Maximum p-retry attempts per LLM chat completion on transient API errors */
 	MAX_RETRY_ATTEMPTS: number;
 
 	/**
