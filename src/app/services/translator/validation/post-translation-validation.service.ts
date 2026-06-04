@@ -10,7 +10,7 @@ import { ApplicationError, ErrorCode } from "@/shared/errors";
 
 import { MARKDOWN_REGEXES } from "../markdown/markdown.regexes";
 
-import { collectPostTranslationValidationIssues } from "./guards";
+import { collectPostTranslationValidationIssues as runPostTranslationValidationGuards } from "./guards";
 import { partitionPostTranslationValidationIssues } from "./validation-outcome.util";
 import { VALIDATION_RATIOS } from "./validation.constants";
 
@@ -36,18 +36,18 @@ export class PostTranslationValidationService {
 	}
 
 	/**
-	 * Runs post-translation guards that can trigger an LLM retry with hints.
+	 * Runs all post-translation guards on translated content.
 	 *
 	 * @param file Original file containing source content for comparison
 	 * @param translatedContent Translated content to validate against source
 	 *
-	 * @returns All retryable issues; empty when the output passes every guard
+	 * @returns Every guard issue found; empty when the output passes every guard
 	 */
-	public collectRetryableValidationIssues(
+	public collectPostTranslationValidationIssues(
 		file: TranslationFile,
 		translatedContent: string,
 	): TranslationValidationIssue[] {
-		return collectPostTranslationValidationIssues(file.content, translatedContent, {
+		return runPostTranslationValidationGuards(file.content, translatedContent, {
 			translationGuidelines: this.getTranslationGuidelines(),
 		} satisfies PostTranslationValidationOptions);
 	}
@@ -55,7 +55,7 @@ export class PostTranslationValidationService {
 	/**
 	 * Validates translated content to ensure completeness and quality.
 	 *
-	 * Hard failures are handled by {@link collectRetryableValidationIssues}. This method
+	 * Hard failures are handled by {@link collectPostTranslationValidationIssues}. This method
 	 * throws when any guard fails, then records soft warnings (ratio drift) without throwing.
 	 *
 	 * @param file Original file containing source content for comparison
@@ -64,7 +64,7 @@ export class PostTranslationValidationService {
 	 * @throws {ApplicationError} with {@link ErrorCode.FormatValidationFailed} when a guard fails
 	 */
 	public validateTranslation(file: TranslationFile, translatedContent: string): void {
-		const issues = this.collectRetryableValidationIssues(file, translatedContent);
+		const issues = this.collectPostTranslationValidationIssues(file, translatedContent);
 		const { blocking } = partitionPostTranslationValidationIssues(issues);
 		if (blocking.length > 0) {
 			throw this.createValidationFailedError(file, translatedContent, issues);
@@ -87,7 +87,7 @@ export class PostTranslationValidationService {
 	 *
 	 * @param file Original translation file
 	 * @param translatedContent Model output that failed validation
-	 * @param issues Guard issues collected from {@link collectRetryableValidationIssues}
+	 * @param issues Guard issues collected from {@link collectPostTranslationValidationIssues}
 	 *
 	 * @returns Error to throw after the final failed attempt
 	 */

@@ -43,7 +43,7 @@ describe("PostTranslationValidationService", () => {
 				validation.validateTranslation(file, translated);
 			}).not.toThrow();
 
-			const issues = validation.collectRetryableValidationIssues(file, translated);
+			const issues = validation.collectPostTranslationValidationIssues(file, translated);
 			expect(issues.some((issue) => issue.guardId === "headingsPreserved")).toBe(true);
 		});
 
@@ -119,7 +119,7 @@ Body paragraph with enough text to keep the translated document within the conte
 		});
 	});
 
-	describe("collectRetryableValidationIssues", () => {
+	describe("collectPostTranslationValidationIssues", () => {
 		test("returns multiple issues with distinct guardIds", () => {
 			const file = makeFile(`
 # Title
@@ -131,7 +131,7 @@ function OptimizedList() {}
 [docs](/learn)
 `);
 
-			const issues = validation.collectRetryableValidationIssues(
+			const issues = validation.collectPostTranslationValidationIssues(
 				file,
 				`
 Plain text only
@@ -155,7 +155,7 @@ function ListaOtimizada() {}
 			const file = makeFile("[one](/a) [two](/b)");
 			const translated = "/a";
 
-			const issues = validation.collectRetryableValidationIssues(file, translated);
+			const issues = validation.collectPostTranslationValidationIssues(file, translated);
 			const error = validation.createValidationFailedError(file, translated, issues);
 
 			expect(error.message).toContain("content ratio");

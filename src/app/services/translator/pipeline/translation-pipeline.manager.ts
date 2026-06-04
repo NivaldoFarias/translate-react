@@ -24,7 +24,7 @@ export interface TranslationPipelineRunParams {
 	/** Original file whose full document is validated after assembly */
 	file: TranslationFile;
 
-	/** Translates markdown body (single-shot or chunked) using attempt context hints */
+	/** Translates markdown body (single-shot or chunked) using maintainer feedback when set */
 	translateBody: (attemptContext: TranslationAttemptContext) => Promise<string>;
 
 	/** Restores masks, strips artifacts, and merges frontmatter into the full document */
