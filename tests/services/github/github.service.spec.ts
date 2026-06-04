@@ -851,6 +851,35 @@ describe("GitHubService", () => {
 			});
 		});
 
+		describe("listPullRequestIssueComments", () => {
+			test("should return normalized issue comments for a pull request", async () => {
+				octokitMock.paginate.mockResolvedValueOnce([
+					{
+						user: { login: "maintainer", type: "User" },
+						author_association: "MEMBER",
+						created_at: "2026-06-01T12:00:00Z",
+						body: "Please fix the heading.",
+					},
+				]);
+
+				const comments = await githubService.listPullRequestIssueComments(42);
+
+				expect(comments).toEqual([
+					{
+						login: "maintainer",
+						authorAssociation: "MEMBER",
+						userType: "User",
+						createdAt: new Date("2026-06-01T12:00:00Z"),
+						body: "Please fix the heading.",
+					},
+				]);
+				expect(octokitMock.paginate).toHaveBeenCalledWith(
+					"GET /repos/{owner}/{repo}/issues/{issue_number}/comments",
+					{ ...testRepositories.upstream, issue_number: 42, per_page: 100 },
+				);
+			});
+		});
+
 		describe("findPullRequestByBranch", () => {
 			test("should return PR when branch matches", async () => {
 				octokitMock.pulls.list.mockResolvedValueOnce({
