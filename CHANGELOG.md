@@ -7,6 +7,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 ### Added
 
 - `fenceJsxStaticText` post-translation guard rejects translated static JSX demo text inside fenced code blocks (pairs fences, compares text between tags with expressions removed, accumulates retry hints).
+- `validation-outcome.util` splits post-translation guards into blocking vs advisory; `ReviewerValidationNotice` carries maintainer `retryHint` text on shipped PRs.
+- Per-file LLM usage totals and workflow `printFinalStatistics` rollup (prompt/completion tokens, OpenRouter `usage.cost` when present, advisory guard counts).
 
 ### Fixed
 
@@ -15,8 +17,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 ### Changed
 
 - `markdownLinksPreserved` and `fenceFunctionIdentifiers` guards and retry hints list every violation (no arbitrary slice caps).
-- Post-translation validation retries accumulate every guard `retryHint` on the same attempt and across attempts (complementary hints, not exclusive).
-- Post-translation validation allows up to three full-document attempts (was two).
+- Post-translation validation uses one LLM pass: only `contentRatio` and `nonEmptyContent` fail the workflow; other guard failures open or update the PR with a `[!WARNING]` hint table (no guard-driven LLM retries).
+- Translation PR bodies drop stats/tech `<details>`; operator metadata (model, tokens, ratio) logs at `debug` when the PR is built.
+- `ProcessedFileResult` exposes `reviewerNotices` instead of `retries`.
 - Translation-progress issue comments separate **created** and **updated** pull requests in distinct sections.
 - GitHub Actions: `actions/cache` v5 in `setup-bun-deps`; CI Bun default `1.3.14` (override with repo variable `BUN_VERSION`).
 - Translation workflow concurrency is per matrix locale on the same ref: a new run cancels only the in-flight job for that locale, not sibling locales in the same matrix.

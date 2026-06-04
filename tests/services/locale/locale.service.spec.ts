@@ -17,21 +17,7 @@ function createPullRequestDescriptionMetadata(
 	return {
 		languageName: "Português (Brasil)",
 		invalidFilePR: undefined,
-		content: {
-			source: "1.5 kB",
-			translation: "1.8 kB",
-			compressionRatio: "1.20",
-		},
-		timestamps: {
-			now: 1706900000000,
-			workflowStart: 1706899000000,
-		},
-		runnerVersion: "v0.1.28",
-		translationModel: "google/gemini-2.0-flash-exp:free",
-		llmApiHost: "openrouter.ai",
-		nodeEnv: "test",
-		maskVerbatimLargeFences: false,
-		retries: [],
+		reviewerNotices: [],
 		...overrides,
 	};
 }
@@ -170,7 +156,7 @@ describe("ptBrLocale.pullRequest.body", () => {
 
 			const body = buildPullRequestBody(file, processingResult, metadata);
 
-			expect(body).not.toContain("[!IMPORTANT]\n> **PR anterior fechado**");
+			expect(body).not.toContain("PR anterior fechado");
 			expect(body).not.toContain("fechado automaticamente");
 		});
 
@@ -190,7 +176,7 @@ describe("ptBrLocale.pullRequest.body", () => {
 
 			const body = buildPullRequestBody(file, processingResult, metadata);
 
-			expect(body).toContain("> [!IMPORTANT]");
+			expect(body).toContain("> [!NOTE]");
 			expect(body).toContain("**PR anterior fechado**");
 			expect(body).toContain("#42");
 			expect(body).toContain("fechado automaticamente");
@@ -215,26 +201,6 @@ describe("ptBrLocale.pullRequest.body", () => {
 			expect(body).toContain("refeita a partir do arquivo fonte atual");
 			expect(body).toContain("sem merge manual dos conflitos");
 		});
-
-		test("should use GFM IMPORTANT alert syntax for conflict notice", () => {
-			const metadata = createPullRequestDescriptionMetadata({
-				invalidFilePR: {
-					prNumber: 1,
-					status: {
-						needsUpdate: true,
-						hasConflicts: true,
-						mergeable: false,
-						mergeableState: "dirty",
-						createdBy: "other-user",
-					},
-				},
-			});
-
-			const body = buildPullRequestBody(file, processingResult, metadata);
-
-			expect(body).toContain("> [!IMPORTANT]");
-			expect(body).not.toContain("> [!WARNING]");
-		});
 	});
 
 	describe("PR body structure", () => {
@@ -246,20 +212,17 @@ describe("ptBrLocale.pullRequest.body", () => {
 			expect(body).toContain("Português (Brasil)");
 		});
 
-		test("should include processing statistics in details section", () => {
-			const metadata = createPullRequestDescriptionMetadata({
-				content: {
-					source: "2.5 kB",
-					translation: "3.0 kB",
-					compressionRatio: "1.20",
-				},
-			});
+		test("should not include collapsible details or operator metadata", () => {
+			const body = buildPullRequestBody(
+				file,
+				processingResult,
+				createPullRequestDescriptionMetadata(),
+			);
 
-			const body = buildPullRequestBody(file, processingResult, metadata);
-
-			expect(body).toContain("2.5 kB");
-			expect(body).toContain("3.0 kB");
-			expect(body).toContain("1.20x");
+			expect(body).not.toContain("<details>");
+			expect(body).not.toContain("Estatísticas de Processamento");
+			expect(body).not.toContain("Informações Técnicas");
+			expect(body).not.toContain("Versão do translate-react");
 		});
 
 		test("should include human review notice", () => {
@@ -270,59 +233,23 @@ describe("ptBrLocale.pullRequest.body", () => {
 			expect(body).toContain("requer revisão humana");
 		});
 
-		test("should include translation model under technical info", () => {
+		test("should render WARNING table with retry hints when reviewer notices exist", () => {
 			const metadata = createPullRequestDescriptionMetadata({
-				translationModel: "anthropic/claude-3.5-sonnet",
+				reviewerNotices: [
+					{
+						guardId: "markdownLinksPreserved",
+						hint: "Preserve every `[label](url)` from the source.",
+					},
+				],
 			});
 
 			const body = buildPullRequestBody(file, processingResult, metadata);
 
-			expect(body).toContain("Modelo de tradução (LLM)");
-			expect(body).toContain("`anthropic/claude-3.5-sonnet`");
-		});
-
-		test("should include runner version and runtime config under technical info", () => {
-			const metadata = createPullRequestDescriptionMetadata({
-				runnerVersion: "v0.2.0",
-				llmApiHost: "openrouter.ai",
-				nodeEnv: "production",
-			});
-
-			const body = buildPullRequestBody(file, processingResult, metadata);
-
-			expect(body).toContain("Versão do translate-react");
-			expect(body).toContain("`v0.2.0`");
-			expect(body).toContain("`openrouter.ai`");
-			expect(body).toContain("`production`");
-		});
-
-		test("should list mask verbatim fences only when enabled", () => {
-			const enabled = buildPullRequestBody(
-				file,
-				processingResult,
-				createPullRequestDescriptionMetadata({ maskVerbatimLargeFences: true }),
-			);
-			const disabled = buildPullRequestBody(
-				file,
-				processingResult,
-				createPullRequestDescriptionMetadata({ maskVerbatimLargeFences: false }),
-			);
-
-			expect(enabled).toContain("Máscara de blocos de código grandes");
-			expect(disabled).not.toContain("Máscara de blocos de código grandes");
-		});
-
-		test("should use footnotes for content ratio and processing time metrics", () => {
-			const metadata = createPullRequestDescriptionMetadata();
-
-			const body = buildPullRequestBody(file, processingResult, metadata);
-
-			expect(body).toContain("1.20x [^content-ratio]");
-			expect(body).toContain("[^processing-time]");
-			expect(body).toContain("[^content-ratio]:");
-			expect(body).toContain("[^processing-time]:");
-			expect(body).not.toContain("> [!NOTE]");
-			expect(body).toContain("Razão de Conteúdo");
+			expect(body).toContain("> [!WARNING]");
+			expect(body).toContain("`markdownLinksPreserved`");
+			expect(body).toContain("Preserve every `[label](url)` from the source.");
+			expect(body).toContain("| Validador | O que corrigir |");
+			expect(body).not.toContain("Tentativas de Validação");
 		});
 
 		test("should link to the maintainer wiki guide", () => {
@@ -382,7 +309,7 @@ describe("ruLocale.pullRequest.body", () => {
 
 			const body = buildPullRequestBody(file, processingResult, metadata);
 
-			expect(body).toContain("> [!IMPORTANT]");
+			expect(body).toContain("> [!NOTE]");
 			expect(body).toContain("**Предыдущий PR закрыт**");
 			expect(body).toContain("#42");
 			expect(body).toContain("закрыт автоматически");
@@ -410,16 +337,16 @@ describe("ruLocale.pullRequest.body", () => {
 			expect(body).toContain("требует проверки человеком");
 		});
 
-		test("should include Russian section headers", () => {
+		test("should not include removed stats or tech sections", () => {
 			const metadata = createPullRequestDescriptionMetadata({
 				languageName: "Русский",
 			});
 
 			const body = buildPullRequestBody(file, processingResult, metadata);
 
-			expect(body).toContain("Статистика обработки");
-			expect(body).toContain("Техническая информация");
-			expect(body).toContain("Модель перевода (LLM)");
+			expect(body).not.toContain("Статистика обработки");
+			expect(body).not.toContain("Техническая информация");
+			expect(body).not.toContain("<details>");
 		});
 	});
 });

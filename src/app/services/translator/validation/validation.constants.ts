@@ -1,6 +1,3 @@
-/** Maximum full-document translation attempts when post-translation guards fail (includes the first try) */
-export const TRANSLATION_VALIDATION_MAX_ATTEMPTS = 3;
-
 /** Common LLM response prefixes that should be removed from translated content */
 export const TRANSLATION_PREFIXES = [
 	"Here is the translation:",

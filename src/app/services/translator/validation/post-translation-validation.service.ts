@@ -11,6 +11,7 @@ import { ApplicationError, ErrorCode } from "@/shared/errors";
 import { MARKDOWN_REGEXES } from "../markdown/markdown.regexes";
 
 import { collectPostTranslationValidationIssues } from "./guards";
+import { partitionPostTranslationValidationIssues } from "./validation-outcome.util";
 import { VALIDATION_RATIOS } from "./validation.constants";
 
 export type { TranslationValidationIssue } from "./validation.types";
@@ -64,7 +65,8 @@ export class PostTranslationValidationService {
 	 */
 	public validateTranslation(file: TranslationFile, translatedContent: string): void {
 		const issues = this.collectRetryableValidationIssues(file, translatedContent);
-		if (issues.length > 0) {
+		const { blocking } = partitionPostTranslationValidationIssues(issues);
+		if (blocking.length > 0) {
 			throw this.createValidationFailedError(file, translatedContent, issues);
 		}
 
@@ -94,7 +96,9 @@ export class PostTranslationValidationService {
 		translatedContent: string,
 		issues: TranslationValidationIssue[],
 	) {
-		const summary = issues.map((issue) => issue.message).join("; ");
+		const { blocking } = partitionPostTranslationValidationIssues(issues);
+		const failingIssues = blocking.length > 0 ? blocking : issues;
+		const summary = failingIssues.map((issue) => issue.message).join("; ");
 
 		return new ApplicationError(
 			summary,
@@ -105,7 +109,11 @@ export class PostTranslationValidationService {
 				path: file.path,
 				originalLength: file.content.length,
 				translatedLength: translatedContent.length,
-				validationIssues: issues.map(({ guardId, message }) => ({ guardId, message })),
+				validationIssues: issues.map(({ guardId, message, retryHint }) => ({
+					guardId,
+					message,
+					retryHint,
+				})),
 			},
 		);
 	}

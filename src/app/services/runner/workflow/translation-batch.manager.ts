@@ -1,5 +1,4 @@
 import { version } from "@package";
-import prettyBytes from "pretty-bytes";
 
 import type { InvalidFilePullRequest, PullRequestDescriptionMetadata } from "@/app/locales/types";
 import type { ProcessedFileResult } from "@/app/services/github/types";
@@ -244,7 +243,7 @@ export class TranslationBatchManager {
 			branch: null,
 			filename: file.filename,
 			translation: null,
-			retries: [],
+			reviewerNotices: [],
 			pullRequest: null,
 			pullRequestProgress: null,
 			error: null,
@@ -292,12 +291,14 @@ export class TranslationBatchManager {
 			const translationStart = Date.now();
 			const translationResult = await this.resolveTranslation(file, pullRequestValidity);
 			metadata.translation = translationResult.content;
-			metadata.retries = translationResult.retries;
+			metadata.reviewerNotices = translationResult.reviewerNotices;
+			metadata.llmUsage = translationResult.llmUsage;
 			file.logger.debug(
 				{
 					translationSize: metadata.translation.length,
 					durationMs: Date.now() - translationStart,
-					retryCount: metadata.retries.length,
+					advisoryGuardCount: metadata.reviewerNotices.length,
+					reviewerNotices: metadata.reviewerNotices,
 				},
 				"Step 3/5: Translation complete",
 			);
@@ -421,7 +422,7 @@ export class TranslationBatchManager {
 	 * @param file Upstream English source file for the workflow
 	 * @param validity Pull request validity from the start of file processing
 	 *
-	 * @returns Translated content and validation retries from the translator
+	 * @returns Translated content, advisory notices, and LLM usage from the translator
 	 */
 	private async resolveTranslation(
 		file: TranslationFile,
@@ -698,27 +699,31 @@ export class TranslationBatchManager {
 			"Creating pull request description",
 		);
 
+		const contentRatio =
+			file.content.length > 0 ?
+				((processingResult.translation?.length ?? 0) / file.content.length).toFixed(2)
+			:	"unknown";
+
+		this.logger.debug(
+			{
+				path: file.path,
+				runnerVersion: `v${version}`,
+				translationModel: env.LLM_MODEL,
+				llmApiHost: resolveLlmApiHost(env.LLM_API_BASE_URL),
+				nodeEnv: env.NODE_ENV,
+				maskVerbatimLargeFences: env.MASK_VERBATIM_LARGE_FENCES,
+				contentRatio,
+				sourceBytes: file.content.length,
+				translationBytes: processingResult.translation?.length ?? 0,
+				reviewerNotices: processingResult.reviewerNotices,
+			},
+			"Pull request description operator metadata",
+		);
+
 		const pullRequestDescriptionMetadata: PullRequestDescriptionMetadata = {
 			languageName,
 			invalidFilePR: this.invalidPRsByFile.get(file.path),
-			content: {
-				source: prettyBytes(file.content.length),
-				translation: prettyBytes(processingResult.translation?.length ?? 0),
-				compressionRatio:
-					file.content.length > 0 ?
-						((processingResult.translation?.length ?? 0) / file.content.length).toFixed(2)
-					:	"unknown",
-			},
-			timestamps: {
-				now: Date.now(),
-				workflowStart: this.workflowStartTimestamp,
-			},
-			runnerVersion: `v${version}`,
-			translationModel: env.LLM_MODEL,
-			llmApiHost: resolveLlmApiHost(env.LLM_API_BASE_URL),
-			nodeEnv: env.NODE_ENV,
-			maskVerbatimLargeFences: env.MASK_VERBATIM_LARGE_FENCES,
-			retries: processingResult.retries,
+			reviewerNotices: processingResult.reviewerNotices,
 		};
 		return this.services.locale.definitions.pullRequest.body(
 			file,

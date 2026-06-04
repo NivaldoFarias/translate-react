@@ -35,32 +35,36 @@ describe("PostTranslationValidationService", () => {
 			}).toThrow("empty content");
 		});
 
-		test("throws when all headings are lost", () => {
+		test("does not throw for advisory guard failures such as lost headings", () => {
 			const file = makeFile("# Title\n\n## Section\n\nContent");
+			const translated = "Plain body without heading lines.";
 
 			expect(() => {
-				validation.validateTranslation(file, "Just plain text");
-			}).toThrow("All markdown headings lost");
+				validation.validateTranslation(file, translated);
+			}).not.toThrow();
+
+			const issues = validation.collectRetryableValidationIssues(file, translated);
+			expect(issues.some((issue) => issue.guardId === "headingsPreserved")).toBe(true);
 		});
 
-		test("throws when markdown links are broken", () => {
+		test("does not throw for broken markdown links (advisory)", () => {
 			const file = makeFile("[docs](/learn)");
 			const translated = "\\`docs\\`](/learn)";
 
 			expect(() => {
 				validation.validateTranslation(file, translated);
-			}).toThrow("Markdown links");
+			}).not.toThrow();
 		});
 
-		test("throws when fenced function identifiers change", () => {
+		test("does not throw when fenced function identifiers change (advisory)", () => {
 			const file = makeFile("```js\nfunction OptimizedList() {}\n```");
 
 			expect(() => {
 				validation.validateTranslation(file, "```js\nfunction ListaOtimizada() {}\n```");
-			}).toThrow("Function identifiers changed");
+			}).not.toThrow();
 		});
 
-		test("throws when static JSX demo text inside fences is translated", () => {
+		test("does not throw when static JSX demo text inside fences is translated (advisory)", () => {
 			const file = makeFile("```js\nreturn <div>Count: {renderCount}</div>;\n```");
 
 			expect(() => {
@@ -68,20 +72,33 @@ describe("PostTranslationValidationService", () => {
 					file,
 					"```js\nreturn <div>Contagem: {renderCount}</div>;\n```",
 				);
-			}).toThrow("JSX demo text changed");
+			}).not.toThrow();
 		});
 
-		test("throws when frontmatter is removed", () => {
+		test("does not throw when frontmatter is removed (advisory)", () => {
 			const file = makeFile(`---
 title: Example
 ---
 
 # Title
+
+Body paragraph with enough text to keep the translated document within the content ratio range.
 `);
 
 			expect(() => {
-				validation.validateTranslation(file, "# Título\n");
-			}).toThrow("Frontmatter lost");
+				validation.validateTranslation(
+					file,
+					"# Título\n\nCorpo traduzido com texto suficiente para manter a razão de conteúdo dentro do intervalo aceitável.\n",
+				);
+			}).not.toThrow();
+		});
+
+		test("throws when content ratio is out of range", () => {
+			const file = makeFile("# Title\n\n" + "word ".repeat(200));
+
+			expect(() => {
+				validation.validateTranslation(file, "short");
+			}).toThrow(ApplicationError);
 		});
 
 		test("passes for a well-formed translation", () => {
@@ -134,17 +151,14 @@ function ListaOtimizada() {}
 			expect(guardIds).toContain("markdownLinksPreserved");
 		});
 
-		test("createValidationFailedError aggregates every issue message", () => {
+		test("createValidationFailedError summarizes blocking guard messages", () => {
 			const file = makeFile("[one](/a) [two](/b)");
 			const translated = "/a";
 
 			const issues = validation.collectRetryableValidationIssues(file, translated);
 			const error = validation.createValidationFailedError(file, translated, issues);
 
-			expect(error.message).toContain(";");
-			expect(
-				issues.every((issue) => error.message.includes(issue.message.split(":")[0] ?? "")),
-			).toBe(true);
+			expect(error.message).toContain("content ratio");
 		});
 	});
 });
