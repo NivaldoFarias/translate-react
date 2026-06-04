@@ -4,6 +4,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-06-04
+
 ### Added
 
 - Maintainer feedback detection: invalidate open translation PRs when a member comments after the latest runner commit, then full re-translate on the existing branch and PR with those comments in the LLM system prompt.
@@ -269,6 +271,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 - README `MAX_RETRY_ATTEMPTS` default matches `src/utils/constants.util.ts` (`3`).
 
+[0.2.6]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.6
 [0.2.5]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.5
 [0.2.5]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.5
 [0.2.4]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.4
