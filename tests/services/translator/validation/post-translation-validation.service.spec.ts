@@ -60,6 +60,17 @@ describe("PostTranslationValidationService", () => {
 			}).toThrow("Function identifiers changed");
 		});
 
+		test("throws when static JSX demo text inside fences is translated", () => {
+			const file = makeFile("```js\nreturn <div>Count: {renderCount}</div>;\n```");
+
+			expect(() => {
+				validation.validateTranslation(
+					file,
+					"```js\nreturn <div>Contagem: {renderCount}</div>;\n```",
+				);
+			}).toThrow("JSX demo text changed");
+		});
+
 		test("throws when frontmatter is removed", () => {
 			const file = makeFile(`---
 title: Example

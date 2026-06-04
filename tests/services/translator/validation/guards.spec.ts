@@ -12,6 +12,7 @@ describe("POST_TRANSLATION_VALIDATION_GUARDS", () => {
 			"markdownLinksPreservedGuard",
 			"frontmatterPreservedGuard",
 			"fenceFunctionIdentifiersGuard",
+			"fenceJsxStaticTextGuard",
 		]);
 	});
 });

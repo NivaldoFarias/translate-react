@@ -68,7 +68,7 @@ const ptBrPRBodyStrings: LocalePRBodyStrings = {
 };
 
 /**
- * LLM rules for pt-br.react.dev (maintainer review evidence; prompt-only, no locale-specific guards).
+ * LLM rules for pt-br.react.dev (maintainer review evidence; static JSX demo text in fences is also enforced by the `fenceJsxStaticText` post-translation guard).
  *
  * @see {@link https://github.com/NivaldoFarias/translate-react/issues/50}
  */
