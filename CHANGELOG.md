@@ -10,6 +10,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Changed
 
+- GitHub Actions: `actions/cache` v5 in `setup-bun-deps`; CI Bun default `1.3.14` (override with repo variable `BUN_VERSION`).
 - Translation workflow concurrency is per matrix locale on the same ref: a new run cancels only the in-flight job for that locale, not sibling locales in the same matrix.
 - Poll workflow no longer cancels an in-progress upstream SHA check when another poll starts on the same ref.
 - Wiki: locale onboarding checklist, translation workflow concurrency policy, and parallel matrix capacity guidance for LLM and GitHub limits.
