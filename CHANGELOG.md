@@ -4,6 +4,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+### Added
+
+- `fenceJsxStaticText` post-translation guard rejects translated static JSX demo text inside fenced code blocks (pairs fences, compares text between tags with expressions removed, accumulates retry hints).
+
 ### Fixed
 
 - `listPullRequestIssueComments` uses the REST route string with `octokit.paginate` so maintainer-feedback PR checks work on Octokit v22 (fixes discovery and batch failures with `route.endpoint is not a function`).
