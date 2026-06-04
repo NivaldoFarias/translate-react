@@ -4,6 +4,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+### Fixed
+
+- `listPullRequestIssueComments` uses the REST route string with `octokit.paginate` so maintainer-feedback PR checks work on Octokit v22 (fixes discovery and batch failures with `route.endpoint is not a function`).
+
 ### Changed
 
 - Translation workflow concurrency is per matrix locale on the same ref: a new run cancels only the in-flight job for that locale, not sibling locales in the same matrix.

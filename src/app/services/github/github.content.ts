@@ -653,11 +653,14 @@ export class GitHubContent {
 	public async listPullRequestIssueComments(
 		prNumber: number,
 	): Promise<PullRequestIssueCommentSnapshot[]> {
-		const comments = await this.deps.octokit.paginate(this.deps.octokit.issues.listComments, {
-			...this.deps.repositories.upstream,
-			issue_number: prNumber,
-			per_page: 100,
-		});
+		const comments = await this.deps.octokit.paginate(
+			"GET /repos/{owner}/{repo}/issues/{issue_number}/comments",
+			{
+				...this.deps.repositories.upstream,
+				issue_number: prNumber,
+				per_page: 100,
+			},
+		);
 
 		return comments.map((comment) => ({
 			login: comment.user?.login ?? "",
