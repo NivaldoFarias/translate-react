@@ -9,6 +9,8 @@ import type { TranslationFile } from "../translation-file";
 import { env, logger } from "@/app/utils";
 import { ApplicationError, ErrorCode } from "@/shared/errors";
 
+import { TranslatorService } from "../translator.service";
+
 import {
 	CHUNK_OUTPUT_COMPLETION_RESERVE,
 	CHUNKS,
@@ -81,6 +83,8 @@ export class ChunksManager {
 	/**
 	 * Maximum estimated **source** tokens per markdown chunk so the model can usually finish
 	 * within {@link maxCompletionTokensPerResponse} completion tokens.
+	 *
+	 * @returns Token budget derived from completion cap and output-to-input ratio
 	 */
 	public getMaxChunkInputTokensFromCompletionCap(): number {
 		const budget = Math.max(
@@ -94,6 +98,8 @@ export class ChunksManager {
 	/**
 	 * Effective `chunkSize` passed to {@link MarkdownTextSplitter}: limited by both context budget
 	 * and completion-token budget for translation output.
+	 *
+	 * @returns Minimum of context-window and completion-derived chunk token limits
 	 */
 	public getMarkdownChunkSplitterTokenBudget(): number {
 		const fromContext = this.maxGrossChunkInputTokens - CHUNKS.tokenBuffer;
@@ -111,6 +117,8 @@ export class ChunksManager {
 	 * The encoder is expensive to create (~500ms) due to vocabulary loading
 	 * and regex compilation, so we cache it for reuse across all token
 	 * estimation calls.
+	 *
+	 * @returns Cached `Tiktoken` encoder for the configured model
 	 */
 	private get encoder(): Tiktoken {
 		const tiktokenModel = this.getTiktokenModel(this.model);
@@ -204,9 +212,9 @@ export class ChunksManager {
 	 * derived from {@link maxCompletionTokensPerResponse} so a single-shot translation is unlikely
 	 * to hit `max_tokens` mid-document.
 	 *
-	 * @param content Content to check for chunking requirements
+	 * @param file Translation file whose `content` is measured against token budgets
 	 *
-	 * @returns True if content exceeds safe token limits and needs chunking
+	 * @returns `true` when content exceeds context or completion token limits
 	 *
 	 * @example
 	 * ```typescript
@@ -257,7 +265,7 @@ export class ChunksManager {
 	 *
 	 * @returns Result object containing chunk array and separator array for reassembly
 	 *
-	 * @see {@link translateWithChunking} for usage in translation workflow
+	 * @see {@link TranslatorService.translateWithChunking} for usage in translation workflow
 	 * @see {@link MarkdownTextSplitter} from LangChain for splitting implementation
 	 *
 	 * @example

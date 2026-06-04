@@ -15,7 +15,10 @@ import { env } from "@/app/utils/";
 export const localeService = new LocaleService();
 
 /** CLD-backed language detection */
-export const languageDetectorService = new LanguageDetectorService();
+export const languageDetectorService = new LanguageDetectorService({
+	source: env.SOURCE_LANGUAGE,
+	target: env.TARGET_LANGUAGE,
+});
 
 /** Markdown for translation-progress issues and PR comments */
 export const commentBuilderService = new CommentBuilderService(localeService.definitions);

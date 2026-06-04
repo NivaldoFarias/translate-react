@@ -5,7 +5,14 @@ import {
 	findFenceFunctionIdentifierMismatches,
 } from "../analyzers/fence-code-identifier.analyzer";
 
-/** Rejects translations that renamed `function` identifiers inside fenced code blocks */
+/**
+ * Rejects translations that renamed `function` identifiers inside fenced code blocks
+ *
+ * @param source Original markdown before translation
+ * @param translated Model output to validate
+ *
+ * @returns Guard failure with retry hint, or `null` when fenced identifiers match
+ */
 export const fenceFunctionIdentifiersGuard: PostTranslationValidationGuard = (
 	source,
 	translated,

@@ -3,19 +3,16 @@ import type { ReactLanguageCode } from "@/app/utils/";
 
 import { ptBrLocale, ruLocale } from "@/app/locales/";
 import { env, logger } from "@/app/utils/";
+import { ApplicationError, ErrorCode } from "@/shared/errors/";
 
 /**
  * Service for retrieving locale-specific text content.
  *
  * @example
  * ```typescript
- * // Via DI (preferred for services requiring testability)
- * const localeService = new LocaleService('pt-br');
- * const commentPrefix = localeService.locale.comment.prefix;
- *
- * // Via static accessor (simpler, uses env.TARGET_LANGUAGE)
- * const locale = LocaleService.get();
- * const rules = locale.rules.specific;
+ * const localeService = new LocaleService(env.TARGET_LANGUAGE);
+ * const commentPrefix = localeService.definitions.comment.prefix();
+ * const rules = localeService.definitions.rules.specific;
  * ```
  */
 export class LocaleService {
@@ -68,19 +65,23 @@ export class LocaleService {
 	 *
 	 * @param languageCode Language code to resolve locale for
 	 *
-	 * @returns The locale definition for the language or fallback
+	 * @returns The locale definition for the language code
+	 *
+	 * @throws {ApplicationError} with {@link ErrorCode.InitializationError|`"INITIALIZATION_ERROR"`} when no locale is registered
 	 */
 	private resolveLocale(languageCode: ReactLanguageCode): LocaleDefinition {
 		const locale = this.localeRegistry[languageCode];
 
 		if (locale) return locale;
 
-		this.logger.warn(
-			{ requestedLocale: languageCode, fallbackLocale: "pt-br" },
-			"Locale not found, falling back to pt-br",
-		);
+		const registeredLocales = this.getAvailableLocales();
 
-		return ptBrLocale;
+		throw new ApplicationError(
+			`Locale definition is not registered for '${languageCode}'`,
+			ErrorCode.InitializationError,
+			`${LocaleService.name}.${this.resolveLocale.name}`,
+			{ requestedLocale: languageCode, registeredLocales },
+		);
 	}
 }
 

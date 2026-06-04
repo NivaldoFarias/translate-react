@@ -9,13 +9,16 @@ import type { CommentBuilderService } from "@/app/services/comment-builder/";
 import type {
 	PatchedRepositoryTreeItem,
 	ProcessedFileResult,
+	PullRequestIssueCommentSnapshot,
 	PullRequestStatus,
+	RepositoryMarkdownBlob,
+	TranslationProgressFileRef,
 } from "@/app/services/github/types";
 
 import type { SharedGitHubDependencies } from "./types";
 
+import { TRANSLATION_COMMIT_MESSAGE_PREFIX } from "@/app/constants/maintainer-feedback.constants";
 import { selectProgressCommentPayload } from "@/app/services/comment-builder/progress-comment.util";
-import { TranslationFile } from "@/app/services/translator/";
 import { logger } from "@/app/utils/";
 import { ApplicationError, ErrorCode } from "@/shared/errors/";
 
@@ -39,8 +42,8 @@ export interface CommitTranslationOptions {
 	/** Target branch reference */
 	branch: RestEndpointMethodTypes["git"]["getRef"]["response"]["data"];
 
-	/** File being translated */
-	file: TranslationFile;
+	/** File path being committed on the fork */
+	file: Pick<RepositoryMarkdownBlob, "path">;
 
 	/** Translated content */
 	content: string;
@@ -183,6 +186,12 @@ export class GitHubContent {
 	 * send a stale tree `sha` (GitHub returns HTTP 409 when the `sha` does not match).
 	 *
 	 * @param options Commit options
+	 * @param options.branch Target branch ref for the commit
+	 * @param options.file File metadata including path and optional stale `sha`
+	 * @param options.content UTF-8 translated file body
+	 * @param options.message Commit message for the translation
+	 *
+	 * @returns Octokit `createOrUpdateFileContents` response
 	 *
 	 * @example
 	 * ```typescript
@@ -220,7 +229,7 @@ export class GitHubContent {
 			...(blobShaOnBranch !== undefined ? { sha: blobShaOnBranch } : {}),
 		});
 
-		file.logger.info(
+		this.logger.info(
 			{
 				filePath: file.path,
 				branch: branch.ref,
@@ -238,6 +247,8 @@ export class GitHubContent {
 	 *
 	 * @param branchRef Full ref such as `refs/heads/translate/foo`
 	 * @param path Repository path of the file
+	 *
+	 * @returns Blob `sha` on the branch, or `undefined` when the path is absent (create)
 	 */
 	private async resolveBlobShaOnBranchForPath(branchRef: string, path: string) {
 		try {
@@ -274,6 +285,12 @@ export class GitHubContent {
 	 * Creates a pull request.
 	 *
 	 * @param options Pull request options
+	 * @param options.branch Head branch name for the translation PR
+	 * @param options.title PR title shown on GitHub
+	 * @param options.body PR description body (markdown)
+	 * @param options.baseBranch Base branch on the upstream repo (default branch when omitted)
+	 *
+	 * @returns Octokit `pulls.create` response
 	 *
 	 * @example
 	 * ```typescript
@@ -328,9 +345,9 @@ export class GitHubContent {
 	 *
 	 * @param file File reference from the upstream repository tree
 	 *
-	 * @returns A `TranslationFile` backed by upstream branch content and blob `sha`
+	 * @returns Upstream markdown blob content and `sha`
 	 */
-	public async getFile(file: PatchedRepositoryTreeItem): Promise<TranslationFile> {
+	public async getFile(file: PatchedRepositoryTreeItem): Promise<RepositoryMarkdownBlob> {
 		const ref = await this.resolveUpstreamDefaultBranchRef();
 
 		const response = await this.deps.octokit.repos.getContent({
@@ -359,7 +376,12 @@ export class GitHubContent {
 
 		const content = Buffer.from(response.data.content, "base64").toString();
 
-		return new TranslationFile(content, file.filename, file.path, response.data.sha || file.sha);
+		return {
+			content,
+			filename: file.filename,
+			path: file.path,
+			sha: response.data.sha || file.sha,
+		};
 	}
 
 	/**
@@ -405,6 +427,8 @@ export class GitHubContent {
 
 	/**
 	 * Resolves and caches the upstream repository default branch name.
+	 *
+	 * @returns Default branch name (for example `main`)
 	 */
 	private async resolveUpstreamDefaultBranchRef() {
 		if (this.upstreamDefaultBranchRef) {
@@ -492,7 +516,7 @@ export class GitHubContent {
 	 */
 	public async commentCompiledResultsOnIssue(
 		results: ProcessedFileResult[],
-		filesToTranslate: TranslationFile[],
+		filesToTranslate: readonly TranslationProgressFileRef[],
 	): Promise<RestEndpointMethodTypes["issues"]["createComment"]["response"]["data"] | undefined> {
 		if (results.length === 0 || filesToTranslate.length === 0) {
 			this.logger.warn("No results or files to translate. Skipping issue comment update");
@@ -603,7 +627,13 @@ export class GitHubContent {
 		};
 	}
 
-	/** Fetches a single PR's data from GitHub */
+	/**
+	 * Fetches a single PR's data from GitHub.
+	 *
+	 * @param prNumber Pull request number on the upstream repository
+	 *
+	 * @returns Pull request payload from the GitHub REST API
+	 */
 	private async fetchPullRequest(prNumber: number) {
 		const response = await this.deps.octokit.pulls.get({
 			...this.deps.repositories.upstream,
@@ -614,9 +644,64 @@ export class GitHubContent {
 	}
 
 	/**
+	 * Lists issue comments on an open translation pull request (upstream repo).
+	 *
+	 * @param prNumber Pull request number on the upstream repository
+	 *
+	 * @returns Normalized issue comments, oldest first
+	 */
+	public async listPullRequestIssueComments(
+		prNumber: number,
+	): Promise<PullRequestIssueCommentSnapshot[]> {
+		const comments = await this.deps.octokit.paginate(this.deps.octokit.issues.listComments, {
+			...this.deps.repositories.upstream,
+			issue_number: prNumber,
+			per_page: 100,
+		});
+
+		return comments.map((comment) => ({
+			login: comment.user?.login ?? "",
+			authorAssociation: comment.author_association,
+			userType: comment.user?.type ?? "User",
+			createdAt: new Date(comment.created_at),
+			body: comment.body ?? "",
+		}));
+	}
+
+	/**
+	 * Returns the committer timestamp of the latest runner translation commit on a fork branch.
+	 *
+	 * @param branchName Translation branch name without `refs/heads/` prefix
+	 *
+	 * @returns Committer date of the newest `docs: translate` commit, or `undefined` when none exist
+	 */
+	public async getLatestTranslationCommitTimestamp(branchName: string): Promise<Date | undefined> {
+		const response = await this.deps.octokit.repos.listCommits({
+			...this.deps.repositories.fork,
+			sha: branchName,
+			per_page: 30,
+		});
+
+		const translationCommit = response.data.find((commit) =>
+			commit.commit.message.startsWith(TRANSLATION_COMMIT_MESSAGE_PREFIX),
+		);
+
+		if (!translationCommit) {
+			return undefined;
+		}
+
+		const timestamp =
+			translationCommit.commit.committer?.date ?? translationCommit.commit.author?.date;
+
+		return timestamp ? new Date(timestamp) : undefined;
+	}
+
+	/**
 	 * Closes a pull request by number.
 	 *
 	 * @param prNumber Pull request number
+	 *
+	 * @returns Updated pull request data after setting `state` to `closed`
 	 *
 	 * @throws {Error} If pull request closure fails
 	 */

@@ -9,7 +9,6 @@ import type {
 
 import type { RunnerServiceDependencies } from "../runner.types";
 
-import { LanguageDetectorService } from "@/app/services/language-detector/";
 import { TranslationFile } from "@/app/services/translator/";
 import { logger } from "@/app/utils/";
 
@@ -191,7 +190,7 @@ export class FileDiscoveryManager {
 
 		let cacheHits = 0;
 		let cacheMisses = 0;
-		const targetLanguage = LanguageDetectorService.languages.target;
+		const targetLanguage = this.services.languageDetector.languages.target;
 
 		for (const file of files) {
 			if (!file.sha) {
@@ -353,8 +352,16 @@ export class FileDiscoveryManager {
 	 *
 	 * @returns Array of translation files or `null` for failed fetches
 	 */
-	private fetchBatch(batch: PatchedRepositoryTreeItem[]): Promise<(TranslationFile | null)[]> {
-		return Promise.all(batch.map((file) => this.services.github.getFile(file)));
+	private async fetchBatch(
+		batch: PatchedRepositoryTreeItem[],
+	): Promise<(TranslationFile | null)[]> {
+		return Promise.all(
+			batch.map(async (treeItem) => {
+				const blob = await this.services.github.getFile(treeItem);
+
+				return TranslationFile.fromRepositoryBlob(blob);
+			}),
+		);
 	}
 
 	/**
@@ -398,7 +405,7 @@ export class FileDiscoveryManager {
 					{
 						detectedLanguage:
 							analysis.isTranslated ?
-								LanguageDetectorService.languages.target
+								this.services.languageDetector.languages.target
 							:	(analysis.detectedLanguage ?? "und"),
 						confidence: analysis.languageScore.target,
 						timestamp: Date.now(),

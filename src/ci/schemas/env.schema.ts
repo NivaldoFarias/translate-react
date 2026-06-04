@@ -34,7 +34,7 @@ let cachedCiPollResolveEnvironment: CiPollResolveEnvironment | undefined;
 /**
  * Returns parsed CI poll/resolve environment, parsing once per process.
  *
- * @returns {@link CiPollResolveEnvironment} from `import.meta.env`
+ * @returns from `import.meta.env`
  */
 export function getCiPollResolveEnv() {
 	cachedCiPollResolveEnvironment ??= parseCiPollResolveEnvironment();

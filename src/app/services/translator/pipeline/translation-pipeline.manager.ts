@@ -43,6 +43,9 @@ export interface TranslationPipelineRunParams {
 		translatedContent: string,
 		issues: TranslationValidationIssue[],
 	) => ApplicationError;
+
+	/** Attempt context for the first translation try (e.g. maintainer feedback hints) */
+	initialAttemptContext?: TranslationAttemptContext;
 }
 
 /**
@@ -64,9 +67,16 @@ export class TranslationPipelineManager {
 	public async translateWithValidationRetries(
 		params: TranslationPipelineRunParams,
 	): Promise<TranslationPipelineResult> {
-		const { file, translateBody, finalizeTranslation, collectIssues, createFailedError } = params;
+		const {
+			file,
+			translateBody,
+			finalizeTranslation,
+			collectIssues,
+			createFailedError,
+			initialAttemptContext = emptyTranslationAttemptContext(),
+		} = params;
 
-		let attemptContext = emptyTranslationAttemptContext();
+		let attemptContext = initialAttemptContext;
 		let translatedContent = "";
 		const retries: TranslationRetryInfo[] = [];
 
@@ -90,6 +100,7 @@ export class TranslationPipelineManager {
 
 			attemptContext = translationAttemptContextFromHints(
 				validationIssues.map((issue) => issue.retryHint),
+				attemptContext,
 			);
 
 			file.logger.warn(

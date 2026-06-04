@@ -112,6 +112,8 @@ export function createMockGitHubService() {
 				state: "closed",
 			} as RestEndpointMethodTypes["pulls"]["update"]["response"]["data"]),
 		),
+		listPullRequestIssueComments: mock(() => Promise.resolve([])),
+		getLatestTranslationCommitTimestamp: mock(() => Promise.resolve(undefined)),
 		commentCompiledResultsOnIssue: mock(() => Promise.resolve({ id: 1 })),
 	};
 }

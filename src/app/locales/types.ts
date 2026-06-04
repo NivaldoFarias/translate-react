@@ -1,5 +1,9 @@
-import type { ProcessedFileResult, PullRequestStatus } from "@/app/services/github/types";
-import type { TranslationFile, TranslationRetryInfo } from "@/app/services/translator/";
+import type {
+	ProcessedFileResult,
+	PullRequestStatus,
+	TranslationRetryInfo,
+} from "@/app/services/github/types";
+import type { TranslationFile } from "@/app/services/translator/";
 
 export type { TranslationRetryInfo };
 
@@ -97,6 +101,13 @@ export interface LocaleRulesConfig {
 	 * URL locale adjustments, style conventions).
 	 */
 	readonly specific: string;
+
+	/**
+	 * Optional override for the markdown "What to Translate" scope section.
+	 *
+	 * When set, replaces the default scope bullets in document prompts.
+	 */
+	readonly markdownTranslationScopeSection?: string;
 }
 
 /**

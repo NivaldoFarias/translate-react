@@ -1,11 +1,16 @@
 /** Matches an opening GFM backtick fence line (start or after newline, up to three spaces indent). */
 const FENCE_OPEN_LINE = /(^|\r?\n)([ \t]{0,3})(`{3,})([^\n\r]*)\r?\n/g;
 
-/** Returns a RegExp for a closing fence line with at least `tickLength` backticks (CommonMark rule). */
-function closingFenceLinePattern(tickLength: number) {
+/**
+ * Returns a RegExp for a closing fence line with at least `tickLength` backticks (CommonMark rule).
+ *
+ * @param tickLength Minimum number of backticks required for a closing fence
+ *
+ * @returns RegExp for a closing fence line with at least `tickLength` backticks
+ */
+function closingFenceLinePattern(tickLength: number): RegExp {
 	return new RegExp(`^[ \\t]{0,3}\`{${tickLength},}\\s*$`);
 }
-
 /**
  * Finds the exclusive end index after a valid closing fence line, or `null` if none before EOF.
  *
@@ -101,6 +106,8 @@ export interface MarkdownVerbatimMaskResult {
  *
  * @param markdown Source markdown
  * @param options `estimateTokens` and `minTokens` cutoff
+ * @param options.estimateTokens Token estimator aligned with chunking (e.g. tiktoken)
+ * @param options.minTokens Minimum estimated tokens for a fence to be masked
  *
  * @returns Masked markdown and replacement list for restore
  *

@@ -153,8 +153,10 @@ export class MissingUnreleasedSectionError extends Error {
 export interface PromoteUnreleasedOptions {
 	/** Semver being released */
 	version: string;
+
 	/** Release date (defaults to now) */
 	date?: Date;
+
 	/** Repository base URL for the footer link (defaults to `package.json` `homepage`) */
 	repositoryUrl?: string;
 }
@@ -169,6 +171,9 @@ export interface PromoteUnreleasedOptions {
  *
  * @param changelogContent Full `CHANGELOG.md` text
  * @param options Release {@link PromoteUnreleasedOptions}
+ * @param options.version Semver being released
+ * @param options.date Release date (defaults to now)
+ * @param options.repositoryUrl Repository base URL for the footer link (defaults to `package.json` `homepage`)
  *
  * @returns Updated `CHANGELOG.md` text
  *

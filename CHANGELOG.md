@@ -4,6 +4,26 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-06-04
+
+### Added
+
+- Maintainer feedback detection: invalidate open translation PRs when a member comments after the latest runner commit, then full re-translate on the existing branch and PR with those comments in the LLM system prompt.
+- pt-br translation rules in `pt-br.locale.ts` (fenced-code policy, terminology from maintainer review, heading sentence case, link preservation) plus a markdown scope override for document prompts.
+- `markdownLinksPreserved` post-translation guard for `[text](url)` integrity across locales.
+- `contentRatio` post-translation guard (70%–140% of source length) with retry metadata in PR bodies.
+
+### Fixed
+
+- `LocaleService` fails fast when a locale definition is missing instead of falling back to `pt-br`.
+- `LanguageDetectorService` reads source/target languages from instance config rather than static class fields.
+
+### Changed
+
+- GitHub content APIs return `RepositoryMarkdownBlob` DTOs; runner maps them to `TranslationFile`.
+- `TranslationRetryInfo` lives in `github/types` for workflow metadata shared across layers.
+- CI test enforces parity between `.github/locales.json` and `LocaleService` registrations.
+
 ## [0.2.5] - 2026-06-02
 
 ### Changed
@@ -251,6 +271,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 - README `MAX_RETRY_ATTEMPTS` default matches `src/utils/constants.util.ts` (`3`).
 
+[0.2.6]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.6
 [0.2.5]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.5
 [0.2.5]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.5
 [0.2.4]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.4

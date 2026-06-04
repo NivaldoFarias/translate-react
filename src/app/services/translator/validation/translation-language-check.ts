@@ -18,9 +18,9 @@ export class TranslationLanguageCheck {
 	 *
 	 * @param file File to analyze
 	 *
-	 * @throws {ApplicationError} with {@link ErrorCode.NoContent} when file content is empty
-	 *
 	 * @returns Resolves to the detailed language analysis
+	 *
+	 * @throws {ApplicationError} with {@link ErrorCode.NoContent|`"NO_CONTENT"`} when file content is empty
 	 */
 	public async getLanguageAnalysis(file: TranslationFile) {
 		if (!file.content.length) {

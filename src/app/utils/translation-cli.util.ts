@@ -2,6 +2,8 @@ import { parseArgs } from "citty";
 
 import type { ArgsDef } from "citty";
 
+import { validateEnv } from "../schemas/env.schema";
+
 /** CLI flags that override per-locale matrix values before env validation */
 export const translationCliArgs = {
 	"lang": {
@@ -39,7 +41,6 @@ const translationCliEnvKeys: Record<keyof typeof translationCliArgs, string> = {
 	"upstream-name": "REPO_UPSTREAM_NAME",
 	"translation-guidelines-file": "TRANSLATION_GUIDELINES_FILE",
 };
-
 /**
  * Applies translation workflow CLI flags to `import.meta.env` before {@link validateEnv} runs.
  *

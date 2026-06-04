@@ -11,9 +11,9 @@ import { MARKDOWN_REGEXES } from "../markdown/markdown.regexes";
  * @param file Original file containing content to validate
  * @param chunks Chunking result containing original and translated chunks along with separators
  *
- * @throws {ApplicationError} with {@link ErrorCode.ChunkProcessingFailed} when chunk counts differ
- *
  * @returns Reassembled translated content
+ *
+ * @throws {ApplicationError} with {@link ErrorCode.ChunkProcessingFailed} when chunk counts differ
  */
 export function validateAndReassembleChunks(file: TranslationFile, chunks: ChunksToReassemble) {
 	if (chunks.translated.length !== chunks.original.length) {
