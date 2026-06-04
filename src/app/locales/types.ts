@@ -82,6 +82,12 @@ export interface LocaleCommentConfig {
 	 */
 	readonly prefix: (runContext?: ProgressCommentRunContext) => string;
 
+	/** Section heading when new pull requests were opened in this run */
+	readonly createdSectionHeader: string;
+
+	/** Section heading when existing pull requests received new translation commits */
+	readonly updatedSectionHeader: string;
+
 	/** Generates the footer/observations section of the comment */
 	readonly suffix: string;
 }

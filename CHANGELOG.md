@@ -10,6 +10,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Changed
 
+- `markdownLinksPreserved` and `fenceFunctionIdentifiers` guards and retry hints list every violation (no arbitrary slice caps).
+- Post-translation validation retries accumulate every guard `retryHint` on the same attempt and across attempts (complementary hints, not exclusive).
+- Post-translation validation allows up to three full-document attempts (was two).
+- Translation-progress issue comments separate **created** and **updated** pull requests in distinct sections.
 - GitHub Actions: `actions/cache` v5 in `setup-bun-deps`; CI Bun default `1.3.14` (override with repo variable `BUN_VERSION`).
 - Translation workflow concurrency is per matrix locale on the same ref: a new run cancels only the in-flight job for that locale, not sibling locales in the same matrix.
 - Poll workflow no longer cancels an in-progress upstream SHA check when another poll starts on the same ref.

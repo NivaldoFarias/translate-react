@@ -122,11 +122,13 @@ export const ptBrLocale: LocaleDefinition = {
 	comment: {
 		prefix: (runContext?: ProgressCommentRunContext) => {
 			if (!runContext) {
-				return "As seguintes páginas foram traduzidas e PRs foram criados:";
+				return "As seguintes páginas foram traduzidas nesta execução:";
 			}
 
-			return `A [última execução](${runContext.url}) do [\`translate-react@${runContext.version}\`](${runContext.releaseUrl}) traduziu as seguintes páginas e criou estes PRs[^1]:`;
+			return `A [última execução](${runContext.url}) do [\`translate-react@${runContext.version}\`](${runContext.releaseUrl}) concluiu estas traduções[^1]:`;
 		},
+		createdSectionHeader: "### PRs criados",
+		updatedSectionHeader: "### PRs atualizados",
 		suffix: `[^1]: as traduções foram geradas por uma LLM e requerem revisão humana para garantir precisão técnica e fluência.`,
 	},
 	rules: {

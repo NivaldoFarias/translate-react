@@ -41,6 +41,82 @@ describe("TranslationPipelineManager", () => {
 		expect(lastHints).toEqual(["keep `Foo` unchanged"]);
 	});
 
+	test("passes every failing guard hint on the same retry attempt", async () => {
+		const file = new TranslationFile("# Title\n\nBody", "doc.md", "src/doc.md", "sha");
+		const pipeline = new TranslationPipelineManager(2);
+		const hintsPerCall: string[][] = [];
+
+		await pipeline.translateWithValidationRetries({
+			file,
+			translateBody: (context) => {
+				hintsPerCall.push([...context.validationRetryHints]);
+				return Promise.resolve(hintsPerCall.length === 1 ? "bad" : "good");
+			},
+			finalizeTranslation: (body) => Promise.resolve(body),
+			collectIssues: (content) =>
+				content === "bad" ?
+					[
+						{
+							guardId: "contentRatio",
+							message: "ratio low",
+							retryHint: "keep full length",
+						},
+						{
+							guardId: "markdownLinksPreserved",
+							message: "links missing",
+							retryHint: "preserve every markdown link",
+						},
+					]
+				:	[],
+			createFailedError: () => {
+				throw new Error("should not fail");
+			},
+		});
+
+		expect(hintsPerCall[1]).toEqual(["keep full length", "preserve every markdown link"]);
+	});
+
+	test("accumulates hints from earlier attempts when a different guard fails next", async () => {
+		const file = new TranslationFile("# Title\n\nBody", "doc.md", "src/doc.md", "sha");
+		const pipeline = new TranslationPipelineManager(3);
+		const hintsPerCall: string[][] = [];
+
+		await pipeline
+			.translateWithValidationRetries({
+				file,
+				translateBody: (context) => {
+					hintsPerCall.push([...context.validationRetryHints]);
+					return Promise.resolve("bad");
+				},
+				finalizeTranslation: (body) => Promise.resolve(body),
+				collectIssues: (_content) => {
+					if (hintsPerCall.length === 1) {
+						return [
+							{
+								guardId: "contentRatio",
+								message: "ratio low",
+								retryHint: "keep full length",
+							},
+						];
+					}
+
+					return [
+						{
+							guardId: "markdownLinksPreserved",
+							message: "links missing",
+							retryHint: "preserve every markdown link",
+						},
+					];
+				},
+				createFailedError: () => {
+					throw new Error("validation failed");
+				},
+			})
+			.catch(() => undefined);
+
+		expect(hintsPerCall[2]).toEqual(["keep full length", "preserve every markdown link"]);
+	});
+
 	test("throws after final failed attempt", () => {
 		const file = new TranslationFile("# Title", "doc.md", "src/doc.md", "sha");
 		const pipeline = new TranslationPipelineManager(2);
