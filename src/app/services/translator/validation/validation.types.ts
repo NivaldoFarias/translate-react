@@ -1,12 +1,21 @@
-import type { TranslationRetryInfo } from "@/app/services/github/types";
+import type { ReviewerValidationNotice, TranslationRetryInfo } from "@/app/services/github/types";
 
-export type { TranslationRetryInfo };
+export type { ReviewerValidationNotice, TranslationRetryInfo };
+
+/** Result of partitioning post-translation validation issues */
+export interface PostTranslationValidationPartition {
+	/** Issues that must fail the workflow (no PR) */
+	readonly blocking: readonly TranslationValidationIssue[];
+
+	/** Mechanical guard failures that still ship with reviewer hints on the PR */
+	readonly advisory: readonly ReviewerValidationNotice[];
+}
 
 /**
- * Issue raised by a post-translation guard when output must be rejected and retried.
+ * Issue raised by a post-translation guard when output fails validation.
  */
 export interface TranslationValidationIssue extends TranslationRetryInfo {
-	/** Instruction appended to the LLM system prompt on the next attempt */
+	/** Actionable hint for maintainers (also surfaced on the translation PR when advisory) */
 	retryHint: string;
 }
 

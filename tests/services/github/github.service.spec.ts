@@ -851,6 +851,35 @@ describe("GitHubService", () => {
 			});
 		});
 
+		describe("listPullRequestIssueComments", () => {
+			test("should return normalized issue comments for a pull request", async () => {
+				octokitMock.paginate.mockResolvedValueOnce([
+					{
+						user: { login: "maintainer", type: "User" },
+						author_association: "MEMBER",
+						created_at: "2026-06-01T12:00:00Z",
+						body: "Please fix the heading.",
+					},
+				]);
+
+				const comments = await githubService.listPullRequestIssueComments(42);
+
+				expect(comments).toEqual([
+					{
+						login: "maintainer",
+						authorAssociation: "MEMBER",
+						userType: "User",
+						createdAt: new Date("2026-06-01T12:00:00Z"),
+						body: "Please fix the heading.",
+					},
+				]);
+				expect(octokitMock.paginate).toHaveBeenCalledWith(
+					"GET /repos/{owner}/{repo}/issues/{issue_number}/comments",
+					{ ...testRepositories.upstream, issue_number: 42, per_page: 100 },
+				);
+			});
+		});
+
 		describe("findPullRequestByBranch", () => {
 			test("should return PR when branch matches", async () => {
 				octokitMock.pulls.list.mockResolvedValueOnce({
@@ -990,6 +1019,24 @@ describe("GitHubService", () => {
 			});
 		});
 
+		describe("updatePullRequestBody", () => {
+			test("should update PR body successfully", async () => {
+				const updatedBody = "## Intro\n\n> [!IMPORTANT]\n> Human review";
+				octokitMock.pulls.update.mockResolvedValueOnce({
+					data: { number: 42, body: updatedBody },
+				});
+
+				const result = await githubService.updatePullRequestBody(42, updatedBody);
+
+				expect(result.body).toBe(updatedBody);
+				expect(octokitMock.pulls.update).toHaveBeenCalledWith({
+					...testRepositories.upstream,
+					pull_number: 42,
+					body: updatedBody,
+				});
+			});
+		});
+
 		describe("closePullRequest", () => {
 			test("should close PR successfully", async () => {
 				octokitMock.pulls.update.mockResolvedValueOnce({ data: { number: 42, state: "closed" } });
@@ -1068,13 +1115,26 @@ describe("GitHubService", () => {
 				expect(octokitMock.issues.createComment).not.toHaveBeenCalled();
 			});
 
-			test("should skip commenting when only existing pull requests were reused", async () => {
+			test("should create a comment when only existing pull requests were updated", async () => {
+				octokitMock.rest.search.issuesAndPullRequests.mockResolvedValueOnce({
+					data: {
+						items: [
+							{ number: 123, state: "open" } as components["schemas"]["issue-search-result-item"],
+						],
+						total_count: 1,
+					},
+				});
+
+				octokitMock.issues.createComment.mockResolvedValueOnce({
+					data: { id: 1, html_url: "https://github.com/test/test/issues/123#comment-1" },
+				});
+
 				const reusedOnly: ProcessedFileResult[] = [
 					{
 						branch: null,
 						filename: "legacy.md",
 						translation: null,
-						retries: [],
+						reviewerNotices: [],
 						pullRequest: { number: 1090 } as ProcessedFileResult["pullRequest"],
 						pullRequestProgress: PullRequestProgressAction.Reused,
 						error: null,
@@ -1086,8 +1146,12 @@ describe("GitHubService", () => {
 					fixtures.translationFiles,
 				);
 
-				expect(result).toBeUndefined();
-				expect(octokitMock.issues.createComment).not.toHaveBeenCalled();
+				expect(result).toBeDefined();
+				expect(octokitMock.issues.createComment).toHaveBeenCalledWith(
+					expect.objectContaining({
+						issue_number: 123,
+					}),
+				);
 			});
 
 			test("should skip commenting when no results to report", async () => {

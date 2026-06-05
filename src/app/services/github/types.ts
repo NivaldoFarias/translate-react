@@ -2,6 +2,8 @@ import type { components } from "@octokit/openapi-types";
 import type { Octokit, RestEndpointMethodTypes } from "@octokit/rest";
 import type { SetRequired } from "type-fest";
 
+import type { TranslationLlmUsageTotals } from "@/app/services/translator/llm/translation-llm.usage";
+
 /** Post-translation validation retry surfaced on processed file results and PR metadata */
 export interface TranslationRetryInfo {
 	/** Stable guard id for logs and error context */
@@ -9,6 +11,15 @@ export interface TranslationRetryInfo {
 
 	/** Short description for operators and error messages */
 	message: string;
+}
+
+/** Maintainer-facing validation hint surfaced on the translation pull request */
+export interface ReviewerValidationNotice {
+	/** Stable guard id matching the post-translation guard */
+	guardId: string;
+
+	/** Actionable fix text from the guard's `retryHint` */
+	hint: string;
 }
 
 /** Markdown blob fetched from a repository default branch or fork ref */
@@ -55,13 +66,14 @@ export interface SharedGitHubDependencies {
 /**
  * How this workflow run affected the pull request for a translated file.
  *
- * Only {@link PullRequestProgressAction.Created} belongs in the translation-progress issue comment.
+ * Only {@link PullRequestProgressAction.Created} and {@link PullRequestProgressAction.Reused}
+ * belong in the translation-progress issue comment (in separate sections).
  */
 export enum PullRequestProgressAction {
 	/** A new pull request was opened after committing the translation */
 	Created = "created",
 
-	/** An open translation pull request was already valid; this run did not translate or commit */
+	/** An existing open translation pull request received a new commit in this run */
 	Reused = "reused",
 }
 
@@ -81,8 +93,11 @@ export interface ProcessedFileResult {
 	/** Translated content (null if translation failed) */
 	translation: string | null;
 
-	/** Post-translation validation retries that occurred (empty if none) */
-	retries: readonly TranslationRetryInfo[];
+	/** Advisory post-translation guard hints for maintainers (empty if clean) */
+	reviewerNotices: readonly ReviewerValidationNotice[];
+
+	/** Aggregated LLM token and cost usage when translation succeeded */
+	llmUsage?: TranslationLlmUsageTotals;
 
 	/** Pull request created or updated for this translation */
 	pullRequest:

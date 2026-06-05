@@ -1,35 +1,30 @@
+import type { ReviewerValidationNotice } from "@/app/services/github/types";
 import type { ApplicationError } from "@/shared/errors";
 
 import type { TranslationFile } from "../translation-file";
-import type {
-	TranslationRetryInfo,
-	TranslationValidationIssue,
-} from "../validation/validation.types";
+import type { TranslationValidationIssue } from "../validation/validation.types";
 
 import type { TranslationAttemptContext } from "./translation-attempt.context";
 
-import { TRANSLATION_VALIDATION_MAX_ATTEMPTS } from "../validation/validation.constants";
+import { partitionPostTranslationValidationIssues } from "../validation/validation-outcome.util";
 
-import {
-	emptyTranslationAttemptContext,
-	translationAttemptContextFromHints,
-} from "./translation-attempt.context";
+import { emptyTranslationAttemptContext } from "./translation-attempt.context";
 
-/** Result from the translation pipeline with retry metadata */
+/** Result from a single validated translation pass */
 export interface TranslationPipelineResult {
-	/** The translated content that passed all validation guards */
+	/** The translated content after one LLM pass and assembly */
 	content: string;
 
-	/** Retries that occurred during validation (empty if translation passed on first attempt) */
-	retries: readonly TranslationRetryInfo[];
+	/** Advisory guard hints for maintainers when mechanical checks failed (empty if clean) */
+	reviewerNotices: readonly ReviewerValidationNotice[];
 }
 
-/** Dependencies for one validated translation pass with optional LLM retries */
+/** Dependencies for one validated translation pass (single LLM attempt) */
 export interface TranslationPipelineRunParams {
 	/** Original file whose full document is validated after assembly */
 	file: TranslationFile;
 
-	/** Translates markdown body (single-shot or chunked) using attempt context hints */
+	/** Translates markdown body (single-shot or chunked) using maintainer feedback when set */
 	translateBody: (attemptContext: TranslationAttemptContext) => Promise<string>;
 
 	/** Restores masks, strips artifacts, and merges frontmatter into the full document */
@@ -38,33 +33,30 @@ export interface TranslationPipelineRunParams {
 	/** Runs post-translation guards on the assembled document */
 	collectIssues: (translatedContent: string) => TranslationValidationIssue[];
 
-	/** Builds the error thrown after the final failed attempt */
+	/** Builds the error thrown when blocking guards fail */
 	createFailedError: (
 		translatedContent: string,
 		issues: TranslationValidationIssue[],
 	) => ApplicationError;
 
-	/** Attempt context for the first translation try (e.g. maintainer feedback hints) */
+	/** Attempt context for the translation try (e.g. maintainer feedback hints) */
 	initialAttemptContext?: TranslationAttemptContext;
 }
 
 /**
- * Orchestrates translate → assemble → validate → retry with accumulated guard hints.
+ * Orchestrates translate → assemble → validate once; ships with advisory hints when only mechanical guards fail.
  */
 export class TranslationPipelineManager {
 	/**
-	 * @param maxAttempts Maximum full-document attempts including the first try
-	 */
-	constructor(private readonly maxAttempts: number = TRANSLATION_VALIDATION_MAX_ATTEMPTS) {}
-
-	/**
-	 * Runs the validation retry loop until guards pass or attempts are exhausted.
+	 * Runs a single translation attempt and partitions validation into blocking vs advisory outcomes.
 	 *
 	 * @param params Pipeline callbacks and the source file for logging
 	 *
-	 * @returns Result with translated content and retry metadata
+	 * @returns Result with translated content and optional reviewer notices
+	 *
+	 * @throws {ApplicationError} When blocking guards (`contentRatio`, `nonEmptyContent`) fail
 	 */
-	public async translateWithValidationRetries(
+	public async translateWithValidation(
 		params: TranslationPipelineRunParams,
 	): Promise<TranslationPipelineResult> {
 		const {
@@ -76,43 +68,31 @@ export class TranslationPipelineManager {
 			initialAttemptContext = emptyTranslationAttemptContext(),
 		} = params;
 
-		let attemptContext = initialAttemptContext;
-		let translatedContent = "";
-		const retries: TranslationRetryInfo[] = [];
+		const bodyTranslation = await translateBody(initialAttemptContext);
+		const translatedContent = await finalizeTranslation(bodyTranslation);
+		const validationIssues = collectIssues(translatedContent);
+		const { blocking, advisory } = partitionPostTranslationValidationIssues(validationIssues);
 
-		for (let attempt = 1; attempt <= this.maxAttempts; attempt++) {
-			const bodyTranslation = await translateBody(attemptContext);
-			translatedContent = await finalizeTranslation(bodyTranslation);
+		file.logger.debug(
+			{
+				blockingGuardIds: blocking.map((issue) => issue.guardId),
+				advisoryGuardIds: advisory.map((notice) => notice.guardId),
+				validationIssues,
+			},
+			"Post-translation validation partitioned",
+		);
 
-			const validationIssues = collectIssues(translatedContent);
+		if (blocking.length > 0) {
+			throw createFailedError(translatedContent, validationIssues);
+		}
 
-			if (validationIssues.length === 0) {
-				break;
-			}
-
-			if (attempt >= this.maxAttempts) {
-				throw createFailedError(translatedContent, validationIssues);
-			}
-
-			for (const issue of validationIssues) {
-				retries.push({ guardId: issue.guardId, message: issue.message });
-			}
-
-			attemptContext = translationAttemptContextFromHints(
-				validationIssues.map((issue) => issue.retryHint),
-				attemptContext,
-			);
-
+		if (advisory.length > 0) {
 			file.logger.warn(
-				{
-					attempt,
-					maxAttempts: this.maxAttempts,
-					guardIds: validationIssues.map((issue) => issue.guardId),
-				},
-				"Post-translation validation failed; retrying with guard hints",
+				{ guardIds: advisory.map((notice) => notice.guardId) },
+				"Post-translation advisory guards failed; shipping with reviewer hints",
 			);
 		}
 
-		return { content: translatedContent, retries };
+		return { content: translatedContent, reviewerNotices: advisory };
 	}
 }

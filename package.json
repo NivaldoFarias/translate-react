@@ -1,6 +1,6 @@
 {
 	"name": "translate-react",
-	"version": "0.2.6",
+	"version": "0.2.7",
 	"contributors": [
 		{
 			"name": "Nivaldo Farias",
@@ -28,7 +28,6 @@
 		"ci:resolve-matrix": "bun src/ci/actions/resolve-matrix.ts",
 		"ci:verify-changelog": "bun src/ci/actions/verify-changelog.ts",
 		"ci:changelog-notes": "bun src/ci/actions/changelog-notes.ts",
-		"release:draft": "git-cliff --unreleased --tag v$npm_package_version",
 		"release:prepare": "bun src/ci/actions/prepare-release.ts",
 		"test:watch": "bun test --watch",
 		"test:coverage": "bun test --coverage"
@@ -60,11 +59,10 @@
 		"eslint": "^10.4.1",
 		"eslint-config-prettier": "^10.0.1",
 		"eslint-plugin-jsdoc": "^63.0.1",
-		"eslint-plugin-prettier": "^5.5.5",
-		"git-cliff": "^2.13.1",
 		"globals": "^17.2.0",
+		"jiti": "^2.6.1",
 		"pino-pretty": "^13.1.2",
-		"prettier": "^3.4.2",
+		"prettier": "^3.8.3",
 		"type-fest": "^5.4.2",
 		"typescript": "^6.0.3",
 		"typescript-eslint": "^8.60.1"

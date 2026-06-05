@@ -137,7 +137,8 @@ describe("TranslatorService", () => {
 			const result = await translatorService.translateContent(file);
 
 			expect(result.content).toBe("Olá mundo");
-			expect(result.retries).toEqual([]);
+			expect(result.reviewerNotices).toEqual([]);
+			expect(result.llmUsage.totalTokens).toBeGreaterThanOrEqual(0);
 			expect(mockChatCompletionsCreate).toHaveBeenCalledTimes(1);
 		});
 
@@ -472,7 +473,7 @@ describe("TranslatorService", () => {
 			expect(result.content).toContain("title:");
 		});
 
-		test("should fail validation when links are lost during translation", () => {
+		test("should ship with reviewer notices when links are lost during translation", async () => {
 			const title = "Title";
 			const sourceContent = `# Title\n\n[Link 1](https://example.com/1)\n[Link 2](https://example.com/2)\n[Link 3](https://example.com/3)`;
 			const translatedContent = `# Título\n\nTexto traduzido sem links mas com conteúdo suficiente para manter a razão de conteúdo aceitável`;
@@ -481,10 +482,12 @@ describe("TranslatorService", () => {
 
 			const file = createTranslationFileFixture({ content: sourceContent }, title);
 
-			expect(translatorService.translateContent(file)).rejects.toThrow(ApplicationError);
+			const result = await translatorService.translateContent(file);
+
+			expect(result.reviewerNotices.some((n) => n.guardId === "markdownLinksPreserved")).toBe(true);
 		});
 
-		test("should fail validation when required link URLs are missing", () => {
+		test("should ship with reviewer notices when required link URLs are missing", async () => {
 			const title = "Title";
 			const sourceContent = `# Title\n\n[1](u1) [2](u2) [3](u3) [4](u4) [5](u5)`;
 			const translatedContent = `# Título\n\n[1](u1) [2](u2) [3](u3)`;
@@ -493,7 +496,9 @@ describe("TranslatorService", () => {
 
 			const file = createTranslationFileFixture({ content: sourceContent }, title);
 
-			expect(translatorService.translateContent(file)).rejects.toThrow(ApplicationError);
+			const result = await translatorService.translateContent(file);
+
+			expect(result.reviewerNotices.some((n) => n.guardId === "markdownLinksPreserved")).toBe(true);
 		});
 
 		test("should not throw Error when source has no links", () => {

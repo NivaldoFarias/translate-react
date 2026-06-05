@@ -5,6 +5,7 @@ import type {
 
 import { contentRatioGuard } from "./content-ratio.guard";
 import { fenceFunctionIdentifiersGuard } from "./fence-function-identifiers.guard";
+import { fenceJsxStaticTextGuard } from "./fence-jsx-static-text.guard";
 import { frontmatterPreservedGuard } from "./frontmatter-preserved.guard";
 import { headingsPreservedGuard } from "./headings-preserved.guard";
 import { markdownLinksPreservedGuard } from "./markdown-links-preserved.guard";
@@ -18,6 +19,7 @@ export const POST_TRANSLATION_VALIDATION_GUARDS = [
 	markdownLinksPreservedGuard,
 	frontmatterPreservedGuard,
 	fenceFunctionIdentifiersGuard,
+	fenceJsxStaticTextGuard,
 ] as const;
 
 /**

@@ -19,11 +19,14 @@ export function createMockCommentBuilderService() {
 	return {
 		build: mockCommentBody,
 		buildComment: mockCommentBody,
+		buildProgressComment: mockCommentBody,
 		buildReportableComment: mockCommentBody,
 		concatComment: mock((content: string) => `prefix\n\n${content}\n\nsuffix`),
 		comment: {
 			suffix: "suffix",
-			prefix: "As seguintes páginas foram traduzidas e PRs foram criados:",
+			prefix: "As seguintes páginas foram traduzidas nesta execução:",
+			createdSectionHeader: "**PRs criados**",
+			updatedSectionHeader: "**PRs atualizados**",
 		},
 	};
 }
@@ -112,6 +115,12 @@ export function createMockGitHubService() {
 				state: "closed",
 			} as RestEndpointMethodTypes["pulls"]["update"]["response"]["data"]),
 		),
+		updatePullRequestBody: mock(() =>
+			Promise.resolve({
+				number: 1,
+				body: "updated",
+			} as RestEndpointMethodTypes["pulls"]["update"]["response"]["data"]),
+		),
 		listPullRequestIssueComments: mock(() => Promise.resolve([])),
 		getLatestTranslationCommitTimestamp: mock(() => Promise.resolve(undefined)),
 		commentCompiledResultsOnIssue: mock(() => Promise.resolve({ id: 1 })),
@@ -125,7 +134,18 @@ export function createMockGitHubService() {
  */
 export function createMockTranslatorService() {
 	return {
-		translateContent: mock(() => Promise.resolve({ content: "Conteúdo traduzido", retries: [] })),
+		translateContent: mock(() =>
+			Promise.resolve({
+				content: "Conteúdo traduzido",
+				reviewerNotices: [],
+				llmUsage: {
+					promptTokens: 0,
+					completionTokens: 0,
+					totalTokens: 0,
+					costUsd: null,
+				},
+			}),
+		),
 		isContentTranslated: mock(() => Promise.resolve(false)),
 		testConnectivity: mock(() => Promise.resolve()),
 		getLanguageAnalysis: mock(() =>
