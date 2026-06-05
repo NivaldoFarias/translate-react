@@ -4,6 +4,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+## [0.2.7] - 2026-06-05
+
 ### Added
 
 - `fenceJsxStaticText` post-translation guard rejects translated static JSX demo text inside fenced code blocks (pairs fences, compares text between tags with expressions removed, accumulates retry hints).
@@ -296,6 +298,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 - README `MAX_RETRY_ATTEMPTS` default matches `src/utils/constants.util.ts` (`3`).
 
+[0.2.7]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.7
 [0.2.6]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.6
 [0.2.5]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.5
 [0.2.5]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.5
