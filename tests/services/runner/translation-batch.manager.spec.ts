@@ -173,7 +173,11 @@ describe("TranslationBatchManager", () => {
 			expect(translator.translateContent).toHaveBeenCalledWith(file, {
 				maintainerFeedbackComments: [diffComment],
 			});
-			expect(github.commitTranslation).toHaveBeenCalled();
+			expect(github.commitTranslation).toHaveBeenCalledWith(
+				expect.objectContaining({
+					message: "docs: translate `target.md` to Brazilian Portuguese\n\nper @jhonmike feedback",
+				}),
+			);
 			expect(github.createPullRequest).not.toHaveBeenCalled();
 			expect(results.get(file.filename)?.pullRequest).toEqual(existingPR);
 		});
