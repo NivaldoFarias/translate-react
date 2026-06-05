@@ -664,12 +664,20 @@ export class TranslationBatchManager {
 		progress: PullRequestProgressAction;
 	}> {
 		if (validity.invalidReason === "needs_maintainer_fix" && validity.pullRequest) {
+			const languageName = this.services.languageDetector.getLanguageName(
+				this.services.languageDetector.languages.target,
+			);
+			const body = this.createPullRequestDescription(file, processingResult, languageName);
+
+			await this.services.github.updatePullRequestBody(validity.pullRequest.number, body);
+
 			this.logger.info(
 				{
 					path: file.path,
 					prNumber: validity.pullRequest.number,
+					advisoryGuardCount: processingResult.reviewerNotices.length,
 				},
-				"Keeping open translation pull request after maintainer feedback remediation",
+				"Refreshed open translation pull request body after maintainer feedback remediation",
 			);
 
 			return {

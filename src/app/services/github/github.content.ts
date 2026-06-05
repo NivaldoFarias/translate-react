@@ -340,6 +340,29 @@ export class GitHubContent {
 	}
 
 	/**
+	 * Updates the body of an open translation pull request on the upstream repository.
+	 *
+	 * @param prNumber Pull request number
+	 * @param body Markdown body (for example advisory validation warnings after re-translation)
+	 *
+	 * @returns Updated pull request data
+	 */
+	public async updatePullRequestBody(
+		prNumber: number,
+		body: string,
+	): Promise<RestEndpointMethodTypes["pulls"]["update"]["response"]["data"]> {
+		const response = await this.deps.octokit.pulls.update({
+			...this.deps.repositories.upstream,
+			pull_number: prNumber,
+			body,
+		});
+
+		this.logger.info({ prNumber }, "Pull request body updated");
+
+		return response.data;
+	}
+
+	/**
 	 * Fetches source markdown from the upstream default branch at `file.path`.
 	 *
 	 * Uses `repos.getContent` on the upstream repository so discovery always reads
