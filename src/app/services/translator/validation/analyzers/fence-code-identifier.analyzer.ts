@@ -83,6 +83,24 @@ export function findFenceFunctionIdentifierMismatches(
 }
 
 /**
+ * Lists every fence/function mismatch for logs, guard errors, and retry hints.
+ *
+ * @param mismatches Detected fence function mismatches
+ *
+ * @returns Semicolon-separated remediation lines
+ */
+export function formatFenceFunctionMismatchSummary(
+	mismatches: readonly FenceFunctionIdentifierMismatch[],
+) {
+	return mismatches
+		.map(
+			({ fenceIndex, sourceName }) =>
+				`fence ${fenceIndex}: keep \`${sourceName}\` exactly as in the source`,
+		)
+		.join("; ");
+}
+
+/**
  * Builds a retry hint listing renamed function identifiers.
  *
  * @param mismatches Detected fence function mismatches
@@ -90,14 +108,12 @@ export function findFenceFunctionIdentifierMismatches(
  * @returns Hint string for the LLM system prompt
  */
 export function buildFenceFunctionIdentifierRetryHint(
-	mismatches: FenceFunctionIdentifierMismatch[],
+	mismatches: readonly FenceFunctionIdentifierMismatch[],
 ) {
-	const examples = mismatches
-		.slice(0, 6)
-		.map(({ sourceName }) => `keep \`${sourceName}\` exactly as in the source`)
-		.join("; ");
+	const problems = formatFenceFunctionMismatchSummary(mismatches);
+	const problemClause = problems.length > 0 ? ` ${problems}.` : "";
 
-	return `In fenced code blocks, do not translate or rename programming identifiers (function, class, variable, hook, and prop names as written in code). ${examples}.`;
+	return `In fenced code blocks, do not translate or rename programming identifiers (function, class, variable, hook, and prop names as written in code).${problemClause}`;
 }
 
 /**

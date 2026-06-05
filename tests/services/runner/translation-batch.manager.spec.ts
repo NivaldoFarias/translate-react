@@ -173,8 +173,16 @@ describe("TranslationBatchManager", () => {
 			expect(translator.translateContent).toHaveBeenCalledWith(file, {
 				maintainerFeedbackComments: [diffComment],
 			});
-			expect(github.commitTranslation).toHaveBeenCalled();
+			expect(github.commitTranslation).toHaveBeenCalledWith(
+				expect.objectContaining({
+					message: "docs: translate `target.md` to Brazilian Portuguese\n\nper @jhonmike feedback",
+				}),
+			);
 			expect(github.createPullRequest).not.toHaveBeenCalled();
+			expect(github.updatePullRequestBody).toHaveBeenCalledWith(
+				existingPR.number,
+				expect.stringContaining("Brazilian Portuguese"),
+			);
 			expect(results.get(file.filename)?.pullRequest).toEqual(existingPR);
 		});
 
@@ -239,6 +247,10 @@ describe("TranslationBatchManager", () => {
 			expect(github.deleteBranch).not.toHaveBeenCalled();
 			expect(github.createBranch).not.toHaveBeenCalled();
 			expect(github.createPullRequest).not.toHaveBeenCalled();
+			expect(github.updatePullRequestBody).toHaveBeenCalledWith(
+				existingPR.number,
+				expect.stringContaining("Brazilian Portuguese"),
+			);
 			expect(results.get(file.filename)?.pullRequest).toEqual(existingPR);
 			expect(results.get(file.filename)?.pullRequestProgress).toBe(
 				PullRequestProgressAction.Reused,

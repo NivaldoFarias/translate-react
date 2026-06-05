@@ -101,16 +101,63 @@ export class PRManager {
 		const totalCount = results.length;
 		const successRate = totalCount > 0 ? successCount / totalCount : 0;
 
+		let totalPromptTokens = 0;
+		let totalCompletionTokens = 0;
+		let totalEstimatedCostUsd: number | null = null;
+		let filesWithReviewerWarnings = 0;
+		const advisoryIssuesByGuardId: Record<string, number> = {};
+
+		for (const result of results) {
+			if (result.llmUsage) {
+				totalPromptTokens += result.llmUsage.promptTokens;
+				totalCompletionTokens += result.llmUsage.completionTokens;
+
+				if (result.llmUsage.costUsd !== null) {
+					totalEstimatedCostUsd = (totalEstimatedCostUsd ?? 0) + result.llmUsage.costUsd;
+				}
+			}
+
+			if (result.reviewerNotices.length > 0) {
+				filesWithReviewerWarnings += 1;
+
+				for (const notice of result.reviewerNotices) {
+					advisoryIssuesByGuardId[notice.guardId] =
+						(advisoryIssuesByGuardId[notice.guardId] ?? 0) + 1;
+				}
+			}
+		}
+
 		const workflowStats: WorkflowStatistics = {
 			successCount,
 			failureCount,
 			totalCount,
 			successRate,
+			totalPromptTokens,
+			totalCompletionTokens,
+			totalEstimatedCostUsd,
+			filesWithReviewerWarnings,
+			advisoryIssuesByGuardId,
 		};
 
 		this.logger.info(
-			{ ...workflowStats, elapsedTime: formatElapsedTime(elapsedTime) },
+			{
+				...workflowStats,
+				elapsedTime: formatElapsedTime(elapsedTime),
+			},
 			"Final statistics",
+		);
+
+		this.logger.debug(
+			{
+				perFileUsage: results
+					.filter((result) => result.llmUsage)
+					.map(({ filename, llmUsage, reviewerNotices }) => ({
+						filename,
+						llmUsage,
+						reviewerNotices,
+					})),
+			},
+			"Per-file LLM usage and advisory validation",
 		);
 
 		return workflowStats;

@@ -4,6 +4,33 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+## [0.2.7] - 2026-06-05
+
+### Added
+
+- `fenceJsxStaticText` post-translation guard rejects translated static JSX demo text inside fenced code blocks (pairs fences, compares text between tags with expressions removed, accumulates retry hints).
+- `validation-outcome.util` splits post-translation guards into blocking vs advisory; `ReviewerValidationNotice` carries maintainer `retryHint` text on shipped PRs.
+- Per-file LLM usage totals and workflow `printFinalStatistics` rollup (prompt/completion tokens, OpenRouter `usage.cost` when present, advisory guard counts).
+
+### Fixed
+
+- `listPullRequestIssueComments` uses the REST route string with `octokit.paginate` so maintainer-feedback PR checks work on Octokit v22 (fixes discovery and batch failures with `route.endpoint is not a function`).
+
+### Changed
+
+- Maintainer-feedback re-translations refresh the open pull request body (including advisory `[!WARNING]` guard hints) instead of leaving the pre-remediation description unchanged.
+- Removed unused `git-cliff` dependency, `cliff.toml`, and `release:draft` script; release flow uses curated `## [Unreleased]` entries only.
+- Removed guard-driven LLM retry hints from attempt context and prompts; `collectPostTranslationValidationIssues` replaces `collectRetryableValidationIssues`; `MAX_RETRY_ATTEMPTS` documents LLM API p-retry only.
+- `markdownLinksPreserved` and `fenceFunctionIdentifiers` guards and retry hints list every violation (no arbitrary slice caps).
+- Post-translation validation uses one LLM pass: only `contentRatio` and `nonEmptyContent` fail the workflow; other guard failures open or update the PR with a `[!WARNING]` hint table (no guard-driven LLM retries).
+- Translation PR bodies drop stats/tech `<details>`; operator metadata (model, tokens, ratio) logs at `debug` when the PR is built.
+- `ProcessedFileResult` exposes `reviewerNotices` instead of `retries`.
+- Translation-progress issue comments separate **created** and **updated** pull requests in distinct sections.
+- GitHub Actions: `actions/cache` v5 in `setup-bun-deps`; CI Bun default `1.3.14` (override with repo variable `BUN_VERSION`).
+- Translation workflow concurrency is per matrix locale on the same ref: a new run cancels only the in-flight job for that locale, not sibling locales in the same matrix.
+- Poll workflow no longer cancels an in-progress upstream SHA check when another poll starts on the same ref.
+- Wiki: locale onboarding checklist, translation workflow concurrency policy, and parallel matrix capacity guidance for LLM and GitHub limits.
+
 ## [0.2.6] - 2026-06-04
 
 ### Added
@@ -271,6 +298,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 - README `MAX_RETRY_ATTEMPTS` default matches `src/utils/constants.util.ts` (`3`).
 
+[0.2.7]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.7
 [0.2.6]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.6
 [0.2.5]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.5
 [0.2.5]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.5

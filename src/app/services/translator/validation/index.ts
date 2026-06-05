@@ -1,5 +1,6 @@
 export * from "./validation.types";
 export * from "./validation.constants";
+export * from "./validation-outcome.util";
 export * from "./post-translation-validation.service";
 export * from "./translation-language-check";
 export * from "./guards";

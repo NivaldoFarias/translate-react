@@ -24,7 +24,7 @@ export interface BuildMarkdownDocumentPromptParams {
 	/** When set, documents that `userMessageContent` is one slice of a larger markdown body */
 	chunkProgress?: ChunkTranslationProgress;
 
-	/** Guard hints from a failed post-translation validation attempt */
+	/** Maintainer feedback for re-translation, when present */
 	attemptContext: TranslationAttemptContext;
 
 	/** Optional glossary lines appended to the prompt */
@@ -84,7 +84,7 @@ export class TranslationPromptBuilder {
 	}
 
 	/**
-	 * Builds the markdown document system prompt with preservation rules and optional retry hints.
+	 * Builds the markdown document system prompt with preservation rules and optional maintainer feedback.
 	 *
 	 * @param params Markdown prompt parameters
 	 * @param languages Human-readable language names for the prompt
@@ -112,7 +112,6 @@ export class TranslationPromptBuilder {
 			:	"";
 
 		const maintainerReviewSection = this.buildMaintainerReviewSection(params.attemptContext);
-		const validationRetrySection = this.buildValidationRetrySection(params.attemptContext);
 
 		const builtSystemPrompt = `# ROLE
 				You are an expert technical translator specializing in React documentation.
@@ -121,7 +120,6 @@ export class TranslationPromptBuilder {
 				Translate the provided content from ${languages.source} to ${languages.target} with absolute precision and technical accuracy.
 				${chunkSliceSection}
 				${maintainerReviewSection}
-				${validationRetrySection}
 				# CRITICAL PRESERVATION RULES
 				1. **Structure & Formatting**: Preserve ALL markdown syntax, HTML tags, code blocks, frontmatter, and line breaks exactly as written
 				2. **Code & identifiers**: Keep ALL code examples, URLs, and every programming identifier (functions, variables, classes, hooks, packages, props as in code) unchanged in every context—fenced blocks, inline code, tables, lists, or prose
@@ -206,23 +204,6 @@ export class TranslationPromptBuilder {
 				${this.locale.definitions.rules.specific}
 	
 				${termReferenceSection}
-				`;
-	}
-
-	/**
-	 * Builds the correction section appended when post-translation guards failed.
-	 *
-	 * @param attemptContext Attempt context with accumulated guard hints
-	 *
-	 * @returns Correction section or empty string when no hints
-	 */
-	public buildValidationRetrySection(attemptContext: TranslationAttemptContext) {
-		if (attemptContext.validationRetryHints.length === 0) return "";
-
-		return `
-				# CORRECTION REQUIRED (previous attempt failed validation)
-				A previous translation of this content was rejected. Apply every correction below in a new full translation of the user message:
-				${attemptContext.validationRetryHints.map((hint) => `- ${hint}`).join("\n")}
 				`;
 	}
 

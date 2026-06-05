@@ -270,6 +270,21 @@ export class GitHubService {
 	}
 
 	/**
+	 * Updates the body of an open translation pull request.
+	 *
+	 * @param prNumber Pull request number on the upstream repository
+	 * @param body Markdown pull request description
+	 *
+	 * @returns Updated pull request data
+	 */
+	public async updatePullRequestBody(
+		prNumber: number,
+		body: string,
+	): Promise<RestEndpointMethodTypes["pulls"]["update"]["response"]["data"]> {
+		return this.content.updatePullRequestBody(prNumber, body);
+	}
+
+	/**
 	 * Fetches source markdown from the upstream default branch at `file.path`.
 	 *
 	 * @param file File reference from the upstream repository tree

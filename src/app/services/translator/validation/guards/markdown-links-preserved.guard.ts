@@ -3,6 +3,7 @@ import type { PostTranslationValidationGuard } from "../validation.types";
 import {
 	buildMarkdownLinkRetryHint,
 	findMarkdownLinkViolations,
+	formatMarkdownLinkViolationSummary,
 } from "../analyzers/markdown-link.analyzer";
 
 /**
@@ -17,14 +18,9 @@ export const markdownLinksPreservedGuard: PostTranslationValidationGuard = (sour
 	const violations = findMarkdownLinkViolations(source, translated);
 	if (violations.length === 0) return null;
 
-	const summary = violations
-		.slice(0, 3)
-		.map((violation) => violation.message)
-		.join("; ");
-
 	return {
 		guardId: "markdownLinksPreserved",
-		message: `Markdown links: ${summary}`,
+		message: `Markdown links: ${formatMarkdownLinkViolationSummary(violations)}`,
 		retryHint: buildMarkdownLinkRetryHint(violations),
 	};
 };

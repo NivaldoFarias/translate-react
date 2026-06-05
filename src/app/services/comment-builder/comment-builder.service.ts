@@ -1,7 +1,8 @@
 import type { LocaleDefinition } from "@/app/locales";
 import type { ProcessedFileResult, TranslationProgressFileRef } from "@/app/services/github/types";
 
-import { PullRequestProgressAction } from "@/app/services/github/types";
+import type { ProgressCommentPayload } from "./progress-comment.util";
+
 import { TranslationFile } from "@/app/services/translator/";
 import { logger, resolveGitHubActionsRunContext } from "@/app/utils/";
 
@@ -40,7 +41,8 @@ export class CommentBuilderService {
 	 *
 	 * Processes translation results and file data to create a structured comment
 	 * that organizes translated files by their directory hierarchy for better readability.
-	 * Only results with {@link PullRequestProgressAction.Created|`"created"`} are included (reused PRs are omitted).
+	 * Only results with {@link PullRequestProgressAction.Created|`"created"`} or
+	 * {@link PullRequestProgressAction.Reused|`"reused"`} are included, in separate sections.
 	 *
 	 * @param results Translation processing results containing PR information
 	 * @param filesToTranslate Original files that were processed for translation
@@ -58,16 +60,49 @@ export class CommentBuilderService {
 	public buildComment(results: ProcessedFileResult[], filesToTranslate: TranslationFile[]) {
 		const payload = selectProgressCommentPayload(results, filesToTranslate);
 
-		return this.buildReportableComment(payload.reportableResults, payload.reportableFiles);
+		return this.buildProgressComment(payload);
 	}
 
 	/**
-	 * Builds a progress-issue comment from already-filtered reportable results.
+	 * Builds a progress-issue comment from created and updated pull request sections.
 	 *
-	 * @param reportableResults Results with {@link PullRequestProgressAction.Created|`"created"`}
-	 * @param reportableFiles Translation files matching `reportableResults`
+	 * @param payload Created and updated sections from {@link selectProgressCommentPayload}
 	 *
 	 * @returns Formatted hierarchical comment string for GitHub issue posting
+	 */
+	public buildProgressComment(payload: ProgressCommentPayload) {
+		const sectionBlocks: string[] = [];
+
+		if (payload.created.reportableResults.length > 0) {
+			sectionBlocks.push(
+				this.locale.comment.createdSectionHeader,
+				this.buildReportableComment(
+					payload.created.reportableResults,
+					payload.created.reportableFiles,
+				),
+			);
+		}
+
+		if (payload.updated.reportableResults.length > 0) {
+			sectionBlocks.push(
+				this.locale.comment.updatedSectionHeader,
+				this.buildReportableComment(
+					payload.updated.reportableResults,
+					payload.updated.reportableFiles,
+				),
+			);
+		}
+
+		return this.concatComment(sectionBlocks.join("\n\n"));
+	}
+
+	/**
+	 * Builds the hierarchical PR list for one progress-comment section (no prefix or suffix).
+	 *
+	 * @param reportableResults Results for this section
+	 * @param reportableFiles Translation files matching `reportableResults`
+	 *
+	 * @returns Formatted hierarchical Markdown for the section body
 	 */
 	public buildReportableComment(
 		reportableResults: ProcessedFileResult[],
@@ -93,11 +128,9 @@ export class CommentBuilderService {
 
 		const hierarchicalComment = this.buildHierarchicalComment(concattedData);
 
-		const finalComment = this.concatComment(hierarchicalComment);
+		this.logger.debug({ hierarchicalComment }, "Built comment section");
 
-		this.logger.debug({ finalComment }, "Built comment");
-
-		return finalComment;
+		return hierarchicalComment;
 	}
 
 	/**
@@ -292,6 +325,8 @@ export class CommentBuilderService {
 	public get comment() {
 		return {
 			prefix: this.locale.comment.prefix(),
+			createdSectionHeader: this.locale.comment.createdSectionHeader,
+			updatedSectionHeader: this.locale.comment.updatedSectionHeader,
 			suffix: this.locale.comment.suffix,
 		};
 	}

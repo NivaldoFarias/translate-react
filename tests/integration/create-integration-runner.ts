@@ -23,7 +23,10 @@ import {
 	localeService,
 	openRouterModelLimitsService,
 } from "@/app/composition";
-import { PullRequestProgressAction } from "@/app/services/github/types";
+import {
+	hasReportableProgressComment,
+	selectProgressCommentPayload,
+} from "@/app/services/comment-builder/progress-comment.util";
 import { RunnerService } from "@/app/services/runner/runner.service";
 import { TranslationFile, TranslatorService } from "@/app/services/translator/";
 
@@ -232,18 +235,14 @@ export function createWorkflowGitHubServiceFromFiles(
 				return undefined;
 			}
 
-			const hasReportablePullRequest = results.some(
-				(result) =>
-					result.pullRequest !== null &&
-					result.pullRequestProgress === PullRequestProgressAction.Created,
-			);
+			const payload = selectProgressCommentPayload(results, filesToTranslate);
 
-			if (!hasReportablePullRequest) {
+			if (!hasReportableProgressComment(payload)) {
 				return undefined;
 			}
 
 			await fs.mkdir(captureRoot, { recursive: true });
-			const body = commentBuilderService.buildComment(results, filesToTranslate);
+			const body = commentBuilderService.buildProgressComment(payload);
 			await fs.writeFile(
 				path.join(captureRoot, "translation-progress-issue-comment.md"),
 				body,

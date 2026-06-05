@@ -105,6 +105,17 @@ export function findMarkdownLinkViolations(sourceMarkdown: string, translatedMar
 }
 
 /**
+ * Joins every deduplicated violation message for logs, guard errors, and retry hints.
+ *
+ * @param violations Detected link problems
+ *
+ * @returns Semicolon-separated summary of all violations
+ */
+export function formatMarkdownLinkViolationSummary(violations: readonly MarkdownLinkViolation[]) {
+	return violations.map((violation) => violation.message).join("; ");
+}
+
+/**
  * Builds a retry hint for markdown link integrity failures.
  *
  * @param violations Detected link problems
@@ -112,12 +123,10 @@ export function findMarkdownLinkViolations(sourceMarkdown: string, translatedMar
  * @returns Hint string for the LLM system prompt
  */
 export function buildMarkdownLinkRetryHint(violations: readonly MarkdownLinkViolation[]) {
-	const examples = violations
-		.slice(0, 4)
-		.map((violation) => violation.message)
-		.join("; ");
+	const problems = formatMarkdownLinkViolationSummary(violations);
+	const problemClause = problems.length > 0 ? ` Problems found: ${problems}.` : "";
 
-	return `Preserve every source markdown link as \`[translated label](same-url)\` with balanced brackets and parentheses. Do not leave bare paths or broken \`[...](url)\` fragments. ${examples}.`;
+	return `Preserve every source markdown link as \`[translated label](same-url)\` with balanced brackets and parentheses. Do not leave bare paths or broken \`[...](url)\` fragments.${problemClause}`;
 }
 
 /**

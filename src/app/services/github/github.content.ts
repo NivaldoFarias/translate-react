@@ -18,7 +18,10 @@ import type {
 import type { SharedGitHubDependencies } from "./types";
 
 import { TRANSLATION_COMMIT_MESSAGE_PREFIX } from "@/app/constants/maintainer-feedback.constants";
-import { selectProgressCommentPayload } from "@/app/services/comment-builder/progress-comment.util";
+import {
+	hasReportableProgressComment,
+	selectProgressCommentPayload,
+} from "@/app/services/comment-builder/progress-comment.util";
 import { logger } from "@/app/utils/";
 import { ApplicationError, ErrorCode } from "@/shared/errors/";
 
@@ -337,6 +340,29 @@ export class GitHubContent {
 	}
 
 	/**
+	 * Updates the body of an open translation pull request on the upstream repository.
+	 *
+	 * @param prNumber Pull request number
+	 * @param body Markdown body (for example advisory validation warnings after re-translation)
+	 *
+	 * @returns Updated pull request data
+	 */
+	public async updatePullRequestBody(
+		prNumber: number,
+		body: string,
+	): Promise<RestEndpointMethodTypes["pulls"]["update"]["response"]["data"]> {
+		const response = await this.deps.octokit.pulls.update({
+			...this.deps.repositories.upstream,
+			pull_number: prNumber,
+			body,
+		});
+
+		this.logger.info({ prNumber }, "Pull request body updated");
+
+		return response.data;
+	}
+
+	/**
 	 * Fetches source markdown from the upstream default branch at `file.path`.
 	 *
 	 * Uses `repos.getContent` on the upstream repository so discovery always reads
@@ -523,12 +549,9 @@ export class GitHubContent {
 			return;
 		}
 
-		const { reportableResults, reportableFiles } = selectProgressCommentPayload(
-			results,
-			filesToTranslate,
-		);
+		const payload = selectProgressCommentPayload(results, filesToTranslate);
 
-		if (reportableResults.length === 0) {
+		if (!hasReportableProgressComment(payload)) {
 			this.logger.info(
 				{ resultCount: results.length },
 				"No pull requests were opened or updated in this run; skipping translation progress issue comment",
@@ -547,7 +570,7 @@ export class GitHubContent {
 		const createCommentResponse = await this.deps.octokit.issues.createComment({
 			...this.deps.repositories.upstream,
 			issue_number: translationProgressIssue.number,
-			body: this.commentBuilder.buildReportableComment(reportableResults, reportableFiles),
+			body: this.commentBuilder.buildProgressComment(payload),
 		});
 
 		this.logger.info(
@@ -653,11 +676,14 @@ export class GitHubContent {
 	public async listPullRequestIssueComments(
 		prNumber: number,
 	): Promise<PullRequestIssueCommentSnapshot[]> {
-		const comments = await this.deps.octokit.paginate(this.deps.octokit.issues.listComments, {
-			...this.deps.repositories.upstream,
-			issue_number: prNumber,
-			per_page: 100,
-		});
+		const comments = await this.deps.octokit.paginate(
+			"GET /repos/{owner}/{repo}/issues/{issue_number}/comments",
+			{
+				...this.deps.repositories.upstream,
+				issue_number: prNumber,
+				per_page: 100,
+			},
+		);
 
 		return comments.map((comment) => ({
 			login: comment.user?.login ?? "",
