@@ -6,6 +6,7 @@ import type { FileProcessingProgress } from "@/app/services/runner/types";
 
 import type { RunnerServiceDependencies } from "../runner.types";
 
+import type { MaintainerFeedbackSnapshot } from "./maintainer-feedback.util";
 import type { TranslationPullRequestValidity } from "./translation-pull-request-validity.manager";
 
 import { PullRequestProgressAction } from "@/app/services/github/types";
@@ -18,7 +19,10 @@ import {
 } from "@/app/utils/";
 import { ApplicationError, ErrorCode } from "@/shared/errors/";
 
-import { getMaintainerFeedbackCommentBodies } from "./maintainer-feedback.util";
+import {
+	buildTranslationCommitMessage,
+	getMaintainerFeedbackSnapshot,
+} from "./maintainer-feedback.util";
 import { TranslationPullRequestValidityManager } from "./translation-pull-request-validity.manager";
 import { MAX_CONSECUTIVE_FAILURES } from "./workflow.constants";
 
@@ -288,8 +292,17 @@ export class TranslationBatchManager {
 				"Step 1/5: Translation branch reset for single-commit workflow",
 			);
 
+			const maintainerFeedback = await this.loadMaintainerFeedbackForRemediation(
+				file,
+				pullRequestValidity,
+			);
+
 			const translationStart = Date.now();
-			const translationResult = await this.resolveTranslation(file, pullRequestValidity);
+			const translationResult = await this.resolveTranslation(
+				file,
+				pullRequestValidity,
+				maintainerFeedback,
+			);
 			metadata.translation = translationResult.content;
 			metadata.reviewerNotices = translationResult.reviewerNotices;
 			metadata.llmUsage = translationResult.llmUsage;
@@ -334,7 +347,11 @@ export class TranslationBatchManager {
 				file,
 				branch: metadata.branch,
 				content: metadata.translation,
-				message: `docs: translate \`${file.filename}\` to ${languageName}`,
+				message: buildTranslationCommitMessage(
+					file.filename,
+					languageName,
+					maintainerFeedback?.authorLogins,
+				),
 			});
 			file.logger.debug({ durationMs: Date.now() - commitStart }, "Step 4/5: Commit complete");
 
@@ -414,22 +431,19 @@ export class TranslationBatchManager {
 	}
 
 	/**
-	 * Resolves translated content via full document re-translation.
+	 * Loads maintainer PR comments posted after the latest runner commit on the branch.
 	 *
-	 * When {@link TranslationPullRequestValidity.invalidReason} is `needs_maintainer_fix`,
-	 * the open PR and branch are reused and maintainer issue comments are passed into the LLM prompt.
-	 *
-	 * @param file Upstream English source file for the workflow
+	 * @param file Translation file being processed
 	 * @param validity Pull request validity from the start of file processing
 	 *
-	 * @returns Translated content, advisory notices, and LLM usage from the translator
+	 * @returns Feedback snapshot when remediating maintainer review, otherwise `undefined`
 	 */
-	private async resolveTranslation(
+	private async loadMaintainerFeedbackForRemediation(
 		file: TranslationFile,
 		validity: TranslationPullRequestValidity,
 	) {
 		if (validity.invalidReason !== "needs_maintainer_fix" || !validity.pullRequest) {
-			return this.services.translator.translateContent(file);
+			return undefined;
 		}
 
 		const branchName = getTranslationBranchNameFromPath(file.path);
@@ -437,7 +451,32 @@ export class TranslationBatchManager {
 			this.services.github.listPullRequestIssueComments(validity.pullRequest.number),
 			this.services.github.getLatestTranslationCommitTimestamp(branchName),
 		]);
-		const maintainerFeedbackComments = getMaintainerFeedbackCommentBodies(comments, runnerCommitAt);
+
+		return getMaintainerFeedbackSnapshot(comments, runnerCommitAt);
+	}
+
+	/**
+	 * Resolves translated content via full document re-translation.
+	 *
+	 * When {@link TranslationPullRequestValidity.invalidReason} is `needs_maintainer_fix`,
+	 * the open PR and branch are reused and maintainer issue comments are passed into the LLM prompt.
+	 *
+	 * @param file Upstream English source file for the workflow
+	 * @param validity Pull request validity from the start of file processing
+	 * @param maintainerFeedback Preloaded maintainer feedback when remediating review comments
+	 *
+	 * @returns Translated content, advisory notices, and LLM usage from the translator
+	 */
+	private async resolveTranslation(
+		file: TranslationFile,
+		validity: TranslationPullRequestValidity,
+		maintainerFeedback?: MaintainerFeedbackSnapshot,
+	) {
+		if (validity.invalidReason !== "needs_maintainer_fix" || !validity.pullRequest) {
+			return this.services.translator.translateContent(file);
+		}
+
+		const maintainerFeedbackComments = maintainerFeedback?.bodies ?? [];
 
 		file.logger.info(
 			{
