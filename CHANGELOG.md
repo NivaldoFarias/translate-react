@@ -16,6 +16,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Changed
 
+- Maintainer-feedback re-translations refresh the open pull request body (including advisory `[!WARNING]` guard hints) instead of leaving the pre-remediation description unchanged.
 - Removed unused `git-cliff` dependency, `cliff.toml`, and `release:draft` script; release flow uses curated `## [Unreleased]` entries only.
 - Removed guard-driven LLM retry hints from attempt context and prompts; `collectPostTranslationValidationIssues` replaces `collectRetryableValidationIssues`; `MAX_RETRY_ATTEMPTS` documents LLM API p-retry only.
 - `markdownLinksPreserved` and `fenceFunctionIdentifiers` guards and retry hints list every violation (no arbitrary slice caps).

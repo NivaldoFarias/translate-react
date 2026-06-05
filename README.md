@@ -2,18 +2,19 @@
 
 <div align="center">
 
-**Translate react.dev locale repos when upstream changes**
+<div><b>Translate <code>react.dev</code> locale repos when upstream changes</b></div>
+
+<br />
 
 [![CI Status](https://github.com/NivaldoFarias/translate-react/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/NivaldoFarias/translate-react/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/NivaldoFarias/translate-react?sort=semver)](https://github.com/NivaldoFarias/translate-react/releases)
-[![Runtime: Bun](https://img.shields.io/badge/runtime-Bun-000?logo=bun&logoColor=white)](https://bun.sh)
 [![GitHub App](https://img.shields.io/badge/GitHub%20App-translate--react--bot-2ea44f?logo=github)](https://github.com/apps/translate-react-bot)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-db61a2?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/NivaldoFarias)
 
 </div>
 
-When react.dev changes in English, this tool translates the updates into the user fork and opens PRs for review via the [`translate-react` bot](https://github.com/apps/translate-react-bot)[^1].
+When `react.dev` changes in English (and the translation repository is updated), this tool translates the updates into the user fork and opens PRs for review via the [`translate-react` bot](https://github.com/apps/translate-react-bot)[^1].
 
 ## How it works
 
@@ -21,7 +22,7 @@ When react.dev changes in English, this tool translates the updates into the use
 2. **Translate**: changed pages pass through an LLM with guards that keep Markdown structure, frontmatter, and code samples intact
 3. **Open PRs**: translated content lands on the locale fork as review-ready PRs through the `translate-react` bot
 
-Locales are defined in [`.github/locales.json`](./.github/locales.json). Currently, `pt-br` and `ru`.
+Locales are defined in [`.github/locales.json`](./.github/locales.json). Currently, only `pt-br` and `ru` are supported.
 
 ## Start here
 
@@ -41,6 +42,7 @@ Full wiki index: [Home](https://github.com/NivaldoFarias/translate-react/wiki).
 - **GitHub Personal Access Token** with `repo` scope
 - **LLM API Key** (OpenAI, OpenRouter, or compatible)
 - Fork of target React documentation repository with write access
+- (Optional) The [`translate-react-bot`](https://github.com/apps/translate-react-bot) GitHub App installed on the fork
 
 ## Quick start
 
@@ -58,7 +60,21 @@ Full wiki index: [Home](https://github.com/NivaldoFarias/translate-react/wiki).
 
 ## GitHub Actions on a fork
 
-Enable Actions on the repo that holds the workflow, install the bot, and set the secrets and variables listed under [Operating translate-react (forks)](https://github.com/NivaldoFarias/translate-react/wiki/Workflow#operating-translate-react-forks). Scheduled runs use [`.github/workflows/poll.yml`](./.github/workflows/poll.yml) to detect new commits on `reactjs/<lang>.react.dev` before starting translation ([Automated upstream polling](https://github.com/NivaldoFarias/translate-react/wiki/Workflow#automated-upstream-polling)). When several locales run in parallel, tune LLM and GitHub limits per [Parallel matrix locales](https://github.com/NivaldoFarias/translate-react/wiki/Workflow#parallel-matrix-locales--capacity). Manual translation: [`.github/workflows/workflow.yml`](./.github/workflows/workflow.yml). Pin a commit SHA or tag in your fork workflow when you need a fixed tool version ([Releases](https://github.com/NivaldoFarias/translate-react/wiki/Workflow#releases-and-semantic-versioning)).
+In order to enable the [main translation workflow](./.github/workflows/workflow.yml) to run on a fork, either through scheduled runs or manually, you need to:
+
+1. Enable Actions on the repo that holds the workflow
+2. Install the `translate-react-bot` GitHub App on the fork
+3. Set the secrets and variables listed under [Operating translate-react (forks)](https://github.com/NivaldoFarias/translate-react/wiki/Workflow#operating-translate-react-forks)
+
+### Scheduled runs
+
+Scheduled runs use [`.github/workflows/poll.yml`](./.github/workflows/poll.yml) to detect new commits on `reactjs/<lang>.react.dev` before starting translation ([See Wiki: Automated upstream polling](https://github.com/NivaldoFarias/translate-react/wiki/Workflow#automated-upstream-polling))
+
+When several locales run in parallel, tune LLM and GitHub limits per [See Wiki: Parallel matrix locales](https://github.com/NivaldoFarias/translate-react/wiki/Workflow#parallel-matrix-locales--capacity)
+
+### Manual translation
+
+Manual translation is done by running the [`.github/workflows/workflow.yml`](./.github/workflows/workflow.yml) workflow manually. You can also pin a commit SHA or tag in your fork workflow when you need a fixed tool version ([See Wiki: Releases](https://github.com/NivaldoFarias/translate-react/wiki/Workflow#releases-and-semantic-versioning))
 
 ## Configuration
 

@@ -1019,6 +1019,24 @@ describe("GitHubService", () => {
 			});
 		});
 
+		describe("updatePullRequestBody", () => {
+			test("should update PR body successfully", async () => {
+				const updatedBody = "## Intro\n\n> [!IMPORTANT]\n> Human review";
+				octokitMock.pulls.update.mockResolvedValueOnce({
+					data: { number: 42, body: updatedBody },
+				});
+
+				const result = await githubService.updatePullRequestBody(42, updatedBody);
+
+				expect(result.body).toBe(updatedBody);
+				expect(octokitMock.pulls.update).toHaveBeenCalledWith({
+					...testRepositories.upstream,
+					pull_number: 42,
+					body: updatedBody,
+				});
+			});
+		});
+
 		describe("closePullRequest", () => {
 			test("should close PR successfully", async () => {
 				octokitMock.pulls.update.mockResolvedValueOnce({ data: { number: 42, state: "closed" } });
