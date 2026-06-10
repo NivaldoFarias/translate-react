@@ -10,6 +10,7 @@ import { ApplicationError, ErrorCode, isCompletionLengthTruncationError } from "
 import {
 	createChatCompletionFixture,
 	createFrontmatterBatchLlmJsonContent,
+	createSegmentBatchLlmJsonContent,
 	createTranslationFileFixture,
 } from "@tests/fixtures";
 import {
@@ -188,6 +189,42 @@ describe("TranslationLlmClient", () => {
 					expect(error.code).toBe(ErrorCode.TranslationFailed);
 				}
 			}
+		});
+	});
+
+	describe("callLanguageModelSegmentBatch", () => {
+		test("returns parsed envelope for valid structured JSON", async () => {
+			mockChatCompletionsCreate.mockResolvedValue(
+				createChatCompletionFixture(
+					createSegmentBatchLlmJsonContent([
+						{ segmentId: "root/paragraph#0", translated: "Olá mundo" },
+					]),
+				),
+			);
+
+			const file = createTranslationFileFixture({ content: "# Hi\n\nHello world" });
+
+			const { envelope } = await llmClient.callLanguageModelSegmentBatch(file, [
+				{ segmentId: "root/paragraph#0", source: "Hello world" },
+			]);
+
+			expect(envelope.items[0]?.translated).toBe("Olá mundo");
+		});
+
+		test("throws ApplicationError when response segment ids do not match request", () => {
+			mockChatCompletionsCreate.mockResolvedValue(
+				createChatCompletionFixture(
+					createSegmentBatchLlmJsonContent([{ segmentId: "other/id#0", translated: "Olá" }]),
+				),
+			);
+
+			const file = createTranslationFileFixture({ content: "# Hi\n\nHello" });
+
+			expect(
+				llmClient.callLanguageModelSegmentBatch(file, [
+					{ segmentId: "root/paragraph#0", source: "Hello" },
+				]),
+			).rejects.toThrow("Segment batch response ids do not match");
 		});
 	});
 });

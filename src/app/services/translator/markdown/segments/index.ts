@@ -18,9 +18,20 @@ export {
 } from "./fence-comments.util";
 export {
 	extractSegments,
+	extractTranslatableBodySegments,
 	filterTranslatableSegments,
 	sumTranslatableChars,
 } from "./extract-segments.util";
+export {
+	estimateSegmentBatchRequestTokens,
+	packSegmentsIntoBatches,
+	splitSegmentBatchInHalf,
+} from "./segment-batch.util";
+export type { SegmentBatchRequestItem } from "./segment-batch.util";
+export {
+	computeTranslatableCharRatio,
+	isSegmentTranslationEligible,
+} from "./segment-translation.util";
 export {
 	analyzeFixture,
 	simulateBadFullBodyTranslation,
@@ -44,6 +55,7 @@ export {
 export { buildSpikeWriteupComment } from "./spike-writeup.util";
 export { evaluateToolingOnFixture } from "./tooling-eval.util";
 export type {
+	BodySegmentExtractionResult,
 	FixtureCorpusMetrics,
 	GuardSimulationRow,
 	SegmentContext,

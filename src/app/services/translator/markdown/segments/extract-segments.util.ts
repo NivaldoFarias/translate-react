@@ -5,7 +5,12 @@ import type { MdxJsxFlowElement, MdxJsxTextElement } from "mdast-util-mdx-jsx";
 import type { Node } from "unist";
 
 import type { AbsoluteSourceSpan } from "./mdast-segment.util";
-import type { SegmentContext, SegmentExtractionResult, TranslatableSegment } from "./types";
+import type {
+	BodySegmentExtractionResult,
+	SegmentContext,
+	SegmentExtractionResult,
+	TranslatableSegment,
+} from "./types";
 
 import {
 	extractDescriptionScalarFromInnerYaml,
@@ -320,7 +325,27 @@ function extractBodySegments(body: string, offsetBase: number, fullSource: strin
 }
 
 /**
- * Extracts all translatable segments from a markdown document for the spike pipeline.
+ * Extracts translatable segments from a markdown body without frontmatter.
+ *
+ * Used by the default segment translation path so `description` is not translated twice
+ * (frontmatter stays on the dedicated metadata pass in `finalizeTranslation`).
+ *
+ * @param body Markdown body after frontmatter split
+ *
+ * @returns Body segments and parse warnings
+ *
+ * @example
+ * ```typescript
+ * const { segments } = extractTranslatableBodySegments("# Hello\n\nWorld");
+ * ```
+ */
+export function extractTranslatableBodySegments(body: string): BodySegmentExtractionResult {
+	const normalized = body.replace(/\r\n/g, "\n");
+	return extractBodySegments(normalized, 0, normalized);
+}
+
+/**
+ * Extracts all translatable segments from a markdown document including optional frontmatter.
  *
  * @param source Full markdown source including optional frontmatter
  *

@@ -19,8 +19,14 @@ import type {
 	ChunkTranslationProgress,
 	TranslationSystemPromptKind,
 } from "./llm/translation-system-prompt.types";
+import type {
+	BodySegmentExtractionResult,
+	SegmentTranslationMap,
+	TranslatableSegment,
+} from "./markdown/segments/types";
 import type { TranslationAttemptContext } from "./pipeline/translation-attempt.context";
 import type { FrontmatterBatchFieldKey } from "./translator-frontmatter-batch.schema";
+import type { SegmentBatchRequestItem } from "./translator-segment-batch.schema";
 import type { ReviewerValidationNotice } from "./validation/validation.types";
 
 import {
@@ -46,6 +52,16 @@ import {
 	mergePreservedYamlFrontmatter,
 	splitLeadingYamlFrontmatter,
 } from "./markdown/frontmatter";
+import {
+	computeTranslatableCharRatio,
+	extractTranslatableBodySegments,
+	filterTranslatableSegments,
+	isSegmentTranslationEligible,
+	packSegmentsIntoBatches,
+	reinsertSegments,
+	splitSegmentBatchInHalf,
+	sumTranslatableChars,
+} from "./markdown/segments";
 import {
 	emptyTranslationAttemptContext,
 	translationAttemptContextFromMaintainerReview,
@@ -669,6 +685,67 @@ export class TranslatorService {
 		file: TranslationFile,
 		attemptContext: TranslationAttemptContext = emptyTranslationAttemptContext(),
 	) {
+		const extraction = extractTranslatableBodySegments(file.content);
+
+		if (!isSegmentTranslationEligible(extraction.parseWarnings)) {
+			file.logger.info(
+				{ parseWarnings: extraction.parseWarnings, path: file.path },
+				"Segment extraction unsafe; falling back to full-body translation",
+			);
+			return this.translateMarkdownBodyLegacy(file, attemptContext);
+		}
+
+		const translatableSegments = filterTranslatableSegments(extraction.segments);
+
+		if (translatableSegments.length === 0) {
+			return file.content;
+		}
+
+		const translatableCharCount = sumTranslatableChars(extraction.segments);
+		file.logger.debug(
+			{
+				path: file.path,
+				segmentCount: translatableSegments.length,
+				translatableCharCount,
+				translatableCharRatio: computeTranslatableCharRatio(
+					translatableCharCount,
+					file.content.length,
+				),
+			},
+			"Segment translation metrics",
+		);
+
+		try {
+			return await this.translateBodyViaSegments(
+				file,
+				translatableSegments,
+				extraction,
+				attemptContext,
+			);
+		} catch (error) {
+			file.logger.warn(
+				{
+					path: file.path,
+					error: error instanceof Error ? error.message : String(error),
+				},
+				"Segment batch translation failed; falling back to full-body translation",
+			);
+			return this.translateMarkdownBodyLegacy(file, attemptContext);
+		}
+	}
+
+	/**
+	 * Translates markdown body via full-document or chunked LLM calls (fallback path).
+	 *
+	 * @param file Work file whose `content` is the body sent to the LLM
+	 * @param attemptContext Maintainer feedback for the system prompt, when present
+	 *
+	 * @returns Translated markdown body before frontmatter merge
+	 */
+	private async translateMarkdownBodyLegacy(
+		file: TranslationFile,
+		attemptContext: TranslationAttemptContext = emptyTranslationAttemptContext(),
+	) {
 		const contentNeedsChunking = this.managers.chunks.needsChunking(file);
 		if (contentNeedsChunking) {
 			return this.translateWithChunking(file, attemptContext);
@@ -693,6 +770,103 @@ export class TranslatorService {
 				"Completion token limit reached; translating in chunks",
 			);
 			return this.translateWithChunking(file, attemptContext);
+		}
+	}
+
+	/**
+	 * Translates body prose segments in token-budgeted batches and reinserts by source offsets.
+	 *
+	 * @param file Work file whose `content` is the markdown body
+	 * @param translatableSegments Translate-kind segments to send to the LLM
+	 * @param extraction Full body extraction including policy segments for reinsert ordering
+	 * @param attemptContext Maintainer feedback for the system prompt, when present
+	 *
+	 * @returns Translated markdown body before frontmatter merge
+	 */
+	private async translateBodyViaSegments(
+		file: TranslationFile,
+		translatableSegments: readonly TranslatableSegment[],
+		extraction: BodySegmentExtractionResult,
+		attemptContext: TranslationAttemptContext,
+	) {
+		const tokenBudget = this.managers.chunks.getMarkdownChunkSplitterTokenBudget();
+		const batches = packSegmentsIntoBatches(
+			translatableSegments,
+			(text) => this.managers.chunks.estimateTokenCount(text),
+			tokenBudget,
+		);
+
+		const translations: Record<string, string> = {};
+
+		for (const batch of batches) {
+			const batchTranslations = await this.translateSegmentBatchItems(file, batch, attemptContext);
+			Object.assign(translations, batchTranslations);
+		}
+
+		return reinsertSegments(file.content, translations, extraction.segments);
+	}
+
+	/**
+	 * Translates one segment batch, splitting in half when completion tokens truncate output.
+	 *
+	 * @param file Work file for logging and prompt context
+	 * @param batchItems Segment batch request items
+	 * @param attemptContext Maintainer feedback for the system prompt, when present
+	 *
+	 * @returns Map of segment id to cleaned translated text
+	 */
+	private async translateSegmentBatchItems(
+		file: TranslationFile,
+		batchItems: readonly SegmentBatchRequestItem[],
+		attemptContext: TranslationAttemptContext,
+	): Promise<SegmentTranslationMap> {
+		try {
+			const { envelope, usage } = await this.llmClient.callLanguageModelSegmentBatch(
+				file,
+				batchItems,
+				attemptContext,
+			);
+			this.recordLlmUsage(usage);
+
+			const translations: Record<string, string> = {};
+
+			for (const item of envelope.items) {
+				const snippetFile = new TranslationFile(
+					item.translated,
+					`${file.filename}#${item.segmentId}`,
+					file.path,
+					file.sha,
+					file.logger,
+					file.documentSourceLanguage,
+				);
+				translations[item.segmentId] = cleanupTranslatedContent(item.translated, snippetFile);
+			}
+
+			return translations;
+		} catch (error) {
+			if (!isCompletionLengthTruncationError(error) || batchItems.length <= 1) {
+				throw error;
+			}
+
+			const [firstHalf, secondHalf] = splitSegmentBatchInHalf(batchItems);
+
+			file.logger.info(
+				{ segmentCount: batchItems.length, firstHalfCount: firstHalf.length },
+				"Segment batch hit completion token limit; splitting batch",
+			);
+
+			const firstTranslations = await this.translateSegmentBatchItems(
+				file,
+				firstHalf,
+				attemptContext,
+			);
+			const secondTranslations = await this.translateSegmentBatchItems(
+				file,
+				secondHalf,
+				attemptContext,
+			);
+
+			return { ...firstTranslations, ...secondTranslations };
 		}
 	}
 

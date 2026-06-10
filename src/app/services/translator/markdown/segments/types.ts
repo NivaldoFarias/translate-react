@@ -19,6 +19,12 @@ export interface TranslatableSegment {
 	readonly context?: SegmentContext;
 }
 
+/** Result of walking a markdown body (no frontmatter) for translatable regions */
+export interface BodySegmentExtractionResult {
+	readonly segments: readonly TranslatableSegment[];
+	readonly parseWarnings: readonly string[];
+}
+
 /** Result of walking a markdown document for translatable regions */
 export interface SegmentExtractionResult {
 	readonly segments: readonly TranslatableSegment[];

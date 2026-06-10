@@ -4,6 +4,7 @@ import type { TranslatorServiceDependencies } from "@/app/services/translator/tr
 
 import { localeService } from "@/app/composition";
 import { OpenRouterModelLimitsService } from "@/app/services/openrouter/openrouter-model-limits.service";
+import * as segmentMarkdown from "@/app/services/translator/markdown/segments";
 import { TranslatorService } from "@/app/services/translator/translator.service";
 import { ApplicationError } from "@/shared/errors";
 
@@ -12,6 +13,7 @@ import {
 	createFrontmatterBatchLlmJsonContent,
 	createLanguageAnalysisResultFixture,
 	createOpenAIApiErrorFixture,
+	createSegmentBatchLlmJsonContent,
 	createTranslationFileFixture,
 } from "@tests/fixtures";
 import {
@@ -46,6 +48,74 @@ function createTestTranslatorService(
 			randomize: overrides.retryConfig?.randomize ?? false,
 		},
 	} as TranslatorServiceDependencies);
+}
+
+function getUserMessageFromCompletionParams(params: unknown) {
+	const { messages } = params as { messages: { role: string; content: string }[] };
+	return messages.find((message) => message.role === "user");
+}
+
+function isSegmentBatchUserMessage(content: string) {
+	try {
+		const parsed = JSON.parse(content) as { items?: { segmentId?: string }[] };
+		return Array.isArray(parsed.items) && parsed.items[0]?.segmentId !== undefined;
+	} catch {
+		return false;
+	}
+}
+
+function isFrontmatterBatchUserMessage(content: string) {
+	try {
+		const parsed = JSON.parse(content) as { items?: { fieldKey?: string }[] };
+		return Array.isArray(parsed.items) && parsed.items[0]?.fieldKey !== undefined;
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * Mocks LLM completions for segment-batch body translation, with optional legacy/frontmatter queue.
+ *
+ * @param segmentTranslations Maps segment `source` strings to translated text
+ * @param legacyResponses Plain-text responses for full-body fallback calls, in order
+ */
+function mockSegmentAwareTranslation(
+	segmentTranslations: Record<string, string>,
+	...legacyResponses: string[]
+) {
+	let legacyStep = 0;
+
+	mockChatCompletionsCreate.mockImplementation((params: unknown) => {
+		const userMessage = getUserMessageFromCompletionParams(params);
+		const userContent = userMessage?.content ?? "";
+
+		if (isSegmentBatchUserMessage(userContent)) {
+			const payload = JSON.parse(userContent) as {
+				items: { segmentId: string; source: string }[];
+			};
+
+			return Promise.resolve(
+				createChatCompletionFixture(
+					createSegmentBatchLlmJsonContent(
+						payload.items.map((item) => ({
+							segmentId: item.segmentId,
+							translated: segmentTranslations[item.source] ?? item.source,
+						})),
+					),
+				),
+			);
+		}
+
+		if (isFrontmatterBatchUserMessage(userContent)) {
+			const legacyContent = legacyResponses[legacyStep] ?? legacyResponses.at(-1) ?? userContent;
+			legacyStep += 1;
+			return Promise.resolve(createChatCompletionFixture(legacyContent));
+		}
+
+		const legacyContent = legacyResponses[legacyStep] ?? legacyResponses.at(-1) ?? userContent;
+		legacyStep += 1;
+		return Promise.resolve(createChatCompletionFixture(legacyContent));
+	});
 }
 
 function queueOpenAiTranslationResponses(...messageContents: string[]) {
@@ -130,7 +200,7 @@ describe("TranslatorService", () => {
 
 	describe("translateContent", () => {
 		test("should translate content successfully when valid content is provided", async () => {
-			mockChatCompletionsCreate.mockResolvedValue(createChatCompletionFixture("Olá mundo"));
+			mockSegmentAwareTranslation({ "Hello world": "Olá mundo" });
 
 			const file = createTranslationFileFixture({ content: "Hello world" });
 
@@ -186,34 +256,40 @@ describe("TranslatorService", () => {
 			expect(translatorService.translateContent(file)).rejects.toThrow(apiError);
 		});
 
-		test("should trigger chunking for large content and call LLM once per chunk", async () => {
+		test("should batch large content into multiple segment LLM calls", async () => {
 			const sections = Array.from(
 				{ length: 30 },
 				(_, i) => `## Section ${i + 1}\n\n${"Documentation paragraph. ".repeat(60)}`,
 			);
 			const largeContent = sections.join("\n\n");
 
-			const { chunks } = await new (
-				await import("@/app/services/translator/chunking")
-			).ChunksManager("test-model").chunkContent(largeContent);
+			let segmentBatchCallCount = 0;
 
-			let chunkCallIndex = 0;
-			let firstSystemPrompt: string | undefined;
+			mockChatCompletionsCreate.mockImplementation((params: unknown) => {
+				const userMessage = getUserMessageFromCompletionParams(params);
+				const userContent = userMessage?.content ?? "";
 
-			mockChatCompletionsCreate.mockImplementation(async (params: unknown) => {
-				const { messages } = params as { messages: { role: string; content: string }[] };
-				const systemMessage = messages.find((message) => message.role === "system");
-				const userMessage = messages.find((message) => message.role === "user");
-				if (chunkCallIndex === 0) {
-					firstSystemPrompt = systemMessage?.content;
+				if (!isSegmentBatchUserMessage(userContent)) {
+					return Promise.resolve(createChatCompletionFixture(userContent));
 				}
-				chunkCallIndex++;
-				const translatedChunk =
-					userMessage?.content
-						.replace(/Section/g, "Seção")
-						.replace(/Documentation paragraph/g, "Parágrafo de documentação") ??
-					`## Seção\n\nParágrafo de documentação.`;
-				return Promise.resolve(createChatCompletionFixture(translatedChunk));
+
+				segmentBatchCallCount += 1;
+				const payload = JSON.parse(userContent) as {
+					items: { segmentId: string; source: string }[];
+				};
+
+				return Promise.resolve(
+					createChatCompletionFixture(
+						createSegmentBatchLlmJsonContent(
+							payload.items.map((item) => ({
+								segmentId: item.segmentId,
+								translated: item.source
+									.replace(/Section/g, "Seção")
+									.replace(/Documentation paragraph/g, "Parágrafo de documentação"),
+							})),
+						),
+					),
+				);
 			});
 
 			const file = createTranslationFileFixture({ content: largeContent });
@@ -226,10 +302,8 @@ describe("TranslatorService", () => {
 			expect(result).toBeDefined();
 			expect(typeof result.content).toBe("string");
 			expect(result.content.length).toBeGreaterThan(0);
-			expect(mockChatCompletionsCreate.mock.calls.length).toBe(chunks.length);
-			expect(firstSystemPrompt).toBeDefined();
-			expect(firstSystemPrompt).toContain("DOCUMENT SLICE");
-			expect(firstSystemPrompt).toContain(`slice 1 of ${chunks.length}`);
+			expect(segmentBatchCallCount).toBeGreaterThan(1);
+			expect(result.content).toContain("Seção");
 		});
 
 		describe("verbatim fence masking (LLM payload)", () => {
@@ -538,10 +612,9 @@ describe("TranslatorService", () => {
 	describe("Frontmatter Validation", () => {
 		test("should pass validation when frontmatter keys match between source and translation", async () => {
 			const sourceContent = `---\ntitle: 'Hello'\ndescription: 'Welcome'\n---\n\n# Content`;
-			const translatedBody = `# Conteúdo`;
 
-			queueOpenAiTranslationResponses(
-				translatedBody,
+			mockSegmentAwareTranslation(
+				{ Content: "Conteúdo" },
 				createFrontmatterBatchLlmJsonContent("Bem-vindo"),
 			);
 
@@ -697,6 +770,57 @@ describe("TranslatorService", () => {
 			const file = createTranslationFileFixture({ content: "Test content" });
 
 			expect(translatorService.translateContent(file)).rejects.toThrow();
+		});
+
+		describe("segment translation", () => {
+			test("should translate body via segment batch LLM by default", async () => {
+				const body = "# Hello\n\nTranslate me.";
+
+				mockSegmentAwareTranslation({
+					"Translate me.": "Traduza-me.",
+					"Hello": "Olá",
+				});
+
+				const file = createTranslationFileFixture({ content: body });
+				const result = await translatorService.translateContent(file);
+
+				expect(result.content).toContain("Traduza-me.");
+				expect(result.content).toContain("Olá");
+
+				const segmentBatchCallCount = mockChatCompletionsCreate.mock.calls.filter(([params]) => {
+					const userMessage = getUserMessageFromCompletionParams(params);
+					return Boolean(userMessage && isSegmentBatchUserMessage(userMessage.content));
+				}).length;
+
+				expect(segmentBatchCallCount).toBeGreaterThanOrEqual(1);
+			});
+
+			test("should fall back to full-body translation when segment extraction is unsafe", async () => {
+				const extractSpy = spyOn(
+					segmentMarkdown,
+					"extractTranslatableBodySegments",
+				).mockReturnValue({
+					segments: [],
+					parseWarnings: ["parse failed: simulated"],
+				});
+
+				mockChatCompletionsCreate.mockResolvedValue(
+					createChatCompletionFixture("# Oi\n\nTexto do corpo."),
+				);
+
+				const file = createTranslationFileFixture({ content: "# Hi\n\nBody text." });
+				const result = await translatorService.translateContent(file);
+
+				expect(result.content).toBe("# Oi\n\nTexto do corpo.");
+
+				const usedSegmentBatch = mockChatCompletionsCreate.mock.calls.some(([params]) => {
+					const userMessage = getUserMessageFromCompletionParams(params);
+					return Boolean(userMessage && isSegmentBatchUserMessage(userMessage.content));
+				});
+
+				expect(usedSegmentBatch).toBe(false);
+				extractSpy.mockRestore();
+			});
 		});
 	});
 });

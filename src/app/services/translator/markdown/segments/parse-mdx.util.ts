@@ -6,15 +6,11 @@ import { unified } from "unified";
 import type { Root } from "mdast";
 
 /**
- * Spike tooling evaluation (#57): remark-parse + remark-mdx + remark-gfm was chosen over
- * \`@mdx-js/mdx\` compile because the spike needs mdast walking and source positions for
- * byte-stable reinsertion; MDX compile targets JS output and does not expose segment walks.
- *
- * Pinned devDependencies (see package.json): unified, remark-parse, remark-mdx, remark-gfm,
- * unist-util-visit, unist-util-position, mdast-util-to-markdown, `mdx-js/mdx` (eval only).
+ * Production tooling note (#57/#59): remark-parse + remark-mdx + remark-gfm for mdast walking
+ * and source positions (byte-stable reinsertion). `@mdx-js/mdx` compile was deferred.
  *
  * react.dev alignment: upstream uses MDX v3 / ESM; remark-mdx@3 matches. Version drift with
- * upstream plugins remains a defer risk for production adoption.
+ * upstream plugins remains a defer risk.
  */
 export const SEGMENT_SPIKE_TOOLING_NOTE =
 	"remark-parse + remark-mdx + remark-gfm (mdast walk + positions); @mdx-js/mdx deferred for compile-only use";
