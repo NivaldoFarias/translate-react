@@ -178,4 +178,4 @@ jobs:
         with:
           name: translation-logs-${{ matrix.lang }}-${{ github.run_id }}
           path: logs/
-          retention-days: 30
+          retention-days: 90
