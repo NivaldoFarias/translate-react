@@ -101,6 +101,35 @@ export function buildFrontmatterBlock(bom: string, innerYaml: string): string {
  * ```
  */
 export function extractTitleScalarFromInnerYaml(innerYaml: string): string | undefined {
+	return extractStringScalarFromInnerYaml(innerYaml, "title");
+}
+
+/**
+ * Returns the trimmed `description` scalar from inner frontmatter YAML when the document root is a mapping.
+ *
+ * @param innerYaml YAML between the opening and closing `---` delimiters (no fences)
+ *
+ * @returns The trimmed description, or `undefined` when absent or invalid
+ *
+ * @example
+ * ```typescript
+ * extractDescriptionScalarFromInnerYaml(`title: x\ndescription: Learn hooks`);
+ * // ^? "Learn hooks"
+ * ```
+ */
+export function extractDescriptionScalarFromInnerYaml(innerYaml: string): string | undefined {
+	return extractStringScalarFromInnerYaml(innerYaml, "description");
+}
+
+/**
+ * Reads a top-level string scalar from inner frontmatter YAML when the root is a mapping.
+ *
+ * @param innerYaml YAML between frontmatter fences
+ * @param key Top-level key to read
+ *
+ * @returns Trimmed scalar value or `undefined` when absent or invalid
+ */
+function extractStringScalarFromInnerYaml(innerYaml: string, key: string): string | undefined {
 	let doc;
 	try {
 		doc = parseDocument(innerYaml);
@@ -111,10 +140,10 @@ export function extractTitleScalarFromInnerYaml(innerYaml: string): string | und
 	if (doc.errors.length > 0) return undefined;
 	if (!isMap(doc.contents)) return undefined;
 
-	const title = doc.get("title");
-	if (typeof title !== "string") return undefined;
+	const scalar = doc.get(key);
+	if (typeof scalar !== "string") return undefined;
 
-	const trimmed = title.trim();
+	const trimmed = scalar.trim();
 	return trimmed.length > 0 ? trimmed : undefined;
 }
 
