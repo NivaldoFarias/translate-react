@@ -1,9 +1,9 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { analyzeFixture } from "./guard-simulation.util";
-
 import type { FixtureCorpusMetrics } from "./types";
+
+import { analyzeFixture } from "./guard-simulation.util";
 
 const PROJECT_ROOT = join(import.meta.dir, "../../../../../../");
 const FIXTURE_DIR = join(PROJECT_ROOT, "tests/fixtures/segment-extraction");
@@ -69,11 +69,8 @@ export function formatCorpusTable(metrics: readonly FixtureCorpusMetrics[]) {
 
 	const rows = metrics.map((row) => {
 		const ratio =
-			row.bodyCharCount === 0
-				? "n/a"
-				: (row.translatableCharCount / row.bodyCharCount).toFixed(2);
-		const warnings =
-			row.parseWarnings.length === 0 ? "none" : row.parseWarnings.join("; ");
+			row.bodyCharCount === 0 ? "n/a" : (row.translatableCharCount / row.bodyCharCount).toFixed(2);
+		const warnings = row.parseWarnings.length === 0 ? "none" : row.parseWarnings.join("; ");
 
 		return `| ${row.fixtureId} | ${row.segmentCount} (${row.translateSegmentCount}t/${row.policySegmentCount}p) | ${row.translatableCharCount} | ${row.bodyCharCount} | ${ratio} | ${row.identityRoundTrip ? "pass" : "fail"} | ${warnings} |`;
 	});

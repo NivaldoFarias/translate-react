@@ -7,7 +7,7 @@ description: Function names inside fences must stay frozen.
 
 ```js
 function foo() {
-  return will;
+	return will;
 }
 ```
 

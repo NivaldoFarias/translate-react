@@ -1,8 +1,9 @@
+import { pointEnd, pointStart } from "unist-util-position";
+
 import type { Code, Heading, Html, InlineCode, Link, Text } from "mdast";
 import type { MdxFlowExpression, MdxTextExpression } from "mdast-util-mdx-expression";
 import type { MdxJsxAttribute, MdxJsxFlowElement, MdxJsxTextElement } from "mdast-util-mdx-jsx";
 import type { Node, Parent } from "unist";
-import { pointEnd, pointStart } from "unist-util-position";
 
 /** mdast node types whose descendants are never translatable at the AST level */
 export type PreserveAncestorType =
@@ -31,37 +32,79 @@ export interface AbsoluteSourceSpan {
 	readonly sourceText: string;
 }
 
-/** Returns true when `node` is a fenced or inline code block */
+/**
+ * Returns true when `node` is a fenced code block.
+ *
+ * @param node Unist node to test
+ *
+ * @returns Whether `node` is an mdast `code` node
+ */
 export function isCode(node: Node): node is Code {
 	return node.type === "code";
 }
 
-/** Returns true when `node` is a markdown link */
+/**
+ * Returns true when `node` is a markdown link.
+ *
+ * @param node Unist node to test
+ *
+ * @returns Whether `node` is an mdast `link` node
+ */
 export function isLink(node: Node): node is Link {
 	return node.type === "link";
 }
 
-/** Returns true when `node` is a heading */
+/**
+ * Returns true when `node` is a heading.
+ *
+ * @param node Unist node to test
+ *
+ * @returns Whether `node` is an mdast `heading` node
+ */
 export function isHeading(node: Node): node is Heading {
 	return node.type === "heading";
 }
 
-/** Returns true when `node` is a prose text leaf */
+/**
+ * Returns true when `node` is a prose text leaf.
+ *
+ * @param node Unist node to test
+ *
+ * @returns Whether `node` is an mdast `text` node
+ */
 export function isText(node: Node): node is Text {
 	return node.type === "text";
 }
 
-/** Returns true when `node` is an MDX JSX flow or text element */
+/**
+ * Returns true when `node` is an MDX JSX flow or text element.
+ *
+ * @param node Unist node to test
+ *
+ * @returns Whether `node` is an `mdxJsxFlowElement` or `mdxJsxTextElement`
+ */
 export function isMdxJsxElement(node: Node): node is MdxJsxFlowElement | MdxJsxTextElement {
 	return node.type === "mdxJsxFlowElement" || node.type === "mdxJsxTextElement";
 }
 
-/** Returns true when `node` is an MDX JSX attribute */
+/**
+ * Returns true when `node` is an MDX JSX attribute.
+ *
+ * @param node Unist node to test
+ *
+ * @returns Whether `node` is an `mdxJsxAttribute` node
+ */
 export function isMdxJsxAttribute(node: Node): node is MdxJsxAttribute {
 	return node.type === "mdxJsxAttribute";
 }
 
-/** Returns true when `node` is a preserve-only ancestor type */
+/**
+ * Returns true when `node` is a preserve-only ancestor type.
+ *
+ * @param node Unist node to test
+ *
+ * @returns Whether descendants of `node` must not be translated at the mdast level
+ */
 export function isPreserveAncestor(node: Node): node is Node & { type: PreserveAncestorType } {
 	return PRESERVE_ANCESTOR_TYPES.has(node.type as PreserveAncestorType);
 }

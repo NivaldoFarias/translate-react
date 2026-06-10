@@ -1,10 +1,18 @@
 import { visitParents } from "unist-util-visit-parents";
 
+import type { Link, Root } from "mdast";
+import type { MdxJsxFlowElement, MdxJsxTextElement } from "mdast-util-mdx-jsx";
+import type { Node } from "unist";
+
+import type { AbsoluteSourceSpan } from "./mdast-segment.util";
+import type { SegmentContext, SegmentExtractionResult, TranslatableSegment } from "./types";
+
 import {
 	extractDescriptionScalarFromInnerYaml,
 	extractFrontmatterParts,
 	splitLeadingYamlFrontmatter,
 } from "../frontmatter";
+
 import { classificationRuleForNode } from "./classify.util";
 import { extractFenceCommentSegments } from "./fence-comments.util";
 import {
@@ -23,12 +31,6 @@ import {
 	sliceAbsoluteSpan,
 } from "./mdast-segment.util";
 import { parseMdxToMdast } from "./parse-mdx.util";
-
-import type { SegmentContext, SegmentExtractionResult, TranslatableSegment } from "./types";
-
-import type { Link, Root } from "mdast";
-import type { MdxJsxFlowElement, MdxJsxTextElement } from "mdast-util-mdx-jsx";
-import type { Node } from "unist";
 
 interface WalkState {
 	readonly segments: TranslatableSegment[];
@@ -58,7 +60,7 @@ function allocateSegmentId(state: WalkState, path: string): string {
  * Records a segment from an absolute source span when text is non-empty.
  *
  * @param state Mutable walk state
- * @param span Absolute document offsets and text
+ * @param span Absolute document span with `start`, `end`, and `sourceText`
  * @param kind Segment classification
  * @param path Node path
  * @param node mdast node for classification rule lookup
@@ -66,7 +68,7 @@ function allocateSegmentId(state: WalkState, path: string): string {
  */
 function pushSpanSegment(
 	state: WalkState,
-	span: { start: number; end: number; sourceText: string },
+	span: AbsoluteSourceSpan,
 	kind: TranslatableSegment["kind"],
 	path: string,
 	node: Node,
@@ -203,12 +205,7 @@ function extractMdxAttributeSegments(
  * @param path Node path
  * @param context Segment context
  */
-function pushLinkLabelSegment(
-	state: WalkState,
-	link: Link,
-	path: string,
-	context: SegmentContext,
-) {
+function pushLinkLabelSegment(state: WalkState, link: Link, path: string, context: SegmentContext) {
 	const textChildren = collectLinkLabelTexts(link);
 	if (textChildren.length === 0) {
 		return;
@@ -381,8 +378,7 @@ export function filterTranslatableSegments(
 	includePolicy = false,
 ) {
 	return segments.filter(
-		(segment) =>
-			segment.kind === "translate" || (includePolicy && segment.kind === "policy"),
+		(segment) => segment.kind === "translate" || (includePolicy && segment.kind === "policy"),
 	);
 }
 

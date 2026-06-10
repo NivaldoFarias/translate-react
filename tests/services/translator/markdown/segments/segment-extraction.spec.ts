@@ -1,7 +1,5 @@
 import { describe, expect, test } from "bun:test";
 
-import { evaluateToolingOnFixture } from "@/app/services/translator/markdown/segments/tooling-eval.util";
-
 import {
 	compareCommentExtractionMethods,
 	extractSegments,
@@ -14,6 +12,8 @@ import {
 	SEGMENT_SPIKE_TOOLING_NOTE,
 	simulateGuardOutcomes,
 } from "@/app/services/translator/markdown/segments";
+import { evaluateToolingOnFixture } from "@/app/services/translator/markdown/segments/tooling-eval.util";
+
 describe("segment extraction spike", () => {
 	test("documents remark-mdx tooling choice", () => {
 		expect(SEGMENT_SPIKE_TOOLING_NOTE).toContain("remark-mdx");
@@ -40,7 +40,9 @@ describe("segment extraction spike", () => {
 		const { segments } = extractSegments(source);
 
 		expect(
-			filterTranslatableSegments(segments).some((segment) => segment.sourceText.includes("function foo")),
+			filterTranslatableSegments(segments).some((segment) =>
+				segment.sourceText.includes("function foo"),
+			),
 		).toBe(false);
 	});
 

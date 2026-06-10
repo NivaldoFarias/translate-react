@@ -8,8 +8,8 @@ description: Only comments inside fences are policy-translatable.
 ```js
 // Explain what this helper does
 function helper() {
-  /* Block comment for maintainers */
-  return 1;
+	/* Block comment for maintainers */
+	return 1;
 }
 ```
 
