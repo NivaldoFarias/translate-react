@@ -35,8 +35,7 @@ describe("buildReviewerWarningsMarkdown", () => {
 			[
 				{
 					guardId: "fenceJsxStaticText",
-					hint:
-						'Inside fenced code blocks, do not translate JSX text between tags or demo UI string literals used in examples. Copy static JSX text exactly from the source in English. fence 1: keep JSX text "animate me" (changed to "anime-me")',
+					hint: 'Inside fenced code blocks, do not translate JSX text between tags or demo UI string literals used in examples. Copy static JSX text exactly from the source in English. fence 1: keep JSX text "animate me" (changed to "anime-me")',
 				},
 			],
 			strings,

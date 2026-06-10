@@ -1,11 +1,11 @@
 import type { TranslatableSegment } from "@/app/services/translator/markdown/segments/types";
 
-import { collectPostTranslationValidationIssues } from "@/app/services/translator/validation/guards";
 import {
 	extractSegments,
 	filterTranslatableSegments,
 } from "@/app/services/translator/markdown/segments/extract-segments.util";
 import { reinsertSegments } from "@/app/services/translator/markdown/segments/reinsert-segments.util";
+import { collectPostTranslationValidationIssues } from "@/app/services/translator/validation/guards";
 
 /** One row in the guard simulation table for a fixture */
 export interface GuardSimulationRow {
@@ -31,10 +31,7 @@ function simulateBadFullBodyTranslation(source: string) {
 	return corrupted;
 }
 
-function simulateSegmentOnlyTranslation(
-	source: string,
-	segments: readonly TranslatableSegment[],
-) {
+function simulateSegmentOnlyTranslation(source: string, segments: readonly TranslatableSegment[]) {
 	const translations: Record<string, string> = {};
 
 	for (const segment of filterTranslatableSegments(segments)) {
