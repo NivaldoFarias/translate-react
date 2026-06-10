@@ -11,10 +11,10 @@ import {
 	reinsertSegments,
 	splitSegmentBatchInHalf,
 } from "@/app/services/translator/markdown/segments";
-import { loadSegmentFixture } from "@tests/fixtures/segment-extraction/load-fixture.util";
 import { maskLargeVerbatimFencedCodeBlocks } from "@/app/utils/markdown-verbatim-fences.util";
 
 import { hydrateRootMd } from "@tests/fixtures/react-docs-fixtures";
+import { loadSegmentFixture } from "@tests/fixtures/segment-extraction/load-fixture.util";
 
 describe("segment translation utilities", () => {
 	test("isSegmentTranslationEligible returns false when parse failed", () => {

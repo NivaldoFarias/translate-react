@@ -1,17 +1,15 @@
 import type { ReviewerValidationNotice } from "@/app/services/github/types";
+import type { FenceJsxStaticTextMismatch } from "@/app/services/translator/validation/analyzers/fence-jsx-static-text.analyzer";
+
+import type { LocalePRBodyStrings } from "./types";
 
 import { MARKDOWN_REGEXES } from "@/app/services/translator/markdown/markdown.regexes";
 import {
 	extractFencedCodeBlockBodies,
 	findFenceFunctionIdentifierMismatches,
 } from "@/app/services/translator/validation/analyzers/fence-code-identifier.analyzer";
-import {
-	findFenceJsxStaticTextMismatches,
-	type FenceJsxStaticTextMismatch,
-} from "@/app/services/translator/validation/analyzers/fence-jsx-static-text.analyzer";
+import { findFenceJsxStaticTextMismatches } from "@/app/services/translator/validation/analyzers/fence-jsx-static-text.analyzer";
 import { findMarkdownLinkViolations } from "@/app/services/translator/validation/analyzers/markdown-link.analyzer";
-
-import type { LocalePRBodyStrings } from "./types";
 
 const HINT_VIOLATION_SPLIT = /\.\s+(?:fence \d+|Problems found:)/;
 
@@ -156,12 +154,11 @@ function formatFenceJsxMismatchItem(
 		mismatch.sourceText,
 	);
 
-	const startLine =
-		needleOffset === null ? 1 : lineNumberAtOffset(sourceMarkdown, needleOffset);
+	const startLine = needleOffset === null ? 1 : lineNumberAtOffset(sourceMarkdown, needleOffset);
 	const endLine =
-		needleOffset === null ?
-			startLine
-		:	lineNumberAtOffset(sourceMarkdown, needleOffset + mismatch.sourceText.length);
+		needleOffset === null ? startLine : (
+			lineNumberAtOffset(sourceMarkdown, needleOffset + mismatch.sourceText.length)
+		);
 
 	const location = formatViolationLocation(strings, startLine, endLine);
 	const translated = mismatch.translatedText ?? "";
@@ -355,12 +352,7 @@ function formatGuardSectionBody(
 ) {
 	switch (guardId) {
 		case "fenceJsxStaticText":
-			return formatFenceJsxStaticTextSection(
-				strings,
-				sourceMarkdown,
-				translatedMarkdown,
-				hint,
-			);
+			return formatFenceJsxStaticTextSection(strings, sourceMarkdown, translatedMarkdown, hint);
 		case "fenceFunctionIdentifiers":
 			return formatFenceFunctionIdentifiersSection(
 				strings,

@@ -265,10 +265,7 @@ describe("ptBrLocale.pullRequest.body", () => {
 				"src/content/demo.md",
 				"sha-demo",
 			);
-			const translated = sourceFile.content.replace(
-				"<div>animate me</div>",
-				"<div>anime-me</div>",
-			);
+			const translated = sourceFile.content.replace("<div>animate me</div>", "<div>anime-me</div>");
 			const result = {
 				...processingResult,
 				translation: translated,
@@ -277,8 +274,7 @@ describe("ptBrLocale.pullRequest.body", () => {
 				reviewerNotices: [
 					{
 						guardId: "fenceJsxStaticText",
-						hint:
-							"Inside fenced code blocks, do not translate JSX text between tags or demo UI string literals used in examples. Copy static JSX text exactly from the source in English. fence 1: keep JSX text \"<div>animate me\" (changed to \"<div>anime-me\")",
+						hint: 'Inside fenced code blocks, do not translate JSX text between tags or demo UI string literals used in examples. Copy static JSX text exactly from the source in English. fence 1: keep JSX text "<div>animate me" (changed to "<div>anime-me")',
 					},
 				],
 			});

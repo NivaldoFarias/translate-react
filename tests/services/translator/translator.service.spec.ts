@@ -375,10 +375,10 @@ describe("TranslatorService", () => {
 					"# Title\n\n## Section\n\nTo opt-in, wrap it.\n\n```js\n" + inner + "```\n\nAfter.\n";
 
 				mockSegmentAwareTranslation({
-					Title: "Título",
-					Section: "Seção",
+					"Title": "Título",
+					"Section": "Seção",
 					"To opt-in, wrap it.": "Para optar, envolva.",
-					After: "Depois.",
+					"After": "Depois.",
 				});
 
 				const file = createTranslationFileFixture({ content: markdown });
@@ -401,8 +401,8 @@ describe("TranslatorService", () => {
 					"# Doc\n\n```js\n" + filler + secretSentence + "\n```\n\n## Outro\n\nFinal line.\n";
 
 				mockSegmentAwareTranslation({
-					Doc: "Documento",
-					Outro: "Outro",
+					"Doc": "Documento",
+					"Outro": "Outro",
 					"Final line.": "Linha final.",
 				});
 

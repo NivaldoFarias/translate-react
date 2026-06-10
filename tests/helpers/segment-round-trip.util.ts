@@ -1,9 +1,10 @@
+import type { SegmentExtractionResult } from "@/app/services/translator/markdown/segments/types";
+
 import {
 	extractSegments,
 	filterTranslatableSegments,
 } from "@/app/services/translator/markdown/segments/extract-segments.util";
 import { reinsertSegments } from "@/app/services/translator/markdown/segments/reinsert-segments.util";
-import type { SegmentExtractionResult } from "@/app/services/translator/markdown/segments/types";
 
 /** Normalizes line endings to LF for round-trip comparison */
 function normalizeNewlines(text: string) {
