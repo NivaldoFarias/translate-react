@@ -88,7 +88,10 @@ export class TranslationPromptBuilder {
 			);
 		}
 
-		return this.buildMarkdownDocumentSystemPrompt(params, languages);
+		return (
+			// eslint-disable-next-line @typescript-eslint/no-deprecated -- legacy full-body fallback path
+			this.buildMarkdownDocumentSystemPrompt(params, languages)
+		);
 	}
 
 	/**
@@ -100,6 +103,8 @@ export class TranslationPromptBuilder {
 	 * @param languages.target Target language display name
 	 *
 	 * @returns The system prompt string
+	 *
+	 * @deprecated Legacy full-body and chunked fallback only; body prose uses {@link buildSegmentBatchSystemPrompt}.
 	 */
 	public buildMarkdownDocumentSystemPrompt(
 		params: BuildMarkdownDocumentPromptParams,

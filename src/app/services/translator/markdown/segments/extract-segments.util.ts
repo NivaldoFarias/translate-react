@@ -356,6 +356,10 @@ export function extractTranslatableBodySegments(body: string): BodySegmentExtrac
  * const result = extractSegments("---\ntitle: x\ndescription: y\n---\n\nHello");
  * // result.segments includes description + "Hello"
  * ```
+ *
+ * @deprecated For production translation use {@link extractTranslatableBodySegments} on the body
+ * only so frontmatter `description` is not translated twice. Retained for spike fixtures, corpus
+ * metrics, and identity round-trip tests on full documents.
  */
 export function extractSegments(source: string): SegmentExtractionResult {
 	const normalized = source.replace(/\r\n/g, "\n");

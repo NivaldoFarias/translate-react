@@ -2,8 +2,6 @@ import type { SegmentBatchRequestItem } from "@/app/services/translator/translat
 
 import type { TranslatableSegment } from "./types";
 
-export type { SegmentBatchRequestItem };
-
 /** Estimated JSON wrapper tokens for a segment batch user message */
 const SEGMENT_BATCH_JSON_OVERHEAD_TOKENS = 32;
 

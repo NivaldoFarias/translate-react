@@ -651,30 +651,11 @@ export class TranslatorService {
 	}
 
 	/**
-	 * Translates content using intelligent chunking for large files.
+	 * Translates markdown body via AST segment batches with full-body fallback.
 	 *
-	 * Handles large files by breaking them into manageable pieces and processing
-	 * each chunk separately. Automatically reassembles the translated chunks while
-	 * maintaining proper spacing and structure. Validates that all chunks are
-	 * successfully translated before reassembly.
-	 *
-	 * @param content Content to translate (automatically chunked if exceeds token limit)
-	 *
-	 * @returns Promise resolving to translated content reassembled from all chunks
-	 *
-	 * @see {@link ChunksManager.chunkContent} for chunking strategy details
-	 * @see {@link TranslatorService.callLanguageModel} for individual chunk translation
-	 *
-	 * @example
-	 * ```typescript
-	 * const translator = new TranslatorService({ source: 'en', target: 'pt-br' });
-	 * const largeContent = '# Very long documentation...\n'.repeat(1000);
-	 * const translated = await translator.translateWithChunking(largeContent);
-	 * console.log('Translation completed:', translated.length);
-	 * ```
-	 */
-	/**
-	 * Translates markdown body content (single-shot or chunked).
+	 * Default path: {@link extractTranslatableBodySegments}, token-budgeted segment batches, and
+	 * {@link reinsertSegments}. Parse warnings or segment batch failures fall back to
+	 * {@link translateMarkdownBodyLegacy}.
 	 *
 	 * @param file Work file whose `content` is the body sent to the LLM (frontmatter already split off)
 	 * @param attemptContext Maintainer feedback for the system prompt, when present
@@ -736,6 +717,8 @@ export class TranslatorService {
 
 	/**
 	 * Translates markdown body via full-document or chunked LLM calls (fallback path).
+	 *
+	 * Used when segment extraction is unsafe or segment batch translation fails.
 	 *
 	 * @param file Work file whose `content` is the body sent to the LLM
 	 * @param attemptContext Maintainer feedback for the system prompt, when present
@@ -870,6 +853,18 @@ export class TranslatorService {
 		}
 	}
 
+	/**
+	 * Translates an oversized body by splitting with {@link ChunksManager} and reassembling chunks.
+	 *
+	 * Legacy fallback used when {@link translateMarkdownBodyLegacy} needs token-budget chunking.
+	 *
+	 * @param file Work file whose `content` is the markdown body
+	 * @param attemptContext Maintainer feedback for the system prompt, when present
+	 *
+	 * @returns Translated body reassembled from all chunks
+	 *
+	 * @see {@link ChunksManager.chunkContent} for chunking strategy details
+	 */
 	private async translateWithChunking(
 		file: TranslationFile,
 		attemptContext: TranslationAttemptContext = emptyTranslationAttemptContext(),
@@ -907,7 +902,7 @@ export class TranslatorService {
 	private static readonly RECHUNK_BUDGET_FACTOR = 0.5;
 
 	/**
-	 * Translates a single chunk of content using the language model.
+	 * Translates a single markdown chunk using the full-document LLM prompt.
 	 *
 	 * When the LLM truncates output due to completion token limits, the chunk is
 	 * automatically split into smaller sub-chunks and translated recursively.

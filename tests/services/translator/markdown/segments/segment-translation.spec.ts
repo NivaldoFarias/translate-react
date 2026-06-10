@@ -8,6 +8,7 @@ import {
 	isSegmentTranslationEligible,
 	packSegmentsIntoBatches,
 	reinsertSegments,
+	splitSegmentBatchInHalf,
 } from "@/app/services/translator/markdown/segments";
 import { loadSpikeFixture } from "@/app/services/translator/markdown/segments/spike-corpus.util";
 
@@ -40,6 +41,27 @@ describe("segment translation utilities", () => {
 		);
 
 		expect(tinyBudgetBatches.length).toBeGreaterThan(1);
+	});
+
+	test("splitSegmentBatchInHalf returns two non-empty halves for multi-item batches", () => {
+		const items = [
+			{ segmentId: "a", source: "one" },
+			{ segmentId: "b", source: "two" },
+			{ segmentId: "c", source: "three" },
+		];
+
+		const [firstHalf, secondHalf] = splitSegmentBatchInHalf(items);
+
+		expect(firstHalf.length).toBeGreaterThan(0);
+		expect(secondHalf.length).toBeGreaterThan(0);
+		expect(firstHalf.length + secondHalf.length).toBe(items.length);
+	});
+
+	test("extractTranslatableBodySegments returns no translate segments for code-only body", () => {
+		const { segments } = extractTranslatableBodySegments("```js\nconst x = 1;\n```\n");
+		const translatable = filterTranslatableSegments(segments);
+
+		expect(translatable.length).toBe(0);
 	});
 
 	test("reinsert with mock translations preserves fenced code from S1 body", () => {

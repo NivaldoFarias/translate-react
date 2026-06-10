@@ -3,6 +3,7 @@ import { mock } from "bun:test";
 import type OpenAI from "openai";
 
 import { frontmatterBatchRequestEnvelopeSchema } from "@/app/services/translator/translator-frontmatter-batch.schema";
+import { segmentBatchRequestEnvelopeSchema } from "@/app/services/translator/translator-segment-batch.schema";
 
 import { createChatCompletionFixture } from "@tests/fixtures";
 
@@ -48,14 +49,43 @@ function passthroughFrontmatterBatchResponse(userContent: string) {
 	}
 }
 
+/**
+ * When the user message is a segment batch request JSON, builds a valid structured response
+ * by echoing each `source` string into `translated` so integration tests behave like a no-op model.
+ *
+ * @param userContent Raw user message string from the chat request
+ *
+ * @returns JSON string for `choices[0].message.content`, or `null` when the payload is not a batch request
+ */
+function passthroughSegmentBatchResponse(userContent: string) {
+	try {
+		const parsed = segmentBatchRequestEnvelopeSchema.safeParse(JSON.parse(userContent));
+		if (!parsed.success) return null;
+
+		const items = parsed.data.items.map((item) => ({
+			segmentId: item.segmentId,
+			translated: item.source,
+		}));
+
+		return JSON.stringify({ items });
+	} catch {
+		return null;
+	}
+}
+
 /** Echoes the last user message as assistant content; maps `ping` → `pong` for connectivity checks */
 export function createPassthroughChatCompletionsMock() {
 	return mock((params: OpenAI.Chat.Completions.ChatCompletionCreateParams) => {
 		const userContent = getLastUserText(params.messages);
 
-		const batchResponse = passthroughFrontmatterBatchResponse(userContent);
-		if (batchResponse !== null) {
-			return Promise.resolve(createChatCompletionFixture(batchResponse));
+		const frontmatterBatchResponse = passthroughFrontmatterBatchResponse(userContent);
+		if (frontmatterBatchResponse !== null) {
+			return Promise.resolve(createChatCompletionFixture(frontmatterBatchResponse));
+		}
+
+		const segmentBatchResponse = passthroughSegmentBatchResponse(userContent);
+		if (segmentBatchResponse !== null) {
+			return Promise.resolve(createChatCompletionFixture(segmentBatchResponse));
 		}
 
 		const outbound =
