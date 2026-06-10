@@ -11,7 +11,7 @@ import type { Root } from "mdast";
  * byte-stable reinsertion; MDX compile targets JS output and does not expose segment walks.
  *
  * Pinned devDependencies (see package.json): unified, remark-parse, remark-mdx, remark-gfm,
- * unist-util-visit, unist-util-position, mdast-util-to-markdown, @mdx-js/mdx (eval only).
+ * unist-util-visit, unist-util-position, mdast-util-to-markdown, `mdx-js/mdx` (eval only).
  *
  * react.dev alignment: upstream uses MDX v3 / ESM; remark-mdx@3 matches. Version drift with
  * upstream plugins remains a defer risk for production adoption.

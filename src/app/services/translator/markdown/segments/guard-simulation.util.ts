@@ -1,9 +1,9 @@
+import type { FixtureCorpusMetrics, GuardSimulationRow, TranslatableSegment } from "./types";
+
 import { collectPostTranslationValidationIssues } from "../../validation/guards";
 
 import { extractSegments, filterTranslatableSegments } from "./extract-segments.util";
 import { mockTranslateSegments, reinsertSegments } from "./reinsert-segments.util";
-
-import type { FixtureCorpusMetrics, GuardSimulationRow, TranslatableSegment } from "./types";
 
 /** Guards targeted by v0.2.6 structural failure analysis in issue #57 */
 const STRUCTURAL_GUARD_IDS = new Set([
@@ -120,10 +120,7 @@ export function analyzeFixture(fixtureId: string, source: string): FixtureCorpus
  *
  * @returns Round-trip success flag
  */
-function identityRoundTripFromExtraction(
-	source: string,
-	segments: readonly TranslatableSegment[],
-) {
+function identityRoundTripFromExtraction(source: string, segments: readonly TranslatableSegment[]) {
 	const translations: Record<string, string> = {};
 
 	for (const segment of filterTranslatableSegments(segments)) {
@@ -131,8 +128,7 @@ function identityRoundTripFromExtraction(
 	}
 
 	const output = reinsertSegments(source, translations, segments);
-	const ok =
-		output.replace(/\r\n/g, "\n") === source.replace(/\r\n/g, "\n");
+	const ok = output.replace(/\r\n/g, "\n") === source.replace(/\r\n/g, "\n");
 
 	return { ok, output };
 }

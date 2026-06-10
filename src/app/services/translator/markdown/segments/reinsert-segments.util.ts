@@ -1,6 +1,6 @@
-import { extractSegments, filterTranslatableSegments } from "./extract-segments.util";
-
 import type { SegmentExtractionResult, SegmentTranslationMap, TranslatableSegment } from "./types";
+
+import { extractSegments, filterTranslatableSegments } from "./extract-segments.util";
 
 /**
  * Normalizes line endings to LF for spike round-trip comparison.

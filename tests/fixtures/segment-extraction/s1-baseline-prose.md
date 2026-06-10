@@ -9,8 +9,8 @@ Use the `useState` hook to store local state in a component.
 
 ```js
 function Counter() {
-  const [count, setCount] = useState(0);
-  return count;
+	const [count, setCount] = useState(0);
+	return count;
 }
 ```
 

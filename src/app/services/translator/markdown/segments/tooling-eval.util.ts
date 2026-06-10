@@ -1,6 +1,9 @@
-import { compile } from "@mdx-js/mdx";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+
+import { compile } from "@mdx-js/mdx";
+
+import type { Node } from "unist";
 
 import { parseMdxToMdast } from "./parse-mdx.util";
 
@@ -43,14 +46,36 @@ export async function evaluateToolingOnFixture(fixtureRelative: string) {
 	};
 }
 
-/** Counts mdast nodes in a tree for tooling comparison metrics. */
-function countNodes(tree: { children?: unknown[] }): number {
+/**
+ * Counts mdast nodes in a tree for tooling comparison metrics.
+ *
+ * @param tree mdast root or child subtree
+ *
+ * @returns Total node count including `tree`
+ */
+function countNodes(tree: Node): number {
 	let count = 1;
-	for (const child of tree.children ?? []) {
-		if (child && typeof child === "object" && "type" in child) {
-			count += countNodes(child as { type?: string; children?: unknown[] });
+
+	if (!("children" in tree) || !Array.isArray(tree.children)) {
+		return count;
+	}
+
+	for (const child of tree.children) {
+		if (isUnistNode(child)) {
+			count += countNodes(child);
 		}
 	}
 
 	return count;
+}
+
+/**
+ * Returns true when `value` is a unist node with a string `type`.
+ *
+ * @param value Candidate child from a parent `children` array
+ *
+ * @returns Whether `value` can be walked as a `Node`
+ */
+function isUnistNode(value: unknown): value is Node {
+	return typeof value === "object" && value !== null && typeof (value as Node).type === "string";
 }

@@ -1,5 +1,7 @@
 import type { Node } from "unist";
 
+import type { SegmentKind } from "./types";
+
 import {
 	isHeading,
 	isInsidePreserveAncestor,
@@ -8,8 +10,6 @@ import {
 	isPreserveAncestor,
 	isText,
 } from "./mdast-segment.util";
-
-import type { SegmentKind } from "./types";
 
 /**
  * Returns the default segment kind for an mdast node during AST walking.

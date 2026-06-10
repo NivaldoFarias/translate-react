@@ -8,8 +8,8 @@ When you [update state](/reference/react/useState), React schedules a render.
 ```js
 // This comment explains the hook call
 function Example() {
-  const [value, setValue] = useState(0);
-  return value;
+	const [value, setValue] = useState(0);
+	return value;
 }
 ```
 
