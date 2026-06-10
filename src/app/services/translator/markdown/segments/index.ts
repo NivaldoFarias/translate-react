@@ -17,6 +17,7 @@ export {
 	isJsLikeFenceLang,
 } from "./fence-comments.util";
 export {
+	// eslint-disable-next-line @typescript-eslint/no-deprecated -- spike corpus and fixture tests
 	extractSegments,
 	extractTranslatableBodySegments,
 	filterTranslatableSegments,
@@ -27,7 +28,7 @@ export {
 	packSegmentsIntoBatches,
 	splitSegmentBatchInHalf,
 } from "./segment-batch.util";
-export type { SegmentBatchRequestItem } from "./segment-batch.util";
+export type { SegmentBatchRequestItem } from "@/app/services/translator/translator-segment-batch.schema";
 export {
 	computeTranslatableCharRatio,
 	isSegmentTranslationEligible,
@@ -42,6 +43,7 @@ export { SEGMENT_INTEGRATION_ANALYSIS } from "./integration-analysis.util";
 export { parseMdxToMdast, SEGMENT_SPIKE_TOOLING_NOTE } from "./parse-mdx.util";
 export {
 	identityRoundTrip,
+	// eslint-disable-next-line @typescript-eslint/no-deprecated -- spike round-trip helper
 	mockTranslateSegments,
 	normalizeNewlines,
 	reinsertSegments,

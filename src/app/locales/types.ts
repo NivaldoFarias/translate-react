@@ -123,29 +123,32 @@ export interface LocalePRBodyStrings {
 		readonly body: (prNumber: number) => string;
 	};
 
-	/** Important notice about human review requirement */
-	readonly humanReviewNotice: string;
+	/**
+	 * Important notice about human review and the maintainer wiki guide.
+	 *
+	 * @param wikiUrl Absolute URL to the For React Docs Maintainers wiki page
+	 *
+	 * @returns Formatted `[!IMPORTANT]` body text
+	 */
+	readonly humanReviewNotice: (wikiUrl: string) => string;
 
 	/** Advisory validation warnings (shown only when `reviewerNotices` is non-empty) */
 	readonly reviewerWarnings: {
 		/** Intro line inside the `[!WARNING]` callout */
 		readonly intro: string;
 
-		/** Table column headers for guard id and maintainer fix text */
-		readonly columns: {
-			readonly guardColumn: string;
-			readonly whatToFixColumn: string;
-		};
-	};
+		/** `<summary>` label for the collapsible validation details block */
+		readonly detailsSummary: string;
 
-	/**
-	 * Link text for the maintainer guide (wiki URL is fixed in the PR body builder).
-	 *
-	 * @param wikiUrl Absolute URL to the For React Docs Maintainers wiki page
-	 *
-	 * @returns Markdown link line
-	 */
-	readonly maintainerGuide: (wikiUrl: string) => string;
+		/**
+		 * Human-readable heading for an advisory guard id in the details section.
+		 *
+		 * @param guardId Post-translation guard identifier
+		 *
+		 * @returns Localized validator name
+		 */
+		readonly guardLabel: (guardId: string) => string;
+	};
 }
 
 export interface LocalePullRequestConfig {

@@ -212,7 +212,7 @@ describe("ptBrLocale.pullRequest.body", () => {
 			expect(body).toContain("Português (Brasil)");
 		});
 
-		test("should not include collapsible details or operator metadata", () => {
+		test("should not include collapsible details when there are no reviewer notices", () => {
 			const body = buildPullRequestBody(
 				file,
 				processingResult,
@@ -233,7 +233,7 @@ describe("ptBrLocale.pullRequest.body", () => {
 			expect(body).toContain("requer revisão humana");
 		});
 
-		test("should render WARNING table with retry hints when reviewer notices exist", () => {
+		test("should render WARNING callout and grouped details when reviewer notices exist", () => {
 			const metadata = createPullRequestDescriptionMetadata({
 				reviewerNotices: [
 					{
@@ -246,21 +246,33 @@ describe("ptBrLocale.pullRequest.body", () => {
 			const body = buildPullRequestBody(file, processingResult, metadata);
 
 			expect(body).toContain("> [!WARNING]");
-			expect(body).toContain("`markdownLinksPreserved`");
+			expect(body).toContain("> [!IMPORTANT]");
+			expect(body).toContain(WIKI_FOR_REACT_DOCS_MAINTAINERS_URL);
+			expect(body).toContain("<details>");
+			expect(body).toContain("Ver detalhes da validação");
+			expect(body).toContain("### Links markdown");
 			expect(body).toContain("Preserve every `[label](url)` from the source.");
-			expect(body).toContain("| Validador | O que corrigir |");
+			expect(body).not.toContain("| Validador | O que corrigir |");
+			expect(body).not.toContain("Guia para revisores:");
 			expect(body).not.toContain("Tentativas de Validação");
 		});
 
-		test("should link to the maintainer wiki guide", () => {
-			const body = buildPullRequestBody(
-				file,
-				processingResult,
-				createPullRequestDescriptionMetadata(),
-			);
+		test("should list semicolon-separated fence violations as bullets under the validator heading", () => {
+			const metadata = createPullRequestDescriptionMetadata({
+				reviewerNotices: [
+					{
+						guardId: "fenceJsxStaticText",
+						hint:
+							"Inside fenced code blocks, do not translate JSX text between tags or demo UI string literals used in examples. Copy static JSX text exactly from the source in English. fence 6: keep JSX text \"Hello\"; fence 8: keep JSX text \"World\"",
+					},
+				],
+			});
 
-			expect(body).toContain(WIKI_FOR_REACT_DOCS_MAINTAINERS_URL);
-			expect(body).not.toContain("> [!TIP]");
+			const body = buildPullRequestBody(file, processingResult, metadata);
+
+			expect(body).toContain("### Texto JSX estático em blocos de código");
+			expect(body).toContain("- fence 6: keep JSX text \"Hello\"");
+			expect(body).toContain("- fence 8: keep JSX text \"World\"");
 		});
 	});
 });
@@ -346,7 +358,6 @@ describe("ruLocale.pullRequest.body", () => {
 
 			expect(body).not.toContain("Статистика обработки");
 			expect(body).not.toContain("Техническая информация");
-			expect(body).not.toContain("<details>");
 		});
 	});
 });

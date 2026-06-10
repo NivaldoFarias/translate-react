@@ -50,8 +50,11 @@ export function reinsertSegments(
  * @param source Original markdown
  *
  * @returns Mock-translated document for structure proof without an LLM
+ *
+ * @deprecated Spike and fixture tests only; production uses {@link reinsertSegments} with LLM output.
  */
 export function mockTranslateSegments(source: string) {
+	// eslint-disable-next-line @typescript-eslint/no-deprecated -- spike helper intentionally uses full-document extraction
 	const extraction = extractSegments(source);
 	const translations: Record<string, string> = {};
 
@@ -70,6 +73,7 @@ export function mockTranslateSegments(source: string) {
  * @returns Whether output matches input (LF-normalized) and extraction metadata
  */
 export function identityRoundTrip(source: string) {
+	// eslint-disable-next-line @typescript-eslint/no-deprecated -- corpus tests include frontmatter segments
 	const extraction = extractSegments(source);
 	const translations: Record<string, string> = {};
 

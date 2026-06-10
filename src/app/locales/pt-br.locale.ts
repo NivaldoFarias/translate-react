@@ -20,19 +20,25 @@ const ptBrPRBodyStrings: LocalePRBodyStrings = {
 			`O PR #${prNumber} foi fechado automaticamente por conflito com a branch principal. Esta tradução foi refeita a partir do arquivo fonte atual, sem merge manual dos conflitos do PR anterior.`,
 	},
 
-	humanReviewNotice:
-		"Esta tradução foi gerada usando LLMs e **requer revisão humana** para garantir precisão, contexto cultural e terminologia técnica.",
+	humanReviewNotice: (wikiUrl) =>
+		`Esta tradução foi gerada usando LLMs e **requer revisão humana** para garantir precisão, contexto cultural e terminologia técnica. Consulte [For React Docs Maintainers](${wikiUrl}) para orientações de revisão e formato de feedback estruturado.`,
 
 	reviewerWarnings: {
 		intro:
 			"A validação automática detectou problemas mecânicos que precisam de correção manual antes do merge:",
-		columns: {
-			guardColumn: "Validador",
-			whatToFixColumn: "O que corrigir",
+		detailsSummary: "Ver detalhes da validação",
+		guardLabel: (guardId) => {
+			const labels: Record<string, string> = {
+				markdownLinksPreserved: "Links markdown",
+				fenceFunctionIdentifiers: "Identificadores de função em blocos de código",
+				fenceJsxStaticText: "Texto JSX estático em blocos de código",
+				headingsPreserved: "Títulos",
+				frontmatterPreserved: "Frontmatter YAML",
+			};
+
+			return labels[guardId] ?? guardId;
 		},
 	},
-
-	maintainerGuide: (wikiUrl) => `Guia para revisores: [For React Docs Maintainers](${wikiUrl}).`,
 };
 
 /**
