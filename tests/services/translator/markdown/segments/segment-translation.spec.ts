@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
+import { ChunksManager } from "@/app/services/translator/chunking";
 import { splitLeadingYamlFrontmatter } from "@/app/services/translator/markdown/frontmatter";
 import {
 	computeTranslatableCharRatio,
@@ -10,7 +11,10 @@ import {
 	reinsertSegments,
 	splitSegmentBatchInHalf,
 } from "@/app/services/translator/markdown/segments";
-import { loadSpikeFixture } from "@/app/services/translator/markdown/segments/spike-corpus.util";
+import { loadSegmentFixture } from "@tests/fixtures/segment-extraction/load-fixture.util";
+import { maskLargeVerbatimFencedCodeBlocks } from "@/app/utils/markdown-verbatim-fences.util";
+
+import { hydrateRootMd } from "@tests/fixtures/react-docs-fixtures";
 
 describe("segment translation utilities", () => {
 	test("isSegmentTranslationEligible returns false when parse failed", () => {
@@ -64,8 +68,23 @@ describe("segment translation utilities", () => {
 		expect(translatable.length).toBe(0);
 	});
 
+	test("masked hydrateRoot body is not segment-eligible", () => {
+		const { rest: body } = splitLeadingYamlFrontmatter(hydrateRootMd);
+		const chunksManager = new ChunksManager("gpt-4o");
+
+		const { maskedMarkdown } = maskLargeVerbatimFencedCodeBlocks(body, {
+			estimateTokens: (markdown) => chunksManager.estimateTokenCount(markdown),
+			minTokens: 80,
+		});
+
+		const { parseWarnings } = extractTranslatableBodySegments(maskedMarkdown);
+
+		expect(isSegmentTranslationEligible(parseWarnings)).toBe(false);
+		expect(parseWarnings.some((warning) => warning.startsWith("parse failed:"))).toBe(true);
+	});
+
 	test("reinsert with mock translations preserves fenced code from S1 body", () => {
-		const { rest: body } = splitLeadingYamlFrontmatter(loadSpikeFixture("S1"));
+		const { rest: body } = splitLeadingYamlFrontmatter(loadSegmentFixture("S1"));
 		const { segments } = extractTranslatableBodySegments(body);
 		const translatable = filterTranslatableSegments(segments);
 		const translations: Record<string, string> = {};

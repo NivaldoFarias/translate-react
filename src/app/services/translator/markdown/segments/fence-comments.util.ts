@@ -9,7 +9,7 @@ const JS_FENCE_LANGS = new Set(["js", "javascript", "ts", "typescript", "tsx"]);
  *
  * @param fenceLang GFM fence info string
  *
- * @returns Whether to run the comment sub-spike parser
+ * @returns Whether to run the TypeScript comment parser on the fence body
  */
 export function isJsLikeFenceLang(fenceLang: string): boolean {
 	const normalized = fenceLang.trim().toLowerCase().split(/\s/)[0] ?? "";
@@ -129,25 +129,4 @@ export function extractFenceCommentSegments(
 	}
 
 	return segments;
-}
-
-/**
- * Compares TypeScript comment extraction against a naive regex baseline for the sub-spike.
- *
- * @param fenceBody Inner fence text
- *
- * @returns Parser and regex comment counts for false-positive analysis
- */
-export function compareCommentExtractionMethods(fenceBody: string) {
-	const parserSpans = collectTypeScriptCommentSpans(fenceBody);
-	const regexSpans = [...fenceBody.matchAll(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g)].map(
-		(match) => match[0],
-	);
-
-	return {
-		parserCount: parserSpans.length,
-		regexCount: regexSpans.length,
-		parserSpans,
-		regexOnlyCount: Math.max(0, regexSpans.length - parserSpans.length),
-	};
 }

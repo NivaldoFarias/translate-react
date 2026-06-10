@@ -38,6 +38,8 @@ const ptBrPRBodyStrings: LocalePRBodyStrings = {
 
 			return labels[guardId] ?? guardId;
 		},
+		violationLocation: (startLine, endLine) =>
+			startLine === endLine ? `linha ${startLine}` : `linhas ${startLine}–${endLine}`,
 	},
 };
 

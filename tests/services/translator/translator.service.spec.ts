@@ -16,6 +16,7 @@ import {
 	createSegmentBatchLlmJsonContent,
 	createTranslationFileFixture,
 } from "@tests/fixtures";
+import { hydrateRootMd } from "@tests/fixtures/react-docs-fixtures";
 import {
 	createChatCompletionsMock,
 	createMockLanguageDetectorService,
@@ -116,6 +117,24 @@ function mockSegmentAwareTranslation(
 		legacyStep += 1;
 		return Promise.resolve(createChatCompletionFixture(legacyContent));
 	});
+}
+
+function chatCallUsedSegmentBatch(params: unknown) {
+	const userMessage = getUserMessageFromCompletionParams(params);
+	return Boolean(userMessage && isSegmentBatchUserMessage(userMessage.content));
+}
+
+function chatCallUsedMarkdownDocument(params: unknown) {
+	const userMessage = getUserMessageFromCompletionParams(params);
+	if (!userMessage || isSegmentBatchUserMessage(userMessage.content)) {
+		return false;
+	}
+
+	if (isFrontmatterBatchUserMessage(userMessage.content)) {
+		return false;
+	}
+
+	return userMessage.content.length > 0;
 }
 
 function collectSegmentBatchSources() {
@@ -395,6 +414,65 @@ describe("TranslatorService", () => {
 				expect(segmentSources).not.toContain(secretSentence);
 				expect(result.content).toContain(secretSentence);
 				expect(result.content).toContain("# Doc");
+			});
+
+			test("when masking is on, MDX-heavy fixture still uses segment batch on unmasked body", async () => {
+				testEnv.MASK_VERBATIM_LARGE_FENCES = true;
+				testEnv.MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS = 80;
+
+				mockChatCompletionsCreate.mockImplementation((params: unknown) => {
+					const userMessage = getUserMessageFromCompletionParams(params);
+					const userContent = userMessage?.content ?? "";
+
+					if (isSegmentBatchUserMessage(userContent)) {
+						const payload = JSON.parse(userContent) as {
+							items: { segmentId: string; source: string }[];
+						};
+
+						return Promise.resolve(
+							createChatCompletionFixture(
+								createSegmentBatchLlmJsonContent(
+									payload.items.map((item) => ({
+										segmentId: item.segmentId,
+										translated: item.source,
+									})),
+								),
+							),
+						);
+					}
+
+					if (isFrontmatterBatchUserMessage(userContent)) {
+						const payload = JSON.parse(userContent) as {
+							items: { fieldKey: string; source: string }[];
+						};
+
+						return Promise.resolve(
+							createChatCompletionFixture(
+								JSON.stringify({
+									items: payload.items.map((item) => ({
+										fieldKey: item.fieldKey,
+										translated: item.source,
+									})),
+								}),
+							),
+						);
+					}
+
+					return Promise.resolve(createChatCompletionFixture(userContent));
+				});
+
+				const file = createTranslationFileFixture({ content: hydrateRootMd });
+				await translatorService.translateContent(file);
+
+				const usedSegmentBatch = mockChatCompletionsCreate.mock.calls.some(([params]) =>
+					chatCallUsedSegmentBatch(params),
+				);
+				const usedMarkdownDocument = mockChatCompletionsCreate.mock.calls.some(([params]) =>
+					chatCallUsedMarkdownDocument(params),
+				);
+
+				expect(usedSegmentBatch).toBe(true);
+				expect(usedMarkdownDocument).toBe(false);
 			});
 
 			test("when masking is on but the threshold is very high, small fenced bodies still stay out of segment batches", async () => {

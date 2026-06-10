@@ -36,23 +36,3 @@ export interface SegmentExtractionResult {
 
 /** Map of segment id to translated text for reinsertion */
 export type SegmentTranslationMap = Readonly<Record<string, string>>;
-
-/** Metrics recorded per fixture during the spike corpus run */
-export interface FixtureCorpusMetrics {
-	readonly fixtureId: string;
-	readonly segmentCount: number;
-	readonly translateSegmentCount: number;
-	readonly policySegmentCount: number;
-	readonly translatableCharCount: number;
-	readonly bodyCharCount: number;
-	readonly identityRoundTrip: boolean;
-	readonly parseWarnings: readonly string[];
-	readonly guardSimulation: readonly GuardSimulationRow[];
-}
-
-/** One row in the guard simulation table for a fixture */
-export interface GuardSimulationRow {
-	readonly guardId: string;
-	readonly firesOnSimulatedBadFullBody: boolean;
-	readonly preventedBySegmentFreeze: boolean;
-}

@@ -358,8 +358,7 @@ export function extractTranslatableBodySegments(body: string): BodySegmentExtrac
  * ```
  *
  * @deprecated For production translation use {@link extractTranslatableBodySegments} on the body
- * only so frontmatter `description` is not translated twice. Retained for spike fixtures, corpus
- * metrics, and identity round-trip tests on full documents.
+ * only so frontmatter `description` is not translated twice. Retained for fixture tests on full documents.
  */
 export function extractSegments(source: string): SegmentExtractionResult {
 	const normalized = source.replace(/\r\n/g, "\n");
