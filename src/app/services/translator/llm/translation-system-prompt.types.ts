@@ -14,4 +14,4 @@ export type ChunkTranslationProgress = Readonly<{
  * `markdownDocument` keeps chunking, verbatim-placeholder, and full doc rules. `frontmatterBatch`
  * uses one structured-output call for the YAML `description` string field when present.
  */
-export type TranslationSystemPromptKind = "markdownDocument" | "frontmatterBatch";
+export type TranslationSystemPromptKind = "markdownDocument" | "frontmatterBatch" | "segmentBatch";

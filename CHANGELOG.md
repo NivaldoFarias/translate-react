@@ -4,6 +4,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+### Added
+
+- AST segment translation as the default markdown body path: prose mdast segments and link labels are batched to the LLM with offset reinsert; parse failures or warnings fall back to full-body translation.
+
 ## [0.2.7] - 2026-06-05
 
 ### Added

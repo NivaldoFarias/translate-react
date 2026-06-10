@@ -8,6 +8,7 @@ import type OpenAI from "openai";
 import type { TranslationAttemptContext } from "@/app/services/translator/pipeline/translation-attempt.context";
 import type { TranslationFile } from "@/app/services/translator/translation-file";
 import type { FrontmatterBatchFieldKey } from "@/app/services/translator/translator-frontmatter-batch.schema";
+import type { SegmentBatchRequestItem } from "@/app/services/translator/translator-segment-batch.schema";
 
 import type { TranslationLlmClientDependencies } from "./translation-llm.client.types";
 import type { TranslationLlmUsageSnapshot } from "./translation-llm.usage";
@@ -20,6 +21,10 @@ import {
 	frontmatterBatchRequestEnvelopeSchema,
 	frontmatterBatchTranslationEnvelopeSchema,
 } from "@/app/services/translator/translator-frontmatter-batch.schema";
+import {
+	segmentBatchRequestEnvelopeSchema,
+	segmentBatchTranslationEnvelopeSchema,
+} from "@/app/services/translator/translator-segment-batch.schema";
 import { getRateLimitResetWaitMs, isOpenRouterDailyFreeModelQuotaError } from "@/app/utils/";
 import { ApplicationError, ErrorCode } from "@/shared/errors/";
 
@@ -41,6 +46,12 @@ export interface TranslationLlmCallResult {
 const FRONTMATTER_BATCH_RESPONSE_FORMAT = zodResponseFormat(
 	frontmatterBatchTranslationEnvelopeSchema,
 	"frontmatter_batch_translations",
+);
+
+/** Structured-output schema for batched prose segment translation (OpenRouter/OpenAI JSON mode). */
+const SEGMENT_BATCH_RESPONSE_FORMAT = zodResponseFormat(
+	segmentBatchTranslationEnvelopeSchema,
+	"segment_batch_translations",
 );
 
 /**
@@ -410,6 +421,170 @@ export class TranslationLlmClient {
 						callStartTime,
 						contentLengthForLog,
 						"LLM frontmatter batch",
+					),
+				},
+			);
+		});
+	}
+
+	/**
+	 * Translates prose markdown segments in one structured LLM completion.
+	 *
+	 * @param file Logical document being translated
+	 * @param batchItems Segment ids and source strings to translate
+	 * @param attemptContext Maintainer feedback for the system prompt, when present
+	 *
+	 * @returns Parsed envelope matching {@link segmentBatchTranslationEnvelopeSchema}
+	 *
+	 * @throws {ApplicationError} When the model returns empty, truncated, or invalid JSON
+	 *
+	 * @example
+	 * ```typescript
+	 * const { envelope, usage } = await client.callLanguageModelSegmentBatch(file, [
+	 *   { segmentId: "root/paragraph#0", source: "Hello world" },
+	 * ], attemptContext);
+	 * ```
+	 */
+	public async callLanguageModelSegmentBatch(
+		file: TranslationFile,
+		batchItems: readonly SegmentBatchRequestItem[],
+		attemptContext: TranslationAttemptContext = emptyTranslationAttemptContext(),
+	) {
+		file.documentSourceLanguage ??= await this.resolveDocumentSourceLanguage(file.content);
+
+		const requestPayload = segmentBatchRequestEnvelopeSchema.parse({ items: batchItems });
+		const userMessage = JSON.stringify(requestPayload);
+		const contentLengthForLog = userMessage.length;
+
+		return this.queue.add(async () => {
+			const callStartTime = Date.now();
+			const estimatedInputTokens = this.estimateInputTokens(userMessage);
+
+			return pRetry(
+				async () => {
+					const attemptStartTime = Date.now();
+
+					try {
+						file.logger.debug(
+							{
+								contentLength: contentLengthForLog,
+								estimatedInputTokens,
+								model: this.model,
+								systemPromptKind: "segmentBatch",
+								segmentCount: batchItems.length,
+							},
+							"Calling LLM API for batched prose segments",
+						);
+
+						const completion = await this.openai.chat.completions.create(
+							this.getLLMCompletionParams(
+								file,
+								userMessage,
+								undefined,
+								"segmentBatch",
+								SEGMENT_BATCH_RESPONSE_FORMAT,
+								attemptContext,
+							),
+						);
+
+						const rawJson = completion.choices[0]?.message.content;
+
+						if (!rawJson) {
+							throw new ApplicationError(
+								"No content returned from language model for segment batch",
+								ErrorCode.NoContent,
+								`${TranslationLlmClient.name}.${this.callLanguageModelSegmentBatch.name}`,
+								{ model: this.model, contentLength: contentLengthForLog },
+							);
+						}
+
+						const finishReason = completion.choices[0]?.finish_reason;
+						if (finishReason === "length") {
+							throw new ApplicationError(
+								"Language model response ended at max completion tokens (truncated output)",
+								ErrorCode.TranslationFailed,
+								`${TranslationLlmClient.name}.${this.callLanguageModelSegmentBatch.name}`,
+								{
+									model: this.model,
+									contentLength: contentLengthForLog,
+									finishReason,
+									completionTokens: completion.usage?.completion_tokens,
+									promptTokens: completion.usage?.prompt_tokens,
+								},
+							);
+						}
+
+						const parsedEnvelope = segmentBatchTranslationEnvelopeSchema.safeParse(
+							JSON.parse(rawJson),
+						);
+
+						if (!parsedEnvelope.success) {
+							throw new ApplicationError(
+								"Segment batch response failed schema validation",
+								ErrorCode.TranslationFailed,
+								`${TranslationLlmClient.name}.${this.callLanguageModelSegmentBatch.name}`,
+								{
+									model: this.model,
+									issues: parsedEnvelope.error.issues,
+								},
+							);
+						}
+
+						const requestedIds = new Set(batchItems.map((item) => item.segmentId));
+						const responseIds = new Set(parsedEnvelope.data.items.map((item) => item.segmentId));
+
+						if (
+							requestedIds.size !== responseIds.size ||
+							[...requestedIds].some((id) => !responseIds.has(id))
+						) {
+							throw new ApplicationError(
+								"Segment batch response ids do not match requested segments",
+								ErrorCode.TranslationFailed,
+								`${TranslationLlmClient.name}.${this.callLanguageModelSegmentBatch.name}`,
+								{
+									requested: [...requestedIds],
+									received: [...responseIds],
+								},
+							);
+						}
+
+						const usage = extractTranslationLlmUsageFromCompletion(completion.usage);
+
+						file.logger.debug(
+							{
+								model: this.model,
+								durationMs: Date.now() - attemptStartTime,
+								inputTokens: usage?.promptTokens,
+								outputTokens: usage?.completionTokens,
+								totalTokens: usage?.totalTokens,
+								costUsd: usage?.costUsd,
+								segmentCount: parsedEnvelope.data.items.length,
+							},
+							"LLM segment batch call successful",
+						);
+
+						return { envelope: parsedEnvelope.data, usage };
+					} catch (error) {
+						if (error instanceof SyntaxError) {
+							throw new ApplicationError(
+								"Segment batch response was not valid JSON",
+								ErrorCode.TranslationFailed,
+								`${TranslationLlmClient.name}.${this.callLanguageModelSegmentBatch.name}`,
+								{ model: this.model, parseError: error.message },
+							);
+						}
+
+						this.rethrowNonRetryableApiError(error, file);
+						throw error;
+					}
+				},
+				{
+					...this.retryConfig,
+					onFailedAttempt: this.createRateLimitAwareRetryHandler(
+						file,
+						callStartTime,
+						contentLengthForLog,
+						"LLM segment batch",
 					),
 				},
 			);
