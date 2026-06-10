@@ -148,6 +148,16 @@ export interface LocalePRBodyStrings {
 		 * @returns Localized validator name
 		 */
 		readonly guardLabel: (guardId: string) => string;
+
+		/**
+		 * Localized line range label for a violation in the PR details section.
+		 *
+		 * @param startLine 1-based start line in the source markdown
+		 * @param endLine 1-based end line in the source markdown
+		 *
+		 * @returns Location label for a numbered violation heading
+		 */
+		readonly violationLocation: (startLine: number, endLine: number) => string;
 	};
 }
 

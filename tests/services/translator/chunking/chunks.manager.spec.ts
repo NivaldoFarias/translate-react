@@ -1,7 +1,4 @@
-import fs from "node:fs/promises";
-import path from "node:path";
-
-import { beforeAll, beforeEach, describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 
 import { ChunksManager } from "@/app/services/translator/chunking";
 import {
@@ -10,10 +7,7 @@ import {
 } from "@/app/services/translator/chunking/chunking.constants";
 import { TranslationFile } from "@/app/services/translator/translation-file";
 
-const FIXTURE_PATH = path.resolve(
-	import.meta.dir,
-	"../../../fixtures/md/react-labs-view-transitions-activity-and-more.md",
-);
+import { reactLabsMd } from "@tests/fixtures/react-docs-fixtures";
 
 const TEST_MODEL = "gpt-4o";
 
@@ -188,11 +182,7 @@ describe("ChunksManager", () => {
 	});
 
 	describe("chunkContent with real fixture", () => {
-		let fixtureContent: string;
-
-		beforeAll(async () => {
-			fixtureContent = await fs.readFile(FIXTURE_PATH, "utf-8");
-		});
+		const fixtureContent = reactLabsMd;
 
 		test("fixture should be large enough to require chunking", () => {
 			const file = new TranslationFile(fixtureContent, "fixture.md", "fixture.md", "sha-fixture");

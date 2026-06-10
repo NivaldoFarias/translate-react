@@ -38,6 +38,8 @@ const ruPRBodyStrings: LocalePRBodyStrings = {
 
 			return labels[guardId] ?? guardId;
 		},
+		violationLocation: (startLine, endLine) =>
+			startLine === endLine ? `строка ${startLine}` : `строки ${startLine}–${endLine}`,
 	},
 };
 

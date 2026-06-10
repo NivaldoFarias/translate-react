@@ -373,11 +373,10 @@ export class TranslatorService {
 	 * ### Workflow
 	 *
 	 * 1. Validates input content
-	 * 2. Optionally replaces very large fenced code blocks with placeholders when `MASK_VERBATIM_LARGE_FENCES` is enabled
-	 * 3. Resolves source language once on full-file markdown (after any verbatim masking) before chunking
-	 * 4. Determines if chunking is needed based on token estimates (after any masking)
-	 * 5. Translates content (with chunking if necessary)
-	 * 6. Restores verbatim fences when masking was applied
+	 * 2. Resolves source language once on full-file markdown (after any verbatim masking used for legacy fallback)
+	 * 3. Translates the body via AST segments on the unmasked body, or via masked full-body/chunked fallback when segment extraction is unsafe
+	 * 4. Optionally replaces very large fenced code blocks with placeholders only on the legacy fallback path when `MASK_VERBATIM_LARGE_FENCES` is enabled
+	 * 5. Restores verbatim fences when masking was applied on the legacy path
 	 * 7. Validates translation completeness
 	 * 8. Cleans up and returns translated content
 	 *
@@ -452,8 +451,21 @@ export class TranslatorService {
 			);
 		}
 
-		const translationWorkFile = new TranslationFile(
+		const legacyBodyWorkFile = new TranslationFile(
 			translationPayload,
+			file.filename,
+			file.path,
+			file.sha,
+			file.logger,
+			file.documentSourceLanguage,
+		);
+
+		const unmaskedBodySplit = splitLeadingYamlFrontmatter(file.content);
+		const unmaskedBodyPayload =
+			unmaskedBodySplit.rest.length > 0 ? unmaskedBodySplit.rest : file.content;
+
+		const segmentBodyWorkFile = new TranslationFile(
+			unmaskedBodyPayload,
 			file.filename,
 			file.path,
 			file.sha,
@@ -477,7 +489,7 @@ export class TranslatorService {
 		const pipelineResult = await this.managers.pipeline.translateWithValidation({
 			file,
 			translateBody: (attemptContext) =>
-				this.translateMarkdownBody(translationWorkFile, attemptContext),
+				this.translateMarkdownBody(segmentBodyWorkFile, legacyBodyWorkFile, attemptContext),
 			initialAttemptContext,
 			finalizeTranslation: async (bodyTranslation) => {
 				let finalized = bodyTranslation;
@@ -653,44 +665,46 @@ export class TranslatorService {
 	/**
 	 * Translates markdown body via AST segment batches with full-body fallback.
 	 *
-	 * Default path: {@link extractTranslatableBodySegments}, token-budgeted segment batches, and
-	 * {@link reinsertSegments}. Parse warnings or segment batch failures fall back to
-	 * {@link translateMarkdownBodyLegacy}.
+	 * Default path: {@link extractTranslatableBodySegments} on the unmasked body, token-budgeted
+	 * segment batches, and {@link reinsertSegments}. Parse warnings or segment batch failures fall
+	 * back to {@link translateMarkdownBodyLegacy} on the legacy work file (verbatim-masked when enabled).
 	 *
-	 * @param file Work file whose `content` is the body sent to the LLM (frontmatter already split off)
+	 * @param segmentBodyWorkFile Work file whose `content` is the unmasked markdown body (frontmatter already split off)
+	 * @param legacyBodyWorkFile Work file whose `content` is the body for full-body fallback (masked when verbatim masking is on)
 	 * @param attemptContext Maintainer feedback for the system prompt, when present
 	 *
 	 * @returns Translated markdown body before frontmatter merge
 	 */
 	private async translateMarkdownBody(
-		file: TranslationFile,
+		segmentBodyWorkFile: TranslationFile,
+		legacyBodyWorkFile: TranslationFile,
 		attemptContext: TranslationAttemptContext = emptyTranslationAttemptContext(),
 	) {
-		const extraction = extractTranslatableBodySegments(file.content);
+		const extraction = extractTranslatableBodySegments(segmentBodyWorkFile.content);
 
 		if (!isSegmentTranslationEligible(extraction.parseWarnings)) {
-			file.logger.info(
-				{ parseWarnings: extraction.parseWarnings, path: file.path },
+			segmentBodyWorkFile.logger.info(
+				{ parseWarnings: extraction.parseWarnings, path: segmentBodyWorkFile.path },
 				"Segment extraction unsafe; falling back to full-body translation",
 			);
-			return this.translateMarkdownBodyLegacy(file, attemptContext);
+			return this.translateMarkdownBodyLegacy(legacyBodyWorkFile, attemptContext);
 		}
 
 		const translatableSegments = filterTranslatableSegments(extraction.segments);
 
 		if (translatableSegments.length === 0) {
-			return file.content;
+			return segmentBodyWorkFile.content;
 		}
 
 		const translatableCharCount = sumTranslatableChars(extraction.segments);
-		file.logger.debug(
+		segmentBodyWorkFile.logger.debug(
 			{
-				path: file.path,
+				path: segmentBodyWorkFile.path,
 				segmentCount: translatableSegments.length,
 				translatableCharCount,
 				translatableCharRatio: computeTranslatableCharRatio(
 					translatableCharCount,
-					file.content.length,
+					segmentBodyWorkFile.content.length,
 				),
 			},
 			"Segment translation metrics",
@@ -698,20 +712,20 @@ export class TranslatorService {
 
 		try {
 			return await this.translateBodyViaSegments(
-				file,
+				segmentBodyWorkFile,
 				translatableSegments,
 				extraction,
 				attemptContext,
 			);
 		} catch (error) {
-			file.logger.warn(
+			segmentBodyWorkFile.logger.warn(
 				{
-					path: file.path,
+					path: segmentBodyWorkFile.path,
 					error: error instanceof Error ? error.message : String(error),
 				},
 				"Segment batch translation failed; falling back to full-body translation",
 			);
-			return this.translateMarkdownBodyLegacy(file, attemptContext);
+			return this.translateMarkdownBodyLegacy(legacyBodyWorkFile, attemptContext);
 		}
 	}
 

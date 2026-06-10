@@ -6,7 +6,25 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Added
 
-- AST segment translation as the default markdown body path: prose mdast segments and link labels are batched to the LLM with offset reinsert; parse failures or warnings fall back to full-body translation.
+- AST segment translation as the default markdown body path: prose mdast segments and link labels are batched via structured `segmentBatch` LLM calls with offset reinsert; parse failures or batch errors fall back to full-body translation.
+- `translator-segment-batch.schema.ts`, `callLanguageModelSegmentBatch`, and `segmentBatch` system prompt kind on `TranslationLlmClient`.
+- Segment helpers: `segment-translation.util.ts` (eligibility), `segment-batch.util.ts` (token-aware packing and batch split on truncation).
+- `@react-docs-fixtures/*` path alias and `tests/fixtures/react-docs-fixtures.ts` barrel for react.dev markdown fixtures imported as UTF-8 text.
+
+### Changed
+
+- remark/mdast stack promoted from devDependencies to runtime dependencies.
+- Translation PR bodies: advisory warnings grouped by validator in `<details>` with per-violation diff blocks and fenced-code line ranges; maintainer wiki link in `[!IMPORTANT]` callout.
+- Verbatim fence masking applies only to the legacy full-body fallback path.
+- `@deprecated` JSDoc on legacy full-body APIs used only by fallback: `extractSegments`, `buildMarkdownDocumentSystemPrompt`, `translateWithChunking`.
+
+### Fixed
+
+- Segment extraction uses the unmasked document body so `MASK_VERBATIM_LARGE_FENCES` placeholders no longer force MDX-heavy pages onto the legacy path.
+
+### Removed
+
+- Spike-only segment modules (`spike-writeup`, `integration-analysis`, `tooling-eval`, corpus table utilities) and their production barrel exports.
 
 ## [0.2.7] - 2026-06-05
 
