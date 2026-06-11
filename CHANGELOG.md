@@ -10,9 +10,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 - `translator-segment-batch.schema.ts`, `callLanguageModelSegmentBatch`, and `segmentBatch` system prompt kind on `TranslationLlmClient`.
 - Segment helpers: `segment-translation.util.ts` (eligibility), `segment-batch.util.ts` (token-aware packing and batch split on truncation).
 - `@react-docs-fixtures/*` path alias and `tests/fixtures/react-docs-fixtures.ts` barrel for react.dev markdown fixtures imported as UTF-8 text.
+- Opaque `sN` keys in segment-batch LLM payloads (`segment-batch-opaque-id.util.ts`); mdast paths are remapped before reinsert.
+- Partial follow-up for drop-only segment batch failures (retry missing ids only, up to 3 rounds).
+- `SEGMENT_BATCH_MAX_ITEMS_PER_BATCH` (55) cap in `packSegmentsIntoBatches`.
 
 ### Changed
 
+- Segment batch failures split the batch or retry segments individually before full-body fallback; mismatch and truncation logs include id diagnostics and token context.
 - remark/mdast stack promoted from devDependencies to runtime dependencies.
 - Translation PR bodies: human-review notice as the opening paragraph; maintainer wiki link in a `[!TIP]` callout; advisory warnings grouped by validator in `<details>` with per-violation diff blocks and fenced-code line ranges.
 - Verbatim fence masking applies only to the legacy full-body fallback path.
