@@ -14,7 +14,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 ### Changed
 
 - remark/mdast stack promoted from devDependencies to runtime dependencies.
-- Translation PR bodies: advisory warnings grouped by validator in `<details>` with per-violation diff blocks and fenced-code line ranges; maintainer wiki link in `[!IMPORTANT]` callout.
+- Translation PR bodies: human-review notice as the opening paragraph; maintainer wiki link in a `[!TIP]` callout; advisory warnings grouped by validator in `<details>` with per-violation diff blocks and fenced-code line ranges.
 - Verbatim fence masking applies only to the legacy full-body fallback path.
 - `@deprecated` JSDoc on legacy full-body APIs used only by fallback: `extractSegments`, `buildMarkdownDocumentSystemPrompt`, `translateWithChunking`.
 

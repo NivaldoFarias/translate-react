@@ -11,8 +11,8 @@ import { createPRBodyBuilder } from "./pr-body.builder";
  * following the data-driven approach for locale definitions.
  */
 const ruPRBodyStrings: LocalePRBodyStrings = {
-	intro: (languageName) =>
-		`Этот PR содержит автоматический перевод указанной страницы на **${languageName}**.`,
+	humanReviewNotice:
+		"Этот перевод был создан с использованием LLM и **требует проверки человеком** для обеспечения точности, культурного контекста и технической терминологии.",
 
 	conflictNotice: {
 		title: "Предыдущий PR закрыт",
@@ -20,8 +20,8 @@ const ruPRBodyStrings: LocalePRBodyStrings = {
 			`PR #${prNumber} закрыт автоматически из-за конфликта с основной веткой. Перевод сделан заново по текущему исходному файлу, без ручного разрешения конфликтов из предыдущего PR.`,
 	},
 
-	humanReviewNotice: (wikiUrl) =>
-		`Этот перевод был создан с использованием LLM и **требует проверки человеком** для обеспечения точности, культурного контекста и технической терминологии. См. [For React Docs Maintainers](${wikiUrl}) — руководство для ревьюеров и формат структурированного feedback.`,
+	maintainerWikiTip: (wikiUrl) =>
+		`См. [For React Docs Maintainers](${wikiUrl}) — руководство для ревьюеров и формат структурированного feedback.`,
 
 	reviewerWarnings: {
 		intro:

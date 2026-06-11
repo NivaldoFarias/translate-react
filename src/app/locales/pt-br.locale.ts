@@ -11,8 +11,8 @@ import { createPRBodyBuilder } from "./pr-body.builder";
  * following the data-driven approach for locale definitions.
  */
 const ptBrPRBodyStrings: LocalePRBodyStrings = {
-	intro: (languageName) =>
-		`Este PR contém uma tradução automatizada da página referenciada para **${languageName}**.`,
+	humanReviewNotice:
+		"Esta tradução foi gerada usando LLMs e **requer revisão humana** para garantir precisão, contexto cultural e terminologia técnica.",
 
 	conflictNotice: {
 		title: "PR anterior fechado",
@@ -20,8 +20,8 @@ const ptBrPRBodyStrings: LocalePRBodyStrings = {
 			`O PR #${prNumber} foi fechado automaticamente por conflito com a branch principal. Esta tradução foi refeita a partir do arquivo fonte atual, sem merge manual dos conflitos do PR anterior.`,
 	},
 
-	humanReviewNotice: (wikiUrl) =>
-		`Esta tradução foi gerada usando LLMs e **requer revisão humana** para garantir precisão, contexto cultural e terminologia técnica. Consulte [For React Docs Maintainers](${wikiUrl}) para orientações de revisão e formato de feedback estruturado.`,
+	maintainerWikiTip: (wikiUrl) =>
+		`Consulte [For React Docs Maintainers](${wikiUrl}) para orientações de revisão e formato de feedback estruturado.`,
 
 	reviewerWarnings: {
 		intro:
