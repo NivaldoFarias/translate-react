@@ -33,6 +33,27 @@ describe("segment translation utilities", () => {
 		expect(computeTranslatableCharRatio(100, 0)).toBe(0);
 	});
 
+	test("packSegmentsIntoBatches splits when segment cap is exceeded", () => {
+		const translatable = Array.from({ length: 25 }, (_, index) => ({
+			id: `root/paragraph#${index}`,
+			path: `root/paragraph#${index}`,
+			kind: "translate" as const,
+			sourceText: `Sentence ${index}.`,
+			start: index,
+			end: index + 1,
+		}));
+
+		const cappedBatches = packSegmentsIntoBatches(
+			translatable,
+			(text) => Math.ceil(text.length / 4),
+			100_000,
+			10,
+		);
+
+		expect(cappedBatches.length).toBeGreaterThan(1);
+		expect(cappedBatches.every((batch) => batch.length <= 10)).toBe(true);
+	});
+
 	test("packSegmentsIntoBatches splits when token budget is exceeded", () => {
 		const body = `# Heading\n\n${"Prose sentence one. ".repeat(80)}`;
 		const { segments } = extractTranslatableBodySegments(body);

@@ -61,6 +61,39 @@ export function extractTranslationLlmUsageFromCompletion(
 }
 
 /**
+ * Merges two completion usage snapshots into one aggregate snapshot.
+ *
+ * @param left First snapshot, if any
+ * @param right Second snapshot, if any
+ *
+ * @returns Combined snapshot, or `null` when both inputs are missing
+ */
+export function mergeTranslationLlmUsageSnapshots(
+	left: TranslationLlmUsageSnapshot | null,
+	right: TranslationLlmUsageSnapshot | null,
+) {
+	if (!left) {
+		return right;
+	}
+
+	if (!right) {
+		return left;
+	}
+
+	const mergedCost =
+		left.costUsd === null && right.costUsd === null ?
+			null
+		:	(left.costUsd ?? 0) + (right.costUsd ?? 0);
+
+	return {
+		promptTokens: left.promptTokens + right.promptTokens,
+		completionTokens: left.completionTokens + right.completionTokens,
+		totalTokens: left.totalTokens + right.totalTokens,
+		costUsd: mergedCost,
+	};
+}
+
+/**
  * Merges a completion snapshot into running per-file totals.
  *
  * @param accumulator Running totals for the current file
