@@ -204,14 +204,6 @@ describe("ptBrLocale.pullRequest.body", () => {
 	});
 
 	describe("PR body structure", () => {
-		test("should include language name in PR body", () => {
-			const metadata = createPullRequestDescriptionMetadata();
-
-			const body = buildPullRequestBody(file, processingResult, metadata);
-
-			expect(body).toContain("Português (Brasil)");
-		});
-
 		test("should not include collapsible details when there are no reviewer notices", () => {
 			const body = buildPullRequestBody(
 				file,
@@ -225,12 +217,16 @@ describe("ptBrLocale.pullRequest.body", () => {
 			expect(body).not.toContain("Versão do translate-react");
 		});
 
-		test("should include human review notice", () => {
+		test("should include human review notice and maintainer wiki tip", () => {
 			const metadata = createPullRequestDescriptionMetadata();
 
 			const body = buildPullRequestBody(file, processingResult, metadata);
 
 			expect(body).toContain("requer revisão humana");
+			expect(body).toContain("> [!TIP]");
+			expect(body).toContain(WIKI_FOR_REACT_DOCS_MAINTAINERS_URL);
+			expect(body).not.toContain("> [!IMPORTANT]");
+			expect(body).not.toContain("Este PR contém");
 		});
 
 		test("should render validation intro and grouped details when reviewer notices exist", () => {
@@ -247,7 +243,7 @@ describe("ptBrLocale.pullRequest.body", () => {
 
 			expect(body).toContain("A validação automática detectou problemas mecânicos");
 			expect(body).not.toContain("> [!WARNING]");
-			expect(body).toContain("> [!IMPORTANT]");
+			expect(body).toContain("> [!TIP]");
 			expect(body).toContain(WIKI_FOR_REACT_DOCS_MAINTAINERS_URL);
 			expect(body).toContain("<details>");
 			expect(body).toContain("Ver detalhes da validação");
@@ -344,17 +340,7 @@ describe("ruLocale.pullRequest.body", () => {
 	});
 
 	describe("PR body structure", () => {
-		test("should include language name in PR body", () => {
-			const metadata = createPullRequestDescriptionMetadata({
-				languageName: "Русский",
-			});
-
-			const body = buildPullRequestBody(file, processingResult, metadata);
-
-			expect(body).toContain("Русский");
-		});
-
-		test("should include human review notice in Russian", () => {
+		test("should include human review notice and maintainer wiki tip in Russian", () => {
 			const metadata = createPullRequestDescriptionMetadata({
 				languageName: "Русский",
 			});
@@ -362,6 +348,9 @@ describe("ruLocale.pullRequest.body", () => {
 			const body = buildPullRequestBody(file, processingResult, metadata);
 
 			expect(body).toContain("требует проверки человеком");
+			expect(body).toContain("> [!TIP]");
+			expect(body).not.toContain("> [!IMPORTANT]");
+			expect(body).not.toContain("Этот PR содержит");
 		});
 
 		test("should not include removed stats or tech sections", () => {

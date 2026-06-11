@@ -181,7 +181,7 @@ describe("TranslationBatchManager", () => {
 			expect(github.createPullRequest).not.toHaveBeenCalled();
 			expect(github.updatePullRequestBody).toHaveBeenCalledWith(
 				existingPR.number,
-				expect.stringContaining("Brazilian Portuguese"),
+				expect.stringMatching(/requer revisão humana[\s\S]*\[!TIP\]/),
 			);
 			expect(results.get(file.filename)?.pullRequest).toEqual(existingPR);
 		});
@@ -249,7 +249,7 @@ describe("TranslationBatchManager", () => {
 			expect(github.createPullRequest).not.toHaveBeenCalled();
 			expect(github.updatePullRequestBody).toHaveBeenCalledWith(
 				existingPR.number,
-				expect.stringContaining("Brazilian Portuguese"),
+				expect.stringMatching(/requer revisão humana[\s\S]*\[!TIP\]/),
 			);
 			expect(results.get(file.filename)?.pullRequest).toEqual(existingPR);
 			expect(results.get(file.filename)?.pullRequestProgress).toBe(

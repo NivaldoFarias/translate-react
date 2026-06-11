@@ -99,14 +99,8 @@ export interface LocaleRulesConfig {
  * enabling a single shared builder to generate locale-specific PR bodies.
  */
 export interface LocalePRBodyStrings {
-	/**
-	 * Introductory sentence for the PR body.
-	 *
-	 * @param languageName The display name of the target language
-	 *
-	 * @returns Formatted intro string
-	 */
-	readonly intro: (languageName: string) => string;
+	/** Human-review notice as the opening body paragraph */
+	readonly humanReviewNotice: string;
 
 	/** Conflict notice section when a stale PR was closed */
 	readonly conflictNotice: {
@@ -124,13 +118,13 @@ export interface LocalePRBodyStrings {
 	};
 
 	/**
-	 * Important notice about human review and the maintainer wiki guide.
+	 * Maintainer wiki link for the `[!TIP]` callout below the human-review notice.
 	 *
 	 * @param wikiUrl Absolute URL to the For React Docs Maintainers wiki page
 	 *
-	 * @returns Formatted `[!IMPORTANT]` body text
+	 * @returns Formatted `[!TIP]` body text
 	 */
-	readonly humanReviewNotice: (wikiUrl: string) => string;
+	readonly maintainerWikiTip: (wikiUrl: string) => string;
 
 	/** Advisory validation warnings (shown only when `reviewerNotices` is non-empty) */
 	readonly reviewerWarnings: {

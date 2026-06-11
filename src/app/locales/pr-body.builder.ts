@@ -49,10 +49,12 @@ export function createPRBodyBuilder(strings: LocalePRBodyStrings) {
 		);
 		const wikiUrl = WIKI_FOR_REACT_DOCS_MAINTAINERS_URL;
 
-		return `${strings.intro(metadata.languageName)}
+		const conflictSection = conflictNotice ? `${conflictNotice}\n` : "";
 
-${conflictNotice}> [!IMPORTANT]
-> ${strings.humanReviewNotice(wikiUrl)}
+		return `${conflictSection}${strings.humanReviewNotice}
+
+> [!TIP]
+> ${strings.maintainerWikiTip(wikiUrl)}
 
 ${reviewerWarningsSection}`;
 	};

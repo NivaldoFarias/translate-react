@@ -725,8 +725,8 @@ export class TranslationBatchManager {
 	/**
 	 * Creates a pull request description for translated content.
 	 *
-	 * Generates a detailed PR body including translation outcome metrics, runner and LLM
-	 * configuration, optional conflict notices, and a link to the maintainer wiki guide.
+	 * Generates a PR body with a human-review notice, maintainer wiki tip, optional conflict
+	 * notices, and advisory validation details when guards report issues.
 	 * When a file has an existing invalid PR (with merge conflicts), includes a GitHub Flavored Markdown
 	 * alert to inform maintainers about the duplicate PR situation.
 	 *
