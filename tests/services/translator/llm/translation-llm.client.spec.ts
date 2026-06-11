@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import type { TranslationLlmClientDependencies } from "@/app/services/translator/llm/translation-llm.client.types";
 
 import { localeService } from "@/app/composition";
+import { SEGMENT_BATCH_ID_MISMATCH_RECOVERY_OPTIONS } from "@/app/services/translator/llm/segment-batch-id-match.util";
 import { TranslationLlmClient } from "@/app/services/translator/llm/translation-llm.client";
 import { TranslationPromptBuilder } from "@/app/services/translator/llm/translation-prompt.builder";
 import { ApplicationError, ErrorCode, isCompletionLengthTruncationError } from "@/shared/errors/";
@@ -196,9 +197,7 @@ describe("TranslationLlmClient", () => {
 		test("returns parsed envelope for valid structured JSON", async () => {
 			mockChatCompletionsCreate.mockResolvedValue(
 				createChatCompletionFixture(
-					createSegmentBatchLlmJsonContent([
-						{ segmentId: "root/paragraph#0", translated: "Olá mundo" },
-					]),
+					createSegmentBatchLlmJsonContent([{ segmentId: "s0", translated: "Olá mundo" }]),
 				),
 			);
 
@@ -209,22 +208,65 @@ describe("TranslationLlmClient", () => {
 			]);
 
 			expect(envelope.items[0]?.translated).toBe("Olá mundo");
+			expect(envelope.items[0]?.segmentId).toBe("root/paragraph#0");
 		});
 
-		test("throws ApplicationError when response segment ids do not match request", () => {
+		test("follows up with missing segment ids only after a partial batch response", async () => {
+			mockChatCompletionsCreate
+				.mockResolvedValueOnce(
+					createChatCompletionFixture(
+						createSegmentBatchLlmJsonContent([{ segmentId: "s0", translated: "Olá" }]),
+					),
+				)
+				.mockResolvedValueOnce(
+					createChatCompletionFixture(
+						createSegmentBatchLlmJsonContent([{ segmentId: "s0", translated: "Mundo" }]),
+					),
+				);
+
+			const file = createTranslationFileFixture({ content: "# Hi\n\nHello world" });
+
+			const { envelope } = await llmClient.callLanguageModelSegmentBatch(file, [
+				{ segmentId: "root/paragraph#0", source: "Hello" },
+				{ segmentId: "root/paragraph#1", source: "world" },
+			]);
+
+			expect(envelope.items).toEqual([
+				{ segmentId: "root/paragraph#0", translated: "Olá" },
+				{ segmentId: "root/paragraph#1", translated: "Mundo" },
+			]);
+			expect(mockChatCompletionsCreate).toHaveBeenCalledTimes(2);
+		});
+
+		test("throws ApplicationError with id mismatch diagnostics when response segment ids do not match request", async () => {
 			mockChatCompletionsCreate.mockResolvedValue(
 				createChatCompletionFixture(
-					createSegmentBatchLlmJsonContent([{ segmentId: "other/id#0", translated: "Olá" }]),
+					createSegmentBatchLlmJsonContent([{ segmentId: "s9", translated: "Olá" }]),
 				),
 			);
 
 			const file = createTranslationFileFixture({ content: "# Hi\n\nHello" });
 
-			expect(
-				llmClient.callLanguageModelSegmentBatch(file, [
+			try {
+				await llmClient.callLanguageModelSegmentBatch(file, [
 					{ segmentId: "root/paragraph#0", source: "Hello" },
-				]),
-			).rejects.toThrow("Segment batch response ids do not match");
+				]);
+				throw new Error("expected rejection");
+			} catch (error) {
+				expect(error).toBeInstanceOf(ApplicationError);
+				if (!(error instanceof ApplicationError)) {
+					return;
+				}
+
+				expect(error.message).toBe("Segment batch response ids do not match requested segments");
+				expect(error.metadata).toMatchObject({
+					segmentBatchIdMismatch: {
+						missingIds: ["root/paragraph#0"],
+						extraIds: ["s9"],
+					},
+					recoveryOptions: [...SEGMENT_BATCH_ID_MISMATCH_RECOVERY_OPTIONS],
+				});
+			}
 		});
 	});
 });

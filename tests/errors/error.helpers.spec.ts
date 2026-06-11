@@ -1,7 +1,12 @@
 import { describe, expect, mock, test } from "bun:test";
 import { StatusCodes } from "http-status-codes";
 
-import { ApplicationError, ErrorCode, handleTopLevelError } from "@/shared/errors/";
+import {
+	ApplicationError,
+	ErrorCode,
+	handleTopLevelError,
+	isSegmentBatchIdMismatchError,
+} from "@/shared/errors/";
 
 import { createOctokitRequestErrorFixture, createOpenAIApiErrorFixture } from "@tests/fixtures";
 
@@ -118,5 +123,27 @@ describe("handleTopLevelError", () => {
 			}),
 			expect.stringContaining("plain string error"),
 		);
+	});
+});
+
+describe("isSegmentBatchIdMismatchError", () => {
+	test("returns true for segment batch id mismatch ApplicationError", () => {
+		const error = new ApplicationError(
+			"Segment batch response ids do not match requested segments",
+			ErrorCode.TranslationFailed,
+			"TranslationLlmClient.callLanguageModelSegmentBatch",
+		);
+
+		expect(isSegmentBatchIdMismatchError(error)).toBe(true);
+	});
+
+	test("returns false for other translation failures", () => {
+		const error = new ApplicationError(
+			"Segment batch response was not valid JSON",
+			ErrorCode.TranslationFailed,
+			"TranslationLlmClient.callLanguageModelSegmentBatch",
+		);
+
+		expect(isSegmentBatchIdMismatchError(error)).toBe(false);
 	});
 });

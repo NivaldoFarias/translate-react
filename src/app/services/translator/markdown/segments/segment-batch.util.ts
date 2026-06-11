@@ -2,6 +2,8 @@ import type { SegmentBatchRequestItem } from "@/app/services/translator/translat
 
 import type { TranslatableSegment } from "./types";
 
+import { SEGMENT_BATCH_MAX_ITEMS_PER_BATCH } from "@/app/services/translator/translator.constants";
+
 /** Estimated JSON wrapper tokens for a segment batch user message */
 const SEGMENT_BATCH_JSON_OVERHEAD_TOKENS = 32;
 
@@ -27,6 +29,7 @@ export function estimateSegmentBatchRequestTokens(
  * @param segments Segments to pack (typically translate-kind only)
  * @param estimateTokens Token estimator from `ChunksManager`
  * @param maxBatchTokens Maximum estimated tokens per batch request
+ * @param maxSegmentsPerBatch Maximum segment count per batch request
  *
  * @returns Ordered batches of request items
  *
@@ -43,6 +46,7 @@ export function packSegmentsIntoBatches(
 	segments: readonly TranslatableSegment[],
 	estimateTokens: (text: string) => number,
 	maxBatchTokens: number,
+	maxSegmentsPerBatch = SEGMENT_BATCH_MAX_ITEMS_PER_BATCH,
 ) {
 	const batches: SegmentBatchRequestItem[][] = [];
 	let currentBatch: SegmentBatchRequestItem[] = [];
@@ -57,8 +61,9 @@ export function packSegmentsIntoBatches(
 		const itemTokens = estimateSegmentBatchRequestTokens([item], estimateTokens);
 		const batchWouldExceedBudget =
 			currentBatch.length > 0 && currentTokens + itemTokens > maxBatchTokens;
+		const batchWouldExceedSegmentCap = currentBatch.length >= maxSegmentsPerBatch;
 
-		if (batchWouldExceedBudget) {
+		if (batchWouldExceedBudget || batchWouldExceedSegmentCap) {
 			batches.push(currentBatch);
 			currentBatch = [];
 			currentTokens = SEGMENT_BATCH_JSON_OVERHEAD_TOKENS;

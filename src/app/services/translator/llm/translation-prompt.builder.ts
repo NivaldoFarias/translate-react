@@ -252,12 +252,12 @@ export class TranslationPromptBuilder {
 				You are an expert technical translator for React documentation prose fragments.
 
 				# TASK
-				The user message is a JSON object with an \`items\` array. Each element has \`segmentId\`, \`source\` (English text to translate), and optional \`heading\` (nearest section heading for terminology context). Translate each \`source\` from ${languages.source} to ${languages.target}.
+				The user message is a JSON object with an \`items\` array. Each element has \`segmentId\` (a short opaque key such as \`s0\` or \`s12\`), \`source\` (English text to translate), and optional \`heading\` (nearest section heading for terminology context). Translate each \`source\` from ${languages.source} to ${languages.target}.
 
 				${maintainerReviewSection}
 
 				# OUTPUT (STRICT)
-				- Reply with JSON only, matching the response schema: an object \`items\` whose length equals the request, each item having \`segmentId\` (same as input) and \`translated\` (the translated string only).
+				- Reply with JSON only, matching the response schema: an object \`items\` whose length equals the request, each item having \`segmentId\` (copy the input opaque key exactly, e.g. \`s0\`) and \`translated\` (the translated string only).
 				- Do not add markdown, code fences, or commentary outside the JSON object.
 				- Return plain translated prose for each \`source\`; do not wrap segments in headings or lists they did not already contain.
 

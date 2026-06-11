@@ -35,7 +35,12 @@ import {
 	maskLargeVerbatimFencedCodeBlocks,
 	restoreMaskedVerbatimFences,
 } from "@/app/utils/";
-import { ApplicationError, ErrorCode, isCompletionLengthTruncationError } from "@/shared/errors/";
+import {
+	ApplicationError,
+	ErrorCode,
+	isCompletionLengthTruncationError,
+	isSegmentBatchIdMismatchError,
+} from "@/shared/errors/";
 
 import { ChunksManager } from "./chunking";
 import { SYSTEM_PROMPT_TOKEN_RESERVE } from "./chunking/chunking.constants";
@@ -796,8 +801,32 @@ export class TranslatorService {
 		const translations: Record<string, string> = {};
 
 		for (const batch of batches) {
-			const batchTranslations = await this.translateSegmentBatchItems(file, batch, attemptContext);
-			Object.assign(translations, batchTranslations);
+			try {
+				const batchTranslations = await this.translateSegmentBatchItems(
+					file,
+					batch,
+					attemptContext,
+				);
+				Object.assign(translations, batchTranslations);
+			} catch (error) {
+				file.logger.warn(
+					{
+						path: file.path,
+						segmentCount: batch.length,
+						error: error instanceof Error ? error.message : String(error),
+					},
+					"Segment batch failed after split retries; retrying items individually",
+				);
+
+				for (const item of batch) {
+					const itemTranslations = await this.translateSegmentBatchItems(
+						file,
+						[item],
+						attemptContext,
+					);
+					Object.assign(translations, itemTranslations);
+				}
+			}
 		}
 
 		return reinsertSegments(file.content, translations, extraction.segments);
@@ -841,15 +870,26 @@ export class TranslatorService {
 
 			return translations;
 		} catch (error) {
-			if (!isCompletionLengthTruncationError(error) || batchItems.length <= 1) {
+			const shouldSplitBatch =
+				batchItems.length > 1 &&
+				(isCompletionLengthTruncationError(error) || isSegmentBatchIdMismatchError(error));
+
+			if (!shouldSplitBatch) {
 				throw error;
 			}
 
 			const [firstHalf, secondHalf] = splitSegmentBatchInHalf(batchItems);
 
 			file.logger.info(
-				{ segmentCount: batchItems.length, firstHalfCount: firstHalf.length },
-				"Segment batch hit completion token limit; splitting batch",
+				{
+					segmentCount: batchItems.length,
+					firstHalfCount: firstHalf.length,
+					reason:
+						isCompletionLengthTruncationError(error) ? "completion_token_limit" : (
+							"segment_batch_id_mismatch"
+						),
+				},
+				"Segment batch failed; splitting batch and retrying halves",
 			);
 
 			const firstTranslations = await this.translateSegmentBatchItems(
