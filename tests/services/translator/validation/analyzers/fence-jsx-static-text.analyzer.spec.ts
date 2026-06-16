@@ -24,6 +24,28 @@ describe("collectJsxStaticTextSegments", () => {
 
 		expect(collectJsxStaticTextSegments(code)).toEqual([]);
 	});
+
+	test("ignores arrow functions and line comments before nested JSX demo text", () => {
+		const code = [
+			"// when to animate",
+			"startTransition(() => setState(...));",
+			"",
+			"// Deferred Values",
+			"const deferred = useDeferredValue(value);",
+			"",
+			"<Suspense fallback={<Fallback />}>",
+			"  <div>Loading...</div>",
+			"</Suspense>",
+		].join("\n");
+
+		expect(collectJsxStaticTextSegments(code)).toEqual(["Loading..."]);
+	});
+
+	test("recurses into nested JSX instead of treating child tags as static text", () => {
+		const code = "<ViewTransition>\n\t<div>animate me</div>\n</ViewTransition>";
+
+		expect(collectJsxStaticTextSegments(code)).toEqual(["animate me"]);
+	});
 });
 
 describe("findFenceJsxStaticTextMismatches", () => {
@@ -70,8 +92,16 @@ describe("findFenceJsxStaticTextMismatches", () => {
 		const mismatches = findFenceJsxStaticTextMismatches(source, translated);
 
 		expect(mismatches).toEqual([
-			{ fenceIndex: 1, sourceText: "Clicked: ", translatedText: "Clicado: " },
-			{ fenceIndex: 1, sourceText: " times", translatedText: " vezes" },
+			{
+				fenceIndex: 1,
+				sourceText: "\n    Clicked: ",
+				translatedText: "\n    Clicado: ",
+			},
+			{
+				fenceIndex: 1,
+				sourceText: " times\n  ",
+				translatedText: " vezes\n  ",
+			},
 		]);
 	});
 
@@ -93,6 +123,35 @@ describe("findFenceJsxStaticTextMismatches", () => {
 		const translated = "Intro traduzido\n\n```js\nreturn <div>Count: {n}</div>;\n```\n";
 
 		expect(findFenceJsxStaticTextMismatches(source, translated)).toEqual([]);
+	});
+
+	test("does not flag translated line comments when only JSX demo text changes", () => {
+		const source = [
+			"```js",
+			"startTransition(() => setState(...));",
+			"// Deferred Values",
+			"<Suspense fallback={<Fallback />}>",
+			"  <div>Loading...</div>",
+			"</Suspense>",
+			"```",
+		].join("\n");
+		const translated = [
+			"```js",
+			"startTransition(() => setState(...));",
+			"// Valores Adiados",
+			"<Suspense fallback={<Fallback />}>",
+			"  <div>Carregando...</div>",
+			"</Suspense>",
+			"```",
+		].join("\n");
+
+		expect(findFenceJsxStaticTextMismatches(source, translated)).toEqual([
+			{
+				fenceIndex: 1,
+				sourceText: "Loading...",
+				translatedText: "Carregando...",
+			},
+		]);
 	});
 
 	test("returns empty when fence counts differ", () => {

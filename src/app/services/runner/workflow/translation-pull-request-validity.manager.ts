@@ -7,8 +7,8 @@ import type { RunnerServiceDependencies } from "../runner.types";
 import { getTranslationBranchNameFromPath, logger } from "@/app/utils/";
 
 import {
-	hasMaintainerFeedbackAfterRunnerCommit,
-	isMaintainerFeedbackComment,
+	getUnresolvedChangesRequestedReviews,
+	hasUnresolvedChangesRequestedReview,
 } from "./maintainer-feedback.util";
 
 /** Why an open translation pull request is not treated as workflow-complete */
@@ -37,8 +37,8 @@ export interface TranslationPullRequestValidity {
  * Decides whether an open translation PR already satisfies the workflow for a path.
  *
  * Valid when there is an open PR on the `translate/…` branch, fork content is in the
- * target language, the PR is in sync with its base (no merge conflicts), and no maintainer
- * left review feedback on the PR after the latest runner translation commit.
+ * target language, the PR is in sync with its base (no merge conflicts), and no qualifying
+ * reviewer left an unresolved `CHANGES_REQUESTED` review after the latest runner translation commit.
  */
 export class TranslationPullRequestValidityManager {
 	private readonly logger = logger.child({
@@ -138,9 +138,9 @@ export class TranslationPullRequestValidityManager {
 					filePath,
 					prNumber: openPullRequest.number,
 					latestRunnerCommitAt: maintainerFeedback.latestRunnerCommitAt?.toISOString(),
-					maintainerCommentAt: maintainerFeedback.maintainerCommentAt.toISOString(),
+					reviewSubmittedAt: maintainerFeedback.reviewSubmittedAt.toISOString(),
 				},
-				"Translation pull request has maintainer feedback after the latest runner commit",
+				"Translation pull request has unresolved CHANGES_REQUESTED review after the latest runner commit",
 			);
 
 			return {
@@ -168,35 +168,29 @@ export class TranslationPullRequestValidityManager {
 	}
 
 	/**
-	 * Detects maintainer issue comments posted after the latest runner commit on the branch.
+	 * Detects unresolved `CHANGES_REQUESTED` reviews posted after the latest runner commit.
 	 *
 	 * @param prNumber Open translation pull request number
 	 * @param branchName Fork branch backing the pull request
 	 *
-	 * @returns Feedback timing when unresolved maintainer comments exist, otherwise `undefined`
+	 * @returns Feedback timing when unresolved reviews exist, otherwise `undefined`
 	 */
 	private async detectUnresolvedMaintainerFeedback(prNumber: number, branchName: string) {
-		const [comments, latestRunnerCommitAt] = await Promise.all([
-			this.services.github.listPullRequestIssueComments(prNumber),
+		const [reviews, latestRunnerCommitAt] = await Promise.all([
+			this.services.github.listPullRequestReviews(prNumber),
 			this.services.github.getLatestTranslationCommitTimestamp(branchName),
 		]);
 
-		if (!hasMaintainerFeedbackAfterRunnerCommit(comments, latestRunnerCommitAt)) {
+		if (!hasUnresolvedChangesRequestedReview(reviews, latestRunnerCommitAt)) {
 			return undefined;
 		}
 
-		const maintainerCommentAt = comments
-			.filter(
-				(comment) =>
-					latestRunnerCommitAt !== undefined &&
-					isMaintainerFeedbackComment(comment) &&
-					comment.createdAt > latestRunnerCommitAt,
-			)
-			.reduce(
-				(latest, comment) => (comment.createdAt > latest ? comment.createdAt : latest),
-				latestRunnerCommitAt ?? new Date(0),
-			);
+		const unresolvedReviews = getUnresolvedChangesRequestedReviews(reviews, latestRunnerCommitAt);
+		const reviewSubmittedAt = unresolvedReviews.reduce(
+			(latest, review) => (review.submittedAt > latest ? review.submittedAt : latest),
+			unresolvedReviews[0]?.submittedAt ?? latestRunnerCommitAt ?? new Date(0),
+		);
 
-		return { latestRunnerCommitAt, maintainerCommentAt };
+		return { latestRunnerCommitAt, reviewSubmittedAt };
 	}
 }

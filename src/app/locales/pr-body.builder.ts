@@ -6,6 +6,8 @@ import type { LocalePRBodyStrings } from "./types";
 
 import { WIKI_FOR_REACT_DOCS_MAINTAINERS_URL } from "@/app/constants";
 
+import { buildReviewerWarningsMarkdown } from "./reviewer-warnings-pr.util";
+
 /**
  * Builds the conflict notice section for PR body when a stale PR was closed.
  *
@@ -26,33 +28,6 @@ function buildConflictNotice(
 }
 
 /**
- * Builds the advisory validation warnings section when reviewer notices are present.
- *
- * @param reviewerNotices Advisory guard hints from post-translation validation
- * @param strings Locale-specific strings for the warnings section
- *
- * @returns Markdown-formatted WARNING block and hint table, or empty string if none
- */
-function buildReviewerWarningsSection(
-	reviewerNotices: PullRequestDescriptionMetadata["reviewerNotices"],
-	strings: LocalePRBodyStrings["reviewerWarnings"],
-) {
-	if (reviewerNotices.length === 0) return "";
-
-	const tableRows = reviewerNotices
-		.map((notice) => `| \`${notice.guardId}\` | ${notice.hint} |`)
-		.join("\n");
-
-	return `> [!WARNING]
-> ${strings.intro}
-
-| ${strings.columns.guardColumn} | ${strings.columns.whatToFixColumn} |
-| ------------------------ | ----------------------------------------- |
-${tableRows}
-`;
-}
-
-/**
  * Creates a locale-specific PR body builder function.
  *
  * @param strings Locale-specific strings for the PR body template
@@ -61,23 +36,26 @@ ${tableRows}
  */
 export function createPRBodyBuilder(strings: LocalePRBodyStrings) {
 	return (
-		_file: TranslationFile,
-		_processingResult: ProcessedFileResult,
+		file: TranslationFile,
+		processingResult: ProcessedFileResult,
 		metadata: PullRequestDescriptionMetadata,
 	): string => {
 		const conflictNotice = buildConflictNotice(metadata.invalidFilePR, strings.conflictNotice);
-		const reviewerWarningsSection = buildReviewerWarningsSection(
+		const reviewerWarningsSection = buildReviewerWarningsMarkdown(
 			metadata.reviewerNotices,
 			strings.reviewerWarnings,
+			file.content,
+			processingResult.translation,
 		);
-		const maintainerGuideLine = strings.maintainerGuide(WIKI_FOR_REACT_DOCS_MAINTAINERS_URL);
+		const wikiUrl = WIKI_FOR_REACT_DOCS_MAINTAINERS_URL;
 
-		return `${strings.intro(metadata.languageName)}
+		const conflictSection = conflictNotice ? `${conflictNotice}\n` : "";
 
-${conflictNotice}> [!IMPORTANT]
-> ${strings.humanReviewNotice}
+		return `${conflictSection}${strings.humanReviewNotice}
 
-${reviewerWarningsSection}
-${maintainerGuideLine}`;
+> [!TIP]
+> ${strings.maintainerWikiTip(wikiUrl)}
+
+${reviewerWarningsSection}`;
 	};
 }

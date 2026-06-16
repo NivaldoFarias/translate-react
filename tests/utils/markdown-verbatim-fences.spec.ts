@@ -1,7 +1,4 @@
-import fs from "node:fs/promises";
-import path from "node:path";
-
-import { beforeAll, describe, expect, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 
 import { ChunksManager } from "@/app/services/translator/chunking";
 import {
@@ -9,10 +6,7 @@ import {
 	restoreMaskedVerbatimFences,
 } from "@/app/utils/markdown-verbatim-fences.util";
 
-const FIXTURE_PATH = path.resolve(
-	import.meta.dir,
-	"../fixtures/md/react-labs-view-transitions-activity-and-more.md",
-);
+import { reactLabsMd } from "@tests/fixtures/react-docs-fixtures";
 
 const TEST_MODEL = "gpt-4o";
 
@@ -77,11 +71,7 @@ describe("markdown verbatim fenced code blocks", () => {
 	});
 
 	describe("react labs fixture (cost footprint)", () => {
-		let fixtureContent: string;
-
-		beforeAll(async () => {
-			fixtureContent = await fs.readFile(FIXTURE_PATH, "utf-8");
-		});
+		const fixtureContent = reactLabsMd;
 
 		test("fixture contains many large fenced blocks that qualify as verbatim candidates", () => {
 			const minTokens = 120;

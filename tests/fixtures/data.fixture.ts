@@ -177,6 +177,19 @@ export function createFrontmatterBatchLlmJsonContent(descriptionTranslated: stri
 }
 
 /**
+ * JSON assistant message content for mocked prose segment batch LLM completions.
+ *
+ * @param items Segment ids and translated strings for the structured batch response
+ *
+ * @returns String passed as `choices[0].message.content` for segment batch completions
+ */
+export function createSegmentBatchLlmJsonContent(
+	items: readonly { segmentId: string; translated: string }[],
+) {
+	return JSON.stringify({ items });
+}
+
+/**
  * Creates a {@link ChatCompletion} fixture.
  *
  * @param overrides Optional overrides for the ChatCompletion fields

@@ -349,10 +349,32 @@ export class GitHubService {
 	 *
 	 * @param prNumber Pull request number on the upstream repository
 	 *
-	 * @returns Normalized issue comments for maintainer-feedback detection
+	 * @returns Normalized issue comments
 	 */
 	public async listPullRequestIssueComments(prNumber: number) {
 		return this.content.listPullRequestIssueComments(prNumber);
+	}
+
+	/**
+	 * Lists submitted reviews on a translation pull request.
+	 *
+	 * @param prNumber Pull request number on the upstream repository
+	 *
+	 * @returns Normalized reviews for maintainer-feedback detection
+	 */
+	public async listPullRequestReviews(prNumber: number) {
+		return this.content.listPullRequestReviews(prNumber);
+	}
+
+	/**
+	 * Lists inline review comments on a translation pull request.
+	 *
+	 * @param prNumber Pull request number on the upstream repository
+	 *
+	 * @returns Normalized inline review comments for maintainer-feedback remediation
+	 */
+	public async listPullRequestReviewComments(prNumber: number) {
+		return this.content.listPullRequestReviewComments(prNumber);
 	}
 
 	/**

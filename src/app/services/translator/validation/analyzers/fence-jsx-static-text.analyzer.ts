@@ -1,9 +1,12 @@
 import { extractFencedCodeBlockBodies } from "./fence-code-identifier.analyzer";
 
-/** Matches JSX element inner text ending at a named closing tag */
-const JSX_ELEMENT_TEXT_BEFORE_CLOSE = new RegExp(
-	/>\s*(?<content>[\s\S]*?)\s*<\s*\/\s*[A-Za-z_$][\w$.-]*\s*>/g,
-);
+/**
+ * Matches static text directly inside a JSX element (no nested child elements).
+ *
+ * Skips `=>` and outer wrappers such as `<ViewTransition><div>…</div></ViewTransition>`.
+ */
+const JSX_DIRECT_ELEMENT_TEXT =
+	/>(?<text>[^<{}]*(?:\{[^{}]*\}[^<{}]*)*)\s*<\s*\/\s*[A-Za-z_$][\w$.-]*\s*>/g;
 
 /** Removes `{expression}` segments so only static JSX text remains */
 const JSX_EXPRESSION = new RegExp(/\{[^{}]*\}/g);
@@ -30,11 +33,11 @@ export interface FenceJsxStaticTextMismatch {
 export function collectJsxStaticTextSegments(code: string) {
 	const segments: string[] = [];
 
-	for (const match of code.matchAll(JSX_ELEMENT_TEXT_BEFORE_CLOSE)) {
-		const content = match.groups?.["content"];
-		if (!content) continue;
+	for (const match of code.matchAll(JSX_DIRECT_ELEMENT_TEXT)) {
+		const text = match.groups?.["text"];
+		if (!text) continue;
 
-		for (const segment of content.split(JSX_EXPRESSION)) {
+		for (const segment of text.split(JSX_EXPRESSION)) {
 			if (segment.length === 0) continue;
 
 			segments.push(segment);
