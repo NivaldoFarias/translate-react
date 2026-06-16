@@ -10,6 +10,7 @@ import type {
 	PatchedRepositoryTreeItem,
 	ProcessedFileResult,
 	PullRequestIssueCommentSnapshot,
+	PullRequestReviewCommentSnapshot,
 	PullRequestReviewSnapshot,
 	PullRequestStatus,
 	RepositoryMarkdownBlob,
@@ -719,6 +720,7 @@ export class GitHubContent {
 
 			return [
 				{
+					id: review.id,
 					login: review.user?.login ?? "",
 					authorAssociation: review.author_association,
 					userType: review.user?.type ?? "User",
@@ -728,6 +730,37 @@ export class GitHubContent {
 				},
 			];
 		});
+	}
+
+	/**
+	 * Lists inline review comments on an open translation pull request (upstream repo).
+	 *
+	 * @param prNumber Pull request number on the upstream repository
+	 *
+	 * @returns Normalized inline review comments, oldest first
+	 */
+	public async listPullRequestReviewComments(
+		prNumber: number,
+	): Promise<PullRequestReviewCommentSnapshot[]> {
+		const comments = await this.deps.octokit.paginate(
+			"GET /repos/{owner}/{repo}/pulls/{pull_number}/comments",
+			{
+				...this.deps.repositories.upstream,
+				pull_number: prNumber,
+				per_page: 100,
+			},
+		);
+
+		return comments
+			.map((comment) => ({
+				login: comment.user.login,
+				authorAssociation: comment.author_association,
+				userType: comment.user.type,
+				createdAt: new Date(comment.created_at),
+				body: comment.body,
+				pullRequestReviewId: comment.pull_request_review_id,
+			}))
+			.sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime());
 	}
 
 	/**

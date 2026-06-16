@@ -449,7 +449,7 @@ export class TranslationBatchManager {
 	}
 
 	/**
-	 * Loads `CHANGES_REQUESTED` review bodies posted after the latest runner commit on the branch.
+	 * Loads `CHANGES_REQUESTED` review summaries and inline review comments posted after the latest runner commit on the branch.
 	 *
 	 * @param file Translation file being processed
 	 * @param validity Pull request validity from the start of file processing
@@ -465,19 +465,20 @@ export class TranslationBatchManager {
 		}
 
 		const branchName = getTranslationBranchNameFromPath(file.path);
-		const [reviews, runnerCommitAt] = await Promise.all([
+		const [reviews, reviewComments, runnerCommitAt] = await Promise.all([
 			this.services.github.listPullRequestReviews(validity.pullRequest.number),
+			this.services.github.listPullRequestReviewComments(validity.pullRequest.number),
 			this.services.github.getLatestTranslationCommitTimestamp(branchName),
 		]);
 
-		return getMaintainerFeedbackSnapshot(reviews, runnerCommitAt);
+		return getMaintainerFeedbackSnapshot(reviews, runnerCommitAt, reviewComments);
 	}
 
 	/**
 	 * Resolves translated content via full document re-translation.
 	 *
 	 * When {@link TranslationPullRequestValidity.invalidReason} is `needs_maintainer_fix`,
-	 * the open PR and branch are reused and `CHANGES_REQUESTED` review bodies are passed into the LLM prompt.
+	 * the open PR and branch are reused and review feedback is passed into the LLM prompt.
 	 *
 	 * @param file Upstream English source file for the workflow
 	 * @param validity Pull request validity from the start of file processing
@@ -502,7 +503,7 @@ export class TranslationBatchManager {
 				prNumber: validity.pullRequest.number,
 				maintainerCommentCount: maintainerFeedbackComments.length,
 			},
-			"Unresolved CHANGES_REQUESTED review after latest runner commit; running full re-translation with review bodies in prompt",
+			"Unresolved CHANGES_REQUESTED review after latest runner commit; running full re-translation with review feedback in prompt",
 		);
 
 		return this.services.translator.translateContent(file, { maintainerFeedbackComments });

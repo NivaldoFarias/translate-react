@@ -367,6 +367,17 @@ export class GitHubService {
 	}
 
 	/**
+	 * Lists inline review comments on a translation pull request.
+	 *
+	 * @param prNumber Pull request number on the upstream repository
+	 *
+	 * @returns Normalized inline review comments for maintainer-feedback remediation
+	 */
+	public async listPullRequestReviewComments(prNumber: number) {
+		return this.content.listPullRequestReviewComments(prNumber);
+	}
+
+	/**
 	 * Returns the timestamp of the latest runner translation commit on a fork branch.
 	 *
 	 * @param branchName Translation branch name without `refs/heads/` prefix

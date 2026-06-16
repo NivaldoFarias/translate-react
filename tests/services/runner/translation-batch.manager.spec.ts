@@ -138,6 +138,7 @@ describe("TranslationBatchManager", () => {
 			);
 			github.listPullRequestReviews.mockResolvedValue([
 				{
+					id: 42,
 					login: "jhonmike",
 					authorAssociation: "MEMBER",
 					userType: "User",
@@ -187,6 +188,77 @@ describe("TranslationBatchManager", () => {
 			expect(results.get(file.filename)?.pullRequest).toEqual(existingPR);
 		});
 
+		test("passes inline review comments into remediation when the review summary is empty", async () => {
+			const github = createMockGitHubService();
+			const translator = createMockTranslatorService();
+			const languageDetector = createMockLanguageDetectorService();
+			const existingPR = createMockPullRequestListItem(1227);
+			const inlineComment = "Use sentence case in this heading.";
+			const forkContent = "## Solução de problemas {/*troubleshooting*/}\n\nCorpo em português.";
+
+			github.findPullRequestByBranch.mockResolvedValue(existingPR);
+			github.checkPullRequestStatus.mockResolvedValue({
+				hasConflicts: false,
+				mergeable: true,
+				needsUpdate: false,
+				mergeableState: "clean",
+				createdBy: "translate-react-bot",
+			});
+			github.getForkFileContentAtBranch.mockResolvedValue(forkContent);
+			github.getLatestTranslationCommitTimestamp.mockResolvedValue(
+				new Date("2026-06-03T10:00:00Z") as never,
+			);
+			github.listPullRequestReviews.mockResolvedValue([
+				{
+					id: 42,
+					login: "jhonmike",
+					authorAssociation: "MEMBER",
+					userType: "User",
+					state: "CHANGES_REQUESTED",
+					submittedAt: new Date("2026-06-03T12:00:00Z"),
+					body: null,
+				},
+			] as never);
+			github.listPullRequestReviewComments.mockResolvedValue([
+				{
+					login: "jhonmike",
+					authorAssociation: "MEMBER",
+					userType: "User",
+					createdAt: new Date("2026-06-03T12:05:00Z"),
+					body: inlineComment,
+					pullRequestReviewId: 42,
+				},
+			] as never);
+			github.getBranch.mockResolvedValue({
+				data: { ref: "refs/heads/translate/test", object: { sha: "branch-sha" } },
+			} as never);
+			languageDetector.analyzeLanguage.mockResolvedValue({
+				isTranslated: true,
+				ratio: 0.9,
+				detectedLanguage: "pt",
+				languageScore: { target: 0.9, source: 0.1 },
+				rawResult: { reliable: true, languages: [], textBytes: 100, chunks: [] },
+			} as never);
+
+			const manager = createTestTranslationBatchManager({
+				github: github as unknown as RunnerServiceDependencies["github"],
+				translator: translator as unknown as RunnerServiceDependencies["translator"],
+				languageDetector:
+					languageDetector as unknown as RunnerServiceDependencies["languageDetector"],
+			});
+			const file = createTranslationFileFixture({
+				path: "src/content/reference/react/target.md",
+				filename: "target.md",
+				content: "## Troubleshooting\n\nEnglish body.",
+			});
+
+			await manager.processBatches([file], 1);
+
+			expect(translator.translateContent).toHaveBeenCalledWith(file, {
+				maintainerFeedbackComments: [inlineComment],
+			});
+		});
+
 		test("reprocesses maintainer feedback without closing the pull request or resetting the branch", async () => {
 			const github = createMockGitHubService();
 			const translator = createMockTranslatorService();
@@ -213,6 +285,7 @@ describe("TranslationBatchManager", () => {
 			);
 			github.listPullRequestReviews.mockResolvedValue([
 				{
+					id: 42,
 					login: "jhonmike",
 					authorAssociation: "MEMBER",
 					userType: "User",

@@ -14,6 +14,7 @@ function review(
 	overrides: Partial<PullRequestReviewSnapshot> & Pick<PullRequestReviewSnapshot, "submittedAt">,
 ): PullRequestReviewSnapshot {
 	return {
+		id: 1,
 		login: "jhonmike",
 		authorAssociation: "MEMBER",
 		userType: "User",
@@ -182,7 +183,7 @@ describe("maintainer-feedback.util", () => {
 
 			expect(getMaintainerFeedbackSnapshot(reviews, runnerCommitAt)).toEqual({
 				bodies: ["Please fix the terminology."],
-				authorLogins: ["gaearon"],
+				authorLogins: ["jhonmike", "gaearon"],
 			});
 			expect(hasUnresolvedChangesRequestedReview(reviews, runnerCommitAt)).toBe(true);
 		});
@@ -190,17 +191,20 @@ describe("maintainer-feedback.util", () => {
 		test("returns bodies and unique author logins in chronological order", () => {
 			const reviews = [
 				review({
+					id: 10,
 					login: "jhonmike",
 					body: "Fix the heading case.",
 					submittedAt: new Date("2026-06-03T11:00:00Z"),
 				}),
 				review({
+					id: 11,
 					login: "gaearon",
 					authorAssociation: "OWNER",
 					body: "Also check the link text.",
 					submittedAt: new Date("2026-06-03T12:00:00Z"),
 				}),
 				review({
+					id: 12,
 					login: "jhonmike",
 					body: "One more note on terminology.",
 					submittedAt: new Date("2026-06-03T13:00:00Z"),
@@ -210,6 +214,65 @@ describe("maintainer-feedback.util", () => {
 			expect(getMaintainerFeedbackSnapshot(reviews, runnerCommitAt)).toEqual({
 				bodies: ["Also check the link text.", "One more note on terminology."],
 				authorLogins: ["gaearon", "jhonmike"],
+			});
+		});
+
+		test("includes inline review comments from unresolved CHANGES_REQUESTED reviews", () => {
+			const reviews = [
+				review({
+					id: 42,
+					login: "jhonmike",
+					body: null,
+					submittedAt: new Date("2026-06-03T12:00:00Z"),
+				}),
+			];
+			const reviewComments = [
+				{
+					login: "jhonmike",
+					authorAssociation: "MEMBER",
+					userType: "User",
+					createdAt: new Date("2026-06-03T12:05:00Z"),
+					body: "Use sentence case in this heading.",
+					pullRequestReviewId: 42,
+				},
+			];
+
+			expect(getMaintainerFeedbackSnapshot(reviews, runnerCommitAt, reviewComments)).toEqual({
+				bodies: ["Use sentence case in this heading."],
+				authorLogins: ["jhonmike"],
+			});
+		});
+
+		test("ignores inline comments tied to superseded reviews", () => {
+			const reviews = [
+				review({
+					id: 42,
+					login: "jhonmike",
+					body: "Please fix the heading.",
+					submittedAt: new Date("2026-06-03T11:00:00Z"),
+				}),
+				review({
+					id: 43,
+					login: "jhonmike",
+					state: "APPROVED",
+					body: "Looks good now.",
+					submittedAt: new Date("2026-06-03T12:00:00Z"),
+				}),
+			];
+			const reviewComments = [
+				{
+					login: "jhonmike",
+					authorAssociation: "MEMBER",
+					userType: "User",
+					createdAt: new Date("2026-06-03T11:05:00Z"),
+					body: "Stale inline note.",
+					pullRequestReviewId: 42,
+				},
+			];
+
+			expect(getMaintainerFeedbackSnapshot(reviews, runnerCommitAt, reviewComments)).toEqual({
+				bodies: [],
+				authorLogins: [],
 			});
 		});
 	});
