@@ -4,6 +4,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+## [0.2.8] - 2026-06-16
+
 ### Added
 
 - AST segment translation as the default markdown body path: prose mdast segments and link labels are batched via structured `segmentBatch` LLM calls with offset reinsert; parse failures or batch errors fall back to full-body translation.
@@ -326,6 +328,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 - README `MAX_RETRY_ATTEMPTS` default matches `src/utils/constants.util.ts` (`3`).
 
+[0.2.8]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.8
 [0.2.7]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.7
 [0.2.6]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.6
 [0.2.5]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.5
