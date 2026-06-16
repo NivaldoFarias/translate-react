@@ -1,119 +1,124 @@
-import type { PullRequestIssueCommentSnapshot } from "@/app/services/github/types";
+import type { PullRequestReviewSnapshot } from "@/app/services/github/types";
 
 import {
 	IGNORED_MAINTAINER_FEEDBACK_LOGINS,
-	MAINTAINER_COMMENT_ASSOCIATIONS,
+	REVIEWER_FEEDBACK_ASSOCIATIONS,
 	TRANSLATION_COMMIT_MESSAGE_PREFIX,
 } from "@/app/constants/maintainer-feedback.constants";
 
-/** Maintainer comments that triggered a remediation re-translation */
+/** Maintainer reviews that triggered a remediation re-translation */
 export interface MaintainerFeedbackSnapshot {
-	/** Comment bodies, oldest first, for the translation prompt */
+	/** Review bodies, oldest first, for the translation prompt */
 	readonly bodies: readonly string[];
 
-	/** Unique maintainer logins in comment order */
+	/** Unique reviewer logins in review order */
 	readonly authorLogins: readonly string[];
 }
 
 /**
- * Whether a pull request comment counts as maintainer review feedback.
+ * Whether a pull request review author may trigger remediation feedback.
  *
- * @param comment Normalized issue comment on the translation pull request
+ * @param review Normalized pull request review
  *
- * @returns `true` for repository members and collaborators, excluding known bots
+ * @returns `true` for repository members, collaborators, and contributors, excluding known bots
  */
-export function isMaintainerFeedbackComment(comment: PullRequestIssueCommentSnapshot): boolean {
-	if (comment.userType === "Bot") {
+export function isReviewerFeedbackAuthor(review: PullRequestReviewSnapshot): boolean {
+	if (review.userType === "Bot") {
 		return false;
 	}
 
-	if (IGNORED_MAINTAINER_FEEDBACK_LOGINS.has(comment.login)) {
+	if (IGNORED_MAINTAINER_FEEDBACK_LOGINS.has(review.login)) {
 		return false;
 	}
 
-	return MAINTAINER_COMMENT_ASSOCIATIONS.has(comment.authorAssociation);
+	return REVIEWER_FEEDBACK_ASSOCIATIONS.has(review.authorAssociation);
 }
 
 /**
- * Whether maintainer feedback exists after the latest runner commit on the branch.
+ * Returns qualifying reviews submitted after the latest runner commit, oldest first.
  *
- * @param comments Issue comments on the translation pull request
+ * @param reviews Pull request reviews on the translation pull request
  * @param runnerCommitAt Timestamp of the latest `docs: translate` commit, if any
  *
- * @returns `true` when a maintainer comment was posted after that commit
+ * @returns Reviews from qualifying authors posted after that commit
  */
-export function hasMaintainerFeedbackAfterRunnerCommit(
-	comments: readonly PullRequestIssueCommentSnapshot[],
+export function getReviewsAfterRunnerCommit(
+	reviews: readonly PullRequestReviewSnapshot[],
 	runnerCommitAt: Date | undefined,
-): boolean {
-	if (!runnerCommitAt) {
-		return false;
-	}
-
-	return comments.some(
-		(comment) => isMaintainerFeedbackComment(comment) && comment.createdAt > runnerCommitAt,
-	);
-}
-
-/**
- * Returns maintainer comments posted after the latest runner commit, oldest first.
- *
- * @param comments Issue comments on the translation pull request
- * @param runnerCommitAt Timestamp of the latest `docs: translate` commit on the branch
- *
- * @returns Normalized maintainer feedback comments
- */
-export function getMaintainerFeedbackComments(
-	comments: readonly PullRequestIssueCommentSnapshot[],
-	runnerCommitAt: Date | undefined,
-): PullRequestIssueCommentSnapshot[] {
+): PullRequestReviewSnapshot[] {
 	if (!runnerCommitAt) {
 		return [];
 	}
 
-	return comments
-		.filter((comment) => isMaintainerFeedbackComment(comment) && comment.createdAt > runnerCommitAt)
-		.sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime());
+	return reviews
+		.filter((review) => isReviewerFeedbackAuthor(review) && review.submittedAt > runnerCommitAt)
+		.sort((left, right) => left.submittedAt.getTime() - right.submittedAt.getTime());
 }
 
 /**
- * Returns maintainer comment bodies posted after the latest runner commit, oldest first.
+ * Returns unresolved `CHANGES_REQUESTED` reviews after the latest runner commit.
  *
- * @param comments Issue comments on the translation pull request
- * @param runnerCommitAt Timestamp of the latest `docs: translate` commit on the branch
+ * For each qualifying reviewer, only the newest submitted review counts. Remediation runs
+ * when that latest review is still `CHANGES_REQUESTED` (for example after an approval on
+ * an older commit, or a newer `APPROVED` review supersedes an earlier request).
  *
- * @returns Markdown bodies for the maintainer review section in the translation prompt
+ * @param reviews Pull request reviews on the translation pull request
+ * @param runnerCommitAt Timestamp of the latest `docs: translate` commit, if any
+ *
+ * @returns Unresolved change-request reviews, oldest first
  */
-export function getMaintainerFeedbackCommentBodies(
-	comments: readonly PullRequestIssueCommentSnapshot[],
+export function getUnresolvedChangesRequestedReviews(
+	reviews: readonly PullRequestReviewSnapshot[],
 	runnerCommitAt: Date | undefined,
-): string[] {
-	return getMaintainerFeedbackComments(comments, runnerCommitAt)
-		.map((comment) => comment.body)
-		.filter((body) => body.trim().length > 0);
+): PullRequestReviewSnapshot[] {
+	const reviewsAfterCommit = getReviewsAfterRunnerCommit(reviews, runnerCommitAt);
+	const latestReviewByLogin = new Map<string, PullRequestReviewSnapshot>();
+
+	for (const review of reviewsAfterCommit) {
+		latestReviewByLogin.set(review.login, review);
+	}
+
+	return [...latestReviewByLogin.values()]
+		.filter((review) => review.state === "CHANGES_REQUESTED")
+		.sort((left, right) => left.submittedAt.getTime() - right.submittedAt.getTime());
+}
+
+/**
+ * Whether an unresolved `CHANGES_REQUESTED` review exists after the latest runner commit.
+ *
+ * @param reviews Pull request reviews on the translation pull request
+ * @param runnerCommitAt Timestamp of the latest `docs: translate` commit, if any
+ *
+ * @returns `true` when remediation should run
+ */
+export function hasUnresolvedChangesRequestedReview(
+	reviews: readonly PullRequestReviewSnapshot[],
+	runnerCommitAt: Date | undefined,
+): boolean {
+	return getUnresolvedChangesRequestedReviews(reviews, runnerCommitAt).length > 0;
 }
 
 /**
  * Builds maintainer feedback bodies and author logins for remediation re-translations.
  *
- * @param comments Issue comments on the translation pull request
+ * @param reviews Pull request reviews on the translation pull request
  * @param runnerCommitAt Timestamp of the latest `docs: translate` commit on the branch
  *
  * @returns Snapshot for the translation prompt and commit attribution, or empty when none
  */
 export function getMaintainerFeedbackSnapshot(
-	comments: readonly PullRequestIssueCommentSnapshot[],
+	reviews: readonly PullRequestReviewSnapshot[],
 	runnerCommitAt: Date | undefined,
 ): MaintainerFeedbackSnapshot {
-	const feedbackComments = getMaintainerFeedbackComments(comments, runnerCommitAt);
-	const bodies = feedbackComments
-		.map((comment) => comment.body)
+	const feedbackReviews = getUnresolvedChangesRequestedReviews(reviews, runnerCommitAt);
+	const bodies = feedbackReviews
+		.map((review) => review.body)
 		.filter((body) => body.trim().length > 0);
 	const authorLogins = [
 		...new Set(
-			feedbackComments
-				.filter((comment) => comment.body.trim().length > 0)
-				.map((comment) => comment.login),
+			feedbackReviews
+				.filter((review) => review.body.trim().length > 0)
+				.map((review) => review.login),
 		),
 	];
 

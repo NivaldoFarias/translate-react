@@ -99,14 +99,8 @@ export interface LocaleRulesConfig {
  * enabling a single shared builder to generate locale-specific PR bodies.
  */
 export interface LocalePRBodyStrings {
-	/**
-	 * Introductory sentence for the PR body.
-	 *
-	 * @param languageName The display name of the target language
-	 *
-	 * @returns Formatted intro string
-	 */
-	readonly intro: (languageName: string) => string;
+	/** Human-review notice as the opening body paragraph */
+	readonly humanReviewNotice: string;
 
 	/** Conflict notice section when a stale PR was closed */
 	readonly conflictNotice: {
@@ -123,29 +117,42 @@ export interface LocalePRBodyStrings {
 		readonly body: (prNumber: number) => string;
 	};
 
-	/** Important notice about human review requirement */
-	readonly humanReviewNotice: string;
+	/**
+	 * Maintainer wiki link for the `[!TIP]` callout below the human-review notice.
+	 *
+	 * @param wikiUrl Absolute URL to the For React Docs Maintainers wiki page
+	 *
+	 * @returns Formatted `[!TIP]` body text
+	 */
+	readonly maintainerWikiTip: (wikiUrl: string) => string;
 
 	/** Advisory validation warnings (shown only when `reviewerNotices` is non-empty) */
 	readonly reviewerWarnings: {
 		/** Intro line inside the `[!WARNING]` callout */
 		readonly intro: string;
 
-		/** Table column headers for guard id and maintainer fix text */
-		readonly columns: {
-			readonly guardColumn: string;
-			readonly whatToFixColumn: string;
-		};
-	};
+		/** `<summary>` label for the collapsible validation details block */
+		readonly detailsSummary: string;
 
-	/**
-	 * Link text for the maintainer guide (wiki URL is fixed in the PR body builder).
-	 *
-	 * @param wikiUrl Absolute URL to the For React Docs Maintainers wiki page
-	 *
-	 * @returns Markdown link line
-	 */
-	readonly maintainerGuide: (wikiUrl: string) => string;
+		/**
+		 * Human-readable heading for an advisory guard id in the details section.
+		 *
+		 * @param guardId Post-translation guard identifier
+		 *
+		 * @returns Localized validator name
+		 */
+		readonly guardLabel: (guardId: string) => string;
+
+		/**
+		 * Localized line range label for a violation in the PR details section.
+		 *
+		 * @param startLine 1-based start line in the source markdown
+		 * @param endLine 1-based end line in the source markdown
+		 *
+		 * @returns Location label for a numbered violation heading
+		 */
+		readonly violationLocation: (startLine: number, endLine: number) => string;
+	};
 }
 
 export interface LocalePullRequestConfig {

@@ -21,9 +21,11 @@
         "esModuleInterop": true,
         "forceConsistentCasingInFileNames": true,
         "isolatedModules": true,
+        "allowArbitraryExtensions": true,
         "paths": {
             "@/*": ["./src/*"],
             "@tests/*": ["./tests/*"],
+            "@react-docs-fixtures/*": ["./tests/fixtures/md/*"],
             "@package": ["./package.json"]
         }
     },

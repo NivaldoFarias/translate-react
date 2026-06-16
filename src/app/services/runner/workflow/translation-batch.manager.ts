@@ -292,9 +292,19 @@ export class TranslationBatchManager {
 				"Step 1/5: Translation branch reset for single-commit workflow",
 			);
 
+			const step2Start = Date.now();
 			const maintainerFeedback = await this.loadMaintainerFeedbackForRemediation(
 				file,
 				pullRequestValidity,
+			);
+			file.logger.debug(
+				{
+					durationMs: Date.now() - step2Start,
+					pullRequestInvalidReason: pullRequestValidity.invalidReason ?? null,
+					maintainerFeedbackLoaded: maintainerFeedback !== undefined,
+					maintainerCommentCount: maintainerFeedback?.authorLogins.length ?? 0,
+				},
+				"Step 2/5: Pull request validity and maintainer feedback resolved",
 			);
 
 			const translationStart = Date.now();
@@ -306,11 +316,19 @@ export class TranslationBatchManager {
 			metadata.translation = translationResult.content;
 			metadata.reviewerNotices = translationResult.reviewerNotices;
 			metadata.llmUsage = translationResult.llmUsage;
+			const contentRatio =
+				file.content.length > 0 ?
+					(metadata.translation.length / file.content.length).toFixed(2)
+				:	"unknown";
+
 			file.logger.debug(
 				{
 					translationSize: metadata.translation.length,
+					contentRatio,
 					durationMs: Date.now() - translationStart,
 					advisoryGuardCount: metadata.reviewerNotices.length,
+					translationPath: translationResult.translationPath,
+					llmUsage: translationResult.llmUsage,
 					reviewerNotices: metadata.reviewerNotices,
 				},
 				"Step 3/5: Translation complete",
@@ -431,7 +449,7 @@ export class TranslationBatchManager {
 	}
 
 	/**
-	 * Loads maintainer PR comments posted after the latest runner commit on the branch.
+	 * Loads `CHANGES_REQUESTED` review bodies posted after the latest runner commit on the branch.
 	 *
 	 * @param file Translation file being processed
 	 * @param validity Pull request validity from the start of file processing
@@ -447,19 +465,19 @@ export class TranslationBatchManager {
 		}
 
 		const branchName = getTranslationBranchNameFromPath(file.path);
-		const [comments, runnerCommitAt] = await Promise.all([
-			this.services.github.listPullRequestIssueComments(validity.pullRequest.number),
+		const [reviews, runnerCommitAt] = await Promise.all([
+			this.services.github.listPullRequestReviews(validity.pullRequest.number),
 			this.services.github.getLatestTranslationCommitTimestamp(branchName),
 		]);
 
-		return getMaintainerFeedbackSnapshot(comments, runnerCommitAt);
+		return getMaintainerFeedbackSnapshot(reviews, runnerCommitAt);
 	}
 
 	/**
 	 * Resolves translated content via full document re-translation.
 	 *
 	 * When {@link TranslationPullRequestValidity.invalidReason} is `needs_maintainer_fix`,
-	 * the open PR and branch are reused and maintainer issue comments are passed into the LLM prompt.
+	 * the open PR and branch are reused and `CHANGES_REQUESTED` review bodies are passed into the LLM prompt.
 	 *
 	 * @param file Upstream English source file for the workflow
 	 * @param validity Pull request validity from the start of file processing
@@ -484,7 +502,7 @@ export class TranslationBatchManager {
 				prNumber: validity.pullRequest.number,
 				maintainerCommentCount: maintainerFeedbackComments.length,
 			},
-			"Maintainer feedback after latest runner commit; running full re-translation with review comments in prompt",
+			"Unresolved CHANGES_REQUESTED review after latest runner commit; running full re-translation with review bodies in prompt",
 		);
 
 		return this.services.translator.translateContent(file, { maintainerFeedbackComments });
@@ -521,6 +539,8 @@ export class TranslationBatchManager {
 				path: file.path,
 				prNumber: validity.pullRequest.number,
 				mergeableState: validity.pullRequestStatus?.mergeableState,
+				llmWorkSkipped: true,
+				skipReason: "valid_existing_pr",
 			},
 			"Skipping file with valid existing pull request",
 		);
@@ -725,8 +745,8 @@ export class TranslationBatchManager {
 	/**
 	 * Creates a pull request description for translated content.
 	 *
-	 * Generates a detailed PR body including translation outcome metrics, runner and LLM
-	 * configuration, optional conflict notices, and a link to the maintainer wiki guide.
+	 * Generates a PR body with a human-review notice, maintainer wiki tip, optional conflict
+	 * notices, and advisory validation details when guards report issues.
 	 * When a file has an existing invalid PR (with merge conflicts), includes a GitHub Flavored Markdown
 	 * alert to inform maintainers about the duplicate PR situation.
 	 *

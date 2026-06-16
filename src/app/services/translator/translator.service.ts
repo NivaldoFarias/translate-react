@@ -19,8 +19,14 @@ import type {
 	ChunkTranslationProgress,
 	TranslationSystemPromptKind,
 } from "./llm/translation-system-prompt.types";
+import type {
+	BodySegmentExtractionResult,
+	SegmentTranslationMap,
+	TranslatableSegment,
+} from "./markdown/segments/types";
 import type { TranslationAttemptContext } from "./pipeline/translation-attempt.context";
 import type { FrontmatterBatchFieldKey } from "./translator-frontmatter-batch.schema";
+import type { SegmentBatchRequestItem } from "./translator-segment-batch.schema";
 import type { ReviewerValidationNotice } from "./validation/validation.types";
 
 import {
@@ -29,7 +35,12 @@ import {
 	maskLargeVerbatimFencedCodeBlocks,
 	restoreMaskedVerbatimFences,
 } from "@/app/utils/";
-import { ApplicationError, ErrorCode, isCompletionLengthTruncationError } from "@/shared/errors/";
+import {
+	ApplicationError,
+	ErrorCode,
+	isCompletionLengthTruncationError,
+	isSegmentBatchIdMismatchError,
+} from "@/shared/errors/";
 
 import { ChunksManager } from "./chunking";
 import { SYSTEM_PROMPT_TOKEN_RESERVE } from "./chunking/chunking.constants";
@@ -46,6 +57,16 @@ import {
 	mergePreservedYamlFrontmatter,
 	splitLeadingYamlFrontmatter,
 } from "./markdown/frontmatter";
+import {
+	computeTranslatableCharRatio,
+	extractTranslatableBodySegments,
+	filterTranslatableSegments,
+	isSegmentTranslationEligible,
+	packSegmentsIntoBatches,
+	reinsertSegments,
+	splitSegmentBatchInHalf,
+	sumTranslatableChars,
+} from "./markdown/segments";
 import {
 	emptyTranslationAttemptContext,
 	translationAttemptContextFromMaintainerReview,
@@ -74,6 +95,9 @@ export interface TranslateContentOptions {
 	readonly maintainerFeedbackComments?: readonly string[];
 }
 
+/** Translation strategy used for the markdown body on the latest {@link TranslatorService.translateContent} call */
+export type TranslationPath = "segment" | "segment-noop" | "legacy-full-body" | "legacy-chunked";
+
 /** Result from translating a file */
 export interface TranslationResult {
 	/** The translated content */
@@ -84,6 +108,9 @@ export interface TranslationResult {
 
 	/** Aggregated LLM token and cost usage for this file */
 	llmUsage: TranslationLlmUsageTotals;
+
+	/** Body translation strategy used for this file */
+	translationPath: TranslationPath;
 }
 
 /** Dependency injection interface for {@link TranslatorService} */
@@ -176,6 +203,9 @@ export class TranslatorService {
 
 	/** Per-file LLM usage accumulator reset at the start of each {@link translateContent} call */
 	private currentFileLlmUsage = emptyTranslationLlmUsageTotals();
+
+	/** Body translation strategy for the file currently being translated */
+	private currentTranslationPath: TranslationPath = "segment";
 
 	/**
 	 * Creates a new TranslatorService instance with injected dependencies.
@@ -357,11 +387,10 @@ export class TranslatorService {
 	 * ### Workflow
 	 *
 	 * 1. Validates input content
-	 * 2. Optionally replaces very large fenced code blocks with placeholders when `MASK_VERBATIM_LARGE_FENCES` is enabled
-	 * 3. Resolves source language once on full-file markdown (after any verbatim masking) before chunking
-	 * 4. Determines if chunking is needed based on token estimates (after any masking)
-	 * 5. Translates content (with chunking if necessary)
-	 * 6. Restores verbatim fences when masking was applied
+	 * 2. Resolves source language once on full-file markdown (after any verbatim masking used for legacy fallback)
+	 * 3. Translates the body via AST segments on the unmasked body, or via masked full-body/chunked fallback when segment extraction is unsafe
+	 * 4. Optionally replaces very large fenced code blocks with placeholders only on the legacy fallback path when `MASK_VERBATIM_LARGE_FENCES` is enabled
+	 * 5. Restores verbatim fences when masking was applied on the legacy path
 	 * 7. Validates translation completeness
 	 * 8. Cleans up and returns translated content
 	 *
@@ -404,6 +433,7 @@ export class TranslatorService {
 
 		const translationStartTime = Date.now();
 		this.currentFileLlmUsage = emptyTranslationLlmUsageTotals();
+		this.currentTranslationPath = "segment";
 
 		const verbatimMask =
 			env.MASK_VERBATIM_LARGE_FENCES ?
@@ -436,8 +466,21 @@ export class TranslatorService {
 			);
 		}
 
-		const translationWorkFile = new TranslationFile(
+		const legacyBodyWorkFile = new TranslationFile(
 			translationPayload,
+			file.filename,
+			file.path,
+			file.sha,
+			file.logger,
+			file.documentSourceLanguage,
+		);
+
+		const unmaskedBodySplit = splitLeadingYamlFrontmatter(file.content);
+		const unmaskedBodyPayload =
+			unmaskedBodySplit.rest.length > 0 ? unmaskedBodySplit.rest : file.content;
+
+		const segmentBodyWorkFile = new TranslationFile(
+			unmaskedBodyPayload,
 			file.filename,
 			file.path,
 			file.sha,
@@ -461,7 +504,7 @@ export class TranslatorService {
 		const pipelineResult = await this.managers.pipeline.translateWithValidation({
 			file,
 			translateBody: (attemptContext) =>
-				this.translateMarkdownBody(translationWorkFile, attemptContext),
+				this.translateMarkdownBody(segmentBodyWorkFile, legacyBodyWorkFile, attemptContext),
 			initialAttemptContext,
 			finalizeTranslation: async (bodyTranslation) => {
 				let finalized = bodyTranslation;
@@ -522,6 +565,8 @@ export class TranslatorService {
 				durationMs: translationDuration,
 				sizeRatio: (pipelineResult.content.length / file.content.length).toFixed(2),
 				advisoryGuardCount,
+				translationPath: this.currentTranslationPath,
+				llmUsage: this.currentFileLlmUsage,
 			},
 			"Translation completed successfully",
 		);
@@ -530,6 +575,7 @@ export class TranslatorService {
 			content: cleanupTranslatedContent(pipelineResult.content, file),
 			reviewerNotices: pipelineResult.reviewerNotices,
 			llmUsage: this.currentFileLlmUsage,
+			translationPath: this.currentTranslationPath,
 		};
 	}
 
@@ -635,37 +681,86 @@ export class TranslatorService {
 	}
 
 	/**
-	 * Translates content using intelligent chunking for large files.
+	 * Translates markdown body via AST segment batches with full-body fallback.
 	 *
-	 * Handles large files by breaking them into manageable pieces and processing
-	 * each chunk separately. Automatically reassembles the translated chunks while
-	 * maintaining proper spacing and structure. Validates that all chunks are
-	 * successfully translated before reassembly.
+	 * Default path: {@link extractTranslatableBodySegments} on the unmasked body, token-budgeted
+	 * segment batches, and {@link reinsertSegments}. Parse warnings or segment batch failures fall
+	 * back to {@link translateMarkdownBodyLegacy} on the legacy work file (verbatim-masked when enabled).
 	 *
-	 * @param content Content to translate (automatically chunked if exceeds token limit)
-	 *
-	 * @returns Promise resolving to translated content reassembled from all chunks
-	 *
-	 * @see {@link ChunksManager.chunkContent} for chunking strategy details
-	 * @see {@link TranslatorService.callLanguageModel} for individual chunk translation
-	 *
-	 * @example
-	 * ```typescript
-	 * const translator = new TranslatorService({ source: 'en', target: 'pt-br' });
-	 * const largeContent = '# Very long documentation...\n'.repeat(1000);
-	 * const translated = await translator.translateWithChunking(largeContent);
-	 * console.log('Translation completed:', translated.length);
-	 * ```
-	 */
-	/**
-	 * Translates markdown body content (single-shot or chunked).
-	 *
-	 * @param file Work file whose `content` is the body sent to the LLM (frontmatter already split off)
+	 * @param segmentBodyWorkFile Work file whose `content` is the unmasked markdown body (frontmatter already split off)
+	 * @param legacyBodyWorkFile Work file whose `content` is the body for full-body fallback (masked when verbatim masking is on)
 	 * @param attemptContext Maintainer feedback for the system prompt, when present
 	 *
 	 * @returns Translated markdown body before frontmatter merge
 	 */
 	private async translateMarkdownBody(
+		segmentBodyWorkFile: TranslationFile,
+		legacyBodyWorkFile: TranslationFile,
+		attemptContext: TranslationAttemptContext = emptyTranslationAttemptContext(),
+	) {
+		const extraction = extractTranslatableBodySegments(segmentBodyWorkFile.content);
+
+		if (!isSegmentTranslationEligible(extraction.parseWarnings)) {
+			segmentBodyWorkFile.logger.info(
+				{ parseWarnings: extraction.parseWarnings, path: segmentBodyWorkFile.path },
+				"Segment extraction unsafe; falling back to full-body translation",
+			);
+			return this.translateMarkdownBodyLegacy(legacyBodyWorkFile, attemptContext);
+		}
+
+		const translatableSegments = filterTranslatableSegments(extraction.segments);
+
+		if (translatableSegments.length === 0) {
+			this.currentTranslationPath = "segment-noop";
+			return segmentBodyWorkFile.content;
+		}
+
+		const translatableCharCount = sumTranslatableChars(extraction.segments);
+		segmentBodyWorkFile.logger.debug(
+			{
+				path: segmentBodyWorkFile.path,
+				segmentCount: translatableSegments.length,
+				translatableCharCount,
+				translatableCharRatio: computeTranslatableCharRatio(
+					translatableCharCount,
+					segmentBodyWorkFile.content.length,
+				),
+			},
+			"Segment translation metrics",
+		);
+
+		try {
+			const translated = await this.translateBodyViaSegments(
+				segmentBodyWorkFile,
+				translatableSegments,
+				extraction,
+				attemptContext,
+			);
+			this.currentTranslationPath = "segment";
+			return translated;
+		} catch (error) {
+			segmentBodyWorkFile.logger.warn(
+				{
+					path: segmentBodyWorkFile.path,
+					error: error instanceof Error ? error.message : String(error),
+				},
+				"Segment batch translation failed; falling back to full-body translation",
+			);
+			return this.translateMarkdownBodyLegacy(legacyBodyWorkFile, attemptContext);
+		}
+	}
+
+	/**
+	 * Translates markdown body via full-document or chunked LLM calls (fallback path).
+	 *
+	 * Used when segment extraction is unsafe or segment batch translation fails.
+	 *
+	 * @param file Work file whose `content` is the body sent to the LLM
+	 * @param attemptContext Maintainer feedback for the system prompt, when present
+	 *
+	 * @returns Translated markdown body before frontmatter merge
+	 */
+	private async translateMarkdownBodyLegacy(
 		file: TranslationFile,
 		attemptContext: TranslationAttemptContext = emptyTranslationAttemptContext(),
 	) {
@@ -673,6 +768,8 @@ export class TranslatorService {
 		if (contentNeedsChunking) {
 			return this.translateWithChunking(file, attemptContext);
 		}
+
+		this.currentTranslationPath = "legacy-full-body";
 
 		try {
 			return await this.callLanguageModel(
@@ -696,10 +793,155 @@ export class TranslatorService {
 		}
 	}
 
+	/**
+	 * Translates body prose segments in token-budgeted batches and reinserts by source offsets.
+	 *
+	 * @param file Work file whose `content` is the markdown body
+	 * @param translatableSegments Translate-kind segments to send to the LLM
+	 * @param extraction Full body extraction including policy segments for reinsert ordering
+	 * @param attemptContext Maintainer feedback for the system prompt, when present
+	 *
+	 * @returns Translated markdown body before frontmatter merge
+	 */
+	private async translateBodyViaSegments(
+		file: TranslationFile,
+		translatableSegments: readonly TranslatableSegment[],
+		extraction: BodySegmentExtractionResult,
+		attemptContext: TranslationAttemptContext,
+	) {
+		const tokenBudget = this.managers.chunks.getMarkdownChunkSplitterTokenBudget();
+		const batches = packSegmentsIntoBatches(
+			translatableSegments,
+			(text) => this.managers.chunks.estimateTokenCount(text),
+			tokenBudget,
+		);
+
+		const translations: Record<string, string> = {};
+
+		for (const batch of batches) {
+			try {
+				const batchTranslations = await this.translateSegmentBatchItems(
+					file,
+					batch,
+					attemptContext,
+				);
+				Object.assign(translations, batchTranslations);
+			} catch (error) {
+				file.logger.warn(
+					{
+						path: file.path,
+						segmentCount: batch.length,
+						error: error instanceof Error ? error.message : String(error),
+					},
+					"Segment batch failed after split retries; retrying items individually",
+				);
+
+				for (const item of batch) {
+					const itemTranslations = await this.translateSegmentBatchItems(
+						file,
+						[item],
+						attemptContext,
+					);
+					Object.assign(translations, itemTranslations);
+				}
+			}
+		}
+
+		return reinsertSegments(file.content, translations, extraction.segments);
+	}
+
+	/**
+	 * Translates one segment batch, splitting in half when completion tokens truncate output.
+	 *
+	 * @param file Work file for logging and prompt context
+	 * @param batchItems Segment batch request items
+	 * @param attemptContext Maintainer feedback for the system prompt, when present
+	 *
+	 * @returns Map of segment id to cleaned translated text
+	 */
+	private async translateSegmentBatchItems(
+		file: TranslationFile,
+		batchItems: readonly SegmentBatchRequestItem[],
+		attemptContext: TranslationAttemptContext,
+	): Promise<SegmentTranslationMap> {
+		try {
+			const { envelope, usage } = await this.llmClient.callLanguageModelSegmentBatch(
+				file,
+				batchItems,
+				attemptContext,
+			);
+			this.recordLlmUsage(usage);
+
+			const translations: Record<string, string> = {};
+
+			for (const item of envelope.items) {
+				const snippetFile = new TranslationFile(
+					item.translated,
+					`${file.filename}#${item.segmentId}`,
+					file.path,
+					file.sha,
+					file.logger,
+					file.documentSourceLanguage,
+				);
+				translations[item.segmentId] = cleanupTranslatedContent(item.translated, snippetFile);
+			}
+
+			return translations;
+		} catch (error) {
+			const shouldSplitBatch =
+				batchItems.length > 1 &&
+				(isCompletionLengthTruncationError(error) || isSegmentBatchIdMismatchError(error));
+
+			if (!shouldSplitBatch) {
+				throw error;
+			}
+
+			const [firstHalf, secondHalf] = splitSegmentBatchInHalf(batchItems);
+
+			file.logger.info(
+				{
+					segmentCount: batchItems.length,
+					firstHalfCount: firstHalf.length,
+					reason:
+						isCompletionLengthTruncationError(error) ? "completion_token_limit" : (
+							"segment_batch_id_mismatch"
+						),
+				},
+				"Segment batch failed; splitting batch and retrying halves",
+			);
+
+			const firstTranslations = await this.translateSegmentBatchItems(
+				file,
+				firstHalf,
+				attemptContext,
+			);
+			const secondTranslations = await this.translateSegmentBatchItems(
+				file,
+				secondHalf,
+				attemptContext,
+			);
+
+			return { ...firstTranslations, ...secondTranslations };
+		}
+	}
+
+	/**
+	 * Translates an oversized body by splitting with {@link ChunksManager} and reassembling chunks.
+	 *
+	 * Legacy fallback used when {@link translateMarkdownBodyLegacy} needs token-budget chunking.
+	 *
+	 * @param file Work file whose `content` is the markdown body
+	 * @param attemptContext Maintainer feedback for the system prompt, when present
+	 *
+	 * @returns Translated body reassembled from all chunks
+	 *
+	 * @see {@link ChunksManager.chunkContent} for chunking strategy details
+	 */
 	private async translateWithChunking(
 		file: TranslationFile,
 		attemptContext: TranslationAttemptContext = emptyTranslationAttemptContext(),
 	): Promise<string> {
+		this.currentTranslationPath = "legacy-chunked";
 		file.logger.debug({ contentLength: file.content.length }, "Starting chunked translation");
 
 		const { chunks, separators } = await this.managers.chunks.chunkContent(file.content);
@@ -733,7 +975,7 @@ export class TranslatorService {
 	private static readonly RECHUNK_BUDGET_FACTOR = 0.5;
 
 	/**
-	 * Translates a single chunk of content using the language model.
+	 * Translates a single markdown chunk using the full-document LLM prompt.
 	 *
 	 * When the LLM truncates output due to completion token limits, the chunk is
 	 * automatically split into smaller sub-chunks and translated recursively.
