@@ -69,6 +69,19 @@ describe("TranslationLlmClient", () => {
 		});
 	});
 
+	describe("getLLMCompletionParams", () => {
+		test("sets OpenRouter run attribution on the deprecated user field", () => {
+			const file = createTranslationFileFixture({ content: "Hello world" });
+
+			const params = llmClient.getLLMCompletionParams(file, "Hello world");
+
+			// eslint-disable-next-line @typescript-eslint/no-deprecated -- OpenRouter run attribution
+			expect(typeof params.user).toBe("string");
+			// eslint-disable-next-line @typescript-eslint/no-deprecated -- OpenRouter run attribution
+			expect(params.user?.length).toBeGreaterThan(0);
+		});
+	});
+
 	describe("callLanguageModel", () => {
 		test("surfaces finish_reason length as completion truncation error", async () => {
 			mockChatCompletionsCreate.mockResolvedValue(

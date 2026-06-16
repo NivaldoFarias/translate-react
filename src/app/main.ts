@@ -4,7 +4,12 @@ import "@/app/global";
 import { name, version } from "@package";
 
 import { runnerService } from "@/app/composition";
-import { logger as baseLogger, env, setupSignalHandlers } from "@/app/utils/";
+import {
+	logger as baseLogger,
+	buildOpenRouterRunUserId,
+	env,
+	setupSignalHandlers,
+} from "@/app/utils/";
 import { handleTopLevelError } from "@/shared/errors/";
 
 if (import.meta.main) {
@@ -29,6 +34,24 @@ async function main() {
 			`"Starting workflow (v${version} - ${env.NODE_ENV})"`,
 		);
 
+		logger.debug(
+			{
+				openRouterUserId: buildOpenRouterRunUserId(),
+				runConfig: {
+					llmModel: env.LLM_MODEL,
+					llmApiBaseUrl: env.LLM_API_BASE_URL,
+					maxTokens: env.MAX_TOKENS,
+					batchSize: env.BATCH_SIZE,
+					maxLlmConcurrency: env.MAX_LLM_CONCURRENCY,
+					maxRetryAttempts: env.MAX_RETRY_ATTEMPTS,
+					llmMaxRequestsPerMinute: env.LLM_MAX_REQUESTS_PER_MINUTE,
+					maskVerbatimLargeFences: env.MASK_VERBATIM_LARGE_FENCES,
+					maskVerbatimLargeFencesMinTokens: env.MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS,
+				},
+			},
+			"Workflow run configuration",
+		);
+
 		const statistics = await runnerService.run();
 
 		logger.info(
@@ -37,6 +60,11 @@ async function main() {
 				successCount: statistics.successCount,
 				failureCount: statistics.failureCount,
 				totalCount: statistics.totalCount,
+				totalPromptTokens: statistics.totalPromptTokens,
+				totalCompletionTokens: statistics.totalCompletionTokens,
+				totalEstimatedCostUsd: statistics.totalEstimatedCostUsd,
+				filesWithReviewerWarnings: statistics.filesWithReviewerWarnings,
+				advisoryIssuesByGuardId: statistics.advisoryIssuesByGuardId,
 			},
 			"Workflow finished",
 		);
