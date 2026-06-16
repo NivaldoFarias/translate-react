@@ -165,6 +165,28 @@ describe("maintainer-feedback.util", () => {
 	describe("getMaintainerFeedbackSnapshot", () => {
 		const runnerCommitAt = new Date("2026-06-03T10:00:00Z");
 
+		test("ignores CHANGES_REQUESTED reviews with null or empty bodies", () => {
+			const reviews = [
+				review({
+					login: "jhonmike",
+					body: null,
+					submittedAt: new Date("2026-06-03T11:00:00Z"),
+				}),
+				review({
+					login: "gaearon",
+					authorAssociation: "OWNER",
+					body: "Please fix the terminology.",
+					submittedAt: new Date("2026-06-03T12:00:00Z"),
+				}),
+			];
+
+			expect(getMaintainerFeedbackSnapshot(reviews, runnerCommitAt)).toEqual({
+				bodies: ["Please fix the terminology."],
+				authorLogins: ["gaearon"],
+			});
+			expect(hasUnresolvedChangesRequestedReview(reviews, runnerCommitAt)).toBe(true);
+		});
+
 		test("returns bodies and unique author logins in chronological order", () => {
 			const reviews = [
 				review({

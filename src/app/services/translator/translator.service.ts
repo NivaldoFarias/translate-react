@@ -65,7 +65,6 @@ import {
 	packSegmentsIntoBatches,
 	reinsertSegments,
 	splitSegmentBatchInHalf,
-	sumTranslatableChars,
 } from "./markdown/segments";
 import {
 	emptyTranslationAttemptContext,
@@ -708,14 +707,17 @@ export class TranslatorService {
 			return this.translateMarkdownBodyLegacy(legacyBodyWorkFile, attemptContext);
 		}
 
-		const translatableSegments = filterTranslatableSegments(extraction.segments);
+		const translatableSegments = filterTranslatableSegments(extraction.segments, true);
 
 		if (translatableSegments.length === 0) {
 			this.currentTranslationPath = "segment-noop";
 			return segmentBodyWorkFile.content;
 		}
 
-		const translatableCharCount = sumTranslatableChars(extraction.segments);
+		const translatableCharCount = translatableSegments.reduce(
+			(total, segment) => total + segment.sourceText.length,
+			0,
+		);
 		segmentBodyWorkFile.logger.debug(
 			{
 				path: segmentBodyWorkFile.path,
@@ -797,7 +799,7 @@ export class TranslatorService {
 	 * Translates body prose segments in token-budgeted batches and reinserts by source offsets.
 	 *
 	 * @param file Work file whose `content` is the markdown body
-	 * @param translatableSegments Translate-kind segments to send to the LLM
+	 * @param translatableSegments Translate- and policy-kind segments to send to the LLM
 	 * @param extraction Full body extraction including policy segments for reinsert ordering
 	 * @param attemptContext Maintainer feedback for the system prompt, when present
 	 *

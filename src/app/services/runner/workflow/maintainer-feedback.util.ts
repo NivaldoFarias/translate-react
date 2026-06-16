@@ -111,16 +111,9 @@ export function getMaintainerFeedbackSnapshot(
 	runnerCommitAt: Date | undefined,
 ): MaintainerFeedbackSnapshot {
 	const feedbackReviews = getUnresolvedChangesRequestedReviews(reviews, runnerCommitAt);
-	const bodies = feedbackReviews
-		.map((review) => review.body)
-		.filter((body) => body.trim().length > 0);
-	const authorLogins = [
-		...new Set(
-			feedbackReviews
-				.filter((review) => review.body.trim().length > 0)
-				.map((review) => review.login),
-		),
-	];
+	const reviewsWithBody = feedbackReviews.filter((review) => (review.body ?? "").trim().length > 0);
+	const bodies = reviewsWithBody.map((review) => review.body ?? "");
+	const authorLogins = [...new Set(reviewsWithBody.map((review) => review.login))];
 
 	return { bodies, authorLogins };
 }

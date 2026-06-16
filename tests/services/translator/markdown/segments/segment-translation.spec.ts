@@ -104,6 +104,16 @@ describe("segment translation utilities", () => {
 		expect(parseWarnings.some((warning) => warning.startsWith("parse failed:"))).toBe(true);
 	});
 
+	test("filterTranslatableSegments includes policy segments when requested", () => {
+		const { rest: body } = splitLeadingYamlFrontmatter(loadSegmentFixture("S5"));
+		const { segments } = extractTranslatableBodySegments(body);
+		const policyOnly = segments.filter((segment) => segment.kind === "policy");
+		const translatable = filterTranslatableSegments(segments, true);
+
+		expect(policyOnly.length).toBeGreaterThan(0);
+		expect(translatable.some((segment) => segment.kind === "policy")).toBe(true);
+	});
+
 	test("reinsert with mock translations preserves fenced code from S1 body", () => {
 		const { rest: body } = splitLeadingYamlFrontmatter(loadSegmentFixture("S1"));
 		const { segments } = extractTranslatableBodySegments(body);

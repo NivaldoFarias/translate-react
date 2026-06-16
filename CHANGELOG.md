@@ -8,7 +8,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Added
 
-- AST segment translation as the default markdown body path: prose mdast segments and link labels are batched via structured `segmentBatch` LLM calls with offset reinsert; parse failures or batch errors fall back to full-body translation.
+- AST segment translation as the default markdown body path: prose mdast segments, link labels, and `policy` segments (fence comments and MDX string attributes) are batched via structured `segmentBatch` LLM calls with offset reinsert; parse failures or batch errors fall back to full-body translation.
 - `translator-segment-batch.schema.ts`, `callLanguageModelSegmentBatch`, and `segmentBatch` system prompt kind on `TranslationLlmClient`.
 - Segment helpers: `segment-translation.util.ts` (eligibility), `segment-batch.util.ts` (token-aware packing and batch split on truncation).
 - `@react-docs-fixtures/*` path alias and `tests/fixtures/react-docs-fixtures.ts` barrel for react.dev markdown fixtures imported as UTF-8 text.
@@ -19,7 +19,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 ### Changed
 
 - CI runs `bun run test:coverage`; `bunfig.toml` excludes test files and CLI entrypoints from coverage totals.
-- Maintainer remediation triggers on unresolved **`CHANGES_REQUESTED`** pull request reviews (members, owners, collaborators, and contributors) submitted after the latest runner commit; PR conversation comments no longer invalidate open PRs.
+- Maintainer remediation triggers on unresolved **`CHANGES_REQUESTED`** pull request reviews (members, owners, collaborators, and contributors) submitted after the latest runner commit; PR conversation comments no longer invalidate open PRs. Null review bodies from the API are treated as empty instead of aborting the run.
 - Segment batch failures split the batch or retry segments individually before full-body fallback; mismatch and truncation logs include id diagnostics and token context.
 - remark/mdast stack promoted from devDependencies to runtime dependencies.
 - Translation PR bodies: human-review notice as the opening paragraph; maintainer wiki link in a `[!TIP]` callout; advisory warnings grouped by validator in `<details>` with per-violation diff blocks and fenced-code line ranges.

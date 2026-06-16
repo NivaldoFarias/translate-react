@@ -150,8 +150,8 @@ export interface PullRequestReviewSnapshot {
 	/** When the review was submitted */
 	readonly submittedAt: Date;
 
-	/** Review body markdown */
-	readonly body: string;
+	/** Review body markdown; GitHub may return null for reviews without a summary */
+	readonly body: string | null;
 }
 
 /** Normalized pull request issue comment snapshot */
