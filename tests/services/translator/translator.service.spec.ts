@@ -368,7 +368,7 @@ describe("TranslatorService", () => {
 				mockChatCompletionsCreate.mockResolvedValue(createChatCompletionFixture());
 			});
 
-			test("does not send fenced block body text in segment batch payloads when masking is off", async () => {
+			test("sends fence comments but not fenced code bodies in segment batch payloads when masking is off", async () => {
 				const inner =
 					'// "what" to animate.\n<ViewTransition>\n\t<div>animate me</div>\n</ViewTransition>\n';
 				const markdown =
@@ -378,6 +378,7 @@ describe("TranslatorService", () => {
 					"Title": "Título",
 					"Section": "Seção",
 					"To opt-in, wrap it.": "Para optar, envolva.",
+					'// "what" to animate.': "// o que animar.",
 					"After": "Depois.",
 				});
 
@@ -387,7 +388,7 @@ describe("TranslatorService", () => {
 				const segmentSources = collectSegmentBatchSources().join("\n");
 
 				expect(segmentSources).toContain("To opt-in, wrap it.");
-				expect(segmentSources).not.toContain('// "what" to animate.');
+				expect(segmentSources).toContain('// "what" to animate.');
 				expect(segmentSources).not.toContain("animate me");
 			});
 
@@ -475,7 +476,7 @@ describe("TranslatorService", () => {
 				expect(usedMarkdownDocument).toBe(false);
 			});
 
-			test("when masking is on but the threshold is very high, small fenced bodies still stay out of segment batches", async () => {
+			test("when masking is on but the threshold is very high, small fenced comments still reach segment batches", async () => {
 				testEnv.MASK_VERBATIM_LARGE_FENCES = true;
 				testEnv.MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS = 50_000;
 
@@ -483,7 +484,8 @@ describe("TranslatorService", () => {
 				const markdown = "# Title\n\n```js\n" + inner + "```\n";
 
 				mockSegmentAwareTranslation({
-					Title: "Título",
+					"Title": "Título",
+					'// "what" to animate.': "// o que animar.",
 				});
 
 				const file = createTranslationFileFixture({ content: markdown });
@@ -491,7 +493,7 @@ describe("TranslatorService", () => {
 
 				const segmentSources = collectSegmentBatchSources().join("\n");
 
-				expect(segmentSources).not.toContain('// "what" to animate.');
+				expect(segmentSources).toContain('// "what" to animate.');
 				expect(segmentSources).not.toContain("animate me");
 			});
 		});
