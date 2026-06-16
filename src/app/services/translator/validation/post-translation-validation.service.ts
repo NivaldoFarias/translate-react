@@ -99,6 +99,27 @@ export class PostTranslationValidationService {
 		const { blocking } = partitionPostTranslationValidationIssues(issues);
 		const failingIssues = blocking.length > 0 ? blocking : issues;
 		const summary = failingIssues.map((issue) => issue.message).join("; ");
+		const contentRatio =
+			file.content.length > 0 ?
+				(translatedContent.length / file.content.length).toFixed(2)
+			:	"unknown";
+
+		if (blocking.length > 0) {
+			file.logger.error(
+				{
+					blockingGuardIds: blocking.map((issue) => issue.guardId),
+					contentRatio,
+					originalLength: file.content.length,
+					translatedLength: translatedContent.length,
+					validationIssues: blocking.map(({ guardId, message, retryHint }) => ({
+						guardId,
+						message,
+						retryHint,
+					})),
+				},
+				"Post-translation blocking guards failed",
+			);
+		}
 
 		return new ApplicationError(
 			summary,

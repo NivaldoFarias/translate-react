@@ -11,41 +11,29 @@ export {
 	sliceAbsoluteSpan,
 } from "./mdast-segment.util";
 export {
-	compareCommentExtractionMethods,
 	collectTypeScriptCommentSpans,
 	extractFenceCommentSegments,
 	isJsLikeFenceLang,
 } from "./fence-comments.util";
 export {
-	extractSegments,
+	extractTranslatableBodySegments,
 	filterTranslatableSegments,
 	sumTranslatableChars,
 } from "./extract-segments.util";
 export {
-	analyzeFixture,
-	simulateBadFullBodyTranslation,
-	simulateGuardOutcomes,
-	simulateSegmentOnlyTranslation,
-} from "./guard-simulation.util";
-export { SEGMENT_INTEGRATION_ANALYSIS } from "./integration-analysis.util";
-export { parseMdxToMdast, SEGMENT_SPIKE_TOOLING_NOTE } from "./parse-mdx.util";
+	estimateSegmentBatchRequestTokens,
+	packSegmentsIntoBatches,
+	splitSegmentBatchInHalf,
+} from "./segment-batch.util";
+export type { SegmentBatchRequestItem } from "@/app/services/translator/translator-segment-batch.schema";
 export {
-	identityRoundTrip,
-	mockTranslateSegments,
-	normalizeNewlines,
-	reinsertSegments,
-} from "./reinsert-segments.util";
-export {
-	formatCorpusTable,
-	loadSpikeFixture,
-	runSpikeCorpus,
-	SPIKE_FIXTURE_REGISTRY,
-} from "./spike-corpus.util";
-export { buildSpikeWriteupComment } from "./spike-writeup.util";
-export { evaluateToolingOnFixture } from "./tooling-eval.util";
+	computeTranslatableCharRatio,
+	isSegmentTranslationEligible,
+} from "./segment-translation.util";
+export { parseMdxToMdast } from "./parse-mdx.util";
+export { reinsertSegments } from "./reinsert-segments.util";
 export type {
-	FixtureCorpusMetrics,
-	GuardSimulationRow,
+	BodySegmentExtractionResult,
 	SegmentContext,
 	SegmentExtractionResult,
 	SegmentKind,

@@ -112,7 +112,7 @@ describe("TranslationBatchManager", () => {
 			expect(github.createPullRequest).toHaveBeenCalled();
 		});
 
-		test("runs full re-translation when maintainer left feedback after the runner commit", async () => {
+		test("runs full re-translation when a CHANGES_REQUESTED review follows the runner commit", async () => {
 			const github = createMockGitHubService();
 			const translator = createMockTranslatorService();
 			const languageDetector = createMockLanguageDetectorService();
@@ -136,12 +136,13 @@ describe("TranslationBatchManager", () => {
 			github.getLatestTranslationCommitTimestamp.mockResolvedValue(
 				new Date("2026-06-03T10:00:00Z") as never,
 			);
-			github.listPullRequestIssueComments.mockResolvedValue([
+			github.listPullRequestReviews.mockResolvedValue([
 				{
 					login: "jhonmike",
 					authorAssociation: "MEMBER",
 					userType: "User",
-					createdAt: new Date("2026-06-03T12:00:00Z"),
+					state: "CHANGES_REQUESTED",
+					submittedAt: new Date("2026-06-03T12:00:00Z"),
 					body: diffComment,
 				},
 			] as never);
@@ -181,7 +182,7 @@ describe("TranslationBatchManager", () => {
 			expect(github.createPullRequest).not.toHaveBeenCalled();
 			expect(github.updatePullRequestBody).toHaveBeenCalledWith(
 				existingPR.number,
-				expect.stringContaining("Brazilian Portuguese"),
+				expect.stringMatching(/requer revisão humana[\s\S]*\[!TIP\]/),
 			);
 			expect(results.get(file.filename)?.pullRequest).toEqual(existingPR);
 		});
@@ -210,12 +211,13 @@ describe("TranslationBatchManager", () => {
 			github.getLatestTranslationCommitTimestamp.mockResolvedValue(
 				new Date("2026-06-03T10:00:00Z") as never,
 			);
-			github.listPullRequestIssueComments.mockResolvedValue([
+			github.listPullRequestReviews.mockResolvedValue([
 				{
 					login: "jhonmike",
 					authorAssociation: "MEMBER",
 					userType: "User",
-					createdAt: new Date("2026-06-03T12:00:00Z"),
+					state: "CHANGES_REQUESTED",
+					submittedAt: new Date("2026-06-03T12:00:00Z"),
 					body: "Please review the heading case in this file.",
 				},
 			] as never);
@@ -249,7 +251,7 @@ describe("TranslationBatchManager", () => {
 			expect(github.createPullRequest).not.toHaveBeenCalled();
 			expect(github.updatePullRequestBody).toHaveBeenCalledWith(
 				existingPR.number,
-				expect.stringContaining("Brazilian Portuguese"),
+				expect.stringMatching(/requer revisão humana[\s\S]*\[!TIP\]/),
 			);
 			expect(results.get(file.filename)?.pullRequest).toEqual(existingPR);
 			expect(results.get(file.filename)?.pullRequestProgress).toBe(

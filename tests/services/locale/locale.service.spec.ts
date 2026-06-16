@@ -204,15 +204,7 @@ describe("ptBrLocale.pullRequest.body", () => {
 	});
 
 	describe("PR body structure", () => {
-		test("should include language name in PR body", () => {
-			const metadata = createPullRequestDescriptionMetadata();
-
-			const body = buildPullRequestBody(file, processingResult, metadata);
-
-			expect(body).toContain("Português (Brasil)");
-		});
-
-		test("should not include collapsible details or operator metadata", () => {
+		test("should not include collapsible details when there are no reviewer notices", () => {
 			const body = buildPullRequestBody(
 				file,
 				processingResult,
@@ -225,15 +217,19 @@ describe("ptBrLocale.pullRequest.body", () => {
 			expect(body).not.toContain("Versão do translate-react");
 		});
 
-		test("should include human review notice", () => {
+		test("should include human review notice and maintainer wiki tip", () => {
 			const metadata = createPullRequestDescriptionMetadata();
 
 			const body = buildPullRequestBody(file, processingResult, metadata);
 
 			expect(body).toContain("requer revisão humana");
+			expect(body).toContain("> [!TIP]");
+			expect(body).toContain(WIKI_FOR_REACT_DOCS_MAINTAINERS_URL);
+			expect(body).not.toContain("> [!IMPORTANT]");
+			expect(body).not.toContain("Este PR contém");
 		});
 
-		test("should render WARNING table with retry hints when reviewer notices exist", () => {
+		test("should render validation intro and grouped details when reviewer notices exist", () => {
 			const metadata = createPullRequestDescriptionMetadata({
 				reviewerNotices: [
 					{
@@ -245,22 +241,49 @@ describe("ptBrLocale.pullRequest.body", () => {
 
 			const body = buildPullRequestBody(file, processingResult, metadata);
 
-			expect(body).toContain("> [!WARNING]");
-			expect(body).toContain("`markdownLinksPreserved`");
-			expect(body).toContain("Preserve every `[label](url)` from the source.");
-			expect(body).toContain("| Validador | O que corrigir |");
+			expect(body).toContain("A validação automática detectou problemas mecânicos");
+			expect(body).not.toContain("> [!WARNING]");
+			expect(body).toContain("> [!TIP]");
+			expect(body).toContain(WIKI_FOR_REACT_DOCS_MAINTAINERS_URL);
+			expect(body).toContain("<details>");
+			expect(body).toContain("Ver detalhes da validação");
+			expect(body).toContain("### Links markdown");
+			expect(body).toContain("##### `markdownLinksPreserved`");
+			expect(body).not.toContain("| Validador | O que corrigir |");
+			expect(body).not.toContain("Guia para revisores:");
 			expect(body).not.toContain("Tentativas de Validação");
 		});
 
-		test("should link to the maintainer wiki guide", () => {
-			const body = buildPullRequestBody(
-				file,
-				processingResult,
-				createPullRequestDescriptionMetadata(),
+		test("should format JSX fence violations as diff blocks when source and translation are available", () => {
+			const sourceFile = new TranslationFile(
+				["# Demo", "", "```js", "return <div>animate me</div>;", "```"].join("\n"),
+				"demo.md",
+				"src/content/demo.md",
+				"sha-demo",
 			);
+			const translated = sourceFile.content.replace("<div>animate me</div>", "<div>anime-me</div>");
+			const result = {
+				...processingResult,
+				translation: translated,
+			};
+			const metadata = createPullRequestDescriptionMetadata({
+				reviewerNotices: [
+					{
+						guardId: "fenceJsxStaticText",
+						hint: 'Inside fenced code blocks, do not translate JSX text between tags or demo UI string literals used in examples. Copy static JSX text exactly from the source in English. fence 1: keep JSX text "<div>animate me" (changed to "<div>anime-me")',
+					},
+				],
+			});
 
-			expect(body).toContain(WIKI_FOR_REACT_DOCS_MAINTAINERS_URL);
-			expect(body).not.toContain("> [!TIP]");
+			const body = buildPullRequestBody(sourceFile, result, metadata);
+
+			expect(body).toContain("### Texto JSX estático em blocos de código");
+			expect(body).toContain("##### `fenceJsxStaticText`");
+			expect(body).toContain("###### 1. linha");
+			expect(body).toContain("```diff");
+			expect(body).toContain("- animate me");
+			expect(body).toContain("+ anime-me");
+			expect(body).not.toContain("\\n");
 		});
 	});
 });
@@ -317,17 +340,7 @@ describe("ruLocale.pullRequest.body", () => {
 	});
 
 	describe("PR body structure", () => {
-		test("should include language name in PR body", () => {
-			const metadata = createPullRequestDescriptionMetadata({
-				languageName: "Русский",
-			});
-
-			const body = buildPullRequestBody(file, processingResult, metadata);
-
-			expect(body).toContain("Русский");
-		});
-
-		test("should include human review notice in Russian", () => {
+		test("should include human review notice and maintainer wiki tip in Russian", () => {
 			const metadata = createPullRequestDescriptionMetadata({
 				languageName: "Русский",
 			});
@@ -335,6 +348,9 @@ describe("ruLocale.pullRequest.body", () => {
 			const body = buildPullRequestBody(file, processingResult, metadata);
 
 			expect(body).toContain("требует проверки человеком");
+			expect(body).toContain("> [!TIP]");
+			expect(body).not.toContain("> [!IMPORTANT]");
+			expect(body).not.toContain("Этот PR содержит");
 		});
 
 		test("should not include removed stats or tech sections", () => {
@@ -346,7 +362,6 @@ describe("ruLocale.pullRequest.body", () => {
 
 			expect(body).not.toContain("Статистика обработки");
 			expect(body).not.toContain("Техническая информация");
-			expect(body).not.toContain("<details>");
 		});
 	});
 });

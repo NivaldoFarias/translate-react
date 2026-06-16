@@ -10,6 +10,7 @@ import type {
 	PatchedRepositoryTreeItem,
 	ProcessedFileResult,
 	PullRequestIssueCommentSnapshot,
+	PullRequestReviewSnapshot,
 	PullRequestStatus,
 	RepositoryMarkdownBlob,
 	TranslationProgressFileRef,
@@ -692,6 +693,41 @@ export class GitHubContent {
 			createdAt: new Date(comment.created_at),
 			body: comment.body ?? "",
 		}));
+	}
+
+	/**
+	 * Lists submitted pull request reviews on an open translation pull request (upstream repo).
+	 *
+	 * @param prNumber Pull request number on the upstream repository
+	 *
+	 * @returns Normalized reviews, oldest first
+	 */
+	public async listPullRequestReviews(prNumber: number): Promise<PullRequestReviewSnapshot[]> {
+		const reviews = await this.deps.octokit.paginate(
+			"GET /repos/{owner}/{repo}/pulls/{pull_number}/reviews",
+			{
+				...this.deps.repositories.upstream,
+				pull_number: prNumber,
+				per_page: 100,
+			},
+		);
+
+		return reviews.flatMap((review) => {
+			if (!review.submitted_at) {
+				return [];
+			}
+
+			return [
+				{
+					login: review.user?.login ?? "",
+					authorAssociation: review.author_association,
+					userType: review.user?.type ?? "User",
+					state: review.state as PullRequestReviewSnapshot["state"],
+					submittedAt: new Date(review.submitted_at),
+					body: review.body,
+				},
+			];
+		});
 	}
 
 	/**

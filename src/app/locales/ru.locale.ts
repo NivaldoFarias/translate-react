@@ -11,8 +11,8 @@ import { createPRBodyBuilder } from "./pr-body.builder";
  * following the data-driven approach for locale definitions.
  */
 const ruPRBodyStrings: LocalePRBodyStrings = {
-	intro: (languageName) =>
-		`Этот PR содержит автоматический перевод указанной страницы на **${languageName}**.`,
+	humanReviewNotice:
+		"Этот перевод был создан с использованием LLM и **требует проверки человеком** для обеспечения точности, культурного контекста и технической терминологии.",
 
 	conflictNotice: {
 		title: "Предыдущий PR закрыт",
@@ -20,20 +20,27 @@ const ruPRBodyStrings: LocalePRBodyStrings = {
 			`PR #${prNumber} закрыт автоматически из-за конфликта с основной веткой. Перевод сделан заново по текущему исходному файлу, без ручного разрешения конфликтов из предыдущего PR.`,
 	},
 
-	humanReviewNotice:
-		"Этот перевод был создан с использованием LLM и **требует проверки человеком** для обеспечения точности, культурного контекста и технической терминологии.",
+	maintainerWikiTip: (wikiUrl) =>
+		`См. [For React Docs Maintainers](${wikiUrl}) — руководство для ревьюеров и формат структурированного feedback.`,
 
 	reviewerWarnings: {
 		intro:
 			"Автоматическая проверка обнаружила механические проблемы, которые нужно исправить вручную перед merge:",
-		columns: {
-			guardColumn: "Валидатор",
-			whatToFixColumn: "Что исправить",
-		},
-	},
+		detailsSummary: "Показать детали проверки",
+		guardLabel: (guardId) => {
+			const labels: Record<string, string> = {
+				markdownLinksPreserved: "Markdown-ссылки",
+				fenceFunctionIdentifiers: "Идентификаторы функций в блоках кода",
+				fenceJsxStaticText: "Статический JSX-текст в блоках кода",
+				headingsPreserved: "Заголовки",
+				frontmatterPreserved: "YAML frontmatter",
+			};
 
-	maintainerGuide: (wikiUrl) =>
-		`Руководство для ревьюеров: [For React Docs Maintainers](${wikiUrl}).`,
+			return labels[guardId] ?? guardId;
+		},
+		violationLocation: (startLine, endLine) =>
+			startLine === endLine ? `строка ${startLine}` : `строки ${startLine}–${endLine}`,
+	},
 };
 
 /**

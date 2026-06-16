@@ -40,7 +40,7 @@ export function classifyNode(node: Node, ancestors: readonly Node[]): SegmentKin
 }
 
 /**
- * One-line inventory rule for spike fixture tables.
+ * One-line inventory rule describing how a node is classified.
  *
  * @param node Current mdast node
  * @param insidePreserveAncestor Whether inside a frozen subtree
