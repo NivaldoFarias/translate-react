@@ -16,6 +16,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Changed
 
+- Maintainer remediation triggers on unresolved **`CHANGES_REQUESTED`** pull request reviews (members, owners, collaborators, and contributors) submitted after the latest runner commit; PR conversation comments no longer invalidate open PRs.
 - Segment batch failures split the batch or retry segments individually before full-body fallback; mismatch and truncation logs include id diagnostics and token context.
 - remark/mdast stack promoted from devDependencies to runtime dependencies.
 - Translation PR bodies: human-review notice as the opening paragraph; maintainer wiki link in a `[!TIP]` callout; advisory warnings grouped by validator in `<details>` with per-violation diff blocks and fenced-code line ranges.

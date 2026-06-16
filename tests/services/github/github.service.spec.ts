@@ -880,6 +880,37 @@ describe("GitHubService", () => {
 			});
 		});
 
+		describe("listPullRequestReviews", () => {
+			test("should return normalized pull request reviews", async () => {
+				octokitMock.paginate.mockResolvedValueOnce([
+					{
+						user: { login: "maintainer", type: "User" },
+						author_association: "MEMBER",
+						state: "CHANGES_REQUESTED",
+						submitted_at: "2026-06-01T12:00:00Z",
+						body: "Please fix the heading.",
+					},
+				]);
+
+				const reviews = await githubService.listPullRequestReviews(42);
+
+				expect(reviews).toEqual([
+					{
+						login: "maintainer",
+						authorAssociation: "MEMBER",
+						userType: "User",
+						state: "CHANGES_REQUESTED",
+						submittedAt: new Date("2026-06-01T12:00:00Z"),
+						body: "Please fix the heading.",
+					},
+				]);
+				expect(octokitMock.paginate).toHaveBeenCalledWith(
+					"GET /repos/{owner}/{repo}/pulls/{pull_number}/reviews",
+					{ ...testRepositories.upstream, pull_number: 42, per_page: 100 },
+				);
+			});
+		});
+
 		describe("findPullRequestByBranch", () => {
 			test("should return PR when branch matches", async () => {
 				octokitMock.pulls.list.mockResolvedValueOnce({

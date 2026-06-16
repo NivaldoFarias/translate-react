@@ -125,7 +125,36 @@ export interface PatchedRepositoryTreeItem extends SetRequired<RepositoryTreeIte
 	filename: string;
 }
 
-/** Normalized pull request issue comment for maintainer-feedback detection */
+/** GitHub pull request review state returned by the REST reviews API */
+export type PullRequestReviewState =
+	| "APPROVED"
+	| "CHANGES_REQUESTED"
+	| "COMMENTED"
+	| "DISMISSED"
+	| "PENDING";
+
+/** Normalized pull request review for maintainer-feedback detection */
+export interface PullRequestReviewSnapshot {
+	/** GitHub login of the review author */
+	readonly login: string;
+
+	/** GitHub `author_association` for the review */
+	readonly authorAssociation: string;
+
+	/** GitHub user `type` (`User`, `Bot`, etc.) */
+	readonly userType: string;
+
+	/** Review outcome */
+	readonly state: PullRequestReviewState;
+
+	/** When the review was submitted */
+	readonly submittedAt: Date;
+
+	/** Review body markdown */
+	readonly body: string;
+}
+
+/** Normalized pull request issue comment snapshot */
 export interface PullRequestIssueCommentSnapshot {
 	/** GitHub login of the comment author */
 	readonly login: string;
