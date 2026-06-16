@@ -133,16 +133,22 @@ export type PullRequestReviewState =
 	| "DISMISSED"
 	| "PENDING";
 
-/** Normalized pull request review for maintainer-feedback detection */
-export interface PullRequestReviewSnapshot {
-	/** GitHub login of the review author */
+/** Author fields shared by pull request reviews and inline review comments */
+export interface ReviewerFeedbackAuthorSnapshot {
+	/** GitHub login of the review or comment author */
 	readonly login: string;
 
-	/** GitHub `author_association` for the review */
+	/** GitHub `author_association` for the review or comment */
 	readonly authorAssociation: string;
 
 	/** GitHub user `type` (`User`, `Bot`, etc.) */
 	readonly userType: string;
+}
+
+/** Normalized pull request review for maintainer-feedback detection */
+export interface PullRequestReviewSnapshot extends ReviewerFeedbackAuthorSnapshot {
+	/** GitHub review id */
+	readonly id: number;
 
 	/** Review outcome */
 	readonly state: PullRequestReviewState;
@@ -152,6 +158,18 @@ export interface PullRequestReviewSnapshot {
 
 	/** Review body markdown; GitHub may return null for reviews without a summary */
 	readonly body: string | null;
+}
+
+/** Normalized inline pull request review comment for maintainer-feedback remediation */
+export interface PullRequestReviewCommentSnapshot extends ReviewerFeedbackAuthorSnapshot {
+	/** When the inline comment was created */
+	readonly createdAt: Date;
+
+	/** Inline comment body markdown */
+	readonly body: string;
+
+	/** Parent review id when the comment was submitted with a review */
+	readonly pullRequestReviewId: number | null;
 }
 
 /** Normalized pull request issue comment snapshot */

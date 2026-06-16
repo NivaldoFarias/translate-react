@@ -136,6 +136,7 @@ describe("TranslationPullRequestValidityManager", () => {
 		);
 		github.listPullRequestReviews.mockResolvedValue([
 			{
+				id: 42,
 				login: "jhonmike",
 				authorAssociation: "MEMBER",
 				userType: "User",

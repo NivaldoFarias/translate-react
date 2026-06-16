@@ -123,6 +123,7 @@ export function createMockGitHubService() {
 		),
 		listPullRequestIssueComments: mock(() => Promise.resolve([])),
 		listPullRequestReviews: mock(() => Promise.resolve([])),
+		listPullRequestReviewComments: mock(() => Promise.resolve([])),
 		getLatestTranslationCommitTimestamp: mock(() => Promise.resolve(undefined)),
 		commentCompiledResultsOnIssue: mock(() => Promise.resolve({ id: 1 })),
 	};

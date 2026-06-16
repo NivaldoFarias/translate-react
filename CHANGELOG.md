@@ -19,7 +19,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 ### Changed
 
 - CI runs `bun run test:coverage`; `bunfig.toml` excludes test files and CLI entrypoints from coverage totals.
-- Maintainer remediation triggers on unresolved **`CHANGES_REQUESTED`** pull request reviews (members, owners, collaborators, and contributors) submitted after the latest runner commit; PR conversation comments no longer invalidate open PRs. Null review bodies from the API are treated as empty instead of aborting the run.
+- Maintainer remediation triggers on unresolved **`CHANGES_REQUESTED`** pull request reviews (members, owners, collaborators, and contributors) submitted after the latest runner commit; PR conversation comments no longer invalidate open PRs. Review summaries and inline review comments from those reviews feed the remediation prompt; null review bodies from the API are treated as empty instead of aborting the run.
 - Segment batch failures split the batch or retry segments individually before full-body fallback; mismatch and truncation logs include id diagnostics and token context.
 - remark/mdast stack promoted from devDependencies to runtime dependencies.
 - Translation PR bodies: human-review notice as the opening paragraph; maintainer wiki link in a `[!TIP]` callout; advisory warnings grouped by validator in `<details>` with per-violation diff blocks and fenced-code line ranges.

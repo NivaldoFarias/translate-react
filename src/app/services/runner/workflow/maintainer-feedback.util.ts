@@ -1,4 +1,8 @@
-import type { PullRequestReviewSnapshot } from "@/app/services/github/types";
+import type {
+	PullRequestReviewCommentSnapshot,
+	PullRequestReviewSnapshot,
+	ReviewerFeedbackAuthorSnapshot,
+} from "@/app/services/github/types";
 
 import {
 	IGNORED_MAINTAINER_FEEDBACK_LOGINS,
@@ -8,7 +12,7 @@ import {
 
 /** Maintainer reviews that triggered a remediation re-translation */
 export interface MaintainerFeedbackSnapshot {
-	/** Review bodies, oldest first, for the translation prompt */
+	/** Review summary and inline comment bodies, oldest first, for the translation prompt */
 	readonly bodies: readonly string[];
 
 	/** Unique reviewer logins in review order */
@@ -18,20 +22,20 @@ export interface MaintainerFeedbackSnapshot {
 /**
  * Whether a pull request review author may trigger remediation feedback.
  *
- * @param review Normalized pull request review
+ * @param author Normalized pull request review or inline review comment author
  *
  * @returns `true` for repository members, collaborators, and contributors, excluding known bots
  */
-export function isReviewerFeedbackAuthor(review: PullRequestReviewSnapshot): boolean {
-	if (review.userType === "Bot") {
+export function isReviewerFeedbackAuthor(author: ReviewerFeedbackAuthorSnapshot): boolean {
+	if (author.userType === "Bot") {
 		return false;
 	}
 
-	if (IGNORED_MAINTAINER_FEEDBACK_LOGINS.has(review.login)) {
+	if (IGNORED_MAINTAINER_FEEDBACK_LOGINS.has(author.login)) {
 		return false;
 	}
 
-	return REVIEWER_FEEDBACK_ASSOCIATIONS.has(review.authorAssociation);
+	return REVIEWER_FEEDBACK_ASSOCIATIONS.has(author.authorAssociation);
 }
 
 /**
@@ -103,19 +107,71 @@ export function hasUnresolvedChangesRequestedReview(
  *
  * @param reviews Pull request reviews on the translation pull request
  * @param runnerCommitAt Timestamp of the latest `docs: translate` commit on the branch
+ * @param reviewComments Inline pull request review comments on the translation pull request
  *
  * @returns Snapshot for the translation prompt and commit attribution, or empty when none
  */
 export function getMaintainerFeedbackSnapshot(
 	reviews: readonly PullRequestReviewSnapshot[],
 	runnerCommitAt: Date | undefined,
+	reviewComments: readonly PullRequestReviewCommentSnapshot[] = [],
 ): MaintainerFeedbackSnapshot {
 	const feedbackReviews = getUnresolvedChangesRequestedReviews(reviews, runnerCommitAt);
-	const reviewsWithBody = feedbackReviews.filter((review) => (review.body ?? "").trim().length > 0);
-	const bodies = reviewsWithBody.map((review) => review.body ?? "");
-	const authorLogins = [...new Set(reviewsWithBody.map((review) => review.login))];
+	const feedback: RemediationFeedbackScope = {
+		reviewIds: new Set(feedbackReviews.map((review) => review.id)),
+		authorLogins: new Set(feedbackReviews.map((review) => review.login)),
+	};
+
+	const reviewBodies = feedbackReviews
+		.filter((review) => (review.body ?? "").trim().length > 0)
+		.map((review) => (review.body ?? "").trim());
+
+	const inlineBodies = reviewComments
+		.filter((comment) => isInlineReviewCommentForRemediation(comment, runnerCommitAt, feedback))
+		.map((comment) => comment.body.trim());
+
+	const bodies = [...reviewBodies, ...inlineBodies];
+	const authorLogins = [...new Set(feedbackReviews.map((review) => review.login))];
 
 	return { bodies, authorLogins };
+}
+
+/** Unresolved `CHANGES_REQUESTED` reviews that scope inline comment inclusion */
+interface RemediationFeedbackScope {
+	/** Review ids submitted after the latest runner commit */
+	readonly reviewIds: ReadonlySet<number>;
+
+	/** Author logins for those unresolved reviews */
+	readonly authorLogins: ReadonlySet<string>;
+}
+
+/**
+ * Whether an inline review comment should feed maintainer remediation feedback.
+ *
+ * @param comment Normalized inline pull request review comment
+ * @param runnerCommitAt Timestamp of the latest `docs: translate` commit, if any
+ * @param feedback Unresolved `CHANGES_REQUESTED` review ids and author logins after that commit
+ *
+ * @returns `true` when the comment body should reach the remediation prompt
+ */
+function isInlineReviewCommentForRemediation(
+	comment: PullRequestReviewCommentSnapshot,
+	runnerCommitAt: Date | undefined,
+	feedback: RemediationFeedbackScope,
+) {
+	if (!runnerCommitAt || comment.createdAt <= runnerCommitAt) {
+		return false;
+	}
+
+	if (!isReviewerFeedbackAuthor(comment) || comment.body.trim().length === 0) {
+		return false;
+	}
+
+	if (comment.pullRequestReviewId !== null && feedback.reviewIds.has(comment.pullRequestReviewId)) {
+		return true;
+	}
+
+	return feedback.authorLogins.has(comment.login);
 }
 
 /**
