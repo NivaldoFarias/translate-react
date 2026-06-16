@@ -4,6 +4,36 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+## [0.2.8] - 2026-06-16
+
+### Added
+
+- AST segment translation as the default markdown body path: prose mdast segments, link labels, and `policy` segments (fence comments and MDX string attributes) are batched via structured `segmentBatch` LLM calls with offset reinsert; parse failures or batch errors fall back to full-body translation.
+- `translator-segment-batch.schema.ts`, `callLanguageModelSegmentBatch`, and `segmentBatch` system prompt kind on `TranslationLlmClient`.
+- Segment helpers: `segment-translation.util.ts` (eligibility), `segment-batch.util.ts` (token-aware packing and batch split on truncation).
+- `@react-docs-fixtures/*` path alias and `tests/fixtures/react-docs-fixtures.ts` barrel for react.dev markdown fixtures imported as UTF-8 text.
+- Opaque `sN` keys in segment-batch LLM payloads (`segment-batch-opaque-id.util.ts`); mdast paths are remapped before reinsert.
+- Partial follow-up for drop-only segment batch failures (retry missing ids only, up to 3 rounds).
+- `SEGMENT_BATCH_MAX_ITEMS_PER_BATCH` (55) cap in `packSegmentsIntoBatches`.
+
+### Changed
+
+- CI runs `bun run test:coverage`; `bunfig.toml` excludes test files and CLI entrypoints from coverage totals.
+- Maintainer remediation triggers on unresolved **`CHANGES_REQUESTED`** pull request reviews (members, owners, collaborators, and contributors) submitted after the latest runner commit; PR conversation comments no longer invalidate open PRs. Review summaries and inline review comments from those reviews feed the remediation prompt; null review bodies from the API are treated as empty instead of aborting the run.
+- Segment batch failures split the batch or retry segments individually before full-body fallback; mismatch and truncation logs include id diagnostics and token context.
+- remark/mdast stack promoted from devDependencies to runtime dependencies.
+- Translation PR bodies: human-review notice as the opening paragraph; maintainer wiki link in a `[!TIP]` callout; advisory warnings grouped by validator in `<details>` with per-violation diff blocks and fenced-code line ranges.
+- Verbatim fence masking applies only to the legacy full-body fallback path.
+- `@deprecated` JSDoc on legacy full-body APIs used only by fallback: `extractSegments`, `buildMarkdownDocumentSystemPrompt`, `translateWithChunking`.
+
+### Fixed
+
+- Segment extraction uses the unmasked document body so `MASK_VERBATIM_LARGE_FENCES` placeholders no longer force MDX-heavy pages onto the legacy path.
+
+### Removed
+
+- Spike-only segment modules (`spike-writeup`, `integration-analysis`, `tooling-eval`, corpus table utilities) and their production barrel exports.
+
 ## [0.2.7] - 2026-06-05
 
 ### Added
@@ -298,6 +328,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 - README `MAX_RETRY_ATTEMPTS` default matches `src/utils/constants.util.ts` (`3`).
 
+[0.2.8]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.8
 [0.2.7]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.7
 [0.2.6]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.6
 [0.2.5]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.5

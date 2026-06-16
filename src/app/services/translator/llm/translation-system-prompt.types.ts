@@ -11,7 +11,7 @@ export type ChunkTranslationProgress = Readonly<{
 /**
  * Selects which system prompt the translation LLM call uses.
  *
- * `markdownDocument` keeps chunking, verbatim-placeholder, and full doc rules. `frontmatterBatch`
- * uses one structured-output call for the YAML `description` string field when present.
+ * `segmentBatch` is the default for markdown body prose. `frontmatterBatch` handles YAML
+ * `description`. `markdownDocument` remains for the legacy full-body and chunked fallback path.
  */
-export type TranslationSystemPromptKind = "markdownDocument" | "frontmatterBatch";
+export type TranslationSystemPromptKind = "markdownDocument" | "frontmatterBatch" | "segmentBatch";

@@ -7,7 +7,6 @@
 <br />
 
 [![CI Status](https://github.com/NivaldoFarias/translate-react/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/NivaldoFarias/translate-react/actions/workflows/ci.yml)
-[![Latest release](https://img.shields.io/github/v/release/NivaldoFarias/translate-react?sort=semver)](https://github.com/NivaldoFarias/translate-react/releases)
 [![GitHub App](https://img.shields.io/badge/GitHub%20App-translate--react--bot-2ea44f?logo=github)](https://github.com/apps/translate-react-bot)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-db61a2?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/NivaldoFarias)
@@ -94,7 +93,7 @@ bun run dev
 bun start
 ```
 
-To exercise translation with real LLM calls and mocked GitHub, run the workflow integration tests (`tests/integration/workflow.integration.spec.ts`) with fixture markdown under `tests/fixtures/md/`. See [Local LLM exercise](https://github.com/NivaldoFarias/translate-react/wiki/Workflow#local-llm-exercise-integration-tests).
+To exercise translation with real LLM calls and mocked GitHub, run the workflow integration tests ([`workflow.integration.spec.ts`](./tests/integration/workflow.integration.spec.ts)) with fixture markdown under [`tests/fixtures/md/`](./tests/fixtures/md/). See [Local LLM exercise](https://github.com/NivaldoFarias/translate-react/wiki/Workflow#local-llm-exercise-integration-tests).
 
 ## Versioning and releases
 

@@ -122,6 +122,25 @@ export function isCompletionLengthTruncationError(error: unknown) {
 }
 
 /**
+ * Returns whether `error` is a segment batch id mismatch after LLM structured output validation.
+ *
+ * @param error Caught rejection from segment batch translation
+ *
+ * @returns `true` when requested and response segment ids do not match
+ */
+export function isSegmentBatchIdMismatchError(error: unknown) {
+	if (error instanceof ApplicationError && error.code === ErrorCode.TranslationFailed) {
+		return error.message === "Segment batch response ids do not match requested segments";
+	}
+
+	if (error instanceof AbortError) {
+		return isSegmentBatchIdMismatchError(error.originalError);
+	}
+
+	return false;
+}
+
+/**
  * Exhaustively checks wether the provided error is an uncast {@link RequestError}
  *
  * @param error The error to check

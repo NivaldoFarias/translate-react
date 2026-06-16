@@ -116,7 +116,7 @@ describe("TranslationPullRequestValidityManager", () => {
 		expect(result.invalidReason).toBe("not_translated");
 	});
 
-	test("returns needs_maintainer_fix when maintainer commented after the latest runner commit", async () => {
+	test("returns needs_maintainer_fix when a CHANGES_REQUESTED review follows the latest runner commit", async () => {
 		const github = createMockGitHubService();
 		const languageDetector = createMockLanguageDetectorService();
 
@@ -134,12 +134,14 @@ describe("TranslationPullRequestValidityManager", () => {
 		github.getLatestTranslationCommitTimestamp.mockResolvedValue(
 			new Date("2026-06-03T10:00:00Z") as never,
 		);
-		github.listPullRequestIssueComments.mockResolvedValue([
+		github.listPullRequestReviews.mockResolvedValue([
 			{
+				id: 42,
 				login: "jhonmike",
 				authorAssociation: "MEMBER",
 				userType: "User",
-				createdAt: new Date("2026-06-03T12:00:00Z"),
+				state: "CHANGES_REQUESTED",
+				submittedAt: new Date("2026-06-03T12:00:00Z"),
 				body: "Please fix the heading.",
 			},
 		] as never);

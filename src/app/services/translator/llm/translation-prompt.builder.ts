@@ -80,7 +80,18 @@ export class TranslationPromptBuilder {
 			return this.buildFrontmatterBatchSystemPrompt(languages, params.translationGuidelines);
 		}
 
-		return this.buildMarkdownDocumentSystemPrompt(params, languages);
+		if (systemPromptKind === "segmentBatch") {
+			return this.buildSegmentBatchSystemPrompt(
+				languages,
+				params.translationGuidelines,
+				params.attemptContext,
+			);
+		}
+
+		return (
+			// eslint-disable-next-line @typescript-eslint/no-deprecated -- legacy full-body fallback path
+			this.buildMarkdownDocumentSystemPrompt(params, languages)
+		);
 	}
 
 	/**
@@ -92,6 +103,8 @@ export class TranslationPromptBuilder {
 	 * @param languages.target Target language display name
 	 *
 	 * @returns The system prompt string
+	 *
+	 * @deprecated Legacy full-body and chunked fallback only; body prose uses {@link buildSegmentBatchSystemPrompt}.
 	 */
 	public buildMarkdownDocumentSystemPrompt(
 		params: BuildMarkdownDocumentPromptParams,
@@ -203,6 +216,59 @@ export class TranslationPromptBuilder {
 	
 				${this.locale.definitions.rules.specific}
 	
+				${termReferenceSection}
+				`;
+	}
+
+	/**
+	 * Builds the system prompt for batched prose segment translation with structured JSON output.
+	 *
+	 * @param languages Human-readable language names for the TASK section
+	 * @param languages.source Source language display name
+	 * @param languages.target Target language display name
+	 * @param translationGuidelines Optional glossary for terminology alignment
+	 * @param attemptContext Maintainer feedback for re-translations, when present
+	 *
+	 * @returns The system prompt string for the segment batch completion
+	 */
+	public buildSegmentBatchSystemPrompt(
+		languages: { source: string; target: string },
+		translationGuidelines: string | null,
+		attemptContext: TranslationAttemptContext,
+	) {
+		const termReferenceSection =
+			translationGuidelines ?
+				`
+				# TERM REFERENCE (DO NOT OUTPUT)
+				Use only for consistent terminology when translating each \`source\` string. Never copy, quote, translate, summarize, or repeat this reference in your reply JSON.
+
+				${translationGuidelines}
+				`
+			:	"";
+
+		const maintainerReviewSection = this.buildMaintainerReviewSection(attemptContext);
+
+		return `# ROLE
+				You are an expert technical translator for React documentation prose fragments.
+
+				# TASK
+				The user message is a JSON object with an \`items\` array. Each element has \`segmentId\` (a short opaque key such as \`s0\` or \`s12\`), \`source\` (English text to translate), and optional \`heading\` (nearest section heading for terminology context). Translate each \`source\` from ${languages.source} to ${languages.target}.
+
+				${maintainerReviewSection}
+
+				# OUTPUT (STRICT)
+				- Reply with JSON only, matching the response schema: an object \`items\` whose length equals the request, each item having \`segmentId\` (copy the input opaque key exactly, e.g. \`s0\`) and \`translated\` (the translated string only).
+				- Do not add markdown, code fences, or commentary outside the JSON object.
+				- Return plain translated prose for each \`source\`; do not wrap segments in headings or lists they did not already contain.
+
+				# RULES
+				- Translate only natural language in each \`source\` value
+				- Keep programming identifiers, proper nouns, versions, code-like tokens, and URLs unchanged unless the term reference explicitly maps them
+				- Never translate the JSON keys \`segmentId\`, \`source\`, \`heading\`, \`items\`, or \`translated\` themselves
+				- Do not add, remove, or merge segments; one output item per input item
+
+				${this.locale.definitions.rules.specific}
+
 				${termReferenceSection}
 				`;
 	}
