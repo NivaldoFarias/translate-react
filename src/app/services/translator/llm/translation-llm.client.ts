@@ -25,7 +25,11 @@ import {
 	segmentBatchRequestEnvelopeSchema,
 	segmentBatchTranslationEnvelopeSchema,
 } from "@/app/services/translator/translator-segment-batch.schema";
-import { getRateLimitResetWaitMs, isOpenRouterDailyFreeModelQuotaError } from "@/app/utils/";
+import {
+	buildOpenRouterRunUserId,
+	getRateLimitResetWaitMs,
+	isOpenRouterDailyFreeModelQuotaError,
+} from "@/app/utils/";
 import { ApplicationError, ErrorCode } from "@/shared/errors/";
 
 import { emptyTranslationAttemptContext } from "../pipeline/translation-attempt.context";
@@ -167,6 +171,9 @@ export class TranslationLlmClient {
 			params.response_format = responseFormat;
 		}
 
+		// eslint-disable-next-line @typescript-eslint/no-deprecated -- OpenRouter run attribution
+		params.user = buildOpenRouterRunUserId();
+
 		return params;
 	}
 
@@ -259,8 +266,10 @@ export class TranslationLlmClient {
 
 						file.logger.debug(
 							{
+								completionId: completion.id,
 								model: this.model,
 								durationMs: Date.now() - attemptStartTime,
+								finishReason: completion.choices[0]?.finish_reason ?? null,
 								inputTokens: usage?.promptTokens,
 								outputTokens: usage?.completionTokens,
 								totalTokens: usage?.totalTokens,
@@ -403,8 +412,10 @@ export class TranslationLlmClient {
 
 						file.logger.debug(
 							{
+								completionId: completion.id,
 								model: this.model,
 								durationMs: Date.now() - attemptStartTime,
+								finishReason: completion.choices[0]?.finish_reason ?? null,
 								inputTokens: usage?.promptTokens,
 								outputTokens: usage?.completionTokens,
 								totalTokens: usage?.totalTokens,
@@ -554,6 +565,7 @@ export class TranslationLlmClient {
 				pendingUserMessage,
 				attemptContext,
 				contentLengthForLog,
+				partialFollowUpRound,
 			);
 			aggregatedUsage = mergeTranslationLlmUsageSnapshots(aggregatedUsage, usage);
 
@@ -650,6 +662,7 @@ export class TranslationLlmClient {
 	 * @param userMessage Serialized request envelope
 	 * @param attemptContext Maintainer feedback for the system prompt, when present
 	 * @param contentLengthForLog Original full-batch content length for error metadata
+	 * @param partialFollowUpRound Zero-based count of prior partial batch follow-up rounds
 	 *
 	 * @returns Parsed response envelope, usage snapshot, and completion log context
 	 */
@@ -659,7 +672,10 @@ export class TranslationLlmClient {
 		userMessage: string,
 		attemptContext: TranslationAttemptContext,
 		contentLengthForLog: number,
+		partialFollowUpRound = 0,
 	) {
+		const attemptStartTime = Date.now();
+
 		const completion = await this.openai.chat.completions.create(
 			this.getLLMCompletionParams(
 				file,
@@ -750,6 +766,23 @@ export class TranslationLlmClient {
 		}
 
 		const usage = extractTranslationLlmUsageFromCompletion(completion.usage);
+		const subCallDurationMs = Date.now() - attemptStartTime;
+
+		file.logger.debug(
+			{
+				completionId: completion.id,
+				model: this.model,
+				durationMs: subCallDurationMs,
+				finishReason: completionContext.finishReason,
+				inputTokens: usage?.promptTokens,
+				outputTokens: usage?.completionTokens,
+				totalTokens: usage?.totalTokens,
+				costUsd: usage?.costUsd,
+				segmentCount: batchItems.length,
+				...(partialFollowUpRound > 0 ? { partialFollowUpRound } : {}),
+			},
+			"LLM segment batch sub-call successful",
+		);
 
 		return {
 			envelope: parsedEnvelope.data,
@@ -829,6 +862,7 @@ export class TranslationLlmClient {
 		completion: OpenAI.Chat.Completions.ChatCompletion,
 	) {
 		return {
+			completionId: completion.id,
 			finishReason: completion.choices[0]?.finish_reason ?? null,
 			promptTokens: completion.usage?.prompt_tokens,
 			completionTokens: completion.usage?.completion_tokens,

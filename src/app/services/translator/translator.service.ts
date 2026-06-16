@@ -95,6 +95,9 @@ export interface TranslateContentOptions {
 	readonly maintainerFeedbackComments?: readonly string[];
 }
 
+/** Translation strategy used for the markdown body on the latest {@link TranslatorService.translateContent} call */
+export type TranslationPath = "segment" | "segment-noop" | "legacy-full-body" | "legacy-chunked";
+
 /** Result from translating a file */
 export interface TranslationResult {
 	/** The translated content */
@@ -105,6 +108,9 @@ export interface TranslationResult {
 
 	/** Aggregated LLM token and cost usage for this file */
 	llmUsage: TranslationLlmUsageTotals;
+
+	/** Body translation strategy used for this file */
+	translationPath: TranslationPath;
 }
 
 /** Dependency injection interface for {@link TranslatorService} */
@@ -197,6 +203,9 @@ export class TranslatorService {
 
 	/** Per-file LLM usage accumulator reset at the start of each {@link translateContent} call */
 	private currentFileLlmUsage = emptyTranslationLlmUsageTotals();
+
+	/** Body translation strategy for the file currently being translated */
+	private currentTranslationPath: TranslationPath = "segment";
 
 	/**
 	 * Creates a new TranslatorService instance with injected dependencies.
@@ -424,6 +433,7 @@ export class TranslatorService {
 
 		const translationStartTime = Date.now();
 		this.currentFileLlmUsage = emptyTranslationLlmUsageTotals();
+		this.currentTranslationPath = "segment";
 
 		const verbatimMask =
 			env.MASK_VERBATIM_LARGE_FENCES ?
@@ -555,6 +565,8 @@ export class TranslatorService {
 				durationMs: translationDuration,
 				sizeRatio: (pipelineResult.content.length / file.content.length).toFixed(2),
 				advisoryGuardCount,
+				translationPath: this.currentTranslationPath,
+				llmUsage: this.currentFileLlmUsage,
 			},
 			"Translation completed successfully",
 		);
@@ -563,6 +575,7 @@ export class TranslatorService {
 			content: cleanupTranslatedContent(pipelineResult.content, file),
 			reviewerNotices: pipelineResult.reviewerNotices,
 			llmUsage: this.currentFileLlmUsage,
+			translationPath: this.currentTranslationPath,
 		};
 	}
 
@@ -698,6 +711,7 @@ export class TranslatorService {
 		const translatableSegments = filterTranslatableSegments(extraction.segments);
 
 		if (translatableSegments.length === 0) {
+			this.currentTranslationPath = "segment-noop";
 			return segmentBodyWorkFile.content;
 		}
 
@@ -716,12 +730,14 @@ export class TranslatorService {
 		);
 
 		try {
-			return await this.translateBodyViaSegments(
+			const translated = await this.translateBodyViaSegments(
 				segmentBodyWorkFile,
 				translatableSegments,
 				extraction,
 				attemptContext,
 			);
+			this.currentTranslationPath = "segment";
+			return translated;
 		} catch (error) {
 			segmentBodyWorkFile.logger.warn(
 				{
@@ -752,6 +768,8 @@ export class TranslatorService {
 		if (contentNeedsChunking) {
 			return this.translateWithChunking(file, attemptContext);
 		}
+
+		this.currentTranslationPath = "legacy-full-body";
 
 		try {
 			return await this.callLanguageModel(
@@ -923,6 +941,7 @@ export class TranslatorService {
 		file: TranslationFile,
 		attemptContext: TranslationAttemptContext = emptyTranslationAttemptContext(),
 	): Promise<string> {
+		this.currentTranslationPath = "legacy-chunked";
 		file.logger.debug({ contentLength: file.content.length }, "Starting chunked translation");
 
 		const { chunks, separators } = await this.managers.chunks.chunkContent(file.content);

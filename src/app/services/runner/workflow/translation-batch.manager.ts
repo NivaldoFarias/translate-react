@@ -292,9 +292,19 @@ export class TranslationBatchManager {
 				"Step 1/5: Translation branch reset for single-commit workflow",
 			);
 
+			const step2Start = Date.now();
 			const maintainerFeedback = await this.loadMaintainerFeedbackForRemediation(
 				file,
 				pullRequestValidity,
+			);
+			file.logger.debug(
+				{
+					durationMs: Date.now() - step2Start,
+					pullRequestInvalidReason: pullRequestValidity.invalidReason ?? null,
+					maintainerFeedbackLoaded: maintainerFeedback !== undefined,
+					maintainerCommentCount: maintainerFeedback?.authorLogins.length ?? 0,
+				},
+				"Step 2/5: Pull request validity and maintainer feedback resolved",
 			);
 
 			const translationStart = Date.now();
@@ -306,11 +316,19 @@ export class TranslationBatchManager {
 			metadata.translation = translationResult.content;
 			metadata.reviewerNotices = translationResult.reviewerNotices;
 			metadata.llmUsage = translationResult.llmUsage;
+			const contentRatio =
+				file.content.length > 0 ?
+					(metadata.translation.length / file.content.length).toFixed(2)
+				:	"unknown";
+
 			file.logger.debug(
 				{
 					translationSize: metadata.translation.length,
+					contentRatio,
 					durationMs: Date.now() - translationStart,
 					advisoryGuardCount: metadata.reviewerNotices.length,
+					translationPath: translationResult.translationPath,
+					llmUsage: translationResult.llmUsage,
 					reviewerNotices: metadata.reviewerNotices,
 				},
 				"Step 3/5: Translation complete",
@@ -521,6 +539,8 @@ export class TranslationBatchManager {
 				path: file.path,
 				prNumber: validity.pullRequest.number,
 				mergeableState: validity.pullRequestStatus?.mergeableState,
+				llmWorkSkipped: true,
+				skipReason: "valid_existing_pr",
 			},
 			"Skipping file with valid existing pull request",
 		);
