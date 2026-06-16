@@ -449,7 +449,7 @@ export class TranslationBatchManager {
 	}
 
 	/**
-	 * Loads maintainer PR comments posted after the latest runner commit on the branch.
+	 * Loads `CHANGES_REQUESTED` review bodies posted after the latest runner commit on the branch.
 	 *
 	 * @param file Translation file being processed
 	 * @param validity Pull request validity from the start of file processing
@@ -465,19 +465,19 @@ export class TranslationBatchManager {
 		}
 
 		const branchName = getTranslationBranchNameFromPath(file.path);
-		const [comments, runnerCommitAt] = await Promise.all([
-			this.services.github.listPullRequestIssueComments(validity.pullRequest.number),
+		const [reviews, runnerCommitAt] = await Promise.all([
+			this.services.github.listPullRequestReviews(validity.pullRequest.number),
 			this.services.github.getLatestTranslationCommitTimestamp(branchName),
 		]);
 
-		return getMaintainerFeedbackSnapshot(comments, runnerCommitAt);
+		return getMaintainerFeedbackSnapshot(reviews, runnerCommitAt);
 	}
 
 	/**
 	 * Resolves translated content via full document re-translation.
 	 *
 	 * When {@link TranslationPullRequestValidity.invalidReason} is `needs_maintainer_fix`,
-	 * the open PR and branch are reused and maintainer issue comments are passed into the LLM prompt.
+	 * the open PR and branch are reused and `CHANGES_REQUESTED` review bodies are passed into the LLM prompt.
 	 *
 	 * @param file Upstream English source file for the workflow
 	 * @param validity Pull request validity from the start of file processing
@@ -502,7 +502,7 @@ export class TranslationBatchManager {
 				prNumber: validity.pullRequest.number,
 				maintainerCommentCount: maintainerFeedbackComments.length,
 			},
-			"Maintainer feedback after latest runner commit; running full re-translation with review comments in prompt",
+			"Unresolved CHANGES_REQUESTED review after latest runner commit; running full re-translation with review bodies in prompt",
 		);
 
 		return this.services.translator.translateContent(file, { maintainerFeedbackComments });

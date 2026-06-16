@@ -14,7 +14,7 @@ export const emptyTranslationAttemptContext = (): TranslationAttemptContext => (
 /**
  * Builds an attempt context that carries maintainer PR review feedback into the LLM prompt.
  *
- * @param commentBodies Maintainer issue comment bodies after the latest runner commit
+ * @param commentBodies Maintainer review bodies from unresolved `CHANGES_REQUESTED` reviews after the latest runner commit
  *
  * @returns Attempt context for a maintainer-driven re-translation
  */

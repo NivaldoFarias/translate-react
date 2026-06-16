@@ -1,87 +1,164 @@
 import { describe, expect, test } from "bun:test";
 
-import type { PullRequestIssueCommentSnapshot } from "@/app/services/github/types";
+import type { PullRequestReviewSnapshot } from "@/app/services/github/types";
 
 import {
 	buildTranslationCommitMessage,
 	getMaintainerFeedbackSnapshot,
-	hasMaintainerFeedbackAfterRunnerCommit,
-	isMaintainerFeedbackComment,
+	getUnresolvedChangesRequestedReviews,
+	hasUnresolvedChangesRequestedReview,
+	isReviewerFeedbackAuthor,
 } from "@/app/services/runner/workflow/maintainer-feedback.util";
 
-function comment(
-	overrides: Partial<PullRequestIssueCommentSnapshot> &
-		Pick<PullRequestIssueCommentSnapshot, "createdAt">,
-): PullRequestIssueCommentSnapshot {
+function review(
+	overrides: Partial<PullRequestReviewSnapshot> & Pick<PullRequestReviewSnapshot, "submittedAt">,
+): PullRequestReviewSnapshot {
 	return {
 		login: "jhonmike",
 		authorAssociation: "MEMBER",
 		userType: "User",
+		state: "CHANGES_REQUESTED",
 		body: "",
 		...overrides,
 	};
 }
 
 describe("maintainer-feedback.util", () => {
-	describe("isMaintainerFeedbackComment", () => {
-		test("returns true for repository member comments", () => {
+	describe("isReviewerFeedbackAuthor", () => {
+		test("returns true for repository member reviews", () => {
 			expect(
-				isMaintainerFeedbackComment(comment({ createdAt: new Date("2026-06-03T12:00:00Z") })),
+				isReviewerFeedbackAuthor(review({ submittedAt: new Date("2026-06-03T12:00:00Z") })),
+			).toBe(true);
+		});
+
+		test("returns true for contributor reviews", () => {
+			expect(
+				isReviewerFeedbackAuthor(
+					review({
+						authorAssociation: "CONTRIBUTOR",
+						submittedAt: new Date("2026-06-03T12:00:00Z"),
+					}),
+				),
 			).toBe(true);
 		});
 
 		test("returns false for bot and ignored automation logins", () => {
 			expect(
-				isMaintainerFeedbackComment(
-					comment({
+				isReviewerFeedbackAuthor(
+					review({
 						login: "vercel[bot]",
 						userType: "Bot",
-						createdAt: new Date("2026-06-03T12:00:00Z"),
+						submittedAt: new Date("2026-06-03T12:00:00Z"),
 					}),
 				),
 			).toBe(false);
 			expect(
-				isMaintainerFeedbackComment(
-					comment({
+				isReviewerFeedbackAuthor(
+					review({
 						login: "github-actions[bot]",
 						userType: "Bot",
-						createdAt: new Date("2026-06-03T12:00:00Z"),
+						submittedAt: new Date("2026-06-03T12:00:00Z"),
 					}),
 				),
 			).toBe(false);
 		});
 
-		test("returns false for drive-by contributor comments", () => {
+		test("returns false for outside collaborator reviews", () => {
 			expect(
-				isMaintainerFeedbackComment(
-					comment({
-						authorAssociation: "CONTRIBUTOR",
-						createdAt: new Date("2026-06-03T12:00:00Z"),
+				isReviewerFeedbackAuthor(
+					review({
+						authorAssociation: "NONE",
+						submittedAt: new Date("2026-06-03T12:00:00Z"),
 					}),
 				),
 			).toBe(false);
 		});
 	});
 
-	describe("hasMaintainerFeedbackAfterRunnerCommit", () => {
+	describe("hasUnresolvedChangesRequestedReview", () => {
 		const runnerCommitAt = new Date("2026-06-03T10:00:00Z");
 
-		test("returns true when a maintainer commented after the runner commit", () => {
-			const comments = [comment({ createdAt: new Date("2026-06-03T11:30:00Z") })];
+		test("returns true when a qualifying CHANGES_REQUESTED review follows the runner commit", () => {
+			const reviews = [
+				review({
+					body: "Fix the heading case.",
+					submittedAt: new Date("2026-06-03T11:30:00Z"),
+				}),
+			];
 
-			expect(hasMaintainerFeedbackAfterRunnerCommit(comments, runnerCommitAt)).toBe(true);
+			expect(hasUnresolvedChangesRequestedReview(reviews, runnerCommitAt)).toBe(true);
 		});
 
-		test("returns false when maintainer feedback predates the runner commit", () => {
-			const comments = [comment({ createdAt: new Date("2026-06-03T09:00:00Z") })];
+		test("returns false when the latest review after the runner commit is APPROVED", () => {
+			const reviews = [
+				review({
+					body: "Please fix the heading.",
+					submittedAt: new Date("2026-06-03T11:00:00Z"),
+				}),
+				review({
+					state: "APPROVED",
+					body: "Looks good now.",
+					submittedAt: new Date("2026-06-03T12:00:00Z"),
+				}),
+			];
 
-			expect(hasMaintainerFeedbackAfterRunnerCommit(comments, runnerCommitAt)).toBe(false);
+			expect(hasUnresolvedChangesRequestedReview(reviews, runnerCommitAt)).toBe(false);
+		});
+
+		test("returns false when CHANGES_REQUESTED predates the runner commit", () => {
+			const reviews = [
+				review({
+					body: "Please fix the heading.",
+					submittedAt: new Date("2026-06-03T09:00:00Z"),
+				}),
+			];
+
+			expect(hasUnresolvedChangesRequestedReview(reviews, runnerCommitAt)).toBe(false);
 		});
 
 		test("returns false when no runner commit baseline exists", () => {
-			const comments = [comment({ createdAt: new Date("2026-06-03T11:30:00Z") })];
+			const reviews = [
+				review({
+					body: "Please fix the heading.",
+					submittedAt: new Date("2026-06-03T11:30:00Z"),
+				}),
+			];
 
-			expect(hasMaintainerFeedbackAfterRunnerCommit(comments, undefined)).toBe(false);
+			expect(hasUnresolvedChangesRequestedReview(reviews, undefined)).toBe(false);
+		});
+
+		test("returns false for conversation-only COMMENTED reviews without CHANGES_REQUESTED", () => {
+			const reviews = [
+				review({
+					state: "COMMENTED",
+					body: "Thanks for the translation!",
+					submittedAt: new Date("2026-06-03T11:30:00Z"),
+				}),
+			];
+
+			expect(hasUnresolvedChangesRequestedReview(reviews, runnerCommitAt)).toBe(false);
+		});
+	});
+
+	describe("getUnresolvedChangesRequestedReviews", () => {
+		const runnerCommitAt = new Date("2026-06-03T10:00:00Z");
+
+		test("keeps only the latest review per reviewer", () => {
+			const reviews = [
+				review({
+					login: "jhonmike",
+					body: "First request.",
+					submittedAt: new Date("2026-06-03T11:00:00Z"),
+				}),
+				review({
+					login: "jhonmike",
+					state: "APPROVED",
+					body: "Approved after manual fix.",
+					submittedAt: new Date("2026-06-03T12:00:00Z"),
+				}),
+			];
+
+			expect(getUnresolvedChangesRequestedReviews(reviews, runnerCommitAt)).toEqual([]);
 		});
 	});
 
@@ -89,31 +166,28 @@ describe("maintainer-feedback.util", () => {
 		const runnerCommitAt = new Date("2026-06-03T10:00:00Z");
 
 		test("returns bodies and unique author logins in chronological order", () => {
-			const comments = [
-				comment({
+			const reviews = [
+				review({
 					login: "jhonmike",
 					body: "Fix the heading case.",
-					createdAt: new Date("2026-06-03T11:00:00Z"),
+					submittedAt: new Date("2026-06-03T11:00:00Z"),
 				}),
-				comment({
+				review({
 					login: "gaearon",
+					authorAssociation: "OWNER",
 					body: "Also check the link text.",
-					createdAt: new Date("2026-06-03T12:00:00Z"),
+					submittedAt: new Date("2026-06-03T12:00:00Z"),
 				}),
-				comment({
+				review({
 					login: "jhonmike",
 					body: "One more note on terminology.",
-					createdAt: new Date("2026-06-03T13:00:00Z"),
+					submittedAt: new Date("2026-06-03T13:00:00Z"),
 				}),
 			];
 
-			expect(getMaintainerFeedbackSnapshot(comments, runnerCommitAt)).toEqual({
-				bodies: [
-					"Fix the heading case.",
-					"Also check the link text.",
-					"One more note on terminology.",
-				],
-				authorLogins: ["jhonmike", "gaearon"],
+			expect(getMaintainerFeedbackSnapshot(reviews, runnerCommitAt)).toEqual({
+				bodies: ["Also check the link text.", "One more note on terminology."],
+				authorLogins: ["gaearon", "jhonmike"],
 			});
 		});
 	});
