@@ -72,9 +72,17 @@ import {
 } from "./pipeline/translation-attempt.context";
 import { TranslationPipelineManager } from "./pipeline/translation-pipeline.manager";
 import { validateAndReassembleChunks } from "./postprocess/chunk-reassembly";
-import { cleanupTranslatedContent } from "./postprocess/translation-output-cleanup";
+import {
+	cleanupFullBodyTranslation,
+	cleanupTranslatedContent,
+	sanitizeSegmentTranslation,
+} from "./postprocess/translation-output-cleanup";
 import { TranslationFile } from "./translation-file";
-import { CONNECTIVITY_TEST_MAX_TOKENS, LLM_TEMPERATURE } from "./translator.constants";
+import {
+	CONNECTIVITY_TEST_MAX_TOKENS,
+	LLM_TEMPERATURE,
+	SEGMENT_BATCH_MAX_ITEMS_PER_BATCH,
+} from "./translator.constants";
 import { PostTranslationValidationService } from "./validation/post-translation-validation.service";
 import { TranslationLanguageCheck } from "./validation/translation-language-check";
 
@@ -663,7 +671,7 @@ export class TranslatorService {
 				file.documentSourceLanguage,
 			);
 
-			translatedScalar = cleanupTranslatedContent(translatedScalar, snippetFile);
+			translatedScalar = cleanupFullBodyTranslation(translatedScalar, snippetFile);
 
 			if (!translatedScalar.length) {
 				file.logger.warn(
@@ -812,13 +820,18 @@ export class TranslatorService {
 		attemptContext: TranslationAttemptContext,
 	) {
 		const tokenBudget = this.managers.chunks.getMarkdownChunkSplitterTokenBudget();
+		const responseTokenBudget = this.managers.chunks.getSegmentBatchResponseTokenBudget();
 		const batches = packSegmentsIntoBatches(
 			translatableSegments,
 			(text) => this.managers.chunks.estimateTokenCount(text),
 			tokenBudget,
+			SEGMENT_BATCH_MAX_ITEMS_PER_BATCH,
+			responseTokenBudget,
 		);
 
 		const translations: Record<string, string> = {};
+
+		const segmentById = new Map(translatableSegments.map((segment) => [segment.id, segment]));
 
 		for (const batch of batches) {
 			try {
@@ -826,6 +839,7 @@ export class TranslatorService {
 					file,
 					batch,
 					attemptContext,
+					segmentById,
 				);
 				Object.assign(translations, batchTranslations);
 			} catch (error) {
@@ -843,6 +857,7 @@ export class TranslatorService {
 						file,
 						[item],
 						attemptContext,
+						segmentById,
 					);
 					Object.assign(translations, itemTranslations);
 				}
@@ -858,6 +873,7 @@ export class TranslatorService {
 	 * @param file Work file for logging and prompt context
 	 * @param batchItems Segment batch request items
 	 * @param attemptContext Maintainer feedback for the system prompt, when present
+	 * @param segmentById Lookup map for segment metadata used during snippet sanitization
 	 *
 	 * @returns Map of segment id to cleaned translated text
 	 */
@@ -865,6 +881,7 @@ export class TranslatorService {
 		file: TranslationFile,
 		batchItems: readonly SegmentBatchRequestItem[],
 		attemptContext: TranslationAttemptContext,
+		segmentById: ReadonlyMap<string, TranslatableSegment>,
 	): Promise<SegmentTranslationMap> {
 		try {
 			const { envelope, usage } = await this.llmClient.callLanguageModelSegmentBatch(
@@ -877,6 +894,8 @@ export class TranslatorService {
 			const translations: Record<string, string> = {};
 
 			for (const item of envelope.items) {
+				const batchItem = batchItems.find((candidate) => candidate.segmentId === item.segmentId);
+				const segment = segmentById.get(item.segmentId);
 				const snippetFile = new TranslationFile(
 					item.translated,
 					`${file.filename}#${item.segmentId}`,
@@ -885,7 +904,12 @@ export class TranslatorService {
 					file.logger,
 					file.documentSourceLanguage,
 				);
-				translations[item.segmentId] = cleanupTranslatedContent(item.translated, snippetFile);
+				translations[item.segmentId] = sanitizeSegmentTranslation(
+					item.translated,
+					segment?.sourceText ?? batchItem?.source ?? item.translated,
+					segment?.path ?? "",
+					snippetFile,
+				);
 			}
 
 			return translations;
@@ -916,11 +940,13 @@ export class TranslatorService {
 				file,
 				firstHalf,
 				attemptContext,
+				segmentById,
 			);
 			const secondTranslations = await this.translateSegmentBatchItems(
 				file,
 				secondHalf,
 				attemptContext,
+				segmentById,
 			);
 
 			return { ...firstTranslations, ...secondTranslations };

@@ -1,11 +1,16 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 
+import { WORKFLOW_FIXTURE_MANIFEST } from "@tests/fixtures/md/workflow.manifest";
+import { WorkflowFixturePrScenario } from "@tests/fixtures/workflow-fixture.util";
+
 import {
 	createIntegrationRunner,
 	installOpenRouterModelLimitsStub,
-	loadIntegrationWorkflowFilesFromMdFixtureDir,
+	loadWorkflowFilesFromMdFixtureDir,
 	restoreOpenRouterModelLimitsStub,
 } from "./create-integration-runner";
+
+const WORKFLOW_MANIFEST_BASELINES = Object.keys(WORKFLOW_FIXTURE_MANIFEST);
 
 function chatMockUsedSegmentBatch(chatMock: { mock: { calls: unknown[][] } }) {
 	return chatMock.mock.calls.some(([params]) => {
@@ -33,81 +38,74 @@ describe("RunnerService workflow integration", () => {
 		restoreOpenRouterModelLimitsStub();
 	});
 
-	test("small fixture: full run with real TranslatorService and mocked GitHub", async () => {
-		const files = await loadIntegrationWorkflowFilesFromMdFixtureDir(["use-memo.md"]);
+	test.each(WORKFLOW_MANIFEST_BASELINES.map((basename) => [basename] as const))(
+		"manifest %s matches workflow fixture scenario",
+		async (basename) => {
+			const files = await loadWorkflowFilesFromMdFixtureDir([basename]);
 
-		expect(files.length).toBe(1);
+			expect(files).toHaveLength(1);
 
-		const file = files[0];
-		if (file === undefined) {
-			throw new Error("expected one integration workflow file");
-		}
+			const file = files[0];
+			if (file === undefined) {
+				throw new Error(`expected one integration workflow file for ${basename}`);
+			}
 
-		const { runner, github, chatMock } = createIntegrationRunner(file);
+			const manifestEntry =
+				WORKFLOW_FIXTURE_MANIFEST[basename as keyof typeof WORKFLOW_FIXTURE_MANIFEST];
+			expect(file.treeItem.path).toBe(manifestEntry.tree.path);
+			expect(file.smoke.pullRequestNumber).toBe(manifestEntry.smoke.pullRequestNumber);
 
-		const stats = await runner.run();
+			const { runner, github, chatMock } = createIntegrationRunner(file);
+			const stats = await runner.run();
+			const scenario = file.smoke.pullRequestScenario ?? WorkflowFixturePrScenario.New;
 
-		expect(stats.totalCount).toBe(1);
-		expect(stats.successCount).toBe(1);
-		expect(stats.failureCount).toBe(0);
-		expect(stats.successRate).toBe(1);
-
-		expect(github.commitTranslation.mock.calls.length).toBeGreaterThanOrEqual(1);
-		expect(github.createPullRequest.mock.calls.length).toBeGreaterThanOrEqual(1);
-		expect(chatMock.mock.calls.length).toBeGreaterThanOrEqual(1);
-
-		expect(chatMockUsedSegmentBatch(chatMock)).toBe(true);
-	});
-
-	test("medium fixture: full run with real TranslatorService and mocked GitHub", async () => {
-		const files = await loadIntegrationWorkflowFilesFromMdFixtureDir(["hydrateRoot.md"]);
-
-		expect(files.length).toBe(1);
-
-		const file = files[0];
-		if (file === undefined) {
-			throw new Error("expected one integration workflow file");
-		}
-
-		const { runner, github, chatMock } = createIntegrationRunner(file);
-
-		const stats = await runner.run();
-
-		expect(stats.totalCount).toBe(1);
-		expect(stats.successCount).toBe(1);
-		expect(stats.failureCount).toBe(0);
-		expect(stats.successRate).toBe(1);
-
-		expect(github.commitTranslation.mock.calls.length).toBeGreaterThanOrEqual(1);
-		expect(github.createPullRequest.mock.calls.length).toBeGreaterThanOrEqual(1);
-		expect(chatMock.mock.calls.length).toBeGreaterThanOrEqual(1);
-		expect(chatMockUsedSegmentBatch(chatMock)).toBe(true);
-	});
-
-	test("large fixture: full run with segment batching and passthrough LLM", async () => {
-		const files = await loadIntegrationWorkflowFilesFromMdFixtureDir([
-			"react-labs-view-transitions-activity-and-more.md",
-		]);
-
-		expect(files.length).toBe(1);
-
-		const file = files[0];
-		if (file === undefined) {
-			throw new Error("expected one integration workflow file");
-		}
-
-		const { runner, github, chatMock } = createIntegrationRunner(file);
-
-		const stats = await runner.run();
-
-		expect(stats.totalCount).toBe(1);
-		expect(stats.successCount).toBe(1);
-		expect(stats.failureCount).toBe(0);
-		expect(stats.successRate).toBe(1);
-
-		expect(github.commitTranslation.mock.calls.length).toBeGreaterThanOrEqual(1);
-		expect(github.createPullRequest.mock.calls.length).toBeGreaterThanOrEqual(1);
-		expect(chatMock.mock.calls.length).toBeGreaterThanOrEqual(2);
-		expect(chatMockUsedSegmentBatch(chatMock)).toBe(true);
-	});
+			switch (scenario) {
+				case WorkflowFixturePrScenario.New: {
+					expect(stats.totalCount).toBe(1);
+					expect(stats.successCount).toBe(1);
+					expect(stats.failureCount).toBe(0);
+					expect(github.commitTranslation.mock.calls.length).toBeGreaterThanOrEqual(1);
+					expect(github.createPullRequest.mock.calls.length).toBeGreaterThanOrEqual(1);
+					expect(chatMock.mock.calls.length).toBeGreaterThanOrEqual(1);
+					expect(chatMockUsedSegmentBatch(chatMock)).toBe(true);
+					break;
+				}
+				case WorkflowFixturePrScenario.OutOfSync: {
+					expect(stats.totalCount).toBe(1);
+					expect(stats.successCount).toBe(1);
+					expect(stats.failureCount).toBe(0);
+					expect(github.refreshTranslationBranchPreservePr).toHaveBeenCalled();
+					expect(github.createPullRequest).not.toHaveBeenCalled();
+					expect(github.closePullRequest).not.toHaveBeenCalled();
+					expect(chatMock.mock.calls.length).toBeGreaterThanOrEqual(1);
+					break;
+				}
+				case WorkflowFixturePrScenario.MaintainerFix: {
+					expect(stats.totalCount).toBe(1);
+					expect(stats.successCount).toBe(1);
+					expect(stats.failureCount).toBe(0);
+					expect(github.refreshTranslationBranchPreservePr).toHaveBeenCalled();
+					expect(github.updatePullRequestBody).toHaveBeenCalled();
+					expect(github.createPullRequest).not.toHaveBeenCalled();
+					expect(github.closePullRequest).not.toHaveBeenCalled();
+					expect(chatMock.mock.calls.length).toBeGreaterThanOrEqual(1);
+					break;
+				}
+				case WorkflowFixturePrScenario.ValidSkip: {
+					expect(stats.totalCount).toBe(0);
+					expect(stats.successCount).toBe(0);
+					expect(stats.failureCount).toBe(0);
+					expect(github.commitTranslation).not.toHaveBeenCalled();
+					expect(github.createPullRequest).not.toHaveBeenCalled();
+					expect(chatMockUsedSegmentBatch(chatMock)).toBe(false);
+					break;
+				}
+				default: {
+					const exhaustive: never = scenario;
+					throw new Error(`Unhandled workflow scenario: ${String(exhaustive)}`);
+				}
+			}
+		},
+		120_000,
+	);
 });

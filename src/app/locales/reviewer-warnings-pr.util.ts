@@ -5,29 +5,37 @@ import type { LocalePRBodyStrings } from "./types";
 
 import { MARKDOWN_REGEXES } from "@/app/services/translator/markdown/markdown.regexes";
 import {
+	findExtraMarkdownLinkViolationDetails,
+	findMdxSpacingViolationDetails,
+	findSentenceCaseHeadingViolationDetails,
+} from "@/app/services/translator/validation/analyzers/advisory-style.analyzer";
+import {
 	extractFencedCodeBlockBodies,
 	findFenceFunctionIdentifierMismatches,
 } from "@/app/services/translator/validation/analyzers/fence-code-identifier.analyzer";
 import { findFenceJsxStaticTextMismatches } from "@/app/services/translator/validation/analyzers/fence-jsx-static-text.analyzer";
 import { findMarkdownLinkViolations } from "@/app/services/translator/validation/analyzers/markdown-link.analyzer";
+import { PostTranslationGuardId } from "@/app/services/translator/validation/validation.constants";
 
 const HINT_VIOLATION_SPLIT = /\.\s+(?:fence \d+|Problems found:)/;
 
+/** One located violation rendered inside a guard subsection */
+interface LocatedViolation {
+	readonly startLine: number;
+	readonly endLine: number;
+	readonly body: string;
+}
+
 /**
- * Builds a line-range label for the PR details section.
+ * Builds a GitHub-style line anchor label (`L42` or `L42-L45`).
  *
- * @param strings Locale strings for reviewer warnings
- * @param startLine 1-based start line in the source markdown
- * @param endLine 1-based end line in the source markdown
+ * @param startLine 1-based start line in the translated markdown
+ * @param endLine 1-based end line in the translated markdown
  *
- * @returns Localized location label
+ * @returns Line anchor label for a violation subsection heading
  */
-function formatViolationLocation(
-	strings: LocalePRBodyStrings["reviewerWarnings"],
-	startLine: number,
-	endLine: number,
-) {
-	return strings.violationLocation(startLine, endLine);
+function formatViolationLocation(startLine: number, endLine: number) {
+	return startLine === endLine ? `L${startLine}` : `L${startLine}-L${endLine}`;
 }
 
 /**
@@ -133,102 +141,121 @@ function extractHintInstruction(hint: string) {
 }
 
 /**
- * Formats one JSX static-text mismatch as a numbered subsection with a diff block.
+ * Wraps guard instruction prose in a Markdown blockquote.
  *
- * @param strings Locale strings for reviewer warnings
- * @param sourceMarkdown Original markdown
- * @param mismatch Detected JSX static text mismatch
- * @param index 1-based violation index within the guard section
+ * @param instruction Instruction-only retry hint sentence
  *
- * @returns Markdown subsection for the PR details block
+ * @returns Blockquoted instruction
  */
-function formatFenceJsxMismatchItem(
-	strings: LocalePRBodyStrings["reviewerWarnings"],
-	sourceMarkdown: string,
-	mismatch: FenceJsxStaticTextMismatch,
-	index: number,
-) {
-	const needleOffset = findNeedleOffsetInFence(
-		sourceMarkdown,
-		mismatch.fenceIndex,
-		mismatch.sourceText,
-	);
-
-	const startLine = needleOffset === null ? 1 : lineNumberAtOffset(sourceMarkdown, needleOffset);
-	const endLine =
-		needleOffset === null ? startLine : (
-			lineNumberAtOffset(sourceMarkdown, needleOffset + mismatch.sourceText.length)
-		);
-
-	const location = formatViolationLocation(strings, startLine, endLine);
-	const translated = mismatch.translatedText ?? "";
-
-	return `###### ${index}. ${location}
-
-${formatDiffBlock(mismatch.sourceText, translated)}`;
+function formatInstructionBlockquote(instruction: string) {
+	return instruction
+		.split("\n")
+		.map((line) => `> ${line}`)
+		.join("\n");
 }
 
 /**
- * Formats JSX static-text guard violations with diff blocks when source text is available.
+ * Renders one located violation as a subsection heading plus body.
  *
  * @param strings Locale strings for reviewer warnings
- * @param sourceMarkdown Original markdown
- * @param translatedMarkdown Translated markdown
- * @param hint Retry hint fallback when structured mismatches are empty
+ * @param violation Located violation payload
  *
- * @returns Guard subsection body or empty string
+ * @returns Markdown subsection without the guard heading
  */
-function formatFenceJsxStaticTextSection(
+function formatLocatedViolation(
 	strings: LocalePRBodyStrings["reviewerWarnings"],
-	sourceMarkdown: string,
-	translatedMarkdown: string,
-	hint: string,
+	violation: LocatedViolation,
 ) {
-	const mismatches = findFenceJsxStaticTextMismatches(sourceMarkdown, translatedMarkdown);
-	const instruction = extractHintInstruction(hint);
+	const location = formatViolationLocation(violation.startLine, violation.endLine);
 
-	if (mismatches.length === 0) {
-		return `${instruction}\n\n##### \`fenceJsxStaticText\`\n\n${hint}`;
-	}
+	return `#### ${location}
 
-	const items = mismatches
-		.map((mismatch, index) =>
-			formatFenceJsxMismatchItem(strings, sourceMarkdown, mismatch, index + 1),
-		)
+${violation.body}`;
+}
+
+/**
+ * Builds the guard subsection body from located violations.
+ *
+ * @param guardId Post-translation guard identifier
+ * @param instruction Instruction-only retry hint sentence
+ * @param violations Located violations for the guard
+ * @param strings Locale strings for reviewer warnings
+ *
+ * @returns Guard subsection body without the `###` heading
+ */
+function formatLocatedViolationsSection(
+	guardId: PostTranslationGuardId,
+	instruction: string,
+	violations: readonly LocatedViolation[],
+	strings: LocalePRBodyStrings["reviewerWarnings"],
+) {
+	const tally = strings.violationTally(violations.length);
+	const items = violations
+		.map((violation) => formatLocatedViolation(strings, violation))
 		.join("\n\n");
 
-	return `${instruction}
+	return `${formatInstructionBlockquote(instruction)}
 
-##### \`fenceJsxStaticText\`
+#### \`${guardId}\` (${tally})
 
 ${items}`;
 }
 
 /**
- * Formats fence function-identifier guard violations for the PR details block.
+ * Resolves a line range for JSX static text inside a fenced code block.
  *
- * @param strings Locale strings for reviewer warnings
- * @param sourceMarkdown Original markdown
- * @param translatedMarkdown Translated markdown
- * @param hint Retry hint fallback
+ * @param markdown Markdown document containing the fence
+ * @param mismatch Detected JSX static text mismatch
  *
- * @returns Guard subsection body
+ * @returns 1-based start and end line numbers
  */
-function formatFenceFunctionIdentifiersSection(
-	strings: LocalePRBodyStrings["reviewerWarnings"],
-	sourceMarkdown: string,
-	translatedMarkdown: string,
-	hint: string,
-) {
-	const mismatches = findFenceFunctionIdentifierMismatches(sourceMarkdown, translatedMarkdown);
-	const instruction = extractHintInstruction(hint);
+function resolveFenceJsxLineRange(markdown: string, mismatch: FenceJsxStaticTextMismatch) {
+	const needleOffset = findNeedleOffsetInFence(markdown, mismatch.fenceIndex, mismatch.sourceText);
 
-	if (mismatches.length === 0) {
-		return `${instruction}\n\n##### \`fenceFunctionIdentifiers\`\n\n${hint}`;
+	if (needleOffset === null) {
+		return { startLine: 1, endLine: 1 };
 	}
 
-	const items = mismatches
-		.map((mismatch, index) => {
+	return {
+		startLine: lineNumberAtOffset(markdown, needleOffset),
+		endLine: lineNumberAtOffset(markdown, needleOffset + mismatch.sourceText.length),
+	};
+}
+
+/**
+ * Collects JSX static-text guard violations with document line ranges.
+ *
+ * @param sourceMarkdown Original markdown
+ * @param translatedMarkdown Translated markdown
+ *
+ * @returns Located violations for the PR details block
+ */
+function collectFenceJsxStaticTextViolations(sourceMarkdown: string, translatedMarkdown: string) {
+	return findFenceJsxStaticTextMismatches(sourceMarkdown, translatedMarkdown).map((mismatch) => {
+		const { startLine, endLine } = resolveFenceJsxLineRange(sourceMarkdown, mismatch);
+
+		return {
+			startLine,
+			endLine,
+			body: formatDiffBlock(mismatch.sourceText, mismatch.translatedText ?? ""),
+		} satisfies LocatedViolation;
+	});
+}
+
+/**
+ * Collects fence function-identifier guard violations with document line ranges.
+ *
+ * @param sourceMarkdown Original markdown
+ * @param translatedMarkdown Translated markdown
+ *
+ * @returns Located violations for the PR details block
+ */
+function collectFenceFunctionIdentifierViolations(
+	sourceMarkdown: string,
+	translatedMarkdown: string,
+) {
+	return findFenceFunctionIdentifierMismatches(sourceMarkdown, translatedMarkdown).map(
+		(mismatch) => {
 			const needleOffset = findNeedleOffsetInFence(
 				sourceMarkdown,
 				mismatch.fenceIndex,
@@ -236,51 +263,139 @@ function formatFenceFunctionIdentifiersSection(
 			);
 			const startLine =
 				needleOffset === null ? 1 : lineNumberAtOffset(sourceMarkdown, needleOffset);
-			const location = formatViolationLocation(strings, startLine, startLine);
 
-			return `###### ${index + 1}. ${location}
-
-Keep \`${mismatch.sourceName}\` exactly as in the source.`;
-		})
-		.join("\n\n");
-
-	return `${instruction}
-
-##### \`fenceFunctionIdentifiers\`
-
-${items}`;
+			return {
+				startLine,
+				endLine: startLine,
+				body: `Keep \`${mismatch.sourceName}\` exactly as in the source.`,
+			} satisfies LocatedViolation;
+		},
+	);
 }
 
 /**
- * Formats markdown link guard violations for the PR details block.
+ * Collects markdown link guard violations with document line ranges.
  *
  * @param sourceMarkdown Original markdown
  * @param translatedMarkdown Translated markdown
- * @param hint Retry hint fallback
  *
- * @returns Guard subsection body
+ * @returns Located violations for the PR details block
  */
-function formatMarkdownLinksSection(
-	sourceMarkdown: string,
-	translatedMarkdown: string,
-	hint: string,
-) {
-	const violations = findMarkdownLinkViolations(sourceMarkdown, translatedMarkdown);
-	const instruction = extractHintInstruction(hint);
+function collectMarkdownLinkViolations(sourceMarkdown: string, translatedMarkdown: string) {
+	return findMarkdownLinkViolations(sourceMarkdown, translatedMarkdown).map((violation) => ({
+		startLine: violation.startLine,
+		endLine: violation.endLine,
+		body: violation.message,
+	}));
+}
 
-	if (violations.length === 0) {
-		return `${instruction}\n\n##### \`markdownLinksPreserved\`\n\n${hint}`;
+/**
+ * Collects MDX spacing guard violations with document line ranges.
+ *
+ * @param translatedMarkdown Translated markdown
+ *
+ * @returns Located violations for the PR details block
+ */
+function collectMdxSpacingViolations(translatedMarkdown: string) {
+	return findMdxSpacingViolationDetails(translatedMarkdown).map((violation) => ({
+		startLine: violation.startLine,
+		endLine: violation.endLine,
+		body: `${violation.label}: …${violation.excerpt}…`,
+	}));
+}
+
+/**
+ * Collects sentence-case heading guard violations with document line ranges.
+ *
+ * @param translatedMarkdown Translated markdown
+ *
+ * @returns Located violations for the PR details block
+ */
+function collectSentenceCaseHeadingViolations(translatedMarkdown: string) {
+	return findSentenceCaseHeadingViolationDetails(translatedMarkdown).map((violation) => ({
+		startLine: violation.lineNumber,
+		endLine: violation.lineNumber,
+		body: violation.line,
+	}));
+}
+
+/**
+ * Collects extra markdown link guard violations with document line ranges.
+ *
+ * @param sourceMarkdown Original markdown
+ * @param translatedMarkdown Translated markdown
+ *
+ * @returns Located violations for the PR details block
+ */
+function collectExtraMarkdownLinkViolations(sourceMarkdown: string, translatedMarkdown: string) {
+	return findExtraMarkdownLinkViolationDetails(sourceMarkdown, translatedMarkdown).map(
+		(violation) => ({
+			startLine: violation.lineNumber,
+			endLine: violation.lineNumber,
+			body: `Extra URL: \`${violation.url}\``,
+		}),
+	);
+}
+
+/**
+ * Collects frontmatter guard violations with document line ranges.
+ *
+ * @param sourceMarkdown Original markdown
+ * @param translatedMarkdown Translated markdown
+ *
+ * @returns Located violations for the PR details block
+ */
+function collectFrontmatterViolations(sourceMarkdown: string, translatedMarkdown: string) {
+	const sourceMatch = MARKDOWN_REGEXES.frontmatter.exec(sourceMarkdown);
+	MARKDOWN_REGEXES.frontmatter.lastIndex = 0;
+	if (!sourceMatch) {
+		return [];
 	}
 
-	const items = violations
-		.map((violation, index) => `###### ${index + 1}. ${violation.message}`)
-		.join("\n\n");
+	MARKDOWN_REGEXES.frontmatter.lastIndex = 0;
+	const translatedMatch = MARKDOWN_REGEXES.frontmatter.exec(translatedMarkdown);
+	MARKDOWN_REGEXES.frontmatter.lastIndex = 0;
+	if (translatedMatch) {
+		return [];
+	}
 
-	return `${instruction}
+	const endOffset = sourceMatch[0].length;
 
-##### \`markdownLinksPreserved\`
+	return [
+		{
+			startLine: 1,
+			endLine: lineNumberAtOffset(sourceMarkdown, Math.max(0, endOffset - 1)),
+			body: "YAML frontmatter block missing from translation.",
+		},
+	];
+}
 
-${items}`;
+/**
+ * Collects headings-preserved guard violations with document line ranges.
+ *
+ * @param sourceMarkdown Original markdown
+ * @param translatedMarkdown Translated markdown
+ *
+ * @returns Located violations for the PR details block
+ */
+function collectHeadingsPreservedViolations(sourceMarkdown: string, translatedMarkdown: string) {
+	const sourceHeadingCount = (sourceMarkdown.match(MARKDOWN_REGEXES.headings) ?? []).length;
+	const translatedHeadingCount = (translatedMarkdown.match(MARKDOWN_REGEXES.headings) ?? []).length;
+
+	if (sourceHeadingCount === 0 || translatedHeadingCount > 0) {
+		return [];
+	}
+
+	const firstHeading = /^#{1,6}\s.+$/m.exec(sourceMarkdown);
+	const line = firstHeading ? lineNumberAtOffset(sourceMarkdown, firstHeading.index) : 1;
+
+	return [
+		{
+			startLine: line,
+			endLine: line,
+			body: firstHeading?.[0].trim() ?? "All markdown headings were removed.",
+		},
+	];
 }
 
 /**
@@ -288,17 +403,23 @@ ${items}`;
  *
  * @param guardId Post-translation guard identifier
  * @param hint Retry hint text
+ * @param strings Locale strings for reviewer warnings
  *
  * @returns Guard subsection body
  */
-function formatHintOnlySection(guardId: string, hint: string) {
+function formatHintOnlySection(
+	guardId: PostTranslationGuardId,
+	hint: string,
+	strings: LocalePRBodyStrings["reviewerWarnings"],
+) {
 	const instruction = extractHintInstruction(hint);
 
-	return `${instruction}
-
-##### \`${guardId}\`
-
-${hint}`;
+	return formatLocatedViolationsSection(
+		guardId,
+		instruction,
+		[{ startLine: 1, endLine: 1, body: hint }],
+		strings,
+	);
 }
 
 /**
@@ -313,7 +434,7 @@ ${hint}`;
  * @returns Markdown subsection starting with `###`
  */
 function formatGuardSection(
-	guardId: string,
+	guardId: PostTranslationGuardId,
 	hints: readonly string[],
 	sourceMarkdown: string | null,
 	translatedMarkdown: string | null,
@@ -325,7 +446,7 @@ function formatGuardSection(
 	const body =
 		sourceMarkdown && translatedMarkdown ?
 			formatGuardSectionBody(guardId, sourceMarkdown, translatedMarkdown, hint, strings)
-		:	formatHintOnlySection(guardId, hint);
+		:	formatHintOnlySection(guardId, hint, strings);
 
 	return `### ${heading}
 
@@ -344,27 +465,43 @@ ${body}`;
  * @returns Guard subsection body without the `###` heading
  */
 function formatGuardSectionBody(
-	guardId: string,
+	guardId: PostTranslationGuardId,
 	sourceMarkdown: string,
 	translatedMarkdown: string,
 	hint: string,
 	strings: LocalePRBodyStrings["reviewerWarnings"],
 ) {
-	switch (guardId) {
-		case "fenceJsxStaticText":
-			return formatFenceJsxStaticTextSection(strings, sourceMarkdown, translatedMarkdown, hint);
-		case "fenceFunctionIdentifiers":
-			return formatFenceFunctionIdentifiersSection(
-				strings,
-				sourceMarkdown,
-				translatedMarkdown,
-				hint,
-			);
-		case "markdownLinksPreserved":
-			return formatMarkdownLinksSection(sourceMarkdown, translatedMarkdown, hint);
-		default:
-			return formatHintOnlySection(guardId, hint);
+	const instruction = extractHintInstruction(hint);
+
+	const violationsByGuard: Partial<Record<PostTranslationGuardId, () => LocatedViolation[]>> = {
+		[PostTranslationGuardId.fenceJsxStaticText]: () =>
+			collectFenceJsxStaticTextViolations(sourceMarkdown, translatedMarkdown),
+		[PostTranslationGuardId.fenceFunctionIdentifiers]: () =>
+			collectFenceFunctionIdentifierViolations(sourceMarkdown, translatedMarkdown),
+		[PostTranslationGuardId.markdownLinksPreserved]: () =>
+			collectMarkdownLinkViolations(sourceMarkdown, translatedMarkdown),
+		[PostTranslationGuardId.mdxSpacing]: () => collectMdxSpacingViolations(translatedMarkdown),
+		[PostTranslationGuardId.sentenceCaseHeadings]: () =>
+			collectSentenceCaseHeadingViolations(translatedMarkdown),
+		[PostTranslationGuardId.extraMarkdownLinks]: () =>
+			collectExtraMarkdownLinkViolations(sourceMarkdown, translatedMarkdown),
+		[PostTranslationGuardId.frontmatterPreserved]: () =>
+			collectFrontmatterViolations(sourceMarkdown, translatedMarkdown),
+		[PostTranslationGuardId.headingsPreserved]: () =>
+			collectHeadingsPreservedViolations(sourceMarkdown, translatedMarkdown),
+	};
+
+	const collectViolations = violationsByGuard[guardId];
+	if (!collectViolations) {
+		return formatHintOnlySection(guardId, hint, strings);
 	}
+
+	const violations = collectViolations();
+	if (violations.length === 0) {
+		return formatHintOnlySection(guardId, hint, strings);
+	}
+
+	return formatLocatedViolationsSection(guardId, instruction, violations, strings);
 }
 
 /**
@@ -387,7 +524,7 @@ export function buildReviewerWarningsMarkdown(
 		return "";
 	}
 
-	const groupedHints = new Map<string, string[]>();
+	const groupedHints = new Map<PostTranslationGuardId, string[]>();
 
 	for (const notice of reviewerNotices) {
 		const hints = groupedHints.get(notice.guardId) ?? [];

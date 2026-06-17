@@ -15,15 +15,6 @@ In React Labs posts, we write about projects in active research and development.
 
 </Intro>
 
-<Note>
-
-React Conf 2025 is scheduled for October 7–8 in Henderson, Nevada!
-
-We're looking for speakers to help us create talks about the features covered in this post. If you're interested in speaking at ReactConf, [please apply here](https://forms.reform.app/react-conf/call-for-speakers/) (no talk proposal required).
-
-For more info on tickets, free streaming, sponsoring, and more, see [the React Conf website](https://conf.react.dev).
-
-</Note>
 
 Today, we're excited to release documentation for two new experimental features that are ready for testing:
 
@@ -31,7 +22,6 @@ Today, we're excited to release documentation for two new experimental features 
 - [Activity](#activity)
 
 We're also sharing updates on new features currently in development:
-
 - [React Performance Tracks](#react-performance-tracks)
 - [Compiler IDE Extension](#compiler-ide-extension)
 - [Automatic Effect Dependencies](#automatic-effect-dependencies)
@@ -40,7 +30,15 @@ We're also sharing updates on new features currently in development:
 
 ---
 
-# New Experimental Features {/_new-experimental-features_/}
+# New Experimental Features {/*new-experimental-features*/}
+
+<Note>
+
+`<Activity />` has shipped in `react@19.2`.
+
+`<ViewTransition />` and `addTransitionType` are now available in `react@canary`.
+
+</Note>
 
 View Transitions and Activity are now ready for testing in `react@experimental`. These features have been tested in production and are stable, but the final API may still change as we incorporate feedback.
 
@@ -55,7 +53,7 @@ Read on to learn how to use these features in your app, or check out the newly p
 - [`addTransitionType`](/reference/react/addTransitionType): A function that allows you to specify the cause of a Transition.
 - [`<Activity>`](/reference/react/Activity): A component that lets you hide and show parts of the UI.
 
-## View Transitions {/_view-transitions_/}
+## View Transitions {/*view-transitions*/}
 
 React View Transitions are a new experimental feature that makes it easier to add animations to UI transitions in your app. Under-the-hood, these animations use the new [`startViewTransition`](https://developer.mozilla.org/en-US/docs/Web/API/Document/startViewTransition) API available in most modern browsers.
 
@@ -64,7 +62,7 @@ To opt-in to animating an element, wrap it in the new `<ViewTransition>` compone
 ```js
 // "what" to animate.
 <ViewTransition>
-	<div>animate me</div>
+  <div>animate me</div>
 </ViewTransition>
 ```
 
@@ -106,7 +104,6 @@ If you're familiar with the browser's View Transition API and want to know how R
 In this post, let's take a look at a few examples of how to use View Transitions.
 
 We'll start with this app, which doesn't animate any of the following interactions:
-
 - Click a video to view the details.
 - Click "back" to go back to the feed.
 - Type in the list to filter the videos.
@@ -114,263 +111,260 @@ We'll start with this app, which doesn't animate any of the following interactio
 <Sandpack>
 
 ```js src/App.js active
-import TalkDetails from "./Details";
-import Home from "./Home";
-import { useRouter } from "./router";
+import TalkDetails from './Details'; import Home from './Home'; import {useRouter} from './router';
 
 export default function App() {
-	const { url } = useRouter();
+  const {url} = useRouter();
 
-	// 🚩This version doesn't include any animations yet
-	return url === "/" ? <Home /> : <TalkDetails />;
+  // 🚩This version doesn't include any animations yet
+  return url === '/' ? <Home /> : <TalkDetails />;
 }
 ```
 
 ```js src/Details.js
-import { Suspense, use } from "react";
-
 import { fetchVideo, fetchVideoDetails } from "./data";
-import { ChevronLeft } from "./Icons";
-import Layout from "./Layout";
-import { useRouter } from "./router";
 import { Thumbnail, VideoControls } from "./Videos";
+import { useRouter } from "./router";
+import Layout from "./Layout";
+import { use, Suspense } from "react";
+import { ChevronLeft } from "./Icons";
 
 function VideoInfo({ id }) {
-	const details = use(fetchVideoDetails(id));
-	return (
-		<>
-			<p className="info-title">{details.title}</p>
-			<p className="info-description">{details.description}</p>
-		</>
-	);
+  const details = use(fetchVideoDetails(id));
+  return (
+    <>
+      <p className="info-title">{details.title}</p>
+      <p className="info-description">{details.description}</p>
+    </>
+  );
 }
 
 function VideoInfoFallback() {
-	return (
-		<>
-			<div className="fallback title"></div>
-			<div className="fallback description"></div>
-		</>
-	);
+  return (
+    <>
+      <div className="fallback title"></div>
+      <div className="fallback description"></div>
+    </>
+  );
 }
 
 export default function Details() {
-	const { url, navigateBack } = useRouter();
-	const videoId = url.split("/").pop();
-	const video = use(fetchVideo(videoId));
+  const { url, navigateBack } = useRouter();
+  const videoId = url.split("/").pop();
+  const video = use(fetchVideo(videoId));
 
-	return (
-		<Layout
-			heading={
-				<div
-					className="fit back"
-					onClick={() => {
-						navigateBack("/");
-					}}
-				>
-					<ChevronLeft /> Back
-				</div>
-			}
-		>
-			<div className="details">
-				<Thumbnail video={video} large>
-					<VideoControls />
-				</Thumbnail>
-				<Suspense fallback={<VideoInfoFallback />}>
-					<VideoInfo id={video.id} />
-				</Suspense>
-			</div>
-		</Layout>
-	);
+  return (
+    <Layout
+      heading={
+        <div
+          className="fit back"
+          onClick={() => {
+            navigateBack("/");
+          }}
+        >
+          <ChevronLeft /> Back
+        </div>
+      }
+    >
+      <div className="details">
+        <Thumbnail video={video} large>
+          <VideoControls />
+        </Thumbnail>
+        <Suspense fallback={<VideoInfoFallback />}>
+          <VideoInfo id={video.id} />
+        </Suspense>
+      </div>
+    </Layout>
+  );
 }
+
 ```
 
 ```js src/Home.js
-import { use, useId, useState } from "react";
-
-import { fetchVideos } from "./data";
-import { IconSearch } from "./Icons";
-import Layout from "./Layout";
 import { Video } from "./Videos";
+import Layout from "./Layout";
+import { fetchVideos } from "./data";
+import { useId, useState, use } from "react";
+import { IconSearch } from "./Icons";
 
 function SearchInput({ value, onChange }) {
-	const id = useId();
-	return (
-		<form className="search" onSubmit={(e) => e.preventDefault()}>
-			<label htmlFor={id} className="sr-only">
-				Search
-			</label>
-			<div className="search-input">
-				<div className="search-icon">
-					<IconSearch />
-				</div>
-				<input
-					type="text"
-					id={id}
-					placeholder="Search"
-					value={value}
-					onChange={(e) => onChange(e.target.value)}
-				/>
-			</div>
-		</form>
-	);
+  const id = useId();
+  return (
+    <form className="search" onSubmit={(e) => e.preventDefault()}>
+      <label htmlFor={id} className="sr-only">
+        Search
+      </label>
+      <div className="search-input">
+        <div className="search-icon">
+          <IconSearch />
+        </div>
+        <input
+          type="text"
+          id={id}
+          placeholder="Search"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      </div>
+    </form>
+  );
 }
 
 function filterVideos(videos, query) {
-	const keywords = query
-		.toLowerCase()
-		.split(" ")
-		.filter((s) => s !== "");
-	if (keywords.length === 0) {
-		return videos;
-	}
-	return videos.filter((video) => {
-		const words = (video.title + " " + video.description).toLowerCase().split(" ");
-		return keywords.every((kw) => words.some((w) => w.includes(kw)));
-	});
+  const keywords = query
+    .toLowerCase()
+    .split(" ")
+    .filter((s) => s !== "");
+  if (keywords.length === 0) {
+    return videos;
+  }
+  return videos.filter((video) => {
+    const words = (video.title + " " + video.description)
+      .toLowerCase()
+      .split(" ");
+    return keywords.every((kw) => words.some((w) => w.includes(kw)));
+  });
 }
 
 export default function Home() {
-	const videos = use(fetchVideos());
-	const count = videos.length;
-	const [searchText, setSearchText] = useState("");
-	const foundVideos = filterVideos(videos, searchText);
-	return (
-		<Layout heading={<div className="fit">{count} Videos</div>}>
-			<SearchInput value={searchText} onChange={setSearchText} />
-			<div className="video-list">
-				{foundVideos.length === 0 && <div className="no-results">No results</div>}
-				<div className="videos">
-					{foundVideos.map((video) => (
-						<Video key={video.id} video={video} />
-					))}
-				</div>
-			</div>
-		</Layout>
-	);
+  const videos = use(fetchVideos());
+  const count = videos.length;
+  const [searchText, setSearchText] = useState("");
+  const foundVideos = filterVideos(videos, searchText);
+  return (
+    <Layout heading={<div className="fit">{count} Videos</div>}>
+      <SearchInput value={searchText} onChange={setSearchText} />
+      <div className="video-list">
+        {foundVideos.length === 0 && (
+          <div className="no-results">No results</div>
+        )}
+        <div className="videos">
+          {foundVideos.map((video) => (
+            <Video key={video.id} video={video} />
+          ))}
+        </div>
+      </div>
+    </Layout>
+  );
 }
+
 ```
 
 ```js src/Icons.js
 export function ChevronLeft() {
-	return (
-		<svg
-			className="chevron-left"
-			xmlns="http://www.w3.org/2000/svg"
-			width="20"
-			height="20"
-			viewBox="0 0 20 20"
-		>
-			<g fill="none" fillRule="evenodd" transform="translate(-446 -398)">
-				<path
-					fill="currentColor"
-					fillRule="nonzero"
-					d="M95.8838835,240.366117 C95.3957281,239.877961 94.6042719,239.877961 94.1161165,240.366117 C93.6279612,240.854272 93.6279612,241.645728 94.1161165,242.133883 L98.6161165,246.633883 C99.1042719,247.122039 99.8957281,247.122039 100.383883,246.633883 L104.883883,242.133883 C105.372039,241.645728 105.372039,240.854272 104.883883,240.366117 C104.395728,239.877961 103.604272,239.877961 103.116117,240.366117 L99.5,243.982233 L95.8838835,240.366117 Z"
-					transform="translate(356.5 164.5)"
-				/>
-				<polygon points="446 418 466 418 466 398 446 398" />
-			</g>
-		</svg>
-	);
+  return (
+    <svg
+      className="chevron-left"
+      xmlns="http://www.w3.org/2000/svg"
+      width="20"
+      height="20"
+      viewBox="0 0 20 20">
+      <g fill="none" fillRule="evenodd" transform="translate(-446 -398)">
+        <path
+          fill="currentColor"
+          fillRule="nonzero"
+          d="M95.8838835,240.366117 C95.3957281,239.877961 94.6042719,239.877961 94.1161165,240.366117 C93.6279612,240.854272 93.6279612,241.645728 94.1161165,242.133883 L98.6161165,246.633883 C99.1042719,247.122039 99.8957281,247.122039 100.383883,246.633883 L104.883883,242.133883 C105.372039,241.645728 105.372039,240.854272 104.883883,240.366117 C104.395728,239.877961 103.604272,239.877961 103.116117,240.366117 L99.5,243.982233 L95.8838835,240.366117 Z"
+          transform="translate(356.5 164.5)"
+        />
+        <polygon points="446 418 466 418 466 398 446 398" />
+      </g>
+    </svg>
+  );
 }
 
 export function PauseIcon() {
-	return (
-		<svg
-			className="control-icon"
-			style={{ padding: "4px" }}
-			width="100"
-			height="100"
-			viewBox="0 0 512 512"
-			fill="none"
-			xmlns="http://www.w3.org/2000/svg"
-		>
-			<path
-				fillRule="evenodd"
-				clipRule="evenodd"
-				d="M256 0C114.617 0 0 114.615 0 256s114.617 256 256 256 256-114.615 256-256S397.383 0 256 0zm-32 320c0 8.836-7.164 16-16 16h-32c-8.836 0-16-7.164-16-16V192c0-8.836 7.164-16 16-16h32c8.836 0 16 7.164 16 16v128zm128 0c0 8.836-7.164 16-16 16h-32c-8.836 0-16-7.164-16-16V192c0-8.836 7.164-16 16-16h32c8.836 0 16 7.164 16 16v128z"
-				fill="currentColor"
-			/>
-		</svg>
-	);
+  return (
+    <svg
+      className="control-icon"
+      style={{padding: '4px'}}
+      width="100"
+      height="100"
+      viewBox="0 0 512 512"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg">
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M256 0C114.617 0 0 114.615 0 256s114.617 256 256 256 256-114.615 256-256S397.383 0 256 0zm-32 320c0 8.836-7.164 16-16 16h-32c-8.836 0-16-7.164-16-16V192c0-8.836 7.164-16 16-16h32c8.836 0 16 7.164 16 16v128zm128 0c0 8.836-7.164 16-16 16h-32c-8.836 0-16-7.164-16-16V192c0-8.836 7.164-16 16-16h32c8.836 0 16 7.164 16 16v128z"
+        fill="currentColor"
+      />
+    </svg>
+  );
 }
 
 export function PlayIcon() {
-	return (
-		<svg
-			className="control-icon"
-			width="100"
-			height="100"
-			viewBox="0 0 72 72"
-			fill="none"
-			xmlns="http://www.w3.org/2000/svg"
-		>
-			<path
-				fillRule="evenodd"
-				clipRule="evenodd"
-				d="M36 69C54.2254 69 69 54.2254 69 36C69 17.7746 54.2254 3 36 3C17.7746 3 3 17.7746 3 36C3 54.2254 17.7746 69 36 69ZM52.1716 38.6337L28.4366 51.5801C26.4374 52.6705 24 51.2235 24 48.9464V23.0536C24 20.7764 26.4374 19.3295 28.4366 20.4199L52.1716 33.3663C54.2562 34.5034 54.2562 37.4966 52.1716 38.6337Z"
-				fill="currentColor"
-			/>
-		</svg>
-	);
+  return (
+    <svg
+      className="control-icon"
+      width="100"
+      height="100"
+      viewBox="0 0 72 72"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg">
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M36 69C54.2254 69 69 54.2254 69 36C69 17.7746 54.2254 3 36 3C17.7746 3 3 17.7746 3 36C3 54.2254 17.7746 69 36 69ZM52.1716 38.6337L28.4366 51.5801C26.4374 52.6705 24 51.2235 24 48.9464V23.0536C24 20.7764 26.4374 19.3295 28.4366 20.4199L52.1716 33.3663C54.2562 34.5034 54.2562 37.4966 52.1716 38.6337Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
 }
-export function Heart({ liked, animate }) {
-	return (
-		<>
-			<svg
-				className="absolute overflow-visible"
-				viewBox="0 0 24 24"
-				fill="none"
-				xmlns="http://www.w3.org/2000/svg"
-			>
-				<circle
-					className={`circle ${liked ? "liked" : ""} ${animate ? "animate" : ""}`}
-					cx="12"
-					cy="12"
-					r="11.5"
-					fill="transparent"
-					strokeWidth="0"
-					stroke="currentColor"
-				/>
-			</svg>
+export function Heart({liked, animate}) {
+  return (
+    <>
+      <svg
+        className="absolute overflow-visible"
+        viewBox="0 0 24 24"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg">
+        <circle
+          className={`circle ${liked ? 'liked' : ''} ${animate ? 'animate' : ''}`}
+          cx="12"
+          cy="12"
+          r="11.5"
+          fill="transparent"
+          strokeWidth="0"
+          stroke="currentColor"
+        />
+      </svg>
 
-			<svg
-				className={`heart ${liked ? "liked" : ""} ${animate ? "animate" : ""}`}
-				viewBox="0 0 24 24"
-				fill="none"
-				xmlns="http://www.w3.org/2000/svg"
-			>
-				{liked ?
-					<path
-						d="M12 23a.496.496 0 0 1-.26-.074C7.023 19.973 0 13.743 0 8.68c0-4.12 2.322-6.677 6.058-6.677 2.572 0 5.108 2.387 5.134 2.41l.808.771.808-.771C12.834 4.387 15.367 2 17.935 2 21.678 2 24 4.558 24 8.677c0 5.06-7.022 11.293-11.74 14.246a.496.496 0 0 1-.26.074V23z"
-						fill="currentColor"
-					/>
-				:	<path
-						fillRule="evenodd"
-						clipRule="evenodd"
-						d="m12 5.184-.808-.771-.004-.004C11.065 4.299 8.522 2.003 6 2.003c-3.736 0-6 2.558-6 6.677 0 4.47 5.471 9.848 10 13.079.602.43 1.187.82 1.74 1.167A.497.497 0 0 0 12 23v-.003c.09 0 .182-.026.26-.074C16.977 19.97 24 13.737 24 8.677 24 4.557 21.743 2 18 2c-2.569 0-5.166 2.387-5.192 2.413L12 5.184zm-.002 15.525c2.071-1.388 4.477-3.342 6.427-5.47C20.72 12.733 22 10.401 22 8.677c0-1.708-.466-2.855-1.087-3.55C20.316 4.459 19.392 4 18 4c-.726 0-1.63.364-2.5.9-.67.412-1.148.82-1.266.92-.03.025-.037.031-.019.014l-.013.013L12 7.949 9.832 5.88a10.08 10.08 0 0 0-1.33-.977C7.633 4.367 6.728 4.003 6 4.003c-1.388 0-2.312.459-2.91 1.128C2.466 5.826 2 6.974 2 8.68c0 1.726 1.28 4.058 3.575 6.563 1.948 2.127 4.352 4.078 6.423 5.466z"
-						fill="currentColor"
-					/>
-				}
-			</svg>
-		</>
-	);
+      <svg
+        className={`heart ${liked ? 'liked' : ''} ${animate ? 'animate' : ''}`}
+        viewBox="0 0 24 24"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg">
+        {liked ? (
+          <path
+            d="M12 23a.496.496 0 0 1-.26-.074C7.023 19.973 0 13.743 0 8.68c0-4.12 2.322-6.677 6.058-6.677 2.572 0 5.108 2.387 5.134 2.41l.808.771.808-.771C12.834 4.387 15.367 2 17.935 2 21.678 2 24 4.558 24 8.677c0 5.06-7.022 11.293-11.74 14.246a.496.496 0 0 1-.26.074V23z"
+            fill="currentColor"
+          />
+        ) : (
+          <path
+            fillRule="evenodd"
+            clipRule="evenodd"
+            d="m12 5.184-.808-.771-.004-.004C11.065 4.299 8.522 2.003 6 2.003c-3.736 0-6 2.558-6 6.677 0 4.47 5.471 9.848 10 13.079.602.43 1.187.82 1.74 1.167A.497.497 0 0 0 12 23v-.003c.09 0 .182-.026.26-.074C16.977 19.97 24 13.737 24 8.677 24 4.557 21.743 2 18 2c-2.569 0-5.166 2.387-5.192 2.413L12 5.184zm-.002 15.525c2.071-1.388 4.477-3.342 6.427-5.47C20.72 12.733 22 10.401 22 8.677c0-1.708-.466-2.855-1.087-3.55C20.316 4.459 19.392 4 18 4c-.726 0-1.63.364-2.5.9-.67.412-1.148.82-1.266.92-.03.025-.037.031-.019.014l-.013.013L12 7.949 9.832 5.88a10.08 10.08 0 0 0-1.33-.977C7.633 4.367 6.728 4.003 6 4.003c-1.388 0-2.312.459-2.91 1.128C2.466 5.826 2 6.974 2 8.68c0 1.726 1.28 4.058 3.575 6.563 1.948 2.127 4.352 4.078 6.423 5.466z"
+            fill="currentColor"
+          />
+        )}
+      </svg>
+    </>
+  );
 }
 
 export function IconSearch(props) {
-	return (
-		<svg width="1em" height="1em" viewBox="0 0 20 20">
-			<path
-				d="M14.386 14.386l4.0877 4.0877-4.0877-4.0877c-2.9418 2.9419-7.7115 2.9419-10.6533 0-2.9419-2.9418-2.9419-7.7115 0-10.6533 2.9418-2.9419 7.7115-2.9419 10.6533 0 2.9419 2.9418 2.9419 7.7115 0 10.6533z"
-				stroke="currentColor"
-				fill="none"
-				strokeWidth="2"
-				fillRule="evenodd"
-				strokeLinecap="round"
-				strokeLinejoin="round"
-			></path>
-		</svg>
-	);
+  return (
+    <svg width="1em" height="1em" viewBox="0 0 20 20">
+      <path
+        d="M14.386 14.386l4.0877 4.0877-4.0877-4.0877c-2.9418 2.9419-7.7115 2.9419-10.6533 0-2.9419-2.9418-2.9419-7.7115 0-10.6533 2.9418-2.9419 7.7115-2.9419 10.6533 0 2.9419 2.9418 2.9419 7.7115 0 10.6533z"
+        stroke="currentColor"
+        fill="none"
+        strokeWidth="2"
+        fillRule="evenodd"
+        strokeLinecap="round"
+        strokeLinejoin="round"></path>
+    </svg>
+  );
 }
 ```
 
@@ -378,154 +372,155 @@ export function IconSearch(props) {
 import { useIsNavPending } from "./router";
 
 export default function Page({ heading, children }) {
-	const isPending = useIsNavPending();
-	return (
-		<div className="page">
-			<div className="top">
-				<div className="top-nav">
-					{heading}
-					{isPending && <span className="loader"></span>}
-				</div>
-			</div>
+  const isPending = useIsNavPending();
+  return (
+    <div className="page">
+      <div className="top">
+        <div className="top-nav">
+          {heading}
+          {isPending && <span className="loader"></span>}
+        </div>
+      </div>
 
-			<div className="bottom">
-				<div className="content">{children}</div>
-			</div>
-		</div>
-	);
+      <div className="bottom">
+        <div className="content">{children}</div>
+      </div>
+    </div>
+  );
 }
 ```
 
 ```js src/LikeButton.js
-import { useState } from "react";
-
-import { Heart } from "./Icons";
+import {useState} from 'react';
+import {Heart} from './Icons';
 
 // A hack since we don't actually have a backend.
 // Unlike local state, this survives videos being filtered.
 const likedVideos = new Set();
 
-export default function LikeButton({ video }) {
-	const [isLiked, setIsLiked] = useState(() => likedVideos.has(video.id));
-	const [animate, setAnimate] = useState(false);
-	return (
-		<button
-			className={`like-button ${isLiked && "liked"}`}
-			aria-label={isLiked ? "Unsave" : "Save"}
-			onClick={() => {
-				const nextIsLiked = !isLiked;
-				if (nextIsLiked) {
-					likedVideos.add(video.id);
-				} else {
-					likedVideos.delete(video.id);
-				}
-				setAnimate(true);
-				setIsLiked(nextIsLiked);
-			}}
-		>
-			<Heart liked={isLiked} animate={animate} />
-		</button>
-	);
+export default function LikeButton({video}) {
+  const [isLiked, setIsLiked] = useState(() => likedVideos.has(video.id));
+  const [animate, setAnimate] = useState(false);
+  return (
+    <button
+      className={`like-button ${isLiked && 'liked'}`}
+      aria-label={isLiked ? 'Unsave' : 'Save'}
+      onClick={() => {
+        const nextIsLiked = !isLiked;
+        if (nextIsLiked) {
+          likedVideos.add(video.id);
+        } else {
+          likedVideos.delete(video.id);
+        }
+        setAnimate(true);
+        setIsLiked(nextIsLiked);
+      }}>
+      <Heart liked={isLiked} animate={animate} />
+    </button>
+  );
 }
 ```
 
 ```js src/Videos.js
-import { startTransition, useState } from "react";
-
-import { PauseIcon, PlayIcon } from "./Icons";
+import { useState } from "react";
 import LikeButton from "./LikeButton";
 import { useRouter } from "./router";
+import { PauseIcon, PlayIcon } from "./Icons";
+import { startTransition } from "react";
 
 export function VideoControls() {
-	const [isPlaying, setIsPlaying] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
 
-	return (
-		<span
-			className="controls"
-			onClick={() =>
-				startTransition(() => {
-					setIsPlaying((p) => !p);
-				})
-			}
-		>
-			{isPlaying ?
-				<PauseIcon />
-			:	<PlayIcon />}
-		</span>
-	);
+  return (
+    <span
+      className="controls"
+      onClick={() =>
+        startTransition(() => {
+          setIsPlaying((p) => !p);
+        })
+      }
+    >
+      {isPlaying ? <PauseIcon /> : <PlayIcon />}
+    </span>
+  );
 }
 
 export function Thumbnail({ video, children }) {
-	return (
-		<div aria-hidden="true" tabIndex={-1} className={`thumbnail ${video.image}`}>
-			{children}
-		</div>
-	);
+  return (
+    <div
+      aria-hidden="true"
+      tabIndex={-1}
+      className={`thumbnail ${video.image}`}
+    >
+      {children}
+    </div>
+  );
 }
 
 export function Video({ video }) {
-	const { navigate } = useRouter();
+  const { navigate } = useRouter();
 
-	return (
-		<div className="video">
-			<div
-				className="link"
-				onClick={(e) => {
-					e.preventDefault();
-					navigate(`/video/${video.id}`);
-				}}
-			>
-				<Thumbnail video={video}></Thumbnail>
+  return (
+    <div className="video">
+      <div
+        className="link"
+        onClick={(e) => {
+          e.preventDefault();
+          navigate(`/video/${video.id}`);
+        }}
+      >
+        <Thumbnail video={video}></Thumbnail>
 
-				<div className="info">
-					<div className="video-title">{video.title}</div>
-					<div className="video-description">{video.description}</div>
-				</div>
-			</div>
-			<LikeButton video={video} />
-		</div>
-	);
+        <div className="info">
+          <div className="video-title">{video.title}</div>
+          <div className="video-description">{video.description}</div>
+        </div>
+      </div>
+      <LikeButton video={video} />
+    </div>
+  );
 }
 ```
 
+
 ```js src/data.js hidden
 const videos = [
-	{
-		id: "1",
-		title: "First video",
-		description: "Video description",
-		image: "blue",
-	},
-	{
-		id: "2",
-		title: "Second video",
-		description: "Video description",
-		image: "red",
-	},
-	{
-		id: "3",
-		title: "Third video",
-		description: "Video description",
-		image: "green",
-	},
-	{
-		id: "4",
-		title: "Fourth video",
-		description: "Video description",
-		image: "purple",
-	},
-	{
-		id: "5",
-		title: "Fifth video",
-		description: "Video description",
-		image: "yellow",
-	},
-	{
-		id: "6",
-		title: "Sixth video",
-		description: "Video description",
-		image: "gray",
-	},
+  {
+    id: '1',
+    title: 'First video',
+    description: 'Video description',
+    image: 'blue',
+  },
+  {
+    id: '2',
+    title: 'Second video',
+    description: 'Video description',
+    image: 'red',
+  },
+  {
+    id: '3',
+    title: 'Third video',
+    description: 'Video description',
+    image: 'green',
+  },
+  {
+    id: '4',
+    title: 'Fourth video',
+    description: 'Video description',
+    image: 'purple',
+  },
+  {
+    id: '5',
+    title: 'Fifth video',
+    description: 'Video description',
+    image: 'yellow',
+  },
+  {
+    id: '6',
+    title: 'Sixth video',
+    description: 'Video description',
+    image: 'gray',
+  },
 ];
 
 let videosCache = new Map();
@@ -534,774 +529,732 @@ let videoDetailsCache = new Map();
 const VIDEO_DELAY = 1;
 const VIDEO_DETAILS_DELAY = 1000;
 export function fetchVideos() {
-	if (videosCache.has(0)) {
-		return videosCache.get(0);
-	}
-	const promise = new Promise((resolve) => {
-		setTimeout(() => {
-			resolve(videos);
-		}, VIDEO_DELAY);
-	});
-	videosCache.set(0, promise);
-	return promise;
+  if (videosCache.has(0)) {
+    return videosCache.get(0);
+  }
+  const promise = new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(videos);
+    }, VIDEO_DELAY);
+  });
+  videosCache.set(0, promise);
+  return promise;
 }
 
 export function fetchVideo(id) {
-	if (videoCache.has(id)) {
-		return videoCache.get(id);
-	}
-	const promise = new Promise((resolve) => {
-		setTimeout(() => {
-			resolve(videos.find((video) => video.id === id));
-		}, VIDEO_DELAY);
-	});
-	videoCache.set(id, promise);
-	return promise;
+  if (videoCache.has(id)) {
+    return videoCache.get(id);
+  }
+  const promise = new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(videos.find((video) => video.id === id));
+    }, VIDEO_DELAY);
+  });
+  videoCache.set(id, promise);
+  return promise;
 }
 
 export function fetchVideoDetails(id) {
-	if (videoDetailsCache.has(id)) {
-		return videoDetailsCache.get(id);
-	}
-	const promise = new Promise((resolve) => {
-		setTimeout(() => {
-			resolve(videos.find((video) => video.id === id));
-		}, VIDEO_DETAILS_DELAY);
-	});
-	videoDetailsCache.set(id, promise);
-	return promise;
+  if (videoDetailsCache.has(id)) {
+    return videoDetailsCache.get(id);
+  }
+  const promise = new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(videos.find((video) => video.id === id));
+    }, VIDEO_DETAILS_DELAY);
+  });
+  videoDetailsCache.set(id, promise);
+  return promise;
 }
 ```
 
 ```js src/router.js
-import { createContext, use, useEffect, useLayoutEffect, useState, useTransition } from "react";
+import {
+  useState,
+  createContext,
+  use,
+  useTransition,
+  useLayoutEffect,
+  useEffect,
+} from "react";
 
 const RouterContext = createContext({ url: "/", params: {} });
 
 export function useRouter() {
-	return use(RouterContext);
+  return use(RouterContext);
 }
 
 export function useIsNavPending() {
-	return use(RouterContext).isPending;
+  return use(RouterContext).isPending;
 }
 
 export function Router({ children }) {
-	const [routerState, setRouterState] = useState({
-		pendingNav: () => {},
-		url: document.location.pathname,
-	});
-	const [isPending, startTransition] = useTransition();
+  const [routerState, setRouterState] = useState({
+    pendingNav: () => {},
+    url: document.location.pathname,
+  });
+  const [isPending, startTransition] = useTransition();
 
-	function go(url) {
-		setRouterState({
-			url,
-			pendingNav() {
-				window.history.pushState({}, "", url);
-			},
-		});
-	}
-	function navigate(url) {
-		// Update router state in transition.
-		startTransition(() => {
-			go(url);
-		});
-	}
+  function go(url) {
+    setRouterState({
+      url,
+      pendingNav() {
+        window.history.pushState({}, "", url);
+      },
+    });
+  }
+  function navigate(url) {
+    // Update router state in transition.
+    startTransition(() => {
+      go(url);
+    });
+  }
 
-	function navigateBack(url) {
-		// Update router state in transition.
-		startTransition(() => {
-			go(url);
-		});
-	}
+  function navigateBack(url) {
+    // Update router state in transition.
+    startTransition(() => {
+      go(url);
+    });
+  }
 
-	useEffect(() => {
-		function handlePopState() {
-			// This should not animate because restoration has to be synchronous.
-			// Even though it's a transition.
-			startTransition(() => {
-				setRouterState({
-					url: document.location.pathname + document.location.search,
-					pendingNav() {
-						// Noop. URL has already updated.
-					},
-				});
-			});
-		}
-		window.addEventListener("popstate", handlePopState);
-		return () => {
-			window.removeEventListener("popstate", handlePopState);
-		};
-	}, []);
-	const pendingNav = routerState.pendingNav;
-	useLayoutEffect(() => {
-		pendingNav();
-	}, [pendingNav]);
+  useEffect(() => {
+    function handlePopState() {
+      // This should not animate because restoration has to be synchronous.
+      // Even though it's a transition.
+      startTransition(() => {
+        setRouterState({
+          url: document.location.pathname + document.location.search,
+          pendingNav() {
+            // Noop. URL has already updated.
+          },
+        });
+      });
+    }
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, []);
+  const pendingNav = routerState.pendingNav;
+  useLayoutEffect(() => {
+    pendingNav();
+  }, [pendingNav]);
 
-	return (
-		<RouterContext
-			value={{
-				url: routerState.url,
-				navigate,
-				navigateBack,
-				isPending,
-				params: {},
-			}}
-		>
-			{children}
-		</RouterContext>
-	);
+  return (
+    <RouterContext
+      value={{
+        url: routerState.url,
+        navigate,
+        navigateBack,
+        isPending,
+        params: {},
+      }}
+    >
+      {children}
+    </RouterContext>
+  );
 }
 ```
 
 ```css src/styles.css
 @font-face {
-	font-family: Optimistic Text;
-	src: url(https://react.dev/fonts/Optimistic_Text_W_Rg.woff2) format("woff2");
-	font-weight: 400;
-	font-style: normal;
-	font-display: swap;
+  font-family: Optimistic Text;
+  src: url(https://react.dev/fonts/Optimistic_Text_W_Rg.woff2) format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
-	font-family: Optimistic Text;
-	src: url(https://react.dev/fonts/Optimistic_Text_W_Md.woff2) format("woff2");
-	font-weight: 500;
-	font-style: normal;
-	font-display: swap;
+  font-family: Optimistic Text;
+  src: url(https://react.dev/fonts/Optimistic_Text_W_Md.woff2) format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
-	font-family: Optimistic Text;
-	src: url(https://react.dev/fonts/Optimistic_Text_W_Bd.woff2) format("woff2");
-	font-weight: 600;
-	font-style: normal;
-	font-display: swap;
+  font-family: Optimistic Text;
+  src: url(https://react.dev/fonts/Optimistic_Text_W_Bd.woff2) format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
-	font-family: Optimistic Text;
-	src: url(https://react.dev/fonts/Optimistic_Text_W_Bd.woff2) format("woff2");
-	font-weight: 700;
-	font-style: normal;
-	font-display: swap;
+  font-family: Optimistic Text;
+  src: url(https://react.dev/fonts/Optimistic_Text_W_Bd.woff2) format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
 }
 
 * {
-	box-sizing: border-box;
+  box-sizing: border-box;
 }
 
 html {
-	background-image: url(https://react.dev/images/meta-gradient-dark.png);
-	background-size: 100%;
-	background-position: -100%;
-	background-color: rgb(64 71 86);
-	background-repeat: no-repeat;
-	height: 100%;
-	width: 100%;
+  background-image: url(https://react.dev/images/meta-gradient-dark.png);
+  background-size: 100%;
+  background-position: -100%;
+  background-color: rgb(64 71 86);
+  background-repeat: no-repeat;
+  height: 100%;
+  width: 100%;
 }
 
 body {
-	font-family:
-		Optimistic Text,
-		-apple-system,
-		ui-sans-serif,
-		system-ui,
-		sans-serif,
-		Apple Color Emoji,
-		Segoe UI Emoji,
-		Segoe UI Symbol,
-		Noto Color Emoji;
-	padding: 10px 0 10px 0;
-	margin: 0;
-	display: flex;
-	justify-content: center;
+  font-family: Optimistic Text, -apple-system, ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji;
+  padding: 10px 0 10px 0;
+  margin: 0;
+  display: flex;
+  justify-content: center;
 }
 
 #root {
-	flex: 1 1;
-	height: auto;
-	background-color: #fff;
-	border-radius: 10px;
-	max-width: 450px;
-	min-height: 600px;
-	padding-bottom: 10px;
+  flex: 1 1;
+  height: auto;
+  background-color: #fff;
+  border-radius: 10px;
+  max-width: 450px;
+  min-height: 600px;
+  padding-bottom: 10px;
 }
 
 h1 {
-	margin-top: 0;
-	font-size: 22px;
+  margin-top: 0;
+  font-size: 22px;
 }
 
 h2 {
-	margin-top: 0;
-	font-size: 20px;
+  margin-top: 0;
+  font-size: 20px;
 }
 
 h3 {
-	margin-top: 0;
-	font-size: 18px;
+  margin-top: 0;
+  font-size: 18px;
 }
 
 h4 {
-	margin-top: 0;
-	font-size: 16px;
+  margin-top: 0;
+  font-size: 16px;
 }
 
 h5 {
-	margin-top: 0;
-	font-size: 14px;
+  margin-top: 0;
+  font-size: 14px;
 }
 
 h6 {
-	margin-top: 0;
-	font-size: 12px;
+  margin-top: 0;
+  font-size: 12px;
 }
 
 code {
-	font-size: 1.2em;
+  font-size: 1.2em;
 }
 
 ul {
-	padding-inline-start: 20px;
+  padding-inline-start: 20px;
 }
 
 .sr-only {
-	position: absolute;
-	width: 1px;
-	height: 1px;
-	padding: 0;
-	margin: -1px;
-	overflow: hidden;
-	clip: rect(0, 0, 0, 0);
-	white-space: nowrap;
-	border-width: 0;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }
 
 .absolute {
-	position: absolute;
+  position: absolute;
 }
 
 .overflow-visible {
-	overflow: visible;
+  overflow: visible;
 }
 
 .visible {
-	overflow: visible;
+  overflow: visible;
 }
 
 .fit {
-	width: fit-content;
+  width: fit-content;
 }
+
 
 /* Layout */
 .page {
-	display: flex;
-	flex-direction: column;
-	height: 100%;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .top-hero {
-	height: 200px;
-	display: flex;
-	justify-content: center;
-	align-items: center;
-	background-image: conic-gradient(
-		from 90deg at -10% 100%,
-		#2b303b 0deg,
-		#2b303b 90deg,
-		#16181d 1turn
-	);
+  height: 200px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-image: conic-gradient(
+      from 90deg at -10% 100%,
+      #2b303b 0deg,
+      #2b303b 90deg,
+      #16181d 1turn
+  );
 }
 
 .bottom {
-	flex: 1;
-	overflow: auto;
+  flex: 1;
+  overflow: auto;
 }
 
 .top-nav {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	margin-bottom: 0;
-	padding: 0 12px;
-	top: 0;
-	width: 100%;
-	height: 44px;
-	color: #23272f;
-	font-weight: 700;
-	font-size: 20px;
-	z-index: 100;
-	cursor: default;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0;
+  padding: 0 12px;
+  top: 0;
+  width: 100%;
+  height: 44px;
+  color: #23272f;
+  font-weight: 700;
+  font-size: 20px;
+  z-index: 100;
+  cursor: default;
 }
 
 .content {
-	padding: 0 12px;
-	margin-top: 4px;
+  padding: 0 12px;
+  margin-top: 4px;
 }
 
+
 .loader {
-	color: #23272f;
-	font-size: 3px;
-	width: 1em;
-	margin-right: 18px;
-	height: 1em;
-	border-radius: 50%;
-	position: relative;
-	text-indent: -9999em;
-	animation: loading-spinner 1.3s infinite linear;
-	animation-delay: 200ms;
-	transform: translateZ(0);
+  color: #23272f;
+  font-size: 3px;
+  width: 1em;
+  margin-right: 18px;
+  height: 1em;
+  border-radius: 50%;
+  position: relative;
+  text-indent: -9999em;
+  animation: loading-spinner 1.3s infinite linear;
+  animation-delay: 200ms;
+  transform: translateZ(0);
 }
 
 @keyframes loading-spinner {
-	0%,
-	100% {
-		box-shadow:
-			0 -3em 0 0.2em,
-			2em -2em 0 0em,
-			3em 0 0 -1em,
-			2em 2em 0 -1em,
-			0 3em 0 -1em,
-			-2em 2em 0 -1em,
-			-3em 0 0 -1em,
-			-2em -2em 0 0;
-	}
-	12.5% {
-		box-shadow:
-			0 -3em 0 0,
-			2em -2em 0 0.2em,
-			3em 0 0 0,
-			2em 2em 0 -1em,
-			0 3em 0 -1em,
-			-2em 2em 0 -1em,
-			-3em 0 0 -1em,
-			-2em -2em 0 -1em;
-	}
-	25% {
-		box-shadow:
-			0 -3em 0 -0.5em,
-			2em -2em 0 0,
-			3em 0 0 0.2em,
-			2em 2em 0 0,
-			0 3em 0 -1em,
-			-2em 2em 0 -1em,
-			-3em 0 0 -1em,
-			-2em -2em 0 -1em;
-	}
-	37.5% {
-		box-shadow:
-			0 -3em 0 -1em,
-			2em -2em 0 -1em,
-			3em 0em 0 0,
-			2em 2em 0 0.2em,
-			0 3em 0 0em,
-			-2em 2em 0 -1em,
-			-3em 0em 0 -1em,
-			-2em -2em 0 -1em;
-	}
-	50% {
-		box-shadow:
-			0 -3em 0 -1em,
-			2em -2em 0 -1em,
-			3em 0 0 -1em,
-			2em 2em 0 0em,
-			0 3em 0 0.2em,
-			-2em 2em 0 0,
-			-3em 0em 0 -1em,
-			-2em -2em 0 -1em;
-	}
-	62.5% {
-		box-shadow:
-			0 -3em 0 -1em,
-			2em -2em 0 -1em,
-			3em 0 0 -1em,
-			2em 2em 0 -1em,
-			0 3em 0 0,
-			-2em 2em 0 0.2em,
-			-3em 0 0 0,
-			-2em -2em 0 -1em;
-	}
-	75% {
-		box-shadow:
-			0em -3em 0 -1em,
-			2em -2em 0 -1em,
-			3em 0em 0 -1em,
-			2em 2em 0 -1em,
-			0 3em 0 -1em,
-			-2em 2em 0 0,
-			-3em 0em 0 0.2em,
-			-2em -2em 0 0;
-	}
-	87.5% {
-		box-shadow:
-			0em -3em 0 0,
-			2em -2em 0 -1em,
-			3em 0 0 -1em,
-			2em 2em 0 -1em,
-			0 3em 0 -1em,
-			-2em 2em 0 0,
-			-3em 0em 0 0,
-			-2em -2em 0 0.2em;
-	}
+  0%,
+  100% {
+    box-shadow: 0 -3em 0 0.2em,
+    2em -2em 0 0em, 3em 0 0 -1em,
+    2em 2em 0 -1em, 0 3em 0 -1em,
+    -2em 2em 0 -1em, -3em 0 0 -1em,
+    -2em -2em 0 0;
+  }
+  12.5% {
+    box-shadow: 0 -3em 0 0, 2em -2em 0 0.2em,
+    3em 0 0 0, 2em 2em 0 -1em, 0 3em 0 -1em,
+    -2em 2em 0 -1em, -3em 0 0 -1em,
+    -2em -2em 0 -1em;
+  }
+  25% {
+    box-shadow: 0 -3em 0 -0.5em,
+    2em -2em 0 0, 3em 0 0 0.2em,
+    2em 2em 0 0, 0 3em 0 -1em,
+    -2em 2em 0 -1em, -3em 0 0 -1em,
+    -2em -2em 0 -1em;
+  }
+  37.5% {
+    box-shadow: 0 -3em 0 -1em, 2em -2em 0 -1em,
+    3em 0em 0 0, 2em 2em 0 0.2em, 0 3em 0 0em,
+    -2em 2em 0 -1em, -3em 0em 0 -1em, -2em -2em 0 -1em;
+  }
+  50% {
+    box-shadow: 0 -3em 0 -1em, 2em -2em 0 -1em,
+    3em 0 0 -1em, 2em 2em 0 0em, 0 3em 0 0.2em,
+    -2em 2em 0 0, -3em 0em 0 -1em, -2em -2em 0 -1em;
+  }
+  62.5% {
+    box-shadow: 0 -3em 0 -1em, 2em -2em 0 -1em,
+    3em 0 0 -1em, 2em 2em 0 -1em, 0 3em 0 0,
+    -2em 2em 0 0.2em, -3em 0 0 0, -2em -2em 0 -1em;
+  }
+  75% {
+    box-shadow: 0em -3em 0 -1em, 2em -2em 0 -1em,
+    3em 0em 0 -1em, 2em 2em 0 -1em, 0 3em 0 -1em,
+    -2em 2em 0 0, -3em 0em 0 0.2em, -2em -2em 0 0;
+  }
+  87.5% {
+    box-shadow: 0em -3em 0 0, 2em -2em 0 -1em,
+    3em 0 0 -1em, 2em 2em 0 -1em, 0 3em 0 -1em,
+    -2em 2em 0 0, -3em 0em 0 0, -2em -2em 0 0.2em;
+  }
 }
 
 /* LikeButton */
 .like-button {
-	outline-offset: 2px;
-	position: relative;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	width: 2.5rem;
-	height: 2.5rem;
-	cursor: pointer;
-	border-radius: 9999px;
-	border: none;
-	outline: none 2px;
-	color: #5e687e;
-	background: none;
+  outline-offset: 2px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  cursor: pointer;
+  border-radius: 9999px;
+  border: none;
+  outline: none 2px;
+  color: #5e687e;
+  background: none;
 }
 
 .like-button:focus {
-	color: #a6423a;
-	background-color: rgba(166, 66, 58, 0.05);
+  color: #a6423a;
+  background-color: rgba(166, 66, 58, .05);
 }
 
 .like-button:active {
-	color: #a6423a;
-	background-color: rgba(166, 66, 58, 0.05);
-	transform: scaleX(0.95) scaleY(0.95);
+  color: #a6423a;
+  background-color: rgba(166, 66, 58, .05);
+  transform: scaleX(0.95) scaleY(0.95);
 }
 
 .like-button:hover {
-	background-color: #f6f7f9;
+  background-color: #f6f7f9;
 }
 
 .like-button.liked {
-	color: #a6423a;
+  color: #a6423a;
 }
 
 /* Icons */
 @keyframes circle {
-	0% {
-		transform: scale(0);
-		stroke-width: 16px;
-	}
+  0% {
+    transform: scale(0);
+    stroke-width: 16px;
+  }
 
-	50% {
-		transform: scale(0.5);
-		stroke-width: 16px;
-	}
+  50% {
+    transform: scale(.5);
+    stroke-width: 16px;
+  }
 
-	to {
-		transform: scale(1);
-		stroke-width: 0;
-	}
+  to {
+    transform: scale(1);
+    stroke-width: 0;
+  }
 }
 
 .circle {
-	color: rgba(166, 66, 58, 0.5);
-	transform-origin: center;
-	transition-property: all;
-	transition-duration: 0.15s;
-	transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  color: rgba(166, 66, 58, .5);
+  transform-origin: center;
+  transition-property: all;
+  transition-duration: .15s;
+  transition-timing-function: cubic-bezier(.4,0,.2,1);
 }
 
 .circle.liked.animate {
-	animation: circle 0.3s forwards;
+  animation: circle .3s forwards;
 }
 
 .heart {
-	width: 1.5rem;
-	height: 1.5rem;
+  width: 1.5rem;
+  height: 1.5rem;
 }
 
 .heart.liked {
-	transform-origin: center;
-	transition-property: all;
-	transition-duration: 0.15s;
-	transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: center;
+  transition-property: all;
+  transition-duration: .15s;
+  transition-timing-function: cubic-bezier(.4, 0, .2, 1);
 }
 
 .heart.liked.animate {
-	animation: scale 0.35s ease-in-out forwards;
+  animation: scale .35s ease-in-out forwards;
 }
 
 .control-icon {
-	color: hsla(0, 0%, 100%, 0.5);
-	filter: drop-shadow(0 20px 13px rgba(0, 0, 0, 0.03)) drop-shadow(0 8px 5px rgba(0, 0, 0, 0.08));
+  color: hsla(0, 0%, 100%, .5);
+  filter:  drop-shadow(0 20px 13px rgba(0, 0, 0, .03)) drop-shadow(0 8px 5px rgba(0, 0, 0, .08));
 }
 
 .chevron-left {
-	margin-top: 2px;
-	rotate: 90deg;
+  margin-top: 2px;
+  rotate: 90deg;
 }
+
 
 /* Video */
 .thumbnail {
-	position: relative;
-	aspect-ratio: 16 / 9;
-	display: flex;
-	overflow: hidden;
-	flex-direction: column;
-	justify-content: center;
-	align-items: center;
-	border-radius: 0.5rem;
-	outline-offset: 2px;
-	width: 8rem;
-	vertical-align: middle;
-	background-color: #ffffff;
-	background-size: cover;
-	user-select: none;
+  position: relative;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  overflow: hidden;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  border-radius: 0.5rem;
+  outline-offset: 2px;
+  width: 8rem;
+  vertical-align: middle;
+  background-color: #ffffff;
+  background-size: cover;
+  user-select: none;
 }
 
 .thumbnail.blue {
-	background-image: conic-gradient(at top right, #c76a15, #087ea4, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #087ea4, #2b3491);
 }
 
 .thumbnail.red {
-	background-image: conic-gradient(at top right, #c76a15, #a6423a, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #a6423a, #2b3491);
 }
 
 .thumbnail.green {
-	background-image: conic-gradient(at top right, #c76a15, #388f7f, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #388f7f, #2b3491);
 }
 
 .thumbnail.purple {
-	background-image: conic-gradient(at top right, #c76a15, #575fb7, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #575fb7, #2b3491);
 }
 
 .thumbnail.yellow {
-	background-image: conic-gradient(at top right, #c76a15, #fabd62, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #FABD62, #2b3491);
 }
 
 .thumbnail.gray {
-	background-image: conic-gradient(at top right, #c76a15, #4e5769, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #4E5769, #2b3491);
 }
 
 .video {
-	display: flex;
-	flex-direction: row;
-	gap: 0.75rem;
-	align-items: center;
+  display: flex;
+  flex-direction: row;
+  gap: 0.75rem;
+  align-items: center;
 }
 
 .video .link {
-	display: flex;
-	flex-direction: row;
-	flex: 1 1 0;
-	gap: 0.125rem;
-	outline-offset: 4px;
-	cursor: pointer;
+  display: flex;
+  flex-direction: row;
+  flex: 1 1 0;
+  gap: 0.125rem;
+  outline-offset: 4px;
+  cursor: pointer;
 }
 
 .video .info {
-	display: flex;
-	flex-direction: column;
-	justify-content: center;
-	margin-left: 8px;
-	gap: 0.125rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  margin-left: 8px;
+  gap: 0.125rem;
 }
 
 .video .info:hover {
-	text-decoration: underline;
+  text-decoration: underline;
 }
 
 .video-title {
-	font-size: 15px;
-	line-height: 1.25;
-	font-weight: 700;
-	color: #23272f;
+  font-size: 15px;
+  line-height: 1.25;
+  font-weight: 700;
+  color: #23272f;
 }
 
 .video-description {
-	color: #5e687e;
-	font-size: 13px;
+  color: #5e687e;
+  font-size: 13px;
 }
 
 /* Details */
 .details .thumbnail {
-	position: relative;
-	aspect-ratio: 16 / 9;
-	display: flex;
-	overflow: hidden;
-	flex-direction: column;
-	justify-content: center;
-	align-items: center;
-	border-radius: 0.5rem;
-	outline-offset: 2px;
-	width: 100%;
-	vertical-align: middle;
-	background-color: #ffffff;
-	background-size: cover;
-	user-select: none;
+  position: relative;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  overflow: hidden;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  border-radius: 0.5rem;
+  outline-offset: 2px;
+  width: 100%;
+  vertical-align: middle;
+  background-color: #ffffff;
+  background-size: cover;
+  user-select: none;
 }
 
 .video-details-title {
-	margin-top: 8px;
+  margin-top: 8px;
 }
 
 .video-details-speaker {
-	display: flex;
-	gap: 8px;
-	margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  margin-top: 10px
 }
 
 .back {
-	display: flex;
-	align-items: center;
-	margin-left: -5px;
-	cursor: pointer;
+  display: flex;
+  align-items: center;
+  margin-left: -5px;
+  cursor: pointer;
 }
 
 .back:hover {
-	text-decoration: underline;
+  text-decoration: underline;
 }
 
 .info-title {
-	font-size: 1.5rem;
-	font-weight: 700;
-	line-height: 1.25;
-	margin: 8px 0 0 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.25;
+  margin: 8px 0 0 0 ;
 }
 
 .info-description {
-	margin: 8px 0 0 0;
+  margin: 8px 0 0 0;
 }
 
 .controls {
-	cursor: pointer;
+  cursor: pointer;
 }
 
 .fallback {
-	background: #f6f7f8 linear-gradient(to right, #e6e6e6 5%, #cccccc 25%, #e6e6e6 35%) no-repeat;
-	background-size: 800px 104px;
-	display: block;
-	line-height: 1.25;
-	margin: 8px 0 0 0;
-	border-radius: 5px;
-	overflow: hidden;
+  background: #f6f7f8 linear-gradient(to right, #e6e6e6 5%, #cccccc 25%, #e6e6e6 35%) no-repeat;
+  background-size: 800px 104px;
+  display: block;
+  line-height: 1.25;
+  margin: 8px 0 0 0;
+  border-radius: 5px;
+  overflow: hidden;
 
-	animation: 1s linear 1s infinite shimmer;
-	animation-delay: 300ms;
-	animation-duration: 1s;
-	animation-fill-mode: forwards;
-	animation-iteration-count: infinite;
-	animation-name: shimmer;
-	animation-timing-function: linear;
+  animation: 1s linear 1s infinite shimmer;
+  animation-delay: 300ms;
+  animation-duration: 1s;
+  animation-fill-mode: forwards;
+  animation-iteration-count: infinite;
+  animation-name: shimmer;
+  animation-timing-function: linear;
 }
 
+
 .fallback.title {
-	width: 130px;
-	height: 30px;
+  width: 130px;
+  height: 30px;
+
 }
 
 .fallback.description {
-	width: 150px;
-	height: 21px;
+  width: 150px;
+  height: 21px;
 }
 
 @keyframes shimmer {
-	0% {
-		background-position: -468px 0;
-	}
+  0% {
+    background-position: -468px 0;
+  }
 
-	100% {
-		background-position: 468px 0;
-	}
+  100% {
+    background-position: 468px 0;
+  }
 }
 
 .search {
-	margin-bottom: 10px;
+  margin-bottom: 10px;
 }
 .search-input {
-	width: 100%;
-	position: relative;
+  width: 100%;
+  position: relative;
 }
 
 .search-icon {
-	position: absolute;
-	top: 0;
-	bottom: 0;
-	inset-inline-start: 0;
-	display: flex;
-	align-items: center;
-	padding-inline-start: 1rem;
-	pointer-events: none;
-	color: #99a1b3;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  inset-inline-start: 0;
+  display: flex;
+  align-items: center;
+  padding-inline-start: 1rem;
+  pointer-events: none;
+  color: #99a1b3;
 }
 
 .search-input input {
-	display: flex;
-	padding-inline-start: 2.75rem;
-	padding-top: 10px;
-	padding-bottom: 10px;
-	width: 100%;
-	text-align: start;
-	background-color: rgb(235 236 240);
-	outline: 2px solid transparent;
-	cursor: pointer;
-	border: none;
-	align-items: center;
-	color: rgb(35 39 47);
-	border-radius: 9999px;
-	vertical-align: middle;
-	font-size: 15px;
+  display: flex;
+  padding-inline-start: 2.75rem;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  width: 100%;
+  text-align: start;
+  background-color: rgb(235 236 240);
+  outline: 2px solid transparent;
+  cursor: pointer;
+  border: none;
+  align-items: center;
+  color: rgb(35 39 47);
+  border-radius: 9999px;
+  vertical-align: middle;
+  font-size: 15px;
 }
 
-.search-input input:hover,
-.search-input input:active {
-	background-color: rgb(235 236 240/ 0.8);
-	color: rgb(35 39 47/ 0.8);
+.search-input input:hover, .search-input input:active {
+  background-color: rgb(235 236 240/ 0.8);
+  color: rgb(35 39 47/ 0.8);
 }
 
 /* Home */
 .video-list {
-	position: relative;
+  position: relative;
 }
 
 .video-list .videos {
-	display: flex;
-	flex-direction: column;
-	gap: 1rem;
-	overflow-y: auto;
-	height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  overflow-y: auto;
+  height: 100%;
 }
 ```
 
 ```js src/index.js hidden
-import React, { StrictMode } from "react";
-import { createRoot } from "react-dom/client";
+import React, {StrictMode} from 'react';
+import {createRoot} from 'react-dom/client';
+import './styles.css';
 
-import "./styles.css";
+import App from './App';
+import {Router} from './router';
 
-import App from "./App";
-import { Router } from "./router";
-
-const root = createRoot(document.getElementById("root"));
+const root = createRoot(document.getElementById('root'));
 root.render(
-	<StrictMode>
-		<Router>
-			<App />
-		</Router>
-	</StrictMode>,
+  <StrictMode>
+    <Router>
+      <App />
+    </Router>
+  </StrictMode>
 );
 ```
 
 ```json package.json hidden
 {
-	"dependencies": {
-		"react": "experimental",
-		"react-dom": "experimental",
-		"react-scripts": "latest"
-	},
-	"scripts": {
-		"start": "react-scripts start",
-		"build": "react-scripts build",
-		"test": "react-scripts test --env=jsdom",
-		"eject": "react-scripts eject"
-	}
+  "dependencies": {
+    "react": "canary",
+    "react-dom": "canary",
+    "react-scripts": "latest"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test --env=jsdom",
+    "eject": "react-scripts eject"
+  }
 }
 ```
 
@@ -1309,7 +1262,7 @@ root.render(
 
 <Note>
 
-#### View Transitions do not replace CSS and JS driven animations {/_view-transitions-do-not-replace-css-and-js-driven-animations_/}
+#### View Transitions do not replace CSS and JS driven animations {/*view-transitions-do-not-replace-css-and-js-driven-animations*/}
 
 View Transitions are meant to be used for UI transitions such as navigation, expanding, opening, or re-ordering. They are not meant to replace all the animations in your app.
 
@@ -1317,15 +1270,15 @@ In our example app above, notice that there are already animations when you clic
 
 </Note>
 
-### Animating navigations {/_animating-navigations_/}
+### Animating navigations {/*animating-navigations*/}
 
 Our app includes a Suspense-enabled router, with [page transitions already marked as Transitions](/reference/react/useTransition#building-a-suspense-enabled-router), which means navigations are performed with `startTransition`:
 
 ```js
 function navigate(url) {
-	startTransition(() => {
-		go(url);
-	});
+  startTransition(() => {
+    go(url);
+  });
 }
 ```
 
@@ -1334,446 +1287,438 @@ function navigate(url) {
 ```js
 // "what" to animate
 <ViewTransition key={url}>
-	{url === "/" ?
-		<Home />
-	:	<TalkDetails />}
+  {url === '/' ? <Home /> : <TalkDetails />}
 </ViewTransition>
 ```
 
 When the `url` changes, the `<ViewTransition>` and new route are rendered. Since the `<ViewTransition>` was updated inside of `startTransition`, the `<ViewTransition>` is activated for an animation.
+
 
 By default, View Transitions include the browser default cross-fade animation. Adding this to our example, we now have a cross-fade whenever we navigate between pages:
 
 <Sandpack>
 
 ```js src/App.js active
-import { unstable_ViewTransition as ViewTransition } from "react";
-
-import Details from "./Details";
-import Home from "./Home";
-import { useRouter } from "./router";
+import {ViewTransition} from 'react'; import Details from './Details';
+import Home from './Home'; import {useRouter} from './router';
 
 export default function App() {
-	const { url } = useRouter();
+  const {url} = useRouter();
 
-	// Use ViewTransition to animate between pages.
-	// No additional CSS needed by default.
-	return (
-		<ViewTransition>
-			{url === "/" ?
-				<Home />
-			:	<Details />}
-		</ViewTransition>
-	);
+  // Use ViewTransition to animate between pages.
+  // No additional CSS needed by default.
+  return (
+    <ViewTransition>
+      {url === '/' ? <Home /> : <Details />}
+    </ViewTransition>
+  );
 }
 ```
 
 ```js src/Details.js hidden
-import { Suspense, use } from "react";
-
 import { fetchVideo, fetchVideoDetails } from "./data";
-import { ChevronLeft } from "./Icons";
-import Layout from "./Layout";
-import { useRouter } from "./router";
 import { Thumbnail, VideoControls } from "./Videos";
+import { useRouter } from "./router";
+import Layout from "./Layout";
+import { use, Suspense } from "react";
+import { ChevronLeft } from "./Icons";
 
 function VideoInfo({ id }) {
-	const details = use(fetchVideoDetails(id));
-	return (
-		<>
-			<p className="info-title">{details.title}</p>
-			<p className="info-description">{details.description}</p>
-		</>
-	);
+  const details = use(fetchVideoDetails(id));
+  return (
+    <>
+      <p className="info-title">{details.title}</p>
+      <p className="info-description">{details.description}</p>
+    </>
+  );
 }
 
 function VideoInfoFallback() {
-	return (
-		<>
-			<div className="fallback title"></div>
-			<div className="fallback description"></div>
-		</>
-	);
+  return (
+    <>
+      <div className="fallback title"></div>
+      <div className="fallback description"></div>
+    </>
+  );
 }
 
 export default function Details() {
-	const { url, navigateBack } = useRouter();
-	const videoId = url.split("/").pop();
-	const video = use(fetchVideo(videoId));
+  const { url, navigateBack } = useRouter();
+  const videoId = url.split("/").pop();
+  const video = use(fetchVideo(videoId));
 
-	return (
-		<Layout
-			heading={
-				<div
-					className="fit back"
-					onClick={() => {
-						navigateBack("/");
-					}}
-				>
-					<ChevronLeft /> Back
-				</div>
-			}
-		>
-			<div className="details">
-				<Thumbnail video={video} large>
-					<VideoControls />
-				</Thumbnail>
-				<Suspense fallback={<VideoInfoFallback />}>
-					<VideoInfo id={video.id} />
-				</Suspense>
-			</div>
-		</Layout>
-	);
+  return (
+    <Layout
+      heading={
+        <div
+          className="fit back"
+          onClick={() => {
+            navigateBack("/");
+          }}
+        >
+          <ChevronLeft /> Back
+        </div>
+      }
+    >
+      <div className="details">
+        <Thumbnail video={video} large>
+          <VideoControls />
+        </Thumbnail>
+        <Suspense fallback={<VideoInfoFallback />}>
+          <VideoInfo id={video.id} />
+        </Suspense>
+      </div>
+    </Layout>
+  );
 }
+
 ```
 
 ```js src/Home.js hidden
-import { use, useId, useState } from "react";
-
-import { fetchVideos } from "./data";
-import { IconSearch } from "./Icons";
-import Layout from "./Layout";
 import { Video } from "./Videos";
+import Layout from "./Layout";
+import { fetchVideos } from "./data";
+import { useId, useState, use } from "react";
+import { IconSearch } from "./Icons";
 
 function SearchInput({ value, onChange }) {
-	const id = useId();
-	return (
-		<form className="search" onSubmit={(e) => e.preventDefault()}>
-			<label htmlFor={id} className="sr-only">
-				Search
-			</label>
-			<div className="search-input">
-				<div className="search-icon">
-					<IconSearch />
-				</div>
-				<input
-					type="text"
-					id={id}
-					placeholder="Search"
-					value={value}
-					onChange={(e) => onChange(e.target.value)}
-				/>
-			</div>
-		</form>
-	);
+  const id = useId();
+  return (
+    <form className="search" onSubmit={(e) => e.preventDefault()}>
+      <label htmlFor={id} className="sr-only">
+        Search
+      </label>
+      <div className="search-input">
+        <div className="search-icon">
+          <IconSearch />
+        </div>
+        <input
+          type="text"
+          id={id}
+          placeholder="Search"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      </div>
+    </form>
+  );
 }
 
 function filterVideos(videos, query) {
-	const keywords = query
-		.toLowerCase()
-		.split(" ")
-		.filter((s) => s !== "");
-	if (keywords.length === 0) {
-		return videos;
-	}
-	return videos.filter((video) => {
-		const words = (video.title + " " + video.description).toLowerCase().split(" ");
-		return keywords.every((kw) => words.some((w) => w.includes(kw)));
-	});
+  const keywords = query
+    .toLowerCase()
+    .split(" ")
+    .filter((s) => s !== "");
+  if (keywords.length === 0) {
+    return videos;
+  }
+  return videos.filter((video) => {
+    const words = (video.title + " " + video.description)
+      .toLowerCase()
+      .split(" ");
+    return keywords.every((kw) => words.some((w) => w.includes(kw)));
+  });
 }
 
 export default function Home() {
-	const videos = use(fetchVideos());
-	const count = videos.length;
-	const [searchText, setSearchText] = useState("");
-	const foundVideos = filterVideos(videos, searchText);
-	return (
-		<Layout heading={<div className="fit">{count} Videos</div>}>
-			<SearchInput value={searchText} onChange={setSearchText} />
-			<div className="video-list">
-				{foundVideos.length === 0 && <div className="no-results">No results</div>}
-				<div className="videos">
-					{foundVideos.map((video) => (
-						<Video key={video.id} video={video} />
-					))}
-				</div>
-			</div>
-		</Layout>
-	);
+  const videos = use(fetchVideos());
+  const count = videos.length;
+  const [searchText, setSearchText] = useState("");
+  const foundVideos = filterVideos(videos, searchText);
+  return (
+    <Layout heading={<div className="fit">{count} Videos</div>}>
+      <SearchInput value={searchText} onChange={setSearchText} />
+      <div className="video-list">
+        {foundVideos.length === 0 && (
+          <div className="no-results">No results</div>
+        )}
+        <div className="videos">
+          {foundVideos.map((video) => (
+            <Video key={video.id} video={video} />
+          ))}
+        </div>
+      </div>
+    </Layout>
+  );
 }
+
 ```
 
 ```js src/Icons.js hidden
 export function ChevronLeft() {
-	return (
-		<svg
-			className="chevron-left"
-			xmlns="http://www.w3.org/2000/svg"
-			width="20"
-			height="20"
-			viewBox="0 0 20 20"
-		>
-			<g fill="none" fillRule="evenodd" transform="translate(-446 -398)">
-				<path
-					fill="currentColor"
-					fillRule="nonzero"
-					d="M95.8838835,240.366117 C95.3957281,239.877961 94.6042719,239.877961 94.1161165,240.366117 C93.6279612,240.854272 93.6279612,241.645728 94.1161165,242.133883 L98.6161165,246.633883 C99.1042719,247.122039 99.8957281,247.122039 100.383883,246.633883 L104.883883,242.133883 C105.372039,241.645728 105.372039,240.854272 104.883883,240.366117 C104.395728,239.877961 103.604272,239.877961 103.116117,240.366117 L99.5,243.982233 L95.8838835,240.366117 Z"
-					transform="translate(356.5 164.5)"
-				/>
-				<polygon points="446 418 466 418 466 398 446 398" />
-			</g>
-		</svg>
-	);
+  return (
+    <svg
+      className="chevron-left"
+      xmlns="http://www.w3.org/2000/svg"
+      width="20"
+      height="20"
+      viewBox="0 0 20 20">
+      <g fill="none" fillRule="evenodd" transform="translate(-446 -398)">
+        <path
+          fill="currentColor"
+          fillRule="nonzero"
+          d="M95.8838835,240.366117 C95.3957281,239.877961 94.6042719,239.877961 94.1161165,240.366117 C93.6279612,240.854272 93.6279612,241.645728 94.1161165,242.133883 L98.6161165,246.633883 C99.1042719,247.122039 99.8957281,247.122039 100.383883,246.633883 L104.883883,242.133883 C105.372039,241.645728 105.372039,240.854272 104.883883,240.366117 C104.395728,239.877961 103.604272,239.877961 103.116117,240.366117 L99.5,243.982233 L95.8838835,240.366117 Z"
+          transform="translate(356.5 164.5)"
+        />
+        <polygon points="446 418 466 418 466 398 446 398" />
+      </g>
+    </svg>
+  );
 }
 
 export function PauseIcon() {
-	return (
-		<svg
-			className="control-icon"
-			style={{ padding: "4px" }}
-			width="100"
-			height="100"
-			viewBox="0 0 512 512"
-			fill="none"
-			xmlns="http://www.w3.org/2000/svg"
-		>
-			<path
-				fillRule="evenodd"
-				clipRule="evenodd"
-				d="M256 0C114.617 0 0 114.615 0 256s114.617 256 256 256 256-114.615 256-256S397.383 0 256 0zm-32 320c0 8.836-7.164 16-16 16h-32c-8.836 0-16-7.164-16-16V192c0-8.836 7.164-16 16-16h32c8.836 0 16 7.164 16 16v128zm128 0c0 8.836-7.164 16-16 16h-32c-8.836 0-16-7.164-16-16V192c0-8.836 7.164-16 16-16h32c8.836 0 16 7.164 16 16v128z"
-				fill="currentColor"
-			/>
-		</svg>
-	);
+  return (
+    <svg
+      className="control-icon"
+      style={{padding: '4px'}}
+      width="100"
+      height="100"
+      viewBox="0 0 512 512"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg">
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M256 0C114.617 0 0 114.615 0 256s114.617 256 256 256 256-114.615 256-256S397.383 0 256 0zm-32 320c0 8.836-7.164 16-16 16h-32c-8.836 0-16-7.164-16-16V192c0-8.836 7.164-16 16-16h32c8.836 0 16 7.164 16 16v128zm128 0c0 8.836-7.164 16-16 16h-32c-8.836 0-16-7.164-16-16V192c0-8.836 7.164-16 16-16h32c8.836 0 16 7.164 16 16v128z"
+        fill="currentColor"
+      />
+    </svg>
+  );
 }
 
 export function PlayIcon() {
-	return (
-		<svg
-			className="control-icon"
-			width="100"
-			height="100"
-			viewBox="0 0 72 72"
-			fill="none"
-			xmlns="http://www.w3.org/2000/svg"
-		>
-			<path
-				fillRule="evenodd"
-				clipRule="evenodd"
-				d="M36 69C54.2254 69 69 54.2254 69 36C69 17.7746 54.2254 3 36 3C17.7746 3 3 17.7746 3 36C3 54.2254 17.7746 69 36 69ZM52.1716 38.6337L28.4366 51.5801C26.4374 52.6705 24 51.2235 24 48.9464V23.0536C24 20.7764 26.4374 19.3295 28.4366 20.4199L52.1716 33.3663C54.2562 34.5034 54.2562 37.4966 52.1716 38.6337Z"
-				fill="currentColor"
-			/>
-		</svg>
-	);
+  return (
+    <svg
+      className="control-icon"
+      width="100"
+      height="100"
+      viewBox="0 0 72 72"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg">
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M36 69C54.2254 69 69 54.2254 69 36C69 17.7746 54.2254 3 36 3C17.7746 3 3 17.7746 3 36C3 54.2254 17.7746 69 36 69ZM52.1716 38.6337L28.4366 51.5801C26.4374 52.6705 24 51.2235 24 48.9464V23.0536C24 20.7764 26.4374 19.3295 28.4366 20.4199L52.1716 33.3663C54.2562 34.5034 54.2562 37.4966 52.1716 38.6337Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
 }
-export function Heart({ liked, animate }) {
-	return (
-		<>
-			<svg
-				className="absolute overflow-visible"
-				viewBox="0 0 24 24"
-				fill="none"
-				xmlns="http://www.w3.org/2000/svg"
-			>
-				<circle
-					className={`circle ${liked ? "liked" : ""} ${animate ? "animate" : ""}`}
-					cx="12"
-					cy="12"
-					r="11.5"
-					fill="transparent"
-					strokeWidth="0"
-					stroke="currentColor"
-				/>
-			</svg>
+export function Heart({liked, animate}) {
+  return (
+    <>
+      <svg
+        className="absolute overflow-visible"
+        viewBox="0 0 24 24"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg">
+        <circle
+          className={`circle ${liked ? 'liked' : ''} ${animate ? 'animate' : ''}`}
+          cx="12"
+          cy="12"
+          r="11.5"
+          fill="transparent"
+          strokeWidth="0"
+          stroke="currentColor"
+        />
+      </svg>
 
-			<svg
-				className={`heart ${liked ? "liked" : ""} ${animate ? "animate" : ""}`}
-				viewBox="0 0 24 24"
-				fill="none"
-				xmlns="http://www.w3.org/2000/svg"
-			>
-				{liked ?
-					<path
-						d="M12 23a.496.496 0 0 1-.26-.074C7.023 19.973 0 13.743 0 8.68c0-4.12 2.322-6.677 6.058-6.677 2.572 0 5.108 2.387 5.134 2.41l.808.771.808-.771C12.834 4.387 15.367 2 17.935 2 21.678 2 24 4.558 24 8.677c0 5.06-7.022 11.293-11.74 14.246a.496.496 0 0 1-.26.074V23z"
-						fill="currentColor"
-					/>
-				:	<path
-						fillRule="evenodd"
-						clipRule="evenodd"
-						d="m12 5.184-.808-.771-.004-.004C11.065 4.299 8.522 2.003 6 2.003c-3.736 0-6 2.558-6 6.677 0 4.47 5.471 9.848 10 13.079.602.43 1.187.82 1.74 1.167A.497.497 0 0 0 12 23v-.003c.09 0 .182-.026.26-.074C16.977 19.97 24 13.737 24 8.677 24 4.557 21.743 2 18 2c-2.569 0-5.166 2.387-5.192 2.413L12 5.184zm-.002 15.525c2.071-1.388 4.477-3.342 6.427-5.47C20.72 12.733 22 10.401 22 8.677c0-1.708-.466-2.855-1.087-3.55C20.316 4.459 19.392 4 18 4c-.726 0-1.63.364-2.5.9-.67.412-1.148.82-1.266.92-.03.025-.037.031-.019.014l-.013.013L12 7.949 9.832 5.88a10.08 10.08 0 0 0-1.33-.977C7.633 4.367 6.728 4.003 6 4.003c-1.388 0-2.312.459-2.91 1.128C2.466 5.826 2 6.974 2 8.68c0 1.726 1.28 4.058 3.575 6.563 1.948 2.127 4.352 4.078 6.423 5.466z"
-						fill="currentColor"
-					/>
-				}
-			</svg>
-		</>
-	);
+      <svg
+        className={`heart ${liked ? 'liked' : ''} ${animate ? 'animate' : ''}`}
+        viewBox="0 0 24 24"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg">
+        {liked ? (
+          <path
+            d="M12 23a.496.496 0 0 1-.26-.074C7.023 19.973 0 13.743 0 8.68c0-4.12 2.322-6.677 6.058-6.677 2.572 0 5.108 2.387 5.134 2.41l.808.771.808-.771C12.834 4.387 15.367 2 17.935 2 21.678 2 24 4.558 24 8.677c0 5.06-7.022 11.293-11.74 14.246a.496.496 0 0 1-.26.074V23z"
+            fill="currentColor"
+          />
+        ) : (
+          <path
+            fillRule="evenodd"
+            clipRule="evenodd"
+            d="m12 5.184-.808-.771-.004-.004C11.065 4.299 8.522 2.003 6 2.003c-3.736 0-6 2.558-6 6.677 0 4.47 5.471 9.848 10 13.079.602.43 1.187.82 1.74 1.167A.497.497 0 0 0 12 23v-.003c.09 0 .182-.026.26-.074C16.977 19.97 24 13.737 24 8.677 24 4.557 21.743 2 18 2c-2.569 0-5.166 2.387-5.192 2.413L12 5.184zm-.002 15.525c2.071-1.388 4.477-3.342 6.427-5.47C20.72 12.733 22 10.401 22 8.677c0-1.708-.466-2.855-1.087-3.55C20.316 4.459 19.392 4 18 4c-.726 0-1.63.364-2.5.9-.67.412-1.148.82-1.266.92-.03.025-.037.031-.019.014l-.013.013L12 7.949 9.832 5.88a10.08 10.08 0 0 0-1.33-.977C7.633 4.367 6.728 4.003 6 4.003c-1.388 0-2.312.459-2.91 1.128C2.466 5.826 2 6.974 2 8.68c0 1.726 1.28 4.058 3.575 6.563 1.948 2.127 4.352 4.078 6.423 5.466z"
+            fill="currentColor"
+          />
+        )}
+      </svg>
+    </>
+  );
 }
 
 export function IconSearch(props) {
-	return (
-		<svg width="1em" height="1em" viewBox="0 0 20 20">
-			<path
-				d="M14.386 14.386l4.0877 4.0877-4.0877-4.0877c-2.9418 2.9419-7.7115 2.9419-10.6533 0-2.9419-2.9418-2.9419-7.7115 0-10.6533 2.9418-2.9419 7.7115-2.9419 10.6533 0 2.9419 2.9418 2.9419 7.7115 0 10.6533z"
-				stroke="currentColor"
-				fill="none"
-				strokeWidth="2"
-				fillRule="evenodd"
-				strokeLinecap="round"
-				strokeLinejoin="round"
-			></path>
-		</svg>
-	);
+  return (
+    <svg width="1em" height="1em" viewBox="0 0 20 20">
+      <path
+        d="M14.386 14.386l4.0877 4.0877-4.0877-4.0877c-2.9418 2.9419-7.7115 2.9419-10.6533 0-2.9419-2.9418-2.9419-7.7115 0-10.6533 2.9418-2.9419 7.7115-2.9419 10.6533 0 2.9419 2.9418 2.9419 7.7115 0 10.6533z"
+        stroke="currentColor"
+        fill="none"
+        strokeWidth="2"
+        fillRule="evenodd"
+        strokeLinecap="round"
+        strokeLinejoin="round"></path>
+    </svg>
+  );
 }
 ```
 
 ```js src/Layout.js
-import { unstable_ViewTransition as ViewTransition } from "react";
-
-import { useIsNavPending } from "./router";
+import {ViewTransition} from 'react'; import { useIsNavPending } from "./router";
 
 export default function Page({ heading, children }) {
-	const isPending = useIsNavPending();
+  const isPending = useIsNavPending();
 
-	return (
-		<div className="page">
-			<div className="top">
-				<div className="top-nav">
-					{heading}
-					{isPending && <span className="loader"></span>}
-				</div>
-			</div>
-			{/* Opt-out of ViewTransition for the content. */}
-			{/* Content can define it's own ViewTransition. */}
-			<ViewTransition default="none">
-				<div className="bottom">
-					<div className="content">{children}</div>
-				</div>
-			</ViewTransition>
-		</div>
-	);
+  return (
+    <div className="page">
+      <div className="top">
+        <div className="top-nav">
+          {heading}
+          {isPending && <span className="loader"></span>}
+        </div>
+      </div>
+      {/* Opt-out of ViewTransition for the content. */}
+      {/* Content can define it's own ViewTransition. */}
+      <ViewTransition default="none">
+        <div className="bottom">
+          <div className="content">{children}</div>
+        </div>
+      </ViewTransition>
+    </div>
+  );
 }
 ```
 
 ```js src/LikeButton.js hidden
-import { useState } from "react";
-
-import { Heart } from "./Icons";
+import {useState} from 'react';
+import {Heart} from './Icons';
 
 // A hack since we don't actually have a backend.
 // Unlike local state, this survives videos being filtered.
 const likedVideos = new Set();
 
-export default function LikeButton({ video }) {
-	const [isLiked, setIsLiked] = useState(() => likedVideos.has(video.id));
-	const [animate, setAnimate] = useState(false);
-	return (
-		<button
-			className={`like-button ${isLiked && "liked"}`}
-			aria-label={isLiked ? "Unsave" : "Save"}
-			onClick={() => {
-				const nextIsLiked = !isLiked;
-				if (nextIsLiked) {
-					likedVideos.add(video.id);
-				} else {
-					likedVideos.delete(video.id);
-				}
-				setAnimate(true);
-				setIsLiked(nextIsLiked);
-			}}
-		>
-			<Heart liked={isLiked} animate={animate} />
-		</button>
-	);
+export default function LikeButton({video}) {
+  const [isLiked, setIsLiked] = useState(() => likedVideos.has(video.id));
+  const [animate, setAnimate] = useState(false);
+  return (
+    <button
+      className={`like-button ${isLiked && 'liked'}`}
+      aria-label={isLiked ? 'Unsave' : 'Save'}
+      onClick={() => {
+        const nextIsLiked = !isLiked;
+        if (nextIsLiked) {
+          likedVideos.add(video.id);
+        } else {
+          likedVideos.delete(video.id);
+        }
+        setAnimate(true);
+        setIsLiked(nextIsLiked);
+      }}>
+      <Heart liked={isLiked} animate={animate} />
+    </button>
+  );
 }
 ```
 
 ```js src/Videos.js hidden
-import { startTransition, useState } from "react";
-
-import { PauseIcon, PlayIcon } from "./Icons";
+import { useState } from "react";
 import LikeButton from "./LikeButton";
 import { useRouter } from "./router";
+import { PauseIcon, PlayIcon } from "./Icons";
+import { startTransition } from "react";
 
 export function VideoControls() {
-	const [isPlaying, setIsPlaying] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
 
-	return (
-		<span
-			className="controls"
-			onClick={() =>
-				startTransition(() => {
-					setIsPlaying((p) => !p);
-				})
-			}
-		>
-			{isPlaying ?
-				<PauseIcon />
-			:	<PlayIcon />}
-		</span>
-	);
+  return (
+    <span
+      className="controls"
+      onClick={() =>
+        startTransition(() => {
+          setIsPlaying((p) => !p);
+        })
+      }
+    >
+      {isPlaying ? <PauseIcon /> : <PlayIcon />}
+    </span>
+  );
 }
 
 export function Thumbnail({ video, children }) {
-	return (
-		<div aria-hidden="true" tabIndex={-1} className={`thumbnail ${video.image}`}>
-			{children}
-		</div>
-	);
+  return (
+    <div
+      aria-hidden="true"
+      tabIndex={-1}
+      className={`thumbnail ${video.image}`}
+    >
+      {children}
+    </div>
+  );
 }
 
 export function Video({ video }) {
-	const { navigate } = useRouter();
+  const { navigate } = useRouter();
 
-	return (
-		<div className="video">
-			<div
-				className="link"
-				onClick={(e) => {
-					e.preventDefault();
-					navigate(`/video/${video.id}`);
-				}}
-			>
-				<Thumbnail video={video}></Thumbnail>
+  return (
+    <div className="video">
+      <div
+        className="link"
+        onClick={(e) => {
+          e.preventDefault();
+          navigate(`/video/${video.id}`);
+        }}
+      >
+        <Thumbnail video={video}></Thumbnail>
 
-				<div className="info">
-					<div className="video-title">{video.title}</div>
-					<div className="video-description">{video.description}</div>
-				</div>
-			</div>
-			<LikeButton video={video} />
-		</div>
-	);
+        <div className="info">
+          <div className="video-title">{video.title}</div>
+          <div className="video-description">{video.description}</div>
+        </div>
+      </div>
+      <LikeButton video={video} />
+    </div>
+  );
 }
 ```
 
+
 ```js src/data.js hidden
 const videos = [
-	{
-		id: "1",
-		title: "First video",
-		description: "Video description",
-		image: "blue",
-	},
-	{
-		id: "2",
-		title: "Second video",
-		description: "Video description",
-		image: "red",
-	},
-	{
-		id: "3",
-		title: "Third video",
-		description: "Video description",
-		image: "green",
-	},
-	{
-		id: "4",
-		title: "Fourth video",
-		description: "Video description",
-		image: "purple",
-	},
-	{
-		id: "5",
-		title: "Fifth video",
-		description: "Video description",
-		image: "yellow",
-	},
-	{
-		id: "6",
-		title: "Sixth video",
-		description: "Video description",
-		image: "gray",
-	},
+  {
+    id: '1',
+    title: 'First video',
+    description: 'Video description',
+    image: 'blue',
+  },
+  {
+    id: '2',
+    title: 'Second video',
+    description: 'Video description',
+    image: 'red',
+  },
+  {
+    id: '3',
+    title: 'Third video',
+    description: 'Video description',
+    image: 'green',
+  },
+  {
+    id: '4',
+    title: 'Fourth video',
+    description: 'Video description',
+    image: 'purple',
+  },
+  {
+    id: '5',
+    title: 'Fifth video',
+    description: 'Video description',
+    image: 'yellow',
+  },
+  {
+    id: '6',
+    title: 'Sixth video',
+    description: 'Video description',
+    image: 'gray',
+  },
 ];
 
 let videosCache = new Map();
@@ -1782,775 +1727,731 @@ let videoDetailsCache = new Map();
 const VIDEO_DELAY = 1;
 const VIDEO_DETAILS_DELAY = 1000;
 export function fetchVideos() {
-	if (videosCache.has(0)) {
-		return videosCache.get(0);
-	}
-	const promise = new Promise((resolve) => {
-		setTimeout(() => {
-			resolve(videos);
-		}, VIDEO_DELAY);
-	});
-	videosCache.set(0, promise);
-	return promise;
+  if (videosCache.has(0)) {
+    return videosCache.get(0);
+  }
+  const promise = new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(videos);
+    }, VIDEO_DELAY);
+  });
+  videosCache.set(0, promise);
+  return promise;
 }
 
 export function fetchVideo(id) {
-	if (videoCache.has(id)) {
-		return videoCache.get(id);
-	}
-	const promise = new Promise((resolve) => {
-		setTimeout(() => {
-			resolve(videos.find((video) => video.id === id));
-		}, VIDEO_DELAY);
-	});
-	videoCache.set(id, promise);
-	return promise;
+  if (videoCache.has(id)) {
+    return videoCache.get(id);
+  }
+  const promise = new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(videos.find((video) => video.id === id));
+    }, VIDEO_DELAY);
+  });
+  videoCache.set(id, promise);
+  return promise;
 }
 
 export function fetchVideoDetails(id) {
-	if (videoDetailsCache.has(id)) {
-		return videoDetailsCache.get(id);
-	}
-	const promise = new Promise((resolve) => {
-		setTimeout(() => {
-			resolve(videos.find((video) => video.id === id));
-		}, VIDEO_DETAILS_DELAY);
-	});
-	videoDetailsCache.set(id, promise);
-	return promise;
+  if (videoDetailsCache.has(id)) {
+    return videoDetailsCache.get(id);
+  }
+  const promise = new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(videos.find((video) => video.id === id));
+    }, VIDEO_DETAILS_DELAY);
+  });
+  videoDetailsCache.set(id, promise);
+  return promise;
 }
 ```
 
 ```js src/router.js
-import { createContext, use, useEffect, useLayoutEffect, useState, useTransition } from "react";
+import {useState, createContext,use,useTransition,useLayoutEffect,useEffect} from "react";
 
 export function Router({ children }) {
-	const [isPending, startTransition] = useTransition();
+  const [isPending, startTransition] = useTransition();
 
-	function navigate(url) {
-		// Update router state in transition.
-		startTransition(() => {
-			go(url);
-		});
-	}
+  function navigate(url) {
+    // Update router state in transition.
+    startTransition(() => {
+      go(url);
+    });
+  }
 
-	const [routerState, setRouterState] = useState({
-		pendingNav: () => {},
-		url: document.location.pathname,
-	});
 
-	function go(url) {
-		setRouterState({
-			url,
-			pendingNav() {
-				window.history.pushState({}, "", url);
-			},
-		});
-	}
 
-	function navigateBack(url) {
-		startTransition(() => {
-			go(url);
-		});
-	}
 
-	useEffect(() => {
-		function handlePopState() {
-			// This should not animate because restoration has to be synchronous.
-			// Even though it's a transition.
-			startTransition(() => {
-				setRouterState({
-					url: document.location.pathname + document.location.search,
-					pendingNav() {
-						// Noop. URL has already updated.
-					},
-				});
-			});
-		}
-		window.addEventListener("popstate", handlePopState);
-		return () => {
-			window.removeEventListener("popstate", handlePopState);
-		};
-	}, []);
-	const pendingNav = routerState.pendingNav;
-	useLayoutEffect(() => {
-		pendingNav();
-	}, [pendingNav]);
+  const [routerState, setRouterState] = useState({
+    pendingNav: () => {},
+    url: document.location.pathname,
+  });
 
-	return (
-		<RouterContext
-			value={{
-				url: routerState.url,
-				navigate,
-				navigateBack,
-				isPending,
-				params: {},
-			}}
-		>
-			{children}
-		</RouterContext>
-	);
+
+  function go(url) {
+    setRouterState({
+      url,
+      pendingNav() {
+        window.history.pushState({}, "", url);
+      },
+    });
+  }
+
+
+  function navigateBack(url) {
+    startTransition(() => {
+      go(url);
+    });
+  }
+
+  useEffect(() => {
+    function handlePopState() {
+      // This should not animate because restoration has to be synchronous.
+      // Even though it's a transition.
+      startTransition(() => {
+        setRouterState({
+          url: document.location.pathname + document.location.search,
+          pendingNav() {
+            // Noop. URL has already updated.
+          },
+        });
+      });
+    }
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, []);
+  const pendingNav = routerState.pendingNav;
+  useLayoutEffect(() => {
+    pendingNav();
+  }, [pendingNav]);
+
+  return (
+    <RouterContext
+      value={{
+        url: routerState.url,
+        navigate,
+        navigateBack,
+        isPending,
+        params: {},
+      }}
+    >
+      {children}
+    </RouterContext>
+  );
 }
 
 const RouterContext = createContext({ url: "/", params: {} });
 
 export function useRouter() {
-	return use(RouterContext);
+  return use(RouterContext);
 }
 
 export function useIsNavPending() {
-	return use(RouterContext).isPending;
+  return use(RouterContext).isPending;
 }
 ```
 
 ```css src/styles.css hidden
 @font-face {
-	font-family: Optimistic Text;
-	src: url(https://react.dev/fonts/Optimistic_Text_W_Rg.woff2) format("woff2");
-	font-weight: 400;
-	font-style: normal;
-	font-display: swap;
+  font-family: Optimistic Text;
+  src: url(https://react.dev/fonts/Optimistic_Text_W_Rg.woff2) format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
-	font-family: Optimistic Text;
-	src: url(https://react.dev/fonts/Optimistic_Text_W_Md.woff2) format("woff2");
-	font-weight: 500;
-	font-style: normal;
-	font-display: swap;
+  font-family: Optimistic Text;
+  src: url(https://react.dev/fonts/Optimistic_Text_W_Md.woff2) format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
-	font-family: Optimistic Text;
-	src: url(https://react.dev/fonts/Optimistic_Text_W_Bd.woff2) format("woff2");
-	font-weight: 600;
-	font-style: normal;
-	font-display: swap;
+  font-family: Optimistic Text;
+  src: url(https://react.dev/fonts/Optimistic_Text_W_Bd.woff2) format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
-	font-family: Optimistic Text;
-	src: url(https://react.dev/fonts/Optimistic_Text_W_Bd.woff2) format("woff2");
-	font-weight: 700;
-	font-style: normal;
-	font-display: swap;
+  font-family: Optimistic Text;
+  src: url(https://react.dev/fonts/Optimistic_Text_W_Bd.woff2) format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
 }
 
 * {
-	box-sizing: border-box;
+  box-sizing: border-box;
 }
 
 html {
-	background-image: url(https://react.dev/images/meta-gradient-dark.png);
-	background-size: 100%;
-	background-position: -100%;
-	background-color: rgb(64 71 86);
-	background-repeat: no-repeat;
-	height: 100%;
-	width: 100%;
+  background-image: url(https://react.dev/images/meta-gradient-dark.png);
+  background-size: 100%;
+  background-position: -100%;
+  background-color: rgb(64 71 86);
+  background-repeat: no-repeat;
+  height: 100%;
+  width: 100%;
 }
 
 body {
-	font-family:
-		Optimistic Text,
-		-apple-system,
-		ui-sans-serif,
-		system-ui,
-		sans-serif,
-		Apple Color Emoji,
-		Segoe UI Emoji,
-		Segoe UI Symbol,
-		Noto Color Emoji;
-	padding: 10px 0 10px 0;
-	margin: 0;
-	display: flex;
-	justify-content: center;
+  font-family: Optimistic Text, -apple-system, ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji;
+  padding: 10px 0 10px 0;
+  margin: 0;
+  display: flex;
+  justify-content: center;
 }
 
 #root {
-	flex: 1 1;
-	height: auto;
-	background-color: #fff;
-	border-radius: 10px;
-	max-width: 450px;
-	min-height: 600px;
-	padding-bottom: 10px;
+  flex: 1 1;
+  height: auto;
+  background-color: #fff;
+  border-radius: 10px;
+  max-width: 450px;
+  min-height: 600px;
+  padding-bottom: 10px;
 }
 
 h1 {
-	margin-top: 0;
-	font-size: 22px;
+  margin-top: 0;
+  font-size: 22px;
 }
 
 h2 {
-	margin-top: 0;
-	font-size: 20px;
+  margin-top: 0;
+  font-size: 20px;
 }
 
 h3 {
-	margin-top: 0;
-	font-size: 18px;
+  margin-top: 0;
+  font-size: 18px;
 }
 
 h4 {
-	margin-top: 0;
-	font-size: 16px;
+  margin-top: 0;
+  font-size: 16px;
 }
 
 h5 {
-	margin-top: 0;
-	font-size: 14px;
+  margin-top: 0;
+  font-size: 14px;
 }
 
 h6 {
-	margin-top: 0;
-	font-size: 12px;
+  margin-top: 0;
+  font-size: 12px;
 }
 
 code {
-	font-size: 1.2em;
+  font-size: 1.2em;
 }
 
 ul {
-	padding-inline-start: 20px;
+  padding-inline-start: 20px;
 }
 
 .sr-only {
-	position: absolute;
-	width: 1px;
-	height: 1px;
-	padding: 0;
-	margin: -1px;
-	overflow: hidden;
-	clip: rect(0, 0, 0, 0);
-	white-space: nowrap;
-	border-width: 0;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }
 
 .absolute {
-	position: absolute;
+  position: absolute;
 }
 
 .overflow-visible {
-	overflow: visible;
+  overflow: visible;
 }
 
 .visible {
-	overflow: visible;
+  overflow: visible;
 }
 
 .fit {
-	width: fit-content;
+  width: fit-content;
 }
+
 
 /* Layout */
 .page {
-	display: flex;
-	flex-direction: column;
-	height: 100%;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .top-hero {
-	height: 200px;
-	display: flex;
-	justify-content: center;
-	align-items: center;
-	background-image: conic-gradient(
-		from 90deg at -10% 100%,
-		#2b303b 0deg,
-		#2b303b 90deg,
-		#16181d 1turn
-	);
+  height: 200px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-image: conic-gradient(
+      from 90deg at -10% 100%,
+      #2b303b 0deg,
+      #2b303b 90deg,
+      #16181d 1turn
+  );
 }
 
 .bottom {
-	flex: 1;
-	overflow: auto;
+  flex: 1;
+  overflow: auto;
 }
 
 .top-nav {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	margin-bottom: 0;
-	padding: 0 12px;
-	top: 0;
-	width: 100%;
-	height: 44px;
-	color: #23272f;
-	font-weight: 700;
-	font-size: 20px;
-	z-index: 100;
-	cursor: default;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0;
+  padding: 0 12px;
+  top: 0;
+  width: 100%;
+  height: 44px;
+  color: #23272f;
+  font-weight: 700;
+  font-size: 20px;
+  z-index: 100;
+  cursor: default;
 }
 
 .content {
-	padding: 0 12px;
-	margin-top: 4px;
+  padding: 0 12px;
+  margin-top: 4px;
 }
 
+
 .loader {
-	color: #23272f;
-	font-size: 3px;
-	width: 1em;
-	margin-right: 18px;
-	height: 1em;
-	border-radius: 50%;
-	position: relative;
-	text-indent: -9999em;
-	animation: loading-spinner 1.3s infinite linear;
-	animation-delay: 200ms;
-	transform: translateZ(0);
+  color: #23272f;
+  font-size: 3px;
+  width: 1em;
+  margin-right: 18px;
+  height: 1em;
+  border-radius: 50%;
+  position: relative;
+  text-indent: -9999em;
+  animation: loading-spinner 1.3s infinite linear;
+  animation-delay: 200ms;
+  transform: translateZ(0);
 }
 
 @keyframes loading-spinner {
-	0%,
-	100% {
-		box-shadow:
-			0 -3em 0 0.2em,
-			2em -2em 0 0em,
-			3em 0 0 -1em,
-			2em 2em 0 -1em,
-			0 3em 0 -1em,
-			-2em 2em 0 -1em,
-			-3em 0 0 -1em,
-			-2em -2em 0 0;
-	}
-	12.5% {
-		box-shadow:
-			0 -3em 0 0,
-			2em -2em 0 0.2em,
-			3em 0 0 0,
-			2em 2em 0 -1em,
-			0 3em 0 -1em,
-			-2em 2em 0 -1em,
-			-3em 0 0 -1em,
-			-2em -2em 0 -1em;
-	}
-	25% {
-		box-shadow:
-			0 -3em 0 -0.5em,
-			2em -2em 0 0,
-			3em 0 0 0.2em,
-			2em 2em 0 0,
-			0 3em 0 -1em,
-			-2em 2em 0 -1em,
-			-3em 0 0 -1em,
-			-2em -2em 0 -1em;
-	}
-	37.5% {
-		box-shadow:
-			0 -3em 0 -1em,
-			2em -2em 0 -1em,
-			3em 0em 0 0,
-			2em 2em 0 0.2em,
-			0 3em 0 0em,
-			-2em 2em 0 -1em,
-			-3em 0em 0 -1em,
-			-2em -2em 0 -1em;
-	}
-	50% {
-		box-shadow:
-			0 -3em 0 -1em,
-			2em -2em 0 -1em,
-			3em 0 0 -1em,
-			2em 2em 0 0em,
-			0 3em 0 0.2em,
-			-2em 2em 0 0,
-			-3em 0em 0 -1em,
-			-2em -2em 0 -1em;
-	}
-	62.5% {
-		box-shadow:
-			0 -3em 0 -1em,
-			2em -2em 0 -1em,
-			3em 0 0 -1em,
-			2em 2em 0 -1em,
-			0 3em 0 0,
-			-2em 2em 0 0.2em,
-			-3em 0 0 0,
-			-2em -2em 0 -1em;
-	}
-	75% {
-		box-shadow:
-			0em -3em 0 -1em,
-			2em -2em 0 -1em,
-			3em 0em 0 -1em,
-			2em 2em 0 -1em,
-			0 3em 0 -1em,
-			-2em 2em 0 0,
-			-3em 0em 0 0.2em,
-			-2em -2em 0 0;
-	}
-	87.5% {
-		box-shadow:
-			0em -3em 0 0,
-			2em -2em 0 -1em,
-			3em 0 0 -1em,
-			2em 2em 0 -1em,
-			0 3em 0 -1em,
-			-2em 2em 0 0,
-			-3em 0em 0 0,
-			-2em -2em 0 0.2em;
-	}
+  0%,
+  100% {
+    box-shadow: 0 -3em 0 0.2em,
+    2em -2em 0 0em, 3em 0 0 -1em,
+    2em 2em 0 -1em, 0 3em 0 -1em,
+    -2em 2em 0 -1em, -3em 0 0 -1em,
+    -2em -2em 0 0;
+  }
+  12.5% {
+    box-shadow: 0 -3em 0 0, 2em -2em 0 0.2em,
+    3em 0 0 0, 2em 2em 0 -1em, 0 3em 0 -1em,
+    -2em 2em 0 -1em, -3em 0 0 -1em,
+    -2em -2em 0 -1em;
+  }
+  25% {
+    box-shadow: 0 -3em 0 -0.5em,
+    2em -2em 0 0, 3em 0 0 0.2em,
+    2em 2em 0 0, 0 3em 0 -1em,
+    -2em 2em 0 -1em, -3em 0 0 -1em,
+    -2em -2em 0 -1em;
+  }
+  37.5% {
+    box-shadow: 0 -3em 0 -1em, 2em -2em 0 -1em,
+    3em 0em 0 0, 2em 2em 0 0.2em, 0 3em 0 0em,
+    -2em 2em 0 -1em, -3em 0em 0 -1em, -2em -2em 0 -1em;
+  }
+  50% {
+    box-shadow: 0 -3em 0 -1em, 2em -2em 0 -1em,
+    3em 0 0 -1em, 2em 2em 0 0em, 0 3em 0 0.2em,
+    -2em 2em 0 0, -3em 0em 0 -1em, -2em -2em 0 -1em;
+  }
+  62.5% {
+    box-shadow: 0 -3em 0 -1em, 2em -2em 0 -1em,
+    3em 0 0 -1em, 2em 2em 0 -1em, 0 3em 0 0,
+    -2em 2em 0 0.2em, -3em 0 0 0, -2em -2em 0 -1em;
+  }
+  75% {
+    box-shadow: 0em -3em 0 -1em, 2em -2em 0 -1em,
+    3em 0em 0 -1em, 2em 2em 0 -1em, 0 3em 0 -1em,
+    -2em 2em 0 0, -3em 0em 0 0.2em, -2em -2em 0 0;
+  }
+  87.5% {
+    box-shadow: 0em -3em 0 0, 2em -2em 0 -1em,
+    3em 0 0 -1em, 2em 2em 0 -1em, 0 3em 0 -1em,
+    -2em 2em 0 0, -3em 0em 0 0, -2em -2em 0 0.2em;
+  }
 }
 
 /* LikeButton */
 .like-button {
-	outline-offset: 2px;
-	position: relative;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	width: 2.5rem;
-	height: 2.5rem;
-	cursor: pointer;
-	border-radius: 9999px;
-	border: none;
-	outline: none 2px;
-	color: #5e687e;
-	background: none;
+  outline-offset: 2px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  cursor: pointer;
+  border-radius: 9999px;
+  border: none;
+  outline: none 2px;
+  color: #5e687e;
+  background: none;
 }
 
 .like-button:focus {
-	color: #a6423a;
-	background-color: rgba(166, 66, 58, 0.05);
+  color: #a6423a;
+  background-color: rgba(166, 66, 58, .05);
 }
 
 .like-button:active {
-	color: #a6423a;
-	background-color: rgba(166, 66, 58, 0.05);
-	transform: scaleX(0.95) scaleY(0.95);
+  color: #a6423a;
+  background-color: rgba(166, 66, 58, .05);
+  transform: scaleX(0.95) scaleY(0.95);
 }
 
 .like-button:hover {
-	background-color: #f6f7f9;
+  background-color: #f6f7f9;
 }
 
 .like-button.liked {
-	color: #a6423a;
+  color: #a6423a;
 }
 
 /* Icons */
 @keyframes circle {
-	0% {
-		transform: scale(0);
-		stroke-width: 16px;
-	}
+  0% {
+    transform: scale(0);
+    stroke-width: 16px;
+  }
 
-	50% {
-		transform: scale(0.5);
-		stroke-width: 16px;
-	}
+  50% {
+    transform: scale(.5);
+    stroke-width: 16px;
+  }
 
-	to {
-		transform: scale(1);
-		stroke-width: 0;
-	}
+  to {
+    transform: scale(1);
+    stroke-width: 0;
+  }
 }
 
 .circle {
-	color: rgba(166, 66, 58, 0.5);
-	transform-origin: center;
-	transition-property: all;
-	transition-duration: 0.15s;
-	transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  color: rgba(166, 66, 58, .5);
+  transform-origin: center;
+  transition-property: all;
+  transition-duration: .15s;
+  transition-timing-function: cubic-bezier(.4,0,.2,1);
 }
 
 .circle.liked.animate {
-	animation: circle 0.3s forwards;
+  animation: circle .3s forwards;
 }
 
 .heart {
-	width: 1.5rem;
-	height: 1.5rem;
+  width: 1.5rem;
+  height: 1.5rem;
 }
 
 .heart.liked {
-	transform-origin: center;
-	transition-property: all;
-	transition-duration: 0.15s;
-	transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: center;
+  transition-property: all;
+  transition-duration: .15s;
+  transition-timing-function: cubic-bezier(.4, 0, .2, 1);
 }
 
 .heart.liked.animate {
-	animation: scale 0.35s ease-in-out forwards;
+  animation: scale .35s ease-in-out forwards;
 }
 
 .control-icon {
-	color: hsla(0, 0%, 100%, 0.5);
-	filter: drop-shadow(0 20px 13px rgba(0, 0, 0, 0.03)) drop-shadow(0 8px 5px rgba(0, 0, 0, 0.08));
+  color: hsla(0, 0%, 100%, .5);
+  filter:  drop-shadow(0 20px 13px rgba(0, 0, 0, .03)) drop-shadow(0 8px 5px rgba(0, 0, 0, .08));
 }
 
 .chevron-left {
-	margin-top: 2px;
-	rotate: 90deg;
+  margin-top: 2px;
+  rotate: 90deg;
 }
+
 
 /* Video */
 .thumbnail {
-	position: relative;
-	aspect-ratio: 16 / 9;
-	display: flex;
-	overflow: hidden;
-	flex-direction: column;
-	justify-content: center;
-	align-items: center;
-	border-radius: 0.5rem;
-	outline-offset: 2px;
-	width: 8rem;
-	vertical-align: middle;
-	background-color: #ffffff;
-	background-size: cover;
-	user-select: none;
+  position: relative;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  overflow: hidden;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  border-radius: 0.5rem;
+  outline-offset: 2px;
+  width: 8rem;
+  vertical-align: middle;
+  background-color: #ffffff;
+  background-size: cover;
+  user-select: none;
 }
 
 .thumbnail.blue {
-	background-image: conic-gradient(at top right, #c76a15, #087ea4, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #087ea4, #2b3491);
 }
 
 .thumbnail.red {
-	background-image: conic-gradient(at top right, #c76a15, #a6423a, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #a6423a, #2b3491);
 }
 
 .thumbnail.green {
-	background-image: conic-gradient(at top right, #c76a15, #388f7f, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #388f7f, #2b3491);
 }
 
 .thumbnail.purple {
-	background-image: conic-gradient(at top right, #c76a15, #575fb7, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #575fb7, #2b3491);
 }
 
 .thumbnail.yellow {
-	background-image: conic-gradient(at top right, #c76a15, #fabd62, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #FABD62, #2b3491);
 }
 
 .thumbnail.gray {
-	background-image: conic-gradient(at top right, #c76a15, #4e5769, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #4E5769, #2b3491);
 }
 
 .video {
-	display: flex;
-	flex-direction: row;
-	gap: 0.75rem;
-	align-items: center;
+  display: flex;
+  flex-direction: row;
+  gap: 0.75rem;
+  align-items: center;
 }
 
 .video .link {
-	display: flex;
-	flex-direction: row;
-	flex: 1 1 0;
-	gap: 0.125rem;
-	outline-offset: 4px;
-	cursor: pointer;
+  display: flex;
+  flex-direction: row;
+  flex: 1 1 0;
+  gap: 0.125rem;
+  outline-offset: 4px;
+  cursor: pointer;
 }
 
 .video .info {
-	display: flex;
-	flex-direction: column;
-	justify-content: center;
-	margin-left: 8px;
-	gap: 0.125rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  margin-left: 8px;
+  gap: 0.125rem;
 }
 
 .video .info:hover {
-	text-decoration: underline;
+  text-decoration: underline;
 }
 
 .video-title {
-	font-size: 15px;
-	line-height: 1.25;
-	font-weight: 700;
-	color: #23272f;
+  font-size: 15px;
+  line-height: 1.25;
+  font-weight: 700;
+  color: #23272f;
 }
 
 .video-description {
-	color: #5e687e;
-	font-size: 13px;
+  color: #5e687e;
+  font-size: 13px;
 }
 
 /* Details */
 .details .thumbnail {
-	position: relative;
-	aspect-ratio: 16 / 9;
-	display: flex;
-	overflow: hidden;
-	flex-direction: column;
-	justify-content: center;
-	align-items: center;
-	border-radius: 0.5rem;
-	outline-offset: 2px;
-	width: 100%;
-	vertical-align: middle;
-	background-color: #ffffff;
-	background-size: cover;
-	user-select: none;
+  position: relative;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  overflow: hidden;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  border-radius: 0.5rem;
+  outline-offset: 2px;
+  width: 100%;
+  vertical-align: middle;
+  background-color: #ffffff;
+  background-size: cover;
+  user-select: none;
 }
 
 .video-details-title {
-	margin-top: 8px;
+  margin-top: 8px;
 }
 
 .video-details-speaker {
-	display: flex;
-	gap: 8px;
-	margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  margin-top: 10px
 }
 
 .back {
-	display: flex;
-	align-items: center;
-	margin-left: -5px;
-	cursor: pointer;
+  display: flex;
+  align-items: center;
+  margin-left: -5px;
+  cursor: pointer;
 }
 
 .back:hover {
-	text-decoration: underline;
+  text-decoration: underline;
 }
 
 .info-title {
-	font-size: 1.5rem;
-	font-weight: 700;
-	line-height: 1.25;
-	margin: 8px 0 0 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.25;
+  margin: 8px 0 0 0 ;
 }
 
 .info-description {
-	margin: 8px 0 0 0;
+  margin: 8px 0 0 0;
 }
 
 .controls {
-	cursor: pointer;
+  cursor: pointer;
 }
 
 .fallback {
-	background: #f6f7f8 linear-gradient(to right, #e6e6e6 5%, #cccccc 25%, #e6e6e6 35%) no-repeat;
-	background-size: 800px 104px;
-	display: block;
-	line-height: 1.25;
-	margin: 8px 0 0 0;
-	border-radius: 5px;
-	overflow: hidden;
+  background: #f6f7f8 linear-gradient(to right, #e6e6e6 5%, #cccccc 25%, #e6e6e6 35%) no-repeat;
+  background-size: 800px 104px;
+  display: block;
+  line-height: 1.25;
+  margin: 8px 0 0 0;
+  border-radius: 5px;
+  overflow: hidden;
 
-	animation: 1s linear 1s infinite shimmer;
-	animation-delay: 300ms;
-	animation-duration: 1s;
-	animation-fill-mode: forwards;
-	animation-iteration-count: infinite;
-	animation-name: shimmer;
-	animation-timing-function: linear;
+  animation: 1s linear 1s infinite shimmer;
+  animation-delay: 300ms;
+  animation-duration: 1s;
+  animation-fill-mode: forwards;
+  animation-iteration-count: infinite;
+  animation-name: shimmer;
+  animation-timing-function: linear;
 }
 
+
 .fallback.title {
-	width: 130px;
-	height: 30px;
+  width: 130px;
+  height: 30px;
+
 }
 
 .fallback.description {
-	width: 150px;
-	height: 21px;
+  width: 150px;
+  height: 21px;
 }
 
 @keyframes shimmer {
-	0% {
-		background-position: -468px 0;
-	}
+  0% {
+    background-position: -468px 0;
+  }
 
-	100% {
-		background-position: 468px 0;
-	}
+  100% {
+    background-position: 468px 0;
+  }
 }
 
 .search {
-	margin-bottom: 10px;
+  margin-bottom: 10px;
 }
 .search-input {
-	width: 100%;
-	position: relative;
+  width: 100%;
+  position: relative;
 }
 
 .search-icon {
-	position: absolute;
-	top: 0;
-	bottom: 0;
-	inset-inline-start: 0;
-	display: flex;
-	align-items: center;
-	padding-inline-start: 1rem;
-	pointer-events: none;
-	color: #99a1b3;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  inset-inline-start: 0;
+  display: flex;
+  align-items: center;
+  padding-inline-start: 1rem;
+  pointer-events: none;
+  color: #99a1b3;
 }
 
 .search-input input {
-	display: flex;
-	padding-inline-start: 2.75rem;
-	padding-top: 10px;
-	padding-bottom: 10px;
-	width: 100%;
-	text-align: start;
-	background-color: rgb(235 236 240);
-	outline: 2px solid transparent;
-	cursor: pointer;
-	border: none;
-	align-items: center;
-	color: rgb(35 39 47);
-	border-radius: 9999px;
-	vertical-align: middle;
-	font-size: 15px;
+  display: flex;
+  padding-inline-start: 2.75rem;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  width: 100%;
+  text-align: start;
+  background-color: rgb(235 236 240);
+  outline: 2px solid transparent;
+  cursor: pointer;
+  border: none;
+  align-items: center;
+  color: rgb(35 39 47);
+  border-radius: 9999px;
+  vertical-align: middle;
+  font-size: 15px;
 }
 
-.search-input input:hover,
-.search-input input:active {
-	background-color: rgb(235 236 240/ 0.8);
-	color: rgb(35 39 47/ 0.8);
+.search-input input:hover, .search-input input:active {
+  background-color: rgb(235 236 240/ 0.8);
+  color: rgb(35 39 47/ 0.8);
 }
 
 /* Home */
 .video-list {
-	position: relative;
+  position: relative;
 }
 
 .video-list .videos {
-	display: flex;
-	flex-direction: column;
-	gap: 1rem;
-	overflow-y: auto;
-	height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  overflow-y: auto;
+  height: 100%;
 }
 ```
 
 ```js src/index.js hidden
-import React, { StrictMode } from "react";
-import { createRoot } from "react-dom/client";
+import React, {StrictMode} from 'react';
+import {createRoot} from 'react-dom/client';
+import './styles.css';
 
-import "./styles.css";
+import App from './App';
+import {Router} from './router';
 
-import App from "./App";
-import { Router } from "./router";
-
-const root = createRoot(document.getElementById("root"));
+const root = createRoot(document.getElementById('root'));
 root.render(
-	<StrictMode>
-		<Router>
-			<App />
-		</Router>
-	</StrictMode>,
+  <StrictMode>
+    <Router>
+      <App />
+    </Router>
+  </StrictMode>
 );
 ```
 
 ```json package.json hidden
 {
-	"dependencies": {
-		"react": "experimental",
-		"react-dom": "experimental",
-		"react-scripts": "latest"
-	},
-	"scripts": {
-		"start": "react-scripts start",
-		"build": "react-scripts build",
-		"test": "react-scripts test --env=jsdom",
-		"eject": "react-scripts eject"
-	}
+  "dependencies": {
+    "react": "canary",
+    "react-dom": "canary",
+    "react-scripts": "latest"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test --env=jsdom",
+    "eject": "react-scripts eject"
+  }
 }
 ```
 
@@ -2562,7 +2463,7 @@ If you're curious how this works, see the docs for [How does `<ViewTransition>` 
 
 <Note>
 
-#### Opting out of `<ViewTransition>` animations {/_opting-out-of-viewtransition-animations_/}
+#### Opting out of `<ViewTransition>` animations {/*opting-out-of-viewtransition-animations*/}
 
 In this example, we're wrapping the root of the app in `<ViewTransition>` for simplicity, but this means that all transitions in the app will be animated, which can lead to unexpected animations.
 
@@ -2570,14 +2471,16 @@ To fix, we're wrapping route children with `"none"` so each page can control its
 
 ```js
 // Layout.js
-<ViewTransition default="none">{children}</ViewTransition>
+<ViewTransition default="none">
+  {children}
+</ViewTransition>
 ```
 
 In practice, navigations should be done via "enter" and "exit" props, or by using Transition Types.
 
 </Note>
 
-### Customizing animations {/_customizing-animations_/}
+### Customizing animations {/*customizing-animations*/}
 
 By default, `<ViewTransition>` includes the default cross-fade from the browser.
 
@@ -2587,7 +2490,7 @@ For example, we can slow down the `default` cross fade animation:
 
 ```js
 <ViewTransition default="slow-fade">
-	<Home />
+  <Home />
 </ViewTransition>
 ```
 
@@ -2595,11 +2498,11 @@ And define `slow-fade` in CSS using [view transition classes](/reference/react/V
 
 ```css
 ::view-transition-old(.slow-fade) {
-	animation-duration: 500ms;
+    animation-duration: 500ms;
 }
 
 ::view-transition-new(.slow-fade) {
-	animation-duration: 500ms;
+    animation-duration: 500ms;
 }
 ```
 
@@ -2608,433 +2511,428 @@ Now, the cross fade is slower:
 <Sandpack>
 
 ```js src/App.js active
-import { unstable_ViewTransition as ViewTransition } from "react";
-
+import { ViewTransition } from "react";
 import Details from "./Details";
 import Home from "./Home";
 import { useRouter } from "./router";
 
 export default function App() {
-	const { url } = useRouter();
+  const { url } = useRouter();
 
-	// Define a default animation of .slow-fade.
-	// See animations.css for the animation definition.
-	return (
-		<ViewTransition default="slow-fade">
-			{url === "/" ?
-				<Home />
-			:	<Details />}
-		</ViewTransition>
-	);
+  // Define a default animation of .slow-fade.
+  // See animations.css for the animation definition.
+  return (
+    <ViewTransition default="slow-fade">
+      {url === '/' ? <Home /> : <Details />}
+    </ViewTransition>
+  );
 }
 ```
 
 ```js src/Details.js hidden
-import { Suspense, use } from "react";
-
 import { fetchVideo, fetchVideoDetails } from "./data";
-import { ChevronLeft } from "./Icons";
-import Layout from "./Layout";
-import { useRouter } from "./router";
 import { Thumbnail, VideoControls } from "./Videos";
+import { useRouter } from "./router";
+import Layout from "./Layout";
+import { use, Suspense } from "react";
+import { ChevronLeft } from "./Icons";
 
 function VideoInfo({ id }) {
-	const details = use(fetchVideoDetails(id));
-	return (
-		<>
-			<p className="info-title">{details.title}</p>
-			<p className="info-description">{details.description}</p>
-		</>
-	);
+  const details = use(fetchVideoDetails(id));
+  return (
+    <>
+      <p className="info-title">{details.title}</p>
+      <p className="info-description">{details.description}</p>
+    </>
+  );
 }
 
 function VideoInfoFallback() {
-	return (
-		<>
-			<div className="fallback title"></div>
-			<div className="fallback description"></div>
-		</>
-	);
+  return (
+    <>
+      <div className="fallback title"></div>
+      <div className="fallback description"></div>
+    </>
+  );
 }
 
 export default function Details() {
-	const { url, navigateBack } = useRouter();
-	const videoId = url.split("/").pop();
-	const video = use(fetchVideo(videoId));
+  const { url, navigateBack } = useRouter();
+  const videoId = url.split("/").pop();
+  const video = use(fetchVideo(videoId));
 
-	return (
-		<Layout
-			heading={
-				<div
-					className="fit back"
-					onClick={() => {
-						navigateBack("/");
-					}}
-				>
-					<ChevronLeft /> Back
-				</div>
-			}
-		>
-			<div className="details">
-				<Thumbnail video={video} large>
-					<VideoControls />
-				</Thumbnail>
-				<Suspense fallback={<VideoInfoFallback />}>
-					<VideoInfo id={video.id} />
-				</Suspense>
-			</div>
-		</Layout>
-	);
+  return (
+    <Layout
+      heading={
+        <div
+          className="fit back"
+          onClick={() => {
+            navigateBack("/");
+          }}
+        >
+          <ChevronLeft /> Back
+        </div>
+      }
+    >
+      <div className="details">
+        <Thumbnail video={video} large>
+          <VideoControls />
+        </Thumbnail>
+        <Suspense fallback={<VideoInfoFallback />}>
+          <VideoInfo id={video.id} />
+        </Suspense>
+      </div>
+    </Layout>
+  );
 }
+
 ```
 
 ```js src/Home.js hidden
-import { use, useId, useState } from "react";
-
-import { fetchVideos } from "./data";
-import { IconSearch } from "./Icons";
-import Layout from "./Layout";
 import { Video } from "./Videos";
+import Layout from "./Layout";
+import { fetchVideos } from "./data";
+import { useId, useState, use } from "react";
+import { IconSearch } from "./Icons";
 
 function SearchInput({ value, onChange }) {
-	const id = useId();
-	return (
-		<form className="search" onSubmit={(e) => e.preventDefault()}>
-			<label htmlFor={id} className="sr-only">
-				Search
-			</label>
-			<div className="search-input">
-				<div className="search-icon">
-					<IconSearch />
-				</div>
-				<input
-					type="text"
-					id={id}
-					placeholder="Search"
-					value={value}
-					onChange={(e) => onChange(e.target.value)}
-				/>
-			</div>
-		</form>
-	);
+  const id = useId();
+  return (
+    <form className="search" onSubmit={(e) => e.preventDefault()}>
+      <label htmlFor={id} className="sr-only">
+        Search
+      </label>
+      <div className="search-input">
+        <div className="search-icon">
+          <IconSearch />
+        </div>
+        <input
+          type="text"
+          id={id}
+          placeholder="Search"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      </div>
+    </form>
+  );
 }
 
 function filterVideos(videos, query) {
-	const keywords = query
-		.toLowerCase()
-		.split(" ")
-		.filter((s) => s !== "");
-	if (keywords.length === 0) {
-		return videos;
-	}
-	return videos.filter((video) => {
-		const words = (video.title + " " + video.description).toLowerCase().split(" ");
-		return keywords.every((kw) => words.some((w) => w.includes(kw)));
-	});
+  const keywords = query
+    .toLowerCase()
+    .split(" ")
+    .filter((s) => s !== "");
+  if (keywords.length === 0) {
+    return videos;
+  }
+  return videos.filter((video) => {
+    const words = (video.title + " " + video.description)
+      .toLowerCase()
+      .split(" ");
+    return keywords.every((kw) => words.some((w) => w.includes(kw)));
+  });
 }
 
 export default function Home() {
-	const videos = use(fetchVideos());
-	const count = videos.length;
-	const [searchText, setSearchText] = useState("");
-	const foundVideos = filterVideos(videos, searchText);
-	return (
-		<Layout heading={<div className="fit">{count} Videos</div>}>
-			<SearchInput value={searchText} onChange={setSearchText} />
-			<div className="video-list">
-				{foundVideos.length === 0 && <div className="no-results">No results</div>}
-				<div className="videos">
-					{foundVideos.map((video) => (
-						<Video key={video.id} video={video} />
-					))}
-				</div>
-			</div>
-		</Layout>
-	);
+  const videos = use(fetchVideos());
+  const count = videos.length;
+  const [searchText, setSearchText] = useState("");
+  const foundVideos = filterVideos(videos, searchText);
+  return (
+    <Layout heading={<div className="fit">{count} Videos</div>}>
+      <SearchInput value={searchText} onChange={setSearchText} />
+      <div className="video-list">
+        {foundVideos.length === 0 && (
+          <div className="no-results">No results</div>
+        )}
+        <div className="videos">
+          {foundVideos.map((video) => (
+            <Video key={video.id} video={video} />
+          ))}
+        </div>
+      </div>
+    </Layout>
+  );
 }
+
 ```
 
 ```js src/Icons.js hidden
 export function ChevronLeft() {
-	return (
-		<svg
-			className="chevron-left"
-			xmlns="http://www.w3.org/2000/svg"
-			width="20"
-			height="20"
-			viewBox="0 0 20 20"
-		>
-			<g fill="none" fillRule="evenodd" transform="translate(-446 -398)">
-				<path
-					fill="currentColor"
-					fillRule="nonzero"
-					d="M95.8838835,240.366117 C95.3957281,239.877961 94.6042719,239.877961 94.1161165,240.366117 C93.6279612,240.854272 93.6279612,241.645728 94.1161165,242.133883 L98.6161165,246.633883 C99.1042719,247.122039 99.8957281,247.122039 100.383883,246.633883 L104.883883,242.133883 C105.372039,241.645728 105.372039,240.854272 104.883883,240.366117 C104.395728,239.877961 103.604272,239.877961 103.116117,240.366117 L99.5,243.982233 L95.8838835,240.366117 Z"
-					transform="translate(356.5 164.5)"
-				/>
-				<polygon points="446 418 466 418 466 398 446 398" />
-			</g>
-		</svg>
-	);
+  return (
+    <svg
+      className="chevron-left"
+      xmlns="http://www.w3.org/2000/svg"
+      width="20"
+      height="20"
+      viewBox="0 0 20 20">
+      <g fill="none" fillRule="evenodd" transform="translate(-446 -398)">
+        <path
+          fill="currentColor"
+          fillRule="nonzero"
+          d="M95.8838835,240.366117 C95.3957281,239.877961 94.6042719,239.877961 94.1161165,240.366117 C93.6279612,240.854272 93.6279612,241.645728 94.1161165,242.133883 L98.6161165,246.633883 C99.1042719,247.122039 99.8957281,247.122039 100.383883,246.633883 L104.883883,242.133883 C105.372039,241.645728 105.372039,240.854272 104.883883,240.366117 C104.395728,239.877961 103.604272,239.877961 103.116117,240.366117 L99.5,243.982233 L95.8838835,240.366117 Z"
+          transform="translate(356.5 164.5)"
+        />
+        <polygon points="446 418 466 418 466 398 446 398" />
+      </g>
+    </svg>
+  );
 }
 
 export function PauseIcon() {
-	return (
-		<svg
-			className="control-icon"
-			style={{ padding: "4px" }}
-			width="100"
-			height="100"
-			viewBox="0 0 512 512"
-			fill="none"
-			xmlns="http://www.w3.org/2000/svg"
-		>
-			<path
-				fillRule="evenodd"
-				clipRule="evenodd"
-				d="M256 0C114.617 0 0 114.615 0 256s114.617 256 256 256 256-114.615 256-256S397.383 0 256 0zm-32 320c0 8.836-7.164 16-16 16h-32c-8.836 0-16-7.164-16-16V192c0-8.836 7.164-16 16-16h32c8.836 0 16 7.164 16 16v128zm128 0c0 8.836-7.164 16-16 16h-32c-8.836 0-16-7.164-16-16V192c0-8.836 7.164-16 16-16h32c8.836 0 16 7.164 16 16v128z"
-				fill="currentColor"
-			/>
-		</svg>
-	);
+  return (
+    <svg
+      className="control-icon"
+      style={{padding: '4px'}}
+      width="100"
+      height="100"
+      viewBox="0 0 512 512"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg">
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M256 0C114.617 0 0 114.615 0 256s114.617 256 256 256 256-114.615 256-256S397.383 0 256 0zm-32 320c0 8.836-7.164 16-16 16h-32c-8.836 0-16-7.164-16-16V192c0-8.836 7.164-16 16-16h32c8.836 0 16 7.164 16 16v128zm128 0c0 8.836-7.164 16-16 16h-32c-8.836 0-16-7.164-16-16V192c0-8.836 7.164-16 16-16h32c8.836 0 16 7.164 16 16v128z"
+        fill="currentColor"
+      />
+    </svg>
+  );
 }
 
 export function PlayIcon() {
-	return (
-		<svg
-			className="control-icon"
-			width="100"
-			height="100"
-			viewBox="0 0 72 72"
-			fill="none"
-			xmlns="http://www.w3.org/2000/svg"
-		>
-			<path
-				fillRule="evenodd"
-				clipRule="evenodd"
-				d="M36 69C54.2254 69 69 54.2254 69 36C69 17.7746 54.2254 3 36 3C17.7746 3 3 17.7746 3 36C3 54.2254 17.7746 69 36 69ZM52.1716 38.6337L28.4366 51.5801C26.4374 52.6705 24 51.2235 24 48.9464V23.0536C24 20.7764 26.4374 19.3295 28.4366 20.4199L52.1716 33.3663C54.2562 34.5034 54.2562 37.4966 52.1716 38.6337Z"
-				fill="currentColor"
-			/>
-		</svg>
-	);
+  return (
+    <svg
+      className="control-icon"
+      width="100"
+      height="100"
+      viewBox="0 0 72 72"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg">
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M36 69C54.2254 69 69 54.2254 69 36C69 17.7746 54.2254 3 36 3C17.7746 3 3 17.7746 3 36C3 54.2254 17.7746 69 36 69ZM52.1716 38.6337L28.4366 51.5801C26.4374 52.6705 24 51.2235 24 48.9464V23.0536C24 20.7764 26.4374 19.3295 28.4366 20.4199L52.1716 33.3663C54.2562 34.5034 54.2562 37.4966 52.1716 38.6337Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
 }
-export function Heart({ liked, animate }) {
-	return (
-		<>
-			<svg
-				className="absolute overflow-visible"
-				viewBox="0 0 24 24"
-				fill="none"
-				xmlns="http://www.w3.org/2000/svg"
-			>
-				<circle
-					className={`circle ${liked ? "liked" : ""} ${animate ? "animate" : ""}`}
-					cx="12"
-					cy="12"
-					r="11.5"
-					fill="transparent"
-					strokeWidth="0"
-					stroke="currentColor"
-				/>
-			</svg>
+export function Heart({liked, animate}) {
+  return (
+    <>
+      <svg
+        className="absolute overflow-visible"
+        viewBox="0 0 24 24"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg">
+        <circle
+          className={`circle ${liked ? 'liked' : ''} ${animate ? 'animate' : ''}`}
+          cx="12"
+          cy="12"
+          r="11.5"
+          fill="transparent"
+          strokeWidth="0"
+          stroke="currentColor"
+        />
+      </svg>
 
-			<svg
-				className={`heart ${liked ? "liked" : ""} ${animate ? "animate" : ""}`}
-				viewBox="0 0 24 24"
-				fill="none"
-				xmlns="http://www.w3.org/2000/svg"
-			>
-				{liked ?
-					<path
-						d="M12 23a.496.496 0 0 1-.26-.074C7.023 19.973 0 13.743 0 8.68c0-4.12 2.322-6.677 6.058-6.677 2.572 0 5.108 2.387 5.134 2.41l.808.771.808-.771C12.834 4.387 15.367 2 17.935 2 21.678 2 24 4.558 24 8.677c0 5.06-7.022 11.293-11.74 14.246a.496.496 0 0 1-.26.074V23z"
-						fill="currentColor"
-					/>
-				:	<path
-						fillRule="evenodd"
-						clipRule="evenodd"
-						d="m12 5.184-.808-.771-.004-.004C11.065 4.299 8.522 2.003 6 2.003c-3.736 0-6 2.558-6 6.677 0 4.47 5.471 9.848 10 13.079.602.43 1.187.82 1.74 1.167A.497.497 0 0 0 12 23v-.003c.09 0 .182-.026.26-.074C16.977 19.97 24 13.737 24 8.677 24 4.557 21.743 2 18 2c-2.569 0-5.166 2.387-5.192 2.413L12 5.184zm-.002 15.525c2.071-1.388 4.477-3.342 6.427-5.47C20.72 12.733 22 10.401 22 8.677c0-1.708-.466-2.855-1.087-3.55C20.316 4.459 19.392 4 18 4c-.726 0-1.63.364-2.5.9-.67.412-1.148.82-1.266.92-.03.025-.037.031-.019.014l-.013.013L12 7.949 9.832 5.88a10.08 10.08 0 0 0-1.33-.977C7.633 4.367 6.728 4.003 6 4.003c-1.388 0-2.312.459-2.91 1.128C2.466 5.826 2 6.974 2 8.68c0 1.726 1.28 4.058 3.575 6.563 1.948 2.127 4.352 4.078 6.423 5.466z"
-						fill="currentColor"
-					/>
-				}
-			</svg>
-		</>
-	);
+      <svg
+        className={`heart ${liked ? 'liked' : ''} ${animate ? 'animate' : ''}`}
+        viewBox="0 0 24 24"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg">
+        {liked ? (
+          <path
+            d="M12 23a.496.496 0 0 1-.26-.074C7.023 19.973 0 13.743 0 8.68c0-4.12 2.322-6.677 6.058-6.677 2.572 0 5.108 2.387 5.134 2.41l.808.771.808-.771C12.834 4.387 15.367 2 17.935 2 21.678 2 24 4.558 24 8.677c0 5.06-7.022 11.293-11.74 14.246a.496.496 0 0 1-.26.074V23z"
+            fill="currentColor"
+          />
+        ) : (
+          <path
+            fillRule="evenodd"
+            clipRule="evenodd"
+            d="m12 5.184-.808-.771-.004-.004C11.065 4.299 8.522 2.003 6 2.003c-3.736 0-6 2.558-6 6.677 0 4.47 5.471 9.848 10 13.079.602.43 1.187.82 1.74 1.167A.497.497 0 0 0 12 23v-.003c.09 0 .182-.026.26-.074C16.977 19.97 24 13.737 24 8.677 24 4.557 21.743 2 18 2c-2.569 0-5.166 2.387-5.192 2.413L12 5.184zm-.002 15.525c2.071-1.388 4.477-3.342 6.427-5.47C20.72 12.733 22 10.401 22 8.677c0-1.708-.466-2.855-1.087-3.55C20.316 4.459 19.392 4 18 4c-.726 0-1.63.364-2.5.9-.67.412-1.148.82-1.266.92-.03.025-.037.031-.019.014l-.013.013L12 7.949 9.832 5.88a10.08 10.08 0 0 0-1.33-.977C7.633 4.367 6.728 4.003 6 4.003c-1.388 0-2.312.459-2.91 1.128C2.466 5.826 2 6.974 2 8.68c0 1.726 1.28 4.058 3.575 6.563 1.948 2.127 4.352 4.078 6.423 5.466z"
+            fill="currentColor"
+          />
+        )}
+      </svg>
+    </>
+  );
 }
 
 export function IconSearch(props) {
-	return (
-		<svg width="1em" height="1em" viewBox="0 0 20 20">
-			<path
-				d="M14.386 14.386l4.0877 4.0877-4.0877-4.0877c-2.9418 2.9419-7.7115 2.9419-10.6533 0-2.9419-2.9418-2.9419-7.7115 0-10.6533 2.9418-2.9419 7.7115-2.9419 10.6533 0 2.9419 2.9418 2.9419 7.7115 0 10.6533z"
-				stroke="currentColor"
-				fill="none"
-				strokeWidth="2"
-				fillRule="evenodd"
-				strokeLinecap="round"
-				strokeLinejoin="round"
-			></path>
-		</svg>
-	);
+  return (
+    <svg width="1em" height="1em" viewBox="0 0 20 20">
+      <path
+        d="M14.386 14.386l4.0877 4.0877-4.0877-4.0877c-2.9418 2.9419-7.7115 2.9419-10.6533 0-2.9419-2.9418-2.9419-7.7115 0-10.6533 2.9418-2.9419 7.7115-2.9419 10.6533 0 2.9419 2.9418 2.9419 7.7115 0 10.6533z"
+        stroke="currentColor"
+        fill="none"
+        strokeWidth="2"
+        fillRule="evenodd"
+        strokeLinecap="round"
+        strokeLinejoin="round"></path>
+    </svg>
+  );
 }
 ```
 
 ```js src/Layout.js hidden
-import { unstable_ViewTransition as ViewTransition } from "react";
-
-import { useIsNavPending } from "./router";
+import {ViewTransition} from 'react'; import { useIsNavPending } from "./router";
 
 export default function Page({ heading, children }) {
-	const isPending = useIsNavPending();
+  const isPending = useIsNavPending();
 
-	return (
-		<div className="page">
-			<div className="top">
-				<div className="top-nav">
-					{heading}
-					{isPending && <span className="loader"></span>}
-				</div>
-			</div>
-			{/* Opt-out of ViewTransition for the content. */}
-			{/* Content can define it's own ViewTransition. */}
-			<ViewTransition default="none">
-				<div className="bottom">
-					<div className="content">{children}</div>
-				</div>
-			</ViewTransition>
-		</div>
-	);
+  return (
+    <div className="page">
+      <div className="top">
+        <div className="top-nav">
+          {heading}
+          {isPending && <span className="loader"></span>}
+        </div>
+      </div>
+      {/* Opt-out of ViewTransition for the content. */}
+      {/* Content can define it's own ViewTransition. */}
+      <ViewTransition default="none">
+        <div className="bottom">
+          <div className="content">{children}</div>
+        </div>
+      </ViewTransition>
+    </div>
+  );
 }
 ```
 
 ```js src/LikeButton.js hidden
-import { useState } from "react";
-
-import { Heart } from "./Icons";
+import {useState} from 'react';
+import {Heart} from './Icons';
 
 // A hack since we don't actually have a backend.
 // Unlike local state, this survives videos being filtered.
 const likedVideos = new Set();
 
-export default function LikeButton({ video }) {
-	const [isLiked, setIsLiked] = useState(() => likedVideos.has(video.id));
-	const [animate, setAnimate] = useState(false);
-	return (
-		<button
-			className={`like-button ${isLiked && "liked"}`}
-			aria-label={isLiked ? "Unsave" : "Save"}
-			onClick={() => {
-				const nextIsLiked = !isLiked;
-				if (nextIsLiked) {
-					likedVideos.add(video.id);
-				} else {
-					likedVideos.delete(video.id);
-				}
-				setAnimate(true);
-				setIsLiked(nextIsLiked);
-			}}
-		>
-			<Heart liked={isLiked} animate={animate} />
-		</button>
-	);
+export default function LikeButton({video}) {
+  const [isLiked, setIsLiked] = useState(() => likedVideos.has(video.id));
+  const [animate, setAnimate] = useState(false);
+  return (
+    <button
+      className={`like-button ${isLiked && 'liked'}`}
+      aria-label={isLiked ? 'Unsave' : 'Save'}
+      onClick={() => {
+        const nextIsLiked = !isLiked;
+        if (nextIsLiked) {
+          likedVideos.add(video.id);
+        } else {
+          likedVideos.delete(video.id);
+        }
+        setAnimate(true);
+        setIsLiked(nextIsLiked);
+      }}>
+      <Heart liked={isLiked} animate={animate} />
+    </button>
+  );
 }
 ```
 
 ```js src/Videos.js hidden
-import { startTransition, useState } from "react";
-
-import { PauseIcon, PlayIcon } from "./Icons";
+import { useState } from "react";
 import LikeButton from "./LikeButton";
 import { useRouter } from "./router";
+import { PauseIcon, PlayIcon } from "./Icons";
+import { startTransition } from "react";
 
 export function VideoControls() {
-	const [isPlaying, setIsPlaying] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
 
-	return (
-		<span
-			className="controls"
-			onClick={() =>
-				startTransition(() => {
-					setIsPlaying((p) => !p);
-				})
-			}
-		>
-			{isPlaying ?
-				<PauseIcon />
-			:	<PlayIcon />}
-		</span>
-	);
+  return (
+    <span
+      className="controls"
+      onClick={() =>
+        startTransition(() => {
+          setIsPlaying((p) => !p);
+        })
+      }
+    >
+      {isPlaying ? <PauseIcon /> : <PlayIcon />}
+    </span>
+  );
 }
 
 export function Thumbnail({ video, children }) {
-	return (
-		<div aria-hidden="true" tabIndex={-1} className={`thumbnail ${video.image}`}>
-			{children}
-		</div>
-	);
+  return (
+    <div
+      aria-hidden="true"
+      tabIndex={-1}
+      className={`thumbnail ${video.image}`}
+    >
+      {children}
+    </div>
+  );
 }
 
 export function Video({ video }) {
-	const { navigate } = useRouter();
+  const { navigate } = useRouter();
 
-	return (
-		<div className="video">
-			<div
-				className="link"
-				onClick={(e) => {
-					e.preventDefault();
-					navigate(`/video/${video.id}`);
-				}}
-			>
-				<Thumbnail video={video}></Thumbnail>
+  return (
+    <div className="video">
+      <div
+        className="link"
+        onClick={(e) => {
+          e.preventDefault();
+          navigate(`/video/${video.id}`);
+        }}
+      >
+        <Thumbnail video={video}></Thumbnail>
 
-				<div className="info">
-					<div className="video-title">{video.title}</div>
-					<div className="video-description">{video.description}</div>
-				</div>
-			</div>
-			<LikeButton video={video} />
-		</div>
-	);
+        <div className="info">
+          <div className="video-title">{video.title}</div>
+          <div className="video-description">{video.description}</div>
+        </div>
+      </div>
+      <LikeButton video={video} />
+    </div>
+  );
 }
 ```
 
+
 ```js src/data.js hidden
 const videos = [
-	{
-		id: "1",
-		title: "First video",
-		description: "Video description",
-		image: "blue",
-	},
-	{
-		id: "2",
-		title: "Second video",
-		description: "Video description",
-		image: "red",
-	},
-	{
-		id: "3",
-		title: "Third video",
-		description: "Video description",
-		image: "green",
-	},
-	{
-		id: "4",
-		title: "Fourth video",
-		description: "Video description",
-		image: "purple",
-	},
-	{
-		id: "5",
-		title: "Fifth video",
-		description: "Video description",
-		image: "yellow",
-	},
-	{
-		id: "6",
-		title: "Sixth video",
-		description: "Video description",
-		image: "gray",
-	},
+  {
+    id: '1',
+    title: 'First video',
+    description: 'Video description',
+    image: 'blue',
+  },
+  {
+    id: '2',
+    title: 'Second video',
+    description: 'Video description',
+    image: 'red',
+  },
+  {
+    id: '3',
+    title: 'Third video',
+    description: 'Video description',
+    image: 'green',
+  },
+  {
+    id: '4',
+    title: 'Fourth video',
+    description: 'Video description',
+    image: 'purple',
+  },
+  {
+    id: '5',
+    title: 'Fifth video',
+    description: 'Video description',
+    image: 'yellow',
+  },
+  {
+    id: '6',
+    title: 'Sixth video',
+    description: 'Video description',
+    image: 'gray',
+  },
 ];
 
 let videosCache = new Map();
@@ -3043,786 +2941,745 @@ let videoDetailsCache = new Map();
 const VIDEO_DELAY = 1;
 const VIDEO_DETAILS_DELAY = 1000;
 export function fetchVideos() {
-	if (videosCache.has(0)) {
-		return videosCache.get(0);
-	}
-	const promise = new Promise((resolve) => {
-		setTimeout(() => {
-			resolve(videos);
-		}, VIDEO_DELAY);
-	});
-	videosCache.set(0, promise);
-	return promise;
+  if (videosCache.has(0)) {
+    return videosCache.get(0);
+  }
+  const promise = new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(videos);
+    }, VIDEO_DELAY);
+  });
+  videosCache.set(0, promise);
+  return promise;
 }
 
 export function fetchVideo(id) {
-	if (videoCache.has(id)) {
-		return videoCache.get(id);
-	}
-	const promise = new Promise((resolve) => {
-		setTimeout(() => {
-			resolve(videos.find((video) => video.id === id));
-		}, VIDEO_DELAY);
-	});
-	videoCache.set(id, promise);
-	return promise;
+  if (videoCache.has(id)) {
+    return videoCache.get(id);
+  }
+  const promise = new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(videos.find((video) => video.id === id));
+    }, VIDEO_DELAY);
+  });
+  videoCache.set(id, promise);
+  return promise;
 }
 
 export function fetchVideoDetails(id) {
-	if (videoDetailsCache.has(id)) {
-		return videoDetailsCache.get(id);
-	}
-	const promise = new Promise((resolve) => {
-		setTimeout(() => {
-			resolve(videos.find((video) => video.id === id));
-		}, VIDEO_DETAILS_DELAY);
-	});
-	videoDetailsCache.set(id, promise);
-	return promise;
+  if (videoDetailsCache.has(id)) {
+    return videoDetailsCache.get(id);
+  }
+  const promise = new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(videos.find((video) => video.id === id));
+    }, VIDEO_DETAILS_DELAY);
+  });
+  videoDetailsCache.set(id, promise);
+  return promise;
 }
 ```
 
 ```js src/router.js hidden
-import { createContext, use, useEffect, useLayoutEffect, useState, useTransition } from "react";
+import {
+  useState,
+  createContext,
+  use,
+  useTransition,
+  useLayoutEffect,
+  useEffect,
+} from "react";
 
 const RouterContext = createContext({ url: "/", params: {} });
 
 export function useRouter() {
-	return use(RouterContext);
+  return use(RouterContext);
 }
 
 export function useIsNavPending() {
-	return use(RouterContext).isPending;
+  return use(RouterContext).isPending;
 }
 
 export function Router({ children }) {
-	const [routerState, setRouterState] = useState({
-		pendingNav: () => {},
-		url: document.location.pathname,
-	});
-	const [isPending, startTransition] = useTransition();
+  const [routerState, setRouterState] = useState({
+    pendingNav: () => {},
+    url: document.location.pathname,
+  });
+  const [isPending, startTransition] = useTransition();
 
-	function go(url) {
-		setRouterState({
-			url,
-			pendingNav() {
-				window.history.pushState({}, "", url);
-			},
-		});
-	}
-	function navigate(url) {
-		// Update router state in transition.
-		startTransition(() => {
-			go(url);
-		});
-	}
+  function go(url) {
+    setRouterState({
+      url,
+      pendingNav() {
+        window.history.pushState({}, "", url);
+      },
+    });
+  }
+  function navigate(url) {
+    // Update router state in transition.
+    startTransition(() => {
+      go(url);
+    });
+  }
 
-	function navigateBack(url) {
-		// Update router state in transition.
-		startTransition(() => {
-			go(url);
-		});
-	}
+  function navigateBack(url) {
+    // Update router state in transition.
+    startTransition(() => {
+      go(url);
+    });
+  }
 
-	useEffect(() => {
-		function handlePopState() {
-			// This should not animate because restoration has to be synchronous.
-			// Even though it's a transition.
-			startTransition(() => {
-				setRouterState({
-					url: document.location.pathname + document.location.search,
-					pendingNav() {
-						// Noop. URL has already updated.
-					},
-				});
-			});
-		}
-		window.addEventListener("popstate", handlePopState);
-		return () => {
-			window.removeEventListener("popstate", handlePopState);
-		};
-	}, []);
-	const pendingNav = routerState.pendingNav;
-	useLayoutEffect(() => {
-		pendingNav();
-	}, [pendingNav]);
+  useEffect(() => {
+    function handlePopState() {
+      // This should not animate because restoration has to be synchronous.
+      // Even though it's a transition.
+      startTransition(() => {
+        setRouterState({
+          url: document.location.pathname + document.location.search,
+          pendingNav() {
+            // Noop. URL has already updated.
+          },
+        });
+      });
+    }
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, []);
+  const pendingNav = routerState.pendingNav;
+  useLayoutEffect(() => {
+    pendingNav();
+  }, [pendingNav]);
 
-	return (
-		<RouterContext
-			value={{
-				url: routerState.url,
-				navigate,
-				navigateBack,
-				isPending,
-				params: {},
-			}}
-		>
-			{children}
-		</RouterContext>
-	);
+  return (
+    <RouterContext
+      value={{
+        url: routerState.url,
+        navigate,
+        navigateBack,
+        isPending,
+        params: {},
+      }}
+    >
+      {children}
+    </RouterContext>
+  );
 }
 ```
 
 ```css src/styles.css hidden
 @font-face {
-	font-family: Optimistic Text;
-	src: url(https://react.dev/fonts/Optimistic_Text_W_Rg.woff2) format("woff2");
-	font-weight: 400;
-	font-style: normal;
-	font-display: swap;
+  font-family: Optimistic Text;
+  src: url(https://react.dev/fonts/Optimistic_Text_W_Rg.woff2) format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
-	font-family: Optimistic Text;
-	src: url(https://react.dev/fonts/Optimistic_Text_W_Md.woff2) format("woff2");
-	font-weight: 500;
-	font-style: normal;
-	font-display: swap;
+  font-family: Optimistic Text;
+  src: url(https://react.dev/fonts/Optimistic_Text_W_Md.woff2) format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
-	font-family: Optimistic Text;
-	src: url(https://react.dev/fonts/Optimistic_Text_W_Bd.woff2) format("woff2");
-	font-weight: 600;
-	font-style: normal;
-	font-display: swap;
+  font-family: Optimistic Text;
+  src: url(https://react.dev/fonts/Optimistic_Text_W_Bd.woff2) format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
-	font-family: Optimistic Text;
-	src: url(https://react.dev/fonts/Optimistic_Text_W_Bd.woff2) format("woff2");
-	font-weight: 700;
-	font-style: normal;
-	font-display: swap;
+  font-family: Optimistic Text;
+  src: url(https://react.dev/fonts/Optimistic_Text_W_Bd.woff2) format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
 }
 
 * {
-	box-sizing: border-box;
+  box-sizing: border-box;
 }
 
 html {
-	background-image: url(https://react.dev/images/meta-gradient-dark.png);
-	background-size: 100%;
-	background-position: -100%;
-	background-color: rgb(64 71 86);
-	background-repeat: no-repeat;
-	height: 100%;
-	width: 100%;
+  background-image: url(https://react.dev/images/meta-gradient-dark.png);
+  background-size: 100%;
+  background-position: -100%;
+  background-color: rgb(64 71 86);
+  background-repeat: no-repeat;
+  height: 100%;
+  width: 100%;
 }
 
 body {
-	font-family:
-		Optimistic Text,
-		-apple-system,
-		ui-sans-serif,
-		system-ui,
-		sans-serif,
-		Apple Color Emoji,
-		Segoe UI Emoji,
-		Segoe UI Symbol,
-		Noto Color Emoji;
-	padding: 10px 0 10px 0;
-	margin: 0;
-	display: flex;
-	justify-content: center;
+  font-family: Optimistic Text, -apple-system, ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji;
+  padding: 10px 0 10px 0;
+  margin: 0;
+  display: flex;
+  justify-content: center;
 }
 
 #root {
-	flex: 1 1;
-	height: auto;
-	background-color: #fff;
-	border-radius: 10px;
-	max-width: 450px;
-	min-height: 600px;
-	padding-bottom: 10px;
+  flex: 1 1;
+  height: auto;
+  background-color: #fff;
+  border-radius: 10px;
+  max-width: 450px;
+  min-height: 600px;
+  padding-bottom: 10px;
 }
 
 h1 {
-	margin-top: 0;
-	font-size: 22px;
+  margin-top: 0;
+  font-size: 22px;
 }
 
 h2 {
-	margin-top: 0;
-	font-size: 20px;
+  margin-top: 0;
+  font-size: 20px;
 }
 
 h3 {
-	margin-top: 0;
-	font-size: 18px;
+  margin-top: 0;
+  font-size: 18px;
 }
 
 h4 {
-	margin-top: 0;
-	font-size: 16px;
+  margin-top: 0;
+  font-size: 16px;
 }
 
 h5 {
-	margin-top: 0;
-	font-size: 14px;
+  margin-top: 0;
+  font-size: 14px;
 }
 
 h6 {
-	margin-top: 0;
-	font-size: 12px;
+  margin-top: 0;
+  font-size: 12px;
 }
 
 code {
-	font-size: 1.2em;
+  font-size: 1.2em;
 }
 
 ul {
-	padding-inline-start: 20px;
+  padding-inline-start: 20px;
 }
 
 .sr-only {
-	position: absolute;
-	width: 1px;
-	height: 1px;
-	padding: 0;
-	margin: -1px;
-	overflow: hidden;
-	clip: rect(0, 0, 0, 0);
-	white-space: nowrap;
-	border-width: 0;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }
 
 .absolute {
-	position: absolute;
+  position: absolute;
 }
 
 .overflow-visible {
-	overflow: visible;
+  overflow: visible;
 }
 
 .visible {
-	overflow: visible;
+  overflow: visible;
 }
 
 .fit {
-	width: fit-content;
+  width: fit-content;
 }
+
 
 /* Layout */
 .page {
-	display: flex;
-	flex-direction: column;
-	height: 100%;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .top-hero {
-	height: 200px;
-	display: flex;
-	justify-content: center;
-	align-items: center;
-	background-image: conic-gradient(
-		from 90deg at -10% 100%,
-		#2b303b 0deg,
-		#2b303b 90deg,
-		#16181d 1turn
-	);
+  height: 200px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-image: conic-gradient(
+      from 90deg at -10% 100%,
+      #2b303b 0deg,
+      #2b303b 90deg,
+      #16181d 1turn
+  );
 }
 
 .bottom {
-	flex: 1;
-	overflow: auto;
+  flex: 1;
+  overflow: auto;
 }
 
 .top-nav {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	margin-bottom: 0;
-	padding: 0 12px;
-	top: 0;
-	width: 100%;
-	height: 44px;
-	color: #23272f;
-	font-weight: 700;
-	font-size: 20px;
-	z-index: 100;
-	cursor: default;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0;
+  padding: 0 12px;
+  top: 0;
+  width: 100%;
+  height: 44px;
+  color: #23272f;
+  font-weight: 700;
+  font-size: 20px;
+  z-index: 100;
+  cursor: default;
 }
 
 .content {
-	padding: 0 12px;
-	margin-top: 4px;
+  padding: 0 12px;
+  margin-top: 4px;
 }
 
+
 .loader {
-	color: #23272f;
-	font-size: 3px;
-	width: 1em;
-	margin-right: 18px;
-	height: 1em;
-	border-radius: 50%;
-	position: relative;
-	text-indent: -9999em;
-	animation: loading-spinner 1.3s infinite linear;
-	animation-delay: 200ms;
-	transform: translateZ(0);
+  color: #23272f;
+  font-size: 3px;
+  width: 1em;
+  margin-right: 18px;
+  height: 1em;
+  border-radius: 50%;
+  position: relative;
+  text-indent: -9999em;
+  animation: loading-spinner 1.3s infinite linear;
+  animation-delay: 200ms;
+  transform: translateZ(0);
 }
 
 @keyframes loading-spinner {
-	0%,
-	100% {
-		box-shadow:
-			0 -3em 0 0.2em,
-			2em -2em 0 0em,
-			3em 0 0 -1em,
-			2em 2em 0 -1em,
-			0 3em 0 -1em,
-			-2em 2em 0 -1em,
-			-3em 0 0 -1em,
-			-2em -2em 0 0;
-	}
-	12.5% {
-		box-shadow:
-			0 -3em 0 0,
-			2em -2em 0 0.2em,
-			3em 0 0 0,
-			2em 2em 0 -1em,
-			0 3em 0 -1em,
-			-2em 2em 0 -1em,
-			-3em 0 0 -1em,
-			-2em -2em 0 -1em;
-	}
-	25% {
-		box-shadow:
-			0 -3em 0 -0.5em,
-			2em -2em 0 0,
-			3em 0 0 0.2em,
-			2em 2em 0 0,
-			0 3em 0 -1em,
-			-2em 2em 0 -1em,
-			-3em 0 0 -1em,
-			-2em -2em 0 -1em;
-	}
-	37.5% {
-		box-shadow:
-			0 -3em 0 -1em,
-			2em -2em 0 -1em,
-			3em 0em 0 0,
-			2em 2em 0 0.2em,
-			0 3em 0 0em,
-			-2em 2em 0 -1em,
-			-3em 0em 0 -1em,
-			-2em -2em 0 -1em;
-	}
-	50% {
-		box-shadow:
-			0 -3em 0 -1em,
-			2em -2em 0 -1em,
-			3em 0 0 -1em,
-			2em 2em 0 0em,
-			0 3em 0 0.2em,
-			-2em 2em 0 0,
-			-3em 0em 0 -1em,
-			-2em -2em 0 -1em;
-	}
-	62.5% {
-		box-shadow:
-			0 -3em 0 -1em,
-			2em -2em 0 -1em,
-			3em 0 0 -1em,
-			2em 2em 0 -1em,
-			0 3em 0 0,
-			-2em 2em 0 0.2em,
-			-3em 0 0 0,
-			-2em -2em 0 -1em;
-	}
-	75% {
-		box-shadow:
-			0em -3em 0 -1em,
-			2em -2em 0 -1em,
-			3em 0em 0 -1em,
-			2em 2em 0 -1em,
-			0 3em 0 -1em,
-			-2em 2em 0 0,
-			-3em 0em 0 0.2em,
-			-2em -2em 0 0;
-	}
-	87.5% {
-		box-shadow:
-			0em -3em 0 0,
-			2em -2em 0 -1em,
-			3em 0 0 -1em,
-			2em 2em 0 -1em,
-			0 3em 0 -1em,
-			-2em 2em 0 0,
-			-3em 0em 0 0,
-			-2em -2em 0 0.2em;
-	}
+  0%,
+  100% {
+    box-shadow: 0 -3em 0 0.2em,
+    2em -2em 0 0em, 3em 0 0 -1em,
+    2em 2em 0 -1em, 0 3em 0 -1em,
+    -2em 2em 0 -1em, -3em 0 0 -1em,
+    -2em -2em 0 0;
+  }
+  12.5% {
+    box-shadow: 0 -3em 0 0, 2em -2em 0 0.2em,
+    3em 0 0 0, 2em 2em 0 -1em, 0 3em 0 -1em,
+    -2em 2em 0 -1em, -3em 0 0 -1em,
+    -2em -2em 0 -1em;
+  }
+  25% {
+    box-shadow: 0 -3em 0 -0.5em,
+    2em -2em 0 0, 3em 0 0 0.2em,
+    2em 2em 0 0, 0 3em 0 -1em,
+    -2em 2em 0 -1em, -3em 0 0 -1em,
+    -2em -2em 0 -1em;
+  }
+  37.5% {
+    box-shadow: 0 -3em 0 -1em, 2em -2em 0 -1em,
+    3em 0em 0 0, 2em 2em 0 0.2em, 0 3em 0 0em,
+    -2em 2em 0 -1em, -3em 0em 0 -1em, -2em -2em 0 -1em;
+  }
+  50% {
+    box-shadow: 0 -3em 0 -1em, 2em -2em 0 -1em,
+    3em 0 0 -1em, 2em 2em 0 0em, 0 3em 0 0.2em,
+    -2em 2em 0 0, -3em 0em 0 -1em, -2em -2em 0 -1em;
+  }
+  62.5% {
+    box-shadow: 0 -3em 0 -1em, 2em -2em 0 -1em,
+    3em 0 0 -1em, 2em 2em 0 -1em, 0 3em 0 0,
+    -2em 2em 0 0.2em, -3em 0 0 0, -2em -2em 0 -1em;
+  }
+  75% {
+    box-shadow: 0em -3em 0 -1em, 2em -2em 0 -1em,
+    3em 0em 0 -1em, 2em 2em 0 -1em, 0 3em 0 -1em,
+    -2em 2em 0 0, -3em 0em 0 0.2em, -2em -2em 0 0;
+  }
+  87.5% {
+    box-shadow: 0em -3em 0 0, 2em -2em 0 -1em,
+    3em 0 0 -1em, 2em 2em 0 -1em, 0 3em 0 -1em,
+    -2em 2em 0 0, -3em 0em 0 0, -2em -2em 0 0.2em;
+  }
 }
 
 /* LikeButton */
 .like-button {
-	outline-offset: 2px;
-	position: relative;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	width: 2.5rem;
-	height: 2.5rem;
-	cursor: pointer;
-	border-radius: 9999px;
-	border: none;
-	outline: none 2px;
-	color: #5e687e;
-	background: none;
+  outline-offset: 2px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  cursor: pointer;
+  border-radius: 9999px;
+  border: none;
+  outline: none 2px;
+  color: #5e687e;
+  background: none;
 }
 
 .like-button:focus {
-	color: #a6423a;
-	background-color: rgba(166, 66, 58, 0.05);
+  color: #a6423a;
+  background-color: rgba(166, 66, 58, .05);
 }
 
 .like-button:active {
-	color: #a6423a;
-	background-color: rgba(166, 66, 58, 0.05);
-	transform: scaleX(0.95) scaleY(0.95);
+  color: #a6423a;
+  background-color: rgba(166, 66, 58, .05);
+  transform: scaleX(0.95) scaleY(0.95);
 }
 
 .like-button:hover {
-	background-color: #f6f7f9;
+  background-color: #f6f7f9;
 }
 
 .like-button.liked {
-	color: #a6423a;
+  color: #a6423a;
 }
 
 /* Icons */
 @keyframes circle {
-	0% {
-		transform: scale(0);
-		stroke-width: 16px;
-	}
+  0% {
+    transform: scale(0);
+    stroke-width: 16px;
+  }
 
-	50% {
-		transform: scale(0.5);
-		stroke-width: 16px;
-	}
+  50% {
+    transform: scale(.5);
+    stroke-width: 16px;
+  }
 
-	to {
-		transform: scale(1);
-		stroke-width: 0;
-	}
+  to {
+    transform: scale(1);
+    stroke-width: 0;
+  }
 }
 
 .circle {
-	color: rgba(166, 66, 58, 0.5);
-	transform-origin: center;
-	transition-property: all;
-	transition-duration: 0.15s;
-	transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  color: rgba(166, 66, 58, .5);
+  transform-origin: center;
+  transition-property: all;
+  transition-duration: .15s;
+  transition-timing-function: cubic-bezier(.4,0,.2,1);
 }
 
 .circle.liked.animate {
-	animation: circle 0.3s forwards;
+  animation: circle .3s forwards;
 }
 
 .heart {
-	width: 1.5rem;
-	height: 1.5rem;
+  width: 1.5rem;
+  height: 1.5rem;
 }
 
 .heart.liked {
-	transform-origin: center;
-	transition-property: all;
-	transition-duration: 0.15s;
-	transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: center;
+  transition-property: all;
+  transition-duration: .15s;
+  transition-timing-function: cubic-bezier(.4, 0, .2, 1);
 }
 
 .heart.liked.animate {
-	animation: scale 0.35s ease-in-out forwards;
+  animation: scale .35s ease-in-out forwards;
 }
 
 .control-icon {
-	color: hsla(0, 0%, 100%, 0.5);
-	filter: drop-shadow(0 20px 13px rgba(0, 0, 0, 0.03)) drop-shadow(0 8px 5px rgba(0, 0, 0, 0.08));
+  color: hsla(0, 0%, 100%, .5);
+  filter:  drop-shadow(0 20px 13px rgba(0, 0, 0, .03)) drop-shadow(0 8px 5px rgba(0, 0, 0, .08));
 }
 
 .chevron-left {
-	margin-top: 2px;
-	rotate: 90deg;
+  margin-top: 2px;
+  rotate: 90deg;
 }
+
 
 /* Video */
 .thumbnail {
-	position: relative;
-	aspect-ratio: 16 / 9;
-	display: flex;
-	overflow: hidden;
-	flex-direction: column;
-	justify-content: center;
-	align-items: center;
-	border-radius: 0.5rem;
-	outline-offset: 2px;
-	width: 8rem;
-	vertical-align: middle;
-	background-color: #ffffff;
-	background-size: cover;
-	user-select: none;
+  position: relative;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  overflow: hidden;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  border-radius: 0.5rem;
+  outline-offset: 2px;
+  width: 8rem;
+  vertical-align: middle;
+  background-color: #ffffff;
+  background-size: cover;
+  user-select: none;
 }
 
 .thumbnail.blue {
-	background-image: conic-gradient(at top right, #c76a15, #087ea4, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #087ea4, #2b3491);
 }
 
 .thumbnail.red {
-	background-image: conic-gradient(at top right, #c76a15, #a6423a, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #a6423a, #2b3491);
 }
 
 .thumbnail.green {
-	background-image: conic-gradient(at top right, #c76a15, #388f7f, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #388f7f, #2b3491);
 }
 
 .thumbnail.purple {
-	background-image: conic-gradient(at top right, #c76a15, #575fb7, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #575fb7, #2b3491);
 }
 
 .thumbnail.yellow {
-	background-image: conic-gradient(at top right, #c76a15, #fabd62, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #FABD62, #2b3491);
 }
 
 .thumbnail.gray {
-	background-image: conic-gradient(at top right, #c76a15, #4e5769, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #4E5769, #2b3491);
 }
 
 .video {
-	display: flex;
-	flex-direction: row;
-	gap: 0.75rem;
-	align-items: center;
+  display: flex;
+  flex-direction: row;
+  gap: 0.75rem;
+  align-items: center;
 }
 
 .video .link {
-	display: flex;
-	flex-direction: row;
-	flex: 1 1 0;
-	gap: 0.125rem;
-	outline-offset: 4px;
-	cursor: pointer;
+  display: flex;
+  flex-direction: row;
+  flex: 1 1 0;
+  gap: 0.125rem;
+  outline-offset: 4px;
+  cursor: pointer;
 }
 
 .video .info {
-	display: flex;
-	flex-direction: column;
-	justify-content: center;
-	margin-left: 8px;
-	gap: 0.125rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  margin-left: 8px;
+  gap: 0.125rem;
 }
 
 .video .info:hover {
-	text-decoration: underline;
+  text-decoration: underline;
 }
 
 .video-title {
-	font-size: 15px;
-	line-height: 1.25;
-	font-weight: 700;
-	color: #23272f;
+  font-size: 15px;
+  line-height: 1.25;
+  font-weight: 700;
+  color: #23272f;
 }
 
 .video-description {
-	color: #5e687e;
-	font-size: 13px;
+  color: #5e687e;
+  font-size: 13px;
 }
 
 /* Details */
 .details .thumbnail {
-	position: relative;
-	aspect-ratio: 16 / 9;
-	display: flex;
-	overflow: hidden;
-	flex-direction: column;
-	justify-content: center;
-	align-items: center;
-	border-radius: 0.5rem;
-	outline-offset: 2px;
-	width: 100%;
-	vertical-align: middle;
-	background-color: #ffffff;
-	background-size: cover;
-	user-select: none;
+  position: relative;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  overflow: hidden;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  border-radius: 0.5rem;
+  outline-offset: 2px;
+  width: 100%;
+  vertical-align: middle;
+  background-color: #ffffff;
+  background-size: cover;
+  user-select: none;
 }
 
 .video-details-title {
-	margin-top: 8px;
+  margin-top: 8px;
 }
 
 .video-details-speaker {
-	display: flex;
-	gap: 8px;
-	margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  margin-top: 10px
 }
 
 .back {
-	display: flex;
-	align-items: center;
-	margin-left: -5px;
-	cursor: pointer;
+  display: flex;
+  align-items: center;
+  margin-left: -5px;
+  cursor: pointer;
 }
 
 .back:hover {
-	text-decoration: underline;
+  text-decoration: underline;
 }
 
 .info-title {
-	font-size: 1.5rem;
-	font-weight: 700;
-	line-height: 1.25;
-	margin: 8px 0 0 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.25;
+  margin: 8px 0 0 0 ;
 }
 
 .info-description {
-	margin: 8px 0 0 0;
+  margin: 8px 0 0 0;
 }
 
 .controls {
-	cursor: pointer;
+  cursor: pointer;
 }
 
 .fallback {
-	background: #f6f7f8 linear-gradient(to right, #e6e6e6 5%, #cccccc 25%, #e6e6e6 35%) no-repeat;
-	background-size: 800px 104px;
-	display: block;
-	line-height: 1.25;
-	margin: 8px 0 0 0;
-	border-radius: 5px;
-	overflow: hidden;
+  background: #f6f7f8 linear-gradient(to right, #e6e6e6 5%, #cccccc 25%, #e6e6e6 35%) no-repeat;
+  background-size: 800px 104px;
+  display: block;
+  line-height: 1.25;
+  margin: 8px 0 0 0;
+  border-radius: 5px;
+  overflow: hidden;
 
-	animation: 1s linear 1s infinite shimmer;
-	animation-delay: 300ms;
-	animation-duration: 1s;
-	animation-fill-mode: forwards;
-	animation-iteration-count: infinite;
-	animation-name: shimmer;
-	animation-timing-function: linear;
+  animation: 1s linear 1s infinite shimmer;
+  animation-delay: 300ms;
+  animation-duration: 1s;
+  animation-fill-mode: forwards;
+  animation-iteration-count: infinite;
+  animation-name: shimmer;
+  animation-timing-function: linear;
 }
 
+
 .fallback.title {
-	width: 130px;
-	height: 30px;
+  width: 130px;
+  height: 30px;
+
 }
 
 .fallback.description {
-	width: 150px;
-	height: 21px;
+  width: 150px;
+  height: 21px;
 }
 
 @keyframes shimmer {
-	0% {
-		background-position: -468px 0;
-	}
+  0% {
+    background-position: -468px 0;
+  }
 
-	100% {
-		background-position: 468px 0;
-	}
+  100% {
+    background-position: 468px 0;
+  }
 }
 
 .search {
-	margin-bottom: 10px;
+  margin-bottom: 10px;
 }
 .search-input {
-	width: 100%;
-	position: relative;
+  width: 100%;
+  position: relative;
 }
 
 .search-icon {
-	position: absolute;
-	top: 0;
-	bottom: 0;
-	inset-inline-start: 0;
-	display: flex;
-	align-items: center;
-	padding-inline-start: 1rem;
-	pointer-events: none;
-	color: #99a1b3;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  inset-inline-start: 0;
+  display: flex;
+  align-items: center;
+  padding-inline-start: 1rem;
+  pointer-events: none;
+  color: #99a1b3;
 }
 
 .search-input input {
-	display: flex;
-	padding-inline-start: 2.75rem;
-	padding-top: 10px;
-	padding-bottom: 10px;
-	width: 100%;
-	text-align: start;
-	background-color: rgb(235 236 240);
-	outline: 2px solid transparent;
-	cursor: pointer;
-	border: none;
-	align-items: center;
-	color: rgb(35 39 47);
-	border-radius: 9999px;
-	vertical-align: middle;
-	font-size: 15px;
+  display: flex;
+  padding-inline-start: 2.75rem;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  width: 100%;
+  text-align: start;
+  background-color: rgb(235 236 240);
+  outline: 2px solid transparent;
+  cursor: pointer;
+  border: none;
+  align-items: center;
+  color: rgb(35 39 47);
+  border-radius: 9999px;
+  vertical-align: middle;
+  font-size: 15px;
 }
 
-.search-input input:hover,
-.search-input input:active {
-	background-color: rgb(235 236 240/ 0.8);
-	color: rgb(35 39 47/ 0.8);
+.search-input input:hover, .search-input input:active {
+  background-color: rgb(235 236 240/ 0.8);
+  color: rgb(35 39 47/ 0.8);
 }
 
 /* Home */
 .video-list {
-	position: relative;
+  position: relative;
 }
 
 .video-list .videos {
-	display: flex;
-	flex-direction: column;
-	gap: 1rem;
-	overflow-y: auto;
-	height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  overflow-y: auto;
+  height: 100%;
 }
 ```
+
 
 ```css src/animations.css
 /* Define .slow-fade using view transition classes */
 ::view-transition-old(.slow-fade) {
-	animation-duration: 500ms;
+    animation-duration: 500ms;
 }
 
 ::view-transition-new(.slow-fade) {
-	animation-duration: 500ms;
+    animation-duration: 500ms;
 }
 ```
 
 ```js src/index.js hidden
-import React, { StrictMode } from "react";
-import { createRoot } from "react-dom/client";
+import React, {StrictMode} from 'react';
+import {createRoot} from 'react-dom/client';
+import './styles.css';
+import './animations.css';
 
-import "./styles.css";
-import "./animations.css";
+import App from './App';
+import {Router} from './router';
 
-import App from "./App";
-import { Router } from "./router";
-
-const root = createRoot(document.getElementById("root"));
+const root = createRoot(document.getElementById('root'));
 root.render(
-	<StrictMode>
-		<Router>
-			<App />
-		</Router>
-	</StrictMode>,
+  <StrictMode>
+    <Router>
+      <App />
+    </Router>
+  </StrictMode>
 );
 ```
 
 ```json package.json hidden
 {
-	"dependencies": {
-		"react": "experimental",
-		"react-dom": "experimental",
-		"react-scripts": "latest"
-	},
-	"scripts": {
-		"start": "react-scripts start",
-		"build": "react-scripts build",
-		"test": "react-scripts test --env=jsdom",
-		"eject": "react-scripts eject"
-	}
+  "dependencies": {
+    "react": "canary",
+    "react-dom": "canary",
+    "react-scripts": "latest"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test --env=jsdom",
+    "eject": "react-scripts eject"
+  }
 }
 ```
 
@@ -3830,7 +3687,7 @@ root.render(
 
 See [Styling View Transitions](/reference/react/ViewTransition#styling-view-transitions) for a full guide on styling `<ViewTransition>`.
 
-### Shared Element Transitions {/_shared-element-transitions_/}
+### Shared Element Transitions {/*shared-element-transitions*/}
 
 When two pages include the same element, often you want to animate it from one page to the next.
 
@@ -3838,7 +3695,7 @@ To do this you can add a unique `name` to the `<ViewTransition>`:
 
 ```js
 <ViewTransition name={`video-${video.id}`}>
-	<Thumbnail video={video} />
+  <Thumbnail video={video} />
 </ViewTransition>
 ```
 
@@ -3847,438 +3704,429 @@ Now the video thumbnail animates between the two pages:
 <Sandpack>
 
 ```js src/App.js
-import { unstable_ViewTransition as ViewTransition } from "react";
-
+import { ViewTransition } from "react";
 import Details from "./Details";
 import Home from "./Home";
 import { useRouter } from "./router";
 
 export default function App() {
-	const { url } = useRouter();
+  const { url } = useRouter();
 
-	// Keeping our default slow-fade.
-	// This allows the content not in the shared
-	// element transition to cross-fade.
-	return (
-		<ViewTransition default="slow-fade">
-			{url === "/" ?
-				<Home />
-			:	<Details />}
-		</ViewTransition>
-	);
+  // Keeping our default slow-fade.
+  // This allows the content not in the shared
+  // element transition to cross-fade.
+  return (
+    <ViewTransition default="slow-fade">
+      {url === "/" ? <Home /> : <Details />}
+    </ViewTransition>
+  );
 }
 ```
 
 ```js src/Details.js hidden
-import { Suspense, use } from "react";
-
 import { fetchVideo, fetchVideoDetails } from "./data";
-import { ChevronLeft } from "./Icons";
-import Layout from "./Layout";
-import { useRouter } from "./router";
 import { Thumbnail, VideoControls } from "./Videos";
+import { useRouter } from "./router";
+import Layout from "./Layout";
+import { use, Suspense } from "react";
+import { ChevronLeft } from "./Icons";
 
 function VideoInfo({ id }) {
-	const details = use(fetchVideoDetails(id));
-	return (
-		<>
-			<p className="info-title">{details.title}</p>
-			<p className="info-description">{details.description}</p>
-		</>
-	);
+  const details = use(fetchVideoDetails(id));
+  return (
+    <>
+      <p className="info-title">{details.title}</p>
+      <p className="info-description">{details.description}</p>
+    </>
+  );
 }
 
 function VideoInfoFallback() {
-	return (
-		<>
-			<div className="fallback title"></div>
-			<div className="fallback description"></div>
-		</>
-	);
+  return (
+    <>
+      <div className="fallback title"></div>
+      <div className="fallback description"></div>
+    </>
+  );
 }
 
 export default function Details() {
-	const { url, navigateBack } = useRouter();
-	const videoId = url.split("/").pop();
-	const video = use(fetchVideo(videoId));
+  const { url, navigateBack } = useRouter();
+  const videoId = url.split("/").pop();
+  const video = use(fetchVideo(videoId));
 
-	return (
-		<Layout
-			heading={
-				<div
-					className="fit back"
-					onClick={() => {
-						navigateBack("/");
-					}}
-				>
-					<ChevronLeft /> Back
-				</div>
-			}
-		>
-			<div className="details">
-				<Thumbnail video={video} large>
-					<VideoControls />
-				</Thumbnail>
-				<Suspense fallback={<VideoInfoFallback />}>
-					<VideoInfo id={video.id} />
-				</Suspense>
-			</div>
-		</Layout>
-	);
+  return (
+    <Layout
+      heading={
+        <div
+          className="fit back"
+          onClick={() => {
+            navigateBack("/");
+          }}
+        >
+          <ChevronLeft /> Back
+        </div>
+      }
+    >
+      <div className="details">
+        <Thumbnail video={video} large>
+          <VideoControls />
+        </Thumbnail>
+        <Suspense fallback={<VideoInfoFallback />}>
+          <VideoInfo id={video.id} />
+        </Suspense>
+      </div>
+    </Layout>
+  );
 }
+
 ```
 
 ```js src/Home.js hidden
-import { use, useId, useState } from "react";
-
-import { fetchVideos } from "./data";
-import { IconSearch } from "./Icons";
-import Layout from "./Layout";
 import { Video } from "./Videos";
+import Layout from "./Layout";
+import { fetchVideos } from "./data";
+import { useId, useState, use } from "react";
+import { IconSearch } from "./Icons";
 
 function SearchInput({ value, onChange }) {
-	const id = useId();
-	return (
-		<form className="search" onSubmit={(e) => e.preventDefault()}>
-			<label htmlFor={id} className="sr-only">
-				Search
-			</label>
-			<div className="search-input">
-				<div className="search-icon">
-					<IconSearch />
-				</div>
-				<input
-					type="text"
-					id={id}
-					placeholder="Search"
-					value={value}
-					onChange={(e) => onChange(e.target.value)}
-				/>
-			</div>
-		</form>
-	);
+  const id = useId();
+  return (
+    <form className="search" onSubmit={(e) => e.preventDefault()}>
+      <label htmlFor={id} className="sr-only">
+        Search
+      </label>
+      <div className="search-input">
+        <div className="search-icon">
+          <IconSearch />
+        </div>
+        <input
+          type="text"
+          id={id}
+          placeholder="Search"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      </div>
+    </form>
+  );
 }
 
 function filterVideos(videos, query) {
-	const keywords = query
-		.toLowerCase()
-		.split(" ")
-		.filter((s) => s !== "");
-	if (keywords.length === 0) {
-		return videos;
-	}
-	return videos.filter((video) => {
-		const words = (video.title + " " + video.description).toLowerCase().split(" ");
-		return keywords.every((kw) => words.some((w) => w.includes(kw)));
-	});
+  const keywords = query
+    .toLowerCase()
+    .split(" ")
+    .filter((s) => s !== "");
+  if (keywords.length === 0) {
+    return videos;
+  }
+  return videos.filter((video) => {
+    const words = (video.title + " " + video.description)
+      .toLowerCase()
+      .split(" ");
+    return keywords.every((kw) => words.some((w) => w.includes(kw)));
+  });
 }
 
 export default function Home() {
-	const videos = use(fetchVideos());
-	const count = videos.length;
-	const [searchText, setSearchText] = useState("");
-	const foundVideos = filterVideos(videos, searchText);
-	return (
-		<Layout heading={<div className="fit">{count} Videos</div>}>
-			<SearchInput value={searchText} onChange={setSearchText} />
-			<div className="video-list">
-				{foundVideos.length === 0 && <div className="no-results">No results</div>}
-				<div className="videos">
-					{foundVideos.map((video) => (
-						<Video key={video.id} video={video} />
-					))}
-				</div>
-			</div>
-		</Layout>
-	);
+  const videos = use(fetchVideos());
+  const count = videos.length;
+  const [searchText, setSearchText] = useState("");
+  const foundVideos = filterVideos(videos, searchText);
+  return (
+    <Layout heading={<div className="fit">{count} Videos</div>}>
+      <SearchInput value={searchText} onChange={setSearchText} />
+      <div className="video-list">
+        {foundVideos.length === 0 && (
+          <div className="no-results">No results</div>
+        )}
+        <div className="videos">
+          {foundVideos.map((video) => (
+            <Video key={video.id} video={video} />
+          ))}
+        </div>
+      </div>
+    </Layout>
+  );
 }
+
 ```
 
 ```js src/Icons.js hidden
 export function ChevronLeft() {
-	return (
-		<svg
-			className="chevron-left"
-			xmlns="http://www.w3.org/2000/svg"
-			width="20"
-			height="20"
-			viewBox="0 0 20 20"
-		>
-			<g fill="none" fillRule="evenodd" transform="translate(-446 -398)">
-				<path
-					fill="currentColor"
-					fillRule="nonzero"
-					d="M95.8838835,240.366117 C95.3957281,239.877961 94.6042719,239.877961 94.1161165,240.366117 C93.6279612,240.854272 93.6279612,241.645728 94.1161165,242.133883 L98.6161165,246.633883 C99.1042719,247.122039 99.8957281,247.122039 100.383883,246.633883 L104.883883,242.133883 C105.372039,241.645728 105.372039,240.854272 104.883883,240.366117 C104.395728,239.877961 103.604272,239.877961 103.116117,240.366117 L99.5,243.982233 L95.8838835,240.366117 Z"
-					transform="translate(356.5 164.5)"
-				/>
-				<polygon points="446 418 466 418 466 398 446 398" />
-			</g>
-		</svg>
-	);
+  return (
+    <svg
+      className="chevron-left"
+      xmlns="http://www.w3.org/2000/svg"
+      width="20"
+      height="20"
+      viewBox="0 0 20 20">
+      <g fill="none" fillRule="evenodd" transform="translate(-446 -398)">
+        <path
+          fill="currentColor"
+          fillRule="nonzero"
+          d="M95.8838835,240.366117 C95.3957281,239.877961 94.6042719,239.877961 94.1161165,240.366117 C93.6279612,240.854272 93.6279612,241.645728 94.1161165,242.133883 L98.6161165,246.633883 C99.1042719,247.122039 99.8957281,247.122039 100.383883,246.633883 L104.883883,242.133883 C105.372039,241.645728 105.372039,240.854272 104.883883,240.366117 C104.395728,239.877961 103.604272,239.877961 103.116117,240.366117 L99.5,243.982233 L95.8838835,240.366117 Z"
+          transform="translate(356.5 164.5)"
+        />
+        <polygon points="446 418 466 418 466 398 446 398" />
+      </g>
+    </svg>
+  );
 }
 
 export function PauseIcon() {
-	return (
-		<svg
-			className="control-icon"
-			style={{ padding: "4px" }}
-			width="100"
-			height="100"
-			viewBox="0 0 512 512"
-			fill="none"
-			xmlns="http://www.w3.org/2000/svg"
-		>
-			<path
-				fillRule="evenodd"
-				clipRule="evenodd"
-				d="M256 0C114.617 0 0 114.615 0 256s114.617 256 256 256 256-114.615 256-256S397.383 0 256 0zm-32 320c0 8.836-7.164 16-16 16h-32c-8.836 0-16-7.164-16-16V192c0-8.836 7.164-16 16-16h32c8.836 0 16 7.164 16 16v128zm128 0c0 8.836-7.164 16-16 16h-32c-8.836 0-16-7.164-16-16V192c0-8.836 7.164-16 16-16h32c8.836 0 16 7.164 16 16v128z"
-				fill="currentColor"
-			/>
-		</svg>
-	);
+  return (
+    <svg
+      className="control-icon"
+      style={{padding: '4px'}}
+      width="100"
+      height="100"
+      viewBox="0 0 512 512"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg">
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M256 0C114.617 0 0 114.615 0 256s114.617 256 256 256 256-114.615 256-256S397.383 0 256 0zm-32 320c0 8.836-7.164 16-16 16h-32c-8.836 0-16-7.164-16-16V192c0-8.836 7.164-16 16-16h32c8.836 0 16 7.164 16 16v128zm128 0c0 8.836-7.164 16-16 16h-32c-8.836 0-16-7.164-16-16V192c0-8.836 7.164-16 16-16h32c8.836 0 16 7.164 16 16v128z"
+        fill="currentColor"
+      />
+    </svg>
+  );
 }
 
 export function PlayIcon() {
-	return (
-		<svg
-			className="control-icon"
-			width="100"
-			height="100"
-			viewBox="0 0 72 72"
-			fill="none"
-			xmlns="http://www.w3.org/2000/svg"
-		>
-			<path
-				fillRule="evenodd"
-				clipRule="evenodd"
-				d="M36 69C54.2254 69 69 54.2254 69 36C69 17.7746 54.2254 3 36 3C17.7746 3 3 17.7746 3 36C3 54.2254 17.7746 69 36 69ZM52.1716 38.6337L28.4366 51.5801C26.4374 52.6705 24 51.2235 24 48.9464V23.0536C24 20.7764 26.4374 19.3295 28.4366 20.4199L52.1716 33.3663C54.2562 34.5034 54.2562 37.4966 52.1716 38.6337Z"
-				fill="currentColor"
-			/>
-		</svg>
-	);
+  return (
+    <svg
+      className="control-icon"
+      width="100"
+      height="100"
+      viewBox="0 0 72 72"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg">
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M36 69C54.2254 69 69 54.2254 69 36C69 17.7746 54.2254 3 36 3C17.7746 3 3 17.7746 3 36C3 54.2254 17.7746 69 36 69ZM52.1716 38.6337L28.4366 51.5801C26.4374 52.6705 24 51.2235 24 48.9464V23.0536C24 20.7764 26.4374 19.3295 28.4366 20.4199L52.1716 33.3663C54.2562 34.5034 54.2562 37.4966 52.1716 38.6337Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
 }
-export function Heart({ liked, animate }) {
-	return (
-		<>
-			<svg
-				className="absolute overflow-visible"
-				viewBox="0 0 24 24"
-				fill="none"
-				xmlns="http://www.w3.org/2000/svg"
-			>
-				<circle
-					className={`circle ${liked ? "liked" : ""} ${animate ? "animate" : ""}`}
-					cx="12"
-					cy="12"
-					r="11.5"
-					fill="transparent"
-					strokeWidth="0"
-					stroke="currentColor"
-				/>
-			</svg>
+export function Heart({liked, animate}) {
+  return (
+    <>
+      <svg
+        className="absolute overflow-visible"
+        viewBox="0 0 24 24"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg">
+        <circle
+          className={`circle ${liked ? 'liked' : ''} ${animate ? 'animate' : ''}`}
+          cx="12"
+          cy="12"
+          r="11.5"
+          fill="transparent"
+          strokeWidth="0"
+          stroke="currentColor"
+        />
+      </svg>
 
-			<svg
-				className={`heart ${liked ? "liked" : ""} ${animate ? "animate" : ""}`}
-				viewBox="0 0 24 24"
-				fill="none"
-				xmlns="http://www.w3.org/2000/svg"
-			>
-				{liked ?
-					<path
-						d="M12 23a.496.496 0 0 1-.26-.074C7.023 19.973 0 13.743 0 8.68c0-4.12 2.322-6.677 6.058-6.677 2.572 0 5.108 2.387 5.134 2.41l.808.771.808-.771C12.834 4.387 15.367 2 17.935 2 21.678 2 24 4.558 24 8.677c0 5.06-7.022 11.293-11.74 14.246a.496.496 0 0 1-.26.074V23z"
-						fill="currentColor"
-					/>
-				:	<path
-						fillRule="evenodd"
-						clipRule="evenodd"
-						d="m12 5.184-.808-.771-.004-.004C11.065 4.299 8.522 2.003 6 2.003c-3.736 0-6 2.558-6 6.677 0 4.47 5.471 9.848 10 13.079.602.43 1.187.82 1.74 1.167A.497.497 0 0 0 12 23v-.003c.09 0 .182-.026.26-.074C16.977 19.97 24 13.737 24 8.677 24 4.557 21.743 2 18 2c-2.569 0-5.166 2.387-5.192 2.413L12 5.184zm-.002 15.525c2.071-1.388 4.477-3.342 6.427-5.47C20.72 12.733 22 10.401 22 8.677c0-1.708-.466-2.855-1.087-3.55C20.316 4.459 19.392 4 18 4c-.726 0-1.63.364-2.5.9-.67.412-1.148.82-1.266.92-.03.025-.037.031-.019.014l-.013.013L12 7.949 9.832 5.88a10.08 10.08 0 0 0-1.33-.977C7.633 4.367 6.728 4.003 6 4.003c-1.388 0-2.312.459-2.91 1.128C2.466 5.826 2 6.974 2 8.68c0 1.726 1.28 4.058 3.575 6.563 1.948 2.127 4.352 4.078 6.423 5.466z"
-						fill="currentColor"
-					/>
-				}
-			</svg>
-		</>
-	);
+      <svg
+        className={`heart ${liked ? 'liked' : ''} ${animate ? 'animate' : ''}`}
+        viewBox="0 0 24 24"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg">
+        {liked ? (
+          <path
+            d="M12 23a.496.496 0 0 1-.26-.074C7.023 19.973 0 13.743 0 8.68c0-4.12 2.322-6.677 6.058-6.677 2.572 0 5.108 2.387 5.134 2.41l.808.771.808-.771C12.834 4.387 15.367 2 17.935 2 21.678 2 24 4.558 24 8.677c0 5.06-7.022 11.293-11.74 14.246a.496.496 0 0 1-.26.074V23z"
+            fill="currentColor"
+          />
+        ) : (
+          <path
+            fillRule="evenodd"
+            clipRule="evenodd"
+            d="m12 5.184-.808-.771-.004-.004C11.065 4.299 8.522 2.003 6 2.003c-3.736 0-6 2.558-6 6.677 0 4.47 5.471 9.848 10 13.079.602.43 1.187.82 1.74 1.167A.497.497 0 0 0 12 23v-.003c.09 0 .182-.026.26-.074C16.977 19.97 24 13.737 24 8.677 24 4.557 21.743 2 18 2c-2.569 0-5.166 2.387-5.192 2.413L12 5.184zm-.002 15.525c2.071-1.388 4.477-3.342 6.427-5.47C20.72 12.733 22 10.401 22 8.677c0-1.708-.466-2.855-1.087-3.55C20.316 4.459 19.392 4 18 4c-.726 0-1.63.364-2.5.9-.67.412-1.148.82-1.266.92-.03.025-.037.031-.019.014l-.013.013L12 7.949 9.832 5.88a10.08 10.08 0 0 0-1.33-.977C7.633 4.367 6.728 4.003 6 4.003c-1.388 0-2.312.459-2.91 1.128C2.466 5.826 2 6.974 2 8.68c0 1.726 1.28 4.058 3.575 6.563 1.948 2.127 4.352 4.078 6.423 5.466z"
+            fill="currentColor"
+          />
+        )}
+      </svg>
+    </>
+  );
 }
 
 export function IconSearch(props) {
-	return (
-		<svg width="1em" height="1em" viewBox="0 0 20 20">
-			<path
-				d="M14.386 14.386l4.0877 4.0877-4.0877-4.0877c-2.9418 2.9419-7.7115 2.9419-10.6533 0-2.9419-2.9418-2.9419-7.7115 0-10.6533 2.9418-2.9419 7.7115-2.9419 10.6533 0 2.9419 2.9418 2.9419 7.7115 0 10.6533z"
-				stroke="currentColor"
-				fill="none"
-				strokeWidth="2"
-				fillRule="evenodd"
-				strokeLinecap="round"
-				strokeLinejoin="round"
-			></path>
-		</svg>
-	);
+  return (
+    <svg width="1em" height="1em" viewBox="0 0 20 20">
+      <path
+        d="M14.386 14.386l4.0877 4.0877-4.0877-4.0877c-2.9418 2.9419-7.7115 2.9419-10.6533 0-2.9419-2.9418-2.9419-7.7115 0-10.6533 2.9418-2.9419 7.7115-2.9419 10.6533 0 2.9419 2.9418 2.9419 7.7115 0 10.6533z"
+        stroke="currentColor"
+        fill="none"
+        strokeWidth="2"
+        fillRule="evenodd"
+        strokeLinecap="round"
+        strokeLinejoin="round"></path>
+    </svg>
+  );
 }
 ```
 
 ```js src/Layout.js hidden
-import { unstable_ViewTransition as ViewTransition } from "react";
-
-import { useIsNavPending } from "./router";
+import {ViewTransition} from 'react'; import { useIsNavPending } from "./router";
 
 export default function Page({ heading, children }) {
-	const isPending = useIsNavPending();
+  const isPending = useIsNavPending();
 
-	return (
-		<div className="page">
-			<div className="top">
-				<div className="top-nav">
-					{heading}
-					{isPending && <span className="loader"></span>}
-				</div>
-			</div>
-			{/* Opt-out of ViewTransition for the content. */}
-			{/* Content can define it's own ViewTransition. */}
-			<ViewTransition default="none">
-				<div className="bottom">
-					<div className="content">{children}</div>
-				</div>
-			</ViewTransition>
-		</div>
-	);
+  return (
+    <div className="page">
+      <div className="top">
+        <div className="top-nav">
+          {heading}
+          {isPending && <span className="loader"></span>}
+        </div>
+      </div>
+      {/* Opt-out of ViewTransition for the content. */}
+      {/* Content can define it's own ViewTransition. */}
+      <ViewTransition default="none">
+        <div className="bottom">
+          <div className="content">{children}</div>
+        </div>
+      </ViewTransition>
+    </div>
+  );
 }
 ```
 
 ```js src/LikeButton.js hidden
-import { useState } from "react";
-
-import { Heart } from "./Icons";
+import {useState} from 'react';
+import {Heart} from './Icons';
 
 // A hack since we don't actually have a backend.
 // Unlike local state, this survives videos being filtered.
 const likedVideos = new Set();
 
-export default function LikeButton({ video }) {
-	const [isLiked, setIsLiked] = useState(() => likedVideos.has(video.id));
-	const [animate, setAnimate] = useState(false);
-	return (
-		<button
-			className={`like-button ${isLiked && "liked"}`}
-			aria-label={isLiked ? "Unsave" : "Save"}
-			onClick={() => {
-				const nextIsLiked = !isLiked;
-				if (nextIsLiked) {
-					likedVideos.add(video.id);
-				} else {
-					likedVideos.delete(video.id);
-				}
-				setAnimate(true);
-				setIsLiked(nextIsLiked);
-			}}
-		>
-			<Heart liked={isLiked} animate={animate} />
-		</button>
-	);
+export default function LikeButton({video}) {
+  const [isLiked, setIsLiked] = useState(() => likedVideos.has(video.id));
+  const [animate, setAnimate] = useState(false);
+  return (
+    <button
+      className={`like-button ${isLiked && 'liked'}`}
+      aria-label={isLiked ? 'Unsave' : 'Save'}
+      onClick={() => {
+        const nextIsLiked = !isLiked;
+        if (nextIsLiked) {
+          likedVideos.add(video.id);
+        } else {
+          likedVideos.delete(video.id);
+        }
+        setAnimate(true);
+        setIsLiked(nextIsLiked);
+      }}>
+      <Heart liked={isLiked} animate={animate} />
+    </button>
+  );
 }
 ```
 
 ```js src/Videos.js active
-import { startTransition, useState, unstable_ViewTransition as ViewTransition } from "react";
-
-import { PauseIcon, PlayIcon } from "./Icons";
-import LikeButton from "./LikeButton";
-import { useRouter } from "./router";
+import { useState, ViewTransition } from "react"; import LikeButton from "./LikeButton"; import { useRouter } from "./router"; import { PauseIcon, PlayIcon } from "./Icons"; import { startTransition } from "react";
 
 export function Thumbnail({ video, children }) {
-	// Add a name to animate with a shared element transition.
-	// This uses the default animation, no additional css needed.
-	return (
-		<ViewTransition name={`video-${video.id}`}>
-			<div aria-hidden="true" tabIndex={-1} className={`thumbnail ${video.image}`}>
-				{children}
-			</div>
-		</ViewTransition>
-	);
+  // Add a name to animate with a shared element transition.
+  // This uses the default animation, no additional css needed.
+  return (
+    <ViewTransition name={`video-${video.id}`}>
+      <div
+        aria-hidden="true"
+        tabIndex={-1}
+        className={`thumbnail ${video.image}`}
+      >
+        {children}
+      </div>
+    </ViewTransition>
+  );
 }
 
 export function VideoControls() {
-	const [isPlaying, setIsPlaying] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
 
-	return (
-		<span
-			className="controls"
-			onClick={() =>
-				startTransition(() => {
-					setIsPlaying((p) => !p);
-				})
-			}
-		>
-			{isPlaying ?
-				<PauseIcon />
-			:	<PlayIcon />}
-		</span>
-	);
+  return (
+    <span
+      className="controls"
+      onClick={() =>
+        startTransition(() => {
+          setIsPlaying((p) => !p);
+        })
+      }
+    >
+      {isPlaying ? <PauseIcon /> : <PlayIcon />}
+    </span>
+  );
 }
 
 export function Video({ video }) {
-	const { navigate } = useRouter();
+  const { navigate } = useRouter();
 
-	return (
-		<div className="video">
-			<div
-				className="link"
-				onClick={(e) => {
-					e.preventDefault();
-					navigate(`/video/${video.id}`);
-				}}
-			>
-				<Thumbnail video={video}></Thumbnail>
+  return (
+    <div className="video">
+      <div
+        className="link"
+        onClick={(e) => {
+          e.preventDefault();
+          navigate(`/video/${video.id}`);
+        }}
+      >
+        <Thumbnail video={video}></Thumbnail>
 
-				<div className="info">
-					<div className="video-title">{video.title}</div>
-					<div className="video-description">{video.description}</div>
-				</div>
-			</div>
-			<LikeButton video={video} />
-		</div>
-	);
+        <div className="info">
+          <div className="video-title">{video.title}</div>
+          <div className="video-description">{video.description}</div>
+        </div>
+      </div>
+      <LikeButton video={video} />
+    </div>
+  );
 }
 ```
 
+
 ```js src/data.js hidden
 const videos = [
-	{
-		id: "1",
-		title: "First video",
-		description: "Video description",
-		image: "blue",
-	},
-	{
-		id: "2",
-		title: "Second video",
-		description: "Video description",
-		image: "red",
-	},
-	{
-		id: "3",
-		title: "Third video",
-		description: "Video description",
-		image: "green",
-	},
-	{
-		id: "4",
-		title: "Fourth video",
-		description: "Video description",
-		image: "purple",
-	},
-	{
-		id: "5",
-		title: "Fifth video",
-		description: "Video description",
-		image: "yellow",
-	},
-	{
-		id: "6",
-		title: "Sixth video",
-		description: "Video description",
-		image: "gray",
-	},
+  {
+    id: '1',
+    title: 'First video',
+    description: 'Video description',
+    image: 'blue',
+  },
+  {
+    id: '2',
+    title: 'Second video',
+    description: 'Video description',
+    image: 'red',
+  },
+  {
+    id: '3',
+    title: 'Third video',
+    description: 'Video description',
+    image: 'green',
+  },
+  {
+    id: '4',
+    title: 'Fourth video',
+    description: 'Video description',
+    image: 'purple',
+  },
+  {
+    id: '5',
+    title: 'Fifth video',
+    description: 'Video description',
+    image: 'yellow',
+  },
+  {
+    id: '6',
+    title: 'Sixth video',
+    description: 'Video description',
+    image: 'gray',
+  },
 ];
 
 let videosCache = new Map();
@@ -4287,789 +4135,760 @@ let videoDetailsCache = new Map();
 const VIDEO_DELAY = 1;
 const VIDEO_DETAILS_DELAY = 1000;
 export function fetchVideos() {
-	if (videosCache.has(0)) {
-		return videosCache.get(0);
-	}
-	const promise = new Promise((resolve) => {
-		setTimeout(() => {
-			resolve(videos);
-		}, VIDEO_DELAY);
-	});
-	videosCache.set(0, promise);
-	return promise;
+  if (videosCache.has(0)) {
+    return videosCache.get(0);
+  }
+  const promise = new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(videos);
+    }, VIDEO_DELAY);
+  });
+  videosCache.set(0, promise);
+  return promise;
 }
 
 export function fetchVideo(id) {
-	if (videoCache.has(id)) {
-		return videoCache.get(id);
-	}
-	const promise = new Promise((resolve) => {
-		setTimeout(() => {
-			resolve(videos.find((video) => video.id === id));
-		}, VIDEO_DELAY);
-	});
-	videoCache.set(id, promise);
-	return promise;
+  if (videoCache.has(id)) {
+    return videoCache.get(id);
+  }
+  const promise = new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(videos.find((video) => video.id === id));
+    }, VIDEO_DELAY);
+  });
+  videoCache.set(id, promise);
+  return promise;
 }
 
 export function fetchVideoDetails(id) {
-	if (videoDetailsCache.has(id)) {
-		return videoDetailsCache.get(id);
-	}
-	const promise = new Promise((resolve) => {
-		setTimeout(() => {
-			resolve(videos.find((video) => video.id === id));
-		}, VIDEO_DETAILS_DELAY);
-	});
-	videoDetailsCache.set(id, promise);
-	return promise;
+  if (videoDetailsCache.has(id)) {
+    return videoDetailsCache.get(id);
+  }
+  const promise = new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(videos.find((video) => video.id === id));
+    }, VIDEO_DETAILS_DELAY);
+  });
+  videoDetailsCache.set(id, promise);
+  return promise;
 }
 ```
 
 ```js src/router.js hidden
-import { createContext, use, useEffect, useLayoutEffect, useState, useTransition } from "react";
+import {
+  useState,
+  createContext,
+  use,
+  useTransition,
+  useLayoutEffect,
+  useEffect,
+} from "react";
 
 const RouterContext = createContext({ url: "/", params: {} });
 
 export function useRouter() {
-	return use(RouterContext);
+  return use(RouterContext);
 }
 
 export function useIsNavPending() {
-	return use(RouterContext).isPending;
+  return use(RouterContext).isPending;
 }
 
 export function Router({ children }) {
-	const [routerState, setRouterState] = useState({
-		pendingNav: () => {},
-		url: document.location.pathname,
-	});
-	const [isPending, startTransition] = useTransition();
+  const [routerState, setRouterState] = useState({
+    pendingNav: () => {},
+    url: document.location.pathname,
+  });
+  const [isPending, startTransition] = useTransition();
 
-	function go(url) {
-		setRouterState({
-			url,
-			pendingNav() {
-				window.history.pushState({}, "", url);
-			},
-		});
-	}
-	function navigate(url) {
-		// Update router state in transition.
-		startTransition(() => {
-			go(url);
-		});
-	}
+  function go(url) {
+    setRouterState({
+      url,
+      pendingNav() {
+        window.history.pushState({}, "", url);
+      },
+    });
+  }
+  function navigate(url) {
+    // Update router state in transition.
+    startTransition(() => {
+      go(url);
+    });
+  }
 
-	function navigateBack(url) {
-		// Update router state in transition.
-		startTransition(() => {
-			go(url);
-		});
-	}
+  function navigateBack(url) {
+    // Update router state in transition.
+    startTransition(() => {
+      go(url);
+    });
+  }
 
-	useEffect(() => {
-		function handlePopState() {
-			// This should not animate because restoration has to be synchronous.
-			// Even though it's a transition.
-			startTransition(() => {
-				setRouterState({
-					url: document.location.pathname + document.location.search,
-					pendingNav() {
-						// Noop. URL has already updated.
-					},
-				});
-			});
-		}
-		window.addEventListener("popstate", handlePopState);
-		return () => {
-			window.removeEventListener("popstate", handlePopState);
-		};
-	}, []);
-	const pendingNav = routerState.pendingNav;
-	useLayoutEffect(() => {
-		pendingNav();
-	}, [pendingNav]);
+  useEffect(() => {
+    function handlePopState() {
+      // This should not animate because restoration has to be synchronous.
+      // Even though it's a transition.
+      startTransition(() => {
+        setRouterState({
+          url: document.location.pathname + document.location.search,
+          pendingNav() {
+            // Noop. URL has already updated.
+          },
+        });
+      });
+    }
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, []);
+  const pendingNav = routerState.pendingNav;
+  useLayoutEffect(() => {
+    pendingNav();
+  }, [pendingNav]);
 
-	return (
-		<RouterContext
-			value={{
-				url: routerState.url,
-				navigate,
-				navigateBack,
-				isPending,
-				params: {},
-			}}
-		>
-			{children}
-		</RouterContext>
-	);
+  return (
+    <RouterContext
+      value={{
+        url: routerState.url,
+        navigate,
+        navigateBack,
+        isPending,
+        params: {},
+      }}
+    >
+      {children}
+    </RouterContext>
+  );
 }
 ```
 
 ```css src/styles.css hidden
 @font-face {
-	font-family: Optimistic Text;
-	src: url(https://react.dev/fonts/Optimistic_Text_W_Rg.woff2) format("woff2");
-	font-weight: 400;
-	font-style: normal;
-	font-display: swap;
+  font-family: Optimistic Text;
+  src: url(https://react.dev/fonts/Optimistic_Text_W_Rg.woff2) format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
-	font-family: Optimistic Text;
-	src: url(https://react.dev/fonts/Optimistic_Text_W_Md.woff2) format("woff2");
-	font-weight: 500;
-	font-style: normal;
-	font-display: swap;
+  font-family: Optimistic Text;
+  src: url(https://react.dev/fonts/Optimistic_Text_W_Md.woff2) format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
-	font-family: Optimistic Text;
-	src: url(https://react.dev/fonts/Optimistic_Text_W_Bd.woff2) format("woff2");
-	font-weight: 600;
-	font-style: normal;
-	font-display: swap;
+  font-family: Optimistic Text;
+  src: url(https://react.dev/fonts/Optimistic_Text_W_Bd.woff2) format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
-	font-family: Optimistic Text;
-	src: url(https://react.dev/fonts/Optimistic_Text_W_Bd.woff2) format("woff2");
-	font-weight: 700;
-	font-style: normal;
-	font-display: swap;
+  font-family: Optimistic Text;
+  src: url(https://react.dev/fonts/Optimistic_Text_W_Bd.woff2) format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
 }
 
 * {
-	box-sizing: border-box;
+  box-sizing: border-box;
 }
 
 html {
-	background-image: url(https://react.dev/images/meta-gradient-dark.png);
-	background-size: 100%;
-	background-position: -100%;
-	background-color: rgb(64 71 86);
-	background-repeat: no-repeat;
-	height: 100%;
-	width: 100%;
+  background-image: url(https://react.dev/images/meta-gradient-dark.png);
+  background-size: 100%;
+  background-position: -100%;
+  background-color: rgb(64 71 86);
+  background-repeat: no-repeat;
+  height: 100%;
+  width: 100%;
 }
 
 body {
-	font-family:
-		Optimistic Text,
-		-apple-system,
-		ui-sans-serif,
-		system-ui,
-		sans-serif,
-		Apple Color Emoji,
-		Segoe UI Emoji,
-		Segoe UI Symbol,
-		Noto Color Emoji;
-	padding: 10px 0 10px 0;
-	margin: 0;
-	display: flex;
-	justify-content: center;
+  font-family: Optimistic Text, -apple-system, ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji;
+  padding: 10px 0 10px 0;
+  margin: 0;
+  display: flex;
+  justify-content: center;
 }
 
 #root {
-	flex: 1 1;
-	height: auto;
-	background-color: #fff;
-	border-radius: 10px;
-	max-width: 450px;
-	min-height: 600px;
-	padding-bottom: 10px;
+  flex: 1 1;
+  height: auto;
+  background-color: #fff;
+  border-radius: 10px;
+  max-width: 450px;
+  min-height: 600px;
+  padding-bottom: 10px;
 }
 
 h1 {
-	margin-top: 0;
-	font-size: 22px;
+  margin-top: 0;
+  font-size: 22px;
 }
 
 h2 {
-	margin-top: 0;
-	font-size: 20px;
+  margin-top: 0;
+  font-size: 20px;
 }
 
 h3 {
-	margin-top: 0;
-	font-size: 18px;
+  margin-top: 0;
+  font-size: 18px;
 }
 
 h4 {
-	margin-top: 0;
-	font-size: 16px;
+  margin-top: 0;
+  font-size: 16px;
 }
 
 h5 {
-	margin-top: 0;
-	font-size: 14px;
+  margin-top: 0;
+  font-size: 14px;
 }
 
 h6 {
-	margin-top: 0;
-	font-size: 12px;
+  margin-top: 0;
+  font-size: 12px;
 }
 
 code {
-	font-size: 1.2em;
+  font-size: 1.2em;
 }
 
 ul {
-	padding-inline-start: 20px;
+  padding-inline-start: 20px;
 }
 
 .sr-only {
-	position: absolute;
-	width: 1px;
-	height: 1px;
-	padding: 0;
-	margin: -1px;
-	overflow: hidden;
-	clip: rect(0, 0, 0, 0);
-	white-space: nowrap;
-	border-width: 0;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }
 
 .absolute {
-	position: absolute;
+  position: absolute;
 }
 
 .overflow-visible {
-	overflow: visible;
+  overflow: visible;
 }
 
 .visible {
-	overflow: visible;
+  overflow: visible;
 }
 
 .fit {
-	width: fit-content;
+  width: fit-content;
 }
+
 
 /* Layout */
 .page {
-	display: flex;
-	flex-direction: column;
-	height: 100%;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .top-hero {
-	height: 200px;
-	display: flex;
-	justify-content: center;
-	align-items: center;
-	background-image: conic-gradient(
-		from 90deg at -10% 100%,
-		#2b303b 0deg,
-		#2b303b 90deg,
-		#16181d 1turn
-	);
+  height: 200px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-image: conic-gradient(
+      from 90deg at -10% 100%,
+      #2b303b 0deg,
+      #2b303b 90deg,
+      #16181d 1turn
+  );
 }
 
 .bottom {
-	flex: 1;
-	overflow: auto;
+  flex: 1;
+  overflow: auto;
 }
 
 .top-nav {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	margin-bottom: 0;
-	padding: 0 12px;
-	top: 0;
-	width: 100%;
-	height: 44px;
-	color: #23272f;
-	font-weight: 700;
-	font-size: 20px;
-	z-index: 100;
-	cursor: default;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0;
+  padding: 0 12px;
+  top: 0;
+  width: 100%;
+  height: 44px;
+  color: #23272f;
+  font-weight: 700;
+  font-size: 20px;
+  z-index: 100;
+  cursor: default;
 }
 
 .content {
-	padding: 0 12px;
-	margin-top: 4px;
+  padding: 0 12px;
+  margin-top: 4px;
 }
 
+
 .loader {
-	color: #23272f;
-	font-size: 3px;
-	width: 1em;
-	margin-right: 18px;
-	height: 1em;
-	border-radius: 50%;
-	position: relative;
-	text-indent: -9999em;
-	animation: loading-spinner 1.3s infinite linear;
-	animation-delay: 200ms;
-	transform: translateZ(0);
+  color: #23272f;
+  font-size: 3px;
+  width: 1em;
+  margin-right: 18px;
+  height: 1em;
+  border-radius: 50%;
+  position: relative;
+  text-indent: -9999em;
+  animation: loading-spinner 1.3s infinite linear;
+  animation-delay: 200ms;
+  transform: translateZ(0);
 }
 
 @keyframes loading-spinner {
-	0%,
-	100% {
-		box-shadow:
-			0 -3em 0 0.2em,
-			2em -2em 0 0em,
-			3em 0 0 -1em,
-			2em 2em 0 -1em,
-			0 3em 0 -1em,
-			-2em 2em 0 -1em,
-			-3em 0 0 -1em,
-			-2em -2em 0 0;
-	}
-	12.5% {
-		box-shadow:
-			0 -3em 0 0,
-			2em -2em 0 0.2em,
-			3em 0 0 0,
-			2em 2em 0 -1em,
-			0 3em 0 -1em,
-			-2em 2em 0 -1em,
-			-3em 0 0 -1em,
-			-2em -2em 0 -1em;
-	}
-	25% {
-		box-shadow:
-			0 -3em 0 -0.5em,
-			2em -2em 0 0,
-			3em 0 0 0.2em,
-			2em 2em 0 0,
-			0 3em 0 -1em,
-			-2em 2em 0 -1em,
-			-3em 0 0 -1em,
-			-2em -2em 0 -1em;
-	}
-	37.5% {
-		box-shadow:
-			0 -3em 0 -1em,
-			2em -2em 0 -1em,
-			3em 0em 0 0,
-			2em 2em 0 0.2em,
-			0 3em 0 0em,
-			-2em 2em 0 -1em,
-			-3em 0em 0 -1em,
-			-2em -2em 0 -1em;
-	}
-	50% {
-		box-shadow:
-			0 -3em 0 -1em,
-			2em -2em 0 -1em,
-			3em 0 0 -1em,
-			2em 2em 0 0em,
-			0 3em 0 0.2em,
-			-2em 2em 0 0,
-			-3em 0em 0 -1em,
-			-2em -2em 0 -1em;
-	}
-	62.5% {
-		box-shadow:
-			0 -3em 0 -1em,
-			2em -2em 0 -1em,
-			3em 0 0 -1em,
-			2em 2em 0 -1em,
-			0 3em 0 0,
-			-2em 2em 0 0.2em,
-			-3em 0 0 0,
-			-2em -2em 0 -1em;
-	}
-	75% {
-		box-shadow:
-			0em -3em 0 -1em,
-			2em -2em 0 -1em,
-			3em 0em 0 -1em,
-			2em 2em 0 -1em,
-			0 3em 0 -1em,
-			-2em 2em 0 0,
-			-3em 0em 0 0.2em,
-			-2em -2em 0 0;
-	}
-	87.5% {
-		box-shadow:
-			0em -3em 0 0,
-			2em -2em 0 -1em,
-			3em 0 0 -1em,
-			2em 2em 0 -1em,
-			0 3em 0 -1em,
-			-2em 2em 0 0,
-			-3em 0em 0 0,
-			-2em -2em 0 0.2em;
-	}
+  0%,
+  100% {
+    box-shadow: 0 -3em 0 0.2em,
+    2em -2em 0 0em, 3em 0 0 -1em,
+    2em 2em 0 -1em, 0 3em 0 -1em,
+    -2em 2em 0 -1em, -3em 0 0 -1em,
+    -2em -2em 0 0;
+  }
+  12.5% {
+    box-shadow: 0 -3em 0 0, 2em -2em 0 0.2em,
+    3em 0 0 0, 2em 2em 0 -1em, 0 3em 0 -1em,
+    -2em 2em 0 -1em, -3em 0 0 -1em,
+    -2em -2em 0 -1em;
+  }
+  25% {
+    box-shadow: 0 -3em 0 -0.5em,
+    2em -2em 0 0, 3em 0 0 0.2em,
+    2em 2em 0 0, 0 3em 0 -1em,
+    -2em 2em 0 -1em, -3em 0 0 -1em,
+    -2em -2em 0 -1em;
+  }
+  37.5% {
+    box-shadow: 0 -3em 0 -1em, 2em -2em 0 -1em,
+    3em 0em 0 0, 2em 2em 0 0.2em, 0 3em 0 0em,
+    -2em 2em 0 -1em, -3em 0em 0 -1em, -2em -2em 0 -1em;
+  }
+  50% {
+    box-shadow: 0 -3em 0 -1em, 2em -2em 0 -1em,
+    3em 0 0 -1em, 2em 2em 0 0em, 0 3em 0 0.2em,
+    -2em 2em 0 0, -3em 0em 0 -1em, -2em -2em 0 -1em;
+  }
+  62.5% {
+    box-shadow: 0 -3em 0 -1em, 2em -2em 0 -1em,
+    3em 0 0 -1em, 2em 2em 0 -1em, 0 3em 0 0,
+    -2em 2em 0 0.2em, -3em 0 0 0, -2em -2em 0 -1em;
+  }
+  75% {
+    box-shadow: 0em -3em 0 -1em, 2em -2em 0 -1em,
+    3em 0em 0 -1em, 2em 2em 0 -1em, 0 3em 0 -1em,
+    -2em 2em 0 0, -3em 0em 0 0.2em, -2em -2em 0 0;
+  }
+  87.5% {
+    box-shadow: 0em -3em 0 0, 2em -2em 0 -1em,
+    3em 0 0 -1em, 2em 2em 0 -1em, 0 3em 0 -1em,
+    -2em 2em 0 0, -3em 0em 0 0, -2em -2em 0 0.2em;
+  }
 }
 
 /* LikeButton */
 .like-button {
-	outline-offset: 2px;
-	position: relative;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	width: 2.5rem;
-	height: 2.5rem;
-	cursor: pointer;
-	border-radius: 9999px;
-	border: none;
-	outline: none 2px;
-	color: #5e687e;
-	background: none;
+  outline-offset: 2px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  cursor: pointer;
+  border-radius: 9999px;
+  border: none;
+  outline: none 2px;
+  color: #5e687e;
+  background: none;
 }
 
 .like-button:focus {
-	color: #a6423a;
-	background-color: rgba(166, 66, 58, 0.05);
+  color: #a6423a;
+  background-color: rgba(166, 66, 58, .05);
 }
 
 .like-button:active {
-	color: #a6423a;
-	background-color: rgba(166, 66, 58, 0.05);
-	transform: scaleX(0.95) scaleY(0.95);
+  color: #a6423a;
+  background-color: rgba(166, 66, 58, .05);
+  transform: scaleX(0.95) scaleY(0.95);
 }
 
 .like-button:hover {
-	background-color: #f6f7f9;
+  background-color: #f6f7f9;
 }
 
 .like-button.liked {
-	color: #a6423a;
+  color: #a6423a;
 }
 
 /* Icons */
 @keyframes circle {
-	0% {
-		transform: scale(0);
-		stroke-width: 16px;
-	}
+  0% {
+    transform: scale(0);
+    stroke-width: 16px;
+  }
 
-	50% {
-		transform: scale(0.5);
-		stroke-width: 16px;
-	}
+  50% {
+    transform: scale(.5);
+    stroke-width: 16px;
+  }
 
-	to {
-		transform: scale(1);
-		stroke-width: 0;
-	}
+  to {
+    transform: scale(1);
+    stroke-width: 0;
+  }
 }
 
 .circle {
-	color: rgba(166, 66, 58, 0.5);
-	transform-origin: center;
-	transition-property: all;
-	transition-duration: 0.15s;
-	transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  color: rgba(166, 66, 58, .5);
+  transform-origin: center;
+  transition-property: all;
+  transition-duration: .15s;
+  transition-timing-function: cubic-bezier(.4,0,.2,1);
 }
 
 .circle.liked.animate {
-	animation: circle 0.3s forwards;
+  animation: circle .3s forwards;
 }
 
 .heart {
-	width: 1.5rem;
-	height: 1.5rem;
+  width: 1.5rem;
+  height: 1.5rem;
 }
 
 .heart.liked {
-	transform-origin: center;
-	transition-property: all;
-	transition-duration: 0.15s;
-	transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: center;
+  transition-property: all;
+  transition-duration: .15s;
+  transition-timing-function: cubic-bezier(.4, 0, .2, 1);
 }
 
 .heart.liked.animate {
-	animation: scale 0.35s ease-in-out forwards;
+  animation: scale .35s ease-in-out forwards;
 }
 
 .control-icon {
-	color: hsla(0, 0%, 100%, 0.5);
-	filter: drop-shadow(0 20px 13px rgba(0, 0, 0, 0.03)) drop-shadow(0 8px 5px rgba(0, 0, 0, 0.08));
+  color: hsla(0, 0%, 100%, .5);
+  filter:  drop-shadow(0 20px 13px rgba(0, 0, 0, .03)) drop-shadow(0 8px 5px rgba(0, 0, 0, .08));
 }
 
 .chevron-left {
-	margin-top: 2px;
-	rotate: 90deg;
+  margin-top: 2px;
+  rotate: 90deg;
 }
+
 
 /* Video */
 .thumbnail {
-	position: relative;
-	aspect-ratio: 16 / 9;
-	display: flex;
-	overflow: hidden;
-	flex-direction: column;
-	justify-content: center;
-	align-items: center;
-	border-radius: 0.5rem;
-	outline-offset: 2px;
-	width: 8rem;
-	vertical-align: middle;
-	background-color: #ffffff;
-	background-size: cover;
-	user-select: none;
+  position: relative;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  overflow: hidden;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  border-radius: 0.5rem;
+  outline-offset: 2px;
+  width: 8rem;
+  vertical-align: middle;
+  background-color: #ffffff;
+  background-size: cover;
+  user-select: none;
 }
 
 .thumbnail.blue {
-	background-image: conic-gradient(at top right, #c76a15, #087ea4, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #087ea4, #2b3491);
 }
 
 .thumbnail.red {
-	background-image: conic-gradient(at top right, #c76a15, #a6423a, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #a6423a, #2b3491);
 }
 
 .thumbnail.green {
-	background-image: conic-gradient(at top right, #c76a15, #388f7f, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #388f7f, #2b3491);
 }
 
 .thumbnail.purple {
-	background-image: conic-gradient(at top right, #c76a15, #575fb7, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #575fb7, #2b3491);
 }
 
 .thumbnail.yellow {
-	background-image: conic-gradient(at top right, #c76a15, #fabd62, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #FABD62, #2b3491);
 }
 
 .thumbnail.gray {
-	background-image: conic-gradient(at top right, #c76a15, #4e5769, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #4E5769, #2b3491);
 }
 
 .video {
-	display: flex;
-	flex-direction: row;
-	gap: 0.75rem;
-	align-items: center;
+  display: flex;
+  flex-direction: row;
+  gap: 0.75rem;
+  align-items: center;
 }
 
 .video .link {
-	display: flex;
-	flex-direction: row;
-	flex: 1 1 0;
-	gap: 0.125rem;
-	outline-offset: 4px;
-	cursor: pointer;
+  display: flex;
+  flex-direction: row;
+  flex: 1 1 0;
+  gap: 0.125rem;
+  outline-offset: 4px;
+  cursor: pointer;
 }
 
 .video .info {
-	display: flex;
-	flex-direction: column;
-	justify-content: center;
-	margin-left: 8px;
-	gap: 0.125rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  margin-left: 8px;
+  gap: 0.125rem;
 }
 
 .video .info:hover {
-	text-decoration: underline;
+  text-decoration: underline;
 }
 
 .video-title {
-	font-size: 15px;
-	line-height: 1.25;
-	font-weight: 700;
-	color: #23272f;
+  font-size: 15px;
+  line-height: 1.25;
+  font-weight: 700;
+  color: #23272f;
 }
 
 .video-description {
-	color: #5e687e;
-	font-size: 13px;
+  color: #5e687e;
+  font-size: 13px;
 }
 
 /* Details */
 .details .thumbnail {
-	position: relative;
-	aspect-ratio: 16 / 9;
-	display: flex;
-	overflow: hidden;
-	flex-direction: column;
-	justify-content: center;
-	align-items: center;
-	border-radius: 0.5rem;
-	outline-offset: 2px;
-	width: 100%;
-	vertical-align: middle;
-	background-color: #ffffff;
-	background-size: cover;
-	user-select: none;
+  position: relative;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  overflow: hidden;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  border-radius: 0.5rem;
+  outline-offset: 2px;
+  width: 100%;
+  vertical-align: middle;
+  background-color: #ffffff;
+  background-size: cover;
+  user-select: none;
 }
 
 .video-details-title {
-	margin-top: 8px;
+  margin-top: 8px;
 }
 
 .video-details-speaker {
-	display: flex;
-	gap: 8px;
-	margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  margin-top: 10px
 }
 
 .back {
-	display: flex;
-	align-items: center;
-	margin-left: -5px;
-	cursor: pointer;
+  display: flex;
+  align-items: center;
+  margin-left: -5px;
+  cursor: pointer;
 }
 
 .back:hover {
-	text-decoration: underline;
+  text-decoration: underline;
 }
 
 .info-title {
-	font-size: 1.5rem;
-	font-weight: 700;
-	line-height: 1.25;
-	margin: 8px 0 0 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.25;
+  margin: 8px 0 0 0 ;
 }
 
 .info-description {
-	margin: 8px 0 0 0;
+  margin: 8px 0 0 0;
 }
 
 .controls {
-	cursor: pointer;
+  cursor: pointer;
 }
 
 .fallback {
-	background: #f6f7f8 linear-gradient(to right, #e6e6e6 5%, #cccccc 25%, #e6e6e6 35%) no-repeat;
-	background-size: 800px 104px;
-	display: block;
-	line-height: 1.25;
-	margin: 8px 0 0 0;
-	border-radius: 5px;
-	overflow: hidden;
+  background: #f6f7f8 linear-gradient(to right, #e6e6e6 5%, #cccccc 25%, #e6e6e6 35%) no-repeat;
+  background-size: 800px 104px;
+  display: block;
+  line-height: 1.25;
+  margin: 8px 0 0 0;
+  border-radius: 5px;
+  overflow: hidden;
 
-	animation: 1s linear 1s infinite shimmer;
-	animation-delay: 300ms;
-	animation-duration: 1s;
-	animation-fill-mode: forwards;
-	animation-iteration-count: infinite;
-	animation-name: shimmer;
-	animation-timing-function: linear;
+  animation: 1s linear 1s infinite shimmer;
+  animation-delay: 300ms;
+  animation-duration: 1s;
+  animation-fill-mode: forwards;
+  animation-iteration-count: infinite;
+  animation-name: shimmer;
+  animation-timing-function: linear;
 }
 
+
 .fallback.title {
-	width: 130px;
-	height: 30px;
+  width: 130px;
+  height: 30px;
+
 }
 
 .fallback.description {
-	width: 150px;
-	height: 21px;
+  width: 150px;
+  height: 21px;
 }
 
 @keyframes shimmer {
-	0% {
-		background-position: -468px 0;
-	}
+  0% {
+    background-position: -468px 0;
+  }
 
-	100% {
-		background-position: 468px 0;
-	}
+  100% {
+    background-position: 468px 0;
+  }
 }
 
 .search {
-	margin-bottom: 10px;
+  margin-bottom: 10px;
 }
 .search-input {
-	width: 100%;
-	position: relative;
+  width: 100%;
+  position: relative;
 }
 
 .search-icon {
-	position: absolute;
-	top: 0;
-	bottom: 0;
-	inset-inline-start: 0;
-	display: flex;
-	align-items: center;
-	padding-inline-start: 1rem;
-	pointer-events: none;
-	color: #99a1b3;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  inset-inline-start: 0;
+  display: flex;
+  align-items: center;
+  padding-inline-start: 1rem;
+  pointer-events: none;
+  color: #99a1b3;
 }
 
 .search-input input {
-	display: flex;
-	padding-inline-start: 2.75rem;
-	padding-top: 10px;
-	padding-bottom: 10px;
-	width: 100%;
-	text-align: start;
-	background-color: rgb(235 236 240);
-	outline: 2px solid transparent;
-	cursor: pointer;
-	border: none;
-	align-items: center;
-	color: rgb(35 39 47);
-	border-radius: 9999px;
-	vertical-align: middle;
-	font-size: 15px;
+  display: flex;
+  padding-inline-start: 2.75rem;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  width: 100%;
+  text-align: start;
+  background-color: rgb(235 236 240);
+  outline: 2px solid transparent;
+  cursor: pointer;
+  border: none;
+  align-items: center;
+  color: rgb(35 39 47);
+  border-radius: 9999px;
+  vertical-align: middle;
+  font-size: 15px;
 }
 
-.search-input input:hover,
-.search-input input:active {
-	background-color: rgb(235 236 240/ 0.8);
-	color: rgb(35 39 47/ 0.8);
+.search-input input:hover, .search-input input:active {
+  background-color: rgb(235 236 240/ 0.8);
+  color: rgb(35 39 47/ 0.8);
 }
 
 /* Home */
 .video-list {
-	position: relative;
+  position: relative;
 }
 
 .video-list .videos {
-	display: flex;
-	flex-direction: column;
-	gap: 1rem;
-	overflow-y: auto;
-	height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  overflow-y: auto;
+  height: 100%;
 }
 ```
+
 
 ```css src/animations.css
 /* No additional animations needed */
 
+
+
+
+
+
+
+
+
 /* Previously defined animations below */
 
+
+
+
+
 ::view-transition-old(.slow-fade) {
-	animation-duration: 500ms;
+    animation-duration: 500ms;
 }
 
 ::view-transition-new(.slow-fade) {
-	animation-duration: 500ms;
+    animation-duration: 500ms;
 }
 ```
 
 ```js src/index.js hidden
-import React, { StrictMode } from "react";
-import { createRoot } from "react-dom/client";
+import React, {StrictMode} from 'react';
+import {createRoot} from 'react-dom/client';
+import './styles.css';
+import './animations.css';
 
-import "./styles.css";
-import "./animations.css";
+import App from './App';
+import {Router} from './router';
 
-import App from "./App";
-import { Router } from "./router";
-
-const root = createRoot(document.getElementById("root"));
+const root = createRoot(document.getElementById('root'));
 root.render(
-	<StrictMode>
-		<Router>
-			<App />
-		</Router>
-	</StrictMode>,
+  <StrictMode>
+    <Router>
+      <App />
+    </Router>
+  </StrictMode>
 );
 ```
 
 ```json package.json hidden
 {
-	"dependencies": {
-		"react": "experimental",
-		"react-dom": "experimental",
-		"react-scripts": "latest"
-	},
-	"scripts": {
-		"start": "react-scripts start",
-		"build": "react-scripts build",
-		"test": "react-scripts test --env=jsdom",
-		"eject": "react-scripts eject"
-	}
+  "dependencies": {
+    "react": "canary",
+    "react-dom": "canary",
+    "react-scripts": "latest"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test --env=jsdom",
+    "eject": "react-scripts eject"
+  }
 }
 ```
 
@@ -5079,24 +4898,24 @@ By default, React automatically generates a unique `name` for each element activ
 
 For more info, see the docs for [Animating a Shared Element](/reference/react/ViewTransition#animating-a-shared-element).
 
-### Animating based on cause {/_animating-based-on-cause_/}
+### Animating based on cause {/*animating-based-on-cause*/}
 
 Sometimes, you may want elements to animate differently based on how it was triggered. For this use case, we've added a new API called `addTransitionType` to specify the cause of a transition:
 
 ```js {4,11}
 function navigate(url) {
-	startTransition(() => {
-		// Transition type for the cause "nav forward"
-		addTransitionType("nav-forward");
-		go(url);
-	});
+  startTransition(() => {
+    // Transition type for the cause "nav forward"
+    addTransitionType('nav-forward');
+    go(url);
+  });
 }
 function navigateBack(url) {
-	startTransition(() => {
-		// Transition type for the cause "nav backward"
-		addTransitionType("nav-back");
-		go(url);
-	});
+  startTransition(() => {
+    // Transition type for the cause "nav backward"
+    addTransitionType('nav-back');
+    go(url);
+  });
 }
 ```
 
@@ -5104,13 +4923,12 @@ With transition types, you can provide custom animations via props to `<ViewTran
 
 ```js {4,5}
 <ViewTransition
-	name="nav"
-	share={{
-		"nav-forward": "slide-forward",
-		"nav-back": "slide-back",
-	}}
->
-	{heading}
+  name="nav"
+  share={{
+    'nav-forward': 'slide-forward',
+    'nav-back': 'slide-back',
+  }}>
+  {heading}
 </ViewTransition>
 ```
 
@@ -5118,23 +4936,23 @@ Here we pass a `share` prop to define how to animate based on the transition typ
 
 ```css
 ::view-transition-old(.slide-forward) {
-	/* when sliding forward, the "old" page should slide out to left. */
-	animation: ...;
+    /* when sliding forward, the "old" page should slide out to left. */
+    animation: ...
 }
 
 ::view-transition-new(.slide-forward) {
-	/* when sliding forward, the "new" page should slide in from right. */
-	animation: ...;
+    /* when sliding forward, the "new" page should slide in from right. */
+    animation: ...
 }
 
 ::view-transition-old(.slide-back) {
-	/* when sliding back, the "old" page should slide out to right. */
-	animation: ...;
+    /* when sliding back, the "old" page should slide out to right. */
+    animation: ...
 }
 
 ::view-transition-new(.slide-back) {
-	/* when sliding back, the "new" page should slide in from left. */
-	animation: ...;
+    /* when sliding back, the "new" page should slide in from left. */
+    animation: ...
 }
 ```
 
@@ -5143,444 +4961,438 @@ Now we can animate the header along with thumbnail based on navigation type:
 <Sandpack>
 
 ```js src/App.js hidden
-import { unstable_ViewTransition as ViewTransition } from "react";
-
+import { ViewTransition } from "react";
 import Details from "./Details";
 import Home from "./Home";
 import { useRouter } from "./router";
 
 export default function App() {
-	const { url } = useRouter();
+  const { url } = useRouter();
 
-	// Keeping our default slow-fade.
-	return (
-		<ViewTransition default="slow-fade">
-			{url === "/" ?
-				<Home />
-			:	<Details />}
-		</ViewTransition>
-	);
+  // Keeping our default slow-fade.
+  return (
+    <ViewTransition default="slow-fade">
+      {url === "/" ? <Home /> : <Details />}
+    </ViewTransition>
+  );
 }
 ```
 
 ```js src/Details.js hidden
-import { Suspense, use } from "react";
-
 import { fetchVideo, fetchVideoDetails } from "./data";
-import { ChevronLeft } from "./Icons";
-import Layout from "./Layout";
-import { useRouter } from "./router";
 import { Thumbnail, VideoControls } from "./Videos";
+import { useRouter } from "./router";
+import Layout from "./Layout";
+import { use, Suspense } from "react";
+import { ChevronLeft } from "./Icons";
 
 function VideoInfo({ id }) {
-	const details = use(fetchVideoDetails(id));
-	return (
-		<>
-			<p className="info-title">{details.title}</p>
-			<p className="info-description">{details.description}</p>
-		</>
-	);
+  const details = use(fetchVideoDetails(id));
+  return (
+    <>
+      <p className="info-title">{details.title}</p>
+      <p className="info-description">{details.description}</p>
+    </>
+  );
 }
 
 function VideoInfoFallback() {
-	return (
-		<>
-			<div className="fallback title"></div>
-			<div className="fallback description"></div>
-		</>
-	);
+  return (
+    <>
+      <div className="fallback title"></div>
+      <div className="fallback description"></div>
+    </>
+  );
 }
 
 export default function Details() {
-	const { url, navigateBack } = useRouter();
-	const videoId = url.split("/").pop();
-	const video = use(fetchVideo(videoId));
+  const { url, navigateBack } = useRouter();
+  const videoId = url.split("/").pop();
+  const video = use(fetchVideo(videoId));
 
-	return (
-		<Layout
-			heading={
-				<div
-					className="fit back"
-					onClick={() => {
-						navigateBack("/");
-					}}
-				>
-					<ChevronLeft /> Back
-				</div>
-			}
-		>
-			<div className="details">
-				<Thumbnail video={video} large>
-					<VideoControls />
-				</Thumbnail>
-				<Suspense fallback={<VideoInfoFallback />}>
-					<VideoInfo id={video.id} />
-				</Suspense>
-			</div>
-		</Layout>
-	);
+  return (
+    <Layout
+      heading={
+        <div
+          className="fit back"
+          onClick={() => {
+            navigateBack("/");
+          }}
+        >
+          <ChevronLeft /> Back
+        </div>
+      }
+    >
+      <div className="details">
+        <Thumbnail video={video} large>
+          <VideoControls />
+        </Thumbnail>
+        <Suspense fallback={<VideoInfoFallback />}>
+          <VideoInfo id={video.id} />
+        </Suspense>
+      </div>
+    </Layout>
+  );
 }
+
 ```
 
 ```js src/Home.js hidden
-import { use, useId, useState } from "react";
-
-import { fetchVideos } from "./data";
-import { IconSearch } from "./Icons";
-import Layout from "./Layout";
 import { Video } from "./Videos";
+import Layout from "./Layout";
+import { fetchVideos } from "./data";
+import { useId, useState, use } from "react";
+import { IconSearch } from "./Icons";
 
 function SearchInput({ value, onChange }) {
-	const id = useId();
-	return (
-		<form className="search" onSubmit={(e) => e.preventDefault()}>
-			<label htmlFor={id} className="sr-only">
-				Search
-			</label>
-			<div className="search-input">
-				<div className="search-icon">
-					<IconSearch />
-				</div>
-				<input
-					type="text"
-					id={id}
-					placeholder="Search"
-					value={value}
-					onChange={(e) => onChange(e.target.value)}
-				/>
-			</div>
-		</form>
-	);
+  const id = useId();
+  return (
+    <form className="search" onSubmit={(e) => e.preventDefault()}>
+      <label htmlFor={id} className="sr-only">
+        Search
+      </label>
+      <div className="search-input">
+        <div className="search-icon">
+          <IconSearch />
+        </div>
+        <input
+          type="text"
+          id={id}
+          placeholder="Search"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      </div>
+    </form>
+  );
 }
 
 function filterVideos(videos, query) {
-	const keywords = query
-		.toLowerCase()
-		.split(" ")
-		.filter((s) => s !== "");
-	if (keywords.length === 0) {
-		return videos;
-	}
-	return videos.filter((video) => {
-		const words = (video.title + " " + video.description).toLowerCase().split(" ");
-		return keywords.every((kw) => words.some((w) => w.includes(kw)));
-	});
+  const keywords = query
+    .toLowerCase()
+    .split(" ")
+    .filter((s) => s !== "");
+  if (keywords.length === 0) {
+    return videos;
+  }
+  return videos.filter((video) => {
+    const words = (video.title + " " + video.description)
+      .toLowerCase()
+      .split(" ");
+    return keywords.every((kw) => words.some((w) => w.includes(kw)));
+  });
 }
 
 export default function Home() {
-	const videos = use(fetchVideos());
-	const count = videos.length;
-	const [searchText, setSearchText] = useState("");
-	const foundVideos = filterVideos(videos, searchText);
-	return (
-		<Layout heading={<div className="fit">{count} Videos</div>}>
-			<SearchInput value={searchText} onChange={setSearchText} />
-			<div className="video-list">
-				{foundVideos.length === 0 && <div className="no-results">No results</div>}
-				<div className="videos">
-					{foundVideos.map((video) => (
-						<Video key={video.id} video={video} />
-					))}
-				</div>
-			</div>
-		</Layout>
-	);
+  const videos = use(fetchVideos());
+  const count = videos.length;
+  const [searchText, setSearchText] = useState("");
+  const foundVideos = filterVideos(videos, searchText);
+  return (
+    <Layout heading={<div className="fit">{count} Videos</div>}>
+      <SearchInput value={searchText} onChange={setSearchText} />
+      <div className="video-list">
+        {foundVideos.length === 0 && (
+          <div className="no-results">No results</div>
+        )}
+        <div className="videos">
+          {foundVideos.map((video) => (
+            <Video key={video.id} video={video} />
+          ))}
+        </div>
+      </div>
+    </Layout>
+  );
 }
+
 ```
 
 ```js src/Icons.js hidden
 export function ChevronLeft() {
-	return (
-		<svg
-			className="chevron-left"
-			xmlns="http://www.w3.org/2000/svg"
-			width="20"
-			height="20"
-			viewBox="0 0 20 20"
-		>
-			<g fill="none" fillRule="evenodd" transform="translate(-446 -398)">
-				<path
-					fill="currentColor"
-					fillRule="nonzero"
-					d="M95.8838835,240.366117 C95.3957281,239.877961 94.6042719,239.877961 94.1161165,240.366117 C93.6279612,240.854272 93.6279612,241.645728 94.1161165,242.133883 L98.6161165,246.633883 C99.1042719,247.122039 99.8957281,247.122039 100.383883,246.633883 L104.883883,242.133883 C105.372039,241.645728 105.372039,240.854272 104.883883,240.366117 C104.395728,239.877961 103.604272,239.877961 103.116117,240.366117 L99.5,243.982233 L95.8838835,240.366117 Z"
-					transform="translate(356.5 164.5)"
-				/>
-				<polygon points="446 418 466 418 466 398 446 398" />
-			</g>
-		</svg>
-	);
+  return (
+    <svg
+      className="chevron-left"
+      xmlns="http://www.w3.org/2000/svg"
+      width="20"
+      height="20"
+      viewBox="0 0 20 20">
+      <g fill="none" fillRule="evenodd" transform="translate(-446 -398)">
+        <path
+          fill="currentColor"
+          fillRule="nonzero"
+          d="M95.8838835,240.366117 C95.3957281,239.877961 94.6042719,239.877961 94.1161165,240.366117 C93.6279612,240.854272 93.6279612,241.645728 94.1161165,242.133883 L98.6161165,246.633883 C99.1042719,247.122039 99.8957281,247.122039 100.383883,246.633883 L104.883883,242.133883 C105.372039,241.645728 105.372039,240.854272 104.883883,240.366117 C104.395728,239.877961 103.604272,239.877961 103.116117,240.366117 L99.5,243.982233 L95.8838835,240.366117 Z"
+          transform="translate(356.5 164.5)"
+        />
+        <polygon points="446 418 466 418 466 398 446 398" />
+      </g>
+    </svg>
+  );
 }
 
 export function PauseIcon() {
-	return (
-		<svg
-			className="control-icon"
-			style={{ padding: "4px" }}
-			width="100"
-			height="100"
-			viewBox="0 0 512 512"
-			fill="none"
-			xmlns="http://www.w3.org/2000/svg"
-		>
-			<path
-				fillRule="evenodd"
-				clipRule="evenodd"
-				d="M256 0C114.617 0 0 114.615 0 256s114.617 256 256 256 256-114.615 256-256S397.383 0 256 0zm-32 320c0 8.836-7.164 16-16 16h-32c-8.836 0-16-7.164-16-16V192c0-8.836 7.164-16 16-16h32c8.836 0 16 7.164 16 16v128zm128 0c0 8.836-7.164 16-16 16h-32c-8.836 0-16-7.164-16-16V192c0-8.836 7.164-16 16-16h32c8.836 0 16 7.164 16 16v128z"
-				fill="currentColor"
-			/>
-		</svg>
-	);
+  return (
+    <svg
+      className="control-icon"
+      style={{padding: '4px'}}
+      width="100"
+      height="100"
+      viewBox="0 0 512 512"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg">
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M256 0C114.617 0 0 114.615 0 256s114.617 256 256 256 256-114.615 256-256S397.383 0 256 0zm-32 320c0 8.836-7.164 16-16 16h-32c-8.836 0-16-7.164-16-16V192c0-8.836 7.164-16 16-16h32c8.836 0 16 7.164 16 16v128zm128 0c0 8.836-7.164 16-16 16h-32c-8.836 0-16-7.164-16-16V192c0-8.836 7.164-16 16-16h32c8.836 0 16 7.164 16 16v128z"
+        fill="currentColor"
+      />
+    </svg>
+  );
 }
 
 export function PlayIcon() {
-	return (
-		<svg
-			className="control-icon"
-			width="100"
-			height="100"
-			viewBox="0 0 72 72"
-			fill="none"
-			xmlns="http://www.w3.org/2000/svg"
-		>
-			<path
-				fillRule="evenodd"
-				clipRule="evenodd"
-				d="M36 69C54.2254 69 69 54.2254 69 36C69 17.7746 54.2254 3 36 3C17.7746 3 3 17.7746 3 36C3 54.2254 17.7746 69 36 69ZM52.1716 38.6337L28.4366 51.5801C26.4374 52.6705 24 51.2235 24 48.9464V23.0536C24 20.7764 26.4374 19.3295 28.4366 20.4199L52.1716 33.3663C54.2562 34.5034 54.2562 37.4966 52.1716 38.6337Z"
-				fill="currentColor"
-			/>
-		</svg>
-	);
+  return (
+    <svg
+      className="control-icon"
+      width="100"
+      height="100"
+      viewBox="0 0 72 72"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg">
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M36 69C54.2254 69 69 54.2254 69 36C69 17.7746 54.2254 3 36 3C17.7746 3 3 17.7746 3 36C3 54.2254 17.7746 69 36 69ZM52.1716 38.6337L28.4366 51.5801C26.4374 52.6705 24 51.2235 24 48.9464V23.0536C24 20.7764 26.4374 19.3295 28.4366 20.4199L52.1716 33.3663C54.2562 34.5034 54.2562 37.4966 52.1716 38.6337Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
 }
-export function Heart({ liked, animate }) {
-	return (
-		<>
-			<svg
-				className="absolute overflow-visible"
-				viewBox="0 0 24 24"
-				fill="none"
-				xmlns="http://www.w3.org/2000/svg"
-			>
-				<circle
-					className={`circle ${liked ? "liked" : ""} ${animate ? "animate" : ""}`}
-					cx="12"
-					cy="12"
-					r="11.5"
-					fill="transparent"
-					strokeWidth="0"
-					stroke="currentColor"
-				/>
-			</svg>
+export function Heart({liked, animate}) {
+  return (
+    <>
+      <svg
+        className="absolute overflow-visible"
+        viewBox="0 0 24 24"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg">
+        <circle
+          className={`circle ${liked ? 'liked' : ''} ${animate ? 'animate' : ''}`}
+          cx="12"
+          cy="12"
+          r="11.5"
+          fill="transparent"
+          strokeWidth="0"
+          stroke="currentColor"
+        />
+      </svg>
 
-			<svg
-				className={`heart ${liked ? "liked" : ""} ${animate ? "animate" : ""}`}
-				viewBox="0 0 24 24"
-				fill="none"
-				xmlns="http://www.w3.org/2000/svg"
-			>
-				{liked ?
-					<path
-						d="M12 23a.496.496 0 0 1-.26-.074C7.023 19.973 0 13.743 0 8.68c0-4.12 2.322-6.677 6.058-6.677 2.572 0 5.108 2.387 5.134 2.41l.808.771.808-.771C12.834 4.387 15.367 2 17.935 2 21.678 2 24 4.558 24 8.677c0 5.06-7.022 11.293-11.74 14.246a.496.496 0 0 1-.26.074V23z"
-						fill="currentColor"
-					/>
-				:	<path
-						fillRule="evenodd"
-						clipRule="evenodd"
-						d="m12 5.184-.808-.771-.004-.004C11.065 4.299 8.522 2.003 6 2.003c-3.736 0-6 2.558-6 6.677 0 4.47 5.471 9.848 10 13.079.602.43 1.187.82 1.74 1.167A.497.497 0 0 0 12 23v-.003c.09 0 .182-.026.26-.074C16.977 19.97 24 13.737 24 8.677 24 4.557 21.743 2 18 2c-2.569 0-5.166 2.387-5.192 2.413L12 5.184zm-.002 15.525c2.071-1.388 4.477-3.342 6.427-5.47C20.72 12.733 22 10.401 22 8.677c0-1.708-.466-2.855-1.087-3.55C20.316 4.459 19.392 4 18 4c-.726 0-1.63.364-2.5.9-.67.412-1.148.82-1.266.92-.03.025-.037.031-.019.014l-.013.013L12 7.949 9.832 5.88a10.08 10.08 0 0 0-1.33-.977C7.633 4.367 6.728 4.003 6 4.003c-1.388 0-2.312.459-2.91 1.128C2.466 5.826 2 6.974 2 8.68c0 1.726 1.28 4.058 3.575 6.563 1.948 2.127 4.352 4.078 6.423 5.466z"
-						fill="currentColor"
-					/>
-				}
-			</svg>
-		</>
-	);
+      <svg
+        className={`heart ${liked ? 'liked' : ''} ${animate ? 'animate' : ''}`}
+        viewBox="0 0 24 24"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg">
+        {liked ? (
+          <path
+            d="M12 23a.496.496 0 0 1-.26-.074C7.023 19.973 0 13.743 0 8.68c0-4.12 2.322-6.677 6.058-6.677 2.572 0 5.108 2.387 5.134 2.41l.808.771.808-.771C12.834 4.387 15.367 2 17.935 2 21.678 2 24 4.558 24 8.677c0 5.06-7.022 11.293-11.74 14.246a.496.496 0 0 1-.26.074V23z"
+            fill="currentColor"
+          />
+        ) : (
+          <path
+            fillRule="evenodd"
+            clipRule="evenodd"
+            d="m12 5.184-.808-.771-.004-.004C11.065 4.299 8.522 2.003 6 2.003c-3.736 0-6 2.558-6 6.677 0 4.47 5.471 9.848 10 13.079.602.43 1.187.82 1.74 1.167A.497.497 0 0 0 12 23v-.003c.09 0 .182-.026.26-.074C16.977 19.97 24 13.737 24 8.677 24 4.557 21.743 2 18 2c-2.569 0-5.166 2.387-5.192 2.413L12 5.184zm-.002 15.525c2.071-1.388 4.477-3.342 6.427-5.47C20.72 12.733 22 10.401 22 8.677c0-1.708-.466-2.855-1.087-3.55C20.316 4.459 19.392 4 18 4c-.726 0-1.63.364-2.5.9-.67.412-1.148.82-1.266.92-.03.025-.037.031-.019.014l-.013.013L12 7.949 9.832 5.88a10.08 10.08 0 0 0-1.33-.977C7.633 4.367 6.728 4.003 6 4.003c-1.388 0-2.312.459-2.91 1.128C2.466 5.826 2 6.974 2 8.68c0 1.726 1.28 4.058 3.575 6.563 1.948 2.127 4.352 4.078 6.423 5.466z"
+            fill="currentColor"
+          />
+        )}
+      </svg>
+    </>
+  );
 }
 
 export function IconSearch(props) {
-	return (
-		<svg width="1em" height="1em" viewBox="0 0 20 20">
-			<path
-				d="M14.386 14.386l4.0877 4.0877-4.0877-4.0877c-2.9418 2.9419-7.7115 2.9419-10.6533 0-2.9419-2.9418-2.9419-7.7115 0-10.6533 2.9418-2.9419 7.7115-2.9419 10.6533 0 2.9419 2.9418 2.9419 7.7115 0 10.6533z"
-				stroke="currentColor"
-				fill="none"
-				strokeWidth="2"
-				fillRule="evenodd"
-				strokeLinecap="round"
-				strokeLinejoin="round"
-			></path>
-		</svg>
-	);
+  return (
+    <svg width="1em" height="1em" viewBox="0 0 20 20">
+      <path
+        d="M14.386 14.386l4.0877 4.0877-4.0877-4.0877c-2.9418 2.9419-7.7115 2.9419-10.6533 0-2.9419-2.9418-2.9419-7.7115 0-10.6533 2.9418-2.9419 7.7115-2.9419 10.6533 0 2.9419 2.9418 2.9419 7.7115 0 10.6533z"
+        stroke="currentColor"
+        fill="none"
+        strokeWidth="2"
+        fillRule="evenodd"
+        strokeLinecap="round"
+        strokeLinejoin="round"></path>
+    </svg>
+  );
 }
 ```
 
 ```js src/Layout.js active
-import { unstable_ViewTransition as ViewTransition } from "react";
-
-import { useIsNavPending } from "./router";
+import {ViewTransition} from 'react'; import { useIsNavPending } from "./router";
 
 export default function Page({ heading, children }) {
-	const isPending = useIsNavPending();
-	return (
-		<div className="page">
-			<div className="top">
-				<div className="top-nav">
-					{/* Custom classes based on transition type. */}
-					<ViewTransition
-						name="nav"
-						share={{
-							"nav-forward": "slide-forward",
-							"nav-back": "slide-back",
-						}}
-					>
-						{heading}
-					</ViewTransition>
-					{isPending && <span className="loader"></span>}
-				</div>
-			</div>
-			{/* Opt-out of ViewTransition for the content. */}
-			{/* Content can define it's own ViewTransition. */}
-			<ViewTransition default="none">
-				<div className="bottom">
-					<div className="content">{children}</div>
-				</div>
-			</ViewTransition>
-		</div>
-	);
+  const isPending = useIsNavPending();
+  return (
+    <div className="page">
+      <div className="top">
+        <div className="top-nav">
+          {/* Custom classes based on transition type. */}
+          <ViewTransition
+            name="nav"
+            share={{
+              'nav-forward': 'slide-forward',
+              'nav-back': 'slide-back',
+            }}>
+            {heading}
+          </ViewTransition>
+          {isPending && <span className="loader"></span>}
+        </div>
+      </div>
+      {/* Opt-out of ViewTransition for the content. */}
+      {/* Content can define it's own ViewTransition. */}
+      <ViewTransition default="none">
+        <div className="bottom">
+          <div className="content">{children}</div>
+        </div>
+      </ViewTransition>
+    </div>
+  );
 }
 ```
 
 ```js src/LikeButton.js hidden
-import { useState } from "react";
-
-import { Heart } from "./Icons";
+import {useState} from 'react';
+import {Heart} from './Icons';
 
 // A hack since we don't actually have a backend.
 // Unlike local state, this survives videos being filtered.
 const likedVideos = new Set();
 
-export default function LikeButton({ video }) {
-	const [isLiked, setIsLiked] = useState(() => likedVideos.has(video.id));
-	const [animate, setAnimate] = useState(false);
-	return (
-		<button
-			className={`like-button ${isLiked && "liked"}`}
-			aria-label={isLiked ? "Unsave" : "Save"}
-			onClick={() => {
-				const nextIsLiked = !isLiked;
-				if (nextIsLiked) {
-					likedVideos.add(video.id);
-				} else {
-					likedVideos.delete(video.id);
-				}
-				setAnimate(true);
-				setIsLiked(nextIsLiked);
-			}}
-		>
-			<Heart liked={isLiked} animate={animate} />
-		</button>
-	);
+export default function LikeButton({video}) {
+  const [isLiked, setIsLiked] = useState(() => likedVideos.has(video.id));
+  const [animate, setAnimate] = useState(false);
+  return (
+    <button
+      className={`like-button ${isLiked && 'liked'}`}
+      aria-label={isLiked ? 'Unsave' : 'Save'}
+      onClick={() => {
+        const nextIsLiked = !isLiked;
+        if (nextIsLiked) {
+          likedVideos.add(video.id);
+        } else {
+          likedVideos.delete(video.id);
+        }
+        setAnimate(true);
+        setIsLiked(nextIsLiked);
+      }}>
+      <Heart liked={isLiked} animate={animate} />
+    </button>
+  );
 }
 ```
 
 ```js src/Videos.js hidden
-import { startTransition, useState, unstable_ViewTransition as ViewTransition } from "react";
-
-import { PauseIcon, PlayIcon } from "./Icons";
+import { useState, ViewTransition } from "react";
 import LikeButton from "./LikeButton";
 import { useRouter } from "./router";
+import { PauseIcon, PlayIcon } from "./Icons";
+import { startTransition } from "react";
 
 export function Thumbnail({ video, children }) {
-	// Add a name to animate with a shared element transition.
-	// This uses the default animation, no additional css needed.
-	return (
-		<ViewTransition name={`video-${video.id}`}>
-			<div aria-hidden="true" tabIndex={-1} className={`thumbnail ${video.image}`}>
-				{children}
-			</div>
-		</ViewTransition>
-	);
+  // Add a name to animate with a shared element transition.
+  // This uses the default animation, no additional css needed.
+  return (
+    <ViewTransition name={`video-${video.id}`}>
+      <div
+        aria-hidden="true"
+        tabIndex={-1}
+        className={`thumbnail ${video.image}`}
+      >
+        {children}
+      </div>
+    </ViewTransition>
+  );
 }
 
 export function VideoControls() {
-	const [isPlaying, setIsPlaying] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
 
-	return (
-		<span
-			className="controls"
-			onClick={() =>
-				startTransition(() => {
-					setIsPlaying((p) => !p);
-				})
-			}
-		>
-			{isPlaying ?
-				<PauseIcon />
-			:	<PlayIcon />}
-		</span>
-	);
+  return (
+    <span
+      className="controls"
+      onClick={() =>
+        startTransition(() => {
+          setIsPlaying((p) => !p);
+        })
+      }
+    >
+      {isPlaying ? <PauseIcon /> : <PlayIcon />}
+    </span>
+  );
 }
 
 export function Video({ video }) {
-	const { navigate } = useRouter();
+  const { navigate } = useRouter();
 
-	return (
-		<div className="video">
-			<div
-				className="link"
-				onClick={(e) => {
-					e.preventDefault();
-					navigate(`/video/${video.id}`);
-				}}
-			>
-				<Thumbnail video={video}></Thumbnail>
+  return (
+    <div className="video">
+      <div
+        className="link"
+        onClick={(e) => {
+          e.preventDefault();
+          navigate(`/video/${video.id}`);
+        }}
+      >
+        <Thumbnail video={video}></Thumbnail>
 
-				<div className="info">
-					<div className="video-title">{video.title}</div>
-					<div className="video-description">{video.description}</div>
-				</div>
-			</div>
-			<LikeButton video={video} />
-		</div>
-	);
+        <div className="info">
+          <div className="video-title">{video.title}</div>
+          <div className="video-description">{video.description}</div>
+        </div>
+      </div>
+      <LikeButton video={video} />
+    </div>
+  );
 }
 ```
 
+
 ```js src/data.js hidden
 const videos = [
-	{
-		id: "1",
-		title: "First video",
-		description: "Video description",
-		image: "blue",
-	},
-	{
-		id: "2",
-		title: "Second video",
-		description: "Video description",
-		image: "red",
-	},
-	{
-		id: "3",
-		title: "Third video",
-		description: "Video description",
-		image: "green",
-	},
-	{
-		id: "4",
-		title: "Fourth video",
-		description: "Video description",
-		image: "purple",
-	},
-	{
-		id: "5",
-		title: "Fifth video",
-		description: "Video description",
-		image: "yellow",
-	},
-	{
-		id: "6",
-		title: "Sixth video",
-		description: "Video description",
-		image: "gray",
-	},
+  {
+    id: '1',
+    title: 'First video',
+    description: 'Video description',
+    image: 'blue',
+  },
+  {
+    id: '2',
+    title: 'Second video',
+    description: 'Video description',
+    image: 'red',
+  },
+  {
+    id: '3',
+    title: 'Third video',
+    description: 'Video description',
+    image: 'green',
+  },
+  {
+    id: '4',
+    title: 'Fourth video',
+    description: 'Video description',
+    image: 'purple',
+  },
+  {
+    id: '5',
+    title: 'Fifth video',
+    description: 'Video description',
+    image: 'yellow',
+  },
+  {
+    id: '6',
+    title: 'Sixth video',
+    description: 'Video description',
+    image: 'gray',
+  },
 ];
 
 let videosCache = new Map();
@@ -5589,877 +5401,816 @@ let videoDetailsCache = new Map();
 const VIDEO_DELAY = 1;
 const VIDEO_DETAILS_DELAY = 1000;
 export function fetchVideos() {
-	if (videosCache.has(0)) {
-		return videosCache.get(0);
-	}
-	const promise = new Promise((resolve) => {
-		setTimeout(() => {
-			resolve(videos);
-		}, VIDEO_DELAY);
-	});
-	videosCache.set(0, promise);
-	return promise;
+  if (videosCache.has(0)) {
+    return videosCache.get(0);
+  }
+  const promise = new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(videos);
+    }, VIDEO_DELAY);
+  });
+  videosCache.set(0, promise);
+  return promise;
 }
 
 export function fetchVideo(id) {
-	if (videoCache.has(id)) {
-		return videoCache.get(id);
-	}
-	const promise = new Promise((resolve) => {
-		setTimeout(() => {
-			resolve(videos.find((video) => video.id === id));
-		}, VIDEO_DELAY);
-	});
-	videoCache.set(id, promise);
-	return promise;
+  if (videoCache.has(id)) {
+    return videoCache.get(id);
+  }
+  const promise = new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(videos.find((video) => video.id === id));
+    }, VIDEO_DELAY);
+  });
+  videoCache.set(id, promise);
+  return promise;
 }
 
 export function fetchVideoDetails(id) {
-	if (videoDetailsCache.has(id)) {
-		return videoDetailsCache.get(id);
-	}
-	const promise = new Promise((resolve) => {
-		setTimeout(() => {
-			resolve(videos.find((video) => video.id === id));
-		}, VIDEO_DETAILS_DELAY);
-	});
-	videoDetailsCache.set(id, promise);
-	return promise;
+  if (videoDetailsCache.has(id)) {
+    return videoDetailsCache.get(id);
+  }
+  const promise = new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(videos.find((video) => video.id === id));
+    }, VIDEO_DETAILS_DELAY);
+  });
+  videoDetailsCache.set(id, promise);
+  return promise;
 }
 ```
 
 ```js src/router.js
-import {
-	unstable_addTransitionType as addTransitionType,
-	createContext,
-	use,
-	useEffect,
-	useLayoutEffect,
-	useState,
-	useTransition,
-} from "react";
+import {useState, createContext, use, useTransition, useLayoutEffect, useEffect, addTransitionType} from "react";
 
 export function Router({ children }) {
-	const [isPending, startTransition] = useTransition();
+  const [isPending, startTransition] = useTransition();
 
-	function navigate(url) {
-		startTransition(() => {
-			// Transition type for the cause "nav forward"
-			addTransitionType("nav-forward");
-			go(url);
-		});
-	}
-	function navigateBack(url) {
-		startTransition(() => {
-			// Transition type for the cause "nav backward"
-			addTransitionType("nav-back");
-			go(url);
-		});
-	}
+  function navigate(url) {
+    startTransition(() => {
+      // Transition type for the cause "nav forward"
+      addTransitionType('nav-forward');
+      go(url);
+    });
+  }
+  function navigateBack(url) {
+    startTransition(() => {
+      // Transition type for the cause "nav backward"
+      addTransitionType('nav-back');
+      go(url);
+    });
+  }
 
-	const [routerState, setRouterState] = useState({
-		pendingNav: () => {},
-		url: document.location.pathname,
-	});
 
-	function go(url) {
-		setRouterState({
-			url,
-			pendingNav() {
-				window.history.pushState({}, "", url);
-			},
-		});
-	}
+  const [routerState, setRouterState] = useState({pendingNav: () => {}, url: document.location.pathname});
 
-	useEffect(() => {
-		function handlePopState() {
-			// This should not animate because restoration has to be synchronous.
-			// Even though it's a transition.
-			startTransition(() => {
-				setRouterState({
-					url: document.location.pathname + document.location.search,
-					pendingNav() {
-						// Noop. URL has already updated.
-					},
-				});
-			});
-		}
-		window.addEventListener("popstate", handlePopState);
-		return () => {
-			window.removeEventListener("popstate", handlePopState);
-		};
-	}, []);
-	const pendingNav = routerState.pendingNav;
-	useLayoutEffect(() => {
-		pendingNav();
-	}, [pendingNav]);
+  function go(url) {
+    setRouterState({
+      url,
+      pendingNav() {
+        window.history.pushState({}, "", url);
+      },
+    });
+  }
 
-	return (
-		<RouterContext
-			value={{
-				url: routerState.url,
-				navigate,
-				navigateBack,
-				isPending,
-				params: {},
-			}}
-		>
-			{children}
-		</RouterContext>
-	);
+  useEffect(() => {
+    function handlePopState() {
+      // This should not animate because restoration has to be synchronous.
+      // Even though it's a transition.
+      startTransition(() => {
+        setRouterState({
+          url: document.location.pathname + document.location.search,
+          pendingNav() {
+            // Noop. URL has already updated.
+          },
+        });
+      });
+    }
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, []);
+  const pendingNav = routerState.pendingNav;
+  useLayoutEffect(() => {
+    pendingNav();
+  }, [pendingNav]);
+
+  return (
+    <RouterContext
+      value={{
+        url: routerState.url,
+        navigate,
+        navigateBack,
+        isPending,
+        params: {},
+      }}
+    >
+      {children}
+    </RouterContext>
+  );
 }
 
 const RouterContext = createContext({ url: "/", params: {} });
 
 export function useRouter() {
-	return use(RouterContext);
+  return use(RouterContext);
 }
 
 export function useIsNavPending() {
-	return use(RouterContext).isPending;
+  return use(RouterContext).isPending;
 }
+
 ```
 
 ```css src/styles.css hidden
 @font-face {
-	font-family: Optimistic Text;
-	src: url(https://react.dev/fonts/Optimistic_Text_W_Rg.woff2) format("woff2");
-	font-weight: 400;
-	font-style: normal;
-	font-display: swap;
+  font-family: Optimistic Text;
+  src: url(https://react.dev/fonts/Optimistic_Text_W_Rg.woff2) format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
-	font-family: Optimistic Text;
-	src: url(https://react.dev/fonts/Optimistic_Text_W_Md.woff2) format("woff2");
-	font-weight: 500;
-	font-style: normal;
-	font-display: swap;
+  font-family: Optimistic Text;
+  src: url(https://react.dev/fonts/Optimistic_Text_W_Md.woff2) format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
-	font-family: Optimistic Text;
-	src: url(https://react.dev/fonts/Optimistic_Text_W_Bd.woff2) format("woff2");
-	font-weight: 600;
-	font-style: normal;
-	font-display: swap;
+  font-family: Optimistic Text;
+  src: url(https://react.dev/fonts/Optimistic_Text_W_Bd.woff2) format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
-	font-family: Optimistic Text;
-	src: url(https://react.dev/fonts/Optimistic_Text_W_Bd.woff2) format("woff2");
-	font-weight: 700;
-	font-style: normal;
-	font-display: swap;
+  font-family: Optimistic Text;
+  src: url(https://react.dev/fonts/Optimistic_Text_W_Bd.woff2) format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
 }
 
 * {
-	box-sizing: border-box;
+  box-sizing: border-box;
 }
 
 html {
-	background-image: url(https://react.dev/images/meta-gradient-dark.png);
-	background-size: 100%;
-	background-position: -100%;
-	background-color: rgb(64 71 86);
-	background-repeat: no-repeat;
-	height: 100%;
-	width: 100%;
+  background-image: url(https://react.dev/images/meta-gradient-dark.png);
+  background-size: 100%;
+  background-position: -100%;
+  background-color: rgb(64 71 86);
+  background-repeat: no-repeat;
+  height: 100%;
+  width: 100%;
 }
 
 body {
-	font-family:
-		Optimistic Text,
-		-apple-system,
-		ui-sans-serif,
-		system-ui,
-		sans-serif,
-		Apple Color Emoji,
-		Segoe UI Emoji,
-		Segoe UI Symbol,
-		Noto Color Emoji;
-	padding: 10px 0 10px 0;
-	margin: 0;
-	display: flex;
-	justify-content: center;
+  font-family: Optimistic Text, -apple-system, ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji;
+  padding: 10px 0 10px 0;
+  margin: 0;
+  display: flex;
+  justify-content: center;
 }
 
 #root {
-	flex: 1 1;
-	height: auto;
-	background-color: #fff;
-	border-radius: 10px;
-	max-width: 450px;
-	min-height: 600px;
-	padding-bottom: 10px;
+  flex: 1 1;
+  height: auto;
+  background-color: #fff;
+  border-radius: 10px;
+  max-width: 450px;
+  min-height: 600px;
+  padding-bottom: 10px;
 }
 
 h1 {
-	margin-top: 0;
-	font-size: 22px;
+  margin-top: 0;
+  font-size: 22px;
 }
 
 h2 {
-	margin-top: 0;
-	font-size: 20px;
+  margin-top: 0;
+  font-size: 20px;
 }
 
 h3 {
-	margin-top: 0;
-	font-size: 18px;
+  margin-top: 0;
+  font-size: 18px;
 }
 
 h4 {
-	margin-top: 0;
-	font-size: 16px;
+  margin-top: 0;
+  font-size: 16px;
 }
 
 h5 {
-	margin-top: 0;
-	font-size: 14px;
+  margin-top: 0;
+  font-size: 14px;
 }
 
 h6 {
-	margin-top: 0;
-	font-size: 12px;
+  margin-top: 0;
+  font-size: 12px;
 }
 
 code {
-	font-size: 1.2em;
+  font-size: 1.2em;
 }
 
 ul {
-	padding-inline-start: 20px;
+  padding-inline-start: 20px;
 }
 
 .sr-only {
-	position: absolute;
-	width: 1px;
-	height: 1px;
-	padding: 0;
-	margin: -1px;
-	overflow: hidden;
-	clip: rect(0, 0, 0, 0);
-	white-space: nowrap;
-	border-width: 0;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }
 
 .absolute {
-	position: absolute;
+  position: absolute;
 }
 
 .overflow-visible {
-	overflow: visible;
+  overflow: visible;
 }
 
 .visible {
-	overflow: visible;
+  overflow: visible;
 }
 
 .fit {
-	width: fit-content;
+  width: fit-content;
 }
+
 
 /* Layout */
 .page {
-	display: flex;
-	flex-direction: column;
-	height: 100%;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .top-hero {
-	height: 200px;
-	display: flex;
-	justify-content: center;
-	align-items: center;
-	background-image: conic-gradient(
-		from 90deg at -10% 100%,
-		#2b303b 0deg,
-		#2b303b 90deg,
-		#16181d 1turn
-	);
+  height: 200px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-image: conic-gradient(
+      from 90deg at -10% 100%,
+      #2b303b 0deg,
+      #2b303b 90deg,
+      #16181d 1turn
+  );
 }
 
 .bottom {
-	flex: 1;
-	overflow: auto;
+  flex: 1;
+  overflow: auto;
 }
 
 .top-nav {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	margin-bottom: 0;
-	padding: 0 12px;
-	top: 0;
-	width: 100%;
-	height: 44px;
-	color: #23272f;
-	font-weight: 700;
-	font-size: 20px;
-	z-index: 100;
-	cursor: default;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0;
+  padding: 0 12px;
+  top: 0;
+  width: 100%;
+  height: 44px;
+  color: #23272f;
+  font-weight: 700;
+  font-size: 20px;
+  z-index: 100;
+  cursor: default;
 }
 
 .content {
-	padding: 0 12px;
-	margin-top: 4px;
+  padding: 0 12px;
+  margin-top: 4px;
 }
 
+
 .loader {
-	color: #23272f;
-	font-size: 3px;
-	width: 1em;
-	margin-right: 18px;
-	height: 1em;
-	border-radius: 50%;
-	position: relative;
-	text-indent: -9999em;
-	animation: loading-spinner 1.3s infinite linear;
-	animation-delay: 200ms;
-	transform: translateZ(0);
+  color: #23272f;
+  font-size: 3px;
+  width: 1em;
+  margin-right: 18px;
+  height: 1em;
+  border-radius: 50%;
+  position: relative;
+  text-indent: -9999em;
+  animation: loading-spinner 1.3s infinite linear;
+  animation-delay: 200ms;
+  transform: translateZ(0);
 }
 
 @keyframes loading-spinner {
-	0%,
-	100% {
-		box-shadow:
-			0 -3em 0 0.2em,
-			2em -2em 0 0em,
-			3em 0 0 -1em,
-			2em 2em 0 -1em,
-			0 3em 0 -1em,
-			-2em 2em 0 -1em,
-			-3em 0 0 -1em,
-			-2em -2em 0 0;
-	}
-	12.5% {
-		box-shadow:
-			0 -3em 0 0,
-			2em -2em 0 0.2em,
-			3em 0 0 0,
-			2em 2em 0 -1em,
-			0 3em 0 -1em,
-			-2em 2em 0 -1em,
-			-3em 0 0 -1em,
-			-2em -2em 0 -1em;
-	}
-	25% {
-		box-shadow:
-			0 -3em 0 -0.5em,
-			2em -2em 0 0,
-			3em 0 0 0.2em,
-			2em 2em 0 0,
-			0 3em 0 -1em,
-			-2em 2em 0 -1em,
-			-3em 0 0 -1em,
-			-2em -2em 0 -1em;
-	}
-	37.5% {
-		box-shadow:
-			0 -3em 0 -1em,
-			2em -2em 0 -1em,
-			3em 0em 0 0,
-			2em 2em 0 0.2em,
-			0 3em 0 0em,
-			-2em 2em 0 -1em,
-			-3em 0em 0 -1em,
-			-2em -2em 0 -1em;
-	}
-	50% {
-		box-shadow:
-			0 -3em 0 -1em,
-			2em -2em 0 -1em,
-			3em 0 0 -1em,
-			2em 2em 0 0em,
-			0 3em 0 0.2em,
-			-2em 2em 0 0,
-			-3em 0em 0 -1em,
-			-2em -2em 0 -1em;
-	}
-	62.5% {
-		box-shadow:
-			0 -3em 0 -1em,
-			2em -2em 0 -1em,
-			3em 0 0 -1em,
-			2em 2em 0 -1em,
-			0 3em 0 0,
-			-2em 2em 0 0.2em,
-			-3em 0 0 0,
-			-2em -2em 0 -1em;
-	}
-	75% {
-		box-shadow:
-			0em -3em 0 -1em,
-			2em -2em 0 -1em,
-			3em 0em 0 -1em,
-			2em 2em 0 -1em,
-			0 3em 0 -1em,
-			-2em 2em 0 0,
-			-3em 0em 0 0.2em,
-			-2em -2em 0 0;
-	}
-	87.5% {
-		box-shadow:
-			0em -3em 0 0,
-			2em -2em 0 -1em,
-			3em 0 0 -1em,
-			2em 2em 0 -1em,
-			0 3em 0 -1em,
-			-2em 2em 0 0,
-			-3em 0em 0 0,
-			-2em -2em 0 0.2em;
-	}
+  0%,
+  100% {
+    box-shadow: 0 -3em 0 0.2em,
+    2em -2em 0 0em, 3em 0 0 -1em,
+    2em 2em 0 -1em, 0 3em 0 -1em,
+    -2em 2em 0 -1em, -3em 0 0 -1em,
+    -2em -2em 0 0;
+  }
+  12.5% {
+    box-shadow: 0 -3em 0 0, 2em -2em 0 0.2em,
+    3em 0 0 0, 2em 2em 0 -1em, 0 3em 0 -1em,
+    -2em 2em 0 -1em, -3em 0 0 -1em,
+    -2em -2em 0 -1em;
+  }
+  25% {
+    box-shadow: 0 -3em 0 -0.5em,
+    2em -2em 0 0, 3em 0 0 0.2em,
+    2em 2em 0 0, 0 3em 0 -1em,
+    -2em 2em 0 -1em, -3em 0 0 -1em,
+    -2em -2em 0 -1em;
+  }
+  37.5% {
+    box-shadow: 0 -3em 0 -1em, 2em -2em 0 -1em,
+    3em 0em 0 0, 2em 2em 0 0.2em, 0 3em 0 0em,
+    -2em 2em 0 -1em, -3em 0em 0 -1em, -2em -2em 0 -1em;
+  }
+  50% {
+    box-shadow: 0 -3em 0 -1em, 2em -2em 0 -1em,
+    3em 0 0 -1em, 2em 2em 0 0em, 0 3em 0 0.2em,
+    -2em 2em 0 0, -3em 0em 0 -1em, -2em -2em 0 -1em;
+  }
+  62.5% {
+    box-shadow: 0 -3em 0 -1em, 2em -2em 0 -1em,
+    3em 0 0 -1em, 2em 2em 0 -1em, 0 3em 0 0,
+    -2em 2em 0 0.2em, -3em 0 0 0, -2em -2em 0 -1em;
+  }
+  75% {
+    box-shadow: 0em -3em 0 -1em, 2em -2em 0 -1em,
+    3em 0em 0 -1em, 2em 2em 0 -1em, 0 3em 0 -1em,
+    -2em 2em 0 0, -3em 0em 0 0.2em, -2em -2em 0 0;
+  }
+  87.5% {
+    box-shadow: 0em -3em 0 0, 2em -2em 0 -1em,
+    3em 0 0 -1em, 2em 2em 0 -1em, 0 3em 0 -1em,
+    -2em 2em 0 0, -3em 0em 0 0, -2em -2em 0 0.2em;
+  }
 }
 
 /* LikeButton */
 .like-button {
-	outline-offset: 2px;
-	position: relative;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	width: 2.5rem;
-	height: 2.5rem;
-	cursor: pointer;
-	border-radius: 9999px;
-	border: none;
-	outline: none 2px;
-	color: #5e687e;
-	background: none;
+  outline-offset: 2px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  cursor: pointer;
+  border-radius: 9999px;
+  border: none;
+  outline: none 2px;
+  color: #5e687e;
+  background: none;
 }
 
 .like-button:focus {
-	color: #a6423a;
-	background-color: rgba(166, 66, 58, 0.05);
+  color: #a6423a;
+  background-color: rgba(166, 66, 58, .05);
 }
 
 .like-button:active {
-	color: #a6423a;
-	background-color: rgba(166, 66, 58, 0.05);
-	transform: scaleX(0.95) scaleY(0.95);
+  color: #a6423a;
+  background-color: rgba(166, 66, 58, .05);
+  transform: scaleX(0.95) scaleY(0.95);
 }
 
 .like-button:hover {
-	background-color: #f6f7f9;
+  background-color: #f6f7f9;
 }
 
 .like-button.liked {
-	color: #a6423a;
+  color: #a6423a;
 }
 
 /* Icons */
 @keyframes circle {
-	0% {
-		transform: scale(0);
-		stroke-width: 16px;
-	}
+  0% {
+    transform: scale(0);
+    stroke-width: 16px;
+  }
 
-	50% {
-		transform: scale(0.5);
-		stroke-width: 16px;
-	}
+  50% {
+    transform: scale(.5);
+    stroke-width: 16px;
+  }
 
-	to {
-		transform: scale(1);
-		stroke-width: 0;
-	}
+  to {
+    transform: scale(1);
+    stroke-width: 0;
+  }
 }
 
 .circle {
-	color: rgba(166, 66, 58, 0.5);
-	transform-origin: center;
-	transition-property: all;
-	transition-duration: 0.15s;
-	transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  color: rgba(166, 66, 58, .5);
+  transform-origin: center;
+  transition-property: all;
+  transition-duration: .15s;
+  transition-timing-function: cubic-bezier(.4,0,.2,1);
 }
 
 .circle.liked.animate {
-	animation: circle 0.3s forwards;
+  animation: circle .3s forwards;
 }
 
 .heart {
-	width: 1.5rem;
-	height: 1.5rem;
+  width: 1.5rem;
+  height: 1.5rem;
 }
 
 .heart.liked {
-	transform-origin: center;
-	transition-property: all;
-	transition-duration: 0.15s;
-	transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: center;
+  transition-property: all;
+  transition-duration: .15s;
+  transition-timing-function: cubic-bezier(.4, 0, .2, 1);
 }
 
 .heart.liked.animate {
-	animation: scale 0.35s ease-in-out forwards;
+  animation: scale .35s ease-in-out forwards;
 }
 
 .control-icon {
-	color: hsla(0, 0%, 100%, 0.5);
-	filter: drop-shadow(0 20px 13px rgba(0, 0, 0, 0.03)) drop-shadow(0 8px 5px rgba(0, 0, 0, 0.08));
+  color: hsla(0, 0%, 100%, .5);
+  filter:  drop-shadow(0 20px 13px rgba(0, 0, 0, .03)) drop-shadow(0 8px 5px rgba(0, 0, 0, .08));
 }
 
 .chevron-left {
-	margin-top: 2px;
-	rotate: 90deg;
+  margin-top: 2px;
+  rotate: 90deg;
 }
+
 
 /* Video */
 .thumbnail {
-	position: relative;
-	aspect-ratio: 16 / 9;
-	display: flex;
-	overflow: hidden;
-	flex-direction: column;
-	justify-content: center;
-	align-items: center;
-	border-radius: 0.5rem;
-	outline-offset: 2px;
-	width: 8rem;
-	vertical-align: middle;
-	background-color: #ffffff;
-	background-size: cover;
-	user-select: none;
+  position: relative;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  overflow: hidden;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  border-radius: 0.5rem;
+  outline-offset: 2px;
+  width: 8rem;
+  vertical-align: middle;
+  background-color: #ffffff;
+  background-size: cover;
+  user-select: none;
 }
 
 .thumbnail.blue {
-	background-image: conic-gradient(at top right, #c76a15, #087ea4, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #087ea4, #2b3491);
 }
 
 .thumbnail.red {
-	background-image: conic-gradient(at top right, #c76a15, #a6423a, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #a6423a, #2b3491);
 }
 
 .thumbnail.green {
-	background-image: conic-gradient(at top right, #c76a15, #388f7f, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #388f7f, #2b3491);
 }
 
 .thumbnail.purple {
-	background-image: conic-gradient(at top right, #c76a15, #575fb7, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #575fb7, #2b3491);
 }
 
 .thumbnail.yellow {
-	background-image: conic-gradient(at top right, #c76a15, #fabd62, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #FABD62, #2b3491);
 }
 
 .thumbnail.gray {
-	background-image: conic-gradient(at top right, #c76a15, #4e5769, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #4E5769, #2b3491);
 }
 
 .video {
-	display: flex;
-	flex-direction: row;
-	gap: 0.75rem;
-	align-items: center;
+  display: flex;
+  flex-direction: row;
+  gap: 0.75rem;
+  align-items: center;
 }
 
 .video .link {
-	display: flex;
-	flex-direction: row;
-	flex: 1 1 0;
-	gap: 0.125rem;
-	outline-offset: 4px;
-	cursor: pointer;
+  display: flex;
+  flex-direction: row;
+  flex: 1 1 0;
+  gap: 0.125rem;
+  outline-offset: 4px;
+  cursor: pointer;
 }
 
 .video .info {
-	display: flex;
-	flex-direction: column;
-	justify-content: center;
-	margin-left: 8px;
-	gap: 0.125rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  margin-left: 8px;
+  gap: 0.125rem;
 }
 
 .video .info:hover {
-	text-decoration: underline;
+  text-decoration: underline;
 }
 
 .video-title {
-	font-size: 15px;
-	line-height: 1.25;
-	font-weight: 700;
-	color: #23272f;
+  font-size: 15px;
+  line-height: 1.25;
+  font-weight: 700;
+  color: #23272f;
 }
 
 .video-description {
-	color: #5e687e;
-	font-size: 13px;
+  color: #5e687e;
+  font-size: 13px;
 }
 
 /* Details */
 .details .thumbnail {
-	position: relative;
-	aspect-ratio: 16 / 9;
-	display: flex;
-	overflow: hidden;
-	flex-direction: column;
-	justify-content: center;
-	align-items: center;
-	border-radius: 0.5rem;
-	outline-offset: 2px;
-	width: 100%;
-	vertical-align: middle;
-	background-color: #ffffff;
-	background-size: cover;
-	user-select: none;
+  position: relative;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  overflow: hidden;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  border-radius: 0.5rem;
+  outline-offset: 2px;
+  width: 100%;
+  vertical-align: middle;
+  background-color: #ffffff;
+  background-size: cover;
+  user-select: none;
 }
 
 .video-details-title {
-	margin-top: 8px;
+  margin-top: 8px;
 }
 
 .video-details-speaker {
-	display: flex;
-	gap: 8px;
-	margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  margin-top: 10px
 }
 
 .back {
-	display: flex;
-	align-items: center;
-	margin-left: -5px;
-	cursor: pointer;
+  display: flex;
+  align-items: center;
+  margin-left: -5px;
+  cursor: pointer;
 }
 
 .back:hover {
-	text-decoration: underline;
+  text-decoration: underline;
 }
 
 .info-title {
-	font-size: 1.5rem;
-	font-weight: 700;
-	line-height: 1.25;
-	margin: 8px 0 0 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.25;
+  margin: 8px 0 0 0 ;
 }
 
 .info-description {
-	margin: 8px 0 0 0;
+  margin: 8px 0 0 0;
 }
 
 .controls {
-	cursor: pointer;
+  cursor: pointer;
 }
 
 .fallback {
-	background: #f6f7f8 linear-gradient(to right, #e6e6e6 5%, #cccccc 25%, #e6e6e6 35%) no-repeat;
-	background-size: 800px 104px;
-	display: block;
-	line-height: 1.25;
-	margin: 8px 0 0 0;
-	border-radius: 5px;
-	overflow: hidden;
+  background: #f6f7f8 linear-gradient(to right, #e6e6e6 5%, #cccccc 25%, #e6e6e6 35%) no-repeat;
+  background-size: 800px 104px;
+  display: block;
+  line-height: 1.25;
+  margin: 8px 0 0 0;
+  border-radius: 5px;
+  overflow: hidden;
 
-	animation: 1s linear 1s infinite shimmer;
-	animation-delay: 300ms;
-	animation-duration: 1s;
-	animation-fill-mode: forwards;
-	animation-iteration-count: infinite;
-	animation-name: shimmer;
-	animation-timing-function: linear;
+  animation: 1s linear 1s infinite shimmer;
+  animation-delay: 300ms;
+  animation-duration: 1s;
+  animation-fill-mode: forwards;
+  animation-iteration-count: infinite;
+  animation-name: shimmer;
+  animation-timing-function: linear;
 }
 
+
 .fallback.title {
-	width: 130px;
-	height: 30px;
+  width: 130px;
+  height: 30px;
+
 }
 
 .fallback.description {
-	width: 150px;
-	height: 21px;
+  width: 150px;
+  height: 21px;
 }
 
 @keyframes shimmer {
-	0% {
-		background-position: -468px 0;
-	}
+  0% {
+    background-position: -468px 0;
+  }
 
-	100% {
-		background-position: 468px 0;
-	}
+  100% {
+    background-position: 468px 0;
+  }
 }
 
 .search {
-	margin-bottom: 10px;
+  margin-bottom: 10px;
 }
 .search-input {
-	width: 100%;
-	position: relative;
+  width: 100%;
+  position: relative;
 }
 
 .search-icon {
-	position: absolute;
-	top: 0;
-	bottom: 0;
-	inset-inline-start: 0;
-	display: flex;
-	align-items: center;
-	padding-inline-start: 1rem;
-	pointer-events: none;
-	color: #99a1b3;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  inset-inline-start: 0;
+  display: flex;
+  align-items: center;
+  padding-inline-start: 1rem;
+  pointer-events: none;
+  color: #99a1b3;
 }
 
 .search-input input {
-	display: flex;
-	padding-inline-start: 2.75rem;
-	padding-top: 10px;
-	padding-bottom: 10px;
-	width: 100%;
-	text-align: start;
-	background-color: rgb(235 236 240);
-	outline: 2px solid transparent;
-	cursor: pointer;
-	border: none;
-	align-items: center;
-	color: rgb(35 39 47);
-	border-radius: 9999px;
-	vertical-align: middle;
-	font-size: 15px;
+  display: flex;
+  padding-inline-start: 2.75rem;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  width: 100%;
+  text-align: start;
+  background-color: rgb(235 236 240);
+  outline: 2px solid transparent;
+  cursor: pointer;
+  border: none;
+  align-items: center;
+  color: rgb(35 39 47);
+  border-radius: 9999px;
+  vertical-align: middle;
+  font-size: 15px;
 }
 
-.search-input input:hover,
-.search-input input:active {
-	background-color: rgb(235 236 240/ 0.8);
-	color: rgb(35 39 47/ 0.8);
+.search-input input:hover, .search-input input:active {
+  background-color: rgb(235 236 240/ 0.8);
+  color: rgb(35 39 47/ 0.8);
 }
 
 /* Home */
 .video-list {
-	position: relative;
+  position: relative;
 }
 
 .video-list .videos {
-	display: flex;
-	flex-direction: column;
-	gap: 1rem;
-	overflow-y: auto;
-	height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  overflow-y: auto;
+  height: 100%;
 }
 ```
+
 
 ```css src/animations.css
 /* Animations for view transition classed added by transition type */
 ::view-transition-old(.slide-forward) {
-	/* when sliding forward, the "old" page should slide out to left. */
-	animation:
-		150ms cubic-bezier(0.4, 0, 1, 1) both fade-out,
-		400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-to-left;
+    /* when sliding forward, the "old" page should slide out to left. */
+    animation: 150ms cubic-bezier(0.4, 0, 1, 1) both fade-out,
+    400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-to-left;
 }
 
 ::view-transition-new(.slide-forward) {
-	/* when sliding forward, the "new" page should slide in from right. */
-	animation:
-		210ms cubic-bezier(0, 0, 0.2, 1) 150ms both fade-in,
-		400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-from-right;
+    /* when sliding forward, the "new" page should slide in from right. */
+    animation: 210ms cubic-bezier(0, 0, 0.2, 1) 150ms both fade-in,
+    400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-from-right;
 }
 
 ::view-transition-old(.slide-back) {
-	/* when sliding back, the "old" page should slide out to right. */
-	animation:
-		150ms cubic-bezier(0.4, 0, 1, 1) both fade-out,
-		400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-to-right;
+    /* when sliding back, the "old" page should slide out to right. */
+    animation: 150ms cubic-bezier(0.4, 0, 1, 1) both fade-out,
+    400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-to-right;
 }
 
 ::view-transition-new(.slide-back) {
-	/* when sliding back, the "new" page should slide in from left. */
-	animation:
-		210ms cubic-bezier(0, 0, 0.2, 1) 150ms both fade-in,
-		400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-from-left;
+    /* when sliding back, the "new" page should slide in from left. */
+    animation: 210ms cubic-bezier(0, 0, 0.2, 1) 150ms both fade-in,
+    400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-from-left;
 }
 
 /* New keyframes to support our animations above. */
 @keyframes fade-in {
-	from {
-		opacity: 0;
-	}
+    from {
+        opacity: 0;
+    }
 }
 
 @keyframes fade-out {
-	to {
-		opacity: 0;
-	}
+    to {
+        opacity: 0;
+    }
 }
 
 @keyframes slide-to-right {
-	to {
-		transform: translateX(50px);
-	}
+    to {
+        transform: translateX(50px);
+    }
 }
 
 @keyframes slide-from-right {
-	from {
-		transform: translateX(50px);
-	}
-	to {
-		transform: translateX(0);
-	}
+    from {
+        transform: translateX(50px);
+    }
+    to {
+        transform: translateX(0);
+    }
 }
 
 @keyframes slide-to-left {
-	to {
-		transform: translateX(-50px);
-	}
+    to {
+        transform: translateX(-50px);
+    }
 }
 
 @keyframes slide-from-left {
-	from {
-		transform: translateX(-50px);
-	}
-	to {
-		transform: translateX(0);
-	}
+    from {
+        transform: translateX(-50px);
+    }
+    to {
+        transform: translateX(0);
+    }
 }
 
 /* Previously defined animations. */
 
 /* Default .slow-fade. */
 ::view-transition-old(.slow-fade) {
-	animation-duration: 500ms;
+    animation-duration: 500ms;
 }
 
 ::view-transition-new(.slow-fade) {
-	animation-duration: 500ms;
+    animation-duration: 500ms;
 }
 ```
 
 ```js src/index.js hidden
-import React, { StrictMode } from "react";
-import { createRoot } from "react-dom/client";
+import React, {StrictMode} from 'react';
+import {createRoot} from 'react-dom/client';
+import './styles.css';
+import './animations.css';
 
-import "./styles.css";
-import "./animations.css";
+import App from './App';
+import {Router} from './router';
 
-import App from "./App";
-import { Router } from "./router";
-
-const root = createRoot(document.getElementById("root"));
+const root = createRoot(document.getElementById('root'));
 root.render(
-	<StrictMode>
-		<Router>
-			<App />
-		</Router>
-	</StrictMode>,
+  <StrictMode>
+    <Router>
+      <App />
+    </Router>
+  </StrictMode>
 );
 ```
 
 ```json package.json hidden
 {
-	"dependencies": {
-		"react": "experimental",
-		"react-dom": "experimental",
-		"react-scripts": "latest"
-	},
-	"scripts": {
-		"start": "react-scripts start",
-		"build": "react-scripts build",
-		"test": "react-scripts test --env=jsdom",
-		"eject": "react-scripts eject"
-	}
+  "dependencies": {
+    "react": "canary",
+    "react-dom": "canary",
+    "react-scripts": "latest"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test --env=jsdom",
+    "eject": "react-scripts eject"
+  }
 }
 ```
 
 </Sandpack>
 
-### Animating Suspense Boundaries {/_animating-suspense-boundaries_/}
+### Animating Suspense Boundaries {/*animating-suspense-boundaries*/}
 
 Suspense will also activate View Transitions.
 
@@ -6467,9 +6218,9 @@ To animate the fallback to content, we can wrap `Suspense` with `<ViewTranstion>
 
 ```js
 <ViewTransition>
-	<Suspense fallback={<VideoInfoFallback />}>
-		<VideoInfo />
-	</Suspense>
+  <Suspense fallback={<VideoInfoFallback />}>
+    <VideoInfo />
+  </Suspense>
 </ViewTransition>
 ```
 
@@ -6478,453 +6229,442 @@ By adding this, the fallback will cross-fade into the content. Click a video and
 <Sandpack>
 
 ```js src/App.js hidden
-import { unstable_ViewTransition as ViewTransition } from "react";
-
+import { ViewTransition } from "react";
 import Details from "./Details";
 import Home from "./Home";
 import { useRouter } from "./router";
 
 export default function App() {
-	const { url } = useRouter();
+  const { url } = useRouter();
 
-	// Default slow-fade animation.
-	return (
-		<ViewTransition default="slow-fade">
-			{url === "/" ?
-				<Home />
-			:	<Details />}
-		</ViewTransition>
-	);
+  // Default slow-fade animation.
+  return (
+    <ViewTransition default="slow-fade">
+      {url === "/" ? <Home /> : <Details />}
+    </ViewTransition>
+  );
 }
 ```
 
 ```js src/Details.js active
-import { Suspense, use, unstable_ViewTransition as ViewTransition } from "react";
-
-import { fetchVideo, fetchVideoDetails } from "./data";
-import { ChevronLeft } from "./Icons";
-import Layout from "./Layout";
-import { useRouter } from "./router";
-import { Thumbnail, VideoControls } from "./Videos";
+import { use, Suspense, ViewTransition } from "react"; import { fetchVideo, fetchVideoDetails } from "./data"; import { Thumbnail, VideoControls } from "./Videos"; import { useRouter } from "./router"; import Layout from "./Layout"; import { ChevronLeft } from "./Icons";
 
 function VideoDetails({ id }) {
-	// Cross-fade the fallback to content.
-	return (
-		<ViewTransition default="slow-fade">
-			<Suspense fallback={<VideoInfoFallback />}>
-				<VideoInfo id={id} />
-			</Suspense>
-		</ViewTransition>
-	);
+  // Cross-fade the fallback to content.
+  return (
+    <ViewTransition default="slow-fade">
+      <Suspense fallback={<VideoInfoFallback />}>
+          <VideoInfo id={id} />
+      </Suspense>
+    </ViewTransition>
+  );
 }
 
 function VideoInfoFallback() {
-	return (
-		<div>
-			<div className="fit fallback title"></div>
-			<div className="fit fallback description"></div>
-		</div>
-	);
+  return (
+    <div>
+      <div className="fit fallback title"></div>
+      <div className="fit fallback description"></div>
+    </div>
+  );
 }
 
 export default function Details() {
-	const { url, navigateBack } = useRouter();
-	const videoId = url.split("/").pop();
-	const video = use(fetchVideo(videoId));
+  const { url, navigateBack } = useRouter();
+  const videoId = url.split("/").pop();
+  const video = use(fetchVideo(videoId));
 
-	return (
-		<Layout
-			heading={
-				<div
-					className="fit back"
-					onClick={() => {
-						navigateBack("/");
-					}}
-				>
-					<ChevronLeft /> Back
-				</div>
-			}
-		>
-			<div className="details">
-				<Thumbnail video={video} large>
-					<VideoControls />
-				</Thumbnail>
-				<VideoDetails id={video.id} />
-			</div>
-		</Layout>
-	);
+  return (
+    <Layout
+      heading={
+        <div
+          className="fit back"
+          onClick={() => {
+            navigateBack("/");
+          }}
+        >
+          <ChevronLeft /> Back
+        </div>
+      }
+    >
+      <div className="details">
+        <Thumbnail video={video} large>
+          <VideoControls />
+        </Thumbnail>
+        <VideoDetails id={video.id} />
+      </div>
+    </Layout>
+  );
 }
 
 function VideoInfo({ id }) {
-	const details = use(fetchVideoDetails(id));
-	return (
-		<div>
-			<p className="fit info-title">{details.title}</p>
-			<p className="fit info-description">{details.description}</p>
-		</div>
-	);
+  const details = use(fetchVideoDetails(id));
+  return (
+    <div>
+      <p className="fit info-title">{details.title}</p>
+      <p className="fit info-description">{details.description}</p>
+    </div>
+  );
 }
 ```
 
 ```js src/Home.js hidden
-import { use, useId, useState } from "react";
-
-import { fetchVideos } from "./data";
-import { IconSearch } from "./Icons";
-import Layout from "./Layout";
 import { Video } from "./Videos";
+import Layout from "./Layout";
+import { fetchVideos } from "./data";
+import { useId, useState, use } from "react";
+import { IconSearch } from "./Icons";
 
 function SearchInput({ value, onChange }) {
-	const id = useId();
-	return (
-		<form className="search" onSubmit={(e) => e.preventDefault()}>
-			<label htmlFor={id} className="sr-only">
-				Search
-			</label>
-			<div className="search-input">
-				<div className="search-icon">
-					<IconSearch />
-				</div>
-				<input
-					type="text"
-					id={id}
-					placeholder="Search"
-					value={value}
-					onChange={(e) => onChange(e.target.value)}
-				/>
-			</div>
-		</form>
-	);
+  const id = useId();
+  return (
+    <form className="search" onSubmit={(e) => e.preventDefault()}>
+      <label htmlFor={id} className="sr-only">
+        Search
+      </label>
+      <div className="search-input">
+        <div className="search-icon">
+          <IconSearch />
+        </div>
+        <input
+          type="text"
+          id={id}
+          placeholder="Search"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      </div>
+    </form>
+  );
 }
 
 function filterVideos(videos, query) {
-	const keywords = query
-		.toLowerCase()
-		.split(" ")
-		.filter((s) => s !== "");
-	if (keywords.length === 0) {
-		return videos;
-	}
-	return videos.filter((video) => {
-		const words = (video.title + " " + video.description).toLowerCase().split(" ");
-		return keywords.every((kw) => words.some((w) => w.includes(kw)));
-	});
+  const keywords = query
+    .toLowerCase()
+    .split(" ")
+    .filter((s) => s !== "");
+  if (keywords.length === 0) {
+    return videos;
+  }
+  return videos.filter((video) => {
+    const words = (video.title + " " + video.description)
+      .toLowerCase()
+      .split(" ");
+    return keywords.every((kw) => words.some((w) => w.includes(kw)));
+  });
 }
 
 export default function Home() {
-	const videos = use(fetchVideos());
-	const count = videos.length;
-	const [searchText, setSearchText] = useState("");
-	const foundVideos = filterVideos(videos, searchText);
-	return (
-		<Layout heading={<div className="fit">{count} Videos</div>}>
-			<SearchInput value={searchText} onChange={setSearchText} />
-			<div className="video-list">
-				{foundVideos.length === 0 && <div className="no-results">No results</div>}
-				<div className="videos">
-					{foundVideos.map((video) => (
-						<Video key={video.id} video={video} />
-					))}
-				</div>
-			</div>
-		</Layout>
-	);
+  const videos = use(fetchVideos());
+  const count = videos.length;
+  const [searchText, setSearchText] = useState("");
+  const foundVideos = filterVideos(videos, searchText);
+  return (
+    <Layout heading={<div className="fit">{count} Videos</div>}>
+      <SearchInput value={searchText} onChange={setSearchText} />
+      <div className="video-list">
+        {foundVideos.length === 0 && (
+          <div className="no-results">No results</div>
+        )}
+        <div className="videos">
+          {foundVideos.map((video) => (
+            <Video key={video.id} video={video} />
+          ))}
+        </div>
+      </div>
+    </Layout>
+  );
 }
+
 ```
 
 ```js src/Icons.js hidden
 export function ChevronLeft() {
-	return (
-		<svg
-			className="chevron-left"
-			xmlns="http://www.w3.org/2000/svg"
-			width="20"
-			height="20"
-			viewBox="0 0 20 20"
-		>
-			<g fill="none" fillRule="evenodd" transform="translate(-446 -398)">
-				<path
-					fill="currentColor"
-					fillRule="nonzero"
-					d="M95.8838835,240.366117 C95.3957281,239.877961 94.6042719,239.877961 94.1161165,240.366117 C93.6279612,240.854272 93.6279612,241.645728 94.1161165,242.133883 L98.6161165,246.633883 C99.1042719,247.122039 99.8957281,247.122039 100.383883,246.633883 L104.883883,242.133883 C105.372039,241.645728 105.372039,240.854272 104.883883,240.366117 C104.395728,239.877961 103.604272,239.877961 103.116117,240.366117 L99.5,243.982233 L95.8838835,240.366117 Z"
-					transform="translate(356.5 164.5)"
-				/>
-				<polygon points="446 418 466 418 466 398 446 398" />
-			</g>
-		</svg>
-	);
+  return (
+    <svg
+      className="chevron-left"
+      xmlns="http://www.w3.org/2000/svg"
+      width="20"
+      height="20"
+      viewBox="0 0 20 20">
+      <g fill="none" fillRule="evenodd" transform="translate(-446 -398)">
+        <path
+          fill="currentColor"
+          fillRule="nonzero"
+          d="M95.8838835,240.366117 C95.3957281,239.877961 94.6042719,239.877961 94.1161165,240.366117 C93.6279612,240.854272 93.6279612,241.645728 94.1161165,242.133883 L98.6161165,246.633883 C99.1042719,247.122039 99.8957281,247.122039 100.383883,246.633883 L104.883883,242.133883 C105.372039,241.645728 105.372039,240.854272 104.883883,240.366117 C104.395728,239.877961 103.604272,239.877961 103.116117,240.366117 L99.5,243.982233 L95.8838835,240.366117 Z"
+          transform="translate(356.5 164.5)"
+        />
+        <polygon points="446 418 466 418 466 398 446 398" />
+      </g>
+    </svg>
+  );
 }
 
 export function PauseIcon() {
-	return (
-		<svg
-			className="control-icon"
-			style={{ padding: "4px" }}
-			width="100"
-			height="100"
-			viewBox="0 0 512 512"
-			fill="none"
-			xmlns="http://www.w3.org/2000/svg"
-		>
-			<path
-				fillRule="evenodd"
-				clipRule="evenodd"
-				d="M256 0C114.617 0 0 114.615 0 256s114.617 256 256 256 256-114.615 256-256S397.383 0 256 0zm-32 320c0 8.836-7.164 16-16 16h-32c-8.836 0-16-7.164-16-16V192c0-8.836 7.164-16 16-16h32c8.836 0 16 7.164 16 16v128zm128 0c0 8.836-7.164 16-16 16h-32c-8.836 0-16-7.164-16-16V192c0-8.836 7.164-16 16-16h32c8.836 0 16 7.164 16 16v128z"
-				fill="currentColor"
-			/>
-		</svg>
-	);
+  return (
+    <svg
+      className="control-icon"
+      style={{padding: '4px'}}
+      width="100"
+      height="100"
+      viewBox="0 0 512 512"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg">
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M256 0C114.617 0 0 114.615 0 256s114.617 256 256 256 256-114.615 256-256S397.383 0 256 0zm-32 320c0 8.836-7.164 16-16 16h-32c-8.836 0-16-7.164-16-16V192c0-8.836 7.164-16 16-16h32c8.836 0 16 7.164 16 16v128zm128 0c0 8.836-7.164 16-16 16h-32c-8.836 0-16-7.164-16-16V192c0-8.836 7.164-16 16-16h32c8.836 0 16 7.164 16 16v128z"
+        fill="currentColor"
+      />
+    </svg>
+  );
 }
 
 export function PlayIcon() {
-	return (
-		<svg
-			className="control-icon"
-			width="100"
-			height="100"
-			viewBox="0 0 72 72"
-			fill="none"
-			xmlns="http://www.w3.org/2000/svg"
-		>
-			<path
-				fillRule="evenodd"
-				clipRule="evenodd"
-				d="M36 69C54.2254 69 69 54.2254 69 36C69 17.7746 54.2254 3 36 3C17.7746 3 3 17.7746 3 36C3 54.2254 17.7746 69 36 69ZM52.1716 38.6337L28.4366 51.5801C26.4374 52.6705 24 51.2235 24 48.9464V23.0536C24 20.7764 26.4374 19.3295 28.4366 20.4199L52.1716 33.3663C54.2562 34.5034 54.2562 37.4966 52.1716 38.6337Z"
-				fill="currentColor"
-			/>
-		</svg>
-	);
+  return (
+    <svg
+      className="control-icon"
+      width="100"
+      height="100"
+      viewBox="0 0 72 72"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg">
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M36 69C54.2254 69 69 54.2254 69 36C69 17.7746 54.2254 3 36 3C17.7746 3 3 17.7746 3 36C3 54.2254 17.7746 69 36 69ZM52.1716 38.6337L28.4366 51.5801C26.4374 52.6705 24 51.2235 24 48.9464V23.0536C24 20.7764 26.4374 19.3295 28.4366 20.4199L52.1716 33.3663C54.2562 34.5034 54.2562 37.4966 52.1716 38.6337Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
 }
-export function Heart({ liked, animate }) {
-	return (
-		<>
-			<svg
-				className="absolute overflow-visible"
-				viewBox="0 0 24 24"
-				fill="none"
-				xmlns="http://www.w3.org/2000/svg"
-			>
-				<circle
-					className={`circle ${liked ? "liked" : ""} ${animate ? "animate" : ""}`}
-					cx="12"
-					cy="12"
-					r="11.5"
-					fill="transparent"
-					strokeWidth="0"
-					stroke="currentColor"
-				/>
-			</svg>
+export function Heart({liked, animate}) {
+  return (
+    <>
+      <svg
+        className="absolute overflow-visible"
+        viewBox="0 0 24 24"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg">
+        <circle
+          className={`circle ${liked ? 'liked' : ''} ${animate ? 'animate' : ''}`}
+          cx="12"
+          cy="12"
+          r="11.5"
+          fill="transparent"
+          strokeWidth="0"
+          stroke="currentColor"
+        />
+      </svg>
 
-			<svg
-				className={`heart ${liked ? "liked" : ""} ${animate ? "animate" : ""}`}
-				viewBox="0 0 24 24"
-				fill="none"
-				xmlns="http://www.w3.org/2000/svg"
-			>
-				{liked ?
-					<path
-						d="M12 23a.496.496 0 0 1-.26-.074C7.023 19.973 0 13.743 0 8.68c0-4.12 2.322-6.677 6.058-6.677 2.572 0 5.108 2.387 5.134 2.41l.808.771.808-.771C12.834 4.387 15.367 2 17.935 2 21.678 2 24 4.558 24 8.677c0 5.06-7.022 11.293-11.74 14.246a.496.496 0 0 1-.26.074V23z"
-						fill="currentColor"
-					/>
-				:	<path
-						fillRule="evenodd"
-						clipRule="evenodd"
-						d="m12 5.184-.808-.771-.004-.004C11.065 4.299 8.522 2.003 6 2.003c-3.736 0-6 2.558-6 6.677 0 4.47 5.471 9.848 10 13.079.602.43 1.187.82 1.74 1.167A.497.497 0 0 0 12 23v-.003c.09 0 .182-.026.26-.074C16.977 19.97 24 13.737 24 8.677 24 4.557 21.743 2 18 2c-2.569 0-5.166 2.387-5.192 2.413L12 5.184zm-.002 15.525c2.071-1.388 4.477-3.342 6.427-5.47C20.72 12.733 22 10.401 22 8.677c0-1.708-.466-2.855-1.087-3.55C20.316 4.459 19.392 4 18 4c-.726 0-1.63.364-2.5.9-.67.412-1.148.82-1.266.92-.03.025-.037.031-.019.014l-.013.013L12 7.949 9.832 5.88a10.08 10.08 0 0 0-1.33-.977C7.633 4.367 6.728 4.003 6 4.003c-1.388 0-2.312.459-2.91 1.128C2.466 5.826 2 6.974 2 8.68c0 1.726 1.28 4.058 3.575 6.563 1.948 2.127 4.352 4.078 6.423 5.466z"
-						fill="currentColor"
-					/>
-				}
-			</svg>
-		</>
-	);
+      <svg
+        className={`heart ${liked ? 'liked' : ''} ${animate ? 'animate' : ''}`}
+        viewBox="0 0 24 24"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg">
+        {liked ? (
+          <path
+            d="M12 23a.496.496 0 0 1-.26-.074C7.023 19.973 0 13.743 0 8.68c0-4.12 2.322-6.677 6.058-6.677 2.572 0 5.108 2.387 5.134 2.41l.808.771.808-.771C12.834 4.387 15.367 2 17.935 2 21.678 2 24 4.558 24 8.677c0 5.06-7.022 11.293-11.74 14.246a.496.496 0 0 1-.26.074V23z"
+            fill="currentColor"
+          />
+        ) : (
+          <path
+            fillRule="evenodd"
+            clipRule="evenodd"
+            d="m12 5.184-.808-.771-.004-.004C11.065 4.299 8.522 2.003 6 2.003c-3.736 0-6 2.558-6 6.677 0 4.47 5.471 9.848 10 13.079.602.43 1.187.82 1.74 1.167A.497.497 0 0 0 12 23v-.003c.09 0 .182-.026.26-.074C16.977 19.97 24 13.737 24 8.677 24 4.557 21.743 2 18 2c-2.569 0-5.166 2.387-5.192 2.413L12 5.184zm-.002 15.525c2.071-1.388 4.477-3.342 6.427-5.47C20.72 12.733 22 10.401 22 8.677c0-1.708-.466-2.855-1.087-3.55C20.316 4.459 19.392 4 18 4c-.726 0-1.63.364-2.5.9-.67.412-1.148.82-1.266.92-.03.025-.037.031-.019.014l-.013.013L12 7.949 9.832 5.88a10.08 10.08 0 0 0-1.33-.977C7.633 4.367 6.728 4.003 6 4.003c-1.388 0-2.312.459-2.91 1.128C2.466 5.826 2 6.974 2 8.68c0 1.726 1.28 4.058 3.575 6.563 1.948 2.127 4.352 4.078 6.423 5.466z"
+            fill="currentColor"
+          />
+        )}
+      </svg>
+    </>
+  );
 }
 
 export function IconSearch(props) {
-	return (
-		<svg width="1em" height="1em" viewBox="0 0 20 20">
-			<path
-				d="M14.386 14.386l4.0877 4.0877-4.0877-4.0877c-2.9418 2.9419-7.7115 2.9419-10.6533 0-2.9419-2.9418-2.9419-7.7115 0-10.6533 2.9418-2.9419 7.7115-2.9419 10.6533 0 2.9419 2.9418 2.9419 7.7115 0 10.6533z"
-				stroke="currentColor"
-				fill="none"
-				strokeWidth="2"
-				fillRule="evenodd"
-				strokeLinecap="round"
-				strokeLinejoin="round"
-			></path>
-		</svg>
-	);
+  return (
+    <svg width="1em" height="1em" viewBox="0 0 20 20">
+      <path
+        d="M14.386 14.386l4.0877 4.0877-4.0877-4.0877c-2.9418 2.9419-7.7115 2.9419-10.6533 0-2.9419-2.9418-2.9419-7.7115 0-10.6533 2.9418-2.9419 7.7115-2.9419 10.6533 0 2.9419 2.9418 2.9419 7.7115 0 10.6533z"
+        stroke="currentColor"
+        fill="none"
+        strokeWidth="2"
+        fillRule="evenodd"
+        strokeLinecap="round"
+        strokeLinejoin="round"></path>
+    </svg>
+  );
 }
 ```
 
 ```js src/Layout.js hidden
-import { unstable_ViewTransition as ViewTransition } from "react";
-
+import {ViewTransition} from 'react';
 import { useIsNavPending } from "./router";
 
 export default function Page({ heading, children }) {
-	const isPending = useIsNavPending();
-	return (
-		<div className="page">
-			<div className="top">
-				<div className="top-nav">
-					{/* Custom classes based on transition type. */}
-					<ViewTransition
-						name="nav"
-						share={{
-							"nav-forward": "slide-forward",
-							"nav-back": "slide-back",
-						}}
-					>
-						{heading}
-					</ViewTransition>
-					{isPending && <span className="loader"></span>}
-				</div>
-			</div>
-			{/* Opt-out of ViewTransition for the content. */}
-			{/* Content can define it's own ViewTransition. */}
-			<ViewTransition default="none">
-				<div className="bottom">
-					<div className="content">{children}</div>
-				</div>
-			</ViewTransition>
-		</div>
-	);
+  const isPending = useIsNavPending();
+  return (
+    <div className="page">
+      <div className="top">
+        <div className="top-nav">
+          {/* Custom classes based on transition type. */}
+          <ViewTransition
+            name="nav"
+            share={{
+              'nav-forward': 'slide-forward',
+              'nav-back': 'slide-back',
+            }}>
+            {heading}
+          </ViewTransition>
+          {isPending && <span className="loader"></span>}
+        </div>
+      </div>
+      {/* Opt-out of ViewTransition for the content. */}
+      {/* Content can define it's own ViewTransition. */}
+      <ViewTransition default="none">
+        <div className="bottom">
+          <div className="content">{children}</div>
+        </div>
+      </ViewTransition>
+    </div>
+  );
 }
 ```
 
 ```js src/LikeButton.js hidden
-import { useState } from "react";
-
-import { Heart } from "./Icons";
+import {useState} from 'react';
+import {Heart} from './Icons';
 
 // A hack since we don't actually have a backend.
 // Unlike local state, this survives videos being filtered.
 const likedVideos = new Set();
 
-export default function LikeButton({ video }) {
-	const [isLiked, setIsLiked] = useState(() => likedVideos.has(video.id));
-	const [animate, setAnimate] = useState(false);
-	return (
-		<button
-			className={`like-button ${isLiked && "liked"}`}
-			aria-label={isLiked ? "Unsave" : "Save"}
-			onClick={() => {
-				const nextIsLiked = !isLiked;
-				if (nextIsLiked) {
-					likedVideos.add(video.id);
-				} else {
-					likedVideos.delete(video.id);
-				}
-				setAnimate(true);
-				setIsLiked(nextIsLiked);
-			}}
-		>
-			<Heart liked={isLiked} animate={animate} />
-		</button>
-	);
+export default function LikeButton({video}) {
+  const [isLiked, setIsLiked] = useState(() => likedVideos.has(video.id));
+  const [animate, setAnimate] = useState(false);
+  return (
+    <button
+      className={`like-button ${isLiked && 'liked'}`}
+      aria-label={isLiked ? 'Unsave' : 'Save'}
+      onClick={() => {
+        const nextIsLiked = !isLiked;
+        if (nextIsLiked) {
+          likedVideos.add(video.id);
+        } else {
+          likedVideos.delete(video.id);
+        }
+        setAnimate(true);
+        setIsLiked(nextIsLiked);
+      }}>
+      <Heart liked={isLiked} animate={animate} />
+    </button>
+  );
 }
 ```
 
 ```js src/Videos.js hidden
-import { startTransition, useState, unstable_ViewTransition as ViewTransition } from "react";
-
-import { PauseIcon, PlayIcon } from "./Icons";
+import { useState, ViewTransition } from "react";
 import LikeButton from "./LikeButton";
 import { useRouter } from "./router";
+import { PauseIcon, PlayIcon } from "./Icons";
+import { startTransition } from "react";
 
 export function Thumbnail({ video, children }) {
-	// Add a name to animate with a shared element transition.
-	// This uses the default animation, no additional css needed.
-	return (
-		<ViewTransition name={`video-${video.id}`}>
-			<div aria-hidden="true" tabIndex={-1} className={`thumbnail ${video.image}`}>
-				{children}
-			</div>
-		</ViewTransition>
-	);
+  // Add a name to animate with a shared element transition.
+  // This uses the default animation, no additional css needed.
+  return (
+    <ViewTransition name={`video-${video.id}`}>
+      <div
+        aria-hidden="true"
+        tabIndex={-1}
+        className={`thumbnail ${video.image}`}
+      >
+        {children}
+      </div>
+    </ViewTransition>
+  );
 }
 
 export function VideoControls() {
-	const [isPlaying, setIsPlaying] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
 
-	return (
-		<span
-			className="controls"
-			onClick={() =>
-				startTransition(() => {
-					setIsPlaying((p) => !p);
-				})
-			}
-		>
-			{isPlaying ?
-				<PauseIcon />
-			:	<PlayIcon />}
-		</span>
-	);
+  return (
+    <span
+      className="controls"
+      onClick={() =>
+        startTransition(() => {
+          setIsPlaying((p) => !p);
+        })
+      }
+    >
+      {isPlaying ? <PauseIcon /> : <PlayIcon />}
+    </span>
+  );
 }
 
 export function Video({ video }) {
-	const { navigate } = useRouter();
+  const { navigate } = useRouter();
 
-	return (
-		<div className="video">
-			<div
-				className="link"
-				onClick={(e) => {
-					e.preventDefault();
-					navigate(`/video/${video.id}`);
-				}}
-			>
-				<Thumbnail video={video}></Thumbnail>
+  return (
+    <div className="video">
+      <div
+        className="link"
+        onClick={(e) => {
+          e.preventDefault();
+          navigate(`/video/${video.id}`);
+        }}
+      >
+        <Thumbnail video={video}></Thumbnail>
 
-				<div className="info">
-					<div className="video-title">{video.title}</div>
-					<div className="video-description">{video.description}</div>
-				</div>
-			</div>
-			<LikeButton video={video} />
-		</div>
-	);
+        <div className="info">
+          <div className="video-title">{video.title}</div>
+          <div className="video-description">{video.description}</div>
+        </div>
+      </div>
+      <LikeButton video={video} />
+    </div>
+  );
 }
 ```
 
+
 ```js src/data.js hidden
 const videos = [
-	{
-		id: "1",
-		title: "First video",
-		description: "Video description",
-		image: "blue",
-	},
-	{
-		id: "2",
-		title: "Second video",
-		description: "Video description",
-		image: "red",
-	},
-	{
-		id: "3",
-		title: "Third video",
-		description: "Video description",
-		image: "green",
-	},
-	{
-		id: "4",
-		title: "Fourth video",
-		description: "Video description",
-		image: "purple",
-	},
-	{
-		id: "5",
-		title: "Fifth video",
-		description: "Video description",
-		image: "yellow",
-	},
-	{
-		id: "6",
-		title: "Sixth video",
-		description: "Video description",
-		image: "gray",
-	},
+  {
+    id: '1',
+    title: 'First video',
+    description: 'Video description',
+    image: 'blue',
+  },
+  {
+    id: '2',
+    title: 'Second video',
+    description: 'Video description',
+    image: 'red',
+  },
+  {
+    id: '3',
+    title: 'Third video',
+    description: 'Video description',
+    image: 'green',
+  },
+  {
+    id: '4',
+    title: 'Fourth video',
+    description: 'Video description',
+    image: 'purple',
+  },
+  {
+    id: '5',
+    title: 'Fifth video',
+    description: 'Video description',
+    image: 'yellow',
+  },
+  {
+    id: '6',
+    title: 'Sixth video',
+    description: 'Video description',
+    image: 'gray',
+  },
 ];
 
 let videosCache = new Map();
@@ -6933,902 +6673,836 @@ let videoDetailsCache = new Map();
 const VIDEO_DELAY = 1;
 const VIDEO_DETAILS_DELAY = 1000;
 export function fetchVideos() {
-	if (videosCache.has(0)) {
-		return videosCache.get(0);
-	}
-	const promise = new Promise((resolve) => {
-		setTimeout(() => {
-			resolve(videos);
-		}, VIDEO_DELAY);
-	});
-	videosCache.set(0, promise);
-	return promise;
+  if (videosCache.has(0)) {
+    return videosCache.get(0);
+  }
+  const promise = new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(videos);
+    }, VIDEO_DELAY);
+  });
+  videosCache.set(0, promise);
+  return promise;
 }
 
 export function fetchVideo(id) {
-	if (videoCache.has(id)) {
-		return videoCache.get(id);
-	}
-	const promise = new Promise((resolve) => {
-		setTimeout(() => {
-			resolve(videos.find((video) => video.id === id));
-		}, VIDEO_DELAY);
-	});
-	videoCache.set(id, promise);
-	return promise;
+  if (videoCache.has(id)) {
+    return videoCache.get(id);
+  }
+  const promise = new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(videos.find((video) => video.id === id));
+    }, VIDEO_DELAY);
+  });
+  videoCache.set(id, promise);
+  return promise;
 }
 
 export function fetchVideoDetails(id) {
-	if (videoDetailsCache.has(id)) {
-		return videoDetailsCache.get(id);
-	}
-	const promise = new Promise((resolve) => {
-		setTimeout(() => {
-			resolve(videos.find((video) => video.id === id));
-		}, VIDEO_DETAILS_DELAY);
-	});
-	videoDetailsCache.set(id, promise);
-	return promise;
+  if (videoDetailsCache.has(id)) {
+    return videoDetailsCache.get(id);
+  }
+  const promise = new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(videos.find((video) => video.id === id));
+    }, VIDEO_DETAILS_DELAY);
+  });
+  videoDetailsCache.set(id, promise);
+  return promise;
 }
 ```
 
 ```js src/router.js hidden
-import {
-	unstable_addTransitionType as addTransitionType,
-	createContext,
-	use,
-	useEffect,
-	useLayoutEffect,
-	useState,
-	useTransition,
-} from "react";
+import {useState, createContext, use, useTransition, useLayoutEffect, useEffect, addTransitionType} from "react";
 
 export function Router({ children }) {
-	const [isPending, startTransition] = useTransition();
-	const [routerState, setRouterState] = useState({
-		pendingNav: () => {},
-		url: document.location.pathname,
-	});
-	function navigate(url) {
-		startTransition(() => {
-			// Transition type for the cause "nav forward"
-			addTransitionType("nav-forward");
-			go(url);
-		});
-	}
-	function navigateBack(url) {
-		startTransition(() => {
-			// Transition type for the cause "nav backward"
-			addTransitionType("nav-back");
-			go(url);
-		});
-	}
+  const [isPending, startTransition] = useTransition();
+  const [routerState, setRouterState] = useState({pendingNav: () => {}, url: document.location.pathname});
+  function navigate(url) {
+    startTransition(() => {
+      // Transition type for the cause "nav forward"
+      addTransitionType('nav-forward');
+      go(url);
+    });
+  }
+  function navigateBack(url) {
+    startTransition(() => {
+      // Transition type for the cause "nav backward"
+      addTransitionType('nav-back');
+      go(url);
+    });
+  }
 
-	function go(url) {
-		setRouterState({
-			url,
-			pendingNav() {
-				window.history.pushState({}, "", url);
-			},
-		});
-	}
+  function go(url) {
+    setRouterState({
+      url,
+      pendingNav() {
+        window.history.pushState({}, "", url);
+      },
+    });
+  }
 
-	useEffect(() => {
-		function handlePopState() {
-			// This should not animate because restoration has to be synchronous.
-			// Even though it's a transition.
-			startTransition(() => {
-				setRouterState({
-					url: document.location.pathname + document.location.search,
-					pendingNav() {
-						// Noop. URL has already updated.
-					},
-				});
-			});
-		}
-		window.addEventListener("popstate", handlePopState);
-		return () => {
-			window.removeEventListener("popstate", handlePopState);
-		};
-	}, []);
-	const pendingNav = routerState.pendingNav;
-	useLayoutEffect(() => {
-		pendingNav();
-	}, [pendingNav]);
+  useEffect(() => {
+    function handlePopState() {
+      // This should not animate because restoration has to be synchronous.
+      // Even though it's a transition.
+      startTransition(() => {
+        setRouterState({
+          url: document.location.pathname + document.location.search,
+          pendingNav() {
+            // Noop. URL has already updated.
+          },
+        });
+      });
+    }
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, []);
+  const pendingNav = routerState.pendingNav;
+  useLayoutEffect(() => {
+    pendingNav();
+  }, [pendingNav]);
 
-	return (
-		<RouterContext
-			value={{
-				url: routerState.url,
-				navigate,
-				navigateBack,
-				isPending,
-				params: {},
-			}}
-		>
-			{children}
-		</RouterContext>
-	);
+  return (
+    <RouterContext
+      value={{
+        url: routerState.url,
+        navigate,
+        navigateBack,
+        isPending,
+        params: {},
+      }}
+    >
+      {children}
+    </RouterContext>
+  );
 }
 
 const RouterContext = createContext({ url: "/", params: {} });
 
 export function useRouter() {
-	return use(RouterContext);
+  return use(RouterContext);
 }
 
 export function useIsNavPending() {
-	return use(RouterContext).isPending;
+  return use(RouterContext).isPending;
 }
+
 ```
 
 ```css src/styles.css hidden
 @font-face {
-	font-family: Optimistic Text;
-	src: url(https://react.dev/fonts/Optimistic_Text_W_Rg.woff2) format("woff2");
-	font-weight: 400;
-	font-style: normal;
-	font-display: swap;
+  font-family: Optimistic Text;
+  src: url(https://react.dev/fonts/Optimistic_Text_W_Rg.woff2) format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
-	font-family: Optimistic Text;
-	src: url(https://react.dev/fonts/Optimistic_Text_W_Md.woff2) format("woff2");
-	font-weight: 500;
-	font-style: normal;
-	font-display: swap;
+  font-family: Optimistic Text;
+  src: url(https://react.dev/fonts/Optimistic_Text_W_Md.woff2) format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
-	font-family: Optimistic Text;
-	src: url(https://react.dev/fonts/Optimistic_Text_W_Bd.woff2) format("woff2");
-	font-weight: 600;
-	font-style: normal;
-	font-display: swap;
+  font-family: Optimistic Text;
+  src: url(https://react.dev/fonts/Optimistic_Text_W_Bd.woff2) format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
-	font-family: Optimistic Text;
-	src: url(https://react.dev/fonts/Optimistic_Text_W_Bd.woff2) format("woff2");
-	font-weight: 700;
-	font-style: normal;
-	font-display: swap;
+  font-family: Optimistic Text;
+  src: url(https://react.dev/fonts/Optimistic_Text_W_Bd.woff2) format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
 }
 
 * {
-	box-sizing: border-box;
+  box-sizing: border-box;
 }
 
 html {
-	background-image: url(https://react.dev/images/meta-gradient-dark.png);
-	background-size: 100%;
-	background-position: -100%;
-	background-color: rgb(64 71 86);
-	background-repeat: no-repeat;
-	height: 100%;
-	width: 100%;
+  background-image: url(https://react.dev/images/meta-gradient-dark.png);
+  background-size: 100%;
+  background-position: -100%;
+  background-color: rgb(64 71 86);
+  background-repeat: no-repeat;
+  height: 100%;
+  width: 100%;
 }
 
 body {
-	font-family:
-		Optimistic Text,
-		-apple-system,
-		ui-sans-serif,
-		system-ui,
-		sans-serif,
-		Apple Color Emoji,
-		Segoe UI Emoji,
-		Segoe UI Symbol,
-		Noto Color Emoji;
-	padding: 10px 0 10px 0;
-	margin: 0;
-	display: flex;
-	justify-content: center;
+  font-family: Optimistic Text, -apple-system, ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji;
+  padding: 10px 0 10px 0;
+  margin: 0;
+  display: flex;
+  justify-content: center;
 }
 
 #root {
-	flex: 1 1;
-	height: auto;
-	background-color: #fff;
-	border-radius: 10px;
-	max-width: 450px;
-	min-height: 600px;
-	padding-bottom: 10px;
+  flex: 1 1;
+  height: auto;
+  background-color: #fff;
+  border-radius: 10px;
+  max-width: 450px;
+  min-height: 600px;
+  padding-bottom: 10px;
 }
 
 h1 {
-	margin-top: 0;
-	font-size: 22px;
+  margin-top: 0;
+  font-size: 22px;
 }
 
 h2 {
-	margin-top: 0;
-	font-size: 20px;
+  margin-top: 0;
+  font-size: 20px;
 }
 
 h3 {
-	margin-top: 0;
-	font-size: 18px;
+  margin-top: 0;
+  font-size: 18px;
 }
 
 h4 {
-	margin-top: 0;
-	font-size: 16px;
+  margin-top: 0;
+  font-size: 16px;
 }
 
 h5 {
-	margin-top: 0;
-	font-size: 14px;
+  margin-top: 0;
+  font-size: 14px;
 }
 
 h6 {
-	margin-top: 0;
-	font-size: 12px;
+  margin-top: 0;
+  font-size: 12px;
 }
 
 code {
-	font-size: 1.2em;
+  font-size: 1.2em;
 }
 
 ul {
-	padding-inline-start: 20px;
+  padding-inline-start: 20px;
 }
 
 .sr-only {
-	position: absolute;
-	width: 1px;
-	height: 1px;
-	padding: 0;
-	margin: -1px;
-	overflow: hidden;
-	clip: rect(0, 0, 0, 0);
-	white-space: nowrap;
-	border-width: 0;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }
 
 .absolute {
-	position: absolute;
+  position: absolute;
 }
 
 .overflow-visible {
-	overflow: visible;
+  overflow: visible;
 }
 
 .visible {
-	overflow: visible;
+  overflow: visible;
 }
 
 .fit {
-	width: fit-content;
+  width: fit-content;
 }
+
 
 /* Layout */
 .page {
-	display: flex;
-	flex-direction: column;
-	height: 100%;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .top-hero {
-	height: 200px;
-	display: flex;
-	justify-content: center;
-	align-items: center;
-	background-image: conic-gradient(
-		from 90deg at -10% 100%,
-		#2b303b 0deg,
-		#2b303b 90deg,
-		#16181d 1turn
-	);
+  height: 200px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-image: conic-gradient(
+      from 90deg at -10% 100%,
+      #2b303b 0deg,
+      #2b303b 90deg,
+      #16181d 1turn
+  );
 }
 
 .bottom {
-	flex: 1;
-	overflow: auto;
+  flex: 1;
+  overflow: auto;
 }
 
 .top-nav {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	margin-bottom: 0;
-	padding: 0 12px;
-	top: 0;
-	width: 100%;
-	height: 44px;
-	color: #23272f;
-	font-weight: 700;
-	font-size: 20px;
-	z-index: 100;
-	cursor: default;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0;
+  padding: 0 12px;
+  top: 0;
+  width: 100%;
+  height: 44px;
+  color: #23272f;
+  font-weight: 700;
+  font-size: 20px;
+  z-index: 100;
+  cursor: default;
 }
 
 .content {
-	padding: 0 12px;
-	margin-top: 4px;
+  padding: 0 12px;
+  margin-top: 4px;
 }
 
+
 .loader {
-	color: #23272f;
-	font-size: 3px;
-	width: 1em;
-	margin-right: 18px;
-	height: 1em;
-	border-radius: 50%;
-	position: relative;
-	text-indent: -9999em;
-	animation: loading-spinner 1.3s infinite linear;
-	animation-delay: 200ms;
-	transform: translateZ(0);
+  color: #23272f;
+  font-size: 3px;
+  width: 1em;
+  margin-right: 18px;
+  height: 1em;
+  border-radius: 50%;
+  position: relative;
+  text-indent: -9999em;
+  animation: loading-spinner 1.3s infinite linear;
+  animation-delay: 200ms;
+  transform: translateZ(0);
 }
 
 @keyframes loading-spinner {
-	0%,
-	100% {
-		box-shadow:
-			0 -3em 0 0.2em,
-			2em -2em 0 0em,
-			3em 0 0 -1em,
-			2em 2em 0 -1em,
-			0 3em 0 -1em,
-			-2em 2em 0 -1em,
-			-3em 0 0 -1em,
-			-2em -2em 0 0;
-	}
-	12.5% {
-		box-shadow:
-			0 -3em 0 0,
-			2em -2em 0 0.2em,
-			3em 0 0 0,
-			2em 2em 0 -1em,
-			0 3em 0 -1em,
-			-2em 2em 0 -1em,
-			-3em 0 0 -1em,
-			-2em -2em 0 -1em;
-	}
-	25% {
-		box-shadow:
-			0 -3em 0 -0.5em,
-			2em -2em 0 0,
-			3em 0 0 0.2em,
-			2em 2em 0 0,
-			0 3em 0 -1em,
-			-2em 2em 0 -1em,
-			-3em 0 0 -1em,
-			-2em -2em 0 -1em;
-	}
-	37.5% {
-		box-shadow:
-			0 -3em 0 -1em,
-			2em -2em 0 -1em,
-			3em 0em 0 0,
-			2em 2em 0 0.2em,
-			0 3em 0 0em,
-			-2em 2em 0 -1em,
-			-3em 0em 0 -1em,
-			-2em -2em 0 -1em;
-	}
-	50% {
-		box-shadow:
-			0 -3em 0 -1em,
-			2em -2em 0 -1em,
-			3em 0 0 -1em,
-			2em 2em 0 0em,
-			0 3em 0 0.2em,
-			-2em 2em 0 0,
-			-3em 0em 0 -1em,
-			-2em -2em 0 -1em;
-	}
-	62.5% {
-		box-shadow:
-			0 -3em 0 -1em,
-			2em -2em 0 -1em,
-			3em 0 0 -1em,
-			2em 2em 0 -1em,
-			0 3em 0 0,
-			-2em 2em 0 0.2em,
-			-3em 0 0 0,
-			-2em -2em 0 -1em;
-	}
-	75% {
-		box-shadow:
-			0em -3em 0 -1em,
-			2em -2em 0 -1em,
-			3em 0em 0 -1em,
-			2em 2em 0 -1em,
-			0 3em 0 -1em,
-			-2em 2em 0 0,
-			-3em 0em 0 0.2em,
-			-2em -2em 0 0;
-	}
-	87.5% {
-		box-shadow:
-			0em -3em 0 0,
-			2em -2em 0 -1em,
-			3em 0 0 -1em,
-			2em 2em 0 -1em,
-			0 3em 0 -1em,
-			-2em 2em 0 0,
-			-3em 0em 0 0,
-			-2em -2em 0 0.2em;
-	}
+  0%,
+  100% {
+    box-shadow: 0 -3em 0 0.2em,
+    2em -2em 0 0em, 3em 0 0 -1em,
+    2em 2em 0 -1em, 0 3em 0 -1em,
+    -2em 2em 0 -1em, -3em 0 0 -1em,
+    -2em -2em 0 0;
+  }
+  12.5% {
+    box-shadow: 0 -3em 0 0, 2em -2em 0 0.2em,
+    3em 0 0 0, 2em 2em 0 -1em, 0 3em 0 -1em,
+    -2em 2em 0 -1em, -3em 0 0 -1em,
+    -2em -2em 0 -1em;
+  }
+  25% {
+    box-shadow: 0 -3em 0 -0.5em,
+    2em -2em 0 0, 3em 0 0 0.2em,
+    2em 2em 0 0, 0 3em 0 -1em,
+    -2em 2em 0 -1em, -3em 0 0 -1em,
+    -2em -2em 0 -1em;
+  }
+  37.5% {
+    box-shadow: 0 -3em 0 -1em, 2em -2em 0 -1em,
+    3em 0em 0 0, 2em 2em 0 0.2em, 0 3em 0 0em,
+    -2em 2em 0 -1em, -3em 0em 0 -1em, -2em -2em 0 -1em;
+  }
+  50% {
+    box-shadow: 0 -3em 0 -1em, 2em -2em 0 -1em,
+    3em 0 0 -1em, 2em 2em 0 0em, 0 3em 0 0.2em,
+    -2em 2em 0 0, -3em 0em 0 -1em, -2em -2em 0 -1em;
+  }
+  62.5% {
+    box-shadow: 0 -3em 0 -1em, 2em -2em 0 -1em,
+    3em 0 0 -1em, 2em 2em 0 -1em, 0 3em 0 0,
+    -2em 2em 0 0.2em, -3em 0 0 0, -2em -2em 0 -1em;
+  }
+  75% {
+    box-shadow: 0em -3em 0 -1em, 2em -2em 0 -1em,
+    3em 0em 0 -1em, 2em 2em 0 -1em, 0 3em 0 -1em,
+    -2em 2em 0 0, -3em 0em 0 0.2em, -2em -2em 0 0;
+  }
+  87.5% {
+    box-shadow: 0em -3em 0 0, 2em -2em 0 -1em,
+    3em 0 0 -1em, 2em 2em 0 -1em, 0 3em 0 -1em,
+    -2em 2em 0 0, -3em 0em 0 0, -2em -2em 0 0.2em;
+  }
 }
 
 /* LikeButton */
 .like-button {
-	outline-offset: 2px;
-	position: relative;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	width: 2.5rem;
-	height: 2.5rem;
-	cursor: pointer;
-	border-radius: 9999px;
-	border: none;
-	outline: none 2px;
-	color: #5e687e;
-	background: none;
+  outline-offset: 2px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  cursor: pointer;
+  border-radius: 9999px;
+  border: none;
+  outline: none 2px;
+  color: #5e687e;
+  background: none;
 }
 
 .like-button:focus {
-	color: #a6423a;
-	background-color: rgba(166, 66, 58, 0.05);
+  color: #a6423a;
+  background-color: rgba(166, 66, 58, .05);
 }
 
 .like-button:active {
-	color: #a6423a;
-	background-color: rgba(166, 66, 58, 0.05);
-	transform: scaleX(0.95) scaleY(0.95);
+  color: #a6423a;
+  background-color: rgba(166, 66, 58, .05);
+  transform: scaleX(0.95) scaleY(0.95);
 }
 
 .like-button:hover {
-	background-color: #f6f7f9;
+  background-color: #f6f7f9;
 }
 
 .like-button.liked {
-	color: #a6423a;
+  color: #a6423a;
 }
 
 /* Icons */
 @keyframes circle {
-	0% {
-		transform: scale(0);
-		stroke-width: 16px;
-	}
+  0% {
+    transform: scale(0);
+    stroke-width: 16px;
+  }
 
-	50% {
-		transform: scale(0.5);
-		stroke-width: 16px;
-	}
+  50% {
+    transform: scale(.5);
+    stroke-width: 16px;
+  }
 
-	to {
-		transform: scale(1);
-		stroke-width: 0;
-	}
+  to {
+    transform: scale(1);
+    stroke-width: 0;
+  }
 }
 
 .circle {
-	color: rgba(166, 66, 58, 0.5);
-	transform-origin: center;
-	transition-property: all;
-	transition-duration: 0.15s;
-	transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  color: rgba(166, 66, 58, .5);
+  transform-origin: center;
+  transition-property: all;
+  transition-duration: .15s;
+  transition-timing-function: cubic-bezier(.4,0,.2,1);
 }
 
 .circle.liked.animate {
-	animation: circle 0.3s forwards;
+  animation: circle .3s forwards;
 }
 
 .heart {
-	width: 1.5rem;
-	height: 1.5rem;
+  width: 1.5rem;
+  height: 1.5rem;
 }
 
 .heart.liked {
-	transform-origin: center;
-	transition-property: all;
-	transition-duration: 0.15s;
-	transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: center;
+  transition-property: all;
+  transition-duration: .15s;
+  transition-timing-function: cubic-bezier(.4, 0, .2, 1);
 }
 
 .heart.liked.animate {
-	animation: scale 0.35s ease-in-out forwards;
+  animation: scale .35s ease-in-out forwards;
 }
 
 .control-icon {
-	color: hsla(0, 0%, 100%, 0.5);
-	filter: drop-shadow(0 20px 13px rgba(0, 0, 0, 0.03)) drop-shadow(0 8px 5px rgba(0, 0, 0, 0.08));
+  color: hsla(0, 0%, 100%, .5);
+  filter:  drop-shadow(0 20px 13px rgba(0, 0, 0, .03)) drop-shadow(0 8px 5px rgba(0, 0, 0, .08));
 }
 
 .chevron-left {
-	margin-top: 2px;
-	rotate: 90deg;
+  margin-top: 2px;
+  rotate: 90deg;
 }
+
 
 /* Video */
 .thumbnail {
-	position: relative;
-	aspect-ratio: 16 / 9;
-	display: flex;
-	overflow: hidden;
-	flex-direction: column;
-	justify-content: center;
-	align-items: center;
-	border-radius: 0.5rem;
-	outline-offset: 2px;
-	width: 8rem;
-	vertical-align: middle;
-	background-color: #ffffff;
-	background-size: cover;
-	user-select: none;
+  position: relative;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  overflow: hidden;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  border-radius: 0.5rem;
+  outline-offset: 2px;
+  width: 8rem;
+  vertical-align: middle;
+  background-color: #ffffff;
+  background-size: cover;
+  user-select: none;
 }
 
 .thumbnail.blue {
-	background-image: conic-gradient(at top right, #c76a15, #087ea4, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #087ea4, #2b3491);
 }
 
 .thumbnail.red {
-	background-image: conic-gradient(at top right, #c76a15, #a6423a, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #a6423a, #2b3491);
 }
 
 .thumbnail.green {
-	background-image: conic-gradient(at top right, #c76a15, #388f7f, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #388f7f, #2b3491);
 }
 
 .thumbnail.purple {
-	background-image: conic-gradient(at top right, #c76a15, #575fb7, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #575fb7, #2b3491);
 }
 
 .thumbnail.yellow {
-	background-image: conic-gradient(at top right, #c76a15, #fabd62, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #FABD62, #2b3491);
 }
 
 .thumbnail.gray {
-	background-image: conic-gradient(at top right, #c76a15, #4e5769, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #4E5769, #2b3491);
 }
 
 .video {
-	display: flex;
-	flex-direction: row;
-	gap: 0.75rem;
-	align-items: center;
+  display: flex;
+  flex-direction: row;
+  gap: 0.75rem;
+  align-items: center;
 }
 
 .video .link {
-	display: flex;
-	flex-direction: row;
-	flex: 1 1 0;
-	gap: 0.125rem;
-	outline-offset: 4px;
-	cursor: pointer;
+  display: flex;
+  flex-direction: row;
+  flex: 1 1 0;
+  gap: 0.125rem;
+  outline-offset: 4px;
+  cursor: pointer;
 }
 
 .video .info {
-	display: flex;
-	flex-direction: column;
-	justify-content: center;
-	margin-left: 8px;
-	gap: 0.125rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  margin-left: 8px;
+  gap: 0.125rem;
 }
 
 .video .info:hover {
-	text-decoration: underline;
+  text-decoration: underline;
 }
 
 .video-title {
-	font-size: 15px;
-	line-height: 1.25;
-	font-weight: 700;
-	color: #23272f;
+  font-size: 15px;
+  line-height: 1.25;
+  font-weight: 700;
+  color: #23272f;
 }
 
 .video-description {
-	color: #5e687e;
-	font-size: 13px;
+  color: #5e687e;
+  font-size: 13px;
 }
 
 /* Details */
 .details .thumbnail {
-	position: relative;
-	aspect-ratio: 16 / 9;
-	display: flex;
-	overflow: hidden;
-	flex-direction: column;
-	justify-content: center;
-	align-items: center;
-	border-radius: 0.5rem;
-	outline-offset: 2px;
-	width: 100%;
-	vertical-align: middle;
-	background-color: #ffffff;
-	background-size: cover;
-	user-select: none;
+  position: relative;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  overflow: hidden;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  border-radius: 0.5rem;
+  outline-offset: 2px;
+  width: 100%;
+  vertical-align: middle;
+  background-color: #ffffff;
+  background-size: cover;
+  user-select: none;
 }
 
 .video-details-title {
-	margin-top: 8px;
+  margin-top: 8px;
 }
 
 .video-details-speaker {
-	display: flex;
-	gap: 8px;
-	margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  margin-top: 10px
 }
 
 .back {
-	display: flex;
-	align-items: center;
-	margin-left: -5px;
-	cursor: pointer;
+  display: flex;
+  align-items: center;
+  margin-left: -5px;
+  cursor: pointer;
 }
 
 .back:hover {
-	text-decoration: underline;
+  text-decoration: underline;
 }
 
 .info-title {
-	font-size: 1.5rem;
-	font-weight: 700;
-	line-height: 1.25;
-	margin: 8px 0 0 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.25;
+  margin: 8px 0 0 0 ;
 }
 
 .info-description {
-	margin: 8px 0 0 0;
+  margin: 8px 0 0 0;
 }
 
 .controls {
-	cursor: pointer;
+  cursor: pointer;
 }
 
 .fallback {
-	background: #f6f7f8 linear-gradient(to right, #e6e6e6 5%, #cccccc 25%, #e6e6e6 35%) no-repeat;
-	background-size: 800px 104px;
-	display: block;
-	line-height: 1.25;
-	margin: 8px 0 0 0;
-	border-radius: 5px;
-	overflow: hidden;
+  background: #f6f7f8 linear-gradient(to right, #e6e6e6 5%, #cccccc 25%, #e6e6e6 35%) no-repeat;
+  background-size: 800px 104px;
+  display: block;
+  line-height: 1.25;
+  margin: 8px 0 0 0;
+  border-radius: 5px;
+  overflow: hidden;
 
-	animation: 1s linear 1s infinite shimmer;
-	animation-delay: 300ms;
-	animation-duration: 1s;
-	animation-fill-mode: forwards;
-	animation-iteration-count: infinite;
-	animation-name: shimmer;
-	animation-timing-function: linear;
+  animation: 1s linear 1s infinite shimmer;
+  animation-delay: 300ms;
+  animation-duration: 1s;
+  animation-fill-mode: forwards;
+  animation-iteration-count: infinite;
+  animation-name: shimmer;
+  animation-timing-function: linear;
 }
 
+
 .fallback.title {
-	width: 130px;
-	height: 30px;
+  width: 130px;
+  height: 30px;
+
 }
 
 .fallback.description {
-	width: 150px;
-	height: 21px;
+  width: 150px;
+  height: 21px;
 }
 
 @keyframes shimmer {
-	0% {
-		background-position: -468px 0;
-	}
+  0% {
+    background-position: -468px 0;
+  }
 
-	100% {
-		background-position: 468px 0;
-	}
+  100% {
+    background-position: 468px 0;
+  }
 }
 
 .search {
-	margin-bottom: 10px;
+  margin-bottom: 10px;
 }
 .search-input {
-	width: 100%;
-	position: relative;
+  width: 100%;
+  position: relative;
 }
 
 .search-icon {
-	position: absolute;
-	top: 0;
-	bottom: 0;
-	inset-inline-start: 0;
-	display: flex;
-	align-items: center;
-	padding-inline-start: 1rem;
-	pointer-events: none;
-	color: #99a1b3;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  inset-inline-start: 0;
+  display: flex;
+  align-items: center;
+  padding-inline-start: 1rem;
+  pointer-events: none;
+  color: #99a1b3;
 }
 
 .search-input input {
-	display: flex;
-	padding-inline-start: 2.75rem;
-	padding-top: 10px;
-	padding-bottom: 10px;
-	width: 100%;
-	text-align: start;
-	background-color: rgb(235 236 240);
-	outline: 2px solid transparent;
-	cursor: pointer;
-	border: none;
-	align-items: center;
-	color: rgb(35 39 47);
-	border-radius: 9999px;
-	vertical-align: middle;
-	font-size: 15px;
+  display: flex;
+  padding-inline-start: 2.75rem;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  width: 100%;
+  text-align: start;
+  background-color: rgb(235 236 240);
+  outline: 2px solid transparent;
+  cursor: pointer;
+  border: none;
+  align-items: center;
+  color: rgb(35 39 47);
+  border-radius: 9999px;
+  vertical-align: middle;
+  font-size: 15px;
 }
 
-.search-input input:hover,
-.search-input input:active {
-	background-color: rgb(235 236 240/ 0.8);
-	color: rgb(35 39 47/ 0.8);
+.search-input input:hover, .search-input input:active {
+  background-color: rgb(235 236 240/ 0.8);
+  color: rgb(35 39 47/ 0.8);
 }
 
 /* Home */
 .video-list {
-	position: relative;
+  position: relative;
 }
 
 .video-list .videos {
-	display: flex;
-	flex-direction: column;
-	gap: 1rem;
-	overflow-y: auto;
-	height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  overflow-y: auto;
+  height: 100%;
 }
 ```
+
 
 ```css src/animations.css
 /* Slide the fallback down */
 ::view-transition-old(.slide-down) {
-	animation:
-		150ms ease-out both fade-out,
-		150ms ease-out both slide-down;
+    animation: 150ms ease-out both fade-out, 150ms ease-out both slide-down;
 }
 
 /* Slide the content up */
 ::view-transition-new(.slide-up) {
-	animation:
-		210ms ease-in 150ms both fade-in,
-		400ms ease-in both slide-up;
+    animation: 210ms ease-in 150ms both fade-in, 400ms ease-in both slide-up;
 }
 
 /* Define the new keyframes */
 @keyframes slide-up {
-	from {
-		transform: translateY(10px);
-	}
-	to {
-		transform: translateY(0);
-	}
+    from {
+        transform: translateY(10px);
+    }
+    to {
+        transform: translateY(0);
+    }
 }
 
 @keyframes slide-down {
-	from {
-		transform: translateY(0);
-	}
-	to {
-		transform: translateY(10px);
-	}
+    from {
+        transform: translateY(0);
+    }
+    to {
+        transform: translateY(10px);
+    }
 }
 
 /* Previously defined animations below */
 
 /* Animations for view transition classed added by transition type */
 ::view-transition-old(.slide-forward) {
-	/* when sliding forward, the "old" page should slide out to left. */
-	animation:
-		150ms cubic-bezier(0.4, 0, 1, 1) both fade-out,
-		400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-to-left;
+    /* when sliding forward, the "old" page should slide out to left. */
+    animation: 150ms cubic-bezier(0.4, 0, 1, 1) both fade-out,
+    400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-to-left;
 }
 
 ::view-transition-new(.slide-forward) {
-	/* when sliding forward, the "new" page should slide in from right. */
-	animation:
-		210ms cubic-bezier(0, 0, 0.2, 1) 150ms both fade-in,
-		400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-from-right;
+    /* when sliding forward, the "new" page should slide in from right. */
+    animation: 210ms cubic-bezier(0, 0, 0.2, 1) 150ms both fade-in,
+    400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-from-right;
 }
 
 ::view-transition-old(.slide-back) {
-	/* when sliding back, the "old" page should slide out to right. */
-	animation:
-		150ms cubic-bezier(0.4, 0, 1, 1) both fade-out,
-		400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-to-right;
+    /* when sliding back, the "old" page should slide out to right. */
+    animation: 150ms cubic-bezier(0.4, 0, 1, 1) both fade-out,
+    400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-to-right;
 }
 
 ::view-transition-new(.slide-back) {
-	/* when sliding back, the "new" page should slide in from left. */
-	animation:
-		210ms cubic-bezier(0, 0, 0.2, 1) 150ms both fade-in,
-		400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-from-left;
+    /* when sliding back, the "new" page should slide in from left. */
+    animation: 210ms cubic-bezier(0, 0, 0.2, 1) 150ms both fade-in,
+    400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-from-left;
 }
 
 /* Keyframes to support our animations above. */
 @keyframes fade-in {
-	from {
-		opacity: 0;
-	}
+    from {
+        opacity: 0;
+    }
 }
 
 @keyframes fade-out {
-	to {
-		opacity: 0;
-	}
+    to {
+        opacity: 0;
+    }
 }
 
 @keyframes slide-to-right {
-	to {
-		transform: translateX(50px);
-	}
+    to {
+        transform: translateX(50px);
+    }
 }
 
 @keyframes slide-from-right {
-	from {
-		transform: translateX(50px);
-	}
-	to {
-		transform: translateX(0);
-	}
+    from {
+        transform: translateX(50px);
+    }
+    to {
+        transform: translateX(0);
+    }
 }
 
 @keyframes slide-to-left {
-	to {
-		transform: translateX(-50px);
-	}
+    to {
+        transform: translateX(-50px);
+    }
 }
 
 @keyframes slide-from-left {
-	from {
-		transform: translateX(-50px);
-	}
-	to {
-		transform: translateX(0);
-	}
+    from {
+        transform: translateX(-50px);
+    }
+    to {
+        transform: translateX(0);
+    }
 }
 
 /* Default .slow-fade. */
 ::view-transition-old(.slow-fade) {
-	animation-duration: 500ms;
+    animation-duration: 500ms;
 }
 
 ::view-transition-new(.slow-fade) {
-	animation-duration: 500ms;
+    animation-duration: 500ms;
 }
 ```
 
 ```js src/index.js hidden
-import React, { StrictMode } from "react";
-import { createRoot } from "react-dom/client";
+import React, {StrictMode} from 'react';
+import {createRoot} from 'react-dom/client';
+import './styles.css';
+import './animations.css';
 
-import "./styles.css";
-import "./animations.css";
+import App from './App';
+import {Router} from './router';
 
-import App from "./App";
-import { Router } from "./router";
-
-const root = createRoot(document.getElementById("root"));
+const root = createRoot(document.getElementById('root'));
 root.render(
-	<StrictMode>
-		<Router>
-			<App />
-		</Router>
-	</StrictMode>,
+  <StrictMode>
+    <Router>
+      <App />
+    </Router>
+  </StrictMode>
 );
 ```
 
 ```json package.json hidden
 {
-	"dependencies": {
-		"react": "experimental",
-		"react-dom": "experimental",
-		"react-scripts": "latest"
-	},
-	"scripts": {
-		"start": "react-scripts start",
-		"build": "react-scripts build",
-		"test": "react-scripts test --env=jsdom",
-		"eject": "react-scripts eject"
-	}
+  "dependencies": {
+    "react": "canary",
+    "react-dom": "canary",
+    "react-scripts": "latest"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test --env=jsdom",
+    "eject": "react-scripts eject"
+  }
 }
 ```
 
@@ -7838,15 +7512,15 @@ We can also provide custom animations using an `exit` on the fallback, and `ente
 
 ```js {3,8}
 <Suspense
-	fallback={
-		<ViewTransition exit="slide-down">
-			<VideoInfoFallback />
-		</ViewTransition>
-	}
+  fallback={
+    <ViewTransition exit="slide-down">
+      <VideoInfoFallback />
+    </ViewTransition>
+  }
 >
-	<ViewTransition enter="slide-up">
-		<VideoInfo id={id} />
-	</ViewTransition>
+  <ViewTransition enter="slide-up">
+    <VideoInfo id={id} />
+  </ViewTransition>
 </Suspense>
 ```
 
@@ -7854,13 +7528,13 @@ Here's how we'll define `slide-down` and `slide-up` with CSS:
 
 ```css {1, 6}
 ::view-transition-old(.slide-down) {
-	/* Slide the fallback down */
-	animation: ...;
+  /* Slide the fallback down */
+  animation: ...;
 }
 
 ::view-transition-new(.slide-up) {
-	/* Slide the content up */
-	animation: ...;
+  /* Slide the content up */
+  animation: ...;
 }
 ```
 
@@ -7869,460 +7543,449 @@ Now, the Suspense content replaces the fallback with a sliding animation:
 <Sandpack>
 
 ```js src/App.js hidden
-import { unstable_ViewTransition as ViewTransition } from "react";
-
+import { ViewTransition } from "react";
 import Details from "./Details";
 import Home from "./Home";
 import { useRouter } from "./router";
 
 export default function App() {
-	const { url } = useRouter();
+  const { url } = useRouter();
 
-	// Default slow-fade animation.
-	return (
-		<ViewTransition default="slow-fade">
-			{url === "/" ?
-				<Home />
-			:	<Details />}
-		</ViewTransition>
-	);
+  // Default slow-fade animation.
+  return (
+    <ViewTransition default="slow-fade">
+      {url === "/" ? <Home /> : <Details />}
+    </ViewTransition>
+  );
 }
 ```
 
 ```js src/Details.js active
-import { Suspense, use, unstable_ViewTransition as ViewTransition } from "react";
-
-import { fetchVideo, fetchVideoDetails } from "./data";
-import { ChevronLeft } from "./Icons";
-import Layout from "./Layout";
-import { useRouter } from "./router";
-import { Thumbnail, VideoControls } from "./Videos";
+import { use, Suspense, ViewTransition } from "react"; import { fetchVideo, fetchVideoDetails } from "./data"; import { Thumbnail, VideoControls } from "./Videos"; import { useRouter } from "./router"; import Layout from "./Layout"; import { ChevronLeft } from "./Icons";
 
 function VideoDetails({ id }) {
-	return (
-		<Suspense
-			fallback={
-				// Animate the fallback down.
-				<ViewTransition exit="slide-down">
-					<VideoInfoFallback />
-				</ViewTransition>
-			}
-		>
-			{/* Animate the content up */}
-			<ViewTransition enter="slide-up">
-				<VideoInfo id={id} />
-			</ViewTransition>
-		</Suspense>
-	);
+  return (
+    <Suspense
+      fallback={
+        // Animate the fallback down.
+        <ViewTransition exit="slide-down">
+          <VideoInfoFallback />
+        </ViewTransition>
+      }
+    >
+      {/* Animate the content up */}
+      <ViewTransition enter="slide-up">
+        <VideoInfo id={id} />
+      </ViewTransition>
+    </Suspense>
+  );
 }
 
 function VideoInfoFallback() {
-	return (
-		<>
-			<div className="fallback title"></div>
-			<div className="fallback description"></div>
-		</>
-	);
+  return (
+    <>
+      <div className="fallback title"></div>
+      <div className="fallback description"></div>
+    </>
+  );
 }
 
 export default function Details() {
-	const { url, navigateBack } = useRouter();
-	const videoId = url.split("/").pop();
-	const video = use(fetchVideo(videoId));
+  const { url, navigateBack } = useRouter();
+  const videoId = url.split("/").pop();
+  const video = use(fetchVideo(videoId));
 
-	return (
-		<Layout
-			heading={
-				<div
-					className="fit back"
-					onClick={() => {
-						navigateBack("/");
-					}}
-				>
-					<ChevronLeft /> Back
-				</div>
-			}
-		>
-			<div className="details">
-				<Thumbnail video={video} large>
-					<VideoControls />
-				</Thumbnail>
-				<VideoDetails id={video.id} />
-			</div>
-		</Layout>
-	);
+  return (
+    <Layout
+      heading={
+        <div
+          className="fit back"
+          onClick={() => {
+            navigateBack("/");
+          }}
+        >
+          <ChevronLeft /> Back
+        </div>
+      }
+    >
+      <div className="details">
+        <Thumbnail video={video} large>
+          <VideoControls />
+        </Thumbnail>
+        <VideoDetails id={video.id} />
+      </div>
+    </Layout>
+  );
 }
 
 function VideoInfo({ id }) {
-	const details = use(fetchVideoDetails(id));
-	return (
-		<>
-			<p className="info-title">{details.title}</p>
-			<p className="info-description">{details.description}</p>
-		</>
-	);
+  const details = use(fetchVideoDetails(id));
+  return (
+    <>
+      <p className="info-title">{details.title}</p>
+      <p className="info-description">{details.description}</p>
+    </>
+  );
 }
 ```
 
 ```js src/Home.js hidden
-import { use, useId, useState } from "react";
-
-import { fetchVideos } from "./data";
-import { IconSearch } from "./Icons";
-import Layout from "./Layout";
 import { Video } from "./Videos";
+import Layout from "./Layout";
+import { fetchVideos } from "./data";
+import { useId, useState, use } from "react";
+import { IconSearch } from "./Icons";
 
 function SearchInput({ value, onChange }) {
-	const id = useId();
-	return (
-		<form className="search" onSubmit={(e) => e.preventDefault()}>
-			<label htmlFor={id} className="sr-only">
-				Search
-			</label>
-			<div className="search-input">
-				<div className="search-icon">
-					<IconSearch />
-				</div>
-				<input
-					type="text"
-					id={id}
-					placeholder="Search"
-					value={value}
-					onChange={(e) => onChange(e.target.value)}
-				/>
-			</div>
-		</form>
-	);
+  const id = useId();
+  return (
+    <form className="search" onSubmit={(e) => e.preventDefault()}>
+      <label htmlFor={id} className="sr-only">
+        Search
+      </label>
+      <div className="search-input">
+        <div className="search-icon">
+          <IconSearch />
+        </div>
+        <input
+          type="text"
+          id={id}
+          placeholder="Search"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      </div>
+    </form>
+  );
 }
 
 function filterVideos(videos, query) {
-	const keywords = query
-		.toLowerCase()
-		.split(" ")
-		.filter((s) => s !== "");
-	if (keywords.length === 0) {
-		return videos;
-	}
-	return videos.filter((video) => {
-		const words = (video.title + " " + video.description).toLowerCase().split(" ");
-		return keywords.every((kw) => words.some((w) => w.includes(kw)));
-	});
+  const keywords = query
+    .toLowerCase()
+    .split(" ")
+    .filter((s) => s !== "");
+  if (keywords.length === 0) {
+    return videos;
+  }
+  return videos.filter((video) => {
+    const words = (video.title + " " + video.description)
+      .toLowerCase()
+      .split(" ");
+    return keywords.every((kw) => words.some((w) => w.includes(kw)));
+  });
 }
 
 export default function Home() {
-	const videos = use(fetchVideos());
-	const count = videos.length;
-	const [searchText, setSearchText] = useState("");
-	const foundVideos = filterVideos(videos, searchText);
-	return (
-		<Layout heading={<div className="fit">{count} Videos</div>}>
-			<SearchInput value={searchText} onChange={setSearchText} />
-			<div className="video-list">
-				{foundVideos.length === 0 && <div className="no-results">No results</div>}
-				<div className="videos">
-					{foundVideos.map((video) => (
-						<Video key={video.id} video={video} />
-					))}
-				</div>
-			</div>
-		</Layout>
-	);
+  const videos = use(fetchVideos());
+  const count = videos.length;
+  const [searchText, setSearchText] = useState("");
+  const foundVideos = filterVideos(videos, searchText);
+  return (
+    <Layout heading={<div className="fit">{count} Videos</div>}>
+      <SearchInput value={searchText} onChange={setSearchText} />
+      <div className="video-list">
+        {foundVideos.length === 0 && (
+          <div className="no-results">No results</div>
+        )}
+        <div className="videos">
+          {foundVideos.map((video) => (
+            <Video key={video.id} video={video} />
+          ))}
+        </div>
+      </div>
+    </Layout>
+  );
 }
+
 ```
 
 ```js src/Icons.js hidden
 export function ChevronLeft() {
-	return (
-		<svg
-			className="chevron-left"
-			xmlns="http://www.w3.org/2000/svg"
-			width="20"
-			height="20"
-			viewBox="0 0 20 20"
-		>
-			<g fill="none" fillRule="evenodd" transform="translate(-446 -398)">
-				<path
-					fill="currentColor"
-					fillRule="nonzero"
-					d="M95.8838835,240.366117 C95.3957281,239.877961 94.6042719,239.877961 94.1161165,240.366117 C93.6279612,240.854272 93.6279612,241.645728 94.1161165,242.133883 L98.6161165,246.633883 C99.1042719,247.122039 99.8957281,247.122039 100.383883,246.633883 L104.883883,242.133883 C105.372039,241.645728 105.372039,240.854272 104.883883,240.366117 C104.395728,239.877961 103.604272,239.877961 103.116117,240.366117 L99.5,243.982233 L95.8838835,240.366117 Z"
-					transform="translate(356.5 164.5)"
-				/>
-				<polygon points="446 418 466 418 466 398 446 398" />
-			</g>
-		</svg>
-	);
+  return (
+    <svg
+      className="chevron-left"
+      xmlns="http://www.w3.org/2000/svg"
+      width="20"
+      height="20"
+      viewBox="0 0 20 20">
+      <g fill="none" fillRule="evenodd" transform="translate(-446 -398)">
+        <path
+          fill="currentColor"
+          fillRule="nonzero"
+          d="M95.8838835,240.366117 C95.3957281,239.877961 94.6042719,239.877961 94.1161165,240.366117 C93.6279612,240.854272 93.6279612,241.645728 94.1161165,242.133883 L98.6161165,246.633883 C99.1042719,247.122039 99.8957281,247.122039 100.383883,246.633883 L104.883883,242.133883 C105.372039,241.645728 105.372039,240.854272 104.883883,240.366117 C104.395728,239.877961 103.604272,239.877961 103.116117,240.366117 L99.5,243.982233 L95.8838835,240.366117 Z"
+          transform="translate(356.5 164.5)"
+        />
+        <polygon points="446 418 466 418 466 398 446 398" />
+      </g>
+    </svg>
+  );
 }
 
 export function PauseIcon() {
-	return (
-		<svg
-			className="control-icon"
-			style={{ padding: "4px" }}
-			width="100"
-			height="100"
-			viewBox="0 0 512 512"
-			fill="none"
-			xmlns="http://www.w3.org/2000/svg"
-		>
-			<path
-				fillRule="evenodd"
-				clipRule="evenodd"
-				d="M256 0C114.617 0 0 114.615 0 256s114.617 256 256 256 256-114.615 256-256S397.383 0 256 0zm-32 320c0 8.836-7.164 16-16 16h-32c-8.836 0-16-7.164-16-16V192c0-8.836 7.164-16 16-16h32c8.836 0 16 7.164 16 16v128zm128 0c0 8.836-7.164 16-16 16h-32c-8.836 0-16-7.164-16-16V192c0-8.836 7.164-16 16-16h32c8.836 0 16 7.164 16 16v128z"
-				fill="currentColor"
-			/>
-		</svg>
-	);
+  return (
+    <svg
+      className="control-icon"
+      style={{padding: '4px'}}
+      width="100"
+      height="100"
+      viewBox="0 0 512 512"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg">
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M256 0C114.617 0 0 114.615 0 256s114.617 256 256 256 256-114.615 256-256S397.383 0 256 0zm-32 320c0 8.836-7.164 16-16 16h-32c-8.836 0-16-7.164-16-16V192c0-8.836 7.164-16 16-16h32c8.836 0 16 7.164 16 16v128zm128 0c0 8.836-7.164 16-16 16h-32c-8.836 0-16-7.164-16-16V192c0-8.836 7.164-16 16-16h32c8.836 0 16 7.164 16 16v128z"
+        fill="currentColor"
+      />
+    </svg>
+  );
 }
 
 export function PlayIcon() {
-	return (
-		<svg
-			className="control-icon"
-			width="100"
-			height="100"
-			viewBox="0 0 72 72"
-			fill="none"
-			xmlns="http://www.w3.org/2000/svg"
-		>
-			<path
-				fillRule="evenodd"
-				clipRule="evenodd"
-				d="M36 69C54.2254 69 69 54.2254 69 36C69 17.7746 54.2254 3 36 3C17.7746 3 3 17.7746 3 36C3 54.2254 17.7746 69 36 69ZM52.1716 38.6337L28.4366 51.5801C26.4374 52.6705 24 51.2235 24 48.9464V23.0536C24 20.7764 26.4374 19.3295 28.4366 20.4199L52.1716 33.3663C54.2562 34.5034 54.2562 37.4966 52.1716 38.6337Z"
-				fill="currentColor"
-			/>
-		</svg>
-	);
+  return (
+    <svg
+      className="control-icon"
+      width="100"
+      height="100"
+      viewBox="0 0 72 72"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg">
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M36 69C54.2254 69 69 54.2254 69 36C69 17.7746 54.2254 3 36 3C17.7746 3 3 17.7746 3 36C3 54.2254 17.7746 69 36 69ZM52.1716 38.6337L28.4366 51.5801C26.4374 52.6705 24 51.2235 24 48.9464V23.0536C24 20.7764 26.4374 19.3295 28.4366 20.4199L52.1716 33.3663C54.2562 34.5034 54.2562 37.4966 52.1716 38.6337Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
 }
-export function Heart({ liked, animate }) {
-	return (
-		<>
-			<svg
-				className="absolute overflow-visible"
-				viewBox="0 0 24 24"
-				fill="none"
-				xmlns="http://www.w3.org/2000/svg"
-			>
-				<circle
-					className={`circle ${liked ? "liked" : ""} ${animate ? "animate" : ""}`}
-					cx="12"
-					cy="12"
-					r="11.5"
-					fill="transparent"
-					strokeWidth="0"
-					stroke="currentColor"
-				/>
-			</svg>
+export function Heart({liked, animate}) {
+  return (
+    <>
+      <svg
+        className="absolute overflow-visible"
+        viewBox="0 0 24 24"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg">
+        <circle
+          className={`circle ${liked ? 'liked' : ''} ${animate ? 'animate' : ''}`}
+          cx="12"
+          cy="12"
+          r="11.5"
+          fill="transparent"
+          strokeWidth="0"
+          stroke="currentColor"
+        />
+      </svg>
 
-			<svg
-				className={`heart ${liked ? "liked" : ""} ${animate ? "animate" : ""}`}
-				viewBox="0 0 24 24"
-				fill="none"
-				xmlns="http://www.w3.org/2000/svg"
-			>
-				{liked ?
-					<path
-						d="M12 23a.496.496 0 0 1-.26-.074C7.023 19.973 0 13.743 0 8.68c0-4.12 2.322-6.677 6.058-6.677 2.572 0 5.108 2.387 5.134 2.41l.808.771.808-.771C12.834 4.387 15.367 2 17.935 2 21.678 2 24 4.558 24 8.677c0 5.06-7.022 11.293-11.74 14.246a.496.496 0 0 1-.26.074V23z"
-						fill="currentColor"
-					/>
-				:	<path
-						fillRule="evenodd"
-						clipRule="evenodd"
-						d="m12 5.184-.808-.771-.004-.004C11.065 4.299 8.522 2.003 6 2.003c-3.736 0-6 2.558-6 6.677 0 4.47 5.471 9.848 10 13.079.602.43 1.187.82 1.74 1.167A.497.497 0 0 0 12 23v-.003c.09 0 .182-.026.26-.074C16.977 19.97 24 13.737 24 8.677 24 4.557 21.743 2 18 2c-2.569 0-5.166 2.387-5.192 2.413L12 5.184zm-.002 15.525c2.071-1.388 4.477-3.342 6.427-5.47C20.72 12.733 22 10.401 22 8.677c0-1.708-.466-2.855-1.087-3.55C20.316 4.459 19.392 4 18 4c-.726 0-1.63.364-2.5.9-.67.412-1.148.82-1.266.92-.03.025-.037.031-.019.014l-.013.013L12 7.949 9.832 5.88a10.08 10.08 0 0 0-1.33-.977C7.633 4.367 6.728 4.003 6 4.003c-1.388 0-2.312.459-2.91 1.128C2.466 5.826 2 6.974 2 8.68c0 1.726 1.28 4.058 3.575 6.563 1.948 2.127 4.352 4.078 6.423 5.466z"
-						fill="currentColor"
-					/>
-				}
-			</svg>
-		</>
-	);
+      <svg
+        className={`heart ${liked ? 'liked' : ''} ${animate ? 'animate' : ''}`}
+        viewBox="0 0 24 24"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg">
+        {liked ? (
+          <path
+            d="M12 23a.496.496 0 0 1-.26-.074C7.023 19.973 0 13.743 0 8.68c0-4.12 2.322-6.677 6.058-6.677 2.572 0 5.108 2.387 5.134 2.41l.808.771.808-.771C12.834 4.387 15.367 2 17.935 2 21.678 2 24 4.558 24 8.677c0 5.06-7.022 11.293-11.74 14.246a.496.496 0 0 1-.26.074V23z"
+            fill="currentColor"
+          />
+        ) : (
+          <path
+            fillRule="evenodd"
+            clipRule="evenodd"
+            d="m12 5.184-.808-.771-.004-.004C11.065 4.299 8.522 2.003 6 2.003c-3.736 0-6 2.558-6 6.677 0 4.47 5.471 9.848 10 13.079.602.43 1.187.82 1.74 1.167A.497.497 0 0 0 12 23v-.003c.09 0 .182-.026.26-.074C16.977 19.97 24 13.737 24 8.677 24 4.557 21.743 2 18 2c-2.569 0-5.166 2.387-5.192 2.413L12 5.184zm-.002 15.525c2.071-1.388 4.477-3.342 6.427-5.47C20.72 12.733 22 10.401 22 8.677c0-1.708-.466-2.855-1.087-3.55C20.316 4.459 19.392 4 18 4c-.726 0-1.63.364-2.5.9-.67.412-1.148.82-1.266.92-.03.025-.037.031-.019.014l-.013.013L12 7.949 9.832 5.88a10.08 10.08 0 0 0-1.33-.977C7.633 4.367 6.728 4.003 6 4.003c-1.388 0-2.312.459-2.91 1.128C2.466 5.826 2 6.974 2 8.68c0 1.726 1.28 4.058 3.575 6.563 1.948 2.127 4.352 4.078 6.423 5.466z"
+            fill="currentColor"
+          />
+        )}
+      </svg>
+    </>
+  );
 }
 
 export function IconSearch(props) {
-	return (
-		<svg width="1em" height="1em" viewBox="0 0 20 20">
-			<path
-				d="M14.386 14.386l4.0877 4.0877-4.0877-4.0877c-2.9418 2.9419-7.7115 2.9419-10.6533 0-2.9419-2.9418-2.9419-7.7115 0-10.6533 2.9418-2.9419 7.7115-2.9419 10.6533 0 2.9419 2.9418 2.9419 7.7115 0 10.6533z"
-				stroke="currentColor"
-				fill="none"
-				strokeWidth="2"
-				fillRule="evenodd"
-				strokeLinecap="round"
-				strokeLinejoin="round"
-			></path>
-		</svg>
-	);
+  return (
+    <svg width="1em" height="1em" viewBox="0 0 20 20">
+      <path
+        d="M14.386 14.386l4.0877 4.0877-4.0877-4.0877c-2.9418 2.9419-7.7115 2.9419-10.6533 0-2.9419-2.9418-2.9419-7.7115 0-10.6533 2.9418-2.9419 7.7115-2.9419 10.6533 0 2.9419 2.9418 2.9419 7.7115 0 10.6533z"
+        stroke="currentColor"
+        fill="none"
+        strokeWidth="2"
+        fillRule="evenodd"
+        strokeLinecap="round"
+        strokeLinejoin="round"></path>
+    </svg>
+  );
 }
 ```
 
 ```js src/Layout.js hidden
-import { unstable_ViewTransition as ViewTransition } from "react";
-
+import {ViewTransition} from 'react';
 import { useIsNavPending } from "./router";
 
 export default function Page({ heading, children }) {
-	const isPending = useIsNavPending();
-	return (
-		<div className="page">
-			<div className="top">
-				<div className="top-nav">
-					{/* Custom classes based on transition type. */}
-					<ViewTransition
-						name="nav"
-						share={{
-							"nav-forward": "slide-forward",
-							"nav-back": "slide-back",
-						}}
-					>
-						{heading}
-					</ViewTransition>
-					{isPending && <span className="loader"></span>}
-				</div>
-			</div>
-			{/* Opt-out of ViewTransition for the content. */}
-			{/* Content can define it's own ViewTransition. */}
-			<ViewTransition default="none">
-				<div className="bottom">
-					<div className="content">{children}</div>
-				</div>
-			</ViewTransition>
-		</div>
-	);
+  const isPending = useIsNavPending();
+  return (
+    <div className="page">
+      <div className="top">
+        <div className="top-nav">
+          {/* Custom classes based on transition type. */}
+          <ViewTransition
+            name="nav"
+            share={{
+              'nav-forward': 'slide-forward',
+              'nav-back': 'slide-back',
+            }}>
+            {heading}
+          </ViewTransition>
+          {isPending && <span className="loader"></span>}
+        </div>
+      </div>
+      {/* Opt-out of ViewTransition for the content. */}
+      {/* Content can define it's own ViewTransition. */}
+      <ViewTransition default="none">
+        <div className="bottom">
+          <div className="content">{children}</div>
+        </div>
+      </ViewTransition>
+    </div>
+  );
 }
 ```
 
 ```js src/LikeButton.js hidden
-import { useState } from "react";
-
-import { Heart } from "./Icons";
+import {useState} from 'react';
+import {Heart} from './Icons';
 
 // A hack since we don't actually have a backend.
 // Unlike local state, this survives videos being filtered.
 const likedVideos = new Set();
 
-export default function LikeButton({ video }) {
-	const [isLiked, setIsLiked] = useState(() => likedVideos.has(video.id));
-	const [animate, setAnimate] = useState(false);
-	return (
-		<button
-			className={`like-button ${isLiked && "liked"}`}
-			aria-label={isLiked ? "Unsave" : "Save"}
-			onClick={() => {
-				const nextIsLiked = !isLiked;
-				if (nextIsLiked) {
-					likedVideos.add(video.id);
-				} else {
-					likedVideos.delete(video.id);
-				}
-				setAnimate(true);
-				setIsLiked(nextIsLiked);
-			}}
-		>
-			<Heart liked={isLiked} animate={animate} />
-		</button>
-	);
+export default function LikeButton({video}) {
+  const [isLiked, setIsLiked] = useState(() => likedVideos.has(video.id));
+  const [animate, setAnimate] = useState(false);
+  return (
+    <button
+      className={`like-button ${isLiked && 'liked'}`}
+      aria-label={isLiked ? 'Unsave' : 'Save'}
+      onClick={() => {
+        const nextIsLiked = !isLiked;
+        if (nextIsLiked) {
+          likedVideos.add(video.id);
+        } else {
+          likedVideos.delete(video.id);
+        }
+        setAnimate(true);
+        setIsLiked(nextIsLiked);
+      }}>
+      <Heart liked={isLiked} animate={animate} />
+    </button>
+  );
 }
 ```
 
 ```js src/Videos.js hidden
-import { startTransition, useState, unstable_ViewTransition as ViewTransition } from "react";
-
-import { PauseIcon, PlayIcon } from "./Icons";
+import { useState, ViewTransition } from "react";
 import LikeButton from "./LikeButton";
 import { useRouter } from "./router";
+import { PauseIcon, PlayIcon } from "./Icons";
+import { startTransition } from "react";
 
 export function Thumbnail({ video, children }) {
-	// Add a name to animate with a shared element transition.
-	// This uses the default animation, no additional css needed.
-	return (
-		<ViewTransition name={`video-${video.id}`}>
-			<div aria-hidden="true" tabIndex={-1} className={`thumbnail ${video.image}`}>
-				{children}
-			</div>
-		</ViewTransition>
-	);
+  // Add a name to animate with a shared element transition.
+  // This uses the default animation, no additional css needed.
+  return (
+    <ViewTransition name={`video-${video.id}`}>
+      <div
+        aria-hidden="true"
+        tabIndex={-1}
+        className={`thumbnail ${video.image}`}
+      >
+        {children}
+      </div>
+    </ViewTransition>
+  );
 }
 
 export function VideoControls() {
-	const [isPlaying, setIsPlaying] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
 
-	return (
-		<span
-			className="controls"
-			onClick={() =>
-				startTransition(() => {
-					setIsPlaying((p) => !p);
-				})
-			}
-		>
-			{isPlaying ?
-				<PauseIcon />
-			:	<PlayIcon />}
-		</span>
-	);
+  return (
+    <span
+      className="controls"
+      onClick={() =>
+        startTransition(() => {
+          setIsPlaying((p) => !p);
+        })
+      }
+    >
+      {isPlaying ? <PauseIcon /> : <PlayIcon />}
+    </span>
+  );
 }
 
 export function Video({ video }) {
-	const { navigate } = useRouter();
+  const { navigate } = useRouter();
 
-	return (
-		<div className="video">
-			<div
-				className="link"
-				onClick={(e) => {
-					e.preventDefault();
-					navigate(`/video/${video.id}`);
-				}}
-			>
-				<Thumbnail video={video}></Thumbnail>
+  return (
+    <div className="video">
+      <div
+        className="link"
+        onClick={(e) => {
+          e.preventDefault();
+          navigate(`/video/${video.id}`);
+        }}
+      >
+        <Thumbnail video={video}></Thumbnail>
 
-				<div className="info">
-					<div className="video-title">{video.title}</div>
-					<div className="video-description">{video.description}</div>
-				</div>
-			</div>
-			<LikeButton video={video} />
-		</div>
-	);
+        <div className="info">
+          <div className="video-title">{video.title}</div>
+          <div className="video-description">{video.description}</div>
+        </div>
+      </div>
+      <LikeButton video={video} />
+    </div>
+  );
 }
 ```
 
+
 ```js src/data.js hidden
 const videos = [
-	{
-		id: "1",
-		title: "First video",
-		description: "Video description",
-		image: "blue",
-	},
-	{
-		id: "2",
-		title: "Second video",
-		description: "Video description",
-		image: "red",
-	},
-	{
-		id: "3",
-		title: "Third video",
-		description: "Video description",
-		image: "green",
-	},
-	{
-		id: "4",
-		title: "Fourth video",
-		description: "Video description",
-		image: "purple",
-	},
-	{
-		id: "5",
-		title: "Fifth video",
-		description: "Video description",
-		image: "yellow",
-	},
-	{
-		id: "6",
-		title: "Sixth video",
-		description: "Video description",
-		image: "gray",
-	},
+  {
+    id: '1',
+    title: 'First video',
+    description: 'Video description',
+    image: 'blue',
+  },
+  {
+    id: '2',
+    title: 'Second video',
+    description: 'Video description',
+    image: 'red',
+  },
+  {
+    id: '3',
+    title: 'Third video',
+    description: 'Video description',
+    image: 'green',
+  },
+  {
+    id: '4',
+    title: 'Fourth video',
+    description: 'Video description',
+    image: 'purple',
+  },
+  {
+    id: '5',
+    title: 'Fifth video',
+    description: 'Video description',
+    image: 'yellow',
+  },
+  {
+    id: '6',
+    title: 'Sixth video',
+    description: 'Video description',
+    image: 'gray',
+  },
 ];
 
 let videosCache = new Map();
@@ -8331,925 +7994,860 @@ let videoDetailsCache = new Map();
 const VIDEO_DELAY = 1;
 const VIDEO_DETAILS_DELAY = 1000;
 export function fetchVideos() {
-	if (videosCache.has(0)) {
-		return videosCache.get(0);
-	}
-	const promise = new Promise((resolve) => {
-		setTimeout(() => {
-			resolve(videos);
-		}, VIDEO_DELAY);
-	});
-	videosCache.set(0, promise);
-	return promise;
+  if (videosCache.has(0)) {
+    return videosCache.get(0);
+  }
+  const promise = new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(videos);
+    }, VIDEO_DELAY);
+  });
+  videosCache.set(0, promise);
+  return promise;
 }
 
 export function fetchVideo(id) {
-	if (videoCache.has(id)) {
-		return videoCache.get(id);
-	}
-	const promise = new Promise((resolve) => {
-		setTimeout(() => {
-			resolve(videos.find((video) => video.id === id));
-		}, VIDEO_DELAY);
-	});
-	videoCache.set(id, promise);
-	return promise;
+  if (videoCache.has(id)) {
+    return videoCache.get(id);
+  }
+  const promise = new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(videos.find((video) => video.id === id));
+    }, VIDEO_DELAY);
+  });
+  videoCache.set(id, promise);
+  return promise;
 }
 
 export function fetchVideoDetails(id) {
-	if (videoDetailsCache.has(id)) {
-		return videoDetailsCache.get(id);
-	}
-	const promise = new Promise((resolve) => {
-		setTimeout(() => {
-			resolve(videos.find((video) => video.id === id));
-		}, VIDEO_DETAILS_DELAY);
-	});
-	videoDetailsCache.set(id, promise);
-	return promise;
+  if (videoDetailsCache.has(id)) {
+    return videoDetailsCache.get(id);
+  }
+  const promise = new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(videos.find((video) => video.id === id));
+    }, VIDEO_DETAILS_DELAY);
+  });
+  videoDetailsCache.set(id, promise);
+  return promise;
 }
 ```
 
 ```js src/router.js hidden
-import {
-	unstable_addTransitionType as addTransitionType,
-	createContext,
-	use,
-	useEffect,
-	useLayoutEffect,
-	useState,
-	useTransition,
-} from "react";
+import {useState, createContext, use, useTransition, useLayoutEffect, useEffect, addTransitionType} from "react";
 
 export function Router({ children }) {
-	const [isPending, startTransition] = useTransition();
-	const [routerState, setRouterState] = useState({
-		pendingNav: () => {},
-		url: document.location.pathname,
-	});
-	function navigate(url) {
-		startTransition(() => {
-			// Transition type for the cause "nav forward"
-			addTransitionType("nav-forward");
-			go(url);
-		});
-	}
-	function navigateBack(url) {
-		startTransition(() => {
-			// Transition type for the cause "nav backward"
-			addTransitionType("nav-back");
-			go(url);
-		});
-	}
+  const [isPending, startTransition] = useTransition();
+  const [routerState, setRouterState] = useState({pendingNav: () => {}, url: document.location.pathname});
+  function navigate(url) {
+    startTransition(() => {
+      // Transition type for the cause "nav forward"
+      addTransitionType('nav-forward');
+      go(url);
+    });
+  }
+  function navigateBack(url) {
+    startTransition(() => {
+      // Transition type for the cause "nav backward"
+      addTransitionType('nav-back');
+      go(url);
+    });
+  }
 
-	function go(url) {
-		setRouterState({
-			url,
-			pendingNav() {
-				window.history.pushState({}, "", url);
-			},
-		});
-	}
+  function go(url) {
+    setRouterState({
+      url,
+      pendingNav() {
+        window.history.pushState({}, "", url);
+      },
+    });
+  }
 
-	useEffect(() => {
-		function handlePopState() {
-			// This should not animate because restoration has to be synchronous.
-			// Even though it's a transition.
-			startTransition(() => {
-				setRouterState({
-					url: document.location.pathname + document.location.search,
-					pendingNav() {
-						// Noop. URL has already updated.
-					},
-				});
-			});
-		}
-		window.addEventListener("popstate", handlePopState);
-		return () => {
-			window.removeEventListener("popstate", handlePopState);
-		};
-	}, []);
-	const pendingNav = routerState.pendingNav;
-	useLayoutEffect(() => {
-		pendingNav();
-	}, [pendingNav]);
+  useEffect(() => {
+    function handlePopState() {
+      // This should not animate because restoration has to be synchronous.
+      // Even though it's a transition.
+      startTransition(() => {
+        setRouterState({
+          url: document.location.pathname + document.location.search,
+          pendingNav() {
+            // Noop. URL has already updated.
+          },
+        });
+      });
+    }
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, []);
+  const pendingNav = routerState.pendingNav;
+  useLayoutEffect(() => {
+    pendingNav();
+  }, [pendingNav]);
 
-	return (
-		<RouterContext
-			value={{
-				url: routerState.url,
-				navigate,
-				navigateBack,
-				isPending,
-				params: {},
-			}}
-		>
-			{children}
-		</RouterContext>
-	);
+  return (
+    <RouterContext
+      value={{
+        url: routerState.url,
+        navigate,
+        navigateBack,
+        isPending,
+        params: {},
+      }}
+    >
+      {children}
+    </RouterContext>
+  );
 }
 
 const RouterContext = createContext({ url: "/", params: {} });
 
 export function useRouter() {
-	return use(RouterContext);
+  return use(RouterContext);
 }
 
 export function useIsNavPending() {
-	return use(RouterContext).isPending;
+  return use(RouterContext).isPending;
 }
+
 ```
 
 ```css src/styles.css hidden
 @font-face {
-	font-family: Optimistic Text;
-	src: url(https://react.dev/fonts/Optimistic_Text_W_Rg.woff2) format("woff2");
-	font-weight: 400;
-	font-style: normal;
-	font-display: swap;
+  font-family: Optimistic Text;
+  src: url(https://react.dev/fonts/Optimistic_Text_W_Rg.woff2) format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
-	font-family: Optimistic Text;
-	src: url(https://react.dev/fonts/Optimistic_Text_W_Md.woff2) format("woff2");
-	font-weight: 500;
-	font-style: normal;
-	font-display: swap;
+  font-family: Optimistic Text;
+  src: url(https://react.dev/fonts/Optimistic_Text_W_Md.woff2) format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
-	font-family: Optimistic Text;
-	src: url(https://react.dev/fonts/Optimistic_Text_W_Bd.woff2) format("woff2");
-	font-weight: 600;
-	font-style: normal;
-	font-display: swap;
+  font-family: Optimistic Text;
+  src: url(https://react.dev/fonts/Optimistic_Text_W_Bd.woff2) format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
-	font-family: Optimistic Text;
-	src: url(https://react.dev/fonts/Optimistic_Text_W_Bd.woff2) format("woff2");
-	font-weight: 700;
-	font-style: normal;
-	font-display: swap;
+  font-family: Optimistic Text;
+  src: url(https://react.dev/fonts/Optimistic_Text_W_Bd.woff2) format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
 }
 
 * {
-	box-sizing: border-box;
+  box-sizing: border-box;
 }
 
 html {
-	background-image: url(https://react.dev/images/meta-gradient-dark.png);
-	background-size: 100%;
-	background-position: -100%;
-	background-color: rgb(64 71 86);
-	background-repeat: no-repeat;
-	height: 100%;
-	width: 100%;
+  background-image: url(https://react.dev/images/meta-gradient-dark.png);
+  background-size: 100%;
+  background-position: -100%;
+  background-color: rgb(64 71 86);
+  background-repeat: no-repeat;
+  height: 100%;
+  width: 100%;
 }
 
 body {
-	font-family:
-		Optimistic Text,
-		-apple-system,
-		ui-sans-serif,
-		system-ui,
-		sans-serif,
-		Apple Color Emoji,
-		Segoe UI Emoji,
-		Segoe UI Symbol,
-		Noto Color Emoji;
-	padding: 10px 0 10px 0;
-	margin: 0;
-	display: flex;
-	justify-content: center;
+  font-family: Optimistic Text, -apple-system, ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji;
+  padding: 10px 0 10px 0;
+  margin: 0;
+  display: flex;
+  justify-content: center;
 }
 
 #root {
-	flex: 1 1;
-	height: auto;
-	background-color: #fff;
-	border-radius: 10px;
-	max-width: 450px;
-	min-height: 600px;
-	padding-bottom: 10px;
+  flex: 1 1;
+  height: auto;
+  background-color: #fff;
+  border-radius: 10px;
+  max-width: 450px;
+  min-height: 600px;
+  padding-bottom: 10px;
 }
 
 h1 {
-	margin-top: 0;
-	font-size: 22px;
+  margin-top: 0;
+  font-size: 22px;
 }
 
 h2 {
-	margin-top: 0;
-	font-size: 20px;
+  margin-top: 0;
+  font-size: 20px;
 }
 
 h3 {
-	margin-top: 0;
-	font-size: 18px;
+  margin-top: 0;
+  font-size: 18px;
 }
 
 h4 {
-	margin-top: 0;
-	font-size: 16px;
+  margin-top: 0;
+  font-size: 16px;
 }
 
 h5 {
-	margin-top: 0;
-	font-size: 14px;
+  margin-top: 0;
+  font-size: 14px;
 }
 
 h6 {
-	margin-top: 0;
-	font-size: 12px;
+  margin-top: 0;
+  font-size: 12px;
 }
 
 code {
-	font-size: 1.2em;
+  font-size: 1.2em;
 }
 
 ul {
-	padding-inline-start: 20px;
+  padding-inline-start: 20px;
 }
 
 .sr-only {
-	position: absolute;
-	width: 1px;
-	height: 1px;
-	padding: 0;
-	margin: -1px;
-	overflow: hidden;
-	clip: rect(0, 0, 0, 0);
-	white-space: nowrap;
-	border-width: 0;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }
 
 .absolute {
-	position: absolute;
+  position: absolute;
 }
 
 .overflow-visible {
-	overflow: visible;
+  overflow: visible;
 }
 
 .visible {
-	overflow: visible;
+  overflow: visible;
 }
 
 .fit {
-	width: fit-content;
+  width: fit-content;
 }
+
 
 /* Layout */
 .page {
-	display: flex;
-	flex-direction: column;
-	height: 100%;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .top-hero {
-	height: 200px;
-	display: flex;
-	justify-content: center;
-	align-items: center;
-	background-image: conic-gradient(
-		from 90deg at -10% 100%,
-		#2b303b 0deg,
-		#2b303b 90deg,
-		#16181d 1turn
-	);
+  height: 200px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-image: conic-gradient(
+      from 90deg at -10% 100%,
+      #2b303b 0deg,
+      #2b303b 90deg,
+      #16181d 1turn
+  );
 }
 
 .bottom {
-	flex: 1;
-	overflow: auto;
+  flex: 1;
+  overflow: auto;
 }
 
 .top-nav {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	margin-bottom: 0;
-	padding: 0 12px;
-	top: 0;
-	width: 100%;
-	height: 44px;
-	color: #23272f;
-	font-weight: 700;
-	font-size: 20px;
-	z-index: 100;
-	cursor: default;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0;
+  padding: 0 12px;
+  top: 0;
+  width: 100%;
+  height: 44px;
+  color: #23272f;
+  font-weight: 700;
+  font-size: 20px;
+  z-index: 100;
+  cursor: default;
 }
 
 .content {
-	padding: 0 12px;
-	margin-top: 4px;
+  padding: 0 12px;
+  margin-top: 4px;
 }
 
+
 .loader {
-	color: #23272f;
-	font-size: 3px;
-	width: 1em;
-	margin-right: 18px;
-	height: 1em;
-	border-radius: 50%;
-	position: relative;
-	text-indent: -9999em;
-	animation: loading-spinner 1.3s infinite linear;
-	animation-delay: 200ms;
-	transform: translateZ(0);
+  color: #23272f;
+  font-size: 3px;
+  width: 1em;
+  margin-right: 18px;
+  height: 1em;
+  border-radius: 50%;
+  position: relative;
+  text-indent: -9999em;
+  animation: loading-spinner 1.3s infinite linear;
+  animation-delay: 200ms;
+  transform: translateZ(0);
 }
 
 @keyframes loading-spinner {
-	0%,
-	100% {
-		box-shadow:
-			0 -3em 0 0.2em,
-			2em -2em 0 0em,
-			3em 0 0 -1em,
-			2em 2em 0 -1em,
-			0 3em 0 -1em,
-			-2em 2em 0 -1em,
-			-3em 0 0 -1em,
-			-2em -2em 0 0;
-	}
-	12.5% {
-		box-shadow:
-			0 -3em 0 0,
-			2em -2em 0 0.2em,
-			3em 0 0 0,
-			2em 2em 0 -1em,
-			0 3em 0 -1em,
-			-2em 2em 0 -1em,
-			-3em 0 0 -1em,
-			-2em -2em 0 -1em;
-	}
-	25% {
-		box-shadow:
-			0 -3em 0 -0.5em,
-			2em -2em 0 0,
-			3em 0 0 0.2em,
-			2em 2em 0 0,
-			0 3em 0 -1em,
-			-2em 2em 0 -1em,
-			-3em 0 0 -1em,
-			-2em -2em 0 -1em;
-	}
-	37.5% {
-		box-shadow:
-			0 -3em 0 -1em,
-			2em -2em 0 -1em,
-			3em 0em 0 0,
-			2em 2em 0 0.2em,
-			0 3em 0 0em,
-			-2em 2em 0 -1em,
-			-3em 0em 0 -1em,
-			-2em -2em 0 -1em;
-	}
-	50% {
-		box-shadow:
-			0 -3em 0 -1em,
-			2em -2em 0 -1em,
-			3em 0 0 -1em,
-			2em 2em 0 0em,
-			0 3em 0 0.2em,
-			-2em 2em 0 0,
-			-3em 0em 0 -1em,
-			-2em -2em 0 -1em;
-	}
-	62.5% {
-		box-shadow:
-			0 -3em 0 -1em,
-			2em -2em 0 -1em,
-			3em 0 0 -1em,
-			2em 2em 0 -1em,
-			0 3em 0 0,
-			-2em 2em 0 0.2em,
-			-3em 0 0 0,
-			-2em -2em 0 -1em;
-	}
-	75% {
-		box-shadow:
-			0em -3em 0 -1em,
-			2em -2em 0 -1em,
-			3em 0em 0 -1em,
-			2em 2em 0 -1em,
-			0 3em 0 -1em,
-			-2em 2em 0 0,
-			-3em 0em 0 0.2em,
-			-2em -2em 0 0;
-	}
-	87.5% {
-		box-shadow:
-			0em -3em 0 0,
-			2em -2em 0 -1em,
-			3em 0 0 -1em,
-			2em 2em 0 -1em,
-			0 3em 0 -1em,
-			-2em 2em 0 0,
-			-3em 0em 0 0,
-			-2em -2em 0 0.2em;
-	}
+  0%,
+  100% {
+    box-shadow: 0 -3em 0 0.2em,
+    2em -2em 0 0em, 3em 0 0 -1em,
+    2em 2em 0 -1em, 0 3em 0 -1em,
+    -2em 2em 0 -1em, -3em 0 0 -1em,
+    -2em -2em 0 0;
+  }
+  12.5% {
+    box-shadow: 0 -3em 0 0, 2em -2em 0 0.2em,
+    3em 0 0 0, 2em 2em 0 -1em, 0 3em 0 -1em,
+    -2em 2em 0 -1em, -3em 0 0 -1em,
+    -2em -2em 0 -1em;
+  }
+  25% {
+    box-shadow: 0 -3em 0 -0.5em,
+    2em -2em 0 0, 3em 0 0 0.2em,
+    2em 2em 0 0, 0 3em 0 -1em,
+    -2em 2em 0 -1em, -3em 0 0 -1em,
+    -2em -2em 0 -1em;
+  }
+  37.5% {
+    box-shadow: 0 -3em 0 -1em, 2em -2em 0 -1em,
+    3em 0em 0 0, 2em 2em 0 0.2em, 0 3em 0 0em,
+    -2em 2em 0 -1em, -3em 0em 0 -1em, -2em -2em 0 -1em;
+  }
+  50% {
+    box-shadow: 0 -3em 0 -1em, 2em -2em 0 -1em,
+    3em 0 0 -1em, 2em 2em 0 0em, 0 3em 0 0.2em,
+    -2em 2em 0 0, -3em 0em 0 -1em, -2em -2em 0 -1em;
+  }
+  62.5% {
+    box-shadow: 0 -3em 0 -1em, 2em -2em 0 -1em,
+    3em 0 0 -1em, 2em 2em 0 -1em, 0 3em 0 0,
+    -2em 2em 0 0.2em, -3em 0 0 0, -2em -2em 0 -1em;
+  }
+  75% {
+    box-shadow: 0em -3em 0 -1em, 2em -2em 0 -1em,
+    3em 0em 0 -1em, 2em 2em 0 -1em, 0 3em 0 -1em,
+    -2em 2em 0 0, -3em 0em 0 0.2em, -2em -2em 0 0;
+  }
+  87.5% {
+    box-shadow: 0em -3em 0 0, 2em -2em 0 -1em,
+    3em 0 0 -1em, 2em 2em 0 -1em, 0 3em 0 -1em,
+    -2em 2em 0 0, -3em 0em 0 0, -2em -2em 0 0.2em;
+  }
 }
 
 /* LikeButton */
 .like-button {
-	outline-offset: 2px;
-	position: relative;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	width: 2.5rem;
-	height: 2.5rem;
-	cursor: pointer;
-	border-radius: 9999px;
-	border: none;
-	outline: none 2px;
-	color: #5e687e;
-	background: none;
+  outline-offset: 2px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  cursor: pointer;
+  border-radius: 9999px;
+  border: none;
+  outline: none 2px;
+  color: #5e687e;
+  background: none;
 }
 
 .like-button:focus {
-	color: #a6423a;
-	background-color: rgba(166, 66, 58, 0.05);
+  color: #a6423a;
+  background-color: rgba(166, 66, 58, .05);
 }
 
 .like-button:active {
-	color: #a6423a;
-	background-color: rgba(166, 66, 58, 0.05);
-	transform: scaleX(0.95) scaleY(0.95);
+  color: #a6423a;
+  background-color: rgba(166, 66, 58, .05);
+  transform: scaleX(0.95) scaleY(0.95);
 }
 
 .like-button:hover {
-	background-color: #f6f7f9;
+  background-color: #f6f7f9;
 }
 
 .like-button.liked {
-	color: #a6423a;
+  color: #a6423a;
 }
 
 /* Icons */
 @keyframes circle {
-	0% {
-		transform: scale(0);
-		stroke-width: 16px;
-	}
+  0% {
+    transform: scale(0);
+    stroke-width: 16px;
+  }
 
-	50% {
-		transform: scale(0.5);
-		stroke-width: 16px;
-	}
+  50% {
+    transform: scale(.5);
+    stroke-width: 16px;
+  }
 
-	to {
-		transform: scale(1);
-		stroke-width: 0;
-	}
+  to {
+    transform: scale(1);
+    stroke-width: 0;
+  }
 }
 
 .circle {
-	color: rgba(166, 66, 58, 0.5);
-	transform-origin: center;
-	transition-property: all;
-	transition-duration: 0.15s;
-	transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  color: rgba(166, 66, 58, .5);
+  transform-origin: center;
+  transition-property: all;
+  transition-duration: .15s;
+  transition-timing-function: cubic-bezier(.4,0,.2,1);
 }
 
 .circle.liked.animate {
-	animation: circle 0.3s forwards;
+  animation: circle .3s forwards;
 }
 
 .heart {
-	width: 1.5rem;
-	height: 1.5rem;
+  width: 1.5rem;
+  height: 1.5rem;
 }
 
 .heart.liked {
-	transform-origin: center;
-	transition-property: all;
-	transition-duration: 0.15s;
-	transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: center;
+  transition-property: all;
+  transition-duration: .15s;
+  transition-timing-function: cubic-bezier(.4, 0, .2, 1);
 }
 
 .heart.liked.animate {
-	animation: scale 0.35s ease-in-out forwards;
+  animation: scale .35s ease-in-out forwards;
 }
 
 .control-icon {
-	color: hsla(0, 0%, 100%, 0.5);
-	filter: drop-shadow(0 20px 13px rgba(0, 0, 0, 0.03)) drop-shadow(0 8px 5px rgba(0, 0, 0, 0.08));
+  color: hsla(0, 0%, 100%, .5);
+  filter:  drop-shadow(0 20px 13px rgba(0, 0, 0, .03)) drop-shadow(0 8px 5px rgba(0, 0, 0, .08));
 }
 
 .chevron-left {
-	margin-top: 2px;
-	rotate: 90deg;
+  margin-top: 2px;
+  rotate: 90deg;
 }
+
 
 /* Video */
 .thumbnail {
-	position: relative;
-	aspect-ratio: 16 / 9;
-	display: flex;
-	overflow: hidden;
-	flex-direction: column;
-	justify-content: center;
-	align-items: center;
-	border-radius: 0.5rem;
-	outline-offset: 2px;
-	width: 8rem;
-	vertical-align: middle;
-	background-color: #ffffff;
-	background-size: cover;
-	user-select: none;
+  position: relative;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  overflow: hidden;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  border-radius: 0.5rem;
+  outline-offset: 2px;
+  width: 8rem;
+  vertical-align: middle;
+  background-color: #ffffff;
+  background-size: cover;
+  user-select: none;
 }
 
 .thumbnail.blue {
-	background-image: conic-gradient(at top right, #c76a15, #087ea4, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #087ea4, #2b3491);
 }
 
 .thumbnail.red {
-	background-image: conic-gradient(at top right, #c76a15, #a6423a, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #a6423a, #2b3491);
 }
 
 .thumbnail.green {
-	background-image: conic-gradient(at top right, #c76a15, #388f7f, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #388f7f, #2b3491);
 }
 
 .thumbnail.purple {
-	background-image: conic-gradient(at top right, #c76a15, #575fb7, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #575fb7, #2b3491);
 }
 
 .thumbnail.yellow {
-	background-image: conic-gradient(at top right, #c76a15, #fabd62, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #FABD62, #2b3491);
 }
 
 .thumbnail.gray {
-	background-image: conic-gradient(at top right, #c76a15, #4e5769, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #4E5769, #2b3491);
 }
 
 .video {
-	display: flex;
-	flex-direction: row;
-	gap: 0.75rem;
-	align-items: center;
+  display: flex;
+  flex-direction: row;
+  gap: 0.75rem;
+  align-items: center;
 }
 
 .video .link {
-	display: flex;
-	flex-direction: row;
-	flex: 1 1 0;
-	gap: 0.125rem;
-	outline-offset: 4px;
-	cursor: pointer;
+  display: flex;
+  flex-direction: row;
+  flex: 1 1 0;
+  gap: 0.125rem;
+  outline-offset: 4px;
+  cursor: pointer;
 }
 
 .video .info {
-	display: flex;
-	flex-direction: column;
-	justify-content: center;
-	margin-left: 8px;
-	gap: 0.125rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  margin-left: 8px;
+  gap: 0.125rem;
 }
 
 .video .info:hover {
-	text-decoration: underline;
+  text-decoration: underline;
 }
 
 .video-title {
-	font-size: 15px;
-	line-height: 1.25;
-	font-weight: 700;
-	color: #23272f;
+  font-size: 15px;
+  line-height: 1.25;
+  font-weight: 700;
+  color: #23272f;
 }
 
 .video-description {
-	color: #5e687e;
-	font-size: 13px;
+  color: #5e687e;
+  font-size: 13px;
 }
 
 /* Details */
 .details .thumbnail {
-	position: relative;
-	aspect-ratio: 16 / 9;
-	display: flex;
-	overflow: hidden;
-	flex-direction: column;
-	justify-content: center;
-	align-items: center;
-	border-radius: 0.5rem;
-	outline-offset: 2px;
-	width: 100%;
-	vertical-align: middle;
-	background-color: #ffffff;
-	background-size: cover;
-	user-select: none;
+  position: relative;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  overflow: hidden;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  border-radius: 0.5rem;
+  outline-offset: 2px;
+  width: 100%;
+  vertical-align: middle;
+  background-color: #ffffff;
+  background-size: cover;
+  user-select: none;
 }
 
 .video-details-title {
-	margin-top: 8px;
+  margin-top: 8px;
 }
 
 .video-details-speaker {
-	display: flex;
-	gap: 8px;
-	margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  margin-top: 10px
 }
 
 .back {
-	display: flex;
-	align-items: center;
-	margin-left: -5px;
-	cursor: pointer;
+  display: flex;
+  align-items: center;
+  margin-left: -5px;
+  cursor: pointer;
 }
 
 .back:hover {
-	text-decoration: underline;
+  text-decoration: underline;
 }
 
 .info-title {
-	font-size: 1.5rem;
-	font-weight: 700;
-	line-height: 1.25;
-	margin: 8px 0 0 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.25;
+  margin: 8px 0 0 0 ;
 }
 
 .info-description {
-	margin: 8px 0 0 0;
+  margin: 8px 0 0 0;
 }
 
 .controls {
-	cursor: pointer;
+  cursor: pointer;
 }
 
 .fallback {
-	background: #f6f7f8 linear-gradient(to right, #e6e6e6 5%, #cccccc 25%, #e6e6e6 35%) no-repeat;
-	background-size: 800px 104px;
-	display: block;
-	line-height: 1.25;
-	margin: 8px 0 0 0;
-	border-radius: 5px;
-	overflow: hidden;
+  background: #f6f7f8 linear-gradient(to right, #e6e6e6 5%, #cccccc 25%, #e6e6e6 35%) no-repeat;
+  background-size: 800px 104px;
+  display: block;
+  line-height: 1.25;
+  margin: 8px 0 0 0;
+  border-radius: 5px;
+  overflow: hidden;
 
-	animation: 1s linear 1s infinite shimmer;
-	animation-delay: 300ms;
-	animation-duration: 1s;
-	animation-fill-mode: forwards;
-	animation-iteration-count: infinite;
-	animation-name: shimmer;
-	animation-timing-function: linear;
+  animation: 1s linear 1s infinite shimmer;
+  animation-delay: 300ms;
+  animation-duration: 1s;
+  animation-fill-mode: forwards;
+  animation-iteration-count: infinite;
+  animation-name: shimmer;
+  animation-timing-function: linear;
 }
 
+
 .fallback.title {
-	width: 130px;
-	height: 30px;
+  width: 130px;
+  height: 30px;
+
 }
 
 .fallback.description {
-	width: 150px;
-	height: 21px;
+  width: 150px;
+  height: 21px;
 }
 
 @keyframes shimmer {
-	0% {
-		background-position: -468px 0;
-	}
+  0% {
+    background-position: -468px 0;
+  }
 
-	100% {
-		background-position: 468px 0;
-	}
+  100% {
+    background-position: 468px 0;
+  }
 }
 
 .search {
-	margin-bottom: 10px;
+  margin-bottom: 10px;
 }
 .search-input {
-	width: 100%;
-	position: relative;
+  width: 100%;
+  position: relative;
 }
 
 .search-icon {
-	position: absolute;
-	top: 0;
-	bottom: 0;
-	inset-inline-start: 0;
-	display: flex;
-	align-items: center;
-	padding-inline-start: 1rem;
-	pointer-events: none;
-	color: #99a1b3;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  inset-inline-start: 0;
+  display: flex;
+  align-items: center;
+  padding-inline-start: 1rem;
+  pointer-events: none;
+  color: #99a1b3;
 }
 
 .search-input input {
-	display: flex;
-	padding-inline-start: 2.75rem;
-	padding-top: 10px;
-	padding-bottom: 10px;
-	width: 100%;
-	text-align: start;
-	background-color: rgb(235 236 240);
-	outline: 2px solid transparent;
-	cursor: pointer;
-	border: none;
-	align-items: center;
-	color: rgb(35 39 47);
-	border-radius: 9999px;
-	vertical-align: middle;
-	font-size: 15px;
+  display: flex;
+  padding-inline-start: 2.75rem;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  width: 100%;
+  text-align: start;
+  background-color: rgb(235 236 240);
+  outline: 2px solid transparent;
+  cursor: pointer;
+  border: none;
+  align-items: center;
+  color: rgb(35 39 47);
+  border-radius: 9999px;
+  vertical-align: middle;
+  font-size: 15px;
 }
 
-.search-input input:hover,
-.search-input input:active {
-	background-color: rgb(235 236 240/ 0.8);
-	color: rgb(35 39 47/ 0.8);
+.search-input input:hover, .search-input input:active {
+  background-color: rgb(235 236 240/ 0.8);
+  color: rgb(35 39 47/ 0.8);
 }
 
 /* Home */
 .video-list {
-	position: relative;
+  position: relative;
 }
 
 .video-list .videos {
-	display: flex;
-	flex-direction: column;
-	gap: 1rem;
-	overflow-y: auto;
-	height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  overflow-y: auto;
+  height: 100%;
 }
 ```
+
 
 ```css src/animations.css
 /* Slide the fallback down */
 ::view-transition-old(.slide-down) {
-	animation:
-		150ms ease-out both fade-out,
-		150ms ease-out both slide-down;
+    animation: 150ms ease-out both fade-out, 150ms ease-out both slide-down;
 }
 
 /* Slide the content up */
 ::view-transition-new(.slide-up) {
-	animation:
-		210ms ease-in 150ms both fade-in,
-		400ms ease-in both slide-up;
+    animation: 210ms ease-in 150ms both fade-in, 400ms ease-in both slide-up;
 }
 
 /* Define the new keyframes */
 @keyframes slide-up {
-	from {
-		transform: translateY(10px);
-	}
-	to {
-		transform: translateY(0);
-	}
+    from {
+        transform: translateY(10px);
+    }
+    to {
+        transform: translateY(0);
+    }
 }
 
 @keyframes slide-down {
-	from {
-		transform: translateY(0);
-	}
-	to {
-		transform: translateY(10px);
-	}
+    from {
+        transform: translateY(0);
+    }
+    to {
+        transform: translateY(10px);
+    }
 }
 
 /* Previously defined animations below */
 
 /* Animations for view transition classed added by transition type */
 ::view-transition-old(.slide-forward) {
-	/* when sliding forward, the "old" page should slide out to left. */
-	animation:
-		150ms cubic-bezier(0.4, 0, 1, 1) both fade-out,
-		400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-to-left;
+    /* when sliding forward, the "old" page should slide out to left. */
+    animation: 150ms cubic-bezier(0.4, 0, 1, 1) both fade-out,
+    400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-to-left;
 }
 
 ::view-transition-new(.slide-forward) {
-	/* when sliding forward, the "new" page should slide in from right. */
-	animation:
-		210ms cubic-bezier(0, 0, 0.2, 1) 150ms both fade-in,
-		400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-from-right;
+    /* when sliding forward, the "new" page should slide in from right. */
+    animation: 210ms cubic-bezier(0, 0, 0.2, 1) 150ms both fade-in,
+    400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-from-right;
 }
 
 ::view-transition-old(.slide-back) {
-	/* when sliding back, the "old" page should slide out to right. */
-	animation:
-		150ms cubic-bezier(0.4, 0, 1, 1) both fade-out,
-		400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-to-right;
+    /* when sliding back, the "old" page should slide out to right. */
+    animation: 150ms cubic-bezier(0.4, 0, 1, 1) both fade-out,
+    400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-to-right;
 }
 
 ::view-transition-new(.slide-back) {
-	/* when sliding back, the "new" page should slide in from left. */
-	animation:
-		210ms cubic-bezier(0, 0, 0.2, 1) 150ms both fade-in,
-		400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-from-left;
+    /* when sliding back, the "new" page should slide in from left. */
+    animation: 210ms cubic-bezier(0, 0, 0.2, 1) 150ms both fade-in,
+    400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-from-left;
 }
 
 /* Keyframes to support our animations above. */
 @keyframes fade-in {
-	from {
-		opacity: 0;
-	}
+    from {
+        opacity: 0;
+    }
 }
 
 @keyframes fade-out {
-	to {
-		opacity: 0;
-	}
+    to {
+        opacity: 0;
+    }
 }
 
 @keyframes slide-to-right {
-	to {
-		transform: translateX(50px);
-	}
+    to {
+        transform: translateX(50px);
+    }
 }
 
 @keyframes slide-from-right {
-	from {
-		transform: translateX(50px);
-	}
-	to {
-		transform: translateX(0);
-	}
+    from {
+        transform: translateX(50px);
+    }
+    to {
+        transform: translateX(0);
+    }
 }
 
 @keyframes slide-to-left {
-	to {
-		transform: translateX(-50px);
-	}
+    to {
+        transform: translateX(-50px);
+    }
 }
 
 @keyframes slide-from-left {
-	from {
-		transform: translateX(-50px);
-	}
-	to {
-		transform: translateX(0);
-	}
+    from {
+        transform: translateX(-50px);
+    }
+    to {
+        transform: translateX(0);
+    }
 }
 
 /* Default .slow-fade. */
 ::view-transition-old(.slow-fade) {
-	animation-duration: 500ms;
+    animation-duration: 500ms;
 }
 
 ::view-transition-new(.slow-fade) {
-	animation-duration: 500ms;
+    animation-duration: 500ms;
 }
 ```
 
 ```js src/index.js hidden
-import React, { StrictMode } from "react";
-import { createRoot } from "react-dom/client";
+import React, {StrictMode} from 'react';
+import {createRoot} from 'react-dom/client';
+import './styles.css';
+import './animations.css';
 
-import "./styles.css";
-import "./animations.css";
+import App from './App';
+import {Router} from './router';
 
-import App from "./App";
-import { Router } from "./router";
-
-const root = createRoot(document.getElementById("root"));
+const root = createRoot(document.getElementById('root'));
 root.render(
-	<StrictMode>
-		<Router>
-			<App />
-		</Router>
-	</StrictMode>,
+  <StrictMode>
+    <Router>
+      <App />
+    </Router>
+  </StrictMode>
 );
 ```
 
 ```json package.json hidden
 {
-	"dependencies": {
-		"react": "experimental",
-		"react-dom": "experimental",
-		"react-scripts": "latest"
-	},
-	"scripts": {
-		"start": "react-scripts start",
-		"build": "react-scripts build",
-		"test": "react-scripts test --env=jsdom",
-		"eject": "react-scripts eject"
-	}
+  "dependencies": {
+    "react": "canary",
+    "react-dom": "canary",
+    "react-scripts": "latest"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test --env=jsdom",
+    "eject": "react-scripts eject"
+  }
 }
 ```
 
 </Sandpack>
 
-### Animating Lists {/_animating-lists_/}
+
+### Animating Lists {/*animating-lists*/}
 
 You can also use `<ViewTransition>` to animate lists of items as they re-order, like in a searchable list of items:
 
 ```js {3,5}
 <div className="videos">
-	{filteredVideos.map((video) => (
-		<ViewTransition key={video.id}>
-			<Video video={video} />
-		</ViewTransition>
-	))}
+  {filteredVideos.map((video) => (
+    <ViewTransition key={video.id}>
+      <Video video={video} />
+    </ViewTransition>
+  ))}
 </div>
 ```
 
 To activate the ViewTransition, we can use `useDeferredValue`:
 
 ```js {2}
-const [searchText, setSearchText] = useState("");
+const [searchText, setSearchText] = useState('');
 const deferredSearchText = useDeferredValue(searchText);
 const filteredVideos = filterVideos(videos, deferredSearchText);
 ```
@@ -9259,479 +8857,462 @@ Now the items animate as you type in the search bar:
 <Sandpack>
 
 ```js src/App.js hidden
-import { unstable_ViewTransition as ViewTransition } from "react";
-
+import { ViewTransition } from "react";
 import Details from "./Details";
 import Home from "./Home";
 import { useRouter } from "./router";
 
 export default function App() {
-	const { url } = useRouter();
+  const { url } = useRouter();
 
-	// Default slow-fade animation.
-	return (
-		<ViewTransition default="slow-fade">
-			{url === "/" ?
-				<Home />
-			:	<Details />}
-		</ViewTransition>
-	);
+  // Default slow-fade animation.
+  return (
+    <ViewTransition default="slow-fade">
+      {url === "/" ? <Home /> : <Details />}
+    </ViewTransition>
+  );
 }
 ```
 
 ```js src/Details.js hidden
-import { Suspense, use, unstable_ViewTransition as ViewTransition } from "react";
-
+import { use, Suspense, ViewTransition } from "react";
 import { fetchVideo, fetchVideoDetails } from "./data";
-import { ChevronLeft } from "./Icons";
-import Layout from "./Layout";
-import { useRouter } from "./router";
 import { Thumbnail, VideoControls } from "./Videos";
+import { useRouter } from "./router";
+import Layout from "./Layout";
+import { ChevronLeft } from "./Icons";
 
-function VideoDetails({ id }) {
-	// Animate from Suspense fallback to content
-	return (
-		<Suspense
-			fallback={
-				// Animate the fallback down.
-				<ViewTransition exit="slide-down">
-					<VideoInfoFallback />
-				</ViewTransition>
-			}
-		>
-			{/* Animate the content up */}
-			<ViewTransition enter="slide-up">
-				<VideoInfo id={id} />
-			</ViewTransition>
-		</Suspense>
-	);
+function VideoDetails({id}) {
+  // Animate from Suspense fallback to content
+  return (
+    <Suspense
+      fallback={
+        // Animate the fallback down.
+        <ViewTransition exit="slide-down">
+          <VideoInfoFallback />
+        </ViewTransition>
+      }
+    >
+      {/* Animate the content up */}
+      <ViewTransition enter="slide-up">
+        <VideoInfo id={id} />
+      </ViewTransition>
+    </Suspense>
+  );
 }
 
 function VideoInfoFallback() {
-	return (
-		<>
-			<div className="fallback title"></div>
-			<div className="fallback description"></div>
-		</>
-	);
+  return (
+    <>
+      <div className="fallback title"></div>
+      <div className="fallback description"></div>
+    </>
+  );
 }
 
 export default function Details() {
-	const { url, navigateBack } = useRouter();
-	const videoId = url.split("/").pop();
-	const video = use(fetchVideo(videoId));
+  const { url, navigateBack } = useRouter();
+  const videoId = url.split("/").pop();
+  const video = use(fetchVideo(videoId));
 
-	return (
-		<Layout
-			heading={
-				<div
-					className="fit back"
-					onClick={() => {
-						navigateBack("/");
-					}}
-				>
-					<ChevronLeft /> Back
-				</div>
-			}
-		>
-			<div className="details">
-				<Thumbnail video={video} large>
-					<VideoControls />
-				</Thumbnail>
-				<VideoDetails id={video.id} />
-			</div>
-		</Layout>
-	);
+  return (
+    <Layout
+      heading={
+        <div
+          className="fit back"
+          onClick={() => {
+            navigateBack("/");
+          }}
+        >
+          <ChevronLeft /> Back
+        </div>
+      }
+    >
+      <div className="details">
+        <Thumbnail video={video} large>
+          <VideoControls />
+        </Thumbnail>
+        <VideoDetails id={video.id} />
+      </div>
+    </Layout>
+  );
 }
 
 function VideoInfo({ id }) {
-	const details = use(fetchVideoDetails(id));
-	return (
-		<>
-			<p className="info-title">{details.title}</p>
-			<p className="info-description">{details.description}</p>
-		</>
-	);
+  const details = use(fetchVideoDetails(id));
+  return (
+    <>
+      <p className="info-title">{details.title}</p>
+      <p className="info-description">{details.description}</p>
+    </>
+  );
 }
 ```
 
 ```js src/Home.js
-import {
-	use,
-	useDeferredValue,
-	useId,
-	useState,
-	unstable_ViewTransition as ViewTransition,
-} from "react";
+import { useId, useState, use, useDeferredValue, ViewTransition } from "react";import { Video } from "./Videos";import Layout from "./Layout";import { fetchVideos } from "./data";import { IconSearch } from "./Icons";
 
-import { fetchVideos } from "./data";
-import { IconSearch } from "./Icons";
-import Layout from "./Layout";
-import { Video } from "./Videos";
-
-function SearchList({ searchText, videos }) {
-	// Activate with useDeferredValue ("when")
-	const deferredSearchText = useDeferredValue(searchText);
-	const filteredVideos = filterVideos(videos, deferredSearchText);
-	return (
-		<div className="video-list">
-			<div className="videos">
-				{filteredVideos.map((video) => (
-					// Animate each item in list ("what")
-					<ViewTransition key={video.id}>
-						<Video video={video} />
-					</ViewTransition>
-				))}
-			</div>
-			{filteredVideos.length === 0 && <div className="no-results">No results</div>}
-		</div>
-	);
+function SearchList({searchText, videos}) {
+  // Activate with useDeferredValue ("when")
+  const deferredSearchText = useDeferredValue(searchText);
+  const filteredVideos = filterVideos(videos, deferredSearchText);
+  return (
+    <div className="video-list">
+      <div className="videos">
+        {filteredVideos.map((video) => (
+          // Animate each item in list ("what")
+          <ViewTransition key={video.id}>
+            <Video video={video} />
+          </ViewTransition>
+        ))}
+      </div>
+      {filteredVideos.length === 0 && (
+        <div className="no-results">No results</div>
+      )}
+    </div>
+  );
 }
 
 export default function Home() {
-	const videos = use(fetchVideos());
-	const count = videos.length;
-	const [searchText, setSearchText] = useState("");
+  const videos = use(fetchVideos());
+  const count = videos.length;
+  const [searchText, setSearchText] = useState('');
 
-	return (
-		<Layout heading={<div className="fit">{count} Videos</div>}>
-			<SearchInput value={searchText} onChange={setSearchText} />
-			<SearchList videos={videos} searchText={searchText} />
-		</Layout>
-	);
+  return (
+    <Layout heading={<div className="fit">{count} Videos</div>}>
+      <SearchInput value={searchText} onChange={setSearchText} />
+      <SearchList videos={videos} searchText={searchText} />
+    </Layout>
+  );
 }
 
 function SearchInput({ value, onChange }) {
-	const id = useId();
-	return (
-		<form className="search" onSubmit={(e) => e.preventDefault()}>
-			<label htmlFor={id} className="sr-only">
-				Search
-			</label>
-			<div className="search-input">
-				<div className="search-icon">
-					<IconSearch />
-				</div>
-				<input
-					type="text"
-					id={id}
-					placeholder="Search"
-					value={value}
-					onChange={(e) => onChange(e.target.value)}
-				/>
-			</div>
-		</form>
-	);
+  const id = useId();
+  return (
+    <form className="search" onSubmit={(e) => e.preventDefault()}>
+      <label htmlFor={id} className="sr-only">
+        Search
+      </label>
+      <div className="search-input">
+        <div className="search-icon">
+          <IconSearch />
+        </div>
+        <input
+          type="text"
+          id={id}
+          placeholder="Search"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      </div>
+    </form>
+  );
 }
 
 function filterVideos(videos, query) {
-	const keywords = query
-		.toLowerCase()
-		.split(" ")
-		.filter((s) => s !== "");
-	if (keywords.length === 0) {
-		return videos;
-	}
-	return videos.filter((video) => {
-		const words = (video.title + " " + video.description).toLowerCase().split(" ");
-		return keywords.every((kw) => words.some((w) => w.includes(kw)));
-	});
+  const keywords = query
+    .toLowerCase()
+    .split(" ")
+    .filter((s) => s !== "");
+  if (keywords.length === 0) {
+    return videos;
+  }
+  return videos.filter((video) => {
+    const words = (video.title + " " + video.description)
+      .toLowerCase()
+      .split(" ");
+    return keywords.every((kw) => words.some((w) => w.includes(kw)));
+  });
 }
 ```
 
 ```js src/Icons.js hidden
 export function ChevronLeft() {
-	return (
-		<svg
-			className="chevron-left"
-			xmlns="http://www.w3.org/2000/svg"
-			width="20"
-			height="20"
-			viewBox="0 0 20 20"
-		>
-			<g fill="none" fillRule="evenodd" transform="translate(-446 -398)">
-				<path
-					fill="currentColor"
-					fillRule="nonzero"
-					d="M95.8838835,240.366117 C95.3957281,239.877961 94.6042719,239.877961 94.1161165,240.366117 C93.6279612,240.854272 93.6279612,241.645728 94.1161165,242.133883 L98.6161165,246.633883 C99.1042719,247.122039 99.8957281,247.122039 100.383883,246.633883 L104.883883,242.133883 C105.372039,241.645728 105.372039,240.854272 104.883883,240.366117 C104.395728,239.877961 103.604272,239.877961 103.116117,240.366117 L99.5,243.982233 L95.8838835,240.366117 Z"
-					transform="translate(356.5 164.5)"
-				/>
-				<polygon points="446 418 466 418 466 398 446 398" />
-			</g>
-		</svg>
-	);
+  return (
+    <svg
+      className="chevron-left"
+      xmlns="http://www.w3.org/2000/svg"
+      width="20"
+      height="20"
+      viewBox="0 0 20 20">
+      <g fill="none" fillRule="evenodd" transform="translate(-446 -398)">
+        <path
+          fill="currentColor"
+          fillRule="nonzero"
+          d="M95.8838835,240.366117 C95.3957281,239.877961 94.6042719,239.877961 94.1161165,240.366117 C93.6279612,240.854272 93.6279612,241.645728 94.1161165,242.133883 L98.6161165,246.633883 C99.1042719,247.122039 99.8957281,247.122039 100.383883,246.633883 L104.883883,242.133883 C105.372039,241.645728 105.372039,240.854272 104.883883,240.366117 C104.395728,239.877961 103.604272,239.877961 103.116117,240.366117 L99.5,243.982233 L95.8838835,240.366117 Z"
+          transform="translate(356.5 164.5)"
+        />
+        <polygon points="446 418 466 418 466 398 446 398" />
+      </g>
+    </svg>
+  );
 }
 
 export function PauseIcon() {
-	return (
-		<svg
-			className="control-icon"
-			style={{ padding: "4px" }}
-			width="100"
-			height="100"
-			viewBox="0 0 512 512"
-			fill="none"
-			xmlns="http://www.w3.org/2000/svg"
-		>
-			<path
-				fillRule="evenodd"
-				clipRule="evenodd"
-				d="M256 0C114.617 0 0 114.615 0 256s114.617 256 256 256 256-114.615 256-256S397.383 0 256 0zm-32 320c0 8.836-7.164 16-16 16h-32c-8.836 0-16-7.164-16-16V192c0-8.836 7.164-16 16-16h32c8.836 0 16 7.164 16 16v128zm128 0c0 8.836-7.164 16-16 16h-32c-8.836 0-16-7.164-16-16V192c0-8.836 7.164-16 16-16h32c8.836 0 16 7.164 16 16v128z"
-				fill="currentColor"
-			/>
-		</svg>
-	);
+  return (
+    <svg
+      className="control-icon"
+      style={{padding: '4px'}}
+      width="100"
+      height="100"
+      viewBox="0 0 512 512"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg">
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M256 0C114.617 0 0 114.615 0 256s114.617 256 256 256 256-114.615 256-256S397.383 0 256 0zm-32 320c0 8.836-7.164 16-16 16h-32c-8.836 0-16-7.164-16-16V192c0-8.836 7.164-16 16-16h32c8.836 0 16 7.164 16 16v128zm128 0c0 8.836-7.164 16-16 16h-32c-8.836 0-16-7.164-16-16V192c0-8.836 7.164-16 16-16h32c8.836 0 16 7.164 16 16v128z"
+        fill="currentColor"
+      />
+    </svg>
+  );
 }
 
 export function PlayIcon() {
-	return (
-		<svg
-			className="control-icon"
-			width="100"
-			height="100"
-			viewBox="0 0 72 72"
-			fill="none"
-			xmlns="http://www.w3.org/2000/svg"
-		>
-			<path
-				fillRule="evenodd"
-				clipRule="evenodd"
-				d="M36 69C54.2254 69 69 54.2254 69 36C69 17.7746 54.2254 3 36 3C17.7746 3 3 17.7746 3 36C3 54.2254 17.7746 69 36 69ZM52.1716 38.6337L28.4366 51.5801C26.4374 52.6705 24 51.2235 24 48.9464V23.0536C24 20.7764 26.4374 19.3295 28.4366 20.4199L52.1716 33.3663C54.2562 34.5034 54.2562 37.4966 52.1716 38.6337Z"
-				fill="currentColor"
-			/>
-		</svg>
-	);
+  return (
+    <svg
+      className="control-icon"
+      width="100"
+      height="100"
+      viewBox="0 0 72 72"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg">
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M36 69C54.2254 69 69 54.2254 69 36C69 17.7746 54.2254 3 36 3C17.7746 3 3 17.7746 3 36C3 54.2254 17.7746 69 36 69ZM52.1716 38.6337L28.4366 51.5801C26.4374 52.6705 24 51.2235 24 48.9464V23.0536C24 20.7764 26.4374 19.3295 28.4366 20.4199L52.1716 33.3663C54.2562 34.5034 54.2562 37.4966 52.1716 38.6337Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
 }
-export function Heart({ liked, animate }) {
-	return (
-		<>
-			<svg
-				className="absolute overflow-visible"
-				viewBox="0 0 24 24"
-				fill="none"
-				xmlns="http://www.w3.org/2000/svg"
-			>
-				<circle
-					className={`circle ${liked ? "liked" : ""} ${animate ? "animate" : ""}`}
-					cx="12"
-					cy="12"
-					r="11.5"
-					fill="transparent"
-					strokeWidth="0"
-					stroke="currentColor"
-				/>
-			</svg>
+export function Heart({liked, animate}) {
+  return (
+    <>
+      <svg
+        className="absolute overflow-visible"
+        viewBox="0 0 24 24"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg">
+        <circle
+          className={`circle ${liked ? 'liked' : ''} ${animate ? 'animate' : ''}`}
+          cx="12"
+          cy="12"
+          r="11.5"
+          fill="transparent"
+          strokeWidth="0"
+          stroke="currentColor"
+        />
+      </svg>
 
-			<svg
-				className={`heart ${liked ? "liked" : ""} ${animate ? "animate" : ""}`}
-				viewBox="0 0 24 24"
-				fill="none"
-				xmlns="http://www.w3.org/2000/svg"
-			>
-				{liked ?
-					<path
-						d="M12 23a.496.496 0 0 1-.26-.074C7.023 19.973 0 13.743 0 8.68c0-4.12 2.322-6.677 6.058-6.677 2.572 0 5.108 2.387 5.134 2.41l.808.771.808-.771C12.834 4.387 15.367 2 17.935 2 21.678 2 24 4.558 24 8.677c0 5.06-7.022 11.293-11.74 14.246a.496.496 0 0 1-.26.074V23z"
-						fill="currentColor"
-					/>
-				:	<path
-						fillRule="evenodd"
-						clipRule="evenodd"
-						d="m12 5.184-.808-.771-.004-.004C11.065 4.299 8.522 2.003 6 2.003c-3.736 0-6 2.558-6 6.677 0 4.47 5.471 9.848 10 13.079.602.43 1.187.82 1.74 1.167A.497.497 0 0 0 12 23v-.003c.09 0 .182-.026.26-.074C16.977 19.97 24 13.737 24 8.677 24 4.557 21.743 2 18 2c-2.569 0-5.166 2.387-5.192 2.413L12 5.184zm-.002 15.525c2.071-1.388 4.477-3.342 6.427-5.47C20.72 12.733 22 10.401 22 8.677c0-1.708-.466-2.855-1.087-3.55C20.316 4.459 19.392 4 18 4c-.726 0-1.63.364-2.5.9-.67.412-1.148.82-1.266.92-.03.025-.037.031-.019.014l-.013.013L12 7.949 9.832 5.88a10.08 10.08 0 0 0-1.33-.977C7.633 4.367 6.728 4.003 6 4.003c-1.388 0-2.312.459-2.91 1.128C2.466 5.826 2 6.974 2 8.68c0 1.726 1.28 4.058 3.575 6.563 1.948 2.127 4.352 4.078 6.423 5.466z"
-						fill="currentColor"
-					/>
-				}
-			</svg>
-		</>
-	);
+      <svg
+        className={`heart ${liked ? 'liked' : ''} ${animate ? 'animate' : ''}`}
+        viewBox="0 0 24 24"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg">
+        {liked ? (
+          <path
+            d="M12 23a.496.496 0 0 1-.26-.074C7.023 19.973 0 13.743 0 8.68c0-4.12 2.322-6.677 6.058-6.677 2.572 0 5.108 2.387 5.134 2.41l.808.771.808-.771C12.834 4.387 15.367 2 17.935 2 21.678 2 24 4.558 24 8.677c0 5.06-7.022 11.293-11.74 14.246a.496.496 0 0 1-.26.074V23z"
+            fill="currentColor"
+          />
+        ) : (
+          <path
+            fillRule="evenodd"
+            clipRule="evenodd"
+            d="m12 5.184-.808-.771-.004-.004C11.065 4.299 8.522 2.003 6 2.003c-3.736 0-6 2.558-6 6.677 0 4.47 5.471 9.848 10 13.079.602.43 1.187.82 1.74 1.167A.497.497 0 0 0 12 23v-.003c.09 0 .182-.026.26-.074C16.977 19.97 24 13.737 24 8.677 24 4.557 21.743 2 18 2c-2.569 0-5.166 2.387-5.192 2.413L12 5.184zm-.002 15.525c2.071-1.388 4.477-3.342 6.427-5.47C20.72 12.733 22 10.401 22 8.677c0-1.708-.466-2.855-1.087-3.55C20.316 4.459 19.392 4 18 4c-.726 0-1.63.364-2.5.9-.67.412-1.148.82-1.266.92-.03.025-.037.031-.019.014l-.013.013L12 7.949 9.832 5.88a10.08 10.08 0 0 0-1.33-.977C7.633 4.367 6.728 4.003 6 4.003c-1.388 0-2.312.459-2.91 1.128C2.466 5.826 2 6.974 2 8.68c0 1.726 1.28 4.058 3.575 6.563 1.948 2.127 4.352 4.078 6.423 5.466z"
+            fill="currentColor"
+          />
+        )}
+      </svg>
+    </>
+  );
 }
 
 export function IconSearch(props) {
-	return (
-		<svg width="1em" height="1em" viewBox="0 0 20 20">
-			<path
-				d="M14.386 14.386l4.0877 4.0877-4.0877-4.0877c-2.9418 2.9419-7.7115 2.9419-10.6533 0-2.9419-2.9418-2.9419-7.7115 0-10.6533 2.9418-2.9419 7.7115-2.9419 10.6533 0 2.9419 2.9418 2.9419 7.7115 0 10.6533z"
-				stroke="currentColor"
-				fill="none"
-				strokeWidth="2"
-				fillRule="evenodd"
-				strokeLinecap="round"
-				strokeLinejoin="round"
-			></path>
-		</svg>
-	);
+  return (
+    <svg width="1em" height="1em" viewBox="0 0 20 20">
+      <path
+        d="M14.386 14.386l4.0877 4.0877-4.0877-4.0877c-2.9418 2.9419-7.7115 2.9419-10.6533 0-2.9419-2.9418-2.9419-7.7115 0-10.6533 2.9418-2.9419 7.7115-2.9419 10.6533 0 2.9419 2.9418 2.9419 7.7115 0 10.6533z"
+        stroke="currentColor"
+        fill="none"
+        strokeWidth="2"
+        fillRule="evenodd"
+        strokeLinecap="round"
+        strokeLinejoin="round"></path>
+    </svg>
+  );
 }
 ```
 
 ```js src/Layout.js hidden
-import { unstable_ViewTransition as ViewTransition } from "react";
-
+import {ViewTransition} from 'react';
 import { useIsNavPending } from "./router";
 
 export default function Page({ heading, children }) {
-	const isPending = useIsNavPending();
-	return (
-		<div className="page">
-			<div className="top">
-				<div className="top-nav">
-					{/* Custom classes based on transition type. */}
-					<ViewTransition
-						name="nav"
-						share={{
-							"nav-forward": "slide-forward",
-							"nav-back": "slide-back",
-						}}
-					>
-						{heading}
-					</ViewTransition>
-					{isPending && <span className="loader"></span>}
-				</div>
-			</div>
-			{/* Opt-out of ViewTransition for the content. */}
-			{/* Content can define it's own ViewTransition. */}
-			<ViewTransition default="none">
-				<div className="bottom">
-					<div className="content">{children}</div>
-				</div>
-			</ViewTransition>
-		</div>
-	);
+  const isPending = useIsNavPending();
+  return (
+    <div className="page">
+      <div className="top">
+        <div className="top-nav">
+          {/* Custom classes based on transition type. */}
+          <ViewTransition
+            name="nav"
+            share={{
+              'nav-forward': 'slide-forward',
+              'nav-back': 'slide-back',
+            }}>
+            {heading}
+          </ViewTransition>
+          {isPending && <span className="loader"></span>}
+        </div>
+      </div>
+      {/* Opt-out of ViewTransition for the content. */}
+      {/* Content can define it's own ViewTransition. */}
+      <ViewTransition default="none">
+        <div className="bottom">
+          <div className="content">{children}</div>
+        </div>
+      </ViewTransition>
+    </div>
+  );
 }
 ```
 
 ```js src/LikeButton.js hidden
-import { useState } from "react";
-
-import { Heart } from "./Icons";
+import {useState} from 'react';
+import {Heart} from './Icons';
 
 // A hack since we don't actually have a backend.
 // Unlike local state, this survives videos being filtered.
 const likedVideos = new Set();
 
-export default function LikeButton({ video }) {
-	const [isLiked, setIsLiked] = useState(() => likedVideos.has(video.id));
-	const [animate, setAnimate] = useState(false);
-	return (
-		<button
-			className={`like-button ${isLiked && "liked"}`}
-			aria-label={isLiked ? "Unsave" : "Save"}
-			onClick={() => {
-				const nextIsLiked = !isLiked;
-				if (nextIsLiked) {
-					likedVideos.add(video.id);
-				} else {
-					likedVideos.delete(video.id);
-				}
-				setAnimate(true);
-				setIsLiked(nextIsLiked);
-			}}
-		>
-			<Heart liked={isLiked} animate={animate} />
-		</button>
-	);
+export default function LikeButton({video}) {
+  const [isLiked, setIsLiked] = useState(() => likedVideos.has(video.id));
+  const [animate, setAnimate] = useState(false);
+  return (
+    <button
+      className={`like-button ${isLiked && 'liked'}`}
+      aria-label={isLiked ? 'Unsave' : 'Save'}
+      onClick={() => {
+        const nextIsLiked = !isLiked;
+        if (nextIsLiked) {
+          likedVideos.add(video.id);
+        } else {
+          likedVideos.delete(video.id);
+        }
+        setAnimate(true);
+        setIsLiked(nextIsLiked);
+      }}>
+      <Heart liked={isLiked} animate={animate} />
+    </button>
+  );
 }
 ```
 
 ```js src/Videos.js hidden
-import { startTransition, useState, unstable_ViewTransition as ViewTransition } from "react";
-
-import { PauseIcon, PlayIcon } from "./Icons";
+import { useState, ViewTransition } from "react";
 import LikeButton from "./LikeButton";
 import { useRouter } from "./router";
+import { PauseIcon, PlayIcon } from "./Icons";
+import { startTransition } from "react";
 
 export function Thumbnail({ video, children }) {
-	// Add a name to animate with a shared element transition.
-	// This uses the default animation, no additional css needed.
-	return (
-		<ViewTransition name={`video-${video.id}`}>
-			<div aria-hidden="true" tabIndex={-1} className={`thumbnail ${video.image}`}>
-				{children}
-			</div>
-		</ViewTransition>
-	);
+  // Add a name to animate with a shared element transition.
+  // This uses the default animation, no additional css needed.
+  return (
+    <ViewTransition name={`video-${video.id}`}>
+      <div
+        aria-hidden="true"
+        tabIndex={-1}
+        className={`thumbnail ${video.image}`}
+      >
+        {children}
+      </div>
+    </ViewTransition>
+  );
 }
 
 export function VideoControls() {
-	const [isPlaying, setIsPlaying] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
 
-	return (
-		<span
-			className="controls"
-			onClick={() =>
-				startTransition(() => {
-					setIsPlaying((p) => !p);
-				})
-			}
-		>
-			{isPlaying ?
-				<PauseIcon />
-			:	<PlayIcon />}
-		</span>
-	);
+  return (
+    <span
+      className="controls"
+      onClick={() =>
+        startTransition(() => {
+          setIsPlaying((p) => !p);
+        })
+      }
+    >
+      {isPlaying ? <PauseIcon /> : <PlayIcon />}
+    </span>
+  );
 }
 
 export function Video({ video }) {
-	const { navigate } = useRouter();
+  const { navigate } = useRouter();
 
-	return (
-		<div className="video">
-			<div
-				className="link"
-				onClick={(e) => {
-					e.preventDefault();
-					navigate(`/video/${video.id}`);
-				}}
-			>
-				<Thumbnail video={video}></Thumbnail>
+  return (
+    <div className="video">
+      <div
+        className="link"
+        onClick={(e) => {
+          e.preventDefault();
+          navigate(`/video/${video.id}`);
+        }}
+      >
+        <Thumbnail video={video}></Thumbnail>
 
-				<div className="info">
-					<div className="video-title">{video.title}</div>
-					<div className="video-description">{video.description}</div>
-				</div>
-			</div>
-			<LikeButton video={video} />
-		</div>
-	);
+        <div className="info">
+          <div className="video-title">{video.title}</div>
+          <div className="video-description">{video.description}</div>
+        </div>
+      </div>
+      <LikeButton video={video} />
+    </div>
+  );
 }
 ```
 
+
 ```js src/data.js hidden
 const videos = [
-	{
-		id: "1",
-		title: "First video",
-		description: "Video description",
-		image: "blue",
-	},
-	{
-		id: "2",
-		title: "Second video",
-		description: "Video description",
-		image: "red",
-	},
-	{
-		id: "3",
-		title: "Third video",
-		description: "Video description",
-		image: "green",
-	},
-	{
-		id: "4",
-		title: "Fourth video",
-		description: "Video description",
-		image: "purple",
-	},
-	{
-		id: "5",
-		title: "Fifth video",
-		description: "Video description",
-		image: "yellow",
-	},
-	{
-		id: "6",
-		title: "Sixth video",
-		description: "Video description",
-		image: "gray",
-	},
+  {
+    id: '1',
+    title: 'First video',
+    description: 'Video description',
+    image: 'blue',
+  },
+  {
+    id: '2',
+    title: 'Second video',
+    description: 'Video description',
+    image: 'red',
+  },
+  {
+    id: '3',
+    title: 'Third video',
+    description: 'Video description',
+    image: 'green',
+  },
+  {
+    id: '4',
+    title: 'Fourth video',
+    description: 'Video description',
+    image: 'purple',
+  },
+  {
+    id: '5',
+    title: 'Fifth video',
+    description: 'Video description',
+    image: 'yellow',
+  },
+  {
+    id: '6',
+    title: 'Sixth video',
+    description: 'Video description',
+    image: 'gray',
+  },
 ];
 
 let videosCache = new Map();
@@ -9740,908 +9321,856 @@ let videoDetailsCache = new Map();
 const VIDEO_DELAY = 1;
 const VIDEO_DETAILS_DELAY = 1000;
 export function fetchVideos() {
-	if (videosCache.has(0)) {
-		return videosCache.get(0);
-	}
-	const promise = new Promise((resolve) => {
-		setTimeout(() => {
-			resolve(videos);
-		}, VIDEO_DELAY);
-	});
-	videosCache.set(0, promise);
-	return promise;
+  if (videosCache.has(0)) {
+    return videosCache.get(0);
+  }
+  const promise = new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(videos);
+    }, VIDEO_DELAY);
+  });
+  videosCache.set(0, promise);
+  return promise;
 }
 
 export function fetchVideo(id) {
-	if (videoCache.has(id)) {
-		return videoCache.get(id);
-	}
-	const promise = new Promise((resolve) => {
-		setTimeout(() => {
-			resolve(videos.find((video) => video.id === id));
-		}, VIDEO_DELAY);
-	});
-	videoCache.set(id, promise);
-	return promise;
+  if (videoCache.has(id)) {
+    return videoCache.get(id);
+  }
+  const promise = new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(videos.find((video) => video.id === id));
+    }, VIDEO_DELAY);
+  });
+  videoCache.set(id, promise);
+  return promise;
 }
 
 export function fetchVideoDetails(id) {
-	if (videoDetailsCache.has(id)) {
-		return videoDetailsCache.get(id);
-	}
-	const promise = new Promise((resolve) => {
-		setTimeout(() => {
-			resolve(videos.find((video) => video.id === id));
-		}, VIDEO_DETAILS_DELAY);
-	});
-	videoDetailsCache.set(id, promise);
-	return promise;
+  if (videoDetailsCache.has(id)) {
+    return videoDetailsCache.get(id);
+  }
+  const promise = new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(videos.find((video) => video.id === id));
+    }, VIDEO_DETAILS_DELAY);
+  });
+  videoDetailsCache.set(id, promise);
+  return promise;
 }
 ```
 
 ```js src/router.js hidden
-import {
-	unstable_addTransitionType as addTransitionType,
-	createContext,
-	use,
-	useEffect,
-	useLayoutEffect,
-	useState,
-	useTransition,
-} from "react";
+import {useState, createContext, use, useTransition, useLayoutEffect, useEffect, addTransitionType} from "react";
 
 export function Router({ children }) {
-	const [isPending, startTransition] = useTransition();
-	const [routerState, setRouterState] = useState({
-		pendingNav: () => {},
-		url: document.location.pathname,
-	});
-	function navigate(url) {
-		startTransition(() => {
-			// Transition type for the cause "nav forward"
-			addTransitionType("nav-forward");
-			go(url);
-		});
-	}
-	function navigateBack(url) {
-		startTransition(() => {
-			// Transition type for the cause "nav backward"
-			addTransitionType("nav-back");
-			go(url);
-		});
-	}
+  const [isPending, startTransition] = useTransition();
+  const [routerState, setRouterState] = useState({pendingNav: () => {}, url: document.location.pathname});
+  function navigate(url) {
+    startTransition(() => {
+      // Transition type for the cause "nav forward"
+      addTransitionType('nav-forward');
+      go(url);
+    });
+  }
+  function navigateBack(url) {
+    startTransition(() => {
+      // Transition type for the cause "nav backward"
+      addTransitionType('nav-back');
+      go(url);
+    });
+  }
 
-	function go(url) {
-		setRouterState({
-			url,
-			pendingNav() {
-				window.history.pushState({}, "", url);
-			},
-		});
-	}
+  function go(url) {
+    setRouterState({
+      url,
+      pendingNav() {
+        window.history.pushState({}, "", url);
+      },
+    });
+  }
 
-	useEffect(() => {
-		function handlePopState() {
-			// This should not animate because restoration has to be synchronous.
-			// Even though it's a transition.
-			startTransition(() => {
-				setRouterState({
-					url: document.location.pathname + document.location.search,
-					pendingNav() {
-						// Noop. URL has already updated.
-					},
-				});
-			});
-		}
-		window.addEventListener("popstate", handlePopState);
-		return () => {
-			window.removeEventListener("popstate", handlePopState);
-		};
-	}, []);
-	const pendingNav = routerState.pendingNav;
-	useLayoutEffect(() => {
-		pendingNav();
-	}, [pendingNav]);
+  useEffect(() => {
+    function handlePopState() {
+      // This should not animate because restoration has to be synchronous.
+      // Even though it's a transition.
+      startTransition(() => {
+        setRouterState({
+          url: document.location.pathname + document.location.search,
+          pendingNav() {
+            // Noop. URL has already updated.
+          },
+        });
+      });
+    }
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, []);
+  const pendingNav = routerState.pendingNav;
+  useLayoutEffect(() => {
+    pendingNav();
+  }, [pendingNav]);
 
-	return (
-		<RouterContext
-			value={{
-				url: routerState.url,
-				navigate,
-				navigateBack,
-				isPending,
-				params: {},
-			}}
-		>
-			{children}
-		</RouterContext>
-	);
+  return (
+    <RouterContext
+      value={{
+        url: routerState.url,
+        navigate,
+        navigateBack,
+        isPending,
+        params: {},
+      }}
+    >
+      {children}
+    </RouterContext>
+  );
 }
 
 const RouterContext = createContext({ url: "/", params: {} });
 
 export function useRouter() {
-	return use(RouterContext);
+  return use(RouterContext);
 }
 
 export function useIsNavPending() {
-	return use(RouterContext).isPending;
+  return use(RouterContext).isPending;
 }
+
 ```
 
 ```css src/styles.css hidden
 @font-face {
-	font-family: Optimistic Text;
-	src: url(https://react.dev/fonts/Optimistic_Text_W_Rg.woff2) format("woff2");
-	font-weight: 400;
-	font-style: normal;
-	font-display: swap;
+  font-family: Optimistic Text;
+  src: url(https://react.dev/fonts/Optimistic_Text_W_Rg.woff2) format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
-	font-family: Optimistic Text;
-	src: url(https://react.dev/fonts/Optimistic_Text_W_Md.woff2) format("woff2");
-	font-weight: 500;
-	font-style: normal;
-	font-display: swap;
+  font-family: Optimistic Text;
+  src: url(https://react.dev/fonts/Optimistic_Text_W_Md.woff2) format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
-	font-family: Optimistic Text;
-	src: url(https://react.dev/fonts/Optimistic_Text_W_Bd.woff2) format("woff2");
-	font-weight: 600;
-	font-style: normal;
-	font-display: swap;
+  font-family: Optimistic Text;
+  src: url(https://react.dev/fonts/Optimistic_Text_W_Bd.woff2) format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
-	font-family: Optimistic Text;
-	src: url(https://react.dev/fonts/Optimistic_Text_W_Bd.woff2) format("woff2");
-	font-weight: 700;
-	font-style: normal;
-	font-display: swap;
+  font-family: Optimistic Text;
+  src: url(https://react.dev/fonts/Optimistic_Text_W_Bd.woff2) format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
 }
 
 * {
-	box-sizing: border-box;
+  box-sizing: border-box;
 }
 
 html {
-	background-image: url(https://react.dev/images/meta-gradient-dark.png);
-	background-size: 100%;
-	background-position: -100%;
-	background-color: rgb(64 71 86);
-	background-repeat: no-repeat;
-	height: 100%;
-	width: 100%;
+  background-image: url(https://react.dev/images/meta-gradient-dark.png);
+  background-size: 100%;
+  background-position: -100%;
+  background-color: rgb(64 71 86);
+  background-repeat: no-repeat;
+  height: 100%;
+  width: 100%;
 }
 
 body {
-	font-family:
-		Optimistic Text,
-		-apple-system,
-		ui-sans-serif,
-		system-ui,
-		sans-serif,
-		Apple Color Emoji,
-		Segoe UI Emoji,
-		Segoe UI Symbol,
-		Noto Color Emoji;
-	padding: 10px 0 10px 0;
-	margin: 0;
-	display: flex;
-	justify-content: center;
+  font-family: Optimistic Text, -apple-system, ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji;
+  padding: 10px 0 10px 0;
+  margin: 0;
+  display: flex;
+  justify-content: center;
 }
 
 #root {
-	flex: 1 1;
-	height: auto;
-	background-color: #fff;
-	border-radius: 10px;
-	max-width: 450px;
-	min-height: 600px;
-	padding-bottom: 10px;
+  flex: 1 1;
+  height: auto;
+  background-color: #fff;
+  border-radius: 10px;
+  max-width: 450px;
+  min-height: 600px;
+  padding-bottom: 10px;
 }
 
 h1 {
-	margin-top: 0;
-	font-size: 22px;
+  margin-top: 0;
+  font-size: 22px;
 }
 
 h2 {
-	margin-top: 0;
-	font-size: 20px;
+  margin-top: 0;
+  font-size: 20px;
 }
 
 h3 {
-	margin-top: 0;
-	font-size: 18px;
+  margin-top: 0;
+  font-size: 18px;
 }
 
 h4 {
-	margin-top: 0;
-	font-size: 16px;
+  margin-top: 0;
+  font-size: 16px;
 }
 
 h5 {
-	margin-top: 0;
-	font-size: 14px;
+  margin-top: 0;
+  font-size: 14px;
 }
 
 h6 {
-	margin-top: 0;
-	font-size: 12px;
+  margin-top: 0;
+  font-size: 12px;
 }
 
 code {
-	font-size: 1.2em;
+  font-size: 1.2em;
 }
 
 ul {
-	padding-inline-start: 20px;
+  padding-inline-start: 20px;
 }
 
 .sr-only {
-	position: absolute;
-	width: 1px;
-	height: 1px;
-	padding: 0;
-	margin: -1px;
-	overflow: hidden;
-	clip: rect(0, 0, 0, 0);
-	white-space: nowrap;
-	border-width: 0;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }
 
 .absolute {
-	position: absolute;
+  position: absolute;
 }
 
 .overflow-visible {
-	overflow: visible;
+  overflow: visible;
 }
 
 .visible {
-	overflow: visible;
+  overflow: visible;
 }
 
 .fit {
-	width: fit-content;
+  width: fit-content;
 }
+
 
 /* Layout */
 .page {
-	display: flex;
-	flex-direction: column;
-	height: 100%;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .top-hero {
-	height: 200px;
-	display: flex;
-	justify-content: center;
-	align-items: center;
-	background-image: conic-gradient(
-		from 90deg at -10% 100%,
-		#2b303b 0deg,
-		#2b303b 90deg,
-		#16181d 1turn
-	);
+  height: 200px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-image: conic-gradient(
+      from 90deg at -10% 100%,
+      #2b303b 0deg,
+      #2b303b 90deg,
+      #16181d 1turn
+  );
 }
 
 .bottom {
-	flex: 1;
-	overflow: auto;
+  flex: 1;
+  overflow: auto;
 }
 
 .top-nav {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	margin-bottom: 0;
-	padding: 0 12px;
-	top: 0;
-	width: 100%;
-	height: 44px;
-	color: #23272f;
-	font-weight: 700;
-	font-size: 20px;
-	z-index: 100;
-	cursor: default;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0;
+  padding: 0 12px;
+  top: 0;
+  width: 100%;
+  height: 44px;
+  color: #23272f;
+  font-weight: 700;
+  font-size: 20px;
+  z-index: 100;
+  cursor: default;
 }
 
 .content {
-	padding: 0 12px;
-	margin-top: 4px;
+  padding: 0 12px;
+  margin-top: 4px;
 }
 
+
 .loader {
-	color: #23272f;
-	font-size: 3px;
-	width: 1em;
-	margin-right: 18px;
-	height: 1em;
-	border-radius: 50%;
-	position: relative;
-	text-indent: -9999em;
-	animation: loading-spinner 1.3s infinite linear;
-	animation-delay: 200ms;
-	transform: translateZ(0);
+  color: #23272f;
+  font-size: 3px;
+  width: 1em;
+  margin-right: 18px;
+  height: 1em;
+  border-radius: 50%;
+  position: relative;
+  text-indent: -9999em;
+  animation: loading-spinner 1.3s infinite linear;
+  animation-delay: 200ms;
+  transform: translateZ(0);
 }
 
 @keyframes loading-spinner {
-	0%,
-	100% {
-		box-shadow:
-			0 -3em 0 0.2em,
-			2em -2em 0 0em,
-			3em 0 0 -1em,
-			2em 2em 0 -1em,
-			0 3em 0 -1em,
-			-2em 2em 0 -1em,
-			-3em 0 0 -1em,
-			-2em -2em 0 0;
-	}
-	12.5% {
-		box-shadow:
-			0 -3em 0 0,
-			2em -2em 0 0.2em,
-			3em 0 0 0,
-			2em 2em 0 -1em,
-			0 3em 0 -1em,
-			-2em 2em 0 -1em,
-			-3em 0 0 -1em,
-			-2em -2em 0 -1em;
-	}
-	25% {
-		box-shadow:
-			0 -3em 0 -0.5em,
-			2em -2em 0 0,
-			3em 0 0 0.2em,
-			2em 2em 0 0,
-			0 3em 0 -1em,
-			-2em 2em 0 -1em,
-			-3em 0 0 -1em,
-			-2em -2em 0 -1em;
-	}
-	37.5% {
-		box-shadow:
-			0 -3em 0 -1em,
-			2em -2em 0 -1em,
-			3em 0em 0 0,
-			2em 2em 0 0.2em,
-			0 3em 0 0em,
-			-2em 2em 0 -1em,
-			-3em 0em 0 -1em,
-			-2em -2em 0 -1em;
-	}
-	50% {
-		box-shadow:
-			0 -3em 0 -1em,
-			2em -2em 0 -1em,
-			3em 0 0 -1em,
-			2em 2em 0 0em,
-			0 3em 0 0.2em,
-			-2em 2em 0 0,
-			-3em 0em 0 -1em,
-			-2em -2em 0 -1em;
-	}
-	62.5% {
-		box-shadow:
-			0 -3em 0 -1em,
-			2em -2em 0 -1em,
-			3em 0 0 -1em,
-			2em 2em 0 -1em,
-			0 3em 0 0,
-			-2em 2em 0 0.2em,
-			-3em 0 0 0,
-			-2em -2em 0 -1em;
-	}
-	75% {
-		box-shadow:
-			0em -3em 0 -1em,
-			2em -2em 0 -1em,
-			3em 0em 0 -1em,
-			2em 2em 0 -1em,
-			0 3em 0 -1em,
-			-2em 2em 0 0,
-			-3em 0em 0 0.2em,
-			-2em -2em 0 0;
-	}
-	87.5% {
-		box-shadow:
-			0em -3em 0 0,
-			2em -2em 0 -1em,
-			3em 0 0 -1em,
-			2em 2em 0 -1em,
-			0 3em 0 -1em,
-			-2em 2em 0 0,
-			-3em 0em 0 0,
-			-2em -2em 0 0.2em;
-	}
+  0%,
+  100% {
+    box-shadow: 0 -3em 0 0.2em,
+    2em -2em 0 0em, 3em 0 0 -1em,
+    2em 2em 0 -1em, 0 3em 0 -1em,
+    -2em 2em 0 -1em, -3em 0 0 -1em,
+    -2em -2em 0 0;
+  }
+  12.5% {
+    box-shadow: 0 -3em 0 0, 2em -2em 0 0.2em,
+    3em 0 0 0, 2em 2em 0 -1em, 0 3em 0 -1em,
+    -2em 2em 0 -1em, -3em 0 0 -1em,
+    -2em -2em 0 -1em;
+  }
+  25% {
+    box-shadow: 0 -3em 0 -0.5em,
+    2em -2em 0 0, 3em 0 0 0.2em,
+    2em 2em 0 0, 0 3em 0 -1em,
+    -2em 2em 0 -1em, -3em 0 0 -1em,
+    -2em -2em 0 -1em;
+  }
+  37.5% {
+    box-shadow: 0 -3em 0 -1em, 2em -2em 0 -1em,
+    3em 0em 0 0, 2em 2em 0 0.2em, 0 3em 0 0em,
+    -2em 2em 0 -1em, -3em 0em 0 -1em, -2em -2em 0 -1em;
+  }
+  50% {
+    box-shadow: 0 -3em 0 -1em, 2em -2em 0 -1em,
+    3em 0 0 -1em, 2em 2em 0 0em, 0 3em 0 0.2em,
+    -2em 2em 0 0, -3em 0em 0 -1em, -2em -2em 0 -1em;
+  }
+  62.5% {
+    box-shadow: 0 -3em 0 -1em, 2em -2em 0 -1em,
+    3em 0 0 -1em, 2em 2em 0 -1em, 0 3em 0 0,
+    -2em 2em 0 0.2em, -3em 0 0 0, -2em -2em 0 -1em;
+  }
+  75% {
+    box-shadow: 0em -3em 0 -1em, 2em -2em 0 -1em,
+    3em 0em 0 -1em, 2em 2em 0 -1em, 0 3em 0 -1em,
+    -2em 2em 0 0, -3em 0em 0 0.2em, -2em -2em 0 0;
+  }
+  87.5% {
+    box-shadow: 0em -3em 0 0, 2em -2em 0 -1em,
+    3em 0 0 -1em, 2em 2em 0 -1em, 0 3em 0 -1em,
+    -2em 2em 0 0, -3em 0em 0 0, -2em -2em 0 0.2em;
+  }
 }
 
 /* LikeButton */
 .like-button {
-	outline-offset: 2px;
-	position: relative;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	width: 2.5rem;
-	height: 2.5rem;
-	cursor: pointer;
-	border-radius: 9999px;
-	border: none;
-	outline: none 2px;
-	color: #5e687e;
-	background: none;
+  outline-offset: 2px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  cursor: pointer;
+  border-radius: 9999px;
+  border: none;
+  outline: none 2px;
+  color: #5e687e;
+  background: none;
 }
 
 .like-button:focus {
-	color: #a6423a;
-	background-color: rgba(166, 66, 58, 0.05);
+  color: #a6423a;
+  background-color: rgba(166, 66, 58, .05);
 }
 
 .like-button:active {
-	color: #a6423a;
-	background-color: rgba(166, 66, 58, 0.05);
-	transform: scaleX(0.95) scaleY(0.95);
+  color: #a6423a;
+  background-color: rgba(166, 66, 58, .05);
+  transform: scaleX(0.95) scaleY(0.95);
 }
 
 .like-button:hover {
-	background-color: #f6f7f9;
+  background-color: #f6f7f9;
 }
 
 .like-button.liked {
-	color: #a6423a;
+  color: #a6423a;
 }
 
 /* Icons */
 @keyframes circle {
-	0% {
-		transform: scale(0);
-		stroke-width: 16px;
-	}
+  0% {
+    transform: scale(0);
+    stroke-width: 16px;
+  }
 
-	50% {
-		transform: scale(0.5);
-		stroke-width: 16px;
-	}
+  50% {
+    transform: scale(.5);
+    stroke-width: 16px;
+  }
 
-	to {
-		transform: scale(1);
-		stroke-width: 0;
-	}
+  to {
+    transform: scale(1);
+    stroke-width: 0;
+  }
 }
 
 .circle {
-	color: rgba(166, 66, 58, 0.5);
-	transform-origin: center;
-	transition-property: all;
-	transition-duration: 0.15s;
-	transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  color: rgba(166, 66, 58, .5);
+  transform-origin: center;
+  transition-property: all;
+  transition-duration: .15s;
+  transition-timing-function: cubic-bezier(.4,0,.2,1);
 }
 
 .circle.liked.animate {
-	animation: circle 0.3s forwards;
+  animation: circle .3s forwards;
 }
 
 .heart {
-	width: 1.5rem;
-	height: 1.5rem;
+  width: 1.5rem;
+  height: 1.5rem;
 }
 
 .heart.liked {
-	transform-origin: center;
-	transition-property: all;
-	transition-duration: 0.15s;
-	transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: center;
+  transition-property: all;
+  transition-duration: .15s;
+  transition-timing-function: cubic-bezier(.4, 0, .2, 1);
 }
 
 .heart.liked.animate {
-	animation: scale 0.35s ease-in-out forwards;
+  animation: scale .35s ease-in-out forwards;
 }
 
 .control-icon {
-	color: hsla(0, 0%, 100%, 0.5);
-	filter: drop-shadow(0 20px 13px rgba(0, 0, 0, 0.03)) drop-shadow(0 8px 5px rgba(0, 0, 0, 0.08));
+  color: hsla(0, 0%, 100%, .5);
+  filter:  drop-shadow(0 20px 13px rgba(0, 0, 0, .03)) drop-shadow(0 8px 5px rgba(0, 0, 0, .08));
 }
 
 .chevron-left {
-	margin-top: 2px;
-	rotate: 90deg;
+  margin-top: 2px;
+  rotate: 90deg;
 }
+
 
 /* Video */
 .thumbnail {
-	position: relative;
-	aspect-ratio: 16 / 9;
-	display: flex;
-	overflow: hidden;
-	flex-direction: column;
-	justify-content: center;
-	align-items: center;
-	border-radius: 0.5rem;
-	outline-offset: 2px;
-	width: 8rem;
-	vertical-align: middle;
-	background-color: #ffffff;
-	background-size: cover;
-	user-select: none;
+  position: relative;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  overflow: hidden;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  border-radius: 0.5rem;
+  outline-offset: 2px;
+  width: 8rem;
+  vertical-align: middle;
+  background-color: #ffffff;
+  background-size: cover;
+  user-select: none;
 }
 
 .thumbnail.blue {
-	background-image: conic-gradient(at top right, #c76a15, #087ea4, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #087ea4, #2b3491);
 }
 
 .thumbnail.red {
-	background-image: conic-gradient(at top right, #c76a15, #a6423a, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #a6423a, #2b3491);
 }
 
 .thumbnail.green {
-	background-image: conic-gradient(at top right, #c76a15, #388f7f, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #388f7f, #2b3491);
 }
 
 .thumbnail.purple {
-	background-image: conic-gradient(at top right, #c76a15, #575fb7, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #575fb7, #2b3491);
 }
 
 .thumbnail.yellow {
-	background-image: conic-gradient(at top right, #c76a15, #fabd62, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #FABD62, #2b3491);
 }
 
 .thumbnail.gray {
-	background-image: conic-gradient(at top right, #c76a15, #4e5769, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #4E5769, #2b3491);
 }
 
 .video {
-	display: flex;
-	flex-direction: row;
-	gap: 0.75rem;
-	align-items: center;
+  display: flex;
+  flex-direction: row;
+  gap: 0.75rem;
+  align-items: center;
 }
 
 .video .link {
-	display: flex;
-	flex-direction: row;
-	flex: 1 1 0;
-	gap: 0.125rem;
-	outline-offset: 4px;
-	cursor: pointer;
+  display: flex;
+  flex-direction: row;
+  flex: 1 1 0;
+  gap: 0.125rem;
+  outline-offset: 4px;
+  cursor: pointer;
 }
 
 .video .info {
-	display: flex;
-	flex-direction: column;
-	justify-content: center;
-	margin-left: 8px;
-	gap: 0.125rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  margin-left: 8px;
+  gap: 0.125rem;
 }
 
 .video .info:hover {
-	text-decoration: underline;
+  text-decoration: underline;
 }
 
 .video-title {
-	font-size: 15px;
-	line-height: 1.25;
-	font-weight: 700;
-	color: #23272f;
+  font-size: 15px;
+  line-height: 1.25;
+  font-weight: 700;
+  color: #23272f;
 }
 
 .video-description {
-	color: #5e687e;
-	font-size: 13px;
+  color: #5e687e;
+  font-size: 13px;
 }
 
 /* Details */
 .details .thumbnail {
-	position: relative;
-	aspect-ratio: 16 / 9;
-	display: flex;
-	overflow: hidden;
-	flex-direction: column;
-	justify-content: center;
-	align-items: center;
-	border-radius: 0.5rem;
-	outline-offset: 2px;
-	width: 100%;
-	vertical-align: middle;
-	background-color: #ffffff;
-	background-size: cover;
-	user-select: none;
+  position: relative;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  overflow: hidden;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  border-radius: 0.5rem;
+  outline-offset: 2px;
+  width: 100%;
+  vertical-align: middle;
+  background-color: #ffffff;
+  background-size: cover;
+  user-select: none;
 }
 
 .video-details-title {
-	margin-top: 8px;
+  margin-top: 8px;
 }
 
 .video-details-speaker {
-	display: flex;
-	gap: 8px;
-	margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  margin-top: 10px
 }
 
 .back {
-	display: flex;
-	align-items: center;
-	margin-left: -5px;
-	cursor: pointer;
+  display: flex;
+  align-items: center;
+  margin-left: -5px;
+  cursor: pointer;
 }
 
 .back:hover {
-	text-decoration: underline;
+  text-decoration: underline;
 }
 
 .info-title {
-	font-size: 1.5rem;
-	font-weight: 700;
-	line-height: 1.25;
-	margin: 8px 0 0 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.25;
+  margin: 8px 0 0 0 ;
 }
 
 .info-description {
-	margin: 8px 0 0 0;
+  margin: 8px 0 0 0;
 }
 
 .controls {
-	cursor: pointer;
+  cursor: pointer;
 }
 
 .fallback {
-	background: #f6f7f8 linear-gradient(to right, #e6e6e6 5%, #cccccc 25%, #e6e6e6 35%) no-repeat;
-	background-size: 800px 104px;
-	display: block;
-	line-height: 1.25;
-	margin: 8px 0 0 0;
-	border-radius: 5px;
-	overflow: hidden;
+  background: #f6f7f8 linear-gradient(to right, #e6e6e6 5%, #cccccc 25%, #e6e6e6 35%) no-repeat;
+  background-size: 800px 104px;
+  display: block;
+  line-height: 1.25;
+  margin: 8px 0 0 0;
+  border-radius: 5px;
+  overflow: hidden;
 
-	animation: 1s linear 1s infinite shimmer;
-	animation-delay: 300ms;
-	animation-duration: 1s;
-	animation-fill-mode: forwards;
-	animation-iteration-count: infinite;
-	animation-name: shimmer;
-	animation-timing-function: linear;
+  animation: 1s linear 1s infinite shimmer;
+  animation-delay: 300ms;
+  animation-duration: 1s;
+  animation-fill-mode: forwards;
+  animation-iteration-count: infinite;
+  animation-name: shimmer;
+  animation-timing-function: linear;
 }
 
+
 .fallback.title {
-	width: 130px;
-	height: 30px;
+  width: 130px;
+  height: 30px;
+
 }
 
 .fallback.description {
-	width: 150px;
-	height: 21px;
+  width: 150px;
+  height: 21px;
 }
 
 @keyframes shimmer {
-	0% {
-		background-position: -468px 0;
-	}
+  0% {
+    background-position: -468px 0;
+  }
 
-	100% {
-		background-position: 468px 0;
-	}
+  100% {
+    background-position: 468px 0;
+  }
 }
 
 .search {
-	margin-bottom: 10px;
+  margin-bottom: 10px;
 }
 .search-input {
-	width: 100%;
-	position: relative;
+  width: 100%;
+  position: relative;
 }
 
 .search-icon {
-	position: absolute;
-	top: 0;
-	bottom: 0;
-	inset-inline-start: 0;
-	display: flex;
-	align-items: center;
-	padding-inline-start: 1rem;
-	pointer-events: none;
-	color: #99a1b3;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  inset-inline-start: 0;
+  display: flex;
+  align-items: center;
+  padding-inline-start: 1rem;
+  pointer-events: none;
+  color: #99a1b3;
 }
 
 .search-input input {
-	display: flex;
-	padding-inline-start: 2.75rem;
-	padding-top: 10px;
-	padding-bottom: 10px;
-	width: 100%;
-	text-align: start;
-	background-color: rgb(235 236 240);
-	outline: 2px solid transparent;
-	cursor: pointer;
-	border: none;
-	align-items: center;
-	color: rgb(35 39 47);
-	border-radius: 9999px;
-	vertical-align: middle;
-	font-size: 15px;
+  display: flex;
+  padding-inline-start: 2.75rem;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  width: 100%;
+  text-align: start;
+  background-color: rgb(235 236 240);
+  outline: 2px solid transparent;
+  cursor: pointer;
+  border: none;
+  align-items: center;
+  color: rgb(35 39 47);
+  border-radius: 9999px;
+  vertical-align: middle;
+  font-size: 15px;
 }
 
-.search-input input:hover,
-.search-input input:active {
-	background-color: rgb(235 236 240/ 0.8);
-	color: rgb(35 39 47/ 0.8);
+.search-input input:hover, .search-input input:active {
+  background-color: rgb(235 236 240/ 0.8);
+  color: rgb(35 39 47/ 0.8);
 }
 
 /* Home */
 .video-list {
-	position: relative;
+  position: relative;
 }
 
 .video-list .videos {
-	display: flex;
-	flex-direction: column;
-	gap: 1rem;
-	overflow-y: auto;
-	height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  overflow-y: auto;
+  height: 100%;
 }
 ```
+
 
 ```css src/animations.css
 /* No additional animations needed */
 
+
+
+
+
+
+
+
+
 /* Previously defined animations below */
+
+
+
+
+
 
 /* Slide animation for Suspense */
 ::view-transition-old(.slide-down) {
-	animation:
-		150ms ease-out both fade-out,
-		150ms ease-out both slide-down;
+    animation: 150ms ease-out both fade-out, 150ms ease-out both slide-down;
 }
 
 ::view-transition-new(.slide-up) {
-	animation:
-		210ms ease-in 150ms both fade-in,
-		400ms ease-in both slide-up;
+    animation: 210ms ease-in 150ms both fade-in, 400ms ease-in both slide-up;
 }
 
 /* Animations for view transition classed added by transition type */
 ::view-transition-old(.slide-forward) {
-	/* when sliding forward, the "old" page should slide out to left. */
-	animation:
-		150ms cubic-bezier(0.4, 0, 1, 1) both fade-out,
-		400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-to-left;
+    /* when sliding forward, the "old" page should slide out to left. */
+    animation: 150ms cubic-bezier(0.4, 0, 1, 1) both fade-out,
+    400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-to-left;
 }
 
 ::view-transition-new(.slide-forward) {
-	/* when sliding forward, the "new" page should slide in from right. */
-	animation:
-		210ms cubic-bezier(0, 0, 0.2, 1) 150ms both fade-in,
-		400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-from-right;
+    /* when sliding forward, the "new" page should slide in from right. */
+    animation: 210ms cubic-bezier(0, 0, 0.2, 1) 150ms both fade-in,
+    400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-from-right;
 }
 
 ::view-transition-old(.slide-back) {
-	/* when sliding back, the "old" page should slide out to right. */
-	animation:
-		150ms cubic-bezier(0.4, 0, 1, 1) both fade-out,
-		400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-to-right;
+    /* when sliding back, the "old" page should slide out to right. */
+    animation: 150ms cubic-bezier(0.4, 0, 1, 1) both fade-out,
+    400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-to-right;
 }
 
 ::view-transition-new(.slide-back) {
-	/* when sliding back, the "new" page should slide in from left. */
-	animation:
-		210ms cubic-bezier(0, 0, 0.2, 1) 150ms both fade-in,
-		400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-from-left;
+    /* when sliding back, the "new" page should slide in from left. */
+    animation: 210ms cubic-bezier(0, 0, 0.2, 1) 150ms both fade-in,
+    400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-from-left;
 }
 
 /* Keyframes to support our animations above. */
 @keyframes slide-up {
-	from {
-		transform: translateY(10px);
-	}
-	to {
-		transform: translateY(0);
-	}
+    from {
+        transform: translateY(10px);
+    }
+    to {
+        transform: translateY(0);
+    }
 }
 
 @keyframes slide-down {
-	from {
-		transform: translateY(0);
-	}
-	to {
-		transform: translateY(10px);
-	}
+    from {
+        transform: translateY(0);
+    }
+    to {
+        transform: translateY(10px);
+    }
 }
 
 @keyframes fade-in {
-	from {
-		opacity: 0;
-	}
+    from {
+        opacity: 0;
+    }
 }
 
 @keyframes fade-out {
-	to {
-		opacity: 0;
-	}
+    to {
+        opacity: 0;
+    }
 }
 
 @keyframes slide-to-right {
-	to {
-		transform: translateX(50px);
-	}
+    to {
+        transform: translateX(50px);
+    }
 }
 
 @keyframes slide-from-right {
-	from {
-		transform: translateX(50px);
-	}
-	to {
-		transform: translateX(0);
-	}
+    from {
+        transform: translateX(50px);
+    }
+    to {
+        transform: translateX(0);
+    }
 }
 
 @keyframes slide-to-left {
-	to {
-		transform: translateX(-50px);
-	}
+    to {
+        transform: translateX(-50px);
+    }
 }
 
 @keyframes slide-from-left {
-	from {
-		transform: translateX(-50px);
-	}
-	to {
-		transform: translateX(0);
-	}
+    from {
+        transform: translateX(-50px);
+    }
+    to {
+        transform: translateX(0);
+    }
 }
+
 
 /* Default .slow-fade. */
 ::view-transition-old(.slow-fade) {
-	animation-duration: 500ms;
+    animation-duration: 500ms;
 }
 
 ::view-transition-new(.slow-fade) {
-	animation-duration: 500ms;
+    animation-duration: 500ms;
 }
 ```
 
 ```js src/index.js hidden
-import React, { StrictMode } from "react";
-import { createRoot } from "react-dom/client";
+import React, {StrictMode} from 'react';
+import {createRoot} from 'react-dom/client';
+import './styles.css';
+import './animations.css';
 
-import "./styles.css";
-import "./animations.css";
+import App from './App';
+import {Router} from './router';
 
-import App from "./App";
-import { Router } from "./router";
-
-const root = createRoot(document.getElementById("root"));
+const root = createRoot(document.getElementById('root'));
 root.render(
-	<StrictMode>
-		<Router>
-			<App />
-		</Router>
-	</StrictMode>,
+  <StrictMode>
+    <Router>
+      <App />
+    </Router>
+  </StrictMode>
 );
 ```
 
 ```json package.json hidden
 {
-	"dependencies": {
-		"react": "experimental",
-		"react-dom": "experimental",
-		"react-scripts": "latest"
-	},
-	"scripts": {
-		"start": "react-scripts start",
-		"build": "react-scripts build",
-		"test": "react-scripts test --env=jsdom",
-		"eject": "react-scripts eject"
-	}
+  "dependencies": {
+    "react": "canary",
+    "react-dom": "canary",
+    "react-scripts": "latest"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test --env=jsdom",
+    "eject": "react-scripts eject"
+  }
 }
 ```
 
 </Sandpack>
 
-### Final result {/_final-result_/}
+### Final result {/*final-result*/}
 
 By adding a few `<ViewTransition>` components and a few lines of CSS, we were able to add all the animations above into the final result.
 
@@ -10652,478 +10181,450 @@ Let's remove the slow fade, and take a look at the final result:
 <Sandpack>
 
 ```js src/App.js
-import { unstable_ViewTransition as ViewTransition } from "react";
-
-import Details from "./Details";
-import Home from "./Home";
-import { useRouter } from "./router";
+import {ViewTransition} from 'react'; import Details from './Details'; import Home from './Home'; import {useRouter} from './router';
 
 export default function App() {
-	const { url } = useRouter();
+  const {url} = useRouter();
 
-	// Animate with a cross fade between pages.
-	return (
-		<ViewTransition key={url}>
-			{url === "/" ?
-				<Home />
-			:	<Details />}
-		</ViewTransition>
-	);
+  // Animate with a cross fade between pages.
+  return (
+    <ViewTransition key={url}>
+      {url === '/' ? <Home /> : <Details />}
+    </ViewTransition>
+  );
 }
 ```
 
 ```js src/Details.js
-import { Suspense, use, unstable_ViewTransition as ViewTransition } from "react";
+import { use, Suspense, ViewTransition } from "react"; import { fetchVideo, fetchVideoDetails } from "./data"; import { Thumbnail, VideoControls } from "./Videos"; import { useRouter } from "./router"; import Layout from "./Layout"; import { ChevronLeft } from "./Icons";
 
-import { fetchVideo, fetchVideoDetails } from "./data";
-import { ChevronLeft } from "./Icons";
-import Layout from "./Layout";
-import { useRouter } from "./router";
-import { Thumbnail, VideoControls } from "./Videos";
-
-function VideoDetails({ id }) {
-	// Animate from Suspense fallback to content
-	return (
-		<Suspense
-			fallback={
-				// Animate the fallback down.
-				<ViewTransition exit="slide-down">
-					<VideoInfoFallback />
-				</ViewTransition>
-			}
-		>
-			{/* Animate the content up */}
-			<ViewTransition enter="slide-up">
-				<VideoInfo id={id} />
-			</ViewTransition>
-		</Suspense>
-	);
+function VideoDetails({id}) {
+  // Animate from Suspense fallback to content
+  return (
+    <Suspense
+      fallback={
+        // Animate the fallback down.
+        <ViewTransition exit="slide-down">
+          <VideoInfoFallback />
+        </ViewTransition>
+      }
+    >
+      {/* Animate the content up */}
+      <ViewTransition enter="slide-up">
+        <VideoInfo id={id} />
+      </ViewTransition>
+    </Suspense>
+  );
 }
 
 function VideoInfoFallback() {
-	return (
-		<>
-			<div className="fallback title"></div>
-			<div className="fallback description"></div>
-		</>
-	);
+  return (
+    <>
+      <div className="fallback title"></div>
+      <div className="fallback description"></div>
+    </>
+  );
 }
 
 export default function Details() {
-	const { url, navigateBack } = useRouter();
-	const videoId = url.split("/").pop();
-	const video = use(fetchVideo(videoId));
+  const { url, navigateBack } = useRouter();
+  const videoId = url.split("/").pop();
+  const video = use(fetchVideo(videoId));
 
-	return (
-		<Layout
-			heading={
-				<div
-					className="fit back"
-					onClick={() => {
-						navigateBack("/");
-					}}
-				>
-					<ChevronLeft /> Back
-				</div>
-			}
-		>
-			<div className="details">
-				<Thumbnail video={video} large>
-					<VideoControls />
-				</Thumbnail>
-				<VideoDetails id={video.id} />
-			</div>
-		</Layout>
-	);
+  return (
+    <Layout
+      heading={
+        <div
+          className="fit back"
+          onClick={() => {
+            navigateBack("/");
+          }}
+        >
+          <ChevronLeft /> Back
+        </div>
+      }
+    >
+      <div className="details">
+        <Thumbnail video={video} large>
+          <VideoControls />
+        </Thumbnail>
+        <VideoDetails id={video.id} />
+      </div>
+    </Layout>
+  );
 }
 
 function VideoInfo({ id }) {
-	const details = use(fetchVideoDetails(id));
-	return (
-		<>
-			<p className="info-title">{details.title}</p>
-			<p className="info-description">{details.description}</p>
-		</>
-	);
+  const details = use(fetchVideoDetails(id));
+  return (
+    <>
+      <p className="info-title">{details.title}</p>
+      <p className="info-description">{details.description}</p>
+    </>
+  );
 }
 ```
 
 ```js src/Home.js
-import {
-	use,
-	useDeferredValue,
-	useId,
-	useState,
-	unstable_ViewTransition as ViewTransition,
-} from "react";
+import { useId, useState, use, useDeferredValue, ViewTransition } from "react";import { Video } from "./Videos";import Layout from "./Layout";import { fetchVideos } from "./data";import { IconSearch } from "./Icons";
 
-import { fetchVideos } from "./data";
-import { IconSearch } from "./Icons";
-import Layout from "./Layout";
-import { Video } from "./Videos";
-
-function SearchList({ searchText, videos }) {
-	// Activate with useDeferredValue ("when")
-	const deferredSearchText = useDeferredValue(searchText);
-	const filteredVideos = filterVideos(videos, deferredSearchText);
-	return (
-		<div className="video-list">
-			<div className="videos">
-				{filteredVideos.map((video) => (
-					// Animate each item in list ("what")
-					<ViewTransition key={video.id}>
-						<Video video={video} />
-					</ViewTransition>
-				))}
-			</div>
-			{filteredVideos.length === 0 && <div className="no-results">No results</div>}
-		</div>
-	);
+function SearchList({searchText, videos}) {
+  // Activate with useDeferredValue ("when")
+  const deferredSearchText = useDeferredValue(searchText);
+  const filteredVideos = filterVideos(videos, deferredSearchText);
+  return (
+    <div className="video-list">
+      <div className="videos">
+        {filteredVideos.map((video) => (
+          // Animate each item in list ("what")
+          <ViewTransition key={video.id}>
+            <Video video={video} />
+          </ViewTransition>
+        ))}
+      </div>
+      {filteredVideos.length === 0 && (
+        <div className="no-results">No results</div>
+      )}
+    </div>
+  );
 }
 
 export default function Home() {
-	const videos = use(fetchVideos());
-	const count = videos.length;
-	const [searchText, setSearchText] = useState("");
+  const videos = use(fetchVideos());
+  const count = videos.length;
+  const [searchText, setSearchText] = useState('');
 
-	return (
-		<Layout heading={<div className="fit">{count} Videos</div>}>
-			<SearchInput value={searchText} onChange={setSearchText} />
-			<SearchList videos={videos} searchText={searchText} />
-		</Layout>
-	);
+  return (
+    <Layout heading={<div className="fit">{count} Videos</div>}>
+      <SearchInput value={searchText} onChange={setSearchText} />
+      <SearchList videos={videos} searchText={searchText} />
+    </Layout>
+  );
 }
 
 function SearchInput({ value, onChange }) {
-	const id = useId();
-	return (
-		<form className="search" onSubmit={(e) => e.preventDefault()}>
-			<label htmlFor={id} className="sr-only">
-				Search
-			</label>
-			<div className="search-input">
-				<div className="search-icon">
-					<IconSearch />
-				</div>
-				<input
-					type="text"
-					id={id}
-					placeholder="Search"
-					value={value}
-					onChange={(e) => onChange(e.target.value)}
-				/>
-			</div>
-		</form>
-	);
+  const id = useId();
+  return (
+    <form className="search" onSubmit={(e) => e.preventDefault()}>
+      <label htmlFor={id} className="sr-only">
+        Search
+      </label>
+      <div className="search-input">
+        <div className="search-icon">
+          <IconSearch />
+        </div>
+        <input
+          type="text"
+          id={id}
+          placeholder="Search"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      </div>
+    </form>
+  );
 }
 
 function filterVideos(videos, query) {
-	const keywords = query
-		.toLowerCase()
-		.split(" ")
-		.filter((s) => s !== "");
-	if (keywords.length === 0) {
-		return videos;
-	}
-	return videos.filter((video) => {
-		const words = (video.title + " " + video.description).toLowerCase().split(" ");
-		return keywords.every((kw) => words.some((w) => w.includes(kw)));
-	});
+  const keywords = query
+    .toLowerCase()
+    .split(" ")
+    .filter((s) => s !== "");
+  if (keywords.length === 0) {
+    return videos;
+  }
+  return videos.filter((video) => {
+    const words = (video.title + " " + video.description)
+      .toLowerCase()
+      .split(" ");
+    return keywords.every((kw) => words.some((w) => w.includes(kw)));
+  });
 }
 ```
 
 ```js src/Icons.js hidden
 export function ChevronLeft() {
-	return (
-		<svg
-			className="chevron-left"
-			xmlns="http://www.w3.org/2000/svg"
-			width="20"
-			height="20"
-			viewBox="0 0 20 20"
-		>
-			<g fill="none" fillRule="evenodd" transform="translate(-446 -398)">
-				<path
-					fill="currentColor"
-					fillRule="nonzero"
-					d="M95.8838835,240.366117 C95.3957281,239.877961 94.6042719,239.877961 94.1161165,240.366117 C93.6279612,240.854272 93.6279612,241.645728 94.1161165,242.133883 L98.6161165,246.633883 C99.1042719,247.122039 99.8957281,247.122039 100.383883,246.633883 L104.883883,242.133883 C105.372039,241.645728 105.372039,240.854272 104.883883,240.366117 C104.395728,239.877961 103.604272,239.877961 103.116117,240.366117 L99.5,243.982233 L95.8838835,240.366117 Z"
-					transform="translate(356.5 164.5)"
-				/>
-				<polygon points="446 418 466 418 466 398 446 398" />
-			</g>
-		</svg>
-	);
+  return (
+    <svg
+      className="chevron-left"
+      xmlns="http://www.w3.org/2000/svg"
+      width="20"
+      height="20"
+      viewBox="0 0 20 20">
+      <g fill="none" fillRule="evenodd" transform="translate(-446 -398)">
+        <path
+          fill="currentColor"
+          fillRule="nonzero"
+          d="M95.8838835,240.366117 C95.3957281,239.877961 94.6042719,239.877961 94.1161165,240.366117 C93.6279612,240.854272 93.6279612,241.645728 94.1161165,242.133883 L98.6161165,246.633883 C99.1042719,247.122039 99.8957281,247.122039 100.383883,246.633883 L104.883883,242.133883 C105.372039,241.645728 105.372039,240.854272 104.883883,240.366117 C104.395728,239.877961 103.604272,239.877961 103.116117,240.366117 L99.5,243.982233 L95.8838835,240.366117 Z"
+          transform="translate(356.5 164.5)"
+        />
+        <polygon points="446 418 466 418 466 398 446 398" />
+      </g>
+    </svg>
+  );
 }
 
 export function PauseIcon() {
-	return (
-		<svg
-			className="control-icon"
-			style={{ padding: "4px" }}
-			width="100"
-			height="100"
-			viewBox="0 0 512 512"
-			fill="none"
-			xmlns="http://www.w3.org/2000/svg"
-		>
-			<path
-				fillRule="evenodd"
-				clipRule="evenodd"
-				d="M256 0C114.617 0 0 114.615 0 256s114.617 256 256 256 256-114.615 256-256S397.383 0 256 0zm-32 320c0 8.836-7.164 16-16 16h-32c-8.836 0-16-7.164-16-16V192c0-8.836 7.164-16 16-16h32c8.836 0 16 7.164 16 16v128zm128 0c0 8.836-7.164 16-16 16h-32c-8.836 0-16-7.164-16-16V192c0-8.836 7.164-16 16-16h32c8.836 0 16 7.164 16 16v128z"
-				fill="currentColor"
-			/>
-		</svg>
-	);
+  return (
+    <svg
+      className="control-icon"
+      style={{padding: '4px'}}
+      width="100"
+      height="100"
+      viewBox="0 0 512 512"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg">
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M256 0C114.617 0 0 114.615 0 256s114.617 256 256 256 256-114.615 256-256S397.383 0 256 0zm-32 320c0 8.836-7.164 16-16 16h-32c-8.836 0-16-7.164-16-16V192c0-8.836 7.164-16 16-16h32c8.836 0 16 7.164 16 16v128zm128 0c0 8.836-7.164 16-16 16h-32c-8.836 0-16-7.164-16-16V192c0-8.836 7.164-16 16-16h32c8.836 0 16 7.164 16 16v128z"
+        fill="currentColor"
+      />
+    </svg>
+  );
 }
 
 export function PlayIcon() {
-	return (
-		<svg
-			className="control-icon"
-			width="100"
-			height="100"
-			viewBox="0 0 72 72"
-			fill="none"
-			xmlns="http://www.w3.org/2000/svg"
-		>
-			<path
-				fillRule="evenodd"
-				clipRule="evenodd"
-				d="M36 69C54.2254 69 69 54.2254 69 36C69 17.7746 54.2254 3 36 3C17.7746 3 3 17.7746 3 36C3 54.2254 17.7746 69 36 69ZM52.1716 38.6337L28.4366 51.5801C26.4374 52.6705 24 51.2235 24 48.9464V23.0536C24 20.7764 26.4374 19.3295 28.4366 20.4199L52.1716 33.3663C54.2562 34.5034 54.2562 37.4966 52.1716 38.6337Z"
-				fill="currentColor"
-			/>
-		</svg>
-	);
+  return (
+    <svg
+      className="control-icon"
+      width="100"
+      height="100"
+      viewBox="0 0 72 72"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg">
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M36 69C54.2254 69 69 54.2254 69 36C69 17.7746 54.2254 3 36 3C17.7746 3 3 17.7746 3 36C3 54.2254 17.7746 69 36 69ZM52.1716 38.6337L28.4366 51.5801C26.4374 52.6705 24 51.2235 24 48.9464V23.0536C24 20.7764 26.4374 19.3295 28.4366 20.4199L52.1716 33.3663C54.2562 34.5034 54.2562 37.4966 52.1716 38.6337Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
 }
-export function Heart({ liked, animate }) {
-	return (
-		<>
-			<svg
-				className="absolute overflow-visible"
-				viewBox="0 0 24 24"
-				fill="none"
-				xmlns="http://www.w3.org/2000/svg"
-			>
-				<circle
-					className={`circle ${liked ? "liked" : ""} ${animate ? "animate" : ""}`}
-					cx="12"
-					cy="12"
-					r="11.5"
-					fill="transparent"
-					strokeWidth="0"
-					stroke="currentColor"
-				/>
-			</svg>
+export function Heart({liked, animate}) {
+  return (
+    <>
+      <svg
+        className="absolute overflow-visible"
+        viewBox="0 0 24 24"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg">
+        <circle
+          className={`circle ${liked ? 'liked' : ''} ${animate ? 'animate' : ''}`}
+          cx="12"
+          cy="12"
+          r="11.5"
+          fill="transparent"
+          strokeWidth="0"
+          stroke="currentColor"
+        />
+      </svg>
 
-			<svg
-				className={`heart ${liked ? "liked" : ""} ${animate ? "animate" : ""}`}
-				viewBox="0 0 24 24"
-				fill="none"
-				xmlns="http://www.w3.org/2000/svg"
-			>
-				{liked ?
-					<path
-						d="M12 23a.496.496 0 0 1-.26-.074C7.023 19.973 0 13.743 0 8.68c0-4.12 2.322-6.677 6.058-6.677 2.572 0 5.108 2.387 5.134 2.41l.808.771.808-.771C12.834 4.387 15.367 2 17.935 2 21.678 2 24 4.558 24 8.677c0 5.06-7.022 11.293-11.74 14.246a.496.496 0 0 1-.26.074V23z"
-						fill="currentColor"
-					/>
-				:	<path
-						fillRule="evenodd"
-						clipRule="evenodd"
-						d="m12 5.184-.808-.771-.004-.004C11.065 4.299 8.522 2.003 6 2.003c-3.736 0-6 2.558-6 6.677 0 4.47 5.471 9.848 10 13.079.602.43 1.187.82 1.74 1.167A.497.497 0 0 0 12 23v-.003c.09 0 .182-.026.26-.074C16.977 19.97 24 13.737 24 8.677 24 4.557 21.743 2 18 2c-2.569 0-5.166 2.387-5.192 2.413L12 5.184zm-.002 15.525c2.071-1.388 4.477-3.342 6.427-5.47C20.72 12.733 22 10.401 22 8.677c0-1.708-.466-2.855-1.087-3.55C20.316 4.459 19.392 4 18 4c-.726 0-1.63.364-2.5.9-.67.412-1.148.82-1.266.92-.03.025-.037.031-.019.014l-.013.013L12 7.949 9.832 5.88a10.08 10.08 0 0 0-1.33-.977C7.633 4.367 6.728 4.003 6 4.003c-1.388 0-2.312.459-2.91 1.128C2.466 5.826 2 6.974 2 8.68c0 1.726 1.28 4.058 3.575 6.563 1.948 2.127 4.352 4.078 6.423 5.466z"
-						fill="currentColor"
-					/>
-				}
-			</svg>
-		</>
-	);
+      <svg
+        className={`heart ${liked ? 'liked' : ''} ${animate ? 'animate' : ''}`}
+        viewBox="0 0 24 24"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg">
+        {liked ? (
+          <path
+            d="M12 23a.496.496 0 0 1-.26-.074C7.023 19.973 0 13.743 0 8.68c0-4.12 2.322-6.677 6.058-6.677 2.572 0 5.108 2.387 5.134 2.41l.808.771.808-.771C12.834 4.387 15.367 2 17.935 2 21.678 2 24 4.558 24 8.677c0 5.06-7.022 11.293-11.74 14.246a.496.496 0 0 1-.26.074V23z"
+            fill="currentColor"
+          />
+        ) : (
+          <path
+            fillRule="evenodd"
+            clipRule="evenodd"
+            d="m12 5.184-.808-.771-.004-.004C11.065 4.299 8.522 2.003 6 2.003c-3.736 0-6 2.558-6 6.677 0 4.47 5.471 9.848 10 13.079.602.43 1.187.82 1.74 1.167A.497.497 0 0 0 12 23v-.003c.09 0 .182-.026.26-.074C16.977 19.97 24 13.737 24 8.677 24 4.557 21.743 2 18 2c-2.569 0-5.166 2.387-5.192 2.413L12 5.184zm-.002 15.525c2.071-1.388 4.477-3.342 6.427-5.47C20.72 12.733 22 10.401 22 8.677c0-1.708-.466-2.855-1.087-3.55C20.316 4.459 19.392 4 18 4c-.726 0-1.63.364-2.5.9-.67.412-1.148.82-1.266.92-.03.025-.037.031-.019.014l-.013.013L12 7.949 9.832 5.88a10.08 10.08 0 0 0-1.33-.977C7.633 4.367 6.728 4.003 6 4.003c-1.388 0-2.312.459-2.91 1.128C2.466 5.826 2 6.974 2 8.68c0 1.726 1.28 4.058 3.575 6.563 1.948 2.127 4.352 4.078 6.423 5.466z"
+            fill="currentColor"
+          />
+        )}
+      </svg>
+    </>
+  );
 }
 
 export function IconSearch(props) {
-	return (
-		<svg width="1em" height="1em" viewBox="0 0 20 20">
-			<path
-				d="M14.386 14.386l4.0877 4.0877-4.0877-4.0877c-2.9418 2.9419-7.7115 2.9419-10.6533 0-2.9419-2.9418-2.9419-7.7115 0-10.6533 2.9418-2.9419 7.7115-2.9419 10.6533 0 2.9419 2.9418 2.9419 7.7115 0 10.6533z"
-				stroke="currentColor"
-				fill="none"
-				strokeWidth="2"
-				fillRule="evenodd"
-				strokeLinecap="round"
-				strokeLinejoin="round"
-			></path>
-		</svg>
-	);
+  return (
+    <svg width="1em" height="1em" viewBox="0 0 20 20">
+      <path
+        d="M14.386 14.386l4.0877 4.0877-4.0877-4.0877c-2.9418 2.9419-7.7115 2.9419-10.6533 0-2.9419-2.9418-2.9419-7.7115 0-10.6533 2.9418-2.9419 7.7115-2.9419 10.6533 0 2.9419 2.9418 2.9419 7.7115 0 10.6533z"
+        stroke="currentColor"
+        fill="none"
+        strokeWidth="2"
+        fillRule="evenodd"
+        strokeLinecap="round"
+        strokeLinejoin="round"></path>
+    </svg>
+  );
 }
 ```
 
 ```js src/Layout.js
-import { unstable_ViewTransition as ViewTransition } from "react";
-
-import { useIsNavPending } from "./router";
+import {ViewTransition} from 'react'; import { useIsNavPending } from "./router";
 
 export default function Page({ heading, children }) {
-	const isPending = useIsNavPending();
-	return (
-		<div className="page">
-			<div className="top">
-				<div className="top-nav">
-					{/* Custom classes based on transition type. */}
-					<ViewTransition
-						name="nav"
-						share={{
-							"nav-forward": "slide-forward",
-							"nav-back": "slide-back",
-						}}
-					>
-						{heading}
-					</ViewTransition>
-					{isPending && <span className="loader"></span>}
-				</div>
-			</div>
-			{/* Opt-out of ViewTransition for the content. */}
-			{/* Content can define it's own ViewTransition. */}
-			<ViewTransition default="none">
-				<div className="bottom">
-					<div className="content">{children}</div>
-				</div>
-			</ViewTransition>
-		</div>
-	);
+  const isPending = useIsNavPending();
+  return (
+    <div className="page">
+      <div className="top">
+        <div className="top-nav">
+          {/* Custom classes based on transition type. */}
+          <ViewTransition
+            name="nav"
+            share={{
+              'nav-forward': 'slide-forward',
+              'nav-back': 'slide-back',
+            }}>
+            {heading}
+          </ViewTransition>
+          {isPending && <span className="loader"></span>}
+        </div>
+      </div>
+      {/* Opt-out of ViewTransition for the content. */}
+      {/* Content can define it's own ViewTransition. */}
+      <ViewTransition default="none">
+        <div className="bottom">
+          <div className="content">{children}</div>
+        </div>
+      </ViewTransition>
+    </div>
+  );
 }
 ```
 
 ```js src/LikeButton.js hidden
-import { useState } from "react";
-
-import { Heart } from "./Icons";
+import {useState} from 'react';
+import {Heart} from './Icons';
 
 // A hack since we don't actually have a backend.
 // Unlike local state, this survives videos being filtered.
 const likedVideos = new Set();
 
-export default function LikeButton({ video }) {
-	const [isLiked, setIsLiked] = useState(() => likedVideos.has(video.id));
-	const [animate, setAnimate] = useState(false);
-	return (
-		<button
-			className={`like-button ${isLiked && "liked"}`}
-			aria-label={isLiked ? "Unsave" : "Save"}
-			onClick={() => {
-				const nextIsLiked = !isLiked;
-				if (nextIsLiked) {
-					likedVideos.add(video.id);
-				} else {
-					likedVideos.delete(video.id);
-				}
-				setAnimate(true);
-				setIsLiked(nextIsLiked);
-			}}
-		>
-			<Heart liked={isLiked} animate={animate} />
-		</button>
-	);
+export default function LikeButton({video}) {
+  const [isLiked, setIsLiked] = useState(() => likedVideos.has(video.id));
+  const [animate, setAnimate] = useState(false);
+  return (
+    <button
+      className={`like-button ${isLiked && 'liked'}`}
+      aria-label={isLiked ? 'Unsave' : 'Save'}
+      onClick={() => {
+        const nextIsLiked = !isLiked;
+        if (nextIsLiked) {
+          likedVideos.add(video.id);
+        } else {
+          likedVideos.delete(video.id);
+        }
+        setAnimate(true);
+        setIsLiked(nextIsLiked);
+      }}>
+      <Heart liked={isLiked} animate={animate} />
+    </button>
+  );
 }
 ```
 
 ```js src/Videos.js
-import { startTransition, useState, unstable_ViewTransition as ViewTransition } from "react";
-
-import { PauseIcon, PlayIcon } from "./Icons";
-import LikeButton from "./LikeButton";
-import { useRouter } from "./router";
+import { useState, ViewTransition } from "react"; import LikeButton from "./LikeButton"; import { useRouter } from "./router"; import { PauseIcon, PlayIcon } from "./Icons"; import { startTransition } from "react";
 
 export function Thumbnail({ video, children }) {
-	// Add a name to animate with a shared element transition.
-	return (
-		<ViewTransition name={`video-${video.id}`}>
-			<div aria-hidden="true" tabIndex={-1} className={`thumbnail ${video.image}`}>
-				{children}
-			</div>
-		</ViewTransition>
-	);
+  // Add a name to animate with a shared element transition.
+  return (
+    <ViewTransition name={`video-${video.id}`}>
+      <div
+        aria-hidden="true"
+        tabIndex={-1}
+        className={`thumbnail ${video.image}`}
+      >
+        {children}
+      </div>
+    </ViewTransition>
+  );
 }
 
-export function VideoControls() {
-	const [isPlaying, setIsPlaying] = useState(false);
 
-	return (
-		<span
-			className="controls"
-			onClick={() =>
-				startTransition(() => {
-					setIsPlaying((p) => !p);
-				})
-			}
-		>
-			{isPlaying ?
-				<PauseIcon />
-			:	<PlayIcon />}
-		</span>
-	);
+
+export function VideoControls() {
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  return (
+    <span
+      className="controls"
+      onClick={() =>
+        startTransition(() => {
+          setIsPlaying((p) => !p);
+        })
+      }
+    >
+      {isPlaying ? <PauseIcon /> : <PlayIcon />}
+    </span>
+  );
 }
 
 export function Video({ video }) {
-	const { navigate } = useRouter();
+  const { navigate } = useRouter();
 
-	return (
-		<div className="video">
-			<div
-				className="link"
-				onClick={(e) => {
-					e.preventDefault();
-					navigate(`/video/${video.id}`);
-				}}
-			>
-				<Thumbnail video={video}></Thumbnail>
+  return (
+    <div className="video">
+      <div
+        className="link"
+        onClick={(e) => {
+          e.preventDefault();
+          navigate(`/video/${video.id}`);
+        }}
+      >
+        <Thumbnail video={video}></Thumbnail>
 
-				<div className="info">
-					<div className="video-title">{video.title}</div>
-					<div className="video-description">{video.description}</div>
-				</div>
-			</div>
-			<LikeButton video={video} />
-		</div>
-	);
+        <div className="info">
+          <div className="video-title">{video.title}</div>
+          <div className="video-description">{video.description}</div>
+        </div>
+      </div>
+      <LikeButton video={video} />
+    </div>
+  );
 }
 ```
 
+
 ```js src/data.js hidden
 const videos = [
-	{
-		id: "1",
-		title: "First video",
-		description: "Video description",
-		image: "blue",
-	},
-	{
-		id: "2",
-		title: "Second video",
-		description: "Video description",
-		image: "red",
-	},
-	{
-		id: "3",
-		title: "Third video",
-		description: "Video description",
-		image: "green",
-	},
-	{
-		id: "4",
-		title: "Fourth video",
-		description: "Video description",
-		image: "purple",
-	},
-	{
-		id: "5",
-		title: "Fifth video",
-		description: "Video description",
-		image: "yellow",
-	},
-	{
-		id: "6",
-		title: "Sixth video",
-		description: "Video description",
-		image: "gray",
-	},
+  {
+    id: '1',
+    title: 'First video',
+    description: 'Video description',
+    image: 'blue',
+  },
+  {
+    id: '2',
+    title: 'Second video',
+    description: 'Video description',
+    image: 'red',
+  },
+  {
+    id: '3',
+    title: 'Third video',
+    description: 'Video description',
+    image: 'green',
+  },
+  {
+    id: '4',
+    title: 'Fourth video',
+    description: 'Video description',
+    image: 'purple',
+  },
+  {
+    id: '5',
+    title: 'Fifth video',
+    description: 'Video description',
+    image: 'yellow',
+  },
+  {
+    id: '6',
+    title: 'Sixth video',
+    description: 'Video description',
+    image: 'gray',
+  },
 ];
 
 let videosCache = new Map();
@@ -11132,890 +10633,824 @@ let videoDetailsCache = new Map();
 const VIDEO_DELAY = 1;
 const VIDEO_DETAILS_DELAY = 1000;
 export function fetchVideos() {
-	if (videosCache.has(0)) {
-		return videosCache.get(0);
-	}
-	const promise = new Promise((resolve) => {
-		setTimeout(() => {
-			resolve(videos);
-		}, VIDEO_DELAY);
-	});
-	videosCache.set(0, promise);
-	return promise;
+  if (videosCache.has(0)) {
+    return videosCache.get(0);
+  }
+  const promise = new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(videos);
+    }, VIDEO_DELAY);
+  });
+  videosCache.set(0, promise);
+  return promise;
 }
 
 export function fetchVideo(id) {
-	if (videoCache.has(id)) {
-		return videoCache.get(id);
-	}
-	const promise = new Promise((resolve) => {
-		setTimeout(() => {
-			resolve(videos.find((video) => video.id === id));
-		}, VIDEO_DELAY);
-	});
-	videoCache.set(id, promise);
-	return promise;
+  if (videoCache.has(id)) {
+    return videoCache.get(id);
+  }
+  const promise = new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(videos.find((video) => video.id === id));
+    }, VIDEO_DELAY);
+  });
+  videoCache.set(id, promise);
+  return promise;
 }
 
 export function fetchVideoDetails(id) {
-	if (videoDetailsCache.has(id)) {
-		return videoDetailsCache.get(id);
-	}
-	const promise = new Promise((resolve) => {
-		setTimeout(() => {
-			resolve(videos.find((video) => video.id === id));
-		}, VIDEO_DETAILS_DELAY);
-	});
-	videoDetailsCache.set(id, promise);
-	return promise;
+  if (videoDetailsCache.has(id)) {
+    return videoDetailsCache.get(id);
+  }
+  const promise = new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(videos.find((video) => video.id === id));
+    }, VIDEO_DETAILS_DELAY);
+  });
+  videoDetailsCache.set(id, promise);
+  return promise;
 }
 ```
 
 ```js src/router.js
-import {
-	unstable_addTransitionType as addTransitionType,
-	createContext,
-	use,
-	useEffect,
-	useLayoutEffect,
-	useState,
-	useTransition,
-} from "react";
+import {useState, createContext, use, useTransition, useLayoutEffect, useEffect, addTransitionType} from "react";
 
 export function Router({ children }) {
-	const [isPending, startTransition] = useTransition();
-	function navigate(url) {
-		startTransition(() => {
-			// Transition type for the cause "nav forward"
-			addTransitionType("nav-forward");
-			go(url);
-		});
-	}
-	function navigateBack(url) {
-		startTransition(() => {
-			// Transition type for the cause "nav backward"
-			addTransitionType("nav-back");
-			go(url);
-		});
-	}
+  const [isPending, startTransition] = useTransition();
+  function navigate(url) {
+    startTransition(() => {
+      // Transition type for the cause "nav forward"
+      addTransitionType('nav-forward');
+      go(url);
+    });
+  }
+  function navigateBack(url) {
+    startTransition(() => {
+      // Transition type for the cause "nav backward"
+      addTransitionType('nav-back');
+      go(url);
+    });
+  }
 
-	const [routerState, setRouterState] = useState({
-		pendingNav: () => {},
-		url: document.location.pathname,
-	});
+  const [routerState, setRouterState] = useState({pendingNav: () => {}, url: document.location.pathname});
 
-	function go(url) {
-		setRouterState({
-			url,
-			pendingNav() {
-				window.history.pushState({}, "", url);
-			},
-		});
-	}
+  function go(url) {
+    setRouterState({
+      url,
+      pendingNav() {
+        window.history.pushState({}, "", url);
+      },
+    });
+  }
 
-	useEffect(() => {
-		function handlePopState() {
-			// This should not animate because restoration has to be synchronous.
-			// Even though it's a transition.
-			startTransition(() => {
-				setRouterState({
-					url: document.location.pathname + document.location.search,
-					pendingNav() {
-						// Noop. URL has already updated.
-					},
-				});
-			});
-		}
-		window.addEventListener("popstate", handlePopState);
-		return () => {
-			window.removeEventListener("popstate", handlePopState);
-		};
-	}, []);
-	const pendingNav = routerState.pendingNav;
-	useLayoutEffect(() => {
-		pendingNav();
-	}, [pendingNav]);
+  useEffect(() => {
+    function handlePopState() {
+      // This should not animate because restoration has to be synchronous.
+      // Even though it's a transition.
+      startTransition(() => {
+        setRouterState({
+          url: document.location.pathname + document.location.search,
+          pendingNav() {
+            // Noop. URL has already updated.
+          },
+        });
+      });
+    }
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, []);
+  const pendingNav = routerState.pendingNav;
+  useLayoutEffect(() => {
+    pendingNav();
+  }, [pendingNav]);
 
-	return (
-		<RouterContext
-			value={{
-				url: routerState.url,
-				navigate,
-				navigateBack,
-				isPending,
-				params: {},
-			}}
-		>
-			{children}
-		</RouterContext>
-	);
+  return (
+    <RouterContext
+      value={{
+        url: routerState.url,
+        navigate,
+        navigateBack,
+        isPending,
+        params: {},
+      }}
+    >
+      {children}
+    </RouterContext>
+  );
 }
 
 const RouterContext = createContext({ url: "/", params: {} });
 
 export function useRouter() {
-	return use(RouterContext);
+  return use(RouterContext);
 }
 
 export function useIsNavPending() {
-	return use(RouterContext).isPending;
+  return use(RouterContext).isPending;
 }
+
 ```
 
 ```css src/styles.css hidden
 @font-face {
-	font-family: Optimistic Text;
-	src: url(https://react.dev/fonts/Optimistic_Text_W_Rg.woff2) format("woff2");
-	font-weight: 400;
-	font-style: normal;
-	font-display: swap;
+  font-family: Optimistic Text;
+  src: url(https://react.dev/fonts/Optimistic_Text_W_Rg.woff2) format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
-	font-family: Optimistic Text;
-	src: url(https://react.dev/fonts/Optimistic_Text_W_Md.woff2) format("woff2");
-	font-weight: 500;
-	font-style: normal;
-	font-display: swap;
+  font-family: Optimistic Text;
+  src: url(https://react.dev/fonts/Optimistic_Text_W_Md.woff2) format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
-	font-family: Optimistic Text;
-	src: url(https://react.dev/fonts/Optimistic_Text_W_Bd.woff2) format("woff2");
-	font-weight: 600;
-	font-style: normal;
-	font-display: swap;
+  font-family: Optimistic Text;
+  src: url(https://react.dev/fonts/Optimistic_Text_W_Bd.woff2) format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
-	font-family: Optimistic Text;
-	src: url(https://react.dev/fonts/Optimistic_Text_W_Bd.woff2) format("woff2");
-	font-weight: 700;
-	font-style: normal;
-	font-display: swap;
+  font-family: Optimistic Text;
+  src: url(https://react.dev/fonts/Optimistic_Text_W_Bd.woff2) format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
 }
 
 * {
-	box-sizing: border-box;
+  box-sizing: border-box;
 }
 
 html {
-	background-image: url(https://react.dev/images/meta-gradient-dark.png);
-	background-size: 100%;
-	background-position: -100%;
-	background-color: rgb(64 71 86);
-	background-repeat: no-repeat;
-	height: 100%;
-	width: 100%;
+  background-image: url(https://react.dev/images/meta-gradient-dark.png);
+  background-size: 100%;
+  background-position: -100%;
+  background-color: rgb(64 71 86);
+  background-repeat: no-repeat;
+  height: 100%;
+  width: 100%;
 }
 
 body {
-	font-family:
-		Optimistic Text,
-		-apple-system,
-		ui-sans-serif,
-		system-ui,
-		sans-serif,
-		Apple Color Emoji,
-		Segoe UI Emoji,
-		Segoe UI Symbol,
-		Noto Color Emoji;
-	padding: 10px 0 10px 0;
-	margin: 0;
-	display: flex;
-	justify-content: center;
+  font-family: Optimistic Text, -apple-system, ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji;
+  padding: 10px 0 10px 0;
+  margin: 0;
+  display: flex;
+  justify-content: center;
 }
 
 #root {
-	flex: 1 1;
-	height: auto;
-	background-color: #fff;
-	border-radius: 10px;
-	max-width: 450px;
-	min-height: 600px;
-	padding-bottom: 10px;
+  flex: 1 1;
+  height: auto;
+  background-color: #fff;
+  border-radius: 10px;
+  max-width: 450px;
+  min-height: 600px;
+  padding-bottom: 10px;
 }
 
 h1 {
-	margin-top: 0;
-	font-size: 22px;
+  margin-top: 0;
+  font-size: 22px;
 }
 
 h2 {
-	margin-top: 0;
-	font-size: 20px;
+  margin-top: 0;
+  font-size: 20px;
 }
 
 h3 {
-	margin-top: 0;
-	font-size: 18px;
+  margin-top: 0;
+  font-size: 18px;
 }
 
 h4 {
-	margin-top: 0;
-	font-size: 16px;
+  margin-top: 0;
+  font-size: 16px;
 }
 
 h5 {
-	margin-top: 0;
-	font-size: 14px;
+  margin-top: 0;
+  font-size: 14px;
 }
 
 h6 {
-	margin-top: 0;
-	font-size: 12px;
+  margin-top: 0;
+  font-size: 12px;
 }
 
 code {
-	font-size: 1.2em;
+  font-size: 1.2em;
 }
 
 ul {
-	padding-inline-start: 20px;
+  padding-inline-start: 20px;
 }
 
 .sr-only {
-	position: absolute;
-	width: 1px;
-	height: 1px;
-	padding: 0;
-	margin: -1px;
-	overflow: hidden;
-	clip: rect(0, 0, 0, 0);
-	white-space: nowrap;
-	border-width: 0;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }
 
 .absolute {
-	position: absolute;
+  position: absolute;
 }
 
 .overflow-visible {
-	overflow: visible;
+  overflow: visible;
 }
 
 .visible {
-	overflow: visible;
+  overflow: visible;
 }
 
 .fit {
-	width: fit-content;
+  width: fit-content;
 }
+
 
 /* Layout */
 .page {
-	display: flex;
-	flex-direction: column;
-	height: 100%;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .top-hero {
-	height: 200px;
-	display: flex;
-	justify-content: center;
-	align-items: center;
-	background-image: conic-gradient(
-		from 90deg at -10% 100%,
-		#2b303b 0deg,
-		#2b303b 90deg,
-		#16181d 1turn
-	);
+  height: 200px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-image: conic-gradient(
+      from 90deg at -10% 100%,
+      #2b303b 0deg,
+      #2b303b 90deg,
+      #16181d 1turn
+  );
 }
 
 .bottom {
-	flex: 1;
-	overflow: auto;
+  flex: 1;
+  overflow: auto;
 }
 
 .top-nav {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	margin-bottom: 0;
-	padding: 0 12px;
-	top: 0;
-	width: 100%;
-	height: 44px;
-	color: #23272f;
-	font-weight: 700;
-	font-size: 20px;
-	z-index: 100;
-	cursor: default;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0;
+  padding: 0 12px;
+  top: 0;
+  width: 100%;
+  height: 44px;
+  color: #23272f;
+  font-weight: 700;
+  font-size: 20px;
+  z-index: 100;
+  cursor: default;
 }
 
 .content {
-	padding: 0 12px;
-	margin-top: 4px;
+  padding: 0 12px;
+  margin-top: 4px;
 }
 
+
 .loader {
-	color: #23272f;
-	font-size: 3px;
-	width: 1em;
-	margin-right: 18px;
-	height: 1em;
-	border-radius: 50%;
-	position: relative;
-	text-indent: -9999em;
-	animation: loading-spinner 1.3s infinite linear;
-	animation-delay: 200ms;
-	transform: translateZ(0);
+  color: #23272f;
+  font-size: 3px;
+  width: 1em;
+  margin-right: 18px;
+  height: 1em;
+  border-radius: 50%;
+  position: relative;
+  text-indent: -9999em;
+  animation: loading-spinner 1.3s infinite linear;
+  animation-delay: 200ms;
+  transform: translateZ(0);
 }
 
 @keyframes loading-spinner {
-	0%,
-	100% {
-		box-shadow:
-			0 -3em 0 0.2em,
-			2em -2em 0 0em,
-			3em 0 0 -1em,
-			2em 2em 0 -1em,
-			0 3em 0 -1em,
-			-2em 2em 0 -1em,
-			-3em 0 0 -1em,
-			-2em -2em 0 0;
-	}
-	12.5% {
-		box-shadow:
-			0 -3em 0 0,
-			2em -2em 0 0.2em,
-			3em 0 0 0,
-			2em 2em 0 -1em,
-			0 3em 0 -1em,
-			-2em 2em 0 -1em,
-			-3em 0 0 -1em,
-			-2em -2em 0 -1em;
-	}
-	25% {
-		box-shadow:
-			0 -3em 0 -0.5em,
-			2em -2em 0 0,
-			3em 0 0 0.2em,
-			2em 2em 0 0,
-			0 3em 0 -1em,
-			-2em 2em 0 -1em,
-			-3em 0 0 -1em,
-			-2em -2em 0 -1em;
-	}
-	37.5% {
-		box-shadow:
-			0 -3em 0 -1em,
-			2em -2em 0 -1em,
-			3em 0em 0 0,
-			2em 2em 0 0.2em,
-			0 3em 0 0em,
-			-2em 2em 0 -1em,
-			-3em 0em 0 -1em,
-			-2em -2em 0 -1em;
-	}
-	50% {
-		box-shadow:
-			0 -3em 0 -1em,
-			2em -2em 0 -1em,
-			3em 0 0 -1em,
-			2em 2em 0 0em,
-			0 3em 0 0.2em,
-			-2em 2em 0 0,
-			-3em 0em 0 -1em,
-			-2em -2em 0 -1em;
-	}
-	62.5% {
-		box-shadow:
-			0 -3em 0 -1em,
-			2em -2em 0 -1em,
-			3em 0 0 -1em,
-			2em 2em 0 -1em,
-			0 3em 0 0,
-			-2em 2em 0 0.2em,
-			-3em 0 0 0,
-			-2em -2em 0 -1em;
-	}
-	75% {
-		box-shadow:
-			0em -3em 0 -1em,
-			2em -2em 0 -1em,
-			3em 0em 0 -1em,
-			2em 2em 0 -1em,
-			0 3em 0 -1em,
-			-2em 2em 0 0,
-			-3em 0em 0 0.2em,
-			-2em -2em 0 0;
-	}
-	87.5% {
-		box-shadow:
-			0em -3em 0 0,
-			2em -2em 0 -1em,
-			3em 0 0 -1em,
-			2em 2em 0 -1em,
-			0 3em 0 -1em,
-			-2em 2em 0 0,
-			-3em 0em 0 0,
-			-2em -2em 0 0.2em;
-	}
+  0%,
+  100% {
+    box-shadow: 0 -3em 0 0.2em,
+    2em -2em 0 0em, 3em 0 0 -1em,
+    2em 2em 0 -1em, 0 3em 0 -1em,
+    -2em 2em 0 -1em, -3em 0 0 -1em,
+    -2em -2em 0 0;
+  }
+  12.5% {
+    box-shadow: 0 -3em 0 0, 2em -2em 0 0.2em,
+    3em 0 0 0, 2em 2em 0 -1em, 0 3em 0 -1em,
+    -2em 2em 0 -1em, -3em 0 0 -1em,
+    -2em -2em 0 -1em;
+  }
+  25% {
+    box-shadow: 0 -3em 0 -0.5em,
+    2em -2em 0 0, 3em 0 0 0.2em,
+    2em 2em 0 0, 0 3em 0 -1em,
+    -2em 2em 0 -1em, -3em 0 0 -1em,
+    -2em -2em 0 -1em;
+  }
+  37.5% {
+    box-shadow: 0 -3em 0 -1em, 2em -2em 0 -1em,
+    3em 0em 0 0, 2em 2em 0 0.2em, 0 3em 0 0em,
+    -2em 2em 0 -1em, -3em 0em 0 -1em, -2em -2em 0 -1em;
+  }
+  50% {
+    box-shadow: 0 -3em 0 -1em, 2em -2em 0 -1em,
+    3em 0 0 -1em, 2em 2em 0 0em, 0 3em 0 0.2em,
+    -2em 2em 0 0, -3em 0em 0 -1em, -2em -2em 0 -1em;
+  }
+  62.5% {
+    box-shadow: 0 -3em 0 -1em, 2em -2em 0 -1em,
+    3em 0 0 -1em, 2em 2em 0 -1em, 0 3em 0 0,
+    -2em 2em 0 0.2em, -3em 0 0 0, -2em -2em 0 -1em;
+  }
+  75% {
+    box-shadow: 0em -3em 0 -1em, 2em -2em 0 -1em,
+    3em 0em 0 -1em, 2em 2em 0 -1em, 0 3em 0 -1em,
+    -2em 2em 0 0, -3em 0em 0 0.2em, -2em -2em 0 0;
+  }
+  87.5% {
+    box-shadow: 0em -3em 0 0, 2em -2em 0 -1em,
+    3em 0 0 -1em, 2em 2em 0 -1em, 0 3em 0 -1em,
+    -2em 2em 0 0, -3em 0em 0 0, -2em -2em 0 0.2em;
+  }
 }
 
 /* LikeButton */
 .like-button {
-	outline-offset: 2px;
-	position: relative;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	width: 2.5rem;
-	height: 2.5rem;
-	cursor: pointer;
-	border-radius: 9999px;
-	border: none;
-	outline: none 2px;
-	color: #5e687e;
-	background: none;
+  outline-offset: 2px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  cursor: pointer;
+  border-radius: 9999px;
+  border: none;
+  outline: none 2px;
+  color: #5e687e;
+  background: none;
 }
 
 .like-button:focus {
-	color: #a6423a;
-	background-color: rgba(166, 66, 58, 0.05);
+  color: #a6423a;
+  background-color: rgba(166, 66, 58, .05);
 }
 
 .like-button:active {
-	color: #a6423a;
-	background-color: rgba(166, 66, 58, 0.05);
-	transform: scaleX(0.95) scaleY(0.95);
+  color: #a6423a;
+  background-color: rgba(166, 66, 58, .05);
+  transform: scaleX(0.95) scaleY(0.95);
 }
 
 .like-button:hover {
-	background-color: #f6f7f9;
+  background-color: #f6f7f9;
 }
 
 .like-button.liked {
-	color: #a6423a;
+  color: #a6423a;
 }
 
 /* Icons */
 @keyframes circle {
-	0% {
-		transform: scale(0);
-		stroke-width: 16px;
-	}
+  0% {
+    transform: scale(0);
+    stroke-width: 16px;
+  }
 
-	50% {
-		transform: scale(0.5);
-		stroke-width: 16px;
-	}
+  50% {
+    transform: scale(.5);
+    stroke-width: 16px;
+  }
 
-	to {
-		transform: scale(1);
-		stroke-width: 0;
-	}
+  to {
+    transform: scale(1);
+    stroke-width: 0;
+  }
 }
 
 .circle {
-	color: rgba(166, 66, 58, 0.5);
-	transform-origin: center;
-	transition-property: all;
-	transition-duration: 0.15s;
-	transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  color: rgba(166, 66, 58, .5);
+  transform-origin: center;
+  transition-property: all;
+  transition-duration: .15s;
+  transition-timing-function: cubic-bezier(.4,0,.2,1);
 }
 
 .circle.liked.animate {
-	animation: circle 0.3s forwards;
+  animation: circle .3s forwards;
 }
 
 .heart {
-	width: 1.5rem;
-	height: 1.5rem;
+  width: 1.5rem;
+  height: 1.5rem;
 }
 
 .heart.liked {
-	transform-origin: center;
-	transition-property: all;
-	transition-duration: 0.15s;
-	transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: center;
+  transition-property: all;
+  transition-duration: .15s;
+  transition-timing-function: cubic-bezier(.4, 0, .2, 1);
 }
 
 .heart.liked.animate {
-	animation: scale 0.35s ease-in-out forwards;
+  animation: scale .35s ease-in-out forwards;
 }
 
 .control-icon {
-	color: hsla(0, 0%, 100%, 0.5);
-	filter: drop-shadow(0 20px 13px rgba(0, 0, 0, 0.03)) drop-shadow(0 8px 5px rgba(0, 0, 0, 0.08));
+  color: hsla(0, 0%, 100%, .5);
+  filter:  drop-shadow(0 20px 13px rgba(0, 0, 0, .03)) drop-shadow(0 8px 5px rgba(0, 0, 0, .08));
 }
 
 .chevron-left {
-	margin-top: 2px;
-	rotate: 90deg;
+  margin-top: 2px;
+  rotate: 90deg;
 }
+
 
 /* Video */
 .thumbnail {
-	position: relative;
-	aspect-ratio: 16 / 9;
-	display: flex;
-	overflow: hidden;
-	flex-direction: column;
-	justify-content: center;
-	align-items: center;
-	border-radius: 0.5rem;
-	outline-offset: 2px;
-	width: 8rem;
-	vertical-align: middle;
-	background-color: #ffffff;
-	background-size: cover;
-	user-select: none;
+  position: relative;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  overflow: hidden;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  border-radius: 0.5rem;
+  outline-offset: 2px;
+  width: 8rem;
+  vertical-align: middle;
+  background-color: #ffffff;
+  background-size: cover;
+  user-select: none;
 }
 
 .thumbnail.blue {
-	background-image: conic-gradient(at top right, #c76a15, #087ea4, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #087ea4, #2b3491);
 }
 
 .thumbnail.red {
-	background-image: conic-gradient(at top right, #c76a15, #a6423a, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #a6423a, #2b3491);
 }
 
 .thumbnail.green {
-	background-image: conic-gradient(at top right, #c76a15, #388f7f, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #388f7f, #2b3491);
 }
 
 .thumbnail.purple {
-	background-image: conic-gradient(at top right, #c76a15, #575fb7, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #575fb7, #2b3491);
 }
 
 .thumbnail.yellow {
-	background-image: conic-gradient(at top right, #c76a15, #fabd62, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #FABD62, #2b3491);
 }
 
 .thumbnail.gray {
-	background-image: conic-gradient(at top right, #c76a15, #4e5769, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #4E5769, #2b3491);
 }
 
 .video {
-	display: flex;
-	flex-direction: row;
-	gap: 0.75rem;
-	align-items: center;
+  display: flex;
+  flex-direction: row;
+  gap: 0.75rem;
+  align-items: center;
 }
 
 .video .link {
-	display: flex;
-	flex-direction: row;
-	flex: 1 1 0;
-	gap: 0.125rem;
-	outline-offset: 4px;
-	cursor: pointer;
+  display: flex;
+  flex-direction: row;
+  flex: 1 1 0;
+  gap: 0.125rem;
+  outline-offset: 4px;
+  cursor: pointer;
 }
 
 .video .info {
-	display: flex;
-	flex-direction: column;
-	justify-content: center;
-	margin-left: 8px;
-	gap: 0.125rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  margin-left: 8px;
+  gap: 0.125rem;
 }
 
 .video .info:hover {
-	text-decoration: underline;
+  text-decoration: underline;
 }
 
 .video-title {
-	font-size: 15px;
-	line-height: 1.25;
-	font-weight: 700;
-	color: #23272f;
+  font-size: 15px;
+  line-height: 1.25;
+  font-weight: 700;
+  color: #23272f;
 }
 
 .video-description {
-	color: #5e687e;
-	font-size: 13px;
+  color: #5e687e;
+  font-size: 13px;
 }
 
 /* Details */
 .details .thumbnail {
-	position: relative;
-	aspect-ratio: 16 / 9;
-	display: flex;
-	overflow: hidden;
-	flex-direction: column;
-	justify-content: center;
-	align-items: center;
-	border-radius: 0.5rem;
-	outline-offset: 2px;
-	width: 100%;
-	vertical-align: middle;
-	background-color: #ffffff;
-	background-size: cover;
-	user-select: none;
+  position: relative;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  overflow: hidden;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  border-radius: 0.5rem;
+  outline-offset: 2px;
+  width: 100%;
+  vertical-align: middle;
+  background-color: #ffffff;
+  background-size: cover;
+  user-select: none;
 }
 
 .video-details-title {
-	margin-top: 8px;
+  margin-top: 8px;
 }
 
 .video-details-speaker {
-	display: flex;
-	gap: 8px;
-	margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  margin-top: 10px
 }
 
 .back {
-	display: flex;
-	align-items: center;
-	margin-left: -5px;
-	cursor: pointer;
+  display: flex;
+  align-items: center;
+  margin-left: -5px;
+  cursor: pointer;
 }
 
 .back:hover {
-	text-decoration: underline;
+  text-decoration: underline;
 }
 
 .info-title {
-	font-size: 1.5rem;
-	font-weight: 700;
-	line-height: 1.25;
-	margin: 8px 0 0 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.25;
+  margin: 8px 0 0 0 ;
 }
 
 .info-description {
-	margin: 8px 0 0 0;
+  margin: 8px 0 0 0;
 }
 
 .controls {
-	cursor: pointer;
+  cursor: pointer;
 }
 
 .fallback {
-	background: #f6f7f8 linear-gradient(to right, #e6e6e6 5%, #cccccc 25%, #e6e6e6 35%) no-repeat;
-	background-size: 800px 104px;
-	display: block;
-	line-height: 1.25;
-	margin: 8px 0 0 0;
-	border-radius: 5px;
-	overflow: hidden;
+  background: #f6f7f8 linear-gradient(to right, #e6e6e6 5%, #cccccc 25%, #e6e6e6 35%) no-repeat;
+  background-size: 800px 104px;
+  display: block;
+  line-height: 1.25;
+  margin: 8px 0 0 0;
+  border-radius: 5px;
+  overflow: hidden;
 
-	animation: 1s linear 1s infinite shimmer;
-	animation-delay: 300ms;
-	animation-duration: 1s;
-	animation-fill-mode: forwards;
-	animation-iteration-count: infinite;
-	animation-name: shimmer;
-	animation-timing-function: linear;
+  animation: 1s linear 1s infinite shimmer;
+  animation-delay: 300ms;
+  animation-duration: 1s;
+  animation-fill-mode: forwards;
+  animation-iteration-count: infinite;
+  animation-name: shimmer;
+  animation-timing-function: linear;
 }
 
+
 .fallback.title {
-	width: 130px;
-	height: 30px;
+  width: 130px;
+  height: 30px;
+
 }
 
 .fallback.description {
-	width: 150px;
-	height: 21px;
+  width: 150px;
+  height: 21px;
 }
 
 @keyframes shimmer {
-	0% {
-		background-position: -468px 0;
-	}
+  0% {
+    background-position: -468px 0;
+  }
 
-	100% {
-		background-position: 468px 0;
-	}
+  100% {
+    background-position: 468px 0;
+  }
 }
 
 .search {
-	margin-bottom: 10px;
+  margin-bottom: 10px;
 }
 .search-input {
-	width: 100%;
-	position: relative;
+  width: 100%;
+  position: relative;
 }
 
 .search-icon {
-	position: absolute;
-	top: 0;
-	bottom: 0;
-	inset-inline-start: 0;
-	display: flex;
-	align-items: center;
-	padding-inline-start: 1rem;
-	pointer-events: none;
-	color: #99a1b3;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  inset-inline-start: 0;
+  display: flex;
+  align-items: center;
+  padding-inline-start: 1rem;
+  pointer-events: none;
+  color: #99a1b3;
 }
 
 .search-input input {
-	display: flex;
-	padding-inline-start: 2.75rem;
-	padding-top: 10px;
-	padding-bottom: 10px;
-	width: 100%;
-	text-align: start;
-	background-color: rgb(235 236 240);
-	outline: 2px solid transparent;
-	cursor: pointer;
-	border: none;
-	align-items: center;
-	color: rgb(35 39 47);
-	border-radius: 9999px;
-	vertical-align: middle;
-	font-size: 15px;
+  display: flex;
+  padding-inline-start: 2.75rem;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  width: 100%;
+  text-align: start;
+  background-color: rgb(235 236 240);
+  outline: 2px solid transparent;
+  cursor: pointer;
+  border: none;
+  align-items: center;
+  color: rgb(35 39 47);
+  border-radius: 9999px;
+  vertical-align: middle;
+  font-size: 15px;
 }
 
-.search-input input:hover,
-.search-input input:active {
-	background-color: rgb(235 236 240/ 0.8);
-	color: rgb(35 39 47/ 0.8);
+.search-input input:hover, .search-input input:active {
+  background-color: rgb(235 236 240/ 0.8);
+  color: rgb(35 39 47/ 0.8);
 }
 
 /* Home */
 .video-list {
-	position: relative;
+  position: relative;
 }
 
 .video-list .videos {
-	display: flex;
-	flex-direction: column;
-	gap: 1rem;
-	overflow-y: auto;
-	height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  overflow-y: auto;
+  height: 100%;
 }
 ```
+
 
 ```css src/animations.css
 /* Slide animations for Suspense the fallback down */
 ::view-transition-old(.slide-down) {
-	animation:
-		150ms ease-out both fade-out,
-		150ms ease-out both slide-down;
+    animation: 150ms ease-out both fade-out, 150ms ease-out both slide-down;
 }
 
 ::view-transition-new(.slide-up) {
-	animation:
-		210ms ease-in 150ms both fade-in,
-		400ms ease-in both slide-up;
+    animation: 210ms ease-in 150ms both fade-in, 400ms ease-in both slide-up;
 }
 
 /* Animations for view transition classed added by transition type */
 ::view-transition-old(.slide-forward) {
-	/* when sliding forward, the "old" page should slide out to left. */
-	animation:
-		150ms cubic-bezier(0.4, 0, 1, 1) both fade-out,
-		400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-to-left;
+    /* when sliding forward, the "old" page should slide out to left. */
+    animation: 150ms cubic-bezier(0.4, 0, 1, 1) both fade-out,
+    400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-to-left;
 }
 
 ::view-transition-new(.slide-forward) {
-	/* when sliding forward, the "new" page should slide in from right. */
-	animation:
-		210ms cubic-bezier(0, 0, 0.2, 1) 150ms both fade-in,
-		400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-from-right;
+    /* when sliding forward, the "new" page should slide in from right. */
+    animation: 210ms cubic-bezier(0, 0, 0.2, 1) 150ms both fade-in,
+    400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-from-right;
 }
 
 ::view-transition-old(.slide-back) {
-	/* when sliding back, the "old" page should slide out to right. */
-	animation:
-		150ms cubic-bezier(0.4, 0, 1, 1) both fade-out,
-		400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-to-right;
+    /* when sliding back, the "old" page should slide out to right. */
+    animation: 150ms cubic-bezier(0.4, 0, 1, 1) both fade-out,
+    400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-to-right;
 }
 
 ::view-transition-new(.slide-back) {
-	/* when sliding back, the "new" page should slide in from left. */
-	animation:
-		210ms cubic-bezier(0, 0, 0.2, 1) 150ms both fade-in,
-		400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-from-left;
+    /* when sliding back, the "new" page should slide in from left. */
+    animation: 210ms cubic-bezier(0, 0, 0.2, 1) 150ms both fade-in,
+    400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-from-left;
 }
 
 /* Keyframes to support our animations above. */
 @keyframes slide-up {
-	from {
-		transform: translateY(10px);
-	}
-	to {
-		transform: translateY(0);
-	}
+    from {
+        transform: translateY(10px);
+    }
+    to {
+        transform: translateY(0);
+    }
 }
 
 @keyframes slide-down {
-	from {
-		transform: translateY(0);
-	}
-	to {
-		transform: translateY(10px);
-	}
+    from {
+        transform: translateY(0);
+    }
+    to {
+        transform: translateY(10px);
+    }
 }
 
 @keyframes fade-in {
-	from {
-		opacity: 0;
-	}
+    from {
+        opacity: 0;
+    }
 }
 
 @keyframes fade-out {
-	to {
-		opacity: 0;
-	}
+    to {
+        opacity: 0;
+    }
 }
 
 @keyframes slide-to-right {
-	to {
-		transform: translateX(50px);
-	}
+    to {
+        transform: translateX(50px);
+    }
 }
 
 @keyframes slide-from-right {
-	from {
-		transform: translateX(50px);
-	}
-	to {
-		transform: translateX(0);
-	}
+    from {
+        transform: translateX(50px);
+    }
+    to {
+        transform: translateX(0);
+    }
 }
 
 @keyframes slide-to-left {
-	to {
-		transform: translateX(-50px);
-	}
+    to {
+        transform: translateX(-50px);
+    }
 }
 
 @keyframes slide-from-left {
-	from {
-		transform: translateX(-50px);
-	}
-	to {
-		transform: translateX(0);
-	}
+    from {
+        transform: translateX(-50px);
+    }
+    to {
+        transform: translateX(0);
+    }
 }
 ```
 
 ```js src/index.js hidden
-import React, { StrictMode } from "react";
-import { createRoot } from "react-dom/client";
+import React, {StrictMode} from 'react';
+import {createRoot} from 'react-dom/client';
+import './styles.css';
+import './animations.css';
 
-import "./styles.css";
-import "./animations.css";
+import App from './App';
+import {Router} from './router';
 
-import App from "./App";
-import { Router } from "./router";
-
-const root = createRoot(document.getElementById("root"));
+const root = createRoot(document.getElementById('root'));
 root.render(
-	<StrictMode>
-		<Router>
-			<App />
-		</Router>
-	</StrictMode>,
+  <StrictMode>
+    <Router>
+      <App />
+    </Router>
+  </StrictMode>
 );
 ```
 
 ```json package.json hidden
 {
-	"dependencies": {
-		"react": "experimental",
-		"react-dom": "experimental",
-		"react-scripts": "latest"
-	},
-	"scripts": {
-		"start": "react-scripts start",
-		"build": "react-scripts build",
-		"test": "react-scripts test --env=jsdom",
-		"eject": "react-scripts eject"
-	}
+  "dependencies": {
+    "react": "canary",
+    "react-dom": "canary",
+    "react-scripts": "latest"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test --env=jsdom",
+    "eject": "react-scripts eject"
+  }
 }
 ```
 
@@ -12027,7 +11462,7 @@ _For more background on how we built View Transitions, see: [#31975](https://git
 
 ---
 
-## Activity {/_activity_/}
+## Activity {/*activity*/}
 
 <Note>
 
@@ -12044,8 +11479,8 @@ We're now ready to share the API and how it works, so you can start testing it i
 `<Activity>` is a new component to hide and show parts of the UI:
 
 ```js [[1, 1, "'visible'"], [2, 1, "'hidden'"]]
-<Activity mode={isVisible ? "visible" : "hidden"}>
-	<Page />
+<Activity mode={isVisible ? 'visible' : 'hidden'}>
+  <Page />
 </Activity>
 ```
 
@@ -12065,20 +11500,20 @@ In practice, this works as expected if you have followed the [You Might Not Need
 
 </Note>
 
-### Restoring state with Activity {/_restoring-state-with-activity_/}
+### Restoring state with Activity {/*restoring-state-with-activity*/}
 
 When a user navigates away from a page, it's common to stop rendering the old page:
 
 ```js {6,7}
 function App() {
-	const { url } = useRouter();
+  const { url } = useRouter();
 
-	return (
-		<>
-			{url === "/" && <Home />}
-			{url !== "/" && <Details />}
-		</>
-	);
+  return (
+    <>
+      {url === '/' && <Home />}
+      {url !== '/' && <Details />}
+    </>
+  );
 }
 ```
 
@@ -12088,16 +11523,16 @@ Activity allows you to keep the state around as the user changes pages, so when 
 
 ```js {6-8}
 function App() {
-	const { url } = useRouter();
+  const { url } = useRouter();
 
-	return (
-		<>
-			<Activity mode={url === "/" ? "visible" : "hidden"}>
-				<Home />
-			</Activity>
-			{url !== "/" && <Details />}
-		</>
-	);
+  return (
+    <>
+      <Activity mode={url === '/' ? 'visible' : 'hidden'}>
+        <Home />
+      </Activity>
+      {url !== '/' && <Details />}
+    </>
+  );
 }
 ```
 
@@ -12108,481 +11543,462 @@ Try searching for a video, selecting it, and clicking "back":
 <Sandpack>
 
 ```js src/App.js
-import { unstable_Activity as Activity, unstable_ViewTransition as ViewTransition } from "react";
-
-import Details from "./Details";
-import Home from "./Home";
-import { useRouter } from "./router";
+import { Activity, ViewTransition } from "react"; import Details from "./Details"; import Home from "./Home"; import { useRouter } from "./router";
 
 export default function App() {
-	const { url } = useRouter();
+  const { url } = useRouter();
 
-	return (
-		// View Transitions know about Activity
-		<ViewTransition>
-			{/* Render Home in Activity so we don't lose state */}
-			<Activity mode={url === "/" ? "visible" : "hidden"}>
-				<Home />
-			</Activity>
-			{url !== "/" && <Details />}
-		</ViewTransition>
-	);
+  return (
+    // View Transitions know about Activity
+    <ViewTransition>
+      {/* Render Home in Activity so we don't lose state */}
+      <Activity mode={url === '/' ? 'visible' : 'hidden'}>
+        <Home />
+      </Activity>
+      {url !== '/' && <Details />}
+    </ViewTransition>
+  );
 }
 ```
 
 ```js src/Details.js hidden
-import { Suspense, use, unstable_ViewTransition as ViewTransition } from "react";
-
+import { use, Suspense, ViewTransition } from "react";
 import { fetchVideo, fetchVideoDetails } from "./data";
-import { ChevronLeft } from "./Icons";
-import Layout from "./Layout";
-import { useRouter } from "./router";
 import { Thumbnail, VideoControls } from "./Videos";
+import { useRouter } from "./router";
+import Layout from "./Layout";
+import { ChevronLeft } from "./Icons";
 
-function VideoDetails({ id }) {
-	// Animate from Suspense fallback to content
-	return (
-		<Suspense
-			fallback={
-				// Animate the fallback down.
-				<ViewTransition exit="slide-down">
-					<VideoInfoFallback />
-				</ViewTransition>
-			}
-		>
-			{/* Animate the content up */}
-			<ViewTransition enter="slide-up">
-				<VideoInfo id={id} />
-			</ViewTransition>
-		</Suspense>
-	);
+function VideoDetails({id}) {
+  // Animate from Suspense fallback to content
+  return (
+    <Suspense
+      fallback={
+        // Animate the fallback down.
+        <ViewTransition exit="slide-down">
+          <VideoInfoFallback />
+        </ViewTransition>
+      }
+    >
+      {/* Animate the content up */}
+      <ViewTransition enter="slide-up">
+        <VideoInfo id={id} />
+      </ViewTransition>
+    </Suspense>
+  );
 }
 
 function VideoInfoFallback() {
-	return (
-		<>
-			<div className="fallback title"></div>
-			<div className="fallback description"></div>
-		</>
-	);
+  return (
+    <>
+      <div className="fallback title"></div>
+      <div className="fallback description"></div>
+    </>
+  );
 }
 
 export default function Details() {
-	const { url, navigateBack } = useRouter();
-	const videoId = url.split("/").pop();
-	const video = use(fetchVideo(videoId));
+  const { url, navigateBack } = useRouter();
+  const videoId = url.split("/").pop();
+  const video = use(fetchVideo(videoId));
 
-	return (
-		<Layout
-			heading={
-				<div
-					className="fit back"
-					onClick={() => {
-						navigateBack("/");
-					}}
-				>
-					<ChevronLeft /> Back
-				</div>
-			}
-		>
-			<div className="details">
-				<Thumbnail video={video} large>
-					<VideoControls />
-				</Thumbnail>
-				<VideoDetails id={video.id} />
-			</div>
-		</Layout>
-	);
+  return (
+    <Layout
+      heading={
+        <div
+          className="fit back"
+          onClick={() => {
+            navigateBack("/");
+          }}
+        >
+          <ChevronLeft /> Back
+        </div>
+      }
+    >
+      <div className="details">
+        <Thumbnail video={video} large>
+          <VideoControls />
+        </Thumbnail>
+        <VideoDetails id={video.id} />
+      </div>
+    </Layout>
+  );
 }
 
 function VideoInfo({ id }) {
-	const details = use(fetchVideoDetails(id));
-	return (
-		<>
-			<p className="info-title">{details.title}</p>
-			<p className="info-description">{details.description}</p>
-		</>
-	);
+  const details = use(fetchVideoDetails(id));
+  return (
+    <>
+      <p className="info-title">{details.title}</p>
+      <p className="info-description">{details.description}</p>
+    </>
+  );
 }
 ```
 
 ```js src/Home.js hidden
-import {
-	use,
-	useDeferredValue,
-	useId,
-	useState,
-	unstable_ViewTransition as ViewTransition,
-} from "react";
+import { useId, useState, use, useDeferredValue, ViewTransition } from "react";import { Video } from "./Videos";import Layout from "./Layout";import { fetchVideos } from "./data";import { IconSearch } from "./Icons";
 
-import { fetchVideos } from "./data";
-import { IconSearch } from "./Icons";
-import Layout from "./Layout";
-import { Video } from "./Videos";
-
-function SearchList({ searchText, videos }) {
-	// Activate with useDeferredValue ("when")
-	const deferredSearchText = useDeferredValue(searchText);
-	const filteredVideos = filterVideos(videos, deferredSearchText);
-	return (
-		<div className="video-list">
-			{filteredVideos.length === 0 && <div className="no-results">No results</div>}
-			<div className="videos">
-				{filteredVideos.map((video) => (
-					// Animate each item in list ("what")
-					<ViewTransition key={video.id}>
-						<Video video={video} />
-					</ViewTransition>
-				))}
-			</div>
-		</div>
-	);
+function SearchList({searchText, videos}) {
+  // Activate with useDeferredValue ("when")
+  const deferredSearchText = useDeferredValue(searchText);
+  const filteredVideos = filterVideos(videos, deferredSearchText);
+  return (
+    <div className="video-list">
+      {filteredVideos.length === 0 && (
+        <div className="no-results">No results</div>
+      )}
+      <div className="videos">
+        {filteredVideos.map((video) => (
+          // Animate each item in list ("what")
+          <ViewTransition key={video.id}>
+            <Video video={video} />
+          </ViewTransition>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export default function Home() {
-	const videos = use(fetchVideos());
-	const count = videos.length;
-	const [searchText, setSearchText] = useState("");
+  const videos = use(fetchVideos());
+  const count = videos.length;
+  const [searchText, setSearchText] = useState('');
 
-	return (
-		<Layout heading={<div className="fit">{count} Videos</div>}>
-			<SearchInput value={searchText} onChange={setSearchText} />
-			<SearchList videos={videos} searchText={searchText} />
-		</Layout>
-	);
+  return (
+    <Layout heading={<div className="fit">{count} Videos</div>}>
+      <SearchInput value={searchText} onChange={setSearchText} />
+      <SearchList videos={videos} searchText={searchText} />
+    </Layout>
+  );
 }
 
 function SearchInput({ value, onChange }) {
-	const id = useId();
-	return (
-		<form className="search" onSubmit={(e) => e.preventDefault()}>
-			<label htmlFor={id} className="sr-only">
-				Search
-			</label>
-			<div className="search-input">
-				<div className="search-icon">
-					<IconSearch />
-				</div>
-				<input
-					type="text"
-					id={id}
-					placeholder="Search"
-					value={value}
-					onChange={(e) => onChange(e.target.value)}
-				/>
-			</div>
-		</form>
-	);
+  const id = useId();
+  return (
+    <form className="search" onSubmit={(e) => e.preventDefault()}>
+      <label htmlFor={id} className="sr-only">
+        Search
+      </label>
+      <div className="search-input">
+        <div className="search-icon">
+          <IconSearch />
+        </div>
+        <input
+          type="text"
+          id={id}
+          placeholder="Search"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      </div>
+    </form>
+  );
 }
 
 function filterVideos(videos, query) {
-	const keywords = query
-		.toLowerCase()
-		.split(" ")
-		.filter((s) => s !== "");
-	if (keywords.length === 0) {
-		return videos;
-	}
-	return videos.filter((video) => {
-		const words = (video.title + " " + video.description).toLowerCase().split(" ");
-		return keywords.every((kw) => words.some((w) => w.includes(kw)));
-	});
+  const keywords = query
+    .toLowerCase()
+    .split(" ")
+    .filter((s) => s !== "");
+  if (keywords.length === 0) {
+    return videos;
+  }
+  return videos.filter((video) => {
+    const words = (video.title + " " + video.description)
+      .toLowerCase()
+      .split(" ");
+    return keywords.every((kw) => words.some((w) => w.includes(kw)));
+  });
 }
 ```
 
 ```js src/Icons.js hidden
 export function ChevronLeft() {
-	return (
-		<svg
-			className="chevron-left"
-			xmlns="http://www.w3.org/2000/svg"
-			width="20"
-			height="20"
-			viewBox="0 0 20 20"
-		>
-			<g fill="none" fillRule="evenodd" transform="translate(-446 -398)">
-				<path
-					fill="currentColor"
-					fillRule="nonzero"
-					d="M95.8838835,240.366117 C95.3957281,239.877961 94.6042719,239.877961 94.1161165,240.366117 C93.6279612,240.854272 93.6279612,241.645728 94.1161165,242.133883 L98.6161165,246.633883 C99.1042719,247.122039 99.8957281,247.122039 100.383883,246.633883 L104.883883,242.133883 C105.372039,241.645728 105.372039,240.854272 104.883883,240.366117 C104.395728,239.877961 103.604272,239.877961 103.116117,240.366117 L99.5,243.982233 L95.8838835,240.366117 Z"
-					transform="translate(356.5 164.5)"
-				/>
-				<polygon points="446 418 466 418 466 398 446 398" />
-			</g>
-		</svg>
-	);
+  return (
+    <svg
+      className="chevron-left"
+      xmlns="http://www.w3.org/2000/svg"
+      width="20"
+      height="20"
+      viewBox="0 0 20 20">
+      <g fill="none" fillRule="evenodd" transform="translate(-446 -398)">
+        <path
+          fill="currentColor"
+          fillRule="nonzero"
+          d="M95.8838835,240.366117 C95.3957281,239.877961 94.6042719,239.877961 94.1161165,240.366117 C93.6279612,240.854272 93.6279612,241.645728 94.1161165,242.133883 L98.6161165,246.633883 C99.1042719,247.122039 99.8957281,247.122039 100.383883,246.633883 L104.883883,242.133883 C105.372039,241.645728 105.372039,240.854272 104.883883,240.366117 C104.395728,239.877961 103.604272,239.877961 103.116117,240.366117 L99.5,243.982233 L95.8838835,240.366117 Z"
+          transform="translate(356.5 164.5)"
+        />
+        <polygon points="446 418 466 418 466 398 446 398" />
+      </g>
+    </svg>
+  );
 }
 
 export function PauseIcon() {
-	return (
-		<svg
-			className="control-icon"
-			style={{ padding: "4px" }}
-			width="100"
-			height="100"
-			viewBox="0 0 512 512"
-			fill="none"
-			xmlns="http://www.w3.org/2000/svg"
-		>
-			<path
-				fillRule="evenodd"
-				clipRule="evenodd"
-				d="M256 0C114.617 0 0 114.615 0 256s114.617 256 256 256 256-114.615 256-256S397.383 0 256 0zm-32 320c0 8.836-7.164 16-16 16h-32c-8.836 0-16-7.164-16-16V192c0-8.836 7.164-16 16-16h32c8.836 0 16 7.164 16 16v128zm128 0c0 8.836-7.164 16-16 16h-32c-8.836 0-16-7.164-16-16V192c0-8.836 7.164-16 16-16h32c8.836 0 16 7.164 16 16v128z"
-				fill="currentColor"
-			/>
-		</svg>
-	);
+  return (
+    <svg
+      className="control-icon"
+      style={{padding: '4px'}}
+      width="100"
+      height="100"
+      viewBox="0 0 512 512"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg">
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M256 0C114.617 0 0 114.615 0 256s114.617 256 256 256 256-114.615 256-256S397.383 0 256 0zm-32 320c0 8.836-7.164 16-16 16h-32c-8.836 0-16-7.164-16-16V192c0-8.836 7.164-16 16-16h32c8.836 0 16 7.164 16 16v128zm128 0c0 8.836-7.164 16-16 16h-32c-8.836 0-16-7.164-16-16V192c0-8.836 7.164-16 16-16h32c8.836 0 16 7.164 16 16v128z"
+        fill="currentColor"
+      />
+    </svg>
+  );
 }
 
 export function PlayIcon() {
-	return (
-		<svg
-			className="control-icon"
-			width="100"
-			height="100"
-			viewBox="0 0 72 72"
-			fill="none"
-			xmlns="http://www.w3.org/2000/svg"
-		>
-			<path
-				fillRule="evenodd"
-				clipRule="evenodd"
-				d="M36 69C54.2254 69 69 54.2254 69 36C69 17.7746 54.2254 3 36 3C17.7746 3 3 17.7746 3 36C3 54.2254 17.7746 69 36 69ZM52.1716 38.6337L28.4366 51.5801C26.4374 52.6705 24 51.2235 24 48.9464V23.0536C24 20.7764 26.4374 19.3295 28.4366 20.4199L52.1716 33.3663C54.2562 34.5034 54.2562 37.4966 52.1716 38.6337Z"
-				fill="currentColor"
-			/>
-		</svg>
-	);
+  return (
+    <svg
+      className="control-icon"
+      width="100"
+      height="100"
+      viewBox="0 0 72 72"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg">
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M36 69C54.2254 69 69 54.2254 69 36C69 17.7746 54.2254 3 36 3C17.7746 3 3 17.7746 3 36C3 54.2254 17.7746 69 36 69ZM52.1716 38.6337L28.4366 51.5801C26.4374 52.6705 24 51.2235 24 48.9464V23.0536C24 20.7764 26.4374 19.3295 28.4366 20.4199L52.1716 33.3663C54.2562 34.5034 54.2562 37.4966 52.1716 38.6337Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
 }
-export function Heart({ liked, animate }) {
-	return (
-		<>
-			<svg
-				className="absolute overflow-visible"
-				viewBox="0 0 24 24"
-				fill="none"
-				xmlns="http://www.w3.org/2000/svg"
-			>
-				<circle
-					className={`circle ${liked ? "liked" : ""} ${animate ? "animate" : ""}`}
-					cx="12"
-					cy="12"
-					r="11.5"
-					fill="transparent"
-					strokeWidth="0"
-					stroke="currentColor"
-				/>
-			</svg>
+export function Heart({liked, animate}) {
+  return (
+    <>
+      <svg
+        className="absolute overflow-visible"
+        viewBox="0 0 24 24"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg">
+        <circle
+          className={`circle ${liked ? 'liked' : ''} ${animate ? 'animate' : ''}`}
+          cx="12"
+          cy="12"
+          r="11.5"
+          fill="transparent"
+          strokeWidth="0"
+          stroke="currentColor"
+        />
+      </svg>
 
-			<svg
-				className={`heart ${liked ? "liked" : ""} ${animate ? "animate" : ""}`}
-				viewBox="0 0 24 24"
-				fill="none"
-				xmlns="http://www.w3.org/2000/svg"
-			>
-				{liked ?
-					<path
-						d="M12 23a.496.496 0 0 1-.26-.074C7.023 19.973 0 13.743 0 8.68c0-4.12 2.322-6.677 6.058-6.677 2.572 0 5.108 2.387 5.134 2.41l.808.771.808-.771C12.834 4.387 15.367 2 17.935 2 21.678 2 24 4.558 24 8.677c0 5.06-7.022 11.293-11.74 14.246a.496.496 0 0 1-.26.074V23z"
-						fill="currentColor"
-					/>
-				:	<path
-						fillRule="evenodd"
-						clipRule="evenodd"
-						d="m12 5.184-.808-.771-.004-.004C11.065 4.299 8.522 2.003 6 2.003c-3.736 0-6 2.558-6 6.677 0 4.47 5.471 9.848 10 13.079.602.43 1.187.82 1.74 1.167A.497.497 0 0 0 12 23v-.003c.09 0 .182-.026.26-.074C16.977 19.97 24 13.737 24 8.677 24 4.557 21.743 2 18 2c-2.569 0-5.166 2.387-5.192 2.413L12 5.184zm-.002 15.525c2.071-1.388 4.477-3.342 6.427-5.47C20.72 12.733 22 10.401 22 8.677c0-1.708-.466-2.855-1.087-3.55C20.316 4.459 19.392 4 18 4c-.726 0-1.63.364-2.5.9-.67.412-1.148.82-1.266.92-.03.025-.037.031-.019.014l-.013.013L12 7.949 9.832 5.88a10.08 10.08 0 0 0-1.33-.977C7.633 4.367 6.728 4.003 6 4.003c-1.388 0-2.312.459-2.91 1.128C2.466 5.826 2 6.974 2 8.68c0 1.726 1.28 4.058 3.575 6.563 1.948 2.127 4.352 4.078 6.423 5.466z"
-						fill="currentColor"
-					/>
-				}
-			</svg>
-		</>
-	);
+      <svg
+        className={`heart ${liked ? 'liked' : ''} ${animate ? 'animate' : ''}`}
+        viewBox="0 0 24 24"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg">
+        {liked ? (
+          <path
+            d="M12 23a.496.496 0 0 1-.26-.074C7.023 19.973 0 13.743 0 8.68c0-4.12 2.322-6.677 6.058-6.677 2.572 0 5.108 2.387 5.134 2.41l.808.771.808-.771C12.834 4.387 15.367 2 17.935 2 21.678 2 24 4.558 24 8.677c0 5.06-7.022 11.293-11.74 14.246a.496.496 0 0 1-.26.074V23z"
+            fill="currentColor"
+          />
+        ) : (
+          <path
+            fillRule="evenodd"
+            clipRule="evenodd"
+            d="m12 5.184-.808-.771-.004-.004C11.065 4.299 8.522 2.003 6 2.003c-3.736 0-6 2.558-6 6.677 0 4.47 5.471 9.848 10 13.079.602.43 1.187.82 1.74 1.167A.497.497 0 0 0 12 23v-.003c.09 0 .182-.026.26-.074C16.977 19.97 24 13.737 24 8.677 24 4.557 21.743 2 18 2c-2.569 0-5.166 2.387-5.192 2.413L12 5.184zm-.002 15.525c2.071-1.388 4.477-3.342 6.427-5.47C20.72 12.733 22 10.401 22 8.677c0-1.708-.466-2.855-1.087-3.55C20.316 4.459 19.392 4 18 4c-.726 0-1.63.364-2.5.9-.67.412-1.148.82-1.266.92-.03.025-.037.031-.019.014l-.013.013L12 7.949 9.832 5.88a10.08 10.08 0 0 0-1.33-.977C7.633 4.367 6.728 4.003 6 4.003c-1.388 0-2.312.459-2.91 1.128C2.466 5.826 2 6.974 2 8.68c0 1.726 1.28 4.058 3.575 6.563 1.948 2.127 4.352 4.078 6.423 5.466z"
+            fill="currentColor"
+          />
+        )}
+      </svg>
+    </>
+  );
 }
 
 export function IconSearch(props) {
-	return (
-		<svg width="1em" height="1em" viewBox="0 0 20 20">
-			<path
-				d="M14.386 14.386l4.0877 4.0877-4.0877-4.0877c-2.9418 2.9419-7.7115 2.9419-10.6533 0-2.9419-2.9418-2.9419-7.7115 0-10.6533 2.9418-2.9419 7.7115-2.9419 10.6533 0 2.9419 2.9418 2.9419 7.7115 0 10.6533z"
-				stroke="currentColor"
-				fill="none"
-				strokeWidth="2"
-				fillRule="evenodd"
-				strokeLinecap="round"
-				strokeLinejoin="round"
-			></path>
-		</svg>
-	);
+  return (
+    <svg width="1em" height="1em" viewBox="0 0 20 20">
+      <path
+        d="M14.386 14.386l4.0877 4.0877-4.0877-4.0877c-2.9418 2.9419-7.7115 2.9419-10.6533 0-2.9419-2.9418-2.9419-7.7115 0-10.6533 2.9418-2.9419 7.7115-2.9419 10.6533 0 2.9419 2.9418 2.9419 7.7115 0 10.6533z"
+        stroke="currentColor"
+        fill="none"
+        strokeWidth="2"
+        fillRule="evenodd"
+        strokeLinecap="round"
+        strokeLinejoin="round"></path>
+    </svg>
+  );
 }
 ```
 
 ```js src/Layout.js hidden
-import { unstable_ViewTransition as ViewTransition } from "react";
-
-import { useIsNavPending } from "./router";
+import {ViewTransition} from 'react'; import { useIsNavPending } from "./router";
 
 export default function Page({ heading, children }) {
-	const isPending = useIsNavPending();
-	return (
-		<div className="page">
-			<div className="top">
-				<div className="top-nav">
-					{/* Custom classes based on transition type. */}
-					<ViewTransition
-						name="nav"
-						share={{
-							"nav-forward": "slide-forward",
-							"nav-back": "slide-back",
-						}}
-					>
-						{heading}
-					</ViewTransition>
-					{isPending && <span className="loader"></span>}
-				</div>
-			</div>
-			{/* Opt-out of ViewTransition for the content. */}
-			{/* Content can define it's own ViewTransition. */}
-			<ViewTransition default="none">
-				<div className="bottom">
-					<div className="content">{children}</div>
-				</div>
-			</ViewTransition>
-		</div>
-	);
+  const isPending = useIsNavPending();
+  return (
+    <div className="page">
+      <div className="top">
+        <div className="top-nav">
+          {/* Custom classes based on transition type. */}
+          <ViewTransition
+            name="nav"
+            share={{
+              'nav-forward': 'slide-forward',
+              'nav-back': 'slide-back',
+            }}>
+            {heading}
+          </ViewTransition>
+          {isPending && <span className="loader"></span>}
+        </div>
+      </div>
+      {/* Opt-out of ViewTransition for the content. */}
+      {/* Content can define it's own ViewTransition. */}
+      <ViewTransition default="none">
+        <div className="bottom">
+          <div className="content">{children}</div>
+        </div>
+      </ViewTransition>
+    </div>
+  );
 }
 ```
 
 ```js src/LikeButton.js hidden
-import { useState } from "react";
-
-import { Heart } from "./Icons";
+import {useState} from 'react';
+import {Heart} from './Icons';
 
 // A hack since we don't actually have a backend.
 // Unlike local state, this survives videos being filtered.
 const likedVideos = new Set();
 
-export default function LikeButton({ video }) {
-	const [isLiked, setIsLiked] = useState(() => likedVideos.has(video.id));
-	const [animate, setAnimate] = useState(false);
-	return (
-		<button
-			className={`like-button ${isLiked && "liked"}`}
-			aria-label={isLiked ? "Unsave" : "Save"}
-			onClick={() => {
-				const nextIsLiked = !isLiked;
-				if (nextIsLiked) {
-					likedVideos.add(video.id);
-				} else {
-					likedVideos.delete(video.id);
-				}
-				setAnimate(true);
-				setIsLiked(nextIsLiked);
-			}}
-		>
-			<Heart liked={isLiked} animate={animate} />
-		</button>
-	);
+export default function LikeButton({video}) {
+  const [isLiked, setIsLiked] = useState(() => likedVideos.has(video.id));
+  const [animate, setAnimate] = useState(false);
+  return (
+    <button
+      className={`like-button ${isLiked && 'liked'}`}
+      aria-label={isLiked ? 'Unsave' : 'Save'}
+      onClick={() => {
+        const nextIsLiked = !isLiked;
+        if (nextIsLiked) {
+          likedVideos.add(video.id);
+        } else {
+          likedVideos.delete(video.id);
+        }
+        setAnimate(true);
+        setIsLiked(nextIsLiked);
+      }}>
+      <Heart liked={isLiked} animate={animate} />
+    </button>
+  );
 }
 ```
 
 ```js src/Videos.js hidden
-import { startTransition, useState, unstable_ViewTransition as ViewTransition } from "react";
-
-import { PauseIcon, PlayIcon } from "./Icons";
+import { useState, ViewTransition } from "react";
 import LikeButton from "./LikeButton";
 import { useRouter } from "./router";
+import { PauseIcon, PlayIcon } from "./Icons";
+import { startTransition } from "react";
 
 export function Thumbnail({ video, children }) {
-	// Add a name to animate with a shared element transition.
-	// This uses the default animation, no additional css needed.
-	return (
-		<ViewTransition name={`video-${video.id}`}>
-			<div aria-hidden="true" tabIndex={-1} className={`thumbnail ${video.image}`}>
-				{children}
-			</div>
-		</ViewTransition>
-	);
+  // Add a name to animate with a shared element transition.
+  // This uses the default animation, no additional css needed.
+  return (
+    <ViewTransition name={`video-${video.id}`}>
+      <div
+        aria-hidden="true"
+        tabIndex={-1}
+        className={`thumbnail ${video.image}`}
+      >
+        {children}
+      </div>
+    </ViewTransition>
+  );
 }
 
 export function VideoControls() {
-	const [isPlaying, setIsPlaying] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
 
-	return (
-		<span
-			className="controls"
-			onClick={() =>
-				startTransition(() => {
-					setIsPlaying((p) => !p);
-				})
-			}
-		>
-			{isPlaying ?
-				<PauseIcon />
-			:	<PlayIcon />}
-		</span>
-	);
+  return (
+    <span
+      className="controls"
+      onClick={() =>
+        startTransition(() => {
+          setIsPlaying((p) => !p);
+        })
+      }
+    >
+      {isPlaying ? <PauseIcon /> : <PlayIcon />}
+    </span>
+  );
 }
 
 export function Video({ video }) {
-	const { navigate } = useRouter();
+  const { navigate } = useRouter();
 
-	return (
-		<div className="video">
-			<div
-				className="link"
-				onClick={(e) => {
-					e.preventDefault();
-					navigate(`/video/${video.id}`);
-				}}
-			>
-				<Thumbnail video={video}></Thumbnail>
+  return (
+    <div className="video">
+      <div
+        className="link"
+        onClick={(e) => {
+          e.preventDefault();
+          navigate(`/video/${video.id}`);
+        }}
+      >
+        <Thumbnail video={video}></Thumbnail>
 
-				<div className="info">
-					<div className="video-title">{video.title}</div>
-					<div className="video-description">{video.description}</div>
-				</div>
-			</div>
-			<LikeButton video={video} />
-		</div>
-	);
+        <div className="info">
+          <div className="video-title">{video.title}</div>
+          <div className="video-description">{video.description}</div>
+        </div>
+      </div>
+      <LikeButton video={video} />
+    </div>
+  );
 }
 ```
 
+
 ```js src/data.js hidden
 const videos = [
-	{
-		id: "1",
-		title: "First video",
-		description: "Video description",
-		image: "blue",
-	},
-	{
-		id: "2",
-		title: "Second video",
-		description: "Video description",
-		image: "red",
-	},
-	{
-		id: "3",
-		title: "Third video",
-		description: "Video description",
-		image: "green",
-	},
-	{
-		id: "4",
-		title: "Fourth video",
-		description: "Video description",
-		image: "purple",
-	},
-	{
-		id: "5",
-		title: "Fifth video",
-		description: "Video description",
-		image: "yellow",
-	},
-	{
-		id: "6",
-		title: "Sixth video",
-		description: "Video description",
-		image: "gray",
-	},
+  {
+    id: '1',
+    title: 'First video',
+    description: 'Video description',
+    image: 'blue',
+  },
+  {
+    id: '2',
+    title: 'Second video',
+    description: 'Video description',
+    image: 'red',
+  },
+  {
+    id: '3',
+    title: 'Third video',
+    description: 'Video description',
+    image: 'green',
+  },
+  {
+    id: '4',
+    title: 'Fourth video',
+    description: 'Video description',
+    image: 'purple',
+  },
+  {
+    id: '5',
+    title: 'Fifth video',
+    description: 'Video description',
+    image: 'yellow',
+  },
+  {
+    id: '6',
+    title: 'Sixth video',
+    description: 'Video description',
+    image: 'gray',
+  },
 ];
 
 let videosCache = new Map();
@@ -12591,908 +12007,855 @@ let videoDetailsCache = new Map();
 const VIDEO_DELAY = 1;
 const VIDEO_DETAILS_DELAY = 1000;
 export function fetchVideos() {
-	if (videosCache.has(0)) {
-		return videosCache.get(0);
-	}
-	const promise = new Promise((resolve) => {
-		setTimeout(() => {
-			resolve(videos);
-		}, VIDEO_DELAY);
-	});
-	videosCache.set(0, promise);
-	return promise;
+  if (videosCache.has(0)) {
+    return videosCache.get(0);
+  }
+  const promise = new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(videos);
+    }, VIDEO_DELAY);
+  });
+  videosCache.set(0, promise);
+  return promise;
 }
 
 export function fetchVideo(id) {
-	if (videoCache.has(id)) {
-		return videoCache.get(id);
-	}
-	const promise = new Promise((resolve) => {
-		setTimeout(() => {
-			resolve(videos.find((video) => video.id === id));
-		}, VIDEO_DELAY);
-	});
-	videoCache.set(id, promise);
-	return promise;
+  if (videoCache.has(id)) {
+    return videoCache.get(id);
+  }
+  const promise = new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(videos.find((video) => video.id === id));
+    }, VIDEO_DELAY);
+  });
+  videoCache.set(id, promise);
+  return promise;
 }
 
 export function fetchVideoDetails(id) {
-	if (videoDetailsCache.has(id)) {
-		return videoDetailsCache.get(id);
-	}
-	const promise = new Promise((resolve) => {
-		setTimeout(() => {
-			resolve(videos.find((video) => video.id === id));
-		}, VIDEO_DETAILS_DELAY);
-	});
-	videoDetailsCache.set(id, promise);
-	return promise;
+  if (videoDetailsCache.has(id)) {
+    return videoDetailsCache.get(id);
+  }
+  const promise = new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(videos.find((video) => video.id === id));
+    }, VIDEO_DETAILS_DELAY);
+  });
+  videoDetailsCache.set(id, promise);
+  return promise;
 }
 ```
 
 ```js src/router.js hidden
-import {
-	unstable_addTransitionType as addTransitionType,
-	createContext,
-	use,
-	useEffect,
-	useLayoutEffect,
-	useState,
-	useTransition,
-} from "react";
+import {useState, createContext, use, useTransition, useLayoutEffect, useEffect, addTransitionType} from "react";
 
 export function Router({ children }) {
-	const [isPending, startTransition] = useTransition();
-	const [routerState, setRouterState] = useState({
-		pendingNav: () => {},
-		url: document.location.pathname,
-	});
-	function navigate(url) {
-		startTransition(() => {
-			// Transition type for the cause "nav forward"
-			addTransitionType("nav-forward");
-			go(url);
-		});
-	}
-	function navigateBack(url) {
-		startTransition(() => {
-			// Transition type for the cause "nav backward"
-			addTransitionType("nav-back");
-			go(url);
-		});
-	}
+  const [isPending, startTransition] = useTransition();
+  const [routerState, setRouterState] = useState({pendingNav: () => {}, url: document.location.pathname});
+  function navigate(url) {
+    startTransition(() => {
+      // Transition type for the cause "nav forward"
+      addTransitionType('nav-forward');
+      go(url);
+    });
+  }
+  function navigateBack(url) {
+    startTransition(() => {
+      // Transition type for the cause "nav backward"
+      addTransitionType('nav-back');
+      go(url);
+    });
+  }
 
-	function go(url) {
-		setRouterState({
-			url,
-			pendingNav() {
-				window.history.pushState({}, "", url);
-			},
-		});
-	}
+  function go(url) {
+    setRouterState({
+      url,
+      pendingNav() {
+        window.history.pushState({}, "", url);
+      },
+    });
+  }
 
-	useEffect(() => {
-		function handlePopState() {
-			// This should not animate because restoration has to be synchronous.
-			// Even though it's a transition.
-			startTransition(() => {
-				setRouterState({
-					url: document.location.pathname + document.location.search,
-					pendingNav() {
-						// Noop. URL has already updated.
-					},
-				});
-			});
-		}
-		window.addEventListener("popstate", handlePopState);
-		return () => {
-			window.removeEventListener("popstate", handlePopState);
-		};
-	}, []);
-	const pendingNav = routerState.pendingNav;
-	useLayoutEffect(() => {
-		pendingNav();
-	}, [pendingNav]);
+  useEffect(() => {
+    function handlePopState() {
+      // This should not animate because restoration has to be synchronous.
+      // Even though it's a transition.
+      startTransition(() => {
+        setRouterState({
+          url: document.location.pathname + document.location.search,
+          pendingNav() {
+            // Noop. URL has already updated.
+          },
+        });
+      });
+    }
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, []);
+  const pendingNav = routerState.pendingNav;
+  useLayoutEffect(() => {
+    pendingNav();
+  }, [pendingNav]);
 
-	return (
-		<RouterContext
-			value={{
-				url: routerState.url,
-				navigate,
-				navigateBack,
-				isPending,
-				params: {},
-			}}
-		>
-			{children}
-		</RouterContext>
-	);
+  return (
+    <RouterContext
+      value={{
+        url: routerState.url,
+        navigate,
+        navigateBack,
+        isPending,
+        params: {},
+      }}
+    >
+      {children}
+    </RouterContext>
+  );
 }
 
 const RouterContext = createContext({ url: "/", params: {} });
 
 export function useRouter() {
-	return use(RouterContext);
+  return use(RouterContext);
 }
 
 export function useIsNavPending() {
-	return use(RouterContext).isPending;
+  return use(RouterContext).isPending;
 }
+
 ```
 
 ```css src/styles.css hidden
 @font-face {
-	font-family: Optimistic Text;
-	src: url(https://react.dev/fonts/Optimistic_Text_W_Rg.woff2) format("woff2");
-	font-weight: 400;
-	font-style: normal;
-	font-display: swap;
+  font-family: Optimistic Text;
+  src: url(https://react.dev/fonts/Optimistic_Text_W_Rg.woff2) format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
-	font-family: Optimistic Text;
-	src: url(https://react.dev/fonts/Optimistic_Text_W_Md.woff2) format("woff2");
-	font-weight: 500;
-	font-style: normal;
-	font-display: swap;
+  font-family: Optimistic Text;
+  src: url(https://react.dev/fonts/Optimistic_Text_W_Md.woff2) format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
-	font-family: Optimistic Text;
-	src: url(https://react.dev/fonts/Optimistic_Text_W_Bd.woff2) format("woff2");
-	font-weight: 600;
-	font-style: normal;
-	font-display: swap;
+  font-family: Optimistic Text;
+  src: url(https://react.dev/fonts/Optimistic_Text_W_Bd.woff2) format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
-	font-family: Optimistic Text;
-	src: url(https://react.dev/fonts/Optimistic_Text_W_Bd.woff2) format("woff2");
-	font-weight: 700;
-	font-style: normal;
-	font-display: swap;
+  font-family: Optimistic Text;
+  src: url(https://react.dev/fonts/Optimistic_Text_W_Bd.woff2) format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
 }
 
 * {
-	box-sizing: border-box;
+  box-sizing: border-box;
 }
 
 html {
-	background-image: url(https://react.dev/images/meta-gradient-dark.png);
-	background-size: 100%;
-	background-position: -100%;
-	background-color: rgb(64 71 86);
-	background-repeat: no-repeat;
-	height: 100%;
-	width: 100%;
+  background-image: url(https://react.dev/images/meta-gradient-dark.png);
+  background-size: 100%;
+  background-position: -100%;
+  background-color: rgb(64 71 86);
+  background-repeat: no-repeat;
+  height: 100%;
+  width: 100%;
 }
 
 body {
-	font-family:
-		Optimistic Text,
-		-apple-system,
-		ui-sans-serif,
-		system-ui,
-		sans-serif,
-		Apple Color Emoji,
-		Segoe UI Emoji,
-		Segoe UI Symbol,
-		Noto Color Emoji;
-	padding: 10px 0 10px 0;
-	margin: 0;
-	display: flex;
-	justify-content: center;
+  font-family: Optimistic Text, -apple-system, ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji;
+  padding: 10px 0 10px 0;
+  margin: 0;
+  display: flex;
+  justify-content: center;
 }
 
 #root {
-	flex: 1 1;
-	height: auto;
-	background-color: #fff;
-	border-radius: 10px;
-	max-width: 450px;
-	min-height: 600px;
-	padding-bottom: 10px;
+  flex: 1 1;
+  height: auto;
+  background-color: #fff;
+  border-radius: 10px;
+  max-width: 450px;
+  min-height: 600px;
+  padding-bottom: 10px;
 }
 
 h1 {
-	margin-top: 0;
-	font-size: 22px;
+  margin-top: 0;
+  font-size: 22px;
 }
 
 h2 {
-	margin-top: 0;
-	font-size: 20px;
+  margin-top: 0;
+  font-size: 20px;
 }
 
 h3 {
-	margin-top: 0;
-	font-size: 18px;
+  margin-top: 0;
+  font-size: 18px;
 }
 
 h4 {
-	margin-top: 0;
-	font-size: 16px;
+  margin-top: 0;
+  font-size: 16px;
 }
 
 h5 {
-	margin-top: 0;
-	font-size: 14px;
+  margin-top: 0;
+  font-size: 14px;
 }
 
 h6 {
-	margin-top: 0;
-	font-size: 12px;
+  margin-top: 0;
+  font-size: 12px;
 }
 
 code {
-	font-size: 1.2em;
+  font-size: 1.2em;
 }
 
 ul {
-	padding-inline-start: 20px;
+  padding-inline-start: 20px;
 }
 
 .sr-only {
-	position: absolute;
-	width: 1px;
-	height: 1px;
-	padding: 0;
-	margin: -1px;
-	overflow: hidden;
-	clip: rect(0, 0, 0, 0);
-	white-space: nowrap;
-	border-width: 0;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }
 
 .absolute {
-	position: absolute;
+  position: absolute;
 }
 
 .overflow-visible {
-	overflow: visible;
+  overflow: visible;
 }
 
 .visible {
-	overflow: visible;
+  overflow: visible;
 }
 
 .fit {
-	width: fit-content;
+  width: fit-content;
 }
+
 
 /* Layout */
 .page {
-	display: flex;
-	flex-direction: column;
-	height: 100%;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .top-hero {
-	height: 200px;
-	display: flex;
-	justify-content: center;
-	align-items: center;
-	background-image: conic-gradient(
-		from 90deg at -10% 100%,
-		#2b303b 0deg,
-		#2b303b 90deg,
-		#16181d 1turn
-	);
+  height: 200px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-image: conic-gradient(
+      from 90deg at -10% 100%,
+      #2b303b 0deg,
+      #2b303b 90deg,
+      #16181d 1turn
+  );
 }
 
 .bottom {
-	flex: 1;
-	overflow: auto;
+  flex: 1;
+  overflow: auto;
 }
 
 .top-nav {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	margin-bottom: 0;
-	padding: 0 12px;
-	top: 0;
-	width: 100%;
-	height: 44px;
-	color: #23272f;
-	font-weight: 700;
-	font-size: 20px;
-	z-index: 100;
-	cursor: default;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0;
+  padding: 0 12px;
+  top: 0;
+  width: 100%;
+  height: 44px;
+  color: #23272f;
+  font-weight: 700;
+  font-size: 20px;
+  z-index: 100;
+  cursor: default;
 }
 
 .content {
-	padding: 0 12px;
-	margin-top: 4px;
+  padding: 0 12px;
+  margin-top: 4px;
 }
 
+
 .loader {
-	color: #23272f;
-	font-size: 3px;
-	width: 1em;
-	margin-right: 18px;
-	height: 1em;
-	border-radius: 50%;
-	position: relative;
-	text-indent: -9999em;
-	animation: loading-spinner 1.3s infinite linear;
-	animation-delay: 200ms;
-	transform: translateZ(0);
+  color: #23272f;
+  font-size: 3px;
+  width: 1em;
+  margin-right: 18px;
+  height: 1em;
+  border-radius: 50%;
+  position: relative;
+  text-indent: -9999em;
+  animation: loading-spinner 1.3s infinite linear;
+  animation-delay: 200ms;
+  transform: translateZ(0);
 }
 
 @keyframes loading-spinner {
-	0%,
-	100% {
-		box-shadow:
-			0 -3em 0 0.2em,
-			2em -2em 0 0em,
-			3em 0 0 -1em,
-			2em 2em 0 -1em,
-			0 3em 0 -1em,
-			-2em 2em 0 -1em,
-			-3em 0 0 -1em,
-			-2em -2em 0 0;
-	}
-	12.5% {
-		box-shadow:
-			0 -3em 0 0,
-			2em -2em 0 0.2em,
-			3em 0 0 0,
-			2em 2em 0 -1em,
-			0 3em 0 -1em,
-			-2em 2em 0 -1em,
-			-3em 0 0 -1em,
-			-2em -2em 0 -1em;
-	}
-	25% {
-		box-shadow:
-			0 -3em 0 -0.5em,
-			2em -2em 0 0,
-			3em 0 0 0.2em,
-			2em 2em 0 0,
-			0 3em 0 -1em,
-			-2em 2em 0 -1em,
-			-3em 0 0 -1em,
-			-2em -2em 0 -1em;
-	}
-	37.5% {
-		box-shadow:
-			0 -3em 0 -1em,
-			2em -2em 0 -1em,
-			3em 0em 0 0,
-			2em 2em 0 0.2em,
-			0 3em 0 0em,
-			-2em 2em 0 -1em,
-			-3em 0em 0 -1em,
-			-2em -2em 0 -1em;
-	}
-	50% {
-		box-shadow:
-			0 -3em 0 -1em,
-			2em -2em 0 -1em,
-			3em 0 0 -1em,
-			2em 2em 0 0em,
-			0 3em 0 0.2em,
-			-2em 2em 0 0,
-			-3em 0em 0 -1em,
-			-2em -2em 0 -1em;
-	}
-	62.5% {
-		box-shadow:
-			0 -3em 0 -1em,
-			2em -2em 0 -1em,
-			3em 0 0 -1em,
-			2em 2em 0 -1em,
-			0 3em 0 0,
-			-2em 2em 0 0.2em,
-			-3em 0 0 0,
-			-2em -2em 0 -1em;
-	}
-	75% {
-		box-shadow:
-			0em -3em 0 -1em,
-			2em -2em 0 -1em,
-			3em 0em 0 -1em,
-			2em 2em 0 -1em,
-			0 3em 0 -1em,
-			-2em 2em 0 0,
-			-3em 0em 0 0.2em,
-			-2em -2em 0 0;
-	}
-	87.5% {
-		box-shadow:
-			0em -3em 0 0,
-			2em -2em 0 -1em,
-			3em 0 0 -1em,
-			2em 2em 0 -1em,
-			0 3em 0 -1em,
-			-2em 2em 0 0,
-			-3em 0em 0 0,
-			-2em -2em 0 0.2em;
-	}
+  0%,
+  100% {
+    box-shadow: 0 -3em 0 0.2em,
+    2em -2em 0 0em, 3em 0 0 -1em,
+    2em 2em 0 -1em, 0 3em 0 -1em,
+    -2em 2em 0 -1em, -3em 0 0 -1em,
+    -2em -2em 0 0;
+  }
+  12.5% {
+    box-shadow: 0 -3em 0 0, 2em -2em 0 0.2em,
+    3em 0 0 0, 2em 2em 0 -1em, 0 3em 0 -1em,
+    -2em 2em 0 -1em, -3em 0 0 -1em,
+    -2em -2em 0 -1em;
+  }
+  25% {
+    box-shadow: 0 -3em 0 -0.5em,
+    2em -2em 0 0, 3em 0 0 0.2em,
+    2em 2em 0 0, 0 3em 0 -1em,
+    -2em 2em 0 -1em, -3em 0 0 -1em,
+    -2em -2em 0 -1em;
+  }
+  37.5% {
+    box-shadow: 0 -3em 0 -1em, 2em -2em 0 -1em,
+    3em 0em 0 0, 2em 2em 0 0.2em, 0 3em 0 0em,
+    -2em 2em 0 -1em, -3em 0em 0 -1em, -2em -2em 0 -1em;
+  }
+  50% {
+    box-shadow: 0 -3em 0 -1em, 2em -2em 0 -1em,
+    3em 0 0 -1em, 2em 2em 0 0em, 0 3em 0 0.2em,
+    -2em 2em 0 0, -3em 0em 0 -1em, -2em -2em 0 -1em;
+  }
+  62.5% {
+    box-shadow: 0 -3em 0 -1em, 2em -2em 0 -1em,
+    3em 0 0 -1em, 2em 2em 0 -1em, 0 3em 0 0,
+    -2em 2em 0 0.2em, -3em 0 0 0, -2em -2em 0 -1em;
+  }
+  75% {
+    box-shadow: 0em -3em 0 -1em, 2em -2em 0 -1em,
+    3em 0em 0 -1em, 2em 2em 0 -1em, 0 3em 0 -1em,
+    -2em 2em 0 0, -3em 0em 0 0.2em, -2em -2em 0 0;
+  }
+  87.5% {
+    box-shadow: 0em -3em 0 0, 2em -2em 0 -1em,
+    3em 0 0 -1em, 2em 2em 0 -1em, 0 3em 0 -1em,
+    -2em 2em 0 0, -3em 0em 0 0, -2em -2em 0 0.2em;
+  }
 }
 
 /* LikeButton */
 .like-button {
-	outline-offset: 2px;
-	position: relative;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	width: 2.5rem;
-	height: 2.5rem;
-	cursor: pointer;
-	border-radius: 9999px;
-	border: none;
-	outline: none 2px;
-	color: #5e687e;
-	background: none;
+  outline-offset: 2px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  cursor: pointer;
+  border-radius: 9999px;
+  border: none;
+  outline: none 2px;
+  color: #5e687e;
+  background: none;
 }
 
 .like-button:focus {
-	color: #a6423a;
-	background-color: rgba(166, 66, 58, 0.05);
+  color: #a6423a;
+  background-color: rgba(166, 66, 58, .05);
 }
 
 .like-button:active {
-	color: #a6423a;
-	background-color: rgba(166, 66, 58, 0.05);
-	transform: scaleX(0.95) scaleY(0.95);
+  color: #a6423a;
+  background-color: rgba(166, 66, 58, .05);
+  transform: scaleX(0.95) scaleY(0.95);
 }
 
 .like-button:hover {
-	background-color: #f6f7f9;
+  background-color: #f6f7f9;
 }
 
 .like-button.liked {
-	color: #a6423a;
+  color: #a6423a;
 }
 
 /* Icons */
 @keyframes circle {
-	0% {
-		transform: scale(0);
-		stroke-width: 16px;
-	}
+  0% {
+    transform: scale(0);
+    stroke-width: 16px;
+  }
 
-	50% {
-		transform: scale(0.5);
-		stroke-width: 16px;
-	}
+  50% {
+    transform: scale(.5);
+    stroke-width: 16px;
+  }
 
-	to {
-		transform: scale(1);
-		stroke-width: 0;
-	}
+  to {
+    transform: scale(1);
+    stroke-width: 0;
+  }
 }
 
 .circle {
-	color: rgba(166, 66, 58, 0.5);
-	transform-origin: center;
-	transition-property: all;
-	transition-duration: 0.15s;
-	transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  color: rgba(166, 66, 58, .5);
+  transform-origin: center;
+  transition-property: all;
+  transition-duration: .15s;
+  transition-timing-function: cubic-bezier(.4,0,.2,1);
 }
 
 .circle.liked.animate {
-	animation: circle 0.3s forwards;
+  animation: circle .3s forwards;
 }
 
 .heart {
-	width: 1.5rem;
-	height: 1.5rem;
+  width: 1.5rem;
+  height: 1.5rem;
 }
 
 .heart.liked {
-	transform-origin: center;
-	transition-property: all;
-	transition-duration: 0.15s;
-	transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: center;
+  transition-property: all;
+  transition-duration: .15s;
+  transition-timing-function: cubic-bezier(.4, 0, .2, 1);
 }
 
 .heart.liked.animate {
-	animation: scale 0.35s ease-in-out forwards;
+  animation: scale .35s ease-in-out forwards;
 }
 
 .control-icon {
-	color: hsla(0, 0%, 100%, 0.5);
-	filter: drop-shadow(0 20px 13px rgba(0, 0, 0, 0.03)) drop-shadow(0 8px 5px rgba(0, 0, 0, 0.08));
+  color: hsla(0, 0%, 100%, .5);
+  filter:  drop-shadow(0 20px 13px rgba(0, 0, 0, .03)) drop-shadow(0 8px 5px rgba(0, 0, 0, .08));
 }
 
 .chevron-left {
-	margin-top: 2px;
-	rotate: 90deg;
+  margin-top: 2px;
+  rotate: 90deg;
 }
+
 
 /* Video */
 .thumbnail {
-	position: relative;
-	aspect-ratio: 16 / 9;
-	display: flex;
-	overflow: hidden;
-	flex-direction: column;
-	justify-content: center;
-	align-items: center;
-	border-radius: 0.5rem;
-	outline-offset: 2px;
-	width: 8rem;
-	vertical-align: middle;
-	background-color: #ffffff;
-	background-size: cover;
-	user-select: none;
+  position: relative;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  overflow: hidden;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  border-radius: 0.5rem;
+  outline-offset: 2px;
+  width: 8rem;
+  vertical-align: middle;
+  background-color: #ffffff;
+  background-size: cover;
+  user-select: none;
 }
 
 .thumbnail.blue {
-	background-image: conic-gradient(at top right, #c76a15, #087ea4, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #087ea4, #2b3491);
 }
 
 .thumbnail.red {
-	background-image: conic-gradient(at top right, #c76a15, #a6423a, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #a6423a, #2b3491);
 }
 
 .thumbnail.green {
-	background-image: conic-gradient(at top right, #c76a15, #388f7f, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #388f7f, #2b3491);
 }
 
 .thumbnail.purple {
-	background-image: conic-gradient(at top right, #c76a15, #575fb7, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #575fb7, #2b3491);
 }
 
 .thumbnail.yellow {
-	background-image: conic-gradient(at top right, #c76a15, #fabd62, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #FABD62, #2b3491);
 }
 
 .thumbnail.gray {
-	background-image: conic-gradient(at top right, #c76a15, #4e5769, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #4E5769, #2b3491);
 }
 
 .video {
-	display: flex;
-	flex-direction: row;
-	gap: 0.75rem;
-	align-items: center;
+  display: flex;
+  flex-direction: row;
+  gap: 0.75rem;
+  align-items: center;
 }
 
 .video .link {
-	display: flex;
-	flex-direction: row;
-	flex: 1 1 0;
-	gap: 0.125rem;
-	outline-offset: 4px;
-	cursor: pointer;
+  display: flex;
+  flex-direction: row;
+  flex: 1 1 0;
+  gap: 0.125rem;
+  outline-offset: 4px;
+  cursor: pointer;
 }
 
 .video .info {
-	display: flex;
-	flex-direction: column;
-	justify-content: center;
-	margin-left: 8px;
-	gap: 0.125rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  margin-left: 8px;
+  gap: 0.125rem;
 }
 
 .video .info:hover {
-	text-decoration: underline;
+  text-decoration: underline;
 }
 
 .video-title {
-	font-size: 15px;
-	line-height: 1.25;
-	font-weight: 700;
-	color: #23272f;
+  font-size: 15px;
+  line-height: 1.25;
+  font-weight: 700;
+  color: #23272f;
 }
 
 .video-description {
-	color: #5e687e;
-	font-size: 13px;
+  color: #5e687e;
+  font-size: 13px;
 }
 
 /* Details */
 .details .thumbnail {
-	position: relative;
-	aspect-ratio: 16 / 9;
-	display: flex;
-	overflow: hidden;
-	flex-direction: column;
-	justify-content: center;
-	align-items: center;
-	border-radius: 0.5rem;
-	outline-offset: 2px;
-	width: 100%;
-	vertical-align: middle;
-	background-color: #ffffff;
-	background-size: cover;
-	user-select: none;
+  position: relative;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  overflow: hidden;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  border-radius: 0.5rem;
+  outline-offset: 2px;
+  width: 100%;
+  vertical-align: middle;
+  background-color: #ffffff;
+  background-size: cover;
+  user-select: none;
 }
 
 .video-details-title {
-	margin-top: 8px;
+  margin-top: 8px;
 }
 
 .video-details-speaker {
-	display: flex;
-	gap: 8px;
-	margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  margin-top: 10px
 }
 
 .back {
-	display: flex;
-	align-items: center;
-	margin-left: -5px;
-	cursor: pointer;
+  display: flex;
+  align-items: center;
+  margin-left: -5px;
+  cursor: pointer;
 }
 
 .back:hover {
-	text-decoration: underline;
+  text-decoration: underline;
 }
 
 .info-title {
-	font-size: 1.5rem;
-	font-weight: 700;
-	line-height: 1.25;
-	margin: 8px 0 0 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.25;
+  margin: 8px 0 0 0 ;
 }
 
 .info-description {
-	margin: 8px 0 0 0;
+  margin: 8px 0 0 0;
 }
 
 .controls {
-	cursor: pointer;
+  cursor: pointer;
 }
 
 .fallback {
-	background: #f6f7f8 linear-gradient(to right, #e6e6e6 5%, #cccccc 25%, #e6e6e6 35%) no-repeat;
-	background-size: 800px 104px;
-	display: block;
-	line-height: 1.25;
-	margin: 8px 0 0 0;
-	border-radius: 5px;
-	overflow: hidden;
+  background: #f6f7f8 linear-gradient(to right, #e6e6e6 5%, #cccccc 25%, #e6e6e6 35%) no-repeat;
+  background-size: 800px 104px;
+  display: block;
+  line-height: 1.25;
+  margin: 8px 0 0 0;
+  border-radius: 5px;
+  overflow: hidden;
 
-	animation: 1s linear 1s infinite shimmer;
-	animation-delay: 300ms;
-	animation-duration: 1s;
-	animation-fill-mode: forwards;
-	animation-iteration-count: infinite;
-	animation-name: shimmer;
-	animation-timing-function: linear;
+  animation: 1s linear 1s infinite shimmer;
+  animation-delay: 300ms;
+  animation-duration: 1s;
+  animation-fill-mode: forwards;
+  animation-iteration-count: infinite;
+  animation-name: shimmer;
+  animation-timing-function: linear;
 }
 
+
 .fallback.title {
-	width: 130px;
-	height: 30px;
+  width: 130px;
+  height: 30px;
+
 }
 
 .fallback.description {
-	width: 150px;
-	height: 21px;
+  width: 150px;
+  height: 21px;
 }
 
 @keyframes shimmer {
-	0% {
-		background-position: -468px 0;
-	}
+  0% {
+    background-position: -468px 0;
+  }
 
-	100% {
-		background-position: 468px 0;
-	}
+  100% {
+    background-position: 468px 0;
+  }
 }
 
 .search {
-	margin-bottom: 10px;
+  margin-bottom: 10px;
 }
 .search-input {
-	width: 100%;
-	position: relative;
+  width: 100%;
+  position: relative;
 }
 
 .search-icon {
-	position: absolute;
-	top: 0;
-	bottom: 0;
-	inset-inline-start: 0;
-	display: flex;
-	align-items: center;
-	padding-inline-start: 1rem;
-	pointer-events: none;
-	color: #99a1b3;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  inset-inline-start: 0;
+  display: flex;
+  align-items: center;
+  padding-inline-start: 1rem;
+  pointer-events: none;
+  color: #99a1b3;
 }
 
 .search-input input {
-	display: flex;
-	padding-inline-start: 2.75rem;
-	padding-top: 10px;
-	padding-bottom: 10px;
-	width: 100%;
-	text-align: start;
-	background-color: rgb(235 236 240);
-	outline: 2px solid transparent;
-	cursor: pointer;
-	border: none;
-	align-items: center;
-	color: rgb(35 39 47);
-	border-radius: 9999px;
-	vertical-align: middle;
-	font-size: 15px;
+  display: flex;
+  padding-inline-start: 2.75rem;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  width: 100%;
+  text-align: start;
+  background-color: rgb(235 236 240);
+  outline: 2px solid transparent;
+  cursor: pointer;
+  border: none;
+  align-items: center;
+  color: rgb(35 39 47);
+  border-radius: 9999px;
+  vertical-align: middle;
+  font-size: 15px;
 }
 
-.search-input input:hover,
-.search-input input:active {
-	background-color: rgb(235 236 240/ 0.8);
-	color: rgb(35 39 47/ 0.8);
+.search-input input:hover, .search-input input:active {
+  background-color: rgb(235 236 240/ 0.8);
+  color: rgb(35 39 47/ 0.8);
 }
 
 /* Home */
 .video-list {
-	position: relative;
+  position: relative;
 }
 
 .video-list .videos {
-	display: flex;
-	flex-direction: column;
-	gap: 1rem;
-	overflow-y: auto;
-	height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  overflow-y: auto;
+  height: 100%;
 }
 ```
+
 
 ```css src/animations.css
 /* No additional animations needed */
 
+
+
+
+
+
+
+
+
 /* Previously defined animations below */
+
+
+
+
+
 
 /* Slide animations for Suspense the fallback down */
 ::view-transition-old(.slide-down) {
-	animation:
-		150ms ease-out both fade-out,
-		150ms ease-out both slide-down;
+    animation: 150ms ease-out both fade-out, 150ms ease-out both slide-down;
 }
 
 ::view-transition-new(.slide-up) {
-	animation:
-		210ms ease-in 150ms both fade-in,
-		400ms ease-in both slide-up;
+    animation: 210ms ease-in 150ms both fade-in, 400ms ease-in both slide-up;
 }
 
 /* Animations for view transition classed added by transition type */
 ::view-transition-old(.slide-forward) {
-	/* when sliding forward, the "old" page should slide out to left. */
-	animation:
-		150ms cubic-bezier(0.4, 0, 1, 1) both fade-out,
-		400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-to-left;
+    /* when sliding forward, the "old" page should slide out to left. */
+    animation: 150ms cubic-bezier(0.4, 0, 1, 1) both fade-out,
+    400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-to-left;
 }
 
 ::view-transition-new(.slide-forward) {
-	/* when sliding forward, the "new" page should slide in from right. */
-	animation:
-		210ms cubic-bezier(0, 0, 0.2, 1) 150ms both fade-in,
-		400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-from-right;
+    /* when sliding forward, the "new" page should slide in from right. */
+    animation: 210ms cubic-bezier(0, 0, 0.2, 1) 150ms both fade-in,
+    400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-from-right;
 }
 
 ::view-transition-old(.slide-back) {
-	/* when sliding back, the "old" page should slide out to right. */
-	animation:
-		150ms cubic-bezier(0.4, 0, 1, 1) both fade-out,
-		400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-to-right;
+    /* when sliding back, the "old" page should slide out to right. */
+    animation: 150ms cubic-bezier(0.4, 0, 1, 1) both fade-out,
+    400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-to-right;
 }
 
 ::view-transition-new(.slide-back) {
-	/* when sliding back, the "new" page should slide in from left. */
-	animation:
-		210ms cubic-bezier(0, 0, 0.2, 1) 150ms both fade-in,
-		400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-from-left;
+    /* when sliding back, the "new" page should slide in from left. */
+    animation: 210ms cubic-bezier(0, 0, 0.2, 1) 150ms both fade-in,
+    400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-from-left;
 }
 
 /* Keyframes to support our animations above. */
 @keyframes slide-up {
-	from {
-		transform: translateY(10px);
-	}
-	to {
-		transform: translateY(0);
-	}
+    from {
+        transform: translateY(10px);
+    }
+    to {
+        transform: translateY(0);
+    }
 }
 
 @keyframes slide-down {
-	from {
-		transform: translateY(0);
-	}
-	to {
-		transform: translateY(10px);
-	}
+    from {
+        transform: translateY(0);
+    }
+    to {
+        transform: translateY(10px);
+    }
 }
 
 @keyframes fade-in {
-	from {
-		opacity: 0;
-	}
+    from {
+        opacity: 0;
+    }
 }
 
 @keyframes fade-out {
-	to {
-		opacity: 0;
-	}
+    to {
+        opacity: 0;
+    }
 }
 
 @keyframes slide-to-right {
-	to {
-		transform: translateX(50px);
-	}
+    to {
+        transform: translateX(50px);
+    }
 }
 
 @keyframes slide-from-right {
-	from {
-		transform: translateX(50px);
-	}
-	to {
-		transform: translateX(0);
-	}
+    from {
+        transform: translateX(50px);
+    }
+    to {
+        transform: translateX(0);
+    }
 }
 
 @keyframes slide-to-left {
-	to {
-		transform: translateX(-50px);
-	}
+    to {
+        transform: translateX(-50px);
+    }
 }
 
 @keyframes slide-from-left {
-	from {
-		transform: translateX(-50px);
-	}
-	to {
-		transform: translateX(0);
-	}
+    from {
+        transform: translateX(-50px);
+    }
+    to {
+        transform: translateX(0);
+    }
 }
 
 /* Default .slow-fade. */
 ::view-transition-old(.slow-fade) {
-	animation-duration: 500ms;
+    animation-duration: 500ms;
 }
 
 ::view-transition-new(.slow-fade) {
-	animation-duration: 500ms;
+    animation-duration: 500ms;
 }
 ```
 
 ```js src/index.js hidden
-import React, { StrictMode } from "react";
-import { createRoot } from "react-dom/client";
+import React, {StrictMode} from 'react';
+import {createRoot} from 'react-dom/client';
+import './styles.css';
+import './animations.css';
 
-import "./styles.css";
-import "./animations.css";
+import App from './App';
+import {Router} from './router';
 
-import App from "./App";
-import { Router } from "./router";
-
-const root = createRoot(document.getElementById("root"));
+const root = createRoot(document.getElementById('root'));
 root.render(
-	<StrictMode>
-		<Router>
-			<App />
-		</Router>
-	</StrictMode>,
+  <StrictMode>
+    <Router>
+      <App />
+    </Router>
+  </StrictMode>
 );
 ```
 
 ```json package.json hidden
 {
-	"dependencies": {
-		"react": "experimental",
-		"react-dom": "experimental",
-		"react-scripts": "latest"
-	},
-	"scripts": {
-		"start": "react-scripts start",
-		"build": "react-scripts build",
-		"test": "react-scripts test --env=jsdom",
-		"eject": "react-scripts eject"
-	}
+  "dependencies": {
+    "react": "canary",
+    "react-dom": "canary",
+    "react-scripts": "latest"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test --env=jsdom",
+    "eject": "react-scripts eject"
+  }
 }
 ```
 
 </Sandpack>
 
-### Pre-rendering with Activity {/_prerender-with-activity_/}
+### Pre-rendering with Activity {/*prerender-with-activity*/}
 
 Sometimes, you may want to prepare the next part of the UI a user is likely to use ahead of time, so it's ready by the time they are ready to use it. This is especially useful if the next route needs to suspend on data it needs to render, because you can help ensure the data is already fetched before the user navigates.
 
@@ -13517,492 +12880,463 @@ With this update, if the content on the next page has time to pre-render, it wil
 <Sandpack>
 
 ```js src/App.js
-import {
-	unstable_Activity as Activity,
-	use,
-	unstable_ViewTransition as ViewTransition,
-} from "react";
-
-import { fetchVideos } from "./data";
-import Details from "./Details";
-import Home from "./Home";
-import { useRouter } from "./router";
+import { Activity, ViewTransition, use } from "react"; import Details from "./Details"; import Home from "./Home"; import { useRouter } from "./router"; import {fetchVideos} from './data';
 
 export default function App() {
-	const { url } = useRouter();
-	const videoId = url.split("/").pop();
-	const videos = use(fetchVideos());
+  const { url } = useRouter();
+  const videoId = url.split("/").pop();
+  const videos = use(fetchVideos());
 
-	return (
-		<ViewTransition>
-			{/* Render videos in Activity to pre-render them */}
-			{videos.map(({ id }) => (
-				<Activity key={id} mode={videoId === id ? "visible" : "hidden"}>
-					<Details id={id} />
-				</Activity>
-			))}
-			<Activity mode={url === "/" ? "visible" : "hidden"}>
-				<Home />
-			</Activity>
-		</ViewTransition>
-	);
+  return (
+    <ViewTransition>
+      {/* Render videos in Activity to pre-render them */}
+      {videos.map(({id}) => (
+        <Activity key={id} mode={videoId === id ? 'visible' : 'hidden'}>
+          <Details id={id}/>
+        </Activity>
+      ))}
+      <Activity mode={url === '/' ? 'visible' : 'hidden'}>
+        <Home />
+      </Activity>
+    </ViewTransition>
+  );
 }
 ```
 
 ```js src/Details.js
-import { Suspense, use, unstable_ViewTransition as ViewTransition } from "react";
+import { use, Suspense, ViewTransition } from "react"; import { fetchVideo, fetchVideoDetails } from "./data"; import { Thumbnail, VideoControls } from "./Videos"; import { useRouter } from "./router"; import Layout from "./Layout"; import { ChevronLeft } from "./Icons";
 
-import { fetchVideo, fetchVideoDetails } from "./data";
-import { ChevronLeft } from "./Icons";
-import Layout from "./Layout";
-import { useRouter } from "./router";
-import { Thumbnail, VideoControls } from "./Videos";
-
-function VideoDetails({ id }) {
-	// Animate from Suspense fallback to content.
-	// If this is pre-rendered then the fallback
-	// won't need to show.
-	return (
-		<Suspense
-			fallback={
-				// Animate the fallback down.
-				<ViewTransition exit="slide-down">
-					<VideoInfoFallback />
-				</ViewTransition>
-			}
-		>
-			{/* Animate the content up */}
-			<ViewTransition enter="slide-up">
-				<VideoInfo id={id} />
-			</ViewTransition>
-		</Suspense>
-	);
+function VideoDetails({id}) {
+  // Animate from Suspense fallback to content.
+  // If this is pre-rendered then the fallback
+  // won't need to show.
+  return (
+    <Suspense
+      fallback={
+        // Animate the fallback down.
+        <ViewTransition exit="slide-down">
+          <VideoInfoFallback />
+        </ViewTransition>
+      }
+    >
+      {/* Animate the content up */}
+      <ViewTransition enter="slide-up">
+        <VideoInfo id={id} />
+      </ViewTransition>
+    </Suspense>
+  );
 }
 
 function VideoInfoFallback() {
-	return (
-		<>
-			<div className="fallback title"></div>
-			<div className="fallback description"></div>
-		</>
-	);
+  return (
+    <>
+      <div className="fallback title"></div>
+      <div className="fallback description"></div>
+    </>
+  );
 }
 
-export default function Details({ id }) {
-	const { url, navigateBack } = useRouter();
-	const video = use(fetchVideo(id));
+export default function Details({id}) {
+  const { url, navigateBack } = useRouter();
+  const video = use(fetchVideo(id));
 
-	return (
-		<Layout
-			heading={
-				<div
-					className="fit back"
-					onClick={() => {
-						navigateBack("/");
-					}}
-				>
-					<ChevronLeft /> Back
-				</div>
-			}
-		>
-			<div className="details">
-				<Thumbnail video={video} large>
-					<VideoControls />
-				</Thumbnail>
-				<VideoDetails id={video.id} />
-			</div>
-		</Layout>
-	);
+  return (
+    <Layout
+      heading={
+        <div
+          className="fit back"
+          onClick={() => {
+            navigateBack("/");
+          }}
+        >
+          <ChevronLeft /> Back
+        </div>
+      }
+    >
+      <div className="details">
+        <Thumbnail video={video} large>
+          <VideoControls />
+        </Thumbnail>
+        <VideoDetails id={video.id} />
+      </div>
+    </Layout>
+  );
 }
 
 function VideoInfo({ id }) {
-	const details = use(fetchVideoDetails(id));
-	return (
-		<>
-			<p className="info-title">{details.title}</p>
-			<p className="info-description">{details.description}</p>
-		</>
-	);
+  const details = use(fetchVideoDetails(id));
+  return (
+    <>
+      <p className="info-title">{details.title}</p>
+      <p className="info-description">{details.description}</p>
+    </>
+  );
 }
 ```
 
 ```js src/Home.js hidden
-import {
-	use,
-	useDeferredValue,
-	useId,
-	useState,
-	unstable_ViewTransition as ViewTransition,
-} from "react";
+import { useId, useState, use, useDeferredValue, ViewTransition } from "react";import { Video } from "./Videos";import Layout from "./Layout";import { fetchVideos } from "./data";import { IconSearch } from "./Icons";
 
-import { fetchVideos } from "./data";
-import { IconSearch } from "./Icons";
-import Layout from "./Layout";
-import { Video } from "./Videos";
-
-function SearchList({ searchText, videos }) {
-	// Activate with useDeferredValue ("when")
-	const deferredSearchText = useDeferredValue(searchText);
-	const filteredVideos = filterVideos(videos, deferredSearchText);
-	return (
-		<div className="video-list">
-			{filteredVideos.length === 0 && <div className="no-results">No results</div>}
-			<div className="videos">
-				{filteredVideos.map((video) => (
-					// Animate each item in list ("what")
-					<ViewTransition key={video.id}>
-						<Video video={video} />
-					</ViewTransition>
-				))}
-			</div>
-		</div>
-	);
+function SearchList({searchText, videos}) {
+  // Activate with useDeferredValue ("when")
+  const deferredSearchText = useDeferredValue(searchText);
+  const filteredVideos = filterVideos(videos, deferredSearchText);
+  return (
+    <div className="video-list">
+      {filteredVideos.length === 0 && (
+        <div className="no-results">No results</div>
+      )}
+      <div className="videos">
+        {filteredVideos.map((video) => (
+          // Animate each item in list ("what")
+          <ViewTransition key={video.id}>
+            <Video video={video} />
+          </ViewTransition>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export default function Home() {
-	const videos = use(fetchVideos());
-	const count = videos.length;
-	const [searchText, setSearchText] = useState("");
+  const videos = use(fetchVideos());
+  const count = videos.length;
+  const [searchText, setSearchText] = useState('');
 
-	return (
-		<Layout heading={<div className="fit">{count} Videos</div>}>
-			<SearchInput value={searchText} onChange={setSearchText} />
-			<SearchList videos={videos} searchText={searchText} />
-		</Layout>
-	);
+  return (
+    <Layout heading={<div className="fit">{count} Videos</div>}>
+      <SearchInput value={searchText} onChange={setSearchText} />
+      <SearchList videos={videos} searchText={searchText} />
+    </Layout>
+  );
 }
 
 function SearchInput({ value, onChange }) {
-	const id = useId();
-	return (
-		<form className="search" onSubmit={(e) => e.preventDefault()}>
-			<label htmlFor={id} className="sr-only">
-				Search
-			</label>
-			<div className="search-input">
-				<div className="search-icon">
-					<IconSearch />
-				</div>
-				<input
-					type="text"
-					id={id}
-					placeholder="Search"
-					value={value}
-					onChange={(e) => onChange(e.target.value)}
-				/>
-			</div>
-		</form>
-	);
+  const id = useId();
+  return (
+    <form className="search" onSubmit={(e) => e.preventDefault()}>
+      <label htmlFor={id} className="sr-only">
+        Search
+      </label>
+      <div className="search-input">
+        <div className="search-icon">
+          <IconSearch />
+        </div>
+        <input
+          type="text"
+          id={id}
+          placeholder="Search"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      </div>
+    </form>
+  );
 }
 
 function filterVideos(videos, query) {
-	const keywords = query
-		.toLowerCase()
-		.split(" ")
-		.filter((s) => s !== "");
-	if (keywords.length === 0) {
-		return videos;
-	}
-	return videos.filter((video) => {
-		const words = (video.title + " " + video.description).toLowerCase().split(" ");
-		return keywords.every((kw) => words.some((w) => w.includes(kw)));
-	});
+  const keywords = query
+    .toLowerCase()
+    .split(" ")
+    .filter((s) => s !== "");
+  if (keywords.length === 0) {
+    return videos;
+  }
+  return videos.filter((video) => {
+    const words = (video.title + " " + video.description)
+      .toLowerCase()
+      .split(" ");
+    return keywords.every((kw) => words.some((w) => w.includes(kw)));
+  });
 }
 ```
 
 ```js src/Icons.js hidden
 export function ChevronLeft() {
-	return (
-		<svg
-			className="chevron-left"
-			xmlns="http://www.w3.org/2000/svg"
-			width="20"
-			height="20"
-			viewBox="0 0 20 20"
-		>
-			<g fill="none" fillRule="evenodd" transform="translate(-446 -398)">
-				<path
-					fill="currentColor"
-					fillRule="nonzero"
-					d="M95.8838835,240.366117 C95.3957281,239.877961 94.6042719,239.877961 94.1161165,240.366117 C93.6279612,240.854272 93.6279612,241.645728 94.1161165,242.133883 L98.6161165,246.633883 C99.1042719,247.122039 99.8957281,247.122039 100.383883,246.633883 L104.883883,242.133883 C105.372039,241.645728 105.372039,240.854272 104.883883,240.366117 C104.395728,239.877961 103.604272,239.877961 103.116117,240.366117 L99.5,243.982233 L95.8838835,240.366117 Z"
-					transform="translate(356.5 164.5)"
-				/>
-				<polygon points="446 418 466 418 466 398 446 398" />
-			</g>
-		</svg>
-	);
+  return (
+    <svg
+      className="chevron-left"
+      xmlns="http://www.w3.org/2000/svg"
+      width="20"
+      height="20"
+      viewBox="0 0 20 20">
+      <g fill="none" fillRule="evenodd" transform="translate(-446 -398)">
+        <path
+          fill="currentColor"
+          fillRule="nonzero"
+          d="M95.8838835,240.366117 C95.3957281,239.877961 94.6042719,239.877961 94.1161165,240.366117 C93.6279612,240.854272 93.6279612,241.645728 94.1161165,242.133883 L98.6161165,246.633883 C99.1042719,247.122039 99.8957281,247.122039 100.383883,246.633883 L104.883883,242.133883 C105.372039,241.645728 105.372039,240.854272 104.883883,240.366117 C104.395728,239.877961 103.604272,239.877961 103.116117,240.366117 L99.5,243.982233 L95.8838835,240.366117 Z"
+          transform="translate(356.5 164.5)"
+        />
+        <polygon points="446 418 466 418 466 398 446 398" />
+      </g>
+    </svg>
+  );
 }
 
 export function PauseIcon() {
-	return (
-		<svg
-			className="control-icon"
-			style={{ padding: "4px" }}
-			width="100"
-			height="100"
-			viewBox="0 0 512 512"
-			fill="none"
-			xmlns="http://www.w3.org/2000/svg"
-		>
-			<path
-				fillRule="evenodd"
-				clipRule="evenodd"
-				d="M256 0C114.617 0 0 114.615 0 256s114.617 256 256 256 256-114.615 256-256S397.383 0 256 0zm-32 320c0 8.836-7.164 16-16 16h-32c-8.836 0-16-7.164-16-16V192c0-8.836 7.164-16 16-16h32c8.836 0 16 7.164 16 16v128zm128 0c0 8.836-7.164 16-16 16h-32c-8.836 0-16-7.164-16-16V192c0-8.836 7.164-16 16-16h32c8.836 0 16 7.164 16 16v128z"
-				fill="currentColor"
-			/>
-		</svg>
-	);
+  return (
+    <svg
+      className="control-icon"
+      style={{padding: '4px'}}
+      width="100"
+      height="100"
+      viewBox="0 0 512 512"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg">
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M256 0C114.617 0 0 114.615 0 256s114.617 256 256 256 256-114.615 256-256S397.383 0 256 0zm-32 320c0 8.836-7.164 16-16 16h-32c-8.836 0-16-7.164-16-16V192c0-8.836 7.164-16 16-16h32c8.836 0 16 7.164 16 16v128zm128 0c0 8.836-7.164 16-16 16h-32c-8.836 0-16-7.164-16-16V192c0-8.836 7.164-16 16-16h32c8.836 0 16 7.164 16 16v128z"
+        fill="currentColor"
+      />
+    </svg>
+  );
 }
 
 export function PlayIcon() {
-	return (
-		<svg
-			className="control-icon"
-			width="100"
-			height="100"
-			viewBox="0 0 72 72"
-			fill="none"
-			xmlns="http://www.w3.org/2000/svg"
-		>
-			<path
-				fillRule="evenodd"
-				clipRule="evenodd"
-				d="M36 69C54.2254 69 69 54.2254 69 36C69 17.7746 54.2254 3 36 3C17.7746 3 3 17.7746 3 36C3 54.2254 17.7746 69 36 69ZM52.1716 38.6337L28.4366 51.5801C26.4374 52.6705 24 51.2235 24 48.9464V23.0536C24 20.7764 26.4374 19.3295 28.4366 20.4199L52.1716 33.3663C54.2562 34.5034 54.2562 37.4966 52.1716 38.6337Z"
-				fill="currentColor"
-			/>
-		</svg>
-	);
+  return (
+    <svg
+      className="control-icon"
+      width="100"
+      height="100"
+      viewBox="0 0 72 72"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg">
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M36 69C54.2254 69 69 54.2254 69 36C69 17.7746 54.2254 3 36 3C17.7746 3 3 17.7746 3 36C3 54.2254 17.7746 69 36 69ZM52.1716 38.6337L28.4366 51.5801C26.4374 52.6705 24 51.2235 24 48.9464V23.0536C24 20.7764 26.4374 19.3295 28.4366 20.4199L52.1716 33.3663C54.2562 34.5034 54.2562 37.4966 52.1716 38.6337Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
 }
-export function Heart({ liked, animate }) {
-	return (
-		<>
-			<svg
-				className="absolute overflow-visible"
-				viewBox="0 0 24 24"
-				fill="none"
-				xmlns="http://www.w3.org/2000/svg"
-			>
-				<circle
-					className={`circle ${liked ? "liked" : ""} ${animate ? "animate" : ""}`}
-					cx="12"
-					cy="12"
-					r="11.5"
-					fill="transparent"
-					strokeWidth="0"
-					stroke="currentColor"
-				/>
-			</svg>
+export function Heart({liked, animate}) {
+  return (
+    <>
+      <svg
+        className="absolute overflow-visible"
+        viewBox="0 0 24 24"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg">
+        <circle
+          className={`circle ${liked ? 'liked' : ''} ${animate ? 'animate' : ''}`}
+          cx="12"
+          cy="12"
+          r="11.5"
+          fill="transparent"
+          strokeWidth="0"
+          stroke="currentColor"
+        />
+      </svg>
 
-			<svg
-				className={`heart ${liked ? "liked" : ""} ${animate ? "animate" : ""}`}
-				viewBox="0 0 24 24"
-				fill="none"
-				xmlns="http://www.w3.org/2000/svg"
-			>
-				{liked ?
-					<path
-						d="M12 23a.496.496 0 0 1-.26-.074C7.023 19.973 0 13.743 0 8.68c0-4.12 2.322-6.677 6.058-6.677 2.572 0 5.108 2.387 5.134 2.41l.808.771.808-.771C12.834 4.387 15.367 2 17.935 2 21.678 2 24 4.558 24 8.677c0 5.06-7.022 11.293-11.74 14.246a.496.496 0 0 1-.26.074V23z"
-						fill="currentColor"
-					/>
-				:	<path
-						fillRule="evenodd"
-						clipRule="evenodd"
-						d="m12 5.184-.808-.771-.004-.004C11.065 4.299 8.522 2.003 6 2.003c-3.736 0-6 2.558-6 6.677 0 4.47 5.471 9.848 10 13.079.602.43 1.187.82 1.74 1.167A.497.497 0 0 0 12 23v-.003c.09 0 .182-.026.26-.074C16.977 19.97 24 13.737 24 8.677 24 4.557 21.743 2 18 2c-2.569 0-5.166 2.387-5.192 2.413L12 5.184zm-.002 15.525c2.071-1.388 4.477-3.342 6.427-5.47C20.72 12.733 22 10.401 22 8.677c0-1.708-.466-2.855-1.087-3.55C20.316 4.459 19.392 4 18 4c-.726 0-1.63.364-2.5.9-.67.412-1.148.82-1.266.92-.03.025-.037.031-.019.014l-.013.013L12 7.949 9.832 5.88a10.08 10.08 0 0 0-1.33-.977C7.633 4.367 6.728 4.003 6 4.003c-1.388 0-2.312.459-2.91 1.128C2.466 5.826 2 6.974 2 8.68c0 1.726 1.28 4.058 3.575 6.563 1.948 2.127 4.352 4.078 6.423 5.466z"
-						fill="currentColor"
-					/>
-				}
-			</svg>
-		</>
-	);
+      <svg
+        className={`heart ${liked ? 'liked' : ''} ${animate ? 'animate' : ''}`}
+        viewBox="0 0 24 24"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg">
+        {liked ? (
+          <path
+            d="M12 23a.496.496 0 0 1-.26-.074C7.023 19.973 0 13.743 0 8.68c0-4.12 2.322-6.677 6.058-6.677 2.572 0 5.108 2.387 5.134 2.41l.808.771.808-.771C12.834 4.387 15.367 2 17.935 2 21.678 2 24 4.558 24 8.677c0 5.06-7.022 11.293-11.74 14.246a.496.496 0 0 1-.26.074V23z"
+            fill="currentColor"
+          />
+        ) : (
+          <path
+            fillRule="evenodd"
+            clipRule="evenodd"
+            d="m12 5.184-.808-.771-.004-.004C11.065 4.299 8.522 2.003 6 2.003c-3.736 0-6 2.558-6 6.677 0 4.47 5.471 9.848 10 13.079.602.43 1.187.82 1.74 1.167A.497.497 0 0 0 12 23v-.003c.09 0 .182-.026.26-.074C16.977 19.97 24 13.737 24 8.677 24 4.557 21.743 2 18 2c-2.569 0-5.166 2.387-5.192 2.413L12 5.184zm-.002 15.525c2.071-1.388 4.477-3.342 6.427-5.47C20.72 12.733 22 10.401 22 8.677c0-1.708-.466-2.855-1.087-3.55C20.316 4.459 19.392 4 18 4c-.726 0-1.63.364-2.5.9-.67.412-1.148.82-1.266.92-.03.025-.037.031-.019.014l-.013.013L12 7.949 9.832 5.88a10.08 10.08 0 0 0-1.33-.977C7.633 4.367 6.728 4.003 6 4.003c-1.388 0-2.312.459-2.91 1.128C2.466 5.826 2 6.974 2 8.68c0 1.726 1.28 4.058 3.575 6.563 1.948 2.127 4.352 4.078 6.423 5.466z"
+            fill="currentColor"
+          />
+        )}
+      </svg>
+    </>
+  );
 }
 
 export function IconSearch(props) {
-	return (
-		<svg width="1em" height="1em" viewBox="0 0 20 20">
-			<path
-				d="M14.386 14.386l4.0877 4.0877-4.0877-4.0877c-2.9418 2.9419-7.7115 2.9419-10.6533 0-2.9419-2.9418-2.9419-7.7115 0-10.6533 2.9418-2.9419 7.7115-2.9419 10.6533 0 2.9419 2.9418 2.9419 7.7115 0 10.6533z"
-				stroke="currentColor"
-				fill="none"
-				strokeWidth="2"
-				fillRule="evenodd"
-				strokeLinecap="round"
-				strokeLinejoin="round"
-			></path>
-		</svg>
-	);
+  return (
+    <svg width="1em" height="1em" viewBox="0 0 20 20">
+      <path
+        d="M14.386 14.386l4.0877 4.0877-4.0877-4.0877c-2.9418 2.9419-7.7115 2.9419-10.6533 0-2.9419-2.9418-2.9419-7.7115 0-10.6533 2.9418-2.9419 7.7115-2.9419 10.6533 0 2.9419 2.9418 2.9419 7.7115 0 10.6533z"
+        stroke="currentColor"
+        fill="none"
+        strokeWidth="2"
+        fillRule="evenodd"
+        strokeLinecap="round"
+        strokeLinejoin="round"></path>
+    </svg>
+  );
 }
 ```
 
 ```js src/Layout.js hidden
-import { unstable_ViewTransition as ViewTransition } from "react";
-
-import { useIsNavPending } from "./router";
+import {ViewTransition} from 'react'; import { useIsNavPending } from "./router";
 
 export default function Page({ heading, children }) {
-	const isPending = useIsNavPending();
-	return (
-		<div className="page">
-			<div className="top">
-				<div className="top-nav">
-					{/* Custom classes based on transition type. */}
-					<ViewTransition
-						name="nav"
-						share={{
-							"nav-forward": "slide-forward",
-							"nav-back": "slide-back",
-						}}
-					>
-						{heading}
-					</ViewTransition>
-					{isPending && <span className="loader"></span>}
-				</div>
-			</div>
-			{/* Opt-out of ViewTransition for the content. */}
-			{/* Content can define it's own ViewTransition. */}
-			<ViewTransition default="none">
-				<div className="bottom">
-					<div className="content">{children}</div>
-				</div>
-			</ViewTransition>
-		</div>
-	);
+  const isPending = useIsNavPending();
+  return (
+    <div className="page">
+      <div className="top">
+        <div className="top-nav">
+          {/* Custom classes based on transition type. */}
+          <ViewTransition
+            name="nav"
+            share={{
+              'nav-forward': 'slide-forward',
+              'nav-back': 'slide-back',
+            }}>
+            {heading}
+          </ViewTransition>
+          {isPending && <span className="loader"></span>}
+        </div>
+      </div>
+      {/* Opt-out of ViewTransition for the content. */}
+      {/* Content can define it's own ViewTransition. */}
+      <ViewTransition default="none">
+        <div className="bottom">
+          <div className="content">{children}</div>
+        </div>
+      </ViewTransition>
+    </div>
+  );
 }
 ```
 
 ```js src/LikeButton.js hidden
-import { useState } from "react";
-
-import { Heart } from "./Icons";
+import {useState} from 'react';
+import {Heart} from './Icons';
 
 // A hack since we don't actually have a backend.
 // Unlike local state, this survives videos being filtered.
 const likedVideos = new Set();
 
-export default function LikeButton({ video }) {
-	const [isLiked, setIsLiked] = useState(() => likedVideos.has(video.id));
-	const [animate, setAnimate] = useState(false);
-	return (
-		<button
-			className={`like-button ${isLiked && "liked"}`}
-			aria-label={isLiked ? "Unsave" : "Save"}
-			onClick={() => {
-				const nextIsLiked = !isLiked;
-				if (nextIsLiked) {
-					likedVideos.add(video.id);
-				} else {
-					likedVideos.delete(video.id);
-				}
-				setAnimate(true);
-				setIsLiked(nextIsLiked);
-			}}
-		>
-			<Heart liked={isLiked} animate={animate} />
-		</button>
-	);
+export default function LikeButton({video}) {
+  const [isLiked, setIsLiked] = useState(() => likedVideos.has(video.id));
+  const [animate, setAnimate] = useState(false);
+  return (
+    <button
+      className={`like-button ${isLiked && 'liked'}`}
+      aria-label={isLiked ? 'Unsave' : 'Save'}
+      onClick={() => {
+        const nextIsLiked = !isLiked;
+        if (nextIsLiked) {
+          likedVideos.add(video.id);
+        } else {
+          likedVideos.delete(video.id);
+        }
+        setAnimate(true);
+        setIsLiked(nextIsLiked);
+      }}>
+      <Heart liked={isLiked} animate={animate} />
+    </button>
+  );
 }
 ```
 
 ```js src/Videos.js hidden
-import { startTransition, useState, unstable_ViewTransition as ViewTransition } from "react";
-
-import { PauseIcon, PlayIcon } from "./Icons";
+import { useState, ViewTransition } from "react";
 import LikeButton from "./LikeButton";
 import { useRouter } from "./router";
+import { PauseIcon, PlayIcon } from "./Icons";
+import { startTransition } from "react";
 
 export function Thumbnail({ video, children }) {
-	// Add a name to animate with a shared element transition.
-	// This uses the default animation, no additional css needed.
-	return (
-		<ViewTransition name={`video-${video.id}`}>
-			<div aria-hidden="true" tabIndex={-1} className={`thumbnail ${video.image}`}>
-				{children}
-			</div>
-		</ViewTransition>
-	);
+  // Add a name to animate with a shared element transition.
+  // This uses the default animation, no additional css needed.
+  return (
+    <ViewTransition name={`video-${video.id}`}>
+      <div
+        aria-hidden="true"
+        tabIndex={-1}
+        className={`thumbnail ${video.image}`}
+      >
+        {children}
+      </div>
+    </ViewTransition>
+  );
 }
 
 export function VideoControls() {
-	const [isPlaying, setIsPlaying] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
 
-	return (
-		<span
-			className="controls"
-			onClick={() =>
-				startTransition(() => {
-					setIsPlaying((p) => !p);
-				})
-			}
-		>
-			{isPlaying ?
-				<PauseIcon />
-			:	<PlayIcon />}
-		</span>
-	);
+  return (
+    <span
+      className="controls"
+      onClick={() =>
+        startTransition(() => {
+          setIsPlaying((p) => !p);
+        })
+      }
+    >
+      {isPlaying ? <PauseIcon /> : <PlayIcon />}
+    </span>
+  );
 }
 
 export function Video({ video }) {
-	const { navigate } = useRouter();
+  const { navigate } = useRouter();
 
-	return (
-		<div className="video">
-			<div
-				className="link"
-				onClick={(e) => {
-					e.preventDefault();
-					navigate(`/video/${video.id}`);
-				}}
-			>
-				<Thumbnail video={video}></Thumbnail>
+  return (
+    <div className="video">
+      <div
+        className="link"
+        onClick={(e) => {
+          e.preventDefault();
+          navigate(`/video/${video.id}`);
+        }}
+      >
+        <Thumbnail video={video}></Thumbnail>
 
-				<div className="info">
-					<div className="video-title">{video.title}</div>
-					<div className="video-description">{video.description}</div>
-				</div>
-			</div>
-			<LikeButton video={video} />
-		</div>
-	);
+        <div className="info">
+          <div className="video-title">{video.title}</div>
+          <div className="video-description">{video.description}</div>
+        </div>
+      </div>
+      <LikeButton video={video} />
+    </div>
+  );
 }
 ```
 
+
 ```js src/data.js hidden
 const videos = [
-	{
-		id: "1",
-		title: "First video",
-		description: "Video description",
-		image: "blue",
-	},
-	{
-		id: "2",
-		title: "Second video",
-		description: "Video description",
-		image: "red",
-	},
-	{
-		id: "3",
-		title: "Third video",
-		description: "Video description",
-		image: "green",
-	},
-	{
-		id: "4",
-		title: "Fourth video",
-		description: "Video description",
-		image: "purple",
-	},
-	{
-		id: "5",
-		title: "Fifth video",
-		description: "Video description",
-		image: "yellow",
-	},
-	{
-		id: "6",
-		title: "Sixth video",
-		description: "Video description",
-		image: "gray",
-	},
+  {
+    id: '1',
+    title: 'First video',
+    description: 'Video description',
+    image: 'blue',
+  },
+  {
+    id: '2',
+    title: 'Second video',
+    description: 'Video description',
+    image: 'red',
+  },
+  {
+    id: '3',
+    title: 'Third video',
+    description: 'Video description',
+    image: 'green',
+  },
+  {
+    id: '4',
+    title: 'Fourth video',
+    description: 'Video description',
+    image: 'purple',
+  },
+  {
+    id: '5',
+    title: 'Fifth video',
+    description: 'Video description',
+    image: 'yellow',
+  },
+  {
+    id: '6',
+    title: 'Sixth video',
+    description: 'Video description',
+    image: 'gray',
+  },
 ];
 
 let videosCache = new Map();
@@ -14011,908 +13345,855 @@ let videoDetailsCache = new Map();
 const VIDEO_DELAY = 1;
 const VIDEO_DETAILS_DELAY = 1000;
 export function fetchVideos() {
-	if (videosCache.has(0)) {
-		return videosCache.get(0);
-	}
-	const promise = new Promise((resolve) => {
-		setTimeout(() => {
-			resolve(videos);
-		}, VIDEO_DELAY);
-	});
-	videosCache.set(0, promise);
-	return promise;
+  if (videosCache.has(0)) {
+    return videosCache.get(0);
+  }
+  const promise = new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(videos);
+    }, VIDEO_DELAY);
+  });
+  videosCache.set(0, promise);
+  return promise;
 }
 
 export function fetchVideo(id) {
-	if (videoCache.has(id)) {
-		return videoCache.get(id);
-	}
-	const promise = new Promise((resolve) => {
-		setTimeout(() => {
-			resolve(videos.find((video) => video.id === id));
-		}, VIDEO_DELAY);
-	});
-	videoCache.set(id, promise);
-	return promise;
+  if (videoCache.has(id)) {
+    return videoCache.get(id);
+  }
+  const promise = new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(videos.find((video) => video.id === id));
+    }, VIDEO_DELAY);
+  });
+  videoCache.set(id, promise);
+  return promise;
 }
 
 export function fetchVideoDetails(id) {
-	if (videoDetailsCache.has(id)) {
-		return videoDetailsCache.get(id);
-	}
-	const promise = new Promise((resolve) => {
-		setTimeout(() => {
-			resolve(videos.find((video) => video.id === id));
-		}, VIDEO_DETAILS_DELAY);
-	});
-	videoDetailsCache.set(id, promise);
-	return promise;
+  if (videoDetailsCache.has(id)) {
+    return videoDetailsCache.get(id);
+  }
+  const promise = new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(videos.find((video) => video.id === id));
+    }, VIDEO_DETAILS_DELAY);
+  });
+  videoDetailsCache.set(id, promise);
+  return promise;
 }
 ```
 
 ```js src/router.js hidden
-import {
-	unstable_addTransitionType as addTransitionType,
-	createContext,
-	use,
-	useEffect,
-	useLayoutEffect,
-	useState,
-	useTransition,
-} from "react";
+import {useState, createContext, use, useTransition, useLayoutEffect, useEffect, addTransitionType} from "react";
 
 export function Router({ children }) {
-	const [isPending, startTransition] = useTransition();
-	const [routerState, setRouterState] = useState({
-		pendingNav: () => {},
-		url: document.location.pathname,
-	});
-	function navigate(url) {
-		startTransition(() => {
-			// Transition type for the cause "nav forward"
-			addTransitionType("nav-forward");
-			go(url);
-		});
-	}
-	function navigateBack(url) {
-		startTransition(() => {
-			// Transition type for the cause "nav backward"
-			addTransitionType("nav-back");
-			go(url);
-		});
-	}
+  const [isPending, startTransition] = useTransition();
+  const [routerState, setRouterState] = useState({pendingNav: () => {}, url: document.location.pathname});
+  function navigate(url) {
+    startTransition(() => {
+      // Transition type for the cause "nav forward"
+      addTransitionType('nav-forward');
+      go(url);
+    });
+  }
+  function navigateBack(url) {
+    startTransition(() => {
+      // Transition type for the cause "nav backward"
+      addTransitionType('nav-back');
+      go(url);
+    });
+  }
 
-	function go(url) {
-		setRouterState({
-			url,
-			pendingNav() {
-				window.history.pushState({}, "", url);
-			},
-		});
-	}
+  function go(url) {
+    setRouterState({
+      url,
+      pendingNav() {
+        window.history.pushState({}, "", url);
+      },
+    });
+  }
 
-	useEffect(() => {
-		function handlePopState() {
-			// This should not animate because restoration has to be synchronous.
-			// Even though it's a transition.
-			startTransition(() => {
-				setRouterState({
-					url: document.location.pathname + document.location.search,
-					pendingNav() {
-						// Noop. URL has already updated.
-					},
-				});
-			});
-		}
-		window.addEventListener("popstate", handlePopState);
-		return () => {
-			window.removeEventListener("popstate", handlePopState);
-		};
-	}, []);
-	const pendingNav = routerState.pendingNav;
-	useLayoutEffect(() => {
-		pendingNav();
-	}, [pendingNav]);
+  useEffect(() => {
+    function handlePopState() {
+      // This should not animate because restoration has to be synchronous.
+      // Even though it's a transition.
+      startTransition(() => {
+        setRouterState({
+          url: document.location.pathname + document.location.search,
+          pendingNav() {
+            // Noop. URL has already updated.
+          },
+        });
+      });
+    }
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, []);
+  const pendingNav = routerState.pendingNav;
+  useLayoutEffect(() => {
+    pendingNav();
+  }, [pendingNav]);
 
-	return (
-		<RouterContext
-			value={{
-				url: routerState.url,
-				navigate,
-				navigateBack,
-				isPending,
-				params: {},
-			}}
-		>
-			{children}
-		</RouterContext>
-	);
+  return (
+    <RouterContext
+      value={{
+        url: routerState.url,
+        navigate,
+        navigateBack,
+        isPending,
+        params: {},
+      }}
+    >
+      {children}
+    </RouterContext>
+  );
 }
 
 const RouterContext = createContext({ url: "/", params: {} });
 
 export function useRouter() {
-	return use(RouterContext);
+  return use(RouterContext);
 }
 
 export function useIsNavPending() {
-	return use(RouterContext).isPending;
+  return use(RouterContext).isPending;
 }
+
 ```
 
 ```css src/styles.css hidden
 @font-face {
-	font-family: Optimistic Text;
-	src: url(https://react.dev/fonts/Optimistic_Text_W_Rg.woff2) format("woff2");
-	font-weight: 400;
-	font-style: normal;
-	font-display: swap;
+  font-family: Optimistic Text;
+  src: url(https://react.dev/fonts/Optimistic_Text_W_Rg.woff2) format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
-	font-family: Optimistic Text;
-	src: url(https://react.dev/fonts/Optimistic_Text_W_Md.woff2) format("woff2");
-	font-weight: 500;
-	font-style: normal;
-	font-display: swap;
+  font-family: Optimistic Text;
+  src: url(https://react.dev/fonts/Optimistic_Text_W_Md.woff2) format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
-	font-family: Optimistic Text;
-	src: url(https://react.dev/fonts/Optimistic_Text_W_Bd.woff2) format("woff2");
-	font-weight: 600;
-	font-style: normal;
-	font-display: swap;
+  font-family: Optimistic Text;
+  src: url(https://react.dev/fonts/Optimistic_Text_W_Bd.woff2) format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
-	font-family: Optimistic Text;
-	src: url(https://react.dev/fonts/Optimistic_Text_W_Bd.woff2) format("woff2");
-	font-weight: 700;
-	font-style: normal;
-	font-display: swap;
+  font-family: Optimistic Text;
+  src: url(https://react.dev/fonts/Optimistic_Text_W_Bd.woff2) format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
 }
 
 * {
-	box-sizing: border-box;
+  box-sizing: border-box;
 }
 
 html {
-	background-image: url(https://react.dev/images/meta-gradient-dark.png);
-	background-size: 100%;
-	background-position: -100%;
-	background-color: rgb(64 71 86);
-	background-repeat: no-repeat;
-	height: 100%;
-	width: 100%;
+  background-image: url(https://react.dev/images/meta-gradient-dark.png);
+  background-size: 100%;
+  background-position: -100%;
+  background-color: rgb(64 71 86);
+  background-repeat: no-repeat;
+  height: 100%;
+  width: 100%;
 }
 
 body {
-	font-family:
-		Optimistic Text,
-		-apple-system,
-		ui-sans-serif,
-		system-ui,
-		sans-serif,
-		Apple Color Emoji,
-		Segoe UI Emoji,
-		Segoe UI Symbol,
-		Noto Color Emoji;
-	padding: 10px 0 10px 0;
-	margin: 0;
-	display: flex;
-	justify-content: center;
+  font-family: Optimistic Text, -apple-system, ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji;
+  padding: 10px 0 10px 0;
+  margin: 0;
+  display: flex;
+  justify-content: center;
 }
 
 #root {
-	flex: 1 1;
-	height: auto;
-	background-color: #fff;
-	border-radius: 10px;
-	max-width: 450px;
-	min-height: 600px;
-	padding-bottom: 10px;
+  flex: 1 1;
+  height: auto;
+  background-color: #fff;
+  border-radius: 10px;
+  max-width: 450px;
+  min-height: 600px;
+  padding-bottom: 10px;
 }
 
 h1 {
-	margin-top: 0;
-	font-size: 22px;
+  margin-top: 0;
+  font-size: 22px;
 }
 
 h2 {
-	margin-top: 0;
-	font-size: 20px;
+  margin-top: 0;
+  font-size: 20px;
 }
 
 h3 {
-	margin-top: 0;
-	font-size: 18px;
+  margin-top: 0;
+  font-size: 18px;
 }
 
 h4 {
-	margin-top: 0;
-	font-size: 16px;
+  margin-top: 0;
+  font-size: 16px;
 }
 
 h5 {
-	margin-top: 0;
-	font-size: 14px;
+  margin-top: 0;
+  font-size: 14px;
 }
 
 h6 {
-	margin-top: 0;
-	font-size: 12px;
+  margin-top: 0;
+  font-size: 12px;
 }
 
 code {
-	font-size: 1.2em;
+  font-size: 1.2em;
 }
 
 ul {
-	padding-inline-start: 20px;
+  padding-inline-start: 20px;
 }
 
 .sr-only {
-	position: absolute;
-	width: 1px;
-	height: 1px;
-	padding: 0;
-	margin: -1px;
-	overflow: hidden;
-	clip: rect(0, 0, 0, 0);
-	white-space: nowrap;
-	border-width: 0;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }
 
 .absolute {
-	position: absolute;
+  position: absolute;
 }
 
 .overflow-visible {
-	overflow: visible;
+  overflow: visible;
 }
 
 .visible {
-	overflow: visible;
+  overflow: visible;
 }
 
 .fit {
-	width: fit-content;
+  width: fit-content;
 }
+
 
 /* Layout */
 .page {
-	display: flex;
-	flex-direction: column;
-	height: 100%;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .top-hero {
-	height: 200px;
-	display: flex;
-	justify-content: center;
-	align-items: center;
-	background-image: conic-gradient(
-		from 90deg at -10% 100%,
-		#2b303b 0deg,
-		#2b303b 90deg,
-		#16181d 1turn
-	);
+  height: 200px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-image: conic-gradient(
+      from 90deg at -10% 100%,
+      #2b303b 0deg,
+      #2b303b 90deg,
+      #16181d 1turn
+  );
 }
 
 .bottom {
-	flex: 1;
-	overflow: auto;
+  flex: 1;
+  overflow: auto;
 }
 
 .top-nav {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	margin-bottom: 0;
-	padding: 0 12px;
-	top: 0;
-	width: 100%;
-	height: 44px;
-	color: #23272f;
-	font-weight: 700;
-	font-size: 20px;
-	z-index: 100;
-	cursor: default;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0;
+  padding: 0 12px;
+  top: 0;
+  width: 100%;
+  height: 44px;
+  color: #23272f;
+  font-weight: 700;
+  font-size: 20px;
+  z-index: 100;
+  cursor: default;
 }
 
 .content {
-	padding: 0 12px;
-	margin-top: 4px;
+  padding: 0 12px;
+  margin-top: 4px;
 }
 
+
 .loader {
-	color: #23272f;
-	font-size: 3px;
-	width: 1em;
-	margin-right: 18px;
-	height: 1em;
-	border-radius: 50%;
-	position: relative;
-	text-indent: -9999em;
-	animation: loading-spinner 1.3s infinite linear;
-	animation-delay: 200ms;
-	transform: translateZ(0);
+  color: #23272f;
+  font-size: 3px;
+  width: 1em;
+  margin-right: 18px;
+  height: 1em;
+  border-radius: 50%;
+  position: relative;
+  text-indent: -9999em;
+  animation: loading-spinner 1.3s infinite linear;
+  animation-delay: 200ms;
+  transform: translateZ(0);
 }
 
 @keyframes loading-spinner {
-	0%,
-	100% {
-		box-shadow:
-			0 -3em 0 0.2em,
-			2em -2em 0 0em,
-			3em 0 0 -1em,
-			2em 2em 0 -1em,
-			0 3em 0 -1em,
-			-2em 2em 0 -1em,
-			-3em 0 0 -1em,
-			-2em -2em 0 0;
-	}
-	12.5% {
-		box-shadow:
-			0 -3em 0 0,
-			2em -2em 0 0.2em,
-			3em 0 0 0,
-			2em 2em 0 -1em,
-			0 3em 0 -1em,
-			-2em 2em 0 -1em,
-			-3em 0 0 -1em,
-			-2em -2em 0 -1em;
-	}
-	25% {
-		box-shadow:
-			0 -3em 0 -0.5em,
-			2em -2em 0 0,
-			3em 0 0 0.2em,
-			2em 2em 0 0,
-			0 3em 0 -1em,
-			-2em 2em 0 -1em,
-			-3em 0 0 -1em,
-			-2em -2em 0 -1em;
-	}
-	37.5% {
-		box-shadow:
-			0 -3em 0 -1em,
-			2em -2em 0 -1em,
-			3em 0em 0 0,
-			2em 2em 0 0.2em,
-			0 3em 0 0em,
-			-2em 2em 0 -1em,
-			-3em 0em 0 -1em,
-			-2em -2em 0 -1em;
-	}
-	50% {
-		box-shadow:
-			0 -3em 0 -1em,
-			2em -2em 0 -1em,
-			3em 0 0 -1em,
-			2em 2em 0 0em,
-			0 3em 0 0.2em,
-			-2em 2em 0 0,
-			-3em 0em 0 -1em,
-			-2em -2em 0 -1em;
-	}
-	62.5% {
-		box-shadow:
-			0 -3em 0 -1em,
-			2em -2em 0 -1em,
-			3em 0 0 -1em,
-			2em 2em 0 -1em,
-			0 3em 0 0,
-			-2em 2em 0 0.2em,
-			-3em 0 0 0,
-			-2em -2em 0 -1em;
-	}
-	75% {
-		box-shadow:
-			0em -3em 0 -1em,
-			2em -2em 0 -1em,
-			3em 0em 0 -1em,
-			2em 2em 0 -1em,
-			0 3em 0 -1em,
-			-2em 2em 0 0,
-			-3em 0em 0 0.2em,
-			-2em -2em 0 0;
-	}
-	87.5% {
-		box-shadow:
-			0em -3em 0 0,
-			2em -2em 0 -1em,
-			3em 0 0 -1em,
-			2em 2em 0 -1em,
-			0 3em 0 -1em,
-			-2em 2em 0 0,
-			-3em 0em 0 0,
-			-2em -2em 0 0.2em;
-	}
+  0%,
+  100% {
+    box-shadow: 0 -3em 0 0.2em,
+    2em -2em 0 0em, 3em 0 0 -1em,
+    2em 2em 0 -1em, 0 3em 0 -1em,
+    -2em 2em 0 -1em, -3em 0 0 -1em,
+    -2em -2em 0 0;
+  }
+  12.5% {
+    box-shadow: 0 -3em 0 0, 2em -2em 0 0.2em,
+    3em 0 0 0, 2em 2em 0 -1em, 0 3em 0 -1em,
+    -2em 2em 0 -1em, -3em 0 0 -1em,
+    -2em -2em 0 -1em;
+  }
+  25% {
+    box-shadow: 0 -3em 0 -0.5em,
+    2em -2em 0 0, 3em 0 0 0.2em,
+    2em 2em 0 0, 0 3em 0 -1em,
+    -2em 2em 0 -1em, -3em 0 0 -1em,
+    -2em -2em 0 -1em;
+  }
+  37.5% {
+    box-shadow: 0 -3em 0 -1em, 2em -2em 0 -1em,
+    3em 0em 0 0, 2em 2em 0 0.2em, 0 3em 0 0em,
+    -2em 2em 0 -1em, -3em 0em 0 -1em, -2em -2em 0 -1em;
+  }
+  50% {
+    box-shadow: 0 -3em 0 -1em, 2em -2em 0 -1em,
+    3em 0 0 -1em, 2em 2em 0 0em, 0 3em 0 0.2em,
+    -2em 2em 0 0, -3em 0em 0 -1em, -2em -2em 0 -1em;
+  }
+  62.5% {
+    box-shadow: 0 -3em 0 -1em, 2em -2em 0 -1em,
+    3em 0 0 -1em, 2em 2em 0 -1em, 0 3em 0 0,
+    -2em 2em 0 0.2em, -3em 0 0 0, -2em -2em 0 -1em;
+  }
+  75% {
+    box-shadow: 0em -3em 0 -1em, 2em -2em 0 -1em,
+    3em 0em 0 -1em, 2em 2em 0 -1em, 0 3em 0 -1em,
+    -2em 2em 0 0, -3em 0em 0 0.2em, -2em -2em 0 0;
+  }
+  87.5% {
+    box-shadow: 0em -3em 0 0, 2em -2em 0 -1em,
+    3em 0 0 -1em, 2em 2em 0 -1em, 0 3em 0 -1em,
+    -2em 2em 0 0, -3em 0em 0 0, -2em -2em 0 0.2em;
+  }
 }
 
 /* LikeButton */
 .like-button {
-	outline-offset: 2px;
-	position: relative;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	width: 2.5rem;
-	height: 2.5rem;
-	cursor: pointer;
-	border-radius: 9999px;
-	border: none;
-	outline: none 2px;
-	color: #5e687e;
-	background: none;
+  outline-offset: 2px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  cursor: pointer;
+  border-radius: 9999px;
+  border: none;
+  outline: none 2px;
+  color: #5e687e;
+  background: none;
 }
 
 .like-button:focus {
-	color: #a6423a;
-	background-color: rgba(166, 66, 58, 0.05);
+  color: #a6423a;
+  background-color: rgba(166, 66, 58, .05);
 }
 
 .like-button:active {
-	color: #a6423a;
-	background-color: rgba(166, 66, 58, 0.05);
-	transform: scaleX(0.95) scaleY(0.95);
+  color: #a6423a;
+  background-color: rgba(166, 66, 58, .05);
+  transform: scaleX(0.95) scaleY(0.95);
 }
 
 .like-button:hover {
-	background-color: #f6f7f9;
+  background-color: #f6f7f9;
 }
 
 .like-button.liked {
-	color: #a6423a;
+  color: #a6423a;
 }
 
 /* Icons */
 @keyframes circle {
-	0% {
-		transform: scale(0);
-		stroke-width: 16px;
-	}
+  0% {
+    transform: scale(0);
+    stroke-width: 16px;
+  }
 
-	50% {
-		transform: scale(0.5);
-		stroke-width: 16px;
-	}
+  50% {
+    transform: scale(.5);
+    stroke-width: 16px;
+  }
 
-	to {
-		transform: scale(1);
-		stroke-width: 0;
-	}
+  to {
+    transform: scale(1);
+    stroke-width: 0;
+  }
 }
 
 .circle {
-	color: rgba(166, 66, 58, 0.5);
-	transform-origin: center;
-	transition-property: all;
-	transition-duration: 0.15s;
-	transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  color: rgba(166, 66, 58, .5);
+  transform-origin: center;
+  transition-property: all;
+  transition-duration: .15s;
+  transition-timing-function: cubic-bezier(.4,0,.2,1);
 }
 
 .circle.liked.animate {
-	animation: circle 0.3s forwards;
+  animation: circle .3s forwards;
 }
 
 .heart {
-	width: 1.5rem;
-	height: 1.5rem;
+  width: 1.5rem;
+  height: 1.5rem;
 }
 
 .heart.liked {
-	transform-origin: center;
-	transition-property: all;
-	transition-duration: 0.15s;
-	transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: center;
+  transition-property: all;
+  transition-duration: .15s;
+  transition-timing-function: cubic-bezier(.4, 0, .2, 1);
 }
 
 .heart.liked.animate {
-	animation: scale 0.35s ease-in-out forwards;
+  animation: scale .35s ease-in-out forwards;
 }
 
 .control-icon {
-	color: hsla(0, 0%, 100%, 0.5);
-	filter: drop-shadow(0 20px 13px rgba(0, 0, 0, 0.03)) drop-shadow(0 8px 5px rgba(0, 0, 0, 0.08));
+  color: hsla(0, 0%, 100%, .5);
+  filter:  drop-shadow(0 20px 13px rgba(0, 0, 0, .03)) drop-shadow(0 8px 5px rgba(0, 0, 0, .08));
 }
 
 .chevron-left {
-	margin-top: 2px;
-	rotate: 90deg;
+  margin-top: 2px;
+  rotate: 90deg;
 }
+
 
 /* Video */
 .thumbnail {
-	position: relative;
-	aspect-ratio: 16 / 9;
-	display: flex;
-	overflow: hidden;
-	flex-direction: column;
-	justify-content: center;
-	align-items: center;
-	border-radius: 0.5rem;
-	outline-offset: 2px;
-	width: 8rem;
-	vertical-align: middle;
-	background-color: #ffffff;
-	background-size: cover;
-	user-select: none;
+  position: relative;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  overflow: hidden;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  border-radius: 0.5rem;
+  outline-offset: 2px;
+  width: 8rem;
+  vertical-align: middle;
+  background-color: #ffffff;
+  background-size: cover;
+  user-select: none;
 }
 
 .thumbnail.blue {
-	background-image: conic-gradient(at top right, #c76a15, #087ea4, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #087ea4, #2b3491);
 }
 
 .thumbnail.red {
-	background-image: conic-gradient(at top right, #c76a15, #a6423a, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #a6423a, #2b3491);
 }
 
 .thumbnail.green {
-	background-image: conic-gradient(at top right, #c76a15, #388f7f, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #388f7f, #2b3491);
 }
 
 .thumbnail.purple {
-	background-image: conic-gradient(at top right, #c76a15, #575fb7, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #575fb7, #2b3491);
 }
 
 .thumbnail.yellow {
-	background-image: conic-gradient(at top right, #c76a15, #fabd62, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #FABD62, #2b3491);
 }
 
 .thumbnail.gray {
-	background-image: conic-gradient(at top right, #c76a15, #4e5769, #2b3491);
+  background-image: conic-gradient(at top right, #c76a15, #4E5769, #2b3491);
 }
 
 .video {
-	display: flex;
-	flex-direction: row;
-	gap: 0.75rem;
-	align-items: center;
+  display: flex;
+  flex-direction: row;
+  gap: 0.75rem;
+  align-items: center;
 }
 
 .video .link {
-	display: flex;
-	flex-direction: row;
-	flex: 1 1 0;
-	gap: 0.125rem;
-	outline-offset: 4px;
-	cursor: pointer;
+  display: flex;
+  flex-direction: row;
+  flex: 1 1 0;
+  gap: 0.125rem;
+  outline-offset: 4px;
+  cursor: pointer;
 }
 
 .video .info {
-	display: flex;
-	flex-direction: column;
-	justify-content: center;
-	margin-left: 8px;
-	gap: 0.125rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  margin-left: 8px;
+  gap: 0.125rem;
 }
 
 .video .info:hover {
-	text-decoration: underline;
+  text-decoration: underline;
 }
 
 .video-title {
-	font-size: 15px;
-	line-height: 1.25;
-	font-weight: 700;
-	color: #23272f;
+  font-size: 15px;
+  line-height: 1.25;
+  font-weight: 700;
+  color: #23272f;
 }
 
 .video-description {
-	color: #5e687e;
-	font-size: 13px;
+  color: #5e687e;
+  font-size: 13px;
 }
 
 /* Details */
 .details .thumbnail {
-	position: relative;
-	aspect-ratio: 16 / 9;
-	display: flex;
-	overflow: hidden;
-	flex-direction: column;
-	justify-content: center;
-	align-items: center;
-	border-radius: 0.5rem;
-	outline-offset: 2px;
-	width: 100%;
-	vertical-align: middle;
-	background-color: #ffffff;
-	background-size: cover;
-	user-select: none;
+  position: relative;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  overflow: hidden;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  border-radius: 0.5rem;
+  outline-offset: 2px;
+  width: 100%;
+  vertical-align: middle;
+  background-color: #ffffff;
+  background-size: cover;
+  user-select: none;
 }
 
 .video-details-title {
-	margin-top: 8px;
+  margin-top: 8px;
 }
 
 .video-details-speaker {
-	display: flex;
-	gap: 8px;
-	margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  margin-top: 10px
 }
 
 .back {
-	display: flex;
-	align-items: center;
-	margin-left: -5px;
-	cursor: pointer;
+  display: flex;
+  align-items: center;
+  margin-left: -5px;
+  cursor: pointer;
 }
 
 .back:hover {
-	text-decoration: underline;
+  text-decoration: underline;
 }
 
 .info-title {
-	font-size: 1.5rem;
-	font-weight: 700;
-	line-height: 1.25;
-	margin: 8px 0 0 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.25;
+  margin: 8px 0 0 0 ;
 }
 
 .info-description {
-	margin: 8px 0 0 0;
+  margin: 8px 0 0 0;
 }
 
 .controls {
-	cursor: pointer;
+  cursor: pointer;
 }
 
 .fallback {
-	background: #f6f7f8 linear-gradient(to right, #e6e6e6 5%, #cccccc 25%, #e6e6e6 35%) no-repeat;
-	background-size: 800px 104px;
-	display: block;
-	line-height: 1.25;
-	margin: 8px 0 0 0;
-	border-radius: 5px;
-	overflow: hidden;
+  background: #f6f7f8 linear-gradient(to right, #e6e6e6 5%, #cccccc 25%, #e6e6e6 35%) no-repeat;
+  background-size: 800px 104px;
+  display: block;
+  line-height: 1.25;
+  margin: 8px 0 0 0;
+  border-radius: 5px;
+  overflow: hidden;
 
-	animation: 1s linear 1s infinite shimmer;
-	animation-delay: 300ms;
-	animation-duration: 1s;
-	animation-fill-mode: forwards;
-	animation-iteration-count: infinite;
-	animation-name: shimmer;
-	animation-timing-function: linear;
+  animation: 1s linear 1s infinite shimmer;
+  animation-delay: 300ms;
+  animation-duration: 1s;
+  animation-fill-mode: forwards;
+  animation-iteration-count: infinite;
+  animation-name: shimmer;
+  animation-timing-function: linear;
 }
 
+
 .fallback.title {
-	width: 130px;
-	height: 30px;
+  width: 130px;
+  height: 30px;
+
 }
 
 .fallback.description {
-	width: 150px;
-	height: 21px;
+  width: 150px;
+  height: 21px;
 }
 
 @keyframes shimmer {
-	0% {
-		background-position: -468px 0;
-	}
+  0% {
+    background-position: -468px 0;
+  }
 
-	100% {
-		background-position: 468px 0;
-	}
+  100% {
+    background-position: 468px 0;
+  }
 }
 
 .search {
-	margin-bottom: 10px;
+  margin-bottom: 10px;
 }
 .search-input {
-	width: 100%;
-	position: relative;
+  width: 100%;
+  position: relative;
 }
 
 .search-icon {
-	position: absolute;
-	top: 0;
-	bottom: 0;
-	inset-inline-start: 0;
-	display: flex;
-	align-items: center;
-	padding-inline-start: 1rem;
-	pointer-events: none;
-	color: #99a1b3;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  inset-inline-start: 0;
+  display: flex;
+  align-items: center;
+  padding-inline-start: 1rem;
+  pointer-events: none;
+  color: #99a1b3;
 }
 
 .search-input input {
-	display: flex;
-	padding-inline-start: 2.75rem;
-	padding-top: 10px;
-	padding-bottom: 10px;
-	width: 100%;
-	text-align: start;
-	background-color: rgb(235 236 240);
-	outline: 2px solid transparent;
-	cursor: pointer;
-	border: none;
-	align-items: center;
-	color: rgb(35 39 47);
-	border-radius: 9999px;
-	vertical-align: middle;
-	font-size: 15px;
+  display: flex;
+  padding-inline-start: 2.75rem;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  width: 100%;
+  text-align: start;
+  background-color: rgb(235 236 240);
+  outline: 2px solid transparent;
+  cursor: pointer;
+  border: none;
+  align-items: center;
+  color: rgb(35 39 47);
+  border-radius: 9999px;
+  vertical-align: middle;
+  font-size: 15px;
 }
 
-.search-input input:hover,
-.search-input input:active {
-	background-color: rgb(235 236 240/ 0.8);
-	color: rgb(35 39 47/ 0.8);
+.search-input input:hover, .search-input input:active {
+  background-color: rgb(235 236 240/ 0.8);
+  color: rgb(35 39 47/ 0.8);
 }
 
 /* Home */
 .video-list {
-	position: relative;
+  position: relative;
 }
 
 .video-list .videos {
-	display: flex;
-	flex-direction: column;
-	gap: 1rem;
-	overflow-y: auto;
-	height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  overflow-y: auto;
+  height: 100%;
 }
 ```
+
 
 ```css src/animations.css
 /* No additional animations needed */
 
+
+
+
+
+
+
+
+
 /* Previously defined animations below */
+
+
+
+
+
 
 /* Slide animations for Suspense the fallback down */
 ::view-transition-old(.slide-down) {
-	animation:
-		150ms ease-out both fade-out,
-		150ms ease-out both slide-down;
+    animation: 150ms ease-out both fade-out, 150ms ease-out both slide-down;
 }
 
 ::view-transition-new(.slide-up) {
-	animation:
-		210ms ease-in 150ms both fade-in,
-		400ms ease-in both slide-up;
+    animation: 210ms ease-in 150ms both fade-in, 400ms ease-in both slide-up;
 }
 
 /* Animations for view transition classed added by transition type */
 ::view-transition-old(.slide-forward) {
-	/* when sliding forward, the "old" page should slide out to left. */
-	animation:
-		150ms cubic-bezier(0.4, 0, 1, 1) both fade-out,
-		400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-to-left;
+    /* when sliding forward, the "old" page should slide out to left. */
+    animation: 150ms cubic-bezier(0.4, 0, 1, 1) both fade-out,
+    400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-to-left;
 }
 
 ::view-transition-new(.slide-forward) {
-	/* when sliding forward, the "new" page should slide in from right. */
-	animation:
-		210ms cubic-bezier(0, 0, 0.2, 1) 150ms both fade-in,
-		400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-from-right;
+    /* when sliding forward, the "new" page should slide in from right. */
+    animation: 210ms cubic-bezier(0, 0, 0.2, 1) 150ms both fade-in,
+    400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-from-right;
 }
 
 ::view-transition-old(.slide-back) {
-	/* when sliding back, the "old" page should slide out to right. */
-	animation:
-		150ms cubic-bezier(0.4, 0, 1, 1) both fade-out,
-		400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-to-right;
+    /* when sliding back, the "old" page should slide out to right. */
+    animation: 150ms cubic-bezier(0.4, 0, 1, 1) both fade-out,
+    400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-to-right;
 }
 
 ::view-transition-new(.slide-back) {
-	/* when sliding back, the "new" page should slide in from left. */
-	animation:
-		210ms cubic-bezier(0, 0, 0.2, 1) 150ms both fade-in,
-		400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-from-left;
+    /* when sliding back, the "new" page should slide in from left. */
+    animation: 210ms cubic-bezier(0, 0, 0.2, 1) 150ms both fade-in,
+    400ms cubic-bezier(0.4, 0, 0.2, 1) both slide-from-left;
 }
 
 /* Keyframes to support our animations above. */
 @keyframes slide-up {
-	from {
-		transform: translateY(10px);
-	}
-	to {
-		transform: translateY(0);
-	}
+    from {
+        transform: translateY(10px);
+    }
+    to {
+        transform: translateY(0);
+    }
 }
 
 @keyframes slide-down {
-	from {
-		transform: translateY(0);
-	}
-	to {
-		transform: translateY(10px);
-	}
+    from {
+        transform: translateY(0);
+    }
+    to {
+        transform: translateY(10px);
+    }
 }
 
 @keyframes fade-in {
-	from {
-		opacity: 0;
-	}
+    from {
+        opacity: 0;
+    }
 }
 
 @keyframes fade-out {
-	to {
-		opacity: 0;
-	}
+    to {
+        opacity: 0;
+    }
 }
 
 @keyframes slide-to-right {
-	to {
-		transform: translateX(50px);
-	}
+    to {
+        transform: translateX(50px);
+    }
 }
 
 @keyframes slide-from-right {
-	from {
-		transform: translateX(50px);
-	}
-	to {
-		transform: translateX(0);
-	}
+    from {
+        transform: translateX(50px);
+    }
+    to {
+        transform: translateX(0);
+    }
 }
 
 @keyframes slide-to-left {
-	to {
-		transform: translateX(-50px);
-	}
+    to {
+        transform: translateX(-50px);
+    }
 }
 
 @keyframes slide-from-left {
-	from {
-		transform: translateX(-50px);
-	}
-	to {
-		transform: translateX(0);
-	}
+    from {
+        transform: translateX(-50px);
+    }
+    to {
+        transform: translateX(0);
+    }
 }
 
 /* Default .slow-fade. */
 ::view-transition-old(.slow-fade) {
-	animation-duration: 500ms;
+    animation-duration: 500ms;
 }
 
 ::view-transition-new(.slow-fade) {
-	animation-duration: 500ms;
+    animation-duration: 500ms;
 }
 ```
 
 ```js src/index.js hidden
-import React, { StrictMode } from "react";
-import { createRoot } from "react-dom/client";
+import React, {StrictMode} from 'react';
+import {createRoot} from 'react-dom/client';
+import './styles.css';
+import './animations.css';
 
-import "./styles.css";
-import "./animations.css";
+import App from './App';
+import {Router} from './router';
 
-import App from "./App";
-import { Router } from "./router";
-
-const root = createRoot(document.getElementById("root"));
+const root = createRoot(document.getElementById('root'));
 root.render(
-	<StrictMode>
-		<Router>
-			<App />
-		</Router>
-	</StrictMode>,
+  <StrictMode>
+    <Router>
+      <App />
+    </Router>
+  </StrictMode>
 );
 ```
 
 ```json package.json hidden
 {
-	"dependencies": {
-		"react": "experimental",
-		"react-dom": "experimental",
-		"react-scripts": "latest"
-	},
-	"scripts": {
-		"start": "react-scripts start",
-		"build": "react-scripts build",
-		"test": "react-scripts test --env=jsdom",
-		"eject": "react-scripts eject"
-	}
+  "dependencies": {
+    "react": "canary",
+    "react-dom": "canary",
+    "react-scripts": "latest"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test --env=jsdom",
+    "eject": "react-scripts eject"
+  }
 }
 ```
 
 </Sandpack>
 
-### Server-Side Rendering with Activity {/_server-side-rendering-with-activity_/}
+### Server-Side Rendering with Activity {/*server-side-rendering-with-activity*/}
 
 When using Activity on a page that uses server-side rendering (SSR), there are additional optimizations.
 
@@ -14922,7 +14203,7 @@ For parts of the UI rendered with `mode="visible"`, React will de-prioritize hyd
 
 These are advanced use cases, but they show the additional benefits considered with Activity.
 
-### Future modes for Activity {/_future-modes-for-activity_/}
+### Future modes for Activity {/*future-modes-for-activity*/}
 
 In the future, we may add more modes to Activity.
 
@@ -14936,7 +14217,7 @@ These are areas we're still exploring, and we'll share more as we make progress.
 
 ---
 
-# Features in development {/_features-in-development_/}
+# Features in development {/*features-in-development*/}
 
 We're also developing features to help solve the common problems below.
 
@@ -14946,7 +14227,7 @@ When the solutions we're working on are shared too early, it can create churn an
 
 As these features progress, we'll announce them on the blog with docs included so you can try them out.
 
-## React Performance Tracks {/_react-performance-tracks_/}
+## React Performance Tracks {/*react-performance-tracks*/}
 
 We're working on a new set of custom tracks to performance profilers using browser APIs that [allow adding custom tracks](https://developer.chrome.com/docs/devtools/performance/extension) to provide more information about the performance of your React app.
 
@@ -14969,7 +14250,7 @@ Once we solve those issues, we'll publish experimental docs and share that it's 
 
 ---
 
-## Automatic Effect Dependencies {/_automatic-effect-dependencies_/}
+## Automatic Effect Dependencies {/*automatic-effect-dependencies*/}
 
 When we released hooks, we had three motivations:
 
@@ -14977,9 +14258,9 @@ When we released hooks, we had three motivations:
 - **Think in terms of function, not lifecycles**: hooks let you split one component into smaller functions based on what pieces are related (such as setting up a subscription or fetching data), rather than forcing a split based on lifecycle methods.
 - **Support ahead-of-time compilation**: hooks were designed to support ahead-of-time compilation with less pitfalls causing unintentional de-optimizations caused by lifecycle methods, and limitations of classes.
 
-Since their release, hooks have been successful at _sharing code between components_. Hooks are now the favored way to share logic between components, and there are less use cases for render props and higher order components. Hooks have also been successful at supporting features like Fast Refresh that were not possible with class components.
+Since their release, hooks have been successful at *sharing code between components*. Hooks are now the favored way to share logic between components, and there are less use cases for render props and higher order components. Hooks have also been successful at supporting features like Fast Refresh that were not possible with class components.
 
-### Effects can be hard {/_effects-can-be-hard_/}
+### Effects can be hard {/*effects-can-be-hard*/}
 
 Unfortunately, some hooks are still hard to think in terms of function instead of lifecycles. Effects specifically are still hard to understand and are the most common pain point we hear from developers. Last year, we spent a significant amount of time researching how Effects were used, and how those use cases could be simplified and easier to understand.
 
@@ -14991,19 +14272,19 @@ Let's look at an example [from the docs](/learn/lifecycle-of-reactive-effects#th
 
 ```js
 useEffect(() => {
-	// Your Effect connected to the room specified with roomId...
-	const connection = createConnection(serverUrl, roomId);
-	connection.connect();
-	return () => {
-		// ...until it disconnected
-		connection.disconnect();
-	};
+  // Your Effect connected to the room specified with roomId...
+  const connection = createConnection(serverUrl, roomId);
+  connection.connect();
+  return () => {
+    // ...until it disconnected
+    connection.disconnect();
+  };
 }, [roomId]);
 ```
 
 Many users would read this code as "on mount, connect to the roomId. whenever `roomId` changes, disconnect to the old room and re-create the connection". However, this is thinking from the component's lifecycle perspective, which means you will need to think of every component lifecycle state to write the Effect correctly. This can be difficult, so it's understandable that Effects seem harder than class lifecycles when using the component perspective.
 
-### Effects without dependencies {/_effects-without-dependencies_/}
+### Effects without dependencies {/*effects-without-dependencies*/}
 
 Instead, it's better to think from the Effect's perspective. The Effect doesn't know about the component lifecycles. It only describes how to start synchronization and how to stop it. When users think of Effects in this way, their Effects tend to be easier to write, and more resilient to being started and stopped as many times as is needed.
 
@@ -15013,23 +14294,23 @@ When we released hooks, we knew we could make them easier to use with ahead-of-t
 
 ```js
 useEffect(() => {
-	const connection = createConnection(serverUrl, roomId);
-	connection.connect();
-	return () => {
-		connection.disconnect();
-	};
+  const connection = createConnection(serverUrl, roomId);
+  connection.connect();
+  return () => {
+    connection.disconnect();
+  };
 }); // compiler inserted dependencies.
 ```
 
-With this code, the React Compiler can infer the dependencies for you and insert them automatically so you don't need to see or write them. With features like [the IDE extension](#compiler-ide-extension) and [`useEffectEvent`](/reference/react/experimental_useEffectEvent), we can provide a CodeLens to show you what the Compiler inserted for times you need to debug, or to optimize by removing a dependency. This helps reinforce the correct mental model for writing Effects, which can run at any time to synchronize your component or hook's state with something else.
+With this code, the React Compiler can infer the dependencies for you and insert them automatically so you don't need to see or write them. With features like [the IDE extension](#compiler-ide-extension) and [`useEffectEvent`](/reference/react/useEffectEvent), we can provide a CodeLens to show you what the Compiler inserted for times you need to debug, or to optimize by removing a dependency. This helps reinforce the correct mental model for writing Effects, which can run at any time to synchronize your component or hook's state with something else.
 
 Our hope is that automatically inserting dependencies is not only easier to write, but that it also makes them easier to understand by forcing you to think in terms of what the Effect does, and not in component lifecycles.
 
 ---
 
-## Compiler IDE Extension {/_compiler-ide-extension_/}
+## Compiler IDE Extension {/*compiler-ide-extension*/}
 
-Earlier this week [we shared](/blog/2025/04/21/react-compiler-rc) the React Compiler release candidate, and we're working towards shipping the first SemVer stable version of the compiler in the coming months.
+Later in 2025 [we shared](/blog/2025/10/07/react-compiler-1) the first stable release of React Compiler, and we're continuing to invest in shipping more improvements.
 
 We've also begun exploring ways to use the React Compiler to provide information that can improve understanding and debugging your code. One idea we've started exploring is a new experimental LSP-based React IDE extension powered by React Compiler, similar to the extension used in [Lauren Tan's React Conf talk](https://conf2024.react.dev/talks/5).
 
@@ -15039,7 +14320,7 @@ The IDE extension is still an early exploration, but we'll share our progress in
 
 ---
 
-## Fragment Refs {/_fragment-refs_/}
+## Fragment Refs {/*fragment-refs*/}
 
 Many DOM APIs like those for event management, positioning, and focus are difficult to compose when writing with React. This often leads developers to reach for Effects, managing multiple Refs, by using APIs like `findDOMNode` (removed in React 19).
 
@@ -15049,7 +14330,7 @@ Fragment refs are still being researched. We'll share more when we're closer to 
 
 ---
 
-## Gesture Animations {/_gesture-animations_/}
+## Gesture Animations {/*gesture-animations*/}
 
 We're also researching ways to enhance View Transitions to support gesture animations such as swiping to open a menu, or scroll through a photo carousel.
 
@@ -15063,7 +14344,7 @@ We believe we’ve found an approach that works well and may introduce a new API
 
 ---
 
-## Concurrent Stores {/_concurrent-stores_/}
+## Concurrent Stores {/*concurrent-stores*/}
 
 When we released React 18 with concurrent rendering, we also released `useSyncExternalStore` so external store libraries that did not use React state or context could [support concurrent rendering](https://github.com/reactwg/react-18/discussions/70) by forcing a synchronous render when the store is updated.
 

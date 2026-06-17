@@ -9,6 +9,7 @@ import { getTranslationBranchNameFromPath, logger } from "@/app/utils/";
 import {
 	getUnresolvedChangesRequestedReviews,
 	hasUnresolvedChangesRequestedReview,
+	isRemediationTranslationCommit,
 } from "./maintainer-feedback.util";
 
 /** Why an open translation pull request is not treated as workflow-complete */
@@ -176,10 +177,24 @@ export class TranslationPullRequestValidityManager {
 	 * @returns Feedback timing when unresolved reviews exist, otherwise `undefined`
 	 */
 	private async detectUnresolvedMaintainerFeedback(prNumber: number, branchName: string) {
-		const [reviews, latestRunnerCommitAt] = await Promise.all([
+		const [reviews, latestTranslationCommit] = await Promise.all([
 			this.services.github.listPullRequestReviews(prNumber),
-			this.services.github.getLatestTranslationCommitTimestamp(branchName),
+			this.services.github.getLatestTranslationCommit(branchName),
 		]);
+
+		if (
+			latestTranslationCommit &&
+			isRemediationTranslationCommit(latestTranslationCommit.message)
+		) {
+			this.logger.debug(
+				{ prNumber, branchName },
+				"Skipping maintainer remediation; branch already has a remediation translation commit",
+			);
+
+			return undefined;
+		}
+
+		const latestRunnerCommitAt = latestTranslationCommit?.timestamp;
 
 		if (!hasUnresolvedChangesRequestedReview(reviews, latestRunnerCommitAt)) {
 			return undefined;

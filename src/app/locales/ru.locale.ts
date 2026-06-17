@@ -1,6 +1,12 @@
 import type { TranslationFile } from "@/app/services/translator/";
+import type { PostTranslationGuardId } from "@/app/services/translator/validation/validation.constants";
 
-import type { LocaleDefinition, LocalePRBodyStrings, ProgressCommentRunContext } from "./types";
+import type {
+	LocaleDefinition,
+	LocalePRBodyStrings,
+	ProgressCommentRunContext,
+	RemediationPullRequestCommentParams,
+} from "./types";
 
 import { createPRBodyBuilder } from "./pr-body.builder";
 
@@ -28,18 +34,38 @@ const ruPRBodyStrings: LocalePRBodyStrings = {
 			"Автоматическая проверка обнаружила механические проблемы, которые нужно исправить вручную перед merge:",
 		detailsSummary: "Показать детали проверки",
 		guardLabel: (guardId) => {
-			const labels: Record<string, string> = {
+			const labels: Record<PostTranslationGuardId, string> = {
 				markdownLinksPreserved: "Markdown-ссылки",
 				fenceFunctionIdentifiers: "Идентификаторы функций в блоках кода",
 				fenceJsxStaticText: "Статический JSX-текст в блоках кода",
 				headingsPreserved: "Заголовки",
 				frontmatterPreserved: "YAML frontmatter",
+				sentenceCaseHeadings: "Sentence case в заголовках",
+				mdxSpacing: "Интервалы MDX",
+				extraMarkdownLinks: "Лишние ссылки",
+				mdxSlugPreserved: "MDX-slug",
+				headingCountPreserved: "Количество заголовков",
+				headingSyntax: "Синтаксис заголовков",
+				contentRatio: "Соотношение объёма текста",
+				nonEmptyContent: "Пустой перевод",
 			};
 
-			return labels[guardId] ?? guardId;
+			return labels[guardId];
 		},
-		violationLocation: (startLine, endLine) =>
-			startLine === endLine ? `строка ${startLine}` : `строки ${startLine}–${endLine}`,
+		violationTally: (count) => {
+			const mod10 = count % 10;
+			const mod100 = count % 100;
+
+			if (mod10 === 1 && mod100 !== 11) {
+				return `${count} нарушение`;
+			}
+
+			if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) {
+				return `${count} нарушения`;
+			}
+
+			return `${count} нарушений`;
+		},
 	},
 };
 
@@ -61,6 +87,43 @@ export const ruLocale: LocaleDefinition = {
 		createdSectionHeader: "### Созданные PR",
 		updatedSectionHeader: "### Обновлённые PR",
 		suffix: `[^1]: переводы были сгенерированы с использованием LLM и требуют проверки человеком для обеспечения точности, культурного контекста и технической терминологии.`,
+		remediationPullRequestComment: ({
+			filename,
+			maintainerLogins,
+			runContext,
+			advisoryNoticeCount,
+		}: RemediationPullRequestCommentParams) => {
+			const mentions = maintainerLogins.map((login) => `@${login}`).join(", ");
+			const opener =
+				runContext ?
+					`[\`translate-react@${runContext.version}\`](${runContext.releaseUrl}) опубликовал новый коммит в этом PR.`
+				:	"translate-react опубликовал новый коммит в этом PR.";
+
+			const lines = [
+				opener,
+				"",
+				`Причина: отзывы со статусом **CHANGES_REQUESTED** от ${mentions} после последнего автоматического коммита для \`${filename}\`.`,
+				"",
+				"Страница переведена заново с учётом текста отзывов в промпте LLM; описание PR обновлено.",
+			];
+
+			if (advisoryNoticeCount > 0) {
+				lines.push(
+					"",
+					`> [!NOTE]`,
+					`> Автоматическая проверка сообщила о ${advisoryNoticeCount} рекомендательных предупреждении(ях) в описании PR.`,
+				);
+			}
+
+			if (runContext) {
+				lines.push(
+					"",
+					`###### **GitHub Action Run:** [\`${runContext.workflowName} #${runContext.runId}\`](${runContext.url})`,
+				);
+			}
+
+			return lines.join("\n");
+		},
 	},
 	rules: {
 		specific: `

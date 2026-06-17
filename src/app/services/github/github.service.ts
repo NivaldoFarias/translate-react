@@ -204,6 +204,19 @@ export class GitHubService {
 		return this.branch.deleteBranch(branchName);
 	}
 
+	/**
+	 * Recreates a translation topic branch from the fork default tip without closing its pull request.
+	 *
+	 * @param branchName Translation branch to refresh
+	 *
+	 * @returns New branch reference data
+	 */
+	public async refreshTranslationBranchPreservePr(
+		branchName: string,
+	): Promise<RestEndpointMethodTypes["git"]["getRef"]["response"]["data"]> {
+		return this.branch.refreshTranslationBranchPreservePr(branchName);
+	}
+
 	// === Content/PR Methods ===
 
 	/**
@@ -375,6 +388,17 @@ export class GitHubService {
 	 */
 	public async listPullRequestReviewComments(prNumber: number) {
 		return this.content.listPullRequestReviewComments(prNumber);
+	}
+
+	/**
+	 * Returns the newest runner translation commit on a fork branch.
+	 *
+	 * @param branchName Translation branch name without `refs/heads/` prefix
+	 *
+	 * @returns Committer timestamp and message of the newest translation commit, if present
+	 */
+	public async getLatestTranslationCommit(branchName: string) {
+		return this.content.getLatestTranslationCommit(branchName);
 	}
 
 	/**

@@ -68,6 +68,27 @@ describe("segment translation utilities", () => {
 		expect(tinyBudgetBatches.length).toBeGreaterThan(1);
 	});
 
+	test("packSegmentsIntoBatches splits when completion response budget is exceeded", () => {
+		const translatable = Array.from({ length: 12 }, (_, index) => ({
+			id: `root/paragraph#${index}`,
+			path: `root/paragraph#${index}`,
+			kind: "translate" as const,
+			sourceText: `Sentence ${index} with enough words to consume completion budget.`,
+			start: index,
+			end: index + 1,
+		}));
+
+		const responseCappedBatches = packSegmentsIntoBatches(
+			translatable,
+			(text) => Math.ceil(text.length / 4),
+			100_000,
+			40,
+			80,
+		);
+
+		expect(responseCappedBatches.length).toBeGreaterThan(1);
+	});
+
 	test("splitSegmentBatchInHalf returns two non-empty halves for multi-item batches", () => {
 		const items = [
 			{ segmentId: "a", source: "one" },

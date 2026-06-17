@@ -1,5 +1,7 @@
 import type { PostTranslationValidationGuard } from "../validation.types";
 
+import { PostTranslationGuardId } from "../validation.constants";
+
 /**
  * Minimum acceptable ratio of translated length to source length.
  *
@@ -38,7 +40,7 @@ export const contentRatioGuard: PostTranslationValidationGuard = (source, transl
 
 	if (ratio < MIN_CONTENT_RATIO) {
 		return {
-			guardId: "contentRatio",
+			guardId: PostTranslationGuardId.contentRatio,
 			message: `Translation content ratio too low (${(ratio * 100).toFixed(0)}%)`,
 			retryHint:
 				"The translated output appears truncated. Return the complete translation of ALL sections without omitting any content. Do not summarize or shorten the document.",
@@ -47,7 +49,7 @@ export const contentRatioGuard: PostTranslationValidationGuard = (source, transl
 
 	if (ratio > MAX_CONTENT_RATIO) {
 		return {
-			guardId: "contentRatio",
+			guardId: PostTranslationGuardId.contentRatio,
 			message: `Translation content ratio too high (${(ratio * 100).toFixed(0)}%)`,
 			retryHint:
 				"The translated output appears to contain duplicated or hallucinated content. Return only the translation of the source content without adding extra sections or repeating paragraphs.",

@@ -3,10 +3,8 @@ import { mock } from "bun:test";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 import type { ReactLanguageCode } from "@/app/constants";
-import type { PullRequestStatus } from "@/app/services/github/types";
+import type { PullRequestStatus, RepositoryMarkdownBlob } from "@/app/services/github/types";
 import type { LanguageAnalysisResult } from "@/app/services/language-detector/language-detector.service";
-
-import { createTranslationFileFixture } from "@tests/fixtures";
 
 /**
  * Creates a mock CommentBuilderService for testing.
@@ -27,6 +25,8 @@ export function createMockCommentBuilderService() {
 			prefix: "As seguintes páginas foram traduzidas nesta execução:",
 			createdSectionHeader: "**PRs criados**",
 			updatedSectionHeader: "**PRs atualizados**",
+			remediationPullRequestComment: ({ filename }: { filename: string }) =>
+				`Remediation commit pushed for \`${filename}\`.`,
 		},
 	};
 }
@@ -74,6 +74,12 @@ export function createMockGitHubService() {
 			}),
 		),
 		deleteBranch: mock(() => Promise.resolve({ data: {}, status: 204 })),
+		refreshTranslationBranchPreservePr: mock(() =>
+			Promise.resolve({
+				ref: "refs/heads/translate/test",
+				object: { sha: "refreshed-sha" },
+			}),
+		),
 		createCommentOnPullRequest: mock(() =>
 			Promise.resolve({ data: { id: 1, body: "Mock comment" } }),
 		),
@@ -91,7 +97,14 @@ export function createMockGitHubService() {
 				html_url: "https://github.com/test/test/pull/1",
 			}),
 		),
-		getFile: mock((_file: unknown) => Promise.resolve(createTranslationFileFixture())),
+		getFile: mock((_file: unknown) =>
+			Promise.resolve({
+				content: "# Content of file",
+				filename: "file.md",
+				path: "src/test/file.md",
+				sha: "abc123",
+			} satisfies RepositoryMarkdownBlob),
+		),
 		getForkFileContentAtBranch: mock(() => Promise.resolve(undefined as string | undefined)),
 		findPullRequestByBranch: mock(() =>
 			Promise.resolve(
@@ -124,6 +137,7 @@ export function createMockGitHubService() {
 		listPullRequestIssueComments: mock(() => Promise.resolve([])),
 		listPullRequestReviews: mock(() => Promise.resolve([])),
 		listPullRequestReviewComments: mock(() => Promise.resolve([])),
+		getLatestTranslationCommit: mock(() => Promise.resolve(undefined)),
 		getLatestTranslationCommitTimestamp: mock(() => Promise.resolve(undefined)),
 		commentCompiledResultsOnIssue: mock(() => Promise.resolve({ id: 1 })),
 	};

@@ -11,7 +11,10 @@ import { hydrateRootMd } from "@tests/fixtures/react-docs-fixtures";
 import { loadSegmentFixture } from "@tests/fixtures/segment-extraction/load-fixture.util";
 import { compareCommentExtractionMethods } from "@tests/helpers/segment-fence-comments.util";
 import { simulateGuardOutcomes } from "@tests/helpers/segment-guard-simulation.util";
-import { identityRoundTrip } from "@tests/helpers/segment-round-trip.util";
+import {
+	identityRoundTrip,
+	mockTranslateWithProductionCleanup,
+} from "@tests/helpers/segment-round-trip.util";
 
 describe("markdown segment extraction", () => {
 	test("identity round-trip passes for baseline prose fixture", () => {
@@ -108,5 +111,22 @@ describe("markdown segment extraction", () => {
 
 		expect(isSegmentTranslationEligible(parseWarnings)).toBe(true);
 		expect(filterTranslatableSegments(segments).length).toBeGreaterThan(0);
+	});
+
+	test("production cleanup round-trip preserves JSX static text segments in S4", () => {
+		const source = loadSegmentFixture("S4");
+		const output = mockTranslateWithProductionCleanup(source, (text) => `${text.trim()}ü`);
+
+		expect(output).toContain("ü");
+		expect(output).toContain("<h1>Welcome</h1>");
+	});
+
+	test("production cleanup round-trip preserves slug spacing in S6", () => {
+		const source = loadSegmentFixture("S6");
+		const output = mockTranslateWithProductionCleanup(source, (text) =>
+			text.trim() === "Reference" ? "Referência" : `${text.trim()}ü`,
+		);
+
+		expect(output).toMatch(/## Referência \{.*reference.*\}/i);
 	});
 });

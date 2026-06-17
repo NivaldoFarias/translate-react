@@ -8,6 +8,23 @@ import { segmentBatchRequestEnvelopeSchema } from "@/app/services/translator/tra
 import { createChatCompletionFixture } from "@tests/fixtures";
 
 /**
+ * Returns integration-test translation text that round-trips structurally but differs from source.
+ *
+ * Keeps passthrough batch JSON valid while avoiding {@link isTranslationEquivalentToCurrentBlob} no-op skips.
+ *
+ * @param source Segment or frontmatter field source from the LLM request
+ *
+ * @returns Mock translated string
+ */
+function passthroughMockTranslatedText(source: string) {
+	if (source.trim().length === 0) {
+		return source;
+	}
+
+	return `${source} (mock)`;
+}
+
+/**
  * Returns the last user message content, or empty string if no user messages are found.
  *
  * @param messages The messages to search through
@@ -27,7 +44,7 @@ function getLastUserText(messages: OpenAI.Chat.Completions.ChatCompletionCreateP
 
 /**
  * When the user message is a frontmatter batch request JSON, builds a valid structured response
- * by echoing each `source` string into `translated` so integration tests behave like a no-op model.
+ * by echoing each `source` string into `translated` with a mock suffix so integration tests exercise commits.
  *
  * @param userContent Raw user message string from the chat request
  *
@@ -40,7 +57,7 @@ function passthroughFrontmatterBatchResponse(userContent: string) {
 
 		const items = parsed.data.items.map((item) => ({
 			fieldKey: item.fieldKey,
-			translated: item.source,
+			translated: passthroughMockTranslatedText(item.source),
 		}));
 
 		return JSON.stringify({ items });
@@ -51,7 +68,7 @@ function passthroughFrontmatterBatchResponse(userContent: string) {
 
 /**
  * When the user message is a segment batch request JSON, builds a valid structured response
- * by echoing each `source` string into `translated` so integration tests behave like a no-op model.
+ * by echoing each `source` string into `translated` with a mock suffix so integration tests exercise commits.
  *
  * @param userContent Raw user message string from the chat request
  *
@@ -64,7 +81,7 @@ function passthroughSegmentBatchResponse(userContent: string) {
 
 		const items = parsed.data.items.map((item) => ({
 			segmentId: item.segmentId,
-			translated: item.source,
+			translated: passthroughMockTranslatedText(item.source),
 		}));
 
 		return JSON.stringify({ items });
@@ -90,7 +107,7 @@ export function createPassthroughChatCompletionsMock() {
 
 		const outbound =
 			userContent === "ping" ? "pong"
-			: userContent.length > 0 ? userContent
+			: userContent.length > 0 ? passthroughMockTranslatedText(userContent)
 			: ".";
 
 		return Promise.resolve(createChatCompletionFixture(outbound));

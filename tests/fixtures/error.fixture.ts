@@ -9,9 +9,13 @@ type RequestErrorOptions = ConstructorParameters<typeof RequestError>[2];
 /**
  * Creates a fixture for an {@link APIError} from OpenAI
  *
- * @param overrides The overrides for the APIError
+ * @param overrides Optional overrides
+ * @param overrides.status The HTTP status code
+ * @param overrides.error The error object
+ * @param overrides.message The message
+ * @param overrides.headers The headers
  *
- * @returns The fixture for the APIError
+ * @returns The {@link APIError} fixture
  */
 export function createOpenAIApiErrorFixture<
 	TStatus extends number | undefined = number | undefined,
@@ -36,9 +40,12 @@ export function createOpenAIApiErrorFixture<
  *
  * Defaults to a `500` Internal Server Error.
  *
- * @param overrides The overrides for the Octokit RequestError
+ * @param overrides Optional overrides
+ * @param overrides.status The HTTP status code
+ * @param overrides.message The error message
+ * @param overrides.options Optional overrides for the {@link RequestError} options
  *
- * @returns The fixture for the Octokit RequestError
+ * @returns The {@link RequestError} fixture
  */
 export function createOctokitRequestErrorFixture(overrides?: {
 	status?: number;

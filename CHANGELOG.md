@@ -4,6 +4,27 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+### Added
+
+- `PostTranslationGuardId` constants for post-translation guard identifiers; `guardId` fields and locale label maps infer from that registry.
+- Structural integrity guards (`mdxSlugPreserved`, `headingCountPreserved`, `headingSyntax`) and advisory style guards (`mdxSpacing`, `sentenceCaseHeadings`, `extraMarkdownLinks`), consolidated into `structural-integrity` and `advisory-style` analyzer/guard modules.
+- `refreshTranslationBranchPreservePr` for `out_of_sync` and maintainer-remediation runs that reuse an open translation pull request.
+- `tests/fixtures/md/workflow.manifest.ts` with react.dev fixture corpus and integration coverage for every manifest scenario (`New`, `OutOfSync`, `MaintainerFix`, `ValidSkip`).
+- Segment production-pipeline, reinsert, cleanup, and truncation-audit specs exercising spacing, slug, and heading regressions.
+
+### Changed
+
+- Segment snippet cleanup (`cleanupSegmentSnippet`, `sanitizeSegmentTranslation`) preserves boundary whitespace so reinsert no longer glues prose, links, or `{/*slug*/}` comments.
+- `SEGMENT_BATCH_MAX_ITEMS_PER_BATCH` reduced from 55 to 40; segment batch packing also caps estimated JSON completion tokens.
+- Translation PR advisory warnings use GitHub-style `L{N}` / `L{N}-L{M}` line anchors and grouped `<details>` sections per guard.
+- Russian locale PR bodies include labels for all advisory and structural guard ids (parity with `pt-br`).
+- ESLint enables JSDoc rules under `tests/fixtures/**`; `.prettierignore` excludes large markdown fixtures from formatting.
+
+### Fixed
+
+- Segment batch output no longer duplicates `##` heading markers when translated heading text includes markdown markers.
+- Maintainer remediation reuses open pull requests after `CHANGES_REQUESTED` reviews without closing the branch when an approved review is present.
+
 ## [0.2.8] - 2026-06-16
 
 ### Added

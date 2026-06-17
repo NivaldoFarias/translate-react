@@ -5,6 +5,7 @@ import {
 	findFenceFunctionIdentifierMismatches,
 	formatFenceFunctionMismatchSummary,
 } from "../analyzers/fence-code-identifier.analyzer";
+import { PostTranslationGuardId } from "../validation.constants";
 
 /**
  * Rejects translations that renamed `function` identifiers inside fenced code blocks
@@ -22,7 +23,7 @@ export const fenceFunctionIdentifiersGuard: PostTranslationValidationGuard = (
 	if (mismatches.length === 0) return null;
 
 	return {
-		guardId: "fenceFunctionIdentifiers",
+		guardId: PostTranslationGuardId.fenceFunctionIdentifiers,
 		message: `Function identifiers changed in fenced code: ${formatFenceFunctionMismatchSummary(mismatches)}`,
 		retryHint: buildFenceFunctionIdentifierRetryHint(mismatches),
 	};
