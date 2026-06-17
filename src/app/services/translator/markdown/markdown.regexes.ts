@@ -15,6 +15,9 @@ export const MARKDOWN_REGEXES = {
 	/** Regex pattern to match markdown headings (h1-h6) */
 	headings: new RegExp(/^#{1,6}\s/gm),
 
+	/** Matches MDX heading slug comment expressions in react.dev docs */
+	mdxSlugComment: /\{\/\*[^*]+\*\/\}/g,
+
 	/** Regex pattern to match all newline characters for line ending replacement */
 	lineEnding: new RegExp(/\r?\n/g),
 } as const;

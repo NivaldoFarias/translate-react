@@ -22,6 +22,7 @@ export {
 } from "./extract-segments.util";
 export {
 	estimateSegmentBatchRequestTokens,
+	estimateSegmentBatchResponseTokens,
 	packSegmentsIntoBatches,
 	splitSegmentBatchInHalf,
 } from "./segment-batch.util";

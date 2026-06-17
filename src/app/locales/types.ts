@@ -4,6 +4,7 @@ import type {
 	ReviewerValidationNotice,
 } from "@/app/services/github/types";
 import type { TranslationFile } from "@/app/services/translator/";
+import type { PostTranslationGuardId } from "@/app/services/translator/validation/validation.constants";
 
 export type { ReviewerValidationNotice };
 
@@ -20,6 +21,21 @@ export interface PullRequestDescriptionMetadata {
 
 	/** Advisory post-translation guard hints for maintainers (empty if clean) */
 	reviewerNotices: readonly ReviewerValidationNotice[];
+}
+
+/** Inputs for a pull request comment after maintainer-feedback remediation */
+export interface RemediationPullRequestCommentParams {
+	/** Basename of the translated markdown file */
+	readonly filename: string;
+
+	/** Maintainer logins whose unresolved reviews triggered remediation */
+	readonly maintainerLogins: readonly string[];
+
+	/** Workflow run metadata when executing in GitHub Actions */
+	readonly runContext?: ProgressCommentRunContext;
+
+	/** Count of advisory post-translation guard notices on the refreshed PR body */
+	readonly advisoryNoticeCount: number;
 }
 
 /**
@@ -66,6 +82,15 @@ export interface LocaleCommentConfig {
 
 	/** Generates the footer/observations section of the comment */
 	readonly suffix: string;
+
+	/**
+	 * Comment posted on an open pull request when a remediation commit is pushed.
+	 *
+	 * @param params File name, maintainer logins, optional run metadata, and advisory notice count
+	 *
+	 * @returns Localized pull request comment body
+	 */
+	readonly remediationPullRequestComment: (params: RemediationPullRequestCommentParams) => string;
 }
 
 /**
@@ -141,17 +166,16 @@ export interface LocalePRBodyStrings {
 		 *
 		 * @returns Localized validator name
 		 */
-		readonly guardLabel: (guardId: string) => string;
+		readonly guardLabel: (guardId: PostTranslationGuardId) => string;
 
 		/**
-		 * Localized line range label for a violation in the PR details section.
+		 * Localized violation count for a guard subsection heading.
 		 *
-		 * @param startLine 1-based start line in the source markdown
-		 * @param endLine 1-based end line in the source markdown
+		 * @param count Number of located violations in the section
 		 *
-		 * @returns Location label for a numbered violation heading
+		 * @returns Phrase such as `1 violação` or `3 violations`
 		 */
-		readonly violationLocation: (startLine: number, endLine: number) => string;
+		readonly violationTally: (count: number) => string;
 	};
 }
 

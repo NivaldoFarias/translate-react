@@ -8,11 +8,17 @@ describe("POST_TRANSLATION_VALIDATION_GUARDS", () => {
 		expect(POST_TRANSLATION_VALIDATION_GUARDS.map((guard) => guard.name)).toEqual([
 			"nonEmptyContentGuard",
 			"contentRatioGuard",
+			"mdxSlugPreservedGuard",
+			"headingCountPreservedGuard",
+			"headingSyntaxGuard",
 			"headingsPreservedGuard",
 			"markdownLinksPreservedGuard",
 			"frontmatterPreservedGuard",
 			"fenceFunctionIdentifiersGuard",
 			"fenceJsxStaticTextGuard",
+			"sentenceCaseHeadingsGuard",
+			"mdxSpacingGuard",
+			"extraMarkdownLinksGuard",
 		]);
 	});
 });

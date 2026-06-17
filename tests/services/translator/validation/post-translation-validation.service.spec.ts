@@ -35,7 +35,7 @@ describe("PostTranslationValidationService", () => {
 			}).toThrow("empty content");
 		});
 
-		test("does not throw for advisory guard failures such as lost headings", () => {
+		test("does not throw when headings are removed (advisory heading guards)", () => {
 			const file = makeFile("# Title\n\n## Section\n\nContent");
 			const translated = "Plain body without heading lines.";
 
@@ -44,6 +44,7 @@ describe("PostTranslationValidationService", () => {
 			}).not.toThrow();
 
 			const issues = validation.collectPostTranslationValidationIssues(file, translated);
+			expect(issues.some((issue) => issue.guardId === "headingCountPreserved")).toBe(true);
 			expect(issues.some((issue) => issue.guardId === "headingsPreserved")).toBe(true);
 		});
 

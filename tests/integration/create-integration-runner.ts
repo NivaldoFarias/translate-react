@@ -15,8 +15,17 @@ import type {
 	CommitTranslationOptions,
 	PullRequestOptions,
 } from "@/app/services/github/github.content";
-import type { PatchedRepositoryTreeItem, ProcessedFileResult } from "@/app/services/github/types";
+import type {
+	PatchedRepositoryTreeItem,
+	ProcessedFileResult,
+	PullRequestStatus,
+	RepositoryMarkdownBlob,
+} from "@/app/services/github/types";
 import type { LanguageDetectorService } from "@/app/services/language-detector/";
+import type { LanguageAnalysisResult } from "@/app/services/language-detector/language-detector.service";
+
+import type { WorkflowFixtureFile } from "@tests/fixtures/workflow-fixture.util";
+import type { MockLanguageDetectorService } from "@tests/mocks";
 
 import {
 	commentBuilderService,
@@ -29,7 +38,19 @@ import {
 } from "@/app/services/comment-builder/progress-comment.util";
 import { RunnerService } from "@/app/services/runner/runner.service";
 import { TranslationFile, TranslatorService } from "@/app/services/translator/";
+import { getTranslationBranchNameFromPath } from "@/app/utils/";
 
+import { createMockPullRequestListItem } from "@tests/fixtures";
+import { WORKFLOW_FIXTURE_MANIFEST } from "@tests/fixtures/md/workflow.manifest";
+import {
+	buildWorkflowFixtureFile,
+	defaultWorkflowFixtureForkContent,
+	defaultWorkflowFixtureMaintainerReviewAt,
+	defaultWorkflowFixtureMaintainerReviews,
+	defaultWorkflowFixtureManifestEntry,
+	defaultWorkflowFixtureRunnerCommitAt,
+	WorkflowFixturePrScenario,
+} from "@tests/fixtures/workflow-fixture.util";
 import {
 	createMockGitHubService,
 	createMockLanguageCacheService,
@@ -40,6 +61,8 @@ import {
 } from "@tests/mocks";
 
 type GitTree = RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"];
+
+type GetFileMockFn = (file: PatchedRepositoryTreeItem) => Promise<RepositoryMarkdownBlob>;
 
 type CommitTranslationMockFn = (
 	opts: CommitTranslationOptions,
@@ -54,16 +77,224 @@ type CommentCompiledResultsMockFn = (
 	filesToTranslate: TranslationFile[],
 ) => Promise<RestEndpointMethodTypes["issues"]["createComment"]["response"]["data"] | undefined>;
 
-/** Repo-relative directory of docs-style markdown used by smoke and integration workflow tests */
-export const INTEGRATION_MD_FIXTURE_DIR_RELATIVE = "tests/fixtures/md" as const;
+type FindPullRequestByBranchMockFn = (
+	branch: string,
+) => Promise<RestEndpointMethodTypes["pulls"]["list"]["response"]["data"][number] | undefined>;
 
-/** Describes the single upstream markdown file exercised by a workflow integration run */
-export type IntegrationWorkflowFile = Readonly<{
-	repoPath: string;
-	filename: string;
-	content: string;
-	sha: string;
-}>;
+type CheckPullRequestStatusMockFn = (prNumber: number) => Promise<PullRequestStatus>;
+
+type GetForkFileContentAtBranchMockFn = (
+	path: string,
+	branchName: string,
+) => Promise<string | undefined>;
+
+type GetLatestTranslationCommitMockFn = (
+	branchName: string,
+) => Promise<{ timestamp: Date; message: string } | undefined>;
+
+type GetLatestTranslationCommitTimestampMockFn = (branchName: string) => Promise<Date | undefined>;
+
+type ListPullRequestReviewsMockFn = (prNumber: number) => Promise<
+	{
+		id: number;
+		login: string;
+		authorAssociation: string;
+		userType: string;
+		state: string;
+		submittedAt: Date;
+		body: string;
+	}[]
+>;
+
+const CLEAN_PULL_REQUEST_STATUS = {
+	hasConflicts: false,
+	mergeable: true,
+	needsUpdate: false,
+	mergeableState: "clean",
+	createdBy: "translate-react-bot",
+} as const;
+
+/**
+ * Configures per-fixture open-PR behavior from {@link WorkflowFixtureSmoke}.
+ *
+ * @param github Mock GitHub service from {@link createMockGitHubService}
+ * @param files Loaded workflow fixtures with smoke scenario metadata
+ */
+function applyWorkflowSmokePullRequestMocks(
+	github: ReturnType<typeof createMockGitHubService>,
+	files: readonly WorkflowFixtureFile[],
+) {
+	const fileByBranch = new Map(
+		files.map((file) => [getTranslationBranchNameFromPath(file.treeItem.path), file] as const),
+	);
+	const fileByPullRequestNumber = new Map(
+		files.map((file) => [file.smoke.pullRequestNumber, file] as const),
+	);
+	const fileByRepoPath = new Map(files.map((file) => [file.treeItem.path, file] as const));
+
+	(
+		github.findPullRequestByBranch as unknown as Mock<FindPullRequestByBranchMockFn>
+	).mockImplementation((branch) => {
+		const file = fileByBranch.get(branch);
+		if (!file || file.smoke.pullRequestScenario === WorkflowFixturePrScenario.New) {
+			return Promise.resolve(undefined);
+		}
+
+		return Promise.resolve(createMockPullRequestListItem(file.smoke.pullRequestNumber));
+	});
+
+	(
+		github.checkPullRequestStatus as unknown as Mock<CheckPullRequestStatusMockFn>
+	).mockImplementation((prNumber) => {
+		const file = fileByPullRequestNumber.get(prNumber);
+		if (!file || file.smoke.pullRequestScenario === WorkflowFixturePrScenario.New) {
+			return Promise.resolve({ ...CLEAN_PULL_REQUEST_STATUS });
+		}
+
+		if (file.smoke.pullRequestScenario === WorkflowFixturePrScenario.OutOfSync) {
+			return Promise.resolve({
+				hasConflicts: true,
+				mergeable: false,
+				needsUpdate: true,
+				mergeableState: "dirty",
+				createdBy: "translate-react-bot",
+			});
+		}
+
+		return Promise.resolve({ ...CLEAN_PULL_REQUEST_STATUS });
+	});
+
+	(
+		github.getForkFileContentAtBranch as unknown as Mock<GetForkFileContentAtBranchMockFn>
+	).mockImplementation((path) => {
+		const file = fileByRepoPath.get(path);
+		if (!file || file.smoke.pullRequestScenario === WorkflowFixturePrScenario.New) {
+			return Promise.resolve(undefined);
+		}
+
+		return Promise.resolve(
+			file.smoke.forkContent ?? defaultWorkflowFixtureForkContent(file.treeItem.filename),
+		);
+	});
+
+	const runnerCommitAt = defaultWorkflowFixtureRunnerCommitAt();
+
+	(
+		github.getLatestTranslationCommit as unknown as Mock<GetLatestTranslationCommitMockFn>
+	).mockImplementation((branch) => {
+		const file = fileByBranch.get(branch);
+		if (file?.smoke.pullRequestScenario !== WorkflowFixturePrScenario.MaintainerFix) {
+			return Promise.resolve(undefined);
+		}
+
+		return Promise.resolve({
+			timestamp: runnerCommitAt,
+			message: `docs: translate \`${file.treeItem.filename}\` to Brazilian Portuguese`,
+		});
+	});
+
+	(
+		github.getLatestTranslationCommitTimestamp as unknown as Mock<GetLatestTranslationCommitTimestampMockFn>
+	).mockImplementation((branch) => {
+		const file = fileByBranch.get(branch);
+		if (file?.smoke.pullRequestScenario !== WorkflowFixturePrScenario.MaintainerFix) {
+			return Promise.resolve(undefined);
+		}
+
+		return Promise.resolve(runnerCommitAt);
+	});
+
+	(
+		github.listPullRequestReviews as unknown as Mock<ListPullRequestReviewsMockFn>
+	).mockImplementation((prNumber) => {
+		const file = fileByPullRequestNumber.get(prNumber);
+		if (file?.smoke.pullRequestScenario !== WorkflowFixturePrScenario.MaintainerFix) {
+			return Promise.resolve([]);
+		}
+
+		const bodies =
+			file.smoke.maintainerReviewBodies ??
+			defaultWorkflowFixtureMaintainerReviews(file.treeItem.filename);
+		const logins = file.smoke.maintainerReviewerLogins ?? ["maintainer"];
+
+		return Promise.resolve(
+			bodies.map((body, index) => ({
+				id: 100 + index,
+				login: logins[index] ?? logins[0] ?? "maintainer",
+				authorAssociation: "MEMBER",
+				userType: "User",
+				state: "CHANGES_REQUESTED",
+				submittedAt: defaultWorkflowFixtureMaintainerReviewAt(),
+				body,
+			})),
+		);
+	});
+}
+
+/**
+ * Returns whether fixture fork markdown should read as already translated for CLD mocks.
+ *
+ * @param content Fork branch markdown body
+ *
+ * @returns `true` when the content matches default Portuguese fixture copy
+ */
+function isWorkflowFixtureForkPortugueseContent(content: string) {
+	return /(português|Seção de exemplo|Título de exemplo|Conteúdo em português)/i.test(content);
+}
+
+/**
+ * Configures language-detector mocks for workflow fixture PR scenarios.
+ *
+ * @param languageDetector Mock language detector from {@link createMockLanguageDetectorService}
+ * @param files Loaded workflow fixtures with smoke scenario metadata
+ */
+function applyWorkflowSmokeLanguageDetectorMocks(
+	languageDetector: MockLanguageDetectorService,
+	files: readonly WorkflowFixtureFile[],
+) {
+	const forkContentByPath = new Map(
+		files
+			.filter((file) => file.smoke.pullRequestScenario !== WorkflowFixturePrScenario.New)
+			.map(
+				(file) =>
+					[
+						file.treeItem.path,
+						file.smoke.forkContent ?? defaultWorkflowFixtureForkContent(file.treeItem.filename),
+					] as const,
+			),
+	);
+
+	(
+		languageDetector.analyzeLanguage as Mock<
+			(filename: string, content: string) => Promise<LanguageAnalysisResult>
+		>
+	).mockImplementation((_filename, content) => {
+		const trimmed = content.trim();
+		const isTranslated =
+			isWorkflowFixtureForkPortugueseContent(trimmed) ||
+			[...forkContentByPath.values()].some((forkContent) => forkContent === content);
+
+		const analysis = {
+			languageScore: isTranslated ? { target: 0.9, source: 0.1 } : { target: 0.1, source: 0.9 },
+			ratio: isTranslated ? 0.9 : 0.1,
+			isTranslated,
+			detectedLanguage: isTranslated ? "pt" : "en",
+			rawResult: {
+				reliable: true,
+				languages: [],
+				textBytes: trimmed.length,
+				chunks: [],
+			},
+		} satisfies LanguageAnalysisResult;
+
+		return Promise.resolve(analysis);
+	});
+}
+
+/** Repo-relative directory of docs-style markdown used by smoke and integration workflow tests */
+export const MD_FIXTURE_DIR = "tests/fixtures/md" as const;
+
+export type { WorkflowFixtureFile } from "@tests/fixtures/workflow-fixture.util";
 
 /**
  * When {@link createWorkflowGitHubServiceFromFiles} receives this object, mocked GitHub writes
@@ -100,10 +331,10 @@ export function restoreOpenRouterModelLimitsStub() {
 /**
  * Lists every `*.md` basename under the integration markdown fixture directory.
  *
- * @param cwd Repository root for resolving `INTEGRATION_MD_FIXTURE_DIR_RELATIVE`
+ * @param cwd Repository root for resolving {@link MD_FIXTURE_DIR}
  */
 async function listMdFixtureBasenames(cwd: string) {
-	const absoluteDir = path.resolve(cwd, INTEGRATION_MD_FIXTURE_DIR_RELATIVE);
+	const absoluteDir = path.resolve(cwd, MD_FIXTURE_DIR);
 	const entries = await fs.readdir(absoluteDir, { withFileTypes: true });
 
 	return entries
@@ -118,10 +349,10 @@ async function listMdFixtureBasenames(cwd: string) {
  * When `basenames` is omitted or empty, loads every `*.md` in that directory (sorted). When set,
  * loads only those files in the given order; each name must exist.
  *
- * @param basenames Optional subset of fixture filenames (e.g. `["integration-workflow-small.md"]`)
+ * @param basenames Optional subset of fixture filenames (e.g. `["use-memo.md"]`)
  * @param cwd Repository root (defaults to `process.cwd()`)
  */
-export async function loadIntegrationWorkflowFilesFromMdFixtureDir(
+export async function loadWorkflowFilesFromMdFixtureDir(
 	basenames?: readonly string[],
 	cwd: string = process.cwd(),
 ) {
@@ -129,34 +360,31 @@ export async function loadIntegrationWorkflowFilesFromMdFixtureDir(
 	const orderedNames = basenames !== undefined && basenames.length > 0 ? [...basenames] : allNames;
 
 	if (orderedNames.length === 0) {
-		throw new Error(`No .md files found under ${INTEGRATION_MD_FIXTURE_DIR_RELATIVE}`);
+		throw new Error(`No .md files found under ${MD_FIXTURE_DIR}`);
 	}
 
 	if (basenames !== undefined && basenames.length > 0) {
 		for (const name of basenames) {
 			if (!allNames.includes(name)) {
 				throw new Error(
-					`Fixture ${name} not found under ${INTEGRATION_MD_FIXTURE_DIR_RELATIVE} (have: ${allNames.join(", ")})`,
+					`Fixture ${name} not found under ${MD_FIXTURE_DIR} (have: ${allNames.join(", ")})`,
 				);
 			}
 		}
 	}
 
-	const absoluteDir = path.resolve(cwd, INTEGRATION_MD_FIXTURE_DIR_RELATIVE);
-	const files: IntegrationWorkflowFile[] = [];
+	const absoluteDir = path.resolve(cwd, MD_FIXTURE_DIR);
+	const files: WorkflowFixtureFile[] = [];
 
 	for (const name of orderedNames) {
 		const absoluteFile = path.join(absoluteDir, name);
 		const content = await fs.readFile(absoluteFile, "utf8");
-		const filename = name;
-		const repoPath = `src/content/${filename}`;
+		const manifestEntry =
+			name in WORKFLOW_FIXTURE_MANIFEST ?
+				WORKFLOW_FIXTURE_MANIFEST[name as keyof typeof WORKFLOW_FIXTURE_MANIFEST]
+			:	defaultWorkflowFixtureManifestEntry(name);
 
-		files.push({
-			repoPath,
-			filename,
-			content,
-			sha: `sha-fixture-${filename}`,
-		});
+		files.push(buildWorkflowFixtureFile(manifestEntry.tree, content, manifestEntry.smoke));
 	}
 
 	return files;
@@ -170,7 +398,7 @@ export async function loadIntegrationWorkflowFilesFromMdFixtureDir(
  * subfolders plus `translation-progress-issue-comment.md` at the root)
  */
 export function createWorkflowGitHubServiceFromFiles(
-	files: readonly IntegrationWorkflowFile[],
+	files: readonly WorkflowFixtureFile[],
 	artifactOptions?: WorkflowGitHubArtifactOptions,
 ) {
 	if (files.length === 0) {
@@ -178,7 +406,16 @@ export function createWorkflowGitHubServiceFromFiles(
 	}
 
 	const github = createMockGitHubService();
-	const byRepoPath = new Map(files.map((file) => [file.repoPath, file] as const));
+	const byRepoPath = new Map(files.map((file) => [file.treeItem.path, file] as const));
+	const pullRequestNumberByBranch = new Map(
+		files.map(
+			(file) =>
+				[
+					getTranslationBranchNameFromPath(file.treeItem.path),
+					file.smoke.pullRequestNumber,
+				] as const,
+		),
+	);
 
 	const captureRoot =
 		artifactOptions !== undefined ?
@@ -220,10 +457,12 @@ export function createWorkflowGitHubServiceFromFiles(
 				const prMarkdown = `# ${opts.title}\n\n${opts.body}`;
 				await fs.writeFile(path.join(fileDir, "pull-request.md"), prMarkdown, "utf8");
 
+				const pullRequestNumber = pullRequestNumberByBranch.get(opts.branch) ?? 1;
+
 				return {
-					number: 1,
+					number: pullRequestNumber,
 					title: opts.title,
-					html_url: "https://github.com/test/test/pull/1",
+					html_url: `https://github.com/test/test/pull/${pullRequestNumber}`,
 				} as RestEndpointMethodTypes["pulls"]["create"]["response"]["data"];
 			},
 		);
@@ -259,26 +498,26 @@ export function createWorkflowGitHubServiceFromFiles(
 
 	github.getRepositoryTree.mockResolvedValue(
 		files.map((file) => ({
-			path: file.repoPath,
-			type: "blob",
-			sha: file.sha,
-			mode: "100644",
+			path: file.treeItem.path,
+			type: file.treeItem.type,
+			sha: file.treeItem.sha,
+			mode: file.treeItem.mode,
+			url: file.treeItem.url,
 		})) satisfies GitTree,
 	);
 
-	github.getFile.mockImplementation((item: unknown) => {
-		const { path: repoPath } = item as PatchedRepositoryTreeItem;
-		const source = byRepoPath.get(repoPath);
+	(github.getFile as unknown as Mock<GetFileMockFn>).mockImplementation((item) => {
+		const source = byRepoPath.get(item.path);
 		if (!source) {
-			return Promise.reject(new Error(`getFile: unmocked path ${repoPath}`));
+			return Promise.reject(new Error(`getFile: unmocked path ${item.path}`));
 		}
 
-		return Promise.resolve(
-			new TranslationFile(source.content, source.filename, source.repoPath, source.sha),
-		);
+		return Promise.resolve(source.blob);
 	});
 
-	github.getPullRequestFiles.mockResolvedValue(files.map((file) => file.repoPath));
+	github.getPullRequestFiles.mockResolvedValue(files.map((file) => file.treeItem.path));
+
+	applyWorkflowSmokePullRequestMocks(github, files);
 
 	return github;
 }
@@ -288,7 +527,7 @@ export function createWorkflowGitHubServiceFromFiles(
  *
  * @param file Repository path, display filename, raw content, and blob sha for the scenario
  */
-export function createWorkflowGitHubService(file: IntegrationWorkflowFile) {
+export function createWorkflowGitHubService(file: WorkflowFixtureFile) {
 	return createWorkflowGitHubServiceFromFiles([file]);
 }
 
@@ -322,9 +561,11 @@ export function createIntegrationTranslator() {
 	return { translator, chatMock };
 }
 
-export function createIntegrationRunner(file: IntegrationWorkflowFile) {
+export function createIntegrationRunner(file: WorkflowFixtureFile) {
 	const github = createWorkflowGitHubService(file);
 	const { translator, chatMock } = createIntegrationTranslator();
+	const languageDetector = createMockLanguageDetectorService();
+	applyWorkflowSmokeLanguageDetectorMocks(languageDetector, [file]);
 
 	const runner = new RunnerService(
 		{
@@ -333,10 +574,10 @@ export function createIntegrationRunner(file: IntegrationWorkflowFile) {
 			languageCache:
 				createMockLanguageCacheService() as unknown as CacheService<LanguageCacheEntry>,
 			locale: localeService,
-			languageDetector: createMockLanguageDetectorService() as unknown as LanguageDetectorService,
+			languageDetector: languageDetector as unknown as LanguageDetectorService,
 		},
 		{ batchSize: 1 },
 	);
 
-	return { runner, github, translator, chatMock };
+	return { runner, github, translator, chatMock, languageDetector };
 }

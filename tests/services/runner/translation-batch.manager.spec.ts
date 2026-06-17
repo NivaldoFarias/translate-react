@@ -133,6 +133,10 @@ describe("TranslationBatchManager", () => {
 				createdBy: "translate-react-bot",
 			});
 			github.getForkFileContentAtBranch.mockResolvedValue(forkContent);
+			github.getLatestTranslationCommit.mockResolvedValue({
+				timestamp: new Date("2026-06-03T10:00:00Z"),
+				message: "docs: translate `target.md` to Brazilian Portuguese",
+			} as never);
 			github.getLatestTranslationCommitTimestamp.mockResolvedValue(
 				new Date("2026-06-03T10:00:00Z") as never,
 			);
@@ -185,6 +189,10 @@ describe("TranslationBatchManager", () => {
 				existingPR.number,
 				expect.stringMatching(/requer revisão humana[\s\S]*\[!TIP\]/),
 			);
+			expect(github.createCommentOnPullRequest).toHaveBeenCalledWith(
+				existingPR.number,
+				expect.stringContaining("CHANGES_REQUESTED"),
+			);
 			expect(results.get(file.filename)?.pullRequest).toEqual(existingPR);
 		});
 
@@ -205,6 +213,10 @@ describe("TranslationBatchManager", () => {
 				createdBy: "translate-react-bot",
 			});
 			github.getForkFileContentAtBranch.mockResolvedValue(forkContent);
+			github.getLatestTranslationCommit.mockResolvedValue({
+				timestamp: new Date("2026-06-03T10:00:00Z"),
+				message: "docs: translate `target.md` to Brazilian Portuguese",
+			} as never);
 			github.getLatestTranslationCommitTimestamp.mockResolvedValue(
 				new Date("2026-06-03T10:00:00Z") as never,
 			);
@@ -259,7 +271,7 @@ describe("TranslationBatchManager", () => {
 			});
 		});
 
-		test("reprocesses maintainer feedback without closing the pull request or resetting the branch", async () => {
+		test("reprocesses maintainer feedback while preserving the pull request and refreshing the branch base", async () => {
 			const github = createMockGitHubService();
 			const translator = createMockTranslatorService();
 			const languageDetector = createMockLanguageDetectorService();
@@ -280,6 +292,10 @@ describe("TranslationBatchManager", () => {
 			github.getForkFileContentAtBranch.mockResolvedValue(
 				"Conteúdo em português suficientemente longo para detecção de idioma.",
 			);
+			github.getLatestTranslationCommit.mockResolvedValue({
+				timestamp: new Date("2026-06-03T10:00:00Z"),
+				message: "docs: translate `react-conf-2021-recap.md` to Brazilian Portuguese",
+			} as never);
 			github.getLatestTranslationCommitTimestamp.mockResolvedValue(
 				new Date("2026-06-03T10:00:00Z") as never,
 			);
@@ -319,17 +335,123 @@ describe("TranslationBatchManager", () => {
 			expect(translator.translateContent).toHaveBeenCalled();
 			expect(github.commitTranslation).toHaveBeenCalled();
 			expect(github.closePullRequest).not.toHaveBeenCalled();
-			expect(github.deleteBranch).not.toHaveBeenCalled();
-			expect(github.createBranch).not.toHaveBeenCalled();
+			expect(github.refreshTranslationBranchPreservePr).toHaveBeenCalled();
 			expect(github.createPullRequest).not.toHaveBeenCalled();
 			expect(github.updatePullRequestBody).toHaveBeenCalledWith(
 				existingPR.number,
 				expect.stringMatching(/requer revisão humana[\s\S]*\[!TIP\]/),
 			);
+			expect(github.createCommentOnPullRequest).toHaveBeenCalledWith(
+				existingPR.number,
+				expect.stringContaining("CHANGES_REQUESTED"),
+			);
 			expect(results.get(file.filename)?.pullRequest).toEqual(existingPR);
 			expect(results.get(file.filename)?.pullRequestProgress).toBe(
 				PullRequestProgressAction.Reused,
 			);
+		});
+
+		test("refreshes branch without closing pull request when translation is out of sync", async () => {
+			const github = createMockGitHubService();
+			const translator = createMockTranslatorService();
+			const languageDetector = createMockLanguageDetectorService();
+			const existingPR = createMockPullRequestListItem(1301);
+
+			github.findPullRequestByBranch.mockResolvedValue(existingPR);
+			github.checkPullRequestStatus.mockResolvedValue({
+				hasConflicts: true,
+				mergeable: false,
+				needsUpdate: true,
+				mergeableState: "dirty",
+				createdBy: "translate-react-bot",
+			} as never);
+			github.getForkFileContentAtBranch.mockResolvedValue(
+				"Conteúdo em português suficientemente longo para detecção de idioma.",
+			);
+			github.getBranch.mockResolvedValue({
+				data: { ref: "refs/heads/translate/test", object: { sha: "branch-sha" } },
+			} as never);
+			languageDetector.analyzeLanguage.mockResolvedValue({
+				isTranslated: true,
+				ratio: 0.9,
+				detectedLanguage: "pt",
+				languageScore: { target: 0.9, source: 0.1 },
+				rawResult: { reliable: true, languages: [], textBytes: 100, chunks: [] },
+			} as never);
+
+			const manager = createTestTranslationBatchManager({
+				github: github as unknown as RunnerServiceDependencies["github"],
+				translator: translator as unknown as RunnerServiceDependencies["translator"],
+				languageDetector:
+					languageDetector as unknown as RunnerServiceDependencies["languageDetector"],
+			});
+			const file = createTranslationFileFixture({
+				path: "src/content/reference/react/out-of-sync.md",
+				filename: "out-of-sync.md",
+			});
+
+			await manager.processBatches([file], 1);
+
+			expect(translator.translateContent).toHaveBeenCalled();
+			expect(github.refreshTranslationBranchPreservePr).toHaveBeenCalled();
+			expect(github.closePullRequest).not.toHaveBeenCalled();
+		});
+
+		test("preserves approved pull request when resetting an existing translation branch", async () => {
+			const github = createMockGitHubService();
+			const translator = createMockTranslatorService();
+			const languageDetector = createMockLanguageDetectorService();
+			const existingPR = createMockPullRequestListItem(1182);
+
+			github.findPullRequestByBranch.mockResolvedValue(existingPR);
+			github.checkPullRequestStatus.mockResolvedValue({
+				hasConflicts: false,
+				mergeable: true,
+				needsUpdate: false,
+				mergeableState: "clean",
+				createdBy: "translate-react-bot",
+			});
+			github.getForkFileContentAtBranch.mockResolvedValue(
+				"This is still English prose long enough for language detection to run reliably.",
+			);
+			github.listPullRequestReviews.mockResolvedValue([
+				{
+					id: 99,
+					login: "jhonmike",
+					authorAssociation: "MEMBER",
+					userType: "User",
+					state: "APPROVED",
+					submittedAt: new Date("2026-06-03T12:00:00Z"),
+					body: "Looks good.",
+				},
+			] as never);
+			github.getBranch.mockResolvedValue({
+				data: { ref: "refs/heads/translate/test", object: { sha: "branch-sha" } },
+			} as never);
+			languageDetector.analyzeLanguage.mockResolvedValue({
+				isTranslated: false,
+				ratio: 0.1,
+				detectedLanguage: "en",
+				languageScore: { target: 0.1, source: 0.9 },
+				rawResult: { reliable: true, languages: [], textBytes: 100, chunks: [] },
+			} as never);
+
+			const manager = createTestTranslationBatchManager({
+				github: github as unknown as RunnerServiceDependencies["github"],
+				translator: translator as unknown as RunnerServiceDependencies["translator"],
+				languageDetector:
+					languageDetector as unknown as RunnerServiceDependencies["languageDetector"],
+			});
+			const file = createTranslationFileFixture({
+				path: "src/content/blog/2024/04/25/react-19-upgrade-guide.md",
+				filename: "react-19-upgrade-guide.md",
+			});
+
+			await manager.processBatches([file], 1);
+
+			expect(translator.translateContent).toHaveBeenCalled();
+			expect(github.refreshTranslationBranchPreservePr).toHaveBeenCalled();
+			expect(github.closePullRequest).not.toHaveBeenCalled();
 		});
 	});
 });

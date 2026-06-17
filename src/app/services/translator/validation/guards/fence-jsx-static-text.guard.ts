@@ -5,6 +5,7 @@ import {
 	findFenceJsxStaticTextMismatches,
 	formatFenceJsxStaticTextMismatchSummary,
 } from "../analyzers/fence-jsx-static-text.analyzer";
+import { PostTranslationGuardId } from "../validation.constants";
 
 /**
  * Rejects translations that localized static JSX demo text inside fenced code blocks.
@@ -19,7 +20,7 @@ export const fenceJsxStaticTextGuard: PostTranslationValidationGuard = (source, 
 	if (mismatches.length === 0) return null;
 
 	return {
-		guardId: "fenceJsxStaticText",
+		guardId: PostTranslationGuardId.fenceJsxStaticText,
 		message: `JSX demo text changed in fenced code: ${formatFenceJsxStaticTextMismatchSummary(mismatches)}`,
 		retryHint: buildFenceJsxStaticTextRetryHint(mismatches),
 	};

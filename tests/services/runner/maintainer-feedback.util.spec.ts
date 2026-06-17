@@ -7,6 +7,7 @@ import {
 	getMaintainerFeedbackSnapshot,
 	getUnresolvedChangesRequestedReviews,
 	hasUnresolvedChangesRequestedReview,
+	isRemediationTranslationCommit,
 	isReviewerFeedbackAuthor,
 } from "@/app/services/runner/workflow/maintainer-feedback.util";
 
@@ -294,6 +295,26 @@ describe("maintainer-feedback.util", () => {
 			expect(
 				buildTranslationCommitMessage("target.md", "Portuguese", ["jhonmike", "gaearon"]),
 			).toBe("docs: translate `target.md` to Portuguese\n\nper @jhonmike, @gaearon feedback");
+		});
+	});
+
+	describe("isRemediationTranslationCommit", () => {
+		test("returns true for remediation attribution commit messages", () => {
+			expect(
+				isRemediationTranslationCommit(
+					"docs: translate `target.md` to Portuguese\n\nper @jhonmike feedback",
+				),
+			).toBe(true);
+		});
+
+		test("returns false for standard translation commits", () => {
+			expect(isRemediationTranslationCommit("docs: translate `target.md` to Portuguese")).toBe(
+				false,
+			);
+		});
+
+		test("returns false for unrelated commit messages", () => {
+			expect(isRemediationTranslationCommit("chore: fix heading case")).toBe(false);
 		});
 	});
 });

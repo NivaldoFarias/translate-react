@@ -19,7 +19,8 @@ type PartialChatCompletion = PartialDeep<
  * Cast to full type once here so specs avoid per-use casts.
  *
  * @param prNumber PR number to use in URLs and ids
- * @returns Typed PR list item for use in ProcessedFileResult.pullRequest
+ *
+ * @returns Typed PR list item for use in {@link ProcessedFileResult.pullRequest}
  */
 export function createMockPullRequestListItem(prNumber: number): PullRequestListItem {
 	return {
@@ -39,11 +40,11 @@ export function createMockPullRequestListItem(prNumber: number): PullRequestList
 /**
  * Creates an array of {@link ProcessedFileResult} fixtures
  *
- * @param options
+ * @param options Optional overrides
  * @param options.count Number of results to create
  * @param options.containInvalid Whether to include invalid results
  *
- * @returns Array of ProcessedFileResult objects
+ * @returns Array of {@link ProcessedFileResult} fixtures
  */
 export function createProcessedFileResultsFixture({
 	count,
@@ -89,10 +90,10 @@ export function createProcessedFileResultsFixture({
 /**
  * Creates an array of {@link TranslationFile} fixtures
  *
- * @param options
+ * @param options Optional overrides
  * @param options.count Number of files to create
  *
- * @returns Array of TranslationFile objects
+ * @returns Array of {@link TranslationFile} fixtures
  */
 export function createTranslationFilesFixture({ count }: { count: number }): TranslationFile[] {
 	return new Array(count).fill(null).map((_, index) => {
@@ -110,10 +111,10 @@ export function createTranslationFilesFixture({ count }: { count: number }): Tra
 /**
  * Creates a {@link TranslationFile} fixture
  *
- * @param overrides Values to override the default fixture
- * @param title The title to use in the frontmatter (defaults to "Untitled")
+ * @param overrides Optional overrides
+ * @param title Optional title to use in the frontmatter (defaults to "Untitled")
  *
- * @returns TranslationFile object
+ * @returns The {@link TranslationFile} fixture
  */
 export function createTranslationFileFixture(
 	overrides?: Partial<TranslationFile>,
@@ -144,9 +145,9 @@ export function wrapContentInFrontmatter(content: string, title?: string): strin
 /**
  * Creates a {@link PatchedRepositoryTreeItem} fixture
  *
- * @param overrides Values to override the default fixture
+ * @param overrides Optional overrides
  *
- * @returns PatchedRepositoryTreeItem object
+ * @returns The {@link PatchedRepositoryTreeItem} fixture
  */
 export function createRepositoryTreeItemFixture(
 	overrides?: Partial<PatchedRepositoryTreeItem>,
@@ -193,8 +194,9 @@ export function createSegmentBatchLlmJsonContent(
  * Creates a {@link ChatCompletion} fixture.
  *
  * @param overrides Optional overrides for the ChatCompletion fields
+ * @param title Optional title to wrap content in frontmatter
  *
- * @returns ChatCompletion object
+ * @returns The {@link ChatCompletion} fixture
  */
 export function createChatCompletionFixture(
 	overrides?: string | PartialChatCompletion,
@@ -235,9 +237,9 @@ export function createChatCompletionFixture(
 /**
  * Creates a {@link LanguageAnalysisResult} fixture
  *
- * @param overrides Values to override the default fixture
+ * @param overrides Optional overrides
  *
- * @returns LanguageAnalysisResult object
+ * @returns The {@link LanguageAnalysisResult} fixture
  */
 export function createLanguageAnalysisResultFixture(
 	overrides?: PartialDeep<LanguageAnalysisResult>,

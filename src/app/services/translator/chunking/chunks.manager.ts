@@ -108,6 +108,15 @@ export class ChunksManager {
 		return Math.max(256, Math.min(fromContext, fromCompletion));
 	}
 
+	/**
+	 * Completion token budget for one segment-batch JSON response.
+	 *
+	 * @returns Provider completion cap minus a safety reserve
+	 */
+	public getSegmentBatchResponseTokenBudget(): number {
+		return Math.max(512, this.maxCompletionTokensPerResponse - CHUNK_OUTPUT_COMPLETION_RESERVE);
+	}
+
 	/** Lazily-initialized tiktoken encoder instance, cached for performance */
 	private cachedEncoder: Tiktoken | null = null;
 

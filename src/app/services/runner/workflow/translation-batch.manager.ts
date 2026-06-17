@@ -16,12 +16,14 @@ import {
 	getTranslationBranchNameFromPath,
 	isTranslationEquivalentToCurrentBlob,
 	logger,
+	resolveGitHubActionsRunContext,
 } from "@/app/utils/";
 import { ApplicationError, ErrorCode } from "@/shared/errors/";
 
 import {
 	buildTranslationCommitMessage,
 	getMaintainerFeedbackSnapshot,
+	hasQualifyingApprovedReview,
 } from "./maintainer-feedback.util";
 import { TranslationPullRequestValidityManager } from "./translation-pull-request-validity.manager";
 import { MAX_CONSECUTIVE_FAILURES } from "./workflow.constants";
@@ -378,6 +380,7 @@ export class TranslationBatchManager {
 				file,
 				metadata,
 				pullRequestValidity,
+				maintainerFeedback,
 			);
 			metadata.pullRequest = pullRequestOutcome.pullRequest;
 			metadata.pullRequestProgress = pullRequestOutcome.progress;
@@ -600,25 +603,27 @@ export class TranslationBatchManager {
 		file: TranslationFile,
 		validity: TranslationPullRequestValidity,
 	) {
-		if (validity.invalidReason === "needs_maintainer_fix" && validity.pullRequest) {
-			const branchName = getTranslationBranchNameFromPath(file.path);
-			const existingBranch = await this.services.github.getBranch(branchName);
+		const branchName = getTranslationBranchNameFromPath(file.path);
 
-			if (existingBranch) {
-				this.logger.info(
-					{
-						filename: file.filename,
-						prNumber: validity.pullRequest.number,
-						branchName,
-					},
-					"Reusing translation branch for maintainer feedback remediation",
-				);
+		if (
+			validity.pullRequest &&
+			(validity.invalidReason === "needs_maintainer_fix" ||
+				validity.invalidReason === "out_of_sync")
+		) {
+			this.logger.info(
+				{
+					filename: file.filename,
+					prNumber: validity.pullRequest.number,
+					branchName,
+					invalidReason: validity.invalidReason,
+				},
+				"Refreshing translation branch from fork default while preserving open pull request",
+			);
 
-				return existingBranch.data;
-			}
+			return this.services.github.refreshTranslationBranchPreservePr(branchName);
 		}
 
-		return this.resetTranslationBranch(file);
+		return this.recreateTranslationBranchClosePr(file);
 	}
 
 	/**
@@ -630,11 +635,26 @@ export class TranslationBatchManager {
 	 *
 	 * @returns Fresh branch reference for a single translation commit
 	 */
-	private async resetTranslationBranch(file: TranslationFile) {
+	private async recreateTranslationBranchClosePr(file: TranslationFile) {
 		const branchName = getTranslationBranchNameFromPath(file.path);
 		const existingPullRequest = await this.services.github.findPullRequestByBranch(branchName);
 
 		if (existingPullRequest) {
+			const reviews = await this.services.github.listPullRequestReviews(existingPullRequest.number);
+
+			if (hasQualifyingApprovedReview(reviews)) {
+				this.logger.info(
+					{
+						filename: file.filename,
+						prNumber: existingPullRequest.number,
+						branchName,
+					},
+					"Preserving approved translation pull request; refreshing branch without closing",
+				);
+
+				return this.services.github.refreshTranslationBranchPreservePr(branchName);
+			}
+
 			this.logger.info(
 				{
 					filename: file.filename,
@@ -673,6 +693,7 @@ export class TranslationBatchManager {
 	 * @param file Translation file being processed
 	 * @param processingResult Processing metadata including translation and timing
 	 * @param validity Pull request validity evaluated at the start of file processing
+	 * @param maintainerFeedback Maintainer review snapshot when remediating feedback
 	 *
 	 * @returns Pull request metadata for progress reporting
 	 */
@@ -680,11 +701,16 @@ export class TranslationBatchManager {
 		file: TranslationFile,
 		processingResult: ProcessedFileResult,
 		validity: TranslationPullRequestValidity,
+		maintainerFeedback?: MaintainerFeedbackSnapshot,
 	): Promise<{
 		pullRequest: NonNullable<ProcessedFileResult["pullRequest"]>;
 		progress: PullRequestProgressAction;
 	}> {
-		if (validity.invalidReason === "needs_maintainer_fix" && validity.pullRequest) {
+		if (
+			validity.pullRequest &&
+			(validity.invalidReason === "needs_maintainer_fix" ||
+				validity.invalidReason === "out_of_sync")
+		) {
 			const languageName = this.services.languageDetector.getLanguageName(
 				this.services.languageDetector.languages.target,
 			);
@@ -692,13 +718,31 @@ export class TranslationBatchManager {
 
 			await this.services.github.updatePullRequestBody(validity.pullRequest.number, body);
 
+			if (
+				maintainerFeedback &&
+				(maintainerFeedback.authorLogins.length > 0 || maintainerFeedback.bodies.length > 0)
+			) {
+				const commentBody = this.services.locale.definitions.comment.remediationPullRequestComment({
+					filename: file.filename,
+					maintainerLogins: maintainerFeedback.authorLogins,
+					runContext: resolveGitHubActionsRunContext(),
+					advisoryNoticeCount: processingResult.reviewerNotices.length,
+				});
+
+				await this.services.github.createCommentOnPullRequest(
+					validity.pullRequest.number,
+					commentBody,
+				);
+			}
+
 			this.logger.info(
 				{
 					path: file.path,
 					prNumber: validity.pullRequest.number,
 					advisoryGuardCount: processingResult.reviewerNotices.length,
+					maintainerCommentPosted: maintainerFeedback !== undefined,
 				},
-				"Refreshed open translation pull request body after maintainer feedback remediation",
+				"Refreshed open translation pull request after maintainer feedback remediation",
 			);
 
 			return {
@@ -725,11 +769,23 @@ export class TranslationBatchManager {
 		const strayPullRequest = await this.services.github.findPullRequestByBranch(branchName);
 
 		if (strayPullRequest) {
-			this.logger.warn(
-				{ prNumber: strayPullRequest.number, branchName },
-				"Unexpected open pull request before create; closing before opening replacement",
+			const body = this.createPullRequestDescription(file, processingResult, languageName);
+
+			await this.services.github.updatePullRequestBody(strayPullRequest.number, body);
+
+			this.logger.info(
+				{
+					path: file.path,
+					prNumber: strayPullRequest.number,
+					invalidReason: validity.invalidReason ?? null,
+				},
+				"Reused open translation pull request after branch refresh",
 			);
-			await this.services.github.closePullRequest(strayPullRequest.number);
+
+			return {
+				pullRequest: strayPullRequest,
+				progress: PullRequestProgressAction.Reused,
+			};
 		}
 
 		const pullRequest = await this.services.github.createPullRequest({

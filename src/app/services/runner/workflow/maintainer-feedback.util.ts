@@ -8,6 +8,7 @@ import {
 	IGNORED_MAINTAINER_FEEDBACK_LOGINS,
 	REVIEWER_FEEDBACK_ASSOCIATIONS,
 	TRANSLATION_COMMIT_MESSAGE_PREFIX,
+	TRANSLATION_REMEDIATION_COMMIT_ATTRIBUTION_INFIX,
 } from "@/app/constants/maintainer-feedback.constants";
 
 /** Maintainer reviews that triggered a remediation re-translation */
@@ -103,6 +104,55 @@ export function hasUnresolvedChangesRequestedReview(
 }
 
 /**
+ * Whether a qualifying maintainer left an `APPROVED` review as their latest submission.
+ *
+ * @param reviews Pull request reviews on the translation pull request
+ *
+ * @returns `true` when the latest qualifying review per author is `APPROVED`
+ */
+export function hasQualifyingApprovedReview(reviews: readonly PullRequestReviewSnapshot[]) {
+	const latestReviewByLogin = new Map<string, PullRequestReviewSnapshot>();
+
+	for (const review of reviews) {
+		if (!isReviewerFeedbackAuthor(review)) {
+			continue;
+		}
+
+		const existing = latestReviewByLogin.get(review.login);
+		if (!existing || review.submittedAt > existing.submittedAt) {
+			latestReviewByLogin.set(review.login, review);
+		}
+	}
+
+	return [...latestReviewByLogin.values()].some((review) => review.state === "APPROVED");
+}
+
+/**
+ * Whether a fork commit message marks an automated maintainer-feedback remediation.
+ *
+ * @param message Full Git commit message on the translation branch
+ *
+ * @returns `true` when the runner already pushed one remediation commit for this branch tip
+ */
+export function isRemediationTranslationCommit(message: string): boolean {
+	if (!message.startsWith(TRANSLATION_COMMIT_MESSAGE_PREFIX)) {
+		return false;
+	}
+
+	const attributionIndex = message.indexOf(TRANSLATION_REMEDIATION_COMMIT_ATTRIBUTION_INFIX);
+
+	if (attributionIndex === -1) {
+		return false;
+	}
+
+	const attributionBody = message.slice(
+		attributionIndex + TRANSLATION_REMEDIATION_COMMIT_ATTRIBUTION_INFIX.length,
+	);
+
+	return /^@[\w-]+(?:, @[\w-]+)* feedback$/.test(attributionBody);
+}
+
+/**
  * Builds maintainer feedback bodies and author logins for remediation re-translations.
  *
  * @param reviews Pull request reviews on the translation pull request
@@ -131,7 +181,14 @@ export function getMaintainerFeedbackSnapshot(
 		.map((comment) => comment.body.trim());
 
 	const bodies = [...reviewBodies, ...inlineBodies];
-	const authorLogins = [...new Set(feedbackReviews.map((review) => review.login))];
+	const authorLogins = [
+		...new Set([
+			...feedbackReviews.map((review) => review.login),
+			...reviewComments
+				.filter((comment) => isInlineReviewCommentForRemediation(comment, runnerCommitAt, feedback))
+				.map((comment) => comment.login),
+		]),
+	];
 
 	return { bodies, authorLogins };
 }
@@ -196,5 +253,5 @@ export function buildTranslationCommitMessage(
 
 	const mentions = maintainerAuthorLogins.map((login) => `@${login}`).join(", ");
 
-	return `${subject}\n\nper ${mentions} feedback`;
+	return `${subject}${TRANSLATION_REMEDIATION_COMMIT_ATTRIBUTION_INFIX}${mentions} feedback`;
 }

@@ -3,11 +3,12 @@ import type { Octokit, RestEndpointMethodTypes } from "@octokit/rest";
 import type { SetRequired } from "type-fest";
 
 import type { TranslationLlmUsageTotals } from "@/app/services/translator/llm/translation-llm.usage";
+import type { PostTranslationGuardId } from "@/app/services/translator/validation/validation.constants";
 
 /** Post-translation validation retry surfaced on processed file results and PR metadata */
 export interface TranslationRetryInfo {
 	/** Stable guard id for logs and error context */
-	guardId: string;
+	guardId: PostTranslationGuardId;
 
 	/** Short description for operators and error messages */
 	message: string;
@@ -16,7 +17,7 @@ export interface TranslationRetryInfo {
 /** Maintainer-facing validation hint surfaced on the translation pull request */
 export interface ReviewerValidationNotice {
 	/** Stable guard id matching the post-translation guard */
-	guardId: string;
+	guardId: PostTranslationGuardId;
 
 	/** Actionable fix text from the guard's `retryHint` */
 	hint: string;
@@ -170,6 +171,15 @@ export interface PullRequestReviewCommentSnapshot extends ReviewerFeedbackAuthor
 
 	/** Parent review id when the comment was submitted with a review */
 	readonly pullRequestReviewId: number | null;
+}
+
+/** Newest runner `docs: translate` commit on a fork translation branch */
+export interface LatestTranslationCommitSnapshot {
+	/** Committer timestamp of the translation commit */
+	readonly timestamp: Date;
+
+	/** Full commit message, including optional remediation attribution body */
+	readonly message: string;
 }
 
 /** Normalized pull request issue comment snapshot */
