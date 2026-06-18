@@ -27,7 +27,6 @@ export default defineConfig(
 			"**/*.json",
 			"**/*.yml",
 			"**/*.yaml",
-			"src/ci/smoke-llm.ts",
 		],
 	},
 	{
@@ -131,6 +130,7 @@ export default defineConfig(
 	},
 	{
 		files: ["src/ci/**/*.{ts,tsx}"],
+		ignores: ["src/ci/services/smoke/**", "src/ci/actions/smoke.ts"],
 		rules: {
 			"no-restricted-imports": [
 				"error",

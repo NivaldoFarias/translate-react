@@ -11,6 +11,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 - `refreshTranslationBranchPreservePr` for `out_of_sync` and maintainer-remediation runs that reuse an open translation pull request.
 - `tests/fixtures/md/workflow.manifest.ts` with react.dev fixture corpus and integration coverage for every manifest scenario (`New`, `OutOfSync`, `MaintainerFix`, `ValidSkip`).
 - Segment production-pipeline, reinsert, cleanup, and truncation-audit specs exercising spacing, slug, and heading regressions.
+- `ci:smoke` (`src/ci/actions/smoke.ts`): real-LLM workflow smoke with mocked GitHub fixtures, profile flags (`quick`, `workflow`, `full`), and `.out/` artifacts; [`.github/workflows/smoke.yml`](./.github/workflows/smoke.yml) for manual dispatch.
 
 ### Changed
 
@@ -24,6 +25,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 - Segment batch output no longer duplicates `##` heading markers when translated heading text includes markdown markers.
 - Maintainer remediation reuses open pull requests after `CHANGES_REQUESTED` reviews without closing the branch when an approved review is present.
+
+### Removed
+
+- Gitignored `src/ci/smoke-llm.ts` local script (replaced by tracked `ci:smoke`).
 
 ## [0.2.8] - 2026-06-16
 
@@ -53,7 +58,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Removed
 
-- Spike-only segment modules (`spike-writeup`, `integration-analysis`, `tooling-eval`, corpus table utilities) and their production barrel exports.
+- Exploratory segment modules (`spike-writeup`, `integration-analysis`, `tooling-eval`, corpus table utilities) and their production barrel exports.
 
 ## [0.2.7] - 2026-06-05
 
