@@ -5,9 +5,6 @@ scripts/
 *.backup
 .out/
 
-# Local-only dev script (not persisted; use integration tests in CI)
-src/ci/smoke-llm.ts
-
 # Logs
 logs/
 *.log

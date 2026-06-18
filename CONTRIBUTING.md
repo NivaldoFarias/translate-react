@@ -6,8 +6,9 @@ MIT. Not a hosted app: forks use their own API keys and Actions config.
 - TypeScript strict; match patterns in [`src/`](./src/).
 - Layout and services: [Wiki: Codebase](https://github.com/NivaldoFarias/translate-react/wiki/Codebase); run order: [Wiki: Workflow](https://github.com/NivaldoFarias/translate-react/wiki/Workflow). App wiring: [`src/app/composition.ts`](./src/app/composition.ts).
 - Tests: `bun test` (or `bun run test:coverage` locally); CI runs coverage. Mirror `src/` paths under `tests/`; mock GitHub and LLM.
+- Before merging changes under `src/app/services/translator/`, `src/app/services/runner/`, or `src/app/locales/`: CI green and `bun run ci:smoke -- --profile quick` (real LLM, mocked GitHub; artifacts in `.out/`). Optional: [Workflow smoke](https://github.com/NivaldoFarias/translate-react/actions/workflows/smoke.yml) on GitHub.
 - Before push: `bun run lint`, `bun run format`.
-- Commits: [Conventional Commits](https://www.conventionalcommits.org/) (see repo rules).
+- Commits: [Conventional Commits](https://www.conventionalcommits.org/) (`feat`, `fix`, `chore`, `refactor`; optional scope).
 - Changelog: accumulate entries under `## [Unreleased]` in [`CHANGELOG.md`](./CHANGELOG.md) as you work. Never hand-write a `## [X.Y.Z]` heading or bump `version` outside the release flow below; CI fails a bumped version whose section lacks a date, footer link, or entries.
 - Docs: [Wiki](https://github.com/NivaldoFarias/translate-react/wiki). [`CHANGELOG.md`](./CHANGELOG.md), [`SECURITY.md`](./SECURITY.md) stay in the repo.
 - Adding a production locale: follow the [wiki checklist](https://github.com/NivaldoFarias/translate-react/wiki/Workflow#adding-a-locale) (registry, `LocaleService`, parity test, fork secrets, dry run).

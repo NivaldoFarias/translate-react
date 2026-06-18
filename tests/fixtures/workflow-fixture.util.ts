@@ -178,7 +178,7 @@ export function workflowFixtureBlobUrl(sha: string) {
 /**
  * Default Portuguese fork-branch body for existing-PR smoke scenarios.
  *
- * Long enough for real CLD target-language detection in `ci:smoke-llm`.
+ * Long enough for real CLD target-language detection in workflow integration tests.
  *
  * @param filename Display filename for the translated page
  *
@@ -188,7 +188,7 @@ export function defaultWorkflowFixtureForkContent(filename: string) {
 	return `\
 ---
 title: Título de exemplo
-description: Descrição em português para simular conteúdo já traduzido no fork durante smoke local.
+description: Descrição em português para simular conteúdo já traduzido no fork durante testes locais.
 ---
 
 ## Seção de exemplo {/*exemplo*/}

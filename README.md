@@ -93,7 +93,7 @@ bun run dev
 bun start
 ```
 
-To exercise translation with real LLM calls and mocked GitHub, run the workflow integration tests ([`workflow.integration.spec.ts`](./tests/integration/workflow.integration.spec.ts)) with fixture markdown under [`tests/fixtures/md/`](./tests/fixtures/md/). See [Local LLM exercise](https://github.com/NivaldoFarias/translate-react/wiki/Workflow#local-llm-exercise-integration-tests).
+To exercise translation with a live LLM and mocked GitHub against react.dev fixtures, run `bun run ci:smoke` (profiles: `quick`, `workflow`, `full`; outputs under `.out/`). CI integration tests use a passthrough LLM mock: [`workflow.integration.spec.ts`](./tests/integration/workflow.integration.spec.ts). See [Wiki: Workflow](https://github.com/NivaldoFarias/translate-react/wiki/Workflow#local-llm-exercise-integration-tests).
 
 ## Versioning and releases
 
