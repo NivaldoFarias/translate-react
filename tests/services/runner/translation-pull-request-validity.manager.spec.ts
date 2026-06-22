@@ -170,7 +170,57 @@ describe("TranslationPullRequestValidityManager", () => {
 		expect(result.pullRequest?.number).toBe(55);
 	});
 
-	test("returns valid when the latest translation commit is already a remediation commit", async () => {
+	test("returns valid when CHANGES_REQUESTED review predates the latest remediation commit", async () => {
+		const github = createMockGitHubService();
+		const languageDetector = createMockLanguageDetectorService();
+
+		github.findPullRequestByBranch.mockResolvedValue(createMockPullRequestListItem(55));
+		github.checkPullRequestStatus.mockResolvedValue({
+			hasConflicts: false,
+			mergeable: true,
+			needsUpdate: false,
+			mergeableState: "clean",
+			createdBy: "translate-react-bot",
+		});
+		github.getForkFileContentAtBranch.mockResolvedValue(
+			"Texto em português com comprimento suficiente para análise linguística confiável.",
+		);
+		github.getLatestTranslationCommit.mockResolvedValue({
+			timestamp: new Date("2026-06-04T10:00:00Z"),
+			message: "docs: translate `legacy.md` to Português (Brasil)\n\nper @jhonmike feedback",
+		} as never);
+		github.listPullRequestReviews.mockResolvedValue([
+			{
+				id: 42,
+				login: "jhonmike",
+				authorAssociation: "MEMBER",
+				userType: "User",
+				state: "CHANGES_REQUESTED",
+				submittedAt: new Date("2026-06-03T12:00:00Z"),
+				body: "Please fix the heading.",
+			},
+		] as never);
+		languageDetector.analyzeLanguage.mockResolvedValue({
+			isTranslated: true,
+			ratio: 0.95,
+			detectedLanguage: "pt",
+			languageScore: { target: 0.95, source: 0.05 },
+			rawResult: { reliable: true, languages: [], textBytes: 100, chunks: [] },
+		} as never);
+
+		const manager = createValidityManager({
+			github: github as unknown as RunnerServiceDependencies["github"],
+			languageDetector:
+				languageDetector as unknown as RunnerServiceDependencies["languageDetector"],
+		});
+
+		const result = await manager.evaluate("src/content/reference/react/legacy.md");
+
+		expect(result.isValid).toBe(true);
+		expect(result.pullRequest?.number).toBe(55);
+	});
+
+	test("returns needs_maintainer_fix when CHANGES_REQUESTED review follows the latest remediation commit", async () => {
 		const github = createMockGitHubService();
 		const languageDetector = createMockLanguageDetectorService();
 
@@ -197,7 +247,7 @@ describe("TranslationPullRequestValidityManager", () => {
 				userType: "User",
 				state: "CHANGES_REQUESTED",
 				submittedAt: new Date("2026-06-04T12:00:00Z"),
-				body: "Please fix the heading.",
+				body: "Please fix the heading again.",
 			},
 		] as never);
 		languageDetector.analyzeLanguage.mockResolvedValue({
@@ -216,7 +266,8 @@ describe("TranslationPullRequestValidityManager", () => {
 
 		const result = await manager.evaluate("src/content/reference/react/legacy.md");
 
-		expect(result.isValid).toBe(true);
+		expect(result.isValid).toBe(false);
+		expect(result.invalidReason).toBe("needs_maintainer_fix");
 		expect(result.pullRequest?.number).toBe(55);
 	});
 });
