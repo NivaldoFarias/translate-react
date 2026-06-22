@@ -287,26 +287,26 @@ export class TranslationBatchManager {
 				return skippedForValidTranslationPullRequest;
 			}
 
-			const branchStart = Date.now();
-			metadata.branch = await this.prepareTranslationBranch(file, pullRequestValidity);
-			file.logger.debug(
-				{ branchRef: metadata.branch.ref, durationMs: Date.now() - branchStart },
-				"Step 1/5: Translation branch reset for single-commit workflow",
-			);
-
-			const step2Start = Date.now();
+			const step1Start = Date.now();
 			const maintainerFeedback = await this.loadMaintainerFeedbackForRemediation(
 				file,
 				pullRequestValidity,
 			);
 			file.logger.debug(
 				{
-					durationMs: Date.now() - step2Start,
+					durationMs: Date.now() - step1Start,
 					pullRequestInvalidReason: pullRequestValidity.invalidReason ?? null,
 					maintainerFeedbackLoaded: maintainerFeedback !== undefined,
 					maintainerCommentCount: maintainerFeedback?.authorLogins.length ?? 0,
 				},
-				"Step 2/5: Pull request validity and maintainer feedback resolved",
+				"Step 1/5: Pull request validity and maintainer feedback resolved",
+			);
+
+			const branchStart = Date.now();
+			metadata.branch = await this.prepareTranslationBranch(file, pullRequestValidity);
+			file.logger.debug(
+				{ branchRef: metadata.branch.ref, durationMs: Date.now() - branchStart },
+				"Step 2/5: Translation branch reset for single-commit workflow",
 			);
 
 			const translationStart = Date.now();
@@ -453,6 +453,9 @@ export class TranslationBatchManager {
 
 	/**
 	 * Loads `CHANGES_REQUESTED` review summaries and inline review comments posted after the latest runner commit on the branch.
+	 *
+	 * Must run before {@link prepareTranslationBranch} for maintainer remediation so the runner commit
+	 * baseline is read while translation commits still exist on the branch.
 	 *
 	 * @param file Translation file being processed
 	 * @param validity Pull request validity from the start of file processing

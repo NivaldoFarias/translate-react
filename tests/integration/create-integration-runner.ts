@@ -25,7 +25,13 @@ import type { LanguageDetectorService } from "@/app/services/language-detector/"
 import type { LanguageAnalysisResult } from "@/app/services/language-detector/language-detector.service";
 
 import type { WorkflowFixtureFile } from "@tests/fixtures/workflow-fixture.util";
-import type { MockLanguageDetectorService } from "@tests/mocks";
+import type {
+	MockGitHubGetForkFileContentAtBranchFn,
+	MockGitHubGetLatestTranslationCommitFn,
+	MockGitHubGetLatestTranslationCommitTimestampFn,
+	MockGitHubListPullRequestReviewsFn,
+	MockLanguageDetectorService,
+} from "@tests/mocks";
 
 import {
 	commentBuilderService,
@@ -83,28 +89,7 @@ type FindPullRequestByBranchMockFn = (
 
 type CheckPullRequestStatusMockFn = (prNumber: number) => Promise<PullRequestStatus>;
 
-type GetForkFileContentAtBranchMockFn = (
-	path: string,
-	branchName: string,
-) => Promise<string | undefined>;
-
-type GetLatestTranslationCommitMockFn = (
-	branchName: string,
-) => Promise<{ timestamp: Date; message: string } | undefined>;
-
-type GetLatestTranslationCommitTimestampMockFn = (branchName: string) => Promise<Date | undefined>;
-
-type ListPullRequestReviewsMockFn = (prNumber: number) => Promise<
-	{
-		id: number;
-		login: string;
-		authorAssociation: string;
-		userType: string;
-		state: string;
-		submittedAt: Date;
-		body: string;
-	}[]
->;
+type ListPullRequestReviewsMockFn = MockGitHubListPullRequestReviewsFn;
 
 const CLEAN_PULL_REQUEST_STATUS = {
 	hasConflicts: false,
@@ -165,7 +150,7 @@ function applyWorkflowSmokePullRequestMocks(
 	});
 
 	(
-		github.getForkFileContentAtBranch as unknown as Mock<GetForkFileContentAtBranchMockFn>
+		github.getForkFileContentAtBranch as unknown as Mock<MockGitHubGetForkFileContentAtBranchFn>
 	).mockImplementation((path) => {
 		const file = fileByRepoPath.get(path);
 		if (!file || file.smoke.pullRequestScenario === WorkflowFixturePrScenario.New) {
@@ -180,7 +165,7 @@ function applyWorkflowSmokePullRequestMocks(
 	const runnerCommitAt = defaultWorkflowFixtureRunnerCommitAt();
 
 	(
-		github.getLatestTranslationCommit as unknown as Mock<GetLatestTranslationCommitMockFn>
+		github.getLatestTranslationCommit as unknown as Mock<MockGitHubGetLatestTranslationCommitFn>
 	).mockImplementation((branch) => {
 		const file = fileByBranch.get(branch);
 		if (file?.smoke.pullRequestScenario !== WorkflowFixturePrScenario.MaintainerFix) {
@@ -194,7 +179,7 @@ function applyWorkflowSmokePullRequestMocks(
 	});
 
 	(
-		github.getLatestTranslationCommitTimestamp as unknown as Mock<GetLatestTranslationCommitTimestampMockFn>
+		github.getLatestTranslationCommitTimestamp as unknown as Mock<MockGitHubGetLatestTranslationCommitTimestampFn>
 	).mockImplementation((branch) => {
 		const file = fileByBranch.get(branch);
 		if (file?.smoke.pullRequestScenario !== WorkflowFixturePrScenario.MaintainerFix) {
