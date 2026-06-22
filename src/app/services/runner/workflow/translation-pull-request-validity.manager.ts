@@ -9,7 +9,6 @@ import { getTranslationBranchNameFromPath, logger } from "@/app/utils/";
 import {
 	getUnresolvedChangesRequestedReviews,
 	hasUnresolvedChangesRequestedReview,
-	isRemediationTranslationCommit,
 } from "./maintainer-feedback.util";
 
 /** Why an open translation pull request is not treated as workflow-complete */
@@ -181,18 +180,6 @@ export class TranslationPullRequestValidityManager {
 			this.services.github.listPullRequestReviews(prNumber),
 			this.services.github.getLatestTranslationCommit(branchName),
 		]);
-
-		if (
-			latestTranslationCommit &&
-			isRemediationTranslationCommit(latestTranslationCommit.message)
-		) {
-			this.logger.debug(
-				{ prNumber, branchName },
-				"Skipping maintainer remediation; branch already has a remediation translation commit",
-			);
-
-			return undefined;
-		}
 
 		const latestRunnerCommitAt = latestTranslationCommit?.timestamp;
 
