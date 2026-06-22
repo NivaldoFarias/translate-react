@@ -1,26 +1,21 @@
 import { describe, expect, test } from "bun:test";
 
-import type { RunnerServiceDependencies } from "@/app/services/runner/runner.types";
-
-import { localeService } from "@/app/composition";
 import { TranslationPullRequestValidityManager } from "@/app/services/runner/workflow/translation-pull-request-validity.manager";
 
-import { createMockPullRequestListItem } from "@tests/fixtures";
 import {
-	createMockGitHubService,
-	createMockLanguageCacheService,
-	createMockLanguageDetectorService,
-	createMockTranslatorService,
-} from "@tests/mocks";
+	createMockPullRequestListItem,
+	createMockPullRequestReviewSnapshot,
+	createPullRequestStatusFixture,
+	createTranslatedLanguageAnalysis,
+	createUntranslatedLanguageAnalysis,
+} from "@tests/fixtures";
+import { buildRunnerServiceDependencies } from "@tests/helpers/runner-dependencies.harness";
+import { createMockGitHubService, createMockLanguageDetectorService } from "@tests/mocks";
 
-function createValidityManager(overrides: Partial<RunnerServiceDependencies> = {}) {
-	return new TranslationPullRequestValidityManager({
-		github: overrides.github ?? createMockGitHubService(),
-		translator: overrides.translator ?? createMockTranslatorService(),
-		languageCache: overrides.languageCache ?? createMockLanguageCacheService(),
-		locale: overrides.locale ?? localeService,
-		languageDetector: overrides.languageDetector ?? createMockLanguageDetectorService(),
-	} as RunnerServiceDependencies);
+function createValidityManager(
+	overrides: Parameters<typeof buildRunnerServiceDependencies>[0] = {},
+) {
+	return new TranslationPullRequestValidityManager(buildRunnerServiceDependencies(overrides));
 }
 
 describe("TranslationPullRequestValidityManager", () => {
@@ -29,29 +24,18 @@ describe("TranslationPullRequestValidityManager", () => {
 		const languageDetector = createMockLanguageDetectorService();
 
 		github.findPullRequestByBranch.mockResolvedValue(createMockPullRequestListItem(42));
-		github.checkPullRequestStatus.mockResolvedValue({
-			hasConflicts: false,
-			mergeable: true,
-			needsUpdate: false,
-			mergeableState: "clean",
-			createdBy: "translate-react-bot",
-		});
+		github.checkPullRequestStatus.mockResolvedValue(createPullRequestStatusFixture());
 		github.getForkFileContentAtBranch.mockResolvedValue(
 			"Texto em português com comprimento suficiente para análise linguística confiável.",
 		);
-		languageDetector.analyzeLanguage.mockResolvedValue({
-			isTranslated: true,
-			ratio: 0.95,
-			detectedLanguage: "pt",
-			languageScore: { target: 0.95, source: 0.05 },
-			rawResult: { reliable: true, languages: [], textBytes: 100, chunks: [] },
-		} as never);
+		languageDetector.analyzeLanguage.mockResolvedValue(
+			createTranslatedLanguageAnalysis({
+				ratio: 0.95,
+				languageScore: { target: 0.95, source: 0.05 },
+			}),
+		);
 
-		const manager = createValidityManager({
-			github: github as unknown as RunnerServiceDependencies["github"],
-			languageDetector:
-				languageDetector as unknown as RunnerServiceDependencies["languageDetector"],
-		});
+		const manager = createValidityManager({ github, languageDetector });
 
 		const result = await manager.evaluate("src/content/reference/react/legacy.md");
 
@@ -63,17 +47,16 @@ describe("TranslationPullRequestValidityManager", () => {
 		const github = createMockGitHubService();
 
 		github.findPullRequestByBranch.mockResolvedValue(createMockPullRequestListItem(7));
-		github.checkPullRequestStatus.mockResolvedValue({
-			hasConflicts: true,
-			mergeable: false,
-			needsUpdate: true,
-			mergeableState: "dirty",
-			createdBy: "translate-react-bot",
-		} as never);
+		github.checkPullRequestStatus.mockResolvedValue(
+			createPullRequestStatusFixture({
+				hasConflicts: true,
+				mergeable: false,
+				needsUpdate: true,
+				mergeableState: "dirty",
+			}),
+		);
 
-		const manager = createValidityManager({
-			github: github as unknown as RunnerServiceDependencies["github"],
-		});
+		const manager = createValidityManager({ github });
 
 		const result = await manager.evaluate("src/content/page.md");
 
@@ -86,29 +69,13 @@ describe("TranslationPullRequestValidityManager", () => {
 		const languageDetector = createMockLanguageDetectorService();
 
 		github.findPullRequestByBranch.mockResolvedValue(createMockPullRequestListItem(9));
-		github.checkPullRequestStatus.mockResolvedValue({
-			hasConflicts: false,
-			mergeable: true,
-			needsUpdate: false,
-			mergeableState: "clean",
-			createdBy: "translate-react-bot",
-		});
+		github.checkPullRequestStatus.mockResolvedValue(createPullRequestStatusFixture());
 		github.getForkFileContentAtBranch.mockResolvedValue(
 			"This is still English prose long enough for language detection to run reliably.",
 		);
-		languageDetector.analyzeLanguage.mockResolvedValue({
-			isTranslated: false,
-			ratio: 0.1,
-			detectedLanguage: "en",
-			languageScore: { target: 0.1, source: 0.9 },
-			rawResult: { reliable: true, languages: [], textBytes: 100, chunks: [] },
-		} as never);
+		languageDetector.analyzeLanguage.mockResolvedValue(createUntranslatedLanguageAnalysis());
 
-		const manager = createValidityManager({
-			github: github as unknown as RunnerServiceDependencies["github"],
-			languageDetector:
-				languageDetector as unknown as RunnerServiceDependencies["languageDetector"],
-		});
+		const manager = createValidityManager({ github, languageDetector });
 
 		const result = await manager.evaluate("src/content/page.md");
 
@@ -121,47 +88,26 @@ describe("TranslationPullRequestValidityManager", () => {
 		const languageDetector = createMockLanguageDetectorService();
 
 		github.findPullRequestByBranch.mockResolvedValue(createMockPullRequestListItem(55));
-		github.checkPullRequestStatus.mockResolvedValue({
-			hasConflicts: false,
-			mergeable: true,
-			needsUpdate: false,
-			mergeableState: "clean",
-			createdBy: "translate-react-bot",
-		});
+		github.checkPullRequestStatus.mockResolvedValue(createPullRequestStatusFixture());
 		github.getForkFileContentAtBranch.mockResolvedValue(
 			"Texto em português com comprimento suficiente para análise linguística confiável.",
 		);
 		github.getLatestTranslationCommit.mockResolvedValue({
 			timestamp: new Date("2026-06-03T10:00:00Z"),
 			message: "docs: translate `legacy.md` to Português (Brasil)",
-		} as never);
-		github.getLatestTranslationCommitTimestamp.mockResolvedValue(
-			new Date("2026-06-03T10:00:00Z") as never,
-		);
-		github.listPullRequestReviews.mockResolvedValue([
-			{
-				id: 42,
-				login: "jhonmike",
-				authorAssociation: "MEMBER",
-				userType: "User",
-				state: "CHANGES_REQUESTED",
-				submittedAt: new Date("2026-06-03T12:00:00Z"),
-				body: "Please fix the heading.",
-			},
-		] as never);
-		languageDetector.analyzeLanguage.mockResolvedValue({
-			isTranslated: true,
-			ratio: 0.95,
-			detectedLanguage: "pt",
-			languageScore: { target: 0.95, source: 0.05 },
-			rawResult: { reliable: true, languages: [], textBytes: 100, chunks: [] },
-		} as never);
-
-		const manager = createValidityManager({
-			github: github as unknown as RunnerServiceDependencies["github"],
-			languageDetector:
-				languageDetector as unknown as RunnerServiceDependencies["languageDetector"],
 		});
+		github.getLatestTranslationCommitTimestamp.mockResolvedValue(new Date("2026-06-03T10:00:00Z"));
+		github.listPullRequestReviews.mockResolvedValue([
+			createMockPullRequestReviewSnapshot({ body: "Please fix the heading." }),
+		]);
+		languageDetector.analyzeLanguage.mockResolvedValue(
+			createTranslatedLanguageAnalysis({
+				ratio: 0.95,
+				languageScore: { target: 0.95, source: 0.05 },
+			}),
+		);
+
+		const manager = createValidityManager({ github, languageDetector });
 
 		const result = await manager.evaluate("src/content/reference/react/legacy.md");
 
@@ -175,44 +121,25 @@ describe("TranslationPullRequestValidityManager", () => {
 		const languageDetector = createMockLanguageDetectorService();
 
 		github.findPullRequestByBranch.mockResolvedValue(createMockPullRequestListItem(55));
-		github.checkPullRequestStatus.mockResolvedValue({
-			hasConflicts: false,
-			mergeable: true,
-			needsUpdate: false,
-			mergeableState: "clean",
-			createdBy: "translate-react-bot",
-		});
+		github.checkPullRequestStatus.mockResolvedValue(createPullRequestStatusFixture());
 		github.getForkFileContentAtBranch.mockResolvedValue(
 			"Texto em português com comprimento suficiente para análise linguística confiável.",
 		);
 		github.getLatestTranslationCommit.mockResolvedValue({
 			timestamp: new Date("2026-06-04T10:00:00Z"),
 			message: "docs: translate `legacy.md` to Português (Brasil)\n\nper @jhonmike feedback",
-		} as never);
-		github.listPullRequestReviews.mockResolvedValue([
-			{
-				id: 42,
-				login: "jhonmike",
-				authorAssociation: "MEMBER",
-				userType: "User",
-				state: "CHANGES_REQUESTED",
-				submittedAt: new Date("2026-06-03T12:00:00Z"),
-				body: "Please fix the heading.",
-			},
-		] as never);
-		languageDetector.analyzeLanguage.mockResolvedValue({
-			isTranslated: true,
-			ratio: 0.95,
-			detectedLanguage: "pt",
-			languageScore: { target: 0.95, source: 0.05 },
-			rawResult: { reliable: true, languages: [], textBytes: 100, chunks: [] },
-		} as never);
-
-		const manager = createValidityManager({
-			github: github as unknown as RunnerServiceDependencies["github"],
-			languageDetector:
-				languageDetector as unknown as RunnerServiceDependencies["languageDetector"],
 		});
+		github.listPullRequestReviews.mockResolvedValue([
+			createMockPullRequestReviewSnapshot({ body: "Please fix the heading." }),
+		]);
+		languageDetector.analyzeLanguage.mockResolvedValue(
+			createTranslatedLanguageAnalysis({
+				ratio: 0.95,
+				languageScore: { target: 0.95, source: 0.05 },
+			}),
+		);
+
+		const manager = createValidityManager({ github, languageDetector });
 
 		const result = await manager.evaluate("src/content/reference/react/legacy.md");
 
@@ -225,44 +152,28 @@ describe("TranslationPullRequestValidityManager", () => {
 		const languageDetector = createMockLanguageDetectorService();
 
 		github.findPullRequestByBranch.mockResolvedValue(createMockPullRequestListItem(55));
-		github.checkPullRequestStatus.mockResolvedValue({
-			hasConflicts: false,
-			mergeable: true,
-			needsUpdate: false,
-			mergeableState: "clean",
-			createdBy: "translate-react-bot",
-		});
+		github.checkPullRequestStatus.mockResolvedValue(createPullRequestStatusFixture());
 		github.getForkFileContentAtBranch.mockResolvedValue(
 			"Texto em português com comprimento suficiente para análise linguística confiável.",
 		);
 		github.getLatestTranslationCommit.mockResolvedValue({
 			timestamp: new Date("2026-06-04T10:00:00Z"),
 			message: "docs: translate `legacy.md` to Português (Brasil)\n\nper @jhonmike feedback",
-		} as never);
+		});
 		github.listPullRequestReviews.mockResolvedValue([
-			{
-				id: 42,
-				login: "jhonmike",
-				authorAssociation: "MEMBER",
-				userType: "User",
-				state: "CHANGES_REQUESTED",
+			createMockPullRequestReviewSnapshot({
 				submittedAt: new Date("2026-06-04T12:00:00Z"),
 				body: "Please fix the heading again.",
-			},
-		] as never);
-		languageDetector.analyzeLanguage.mockResolvedValue({
-			isTranslated: true,
-			ratio: 0.95,
-			detectedLanguage: "pt",
-			languageScore: { target: 0.95, source: 0.05 },
-			rawResult: { reliable: true, languages: [], textBytes: 100, chunks: [] },
-		} as never);
+			}),
+		]);
+		languageDetector.analyzeLanguage.mockResolvedValue(
+			createTranslatedLanguageAnalysis({
+				ratio: 0.95,
+				languageScore: { target: 0.95, source: 0.05 },
+			}),
+		);
 
-		const manager = createValidityManager({
-			github: github as unknown as RunnerServiceDependencies["github"],
-			languageDetector:
-				languageDetector as unknown as RunnerServiceDependencies["languageDetector"],
-		});
+		const manager = createValidityManager({ github, languageDetector });
 
 		const result = await manager.evaluate("src/content/reference/react/legacy.md");
 

@@ -3,8 +3,59 @@ import { mock } from "bun:test";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 import type { ReactLanguageCode } from "@/app/constants";
-import type { PullRequestStatus, RepositoryMarkdownBlob } from "@/app/services/github/types";
+import type {
+	LatestTranslationCommitSnapshot,
+	PullRequestReviewCommentSnapshot,
+	PullRequestReviewSnapshot,
+	PullRequestStatus,
+	RepositoryMarkdownBlob,
+} from "@/app/services/github/types";
 import type { LanguageAnalysisResult } from "@/app/services/language-detector/language-detector.service";
+
+import { createGitBranchRefResponse } from "@tests/fixtures";
+
+/** Octokit `git.getRef` response used by {@link GitHubService.getBranch} */
+export type MockGitHubGetBranchResponse = RestEndpointMethodTypes["git"]["getRef"]["response"];
+
+/** Mock signature for {@link GitHubService.getBranch} */
+export type MockGitHubGetBranchFn = (
+	branchName: string,
+) => Promise<MockGitHubGetBranchResponse | undefined>;
+
+/** Mock signature for {@link GitHubService.checkPullRequestStatus} */
+export type MockGitHubCheckPullRequestStatusFn = (prNumber: number) => Promise<PullRequestStatus>;
+
+/** Mock signature for {@link LanguageDetectorService.analyzeLanguage} */
+export type MockLanguageDetectorAnalyzeLanguageFn = (
+	filename: string,
+	content: string,
+) => Promise<LanguageAnalysisResult>;
+
+/** Mock signature for {@link GitHubService.getLatestTranslationCommit} */
+export type MockGitHubGetLatestTranslationCommitFn = (
+	branchName: string,
+) => Promise<LatestTranslationCommitSnapshot | undefined>;
+
+/** Mock signature for {@link GitHubService.getLatestTranslationCommitTimestamp} */
+export type MockGitHubGetLatestTranslationCommitTimestampFn = (
+	branchName: string,
+) => Promise<Date | undefined>;
+
+/** Mock signature for {@link GitHubService.listPullRequestReviews} */
+export type MockGitHubListPullRequestReviewsFn = (
+	prNumber: number,
+) => Promise<PullRequestReviewSnapshot[]>;
+
+/** Mock signature for {@link GitHubService.listPullRequestReviewComments} */
+export type MockGitHubListPullRequestReviewCommentsFn = (
+	prNumber: number,
+) => Promise<PullRequestReviewCommentSnapshot[]>;
+
+/** Mock signature for {@link GitHubService.getForkFileContentAtBranch} */
+export type MockGitHubGetForkFileContentAtBranchFn = (
+	path: string,
+	branchName: string,
+) => Promise<string | undefined>;
 
 /**
  * Creates a mock CommentBuilderService for testing.
@@ -68,10 +119,9 @@ export function createMockGitHubService() {
 				},
 			}),
 		),
-		getBranch: mock(() =>
-			Promise.resolve({
-				data: { object: { sha: "abc123" } },
-			}),
+		getBranch: mock(
+			(_branchName: string): Promise<MockGitHubGetBranchResponse | undefined> =>
+				Promise.resolve(createGitBranchRefResponse({ sha: "abc123" })),
 		),
 		deleteBranch: mock(() => Promise.resolve({ data: {}, status: 204 })),
 		refreshTranslationBranchPreservePr: mock(() =>
@@ -105,7 +155,10 @@ export function createMockGitHubService() {
 				sha: "abc123",
 			} satisfies RepositoryMarkdownBlob),
 		),
-		getForkFileContentAtBranch: mock(() => Promise.resolve(undefined as string | undefined)),
+		getForkFileContentAtBranch: mock(
+			(_path: string, _branchName: string): Promise<string | undefined> =>
+				Promise.resolve(undefined),
+		),
 		findPullRequestByBranch: mock(() =>
 			Promise.resolve(
 				undefined as
@@ -113,14 +166,15 @@ export function createMockGitHubService() {
 					| undefined,
 			),
 		),
-		checkPullRequestStatus: mock(() =>
-			Promise.resolve({
-				hasConflicts: false,
-				mergeable: true,
-				needsUpdate: false,
-				mergeableState: "clean",
-				createdBy: "test-fork-owner",
-			} satisfies PullRequestStatus),
+		checkPullRequestStatus: mock(
+			(_prNumber: number): Promise<PullRequestStatus> =>
+				Promise.resolve({
+					hasConflicts: false,
+					mergeable: true,
+					needsUpdate: false,
+					mergeableState: "clean",
+					createdBy: "test-fork-owner",
+				} satisfies PullRequestStatus),
 		),
 		closePullRequest: mock(() =>
 			Promise.resolve({
@@ -135,10 +189,19 @@ export function createMockGitHubService() {
 			} as RestEndpointMethodTypes["pulls"]["update"]["response"]["data"]),
 		),
 		listPullRequestIssueComments: mock(() => Promise.resolve([])),
-		listPullRequestReviews: mock(() => Promise.resolve([])),
-		listPullRequestReviewComments: mock(() => Promise.resolve([])),
-		getLatestTranslationCommit: mock(() => Promise.resolve(undefined)),
-		getLatestTranslationCommitTimestamp: mock(() => Promise.resolve(undefined)),
+		listPullRequestReviews: mock(
+			(_prNumber: number): Promise<PullRequestReviewSnapshot[]> => Promise.resolve([]),
+		),
+		listPullRequestReviewComments: mock(
+			(_prNumber: number): Promise<PullRequestReviewCommentSnapshot[]> => Promise.resolve([]),
+		),
+		getLatestTranslationCommit: mock(
+			(_branchName: string): Promise<LatestTranslationCommitSnapshot | undefined> =>
+				Promise.resolve(undefined),
+		),
+		getLatestTranslationCommitTimestamp: mock(
+			(_branchName: string): Promise<Date | undefined> => Promise.resolve(undefined),
+		),
 		commentCompiledResultsOnIssue: mock(() => Promise.resolve({ id: 1 })),
 	};
 }
@@ -236,19 +299,20 @@ export function createMockLanguageCacheService() {
 export function createMockLanguageDetectorService() {
 	return {
 		detectPrimaryLanguage: mock(() => Promise.resolve("en" satisfies ReactLanguageCode)),
-		analyzeLanguage: mock(() =>
-			Promise.resolve({
-				languageScore: { target: 0.1, source: 0.9 },
-				ratio: 0.1,
-				isTranslated: false,
-				detectedLanguage: "en",
-				rawResult: {
-					reliable: true,
-					textBytes: 1234,
-					languages: [],
-					chunks: [],
-				},
-			} satisfies LanguageAnalysisResult),
+		analyzeLanguage: mock(
+			(_filename: string, _content: string): Promise<LanguageAnalysisResult> =>
+				Promise.resolve({
+					languageScore: { target: 0.1, source: 0.9 },
+					ratio: 0.1,
+					isTranslated: false,
+					detectedLanguage: "en",
+					rawResult: {
+						reliable: true,
+						textBytes: 1234,
+						languages: [],
+						chunks: [],
+					},
+				} satisfies LanguageAnalysisResult),
 		),
 		getLanguageName: mock((code: string): string => {
 			if (code === "en") return "English";
