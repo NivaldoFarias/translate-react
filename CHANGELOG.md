@@ -4,6 +4,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+## [0.2.9] - 2026-06-22
+
 ### Added
 
 - `PostTranslationGuardId` constants for post-translation guard identifiers; `guardId` fields and locale label maps infer from that registry.
@@ -354,6 +356,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 - README `MAX_RETRY_ATTEMPTS` default matches `src/utils/constants.util.ts` (`3`).
 
+[0.2.9]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.9
 [0.2.8]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.8
 [0.2.7]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.7
 [0.2.6]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.6
