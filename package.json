@@ -1,6 +1,6 @@
 {
 	"name": "translate-react",
-	"version": "0.2.8",
+	"version": "0.2.9",
 	"contributors": [
 		{
 			"name": "Nivaldo Farias",
@@ -27,6 +27,7 @@
 		"ci:poll-upstream": "bun src/ci/actions/poll-upstream.ts",
 		"ci:resolve-matrix": "bun src/ci/actions/resolve-matrix.ts",
 		"ci:verify-changelog": "bun src/ci/actions/verify-changelog.ts",
+		"ci:smoke": "bun src/ci/actions/smoke.ts",
 		"ci:changelog-notes": "bun src/ci/actions/changelog-notes.ts",
 		"release:prepare": "bun src/ci/actions/prepare-release.ts",
 		"test:watch": "bun test --watch",

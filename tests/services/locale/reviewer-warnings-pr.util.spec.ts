@@ -8,8 +8,7 @@ const strings: LocalePRBodyStrings["reviewerWarnings"] = {
 	intro: "Validation issues detected:",
 	detailsSummary: "Show validation details",
 	guardLabel: (guardId) => guardId,
-	violationLocation: (startLine, endLine) =>
-		endLine === startLine ? `line ${startLine}` : `lines ${startLine}–${endLine}`,
+	violationTally: (count) => (count === 1 ? "1 violation" : `${count} violations`),
 };
 
 describe("buildReviewerWarningsMarkdown", () => {
@@ -45,12 +44,55 @@ describe("buildReviewerWarningsMarkdown", () => {
 
 		expect(markdown).toContain("<details>");
 		expect(markdown).toContain("### fenceJsxStaticText");
-		expect(markdown).toContain("##### `fenceJsxStaticText`");
-		expect(markdown).toContain("###### 1. line");
+		expect(markdown).toContain("> Inside fenced code blocks");
+		expect(markdown).toContain("#### `fenceJsxStaticText` (1 violation)");
+		expect(markdown).toContain("#### L");
 		expect(markdown).toContain("```diff");
 		expect(markdown).toContain("- animate me");
 		expect(markdown).toContain("+ anime-me");
+		expect(markdown).not.toContain("######");
 		expect(markdown).not.toContain("\\n");
 		expect(markdown).not.toContain("> [!WARNING]");
+	});
+
+	test("formats MDX spacing violations with line ranges and a violation tally", () => {
+		const translated = "Use `hydrateRoot`permite mounting.\n";
+
+		const markdown = buildReviewerWarningsMarkdown(
+			[
+				{
+					guardId: "mdxSpacing",
+					hint: "Preserve spaces around markdown links, inline code, and `{/*slug*/}` comments exactly as structural separators in prose.",
+				},
+			],
+			strings,
+			"# Source",
+			translated,
+		);
+
+		expect(markdown).toContain("#### `mdxSpacing` (1 violation)");
+		expect(markdown).toContain("#### L1");
+		expect(markdown).toContain("missing space after inline code");
+	});
+
+	test("formats markdown link violations with line ranges", () => {
+		const source = "Read [docs](/learn) for details.\n";
+		const translated = "Read /learn for details.\n";
+
+		const markdown = buildReviewerWarningsMarkdown(
+			[
+				{
+					guardId: "markdownLinksPreserved",
+					hint: 'Preserve every source markdown link as `[translated label](same-url)` with balanced brackets and parentheses. Problems found: Missing markdown link for URL "/learn" (1 → 0).',
+				},
+			],
+			strings,
+			source,
+			translated,
+		);
+
+		expect(markdown).toContain("#### `markdownLinksPreserved`");
+		expect(markdown).toContain("#### L1");
+		expect(markdown).toContain('Missing markdown link for URL "/learn"');
 	});
 });

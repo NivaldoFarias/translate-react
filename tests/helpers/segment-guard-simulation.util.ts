@@ -21,6 +21,13 @@ const STRUCTURAL_GUARD_IDS = new Set([
 	"contentRatio",
 ]);
 
+/**
+ * Simulates a bad full-body translation by corrupting the source markdown.
+ *
+ * @param source The source markdown
+ *
+ * @returns The corrupted markdown
+ */
 function simulateBadFullBodyTranslation(source: string) {
 	let corrupted = source;
 
@@ -31,6 +38,14 @@ function simulateBadFullBodyTranslation(source: string) {
 	return corrupted;
 }
 
+/**
+ * Simulates a segment-only translation by corrupting the source markdown.
+ *
+ * @param source The source markdown
+ * @param segments The segments to translate
+ *
+ * @returns The corrupted markdown
+ */
 function simulateSegmentOnlyTranslation(source: string, segments: readonly TranslatableSegment[]) {
 	const translations: Record<string, string> = {};
 

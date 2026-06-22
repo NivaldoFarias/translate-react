@@ -151,6 +151,33 @@ export class GitHubBranch {
 	}
 
 	/**
+	 * Recreates a translation topic branch from the fork default tip without closing its pull request.
+	 *
+	 * @param branchName Translation branch to refresh
+	 *
+	 * @returns New branch reference data
+	 */
+	public async refreshTranslationBranchPreservePr(
+		branchName: string,
+	): Promise<RestEndpointMethodTypes["git"]["getRef"]["response"]["data"]> {
+		this.logger.info(
+			{ branchName },
+			"Refreshing translation branch from fork default without closing PR",
+		);
+
+		const existingBranch = await this.getBranch(branchName);
+
+		if (existingBranch) {
+			await this.deleteBranch(branchName);
+		}
+
+		const forkDefaultBranch = await this.getDefaultBranch();
+		const newBranch = await this.createBranch(branchName, forkDefaultBranch);
+
+		return newBranch.data;
+	}
+
+	/**
 	 * Deletes a Git branch and removes it from tracking.
 	 * Always removes from tracking even if deletion fails.
 	 *

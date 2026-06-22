@@ -2,10 +2,17 @@ import type { SegmentBatchRequestItem } from "@/app/services/translator/translat
 
 import type { TranslatableSegment } from "./types";
 
+import { TRANSLATION_OUTPUT_TO_INPUT_TOKEN_RATIO } from "@/app/services/translator/chunking/chunking.constants";
 import { SEGMENT_BATCH_MAX_ITEMS_PER_BATCH } from "@/app/services/translator/translator.constants";
 
 /** Estimated JSON wrapper tokens for a segment batch user message */
 const SEGMENT_BATCH_JSON_OVERHEAD_TOKENS = 32;
+
+/** Estimated JSON envelope overhead for a segment batch response */
+const SEGMENT_BATCH_RESPONSE_ENVELOPE_OVERHEAD_TOKENS = 24;
+
+/** Per-item JSON field overhead in a segment batch response (`segmentId`, `translated`) */
+const SEGMENT_BATCH_RESPONSE_ITEM_OVERHEAD_TOKENS = 20;
 
 /**
  * Estimates tokens for a segment batch request envelope serialized as JSON.
@@ -24,12 +31,35 @@ export function estimateSegmentBatchRequestTokens(
 }
 
 /**
+ * Estimates completion tokens for a segment batch JSON response envelope.
+ *
+ * @param items Batch items that would appear in the response
+ * @param estimateTokens Token estimator (typically `ChunksManager.estimateTokenCount`)
+ *
+ * @returns Estimated output tokens for the batched translations
+ */
+export function estimateSegmentBatchResponseTokens(
+	items: readonly SegmentBatchRequestItem[],
+	estimateTokens: (text: string) => number,
+) {
+	let total = SEGMENT_BATCH_RESPONSE_ENVELOPE_OVERHEAD_TOKENS;
+
+	for (const item of items) {
+		total += SEGMENT_BATCH_RESPONSE_ITEM_OVERHEAD_TOKENS;
+		total += Math.ceil(estimateTokens(item.source) * TRANSLATION_OUTPUT_TO_INPUT_TOKEN_RATIO);
+	}
+
+	return total;
+}
+
+/**
  * Packs translate-kind segments into token-budgeted batches in document order.
  *
  * @param segments Segments to pack (typically translate-kind only)
  * @param estimateTokens Token estimator from `ChunksManager`
- * @param maxBatchTokens Maximum estimated tokens per batch request
+ * @param maxBatchTokens Maximum estimated input tokens per batch request
  * @param maxSegmentsPerBatch Maximum segment count per batch request
+ * @param maxBatchResponseTokens Maximum estimated completion tokens for the JSON response
  *
  * @returns Ordered batches of request items
  *
@@ -47,6 +77,7 @@ export function packSegmentsIntoBatches(
 	estimateTokens: (text: string) => number,
 	maxBatchTokens: number,
 	maxSegmentsPerBatch = SEGMENT_BATCH_MAX_ITEMS_PER_BATCH,
+	maxBatchResponseTokens?: number,
 ) {
 	const batches: SegmentBatchRequestItem[][] = [];
 	let currentBatch: SegmentBatchRequestItem[] = [];
@@ -62,8 +93,13 @@ export function packSegmentsIntoBatches(
 		const batchWouldExceedBudget =
 			currentBatch.length > 0 && currentTokens + itemTokens > maxBatchTokens;
 		const batchWouldExceedSegmentCap = currentBatch.length >= maxSegmentsPerBatch;
+		const batchWouldExceedResponseBudget =
+			maxBatchResponseTokens !== undefined &&
+			currentBatch.length > 0 &&
+			estimateSegmentBatchResponseTokens([...currentBatch, item], estimateTokens) >
+				maxBatchResponseTokens;
 
-		if (batchWouldExceedBudget || batchWouldExceedSegmentCap) {
+		if (batchWouldExceedBudget || batchWouldExceedSegmentCap || batchWouldExceedResponseBudget) {
 			batches.push(currentBatch);
 			currentBatch = [];
 			currentTokens = SEGMENT_BATCH_JSON_OVERHEAD_TOKENS;

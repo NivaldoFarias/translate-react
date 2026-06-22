@@ -1,4 +1,4 @@
-/** @type {import("prettier").Config & import("@ianvs/prettier-plugin-sort-imports").PluginConfig } */
+/** @type {import("prettier").Config & import("@ianvs/prettier-plugin-sort-imports").PluginConfig} */
 export default {
 	semi: true,
 	tabWidth: 2,

@@ -22,6 +22,12 @@ export interface MarkdownLinkViolation {
 
 	/** Affected URL when known */
 	readonly url?: string;
+
+	/** 1-based start line where the problem appears */
+	readonly startLine: number;
+
+	/** 1-based end line where the problem appears */
+	readonly endLine: number;
 }
 
 /**
@@ -51,6 +57,38 @@ export function extractMarkdownLinkSpans(markdown: string) {
 }
 
 /**
+ * Returns the 1-based line number at a UTF-16 offset in markdown.
+ *
+ * @param markdown Full markdown document
+ * @param offset Character offset from the start of the document
+ *
+ * @returns 1-based line number
+ */
+function lineNumberAtOffset(markdown: string, offset: number) {
+	if (offset <= 0) {
+		return 1;
+	}
+
+	return markdown.slice(0, offset).split("\n").length;
+}
+
+/**
+ * Builds a line range for a span inside markdown.
+ *
+ * @param markdown Full markdown document
+ * @param start Start offset of the span
+ * @param end End offset of the span (exclusive)
+ *
+ * @returns 1-based line range covering the span
+ */
+function lineRangeForSpan(markdown: string, start: number, end: number) {
+	return {
+		startLine: lineNumberAtOffset(markdown, start),
+		endLine: lineNumberAtOffset(markdown, Math.max(start, end - 1)),
+	};
+}
+
+/**
  * Detects missing or structurally broken markdown links after translation.
  *
  * @param sourceMarkdown Original markdown
@@ -66,8 +104,15 @@ export function findMarkdownLinkViolations(sourceMarkdown: string, translatedMar
 	const violations: MarkdownLinkViolation[] = [];
 
 	if (translatedLinks.length < sourceLinks.length) {
+		const firstMissing = findFirstUnderrepresentedSourceLink(sourceLinks, translatedLinks);
+		const location =
+			firstMissing ?
+				lineRangeForSpan(sourceMarkdown, firstMissing.start, firstMissing.end)
+			:	{ startLine: 1, endLine: 1 };
+
 		violations.push({
 			message: `Markdown link count dropped (${sourceLinks.length} → ${translatedLinks.length})`,
+			...location,
 		});
 	}
 
@@ -78,25 +123,39 @@ export function findMarkdownLinkViolations(sourceMarkdown: string, translatedMar
 		const translatedCount = translatedCountByUrl.get(url) ?? 0;
 
 		if (translatedCount < sourceCount) {
+			const sourceLink = findSourceLinkForUrl(sourceLinks, url);
+			const location =
+				sourceLink ?
+					lineRangeForSpan(sourceMarkdown, sourceLink.start, sourceLink.end)
+				:	findUrlLineRange(translatedMarkdown, url);
+
 			violations.push({
 				message: `Missing markdown link for URL "${url}" (${sourceCount} → ${translatedCount})`,
 				url,
+				...location,
 			});
 		}
 	}
 
 	for (const url of sourceCountByUrl.keys()) {
-		if (findOrphanLinkClosings(translatedMarkdown, url).length > 0) {
+		const orphanIndices = findOrphanLinkClosings(translatedMarkdown, url);
+		if (orphanIndices.length > 0) {
+			const orphanIndex = orphanIndices[0] ?? 0;
+			const closingLength = `](${url})`.length;
+
 			violations.push({
 				message: `Broken markdown link syntax for URL "${url}"`,
 				url,
+				...lineRangeForSpan(translatedMarkdown, orphanIndex, orphanIndex + closingLength),
 			});
 		}
 
-		if (hasBareUrlOccurrence(translatedMarkdown, url, translatedLinks)) {
+		const bareUrlOffset = findBareUrlOffset(translatedMarkdown, url, translatedLinks);
+		if (bareUrlOffset !== null) {
 			violations.push({
 				message: `URL "${url}" appears outside a markdown link`,
 				url,
+				...lineRangeForSpan(translatedMarkdown, bareUrlOffset, bareUrlOffset + url.length),
 			});
 		}
 	}
@@ -127,6 +186,91 @@ export function buildMarkdownLinkRetryHint(violations: readonly MarkdownLinkViol
 	const problemClause = problems.length > 0 ? ` Problems found: ${problems}.` : "";
 
 	return `Preserve every source markdown link as \`[translated label](same-url)\` with balanced brackets and parentheses. Do not leave bare paths or broken \`[...](url)\` fragments.${problemClause}`;
+}
+
+/**
+ * Finds the first source link that is missing from the translated link spans.
+ *
+ * @param sourceLinks Parsed source links
+ * @param translatedLinks Parsed translated links
+ *
+ * @returns First underrepresented source link span, if any
+ */
+function findFirstUnderrepresentedSourceLink(
+	sourceLinks: readonly MarkdownLinkSpan[],
+	translatedLinks: readonly MarkdownLinkSpan[],
+) {
+	const translatedCountByUrl = countLinksByUrl(translatedLinks);
+
+	for (const link of sourceLinks) {
+		const translatedCount = translatedCountByUrl.get(link.url) ?? 0;
+		if (translatedCount === 0) {
+			return link;
+		}
+
+		translatedCountByUrl.set(link.url, translatedCount - 1);
+	}
+
+	return sourceLinks[0] ?? null;
+}
+
+/**
+ * Returns the first source link span for a URL.
+ *
+ * @param sourceLinks Parsed source links
+ * @param url Destination URL to locate
+ *
+ * @returns Matching source link span, if any
+ */
+function findSourceLinkForUrl(sourceLinks: readonly MarkdownLinkSpan[], url: string) {
+	return sourceLinks.find((link) => link.url === url) ?? null;
+}
+
+/**
+ * Locates the first line range for a URL substring in markdown.
+ *
+ * @param markdown Document to search
+ * @param url URL substring
+ *
+ * @returns Line range for the first match, or line 1 when absent
+ */
+function findUrlLineRange(markdown: string, url: string) {
+	const offset = markdown.indexOf(url);
+	if (offset < 0) {
+		return { startLine: 1, endLine: 1 };
+	}
+
+	return lineRangeForSpan(markdown, offset, offset + url.length);
+}
+
+/**
+ * Finds the first bare URL occurrence outside parsed link spans.
+ *
+ * @param markdown Translated markdown
+ * @param url URL from the source document
+ * @param linkSpans Parsed link spans in the translation
+ *
+ * @returns Start offset of the first bare occurrence, or `null`
+ */
+function findBareUrlOffset(markdown: string, url: string, linkSpans: readonly MarkdownLinkSpan[]) {
+	let searchFrom = 0;
+
+	while (searchFrom < markdown.length) {
+		const index = markdown.indexOf(url, searchFrom);
+		if (index < 0) {
+			return null;
+		}
+
+		const insideLink = linkSpans.some(({ start, end }) => index >= start && index < end);
+
+		if (!insideLink) {
+			return index;
+		}
+
+		searchFrom = index + url.length;
+	}
+
+	return null;
 }
 
 /**
@@ -178,36 +322,6 @@ function findOrphanLinkClosings(markdown: string, url: string) {
 	}
 
 	return orphanIndices;
-}
-
-/**
- * Reports whether a source URL appears in prose outside any parsed link span.
- *
- * @param markdown Translated markdown
- * @param url URL from the source document
- * @param linkSpans Parsed link spans in the translation
- *
- * @returns `true` when a bare URL occurrence exists
- */
-function hasBareUrlOccurrence(
-	markdown: string,
-	url: string,
-	linkSpans: readonly MarkdownLinkSpan[],
-) {
-	let searchFrom = 0;
-
-	while (searchFrom < markdown.length) {
-		const index = markdown.indexOf(url, searchFrom);
-		if (index < 0) return false;
-
-		const insideLink = linkSpans.some(({ start, end }) => index >= start && index < end);
-
-		if (!insideLink) return true;
-
-		searchFrom = index + url.length;
-	}
-
-	return false;
 }
 
 /**

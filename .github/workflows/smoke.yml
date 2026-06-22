@@ -1,0 +1,85 @@
+name: Workflow smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: Fixture profile (quick = small + large + out-of-sync; workflow = PR scenarios; full = all fixtures)
+        required: true
+        type: choice
+        options:
+          - quick
+          - workflow
+          - full
+        default: quick
+      files:
+        description: Comma-separated fixture basenames (overrides profile when set)
+        required: false
+        type: string
+        default: ""
+      environment:
+        description: GitHub Environment for LLM secrets and variables
+        required: true
+        type: choice
+        options:
+          - development
+          - production
+        default: development
+
+permissions:
+  contents: read
+
+concurrency:
+  group: workflow-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Real LLM workflow smoke (${{ inputs.profile }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    environment: ${{ inputs.environment }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Setup Bun dependencies
+        uses: ./.github/actions/setup-bun-deps
+        with:
+          bun-version: ${{ vars.BUN_VERSION || '1.3.14' }}
+
+      - name: Run workflow smoke
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          NODE_ENV: ${{ vars.NODE_ENV }}
+          LOG_LEVEL: ${{ vars.LOG_LEVEL }}
+          LOG_TO_CONSOLE: ${{ vars.LOG_TO_CONSOLE }}
+          LLM_MODEL: ${{ vars.LLM_MODEL }}
+          LLM_API_BASE_URL: ${{ vars.LLM_API_BASE_URL }}
+          MAX_RETRY_ATTEMPTS: ${{ vars.MAX_RETRY_ATTEMPTS }}
+          MAX_LLM_CONCURRENCY: ${{ vars.MAX_LLM_CONCURRENCY }}
+          OPENAI_PROJECT_ID: ${{ secrets.OPENAI_PROJECT_ID }}
+          GH_PAT_TOKEN: ${{ secrets.GH_PAT_TOKEN }}
+          MAX_TOKENS: ${{ vars.MAX_TOKENS }}
+          BATCH_SIZE: ${{ vars.BATCH_SIZE }}
+          TARGET_LANGUAGE: ${{ vars.TARGET_LANGUAGE }}
+          HEADER_APP_URL: ${{ vars.HEADER_APP_URL }}
+          HEADER_APP_TITLE: ${{ vars.HEADER_APP_TITLE }}
+        run: |
+          ARGS=(--profile "${{ inputs.profile }}")
+          if [ -n "${{ inputs.files }}" ]; then
+            ARGS+=(--files "${{ inputs.files }}")
+          fi
+          bun run ci:smoke -- "${ARGS[@]}"
+        timeout-minutes: 115
+
+      - name: Upload smoke artifacts
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: workflow-smoke-${{ inputs.profile }}-${{ github.run_id }}
+          path: .out/
+          retention-days: 14
