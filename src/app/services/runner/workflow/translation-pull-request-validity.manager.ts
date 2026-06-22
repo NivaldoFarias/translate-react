@@ -176,10 +176,12 @@ export class TranslationPullRequestValidityManager {
 	 * @returns Feedback timing when unresolved reviews exist, otherwise `undefined`
 	 */
 	private async detectUnresolvedMaintainerFeedback(prNumber: number, branchName: string) {
-		const [reviews, latestRunnerCommitAt] = await Promise.all([
+		const [reviews, latestTranslationCommit] = await Promise.all([
 			this.services.github.listPullRequestReviews(prNumber),
-			this.services.github.getLatestTranslationCommitTimestamp(branchName),
+			this.services.github.getLatestTranslationCommit(branchName),
 		]);
+
+		const latestRunnerCommitAt = latestTranslationCommit?.timestamp;
 
 		if (!hasUnresolvedChangesRequestedReview(reviews, latestRunnerCommitAt)) {
 			return undefined;

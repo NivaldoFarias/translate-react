@@ -1,3 +1,24 @@
+/** Stable identifiers for post-translation validation guards */
+export const PostTranslationGuardId = {
+	nonEmptyContent: "nonEmptyContent",
+	contentRatio: "contentRatio",
+	mdxSlugPreserved: "mdxSlugPreserved",
+	headingCountPreserved: "headingCountPreserved",
+	headingSyntax: "headingSyntax",
+	headingsPreserved: "headingsPreserved",
+	markdownLinksPreserved: "markdownLinksPreserved",
+	frontmatterPreserved: "frontmatterPreserved",
+	fenceFunctionIdentifiers: "fenceFunctionIdentifiers",
+	fenceJsxStaticText: "fenceJsxStaticText",
+	sentenceCaseHeadings: "sentenceCaseHeadings",
+	mdxSpacing: "mdxSpacing",
+	extraMarkdownLinks: "extraMarkdownLinks",
+} as const;
+
+/** Union of all {@link PostTranslationGuardId} values */
+export type PostTranslationGuardId =
+	(typeof PostTranslationGuardId)[keyof typeof PostTranslationGuardId];
+
 /** Common LLM response prefixes that should be removed from translated content */
 export const TRANSLATION_PREFIXES = [
 	"Here is the translation:",

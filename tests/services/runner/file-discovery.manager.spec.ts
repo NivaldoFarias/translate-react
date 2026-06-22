@@ -1,26 +1,20 @@
 import { describe, expect, test } from "bun:test";
 
-import type { RunnerServiceDependencies } from "@/app/services/runner/runner.types";
-
-import { localeService } from "@/app/composition";
 import { FileDiscoveryManager } from "@/app/services/runner/workflow/file-discovery.manager";
 
-import { createRepositoryTreeItemFixture } from "@tests/fixtures";
 import {
-	createMockGitHubService,
-	createMockLanguageCacheService,
-	createMockLanguageDetectorService,
-	createMockTranslatorService,
-} from "@tests/mocks";
+	createMockPullRequestListItem,
+	createPullRequestStatusFixture,
+	createRepositoryTreeItemFixture,
+	createTranslatedLanguageAnalysis,
+} from "@tests/fixtures";
+import { buildRunnerServiceDependencies } from "@tests/helpers/runner-dependencies.harness";
+import { createMockGitHubService, createMockLanguageDetectorService } from "@tests/mocks";
 
-function createTestFileDiscoveryManager(overrides: Partial<RunnerServiceDependencies> = {}) {
-	return new FileDiscoveryManager({
-		github: overrides.github ?? createMockGitHubService(),
-		translator: overrides.translator ?? createMockTranslatorService(),
-		languageCache: overrides.languageCache ?? createMockLanguageCacheService(),
-		locale: overrides.locale ?? localeService,
-		languageDetector: overrides.languageDetector ?? createMockLanguageDetectorService(),
-	} as RunnerServiceDependencies);
+function createTestFileDiscoveryManager(
+	overrides: Parameters<typeof buildRunnerServiceDependencies>[0] = {},
+) {
+	return new FileDiscoveryManager(buildRunnerServiceDependencies(overrides));
 }
 
 describe("FileDiscoveryManager", () => {
@@ -29,9 +23,7 @@ describe("FileDiscoveryManager", () => {
 			const github = createMockGitHubService();
 			github.findPullRequestByBranch.mockRejectedValue(new Error("GitHub API unavailable"));
 
-			const manager = createTestFileDiscoveryManager({
-				github: github as unknown as RunnerServiceDependencies["github"],
-			});
+			const manager = createTestFileDiscoveryManager({ github });
 			const candidate = createRepositoryTreeItemFixture({ path: "src/content/page.md" });
 
 			const result = await manager.filterByPRs([candidate]);
@@ -44,30 +36,14 @@ describe("FileDiscoveryManager", () => {
 			const github = createMockGitHubService();
 			const languageDetector = createMockLanguageDetectorService();
 
-			github.findPullRequestByBranch.mockResolvedValue({ number: 7 } as never);
-			github.checkPullRequestStatus.mockResolvedValue({
-				hasConflicts: false,
-				mergeable: true,
-				needsUpdate: false,
-				mergeableState: "clean",
-				createdBy: "translate-react-bot",
-			});
+			github.findPullRequestByBranch.mockResolvedValue(createMockPullRequestListItem(7));
+			github.checkPullRequestStatus.mockResolvedValue(createPullRequestStatusFixture());
 			github.getForkFileContentAtBranch.mockResolvedValue(
 				"Conteúdo em português suficientemente longo para detecção de idioma.",
 			);
-			languageDetector.analyzeLanguage.mockResolvedValue({
-				isTranslated: true,
-				ratio: 0.9,
-				detectedLanguage: "pt",
-				languageScore: { target: 0.9, source: 0.1 },
-				rawResult: { reliable: true, languages: [], textBytes: 100, chunks: [] },
-			} as never);
+			languageDetector.analyzeLanguage.mockResolvedValue(createTranslatedLanguageAnalysis());
 
-			const manager = createTestFileDiscoveryManager({
-				github: github as unknown as RunnerServiceDependencies["github"],
-				languageDetector:
-					languageDetector as unknown as RunnerServiceDependencies["languageDetector"],
-			});
+			const manager = createTestFileDiscoveryManager({ github, languageDetector });
 			const candidate = createRepositoryTreeItemFixture({ path: "src/content/page.md" });
 
 			const result = await manager.filterByPRs([candidate]);

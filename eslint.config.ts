@@ -5,6 +5,12 @@ import jsdoc from "eslint-plugin-jsdoc";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
+import type { RulesConfig } from "@eslint/core";
+
+const jsdocRulesOff = Object.fromEntries(
+	Object.keys(jsdoc.rules ?? {}).map((rule) => [`jsdoc/${rule}`, "off"]),
+) as Partial<RulesConfig>;
+
 export default defineConfig(
 	{
 		ignores: [
@@ -21,7 +27,6 @@ export default defineConfig(
 			"**/*.json",
 			"**/*.yml",
 			"**/*.yaml",
-			"src/ci/smoke-llm.ts",
 		],
 	},
 	{
@@ -125,6 +130,7 @@ export default defineConfig(
 	},
 	{
 		files: ["src/ci/**/*.{ts,tsx}"],
+		ignores: ["src/ci/services/smoke/**", "src/ci/actions/smoke.ts"],
 		rules: {
 			"no-restricted-imports": [
 				"error",
@@ -192,9 +198,8 @@ export default defineConfig(
 	},
 	{
 		files: ["tests/**"],
-		rules: Object.fromEntries(
-			Object.keys(jsdoc.rules ?? {}).map((rule) => [`jsdoc/${rule}`, "off"]),
-		),
+		ignores: ["tests/fixtures/**", "tests/helpers/**"],
+		rules: jsdocRulesOff,
 	},
 	{
 		files: ["*.cjs"],

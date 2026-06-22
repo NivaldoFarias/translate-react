@@ -161,7 +161,7 @@ describe("formatMarkdownLinkViolationSummary and buildMarkdownLinkRetryHint", ()
 
 	test("retry hint always includes preservation instructions", () => {
 		const hint = buildMarkdownLinkRetryHint([
-			{ message: 'URL "/x" appears outside a markdown link', url: "/x" },
+			{ message: 'URL "/x" appears outside a markdown link', url: "/x", startLine: 1, endLine: 1 },
 		]);
 
 		expect(hint).toContain("[translated label](same-url)");

@@ -1,6 +1,9 @@
 /** Prefix of runner translation commits on fork `translate/…` branches */
 export const TRANSLATION_COMMIT_MESSAGE_PREFIX = "docs: translate ";
 
+/** Body separator before maintainer attribution on remediation commits */
+export const TRANSLATION_REMEDIATION_COMMIT_ATTRIBUTION_INFIX = "\n\nper ";
+
 /**
  * GitHub `author_association` values that may submit review feedback on translation PRs.
  *

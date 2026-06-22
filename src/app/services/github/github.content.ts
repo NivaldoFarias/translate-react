@@ -7,6 +7,7 @@ import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 import type { CommentBuilderService } from "@/app/services/comment-builder/";
 import type {
+	LatestTranslationCommitSnapshot,
 	PatchedRepositoryTreeItem,
 	ProcessedFileResult,
 	PullRequestIssueCommentSnapshot,
@@ -764,13 +765,15 @@ export class GitHubContent {
 	}
 
 	/**
-	 * Returns the committer timestamp of the latest runner translation commit on a fork branch.
+	 * Returns the newest runner translation commit on a fork branch.
 	 *
 	 * @param branchName Translation branch name without `refs/heads/` prefix
 	 *
-	 * @returns Committer date of the newest `docs: translate` commit, or `undefined` when none exist
+	 * @returns Committer timestamp and message of the newest `docs: translate` commit, if any
 	 */
-	public async getLatestTranslationCommitTimestamp(branchName: string): Promise<Date | undefined> {
+	public async getLatestTranslationCommit(
+		branchName: string,
+	): Promise<LatestTranslationCommitSnapshot | undefined> {
 		const response = await this.deps.octokit.repos.listCommits({
 			...this.deps.repositories.fork,
 			sha: branchName,
@@ -788,7 +791,27 @@ export class GitHubContent {
 		const timestamp =
 			translationCommit.commit.committer?.date ?? translationCommit.commit.author?.date;
 
-		return timestamp ? new Date(timestamp) : undefined;
+		if (!timestamp) {
+			return undefined;
+		}
+
+		return {
+			timestamp: new Date(timestamp),
+			message: translationCommit.commit.message,
+		};
+	}
+
+	/**
+	 * Returns the committer timestamp of the latest runner translation commit on a fork branch.
+	 *
+	 * @param branchName Translation branch name without `refs/heads/` prefix
+	 *
+	 * @returns Committer date of the newest `docs: translate` commit, or `undefined` when none exist
+	 */
+	public async getLatestTranslationCommitTimestamp(branchName: string): Promise<Date | undefined> {
+		const latestCommit = await this.getLatestTranslationCommit(branchName);
+
+		return latestCommit?.timestamp;
 	}
 
 	/**

@@ -1,0 +1,76 @@
+/**
+ * Runs the translation workflow against fixture markdown with a live LLM and mocked GitHub.
+ *
+ * Writes reviewable outputs under `.out/`. Invoked locally or by [`.github/workflows/smoke.yml`](../../.github/workflows/smoke.yml).
+ *
+ * @example
+ * ```bash
+ * bun run ci:smoke -- --profile quick
+ * bun run ci:smoke -- --profile workflow
+ * bun run ci:smoke -- --files hydrateRoot.md,lazy.md
+ * ```
+ */
+
+import "@/app/utils/bootstrap-cli-overrides.util";
+
+import { defineCommand, runCommand } from "citty";
+
+import {
+	isSmokeProfileId,
+	runWorkflowSmoke,
+	SmokeProfile,
+	workflowSmokeSucceeded,
+} from "@/ci/services/smoke";
+import { handleTopLevelError } from "@/shared/errors/";
+import { createLogger } from "@/shared/utils/create-logger.util";
+
+const log = createLogger({ level: "info", logToConsole: true }).child({
+	component: "smoke",
+});
+
+const smokeCommand = defineCommand({
+	meta: {
+		name: "smoke",
+		description: "Run workflow smoke with real LLM and mocked GitHub fixtures",
+	},
+	args: {
+		profile: {
+			type: "string",
+			description: "Fixture profile: quick, workflow, or full",
+			default: SmokeProfile.Quick,
+		},
+		files: {
+			type: "string",
+			description: "Comma-separated fixture basenames (overrides profile)",
+			default: "",
+		},
+	},
+	async run({ args }) {
+		if (!isSmokeProfileId(args.profile)) {
+			log.error(
+				{ profile: args.profile, allowed: Object.values(SmokeProfile) },
+				"Invalid smoke profile",
+			);
+			process.exit(1);
+		}
+
+		try {
+			const stats = await runWorkflowSmoke({
+				profile: args.profile,
+				filesArgument: args.files,
+			});
+
+			if (!workflowSmokeSucceeded(stats)) {
+				log.error({ stats }, "Workflow smoke reported translation failures");
+				process.exit(1);
+			}
+
+			process.exit(0);
+		} catch (error) {
+			handleTopLevelError(error, log);
+			process.exit(1);
+		}
+	},
+});
+
+await runCommand(smokeCommand, { rawArgs: process.argv.slice(2) });
