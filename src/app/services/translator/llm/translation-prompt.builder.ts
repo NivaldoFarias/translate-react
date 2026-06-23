@@ -135,7 +135,7 @@ export class TranslationPromptBuilder {
 				${maintainerReviewSection}
 				# CRITICAL PRESERVATION RULES
 				1. **Structure & Formatting**: Preserve ALL markdown syntax, HTML tags, code blocks, frontmatter, and line breaks exactly as written
-				2. **Code & identifiers**: Keep ALL code examples, URLs, and every programming identifier (functions, variables, classes, hooks, packages, props as in code) unchanged in every context—fenced blocks, inline code, tables, lists, or prose
+				2. **Code & identifiers**: Keep ALL code examples, URLs, and every programming identifier (functions, variables, classes, hooks, packages, props as in code) unchanged in every context: fenced blocks, inline code, tables, lists, or prose
 				3. **Content Completeness**: Translate EVERY piece of text content WITHOUT adding, removing, or omitting anything
 				4. **Whitespace Integrity**: ALWAYS preserve blank lines, especially after horizontal rules (---). The pattern '---\n\n##' must remain '---\n\n##' and never become '---\n##'
 	

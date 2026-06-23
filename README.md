@@ -59,7 +59,7 @@ Full wiki index: [Home](https://github.com/NivaldoFarias/translate-react/wiki).
 
 ## GitHub Actions on a fork
 
-In order to enable the [main translation workflow](./.github/workflows/workflow.yml) to run on a fork, either through scheduled runs or manually, you need to:
+To run the [main translation workflow](./.github/workflows/workflow.yml) on a fork (scheduled or manual):
 
 1. Enable Actions on the repo that holds the workflow
 2. Install the `translate-react-bot` GitHub App on the fork
@@ -67,13 +67,13 @@ In order to enable the [main translation workflow](./.github/workflows/workflow.
 
 ### Scheduled runs
 
-Scheduled runs use [`.github/workflows/poll.yml`](./.github/workflows/poll.yml) to detect new commits on `reactjs/<lang>.react.dev` before starting translation ([See Wiki: Automated upstream polling](https://github.com/NivaldoFarias/translate-react/wiki/Workflow#automated-upstream-polling))
+Scheduled runs use [`.github/workflows/poll.yml`](./.github/workflows/poll.yml) to detect new commits on `reactjs/<lang>.react.dev` before starting translation. See [Automated upstream polling](https://github.com/NivaldoFarias/translate-react/wiki/Workflow#automated-upstream-polling).
 
-When several locales run in parallel, tune LLM and GitHub limits per [See Wiki: Parallel matrix locales](https://github.com/NivaldoFarias/translate-react/wiki/Workflow#parallel-matrix-locales--capacity)
+When several locales run in parallel, tune LLM and GitHub limits. See [Parallel matrix locales](https://github.com/NivaldoFarias/translate-react/wiki/Workflow#parallel-matrix-locales--capacity).
 
 ### Manual translation
 
-Manual translation is done by running the [`.github/workflows/workflow.yml`](./.github/workflows/workflow.yml) workflow manually. You can also pin a commit SHA or tag in your fork workflow when you need a fixed tool version ([See Wiki: Releases](https://github.com/NivaldoFarias/translate-react/wiki/Workflow#releases-and-semantic-versioning))
+Run [`.github/workflows/workflow.yml`](./.github/workflows/workflow.yml) manually for on-demand translation. Pin a commit SHA or tag in your fork workflow when you need a fixed tool version. See [Releases and semantic versioning](https://github.com/NivaldoFarias/translate-react/wiki/Workflow#releases-and-semantic-versioning).
 
 ## Configuration
 
@@ -93,7 +93,7 @@ bun run dev
 bun start
 ```
 
-To exercise translation with a live LLM and mocked GitHub against react.dev fixtures, run `bun run ci:smoke` (profiles: `quick`, `workflow`, `full`; outputs under `.out/`). CI integration tests use a passthrough LLM mock: [`workflow.integration.spec.ts`](./tests/integration/workflow.integration.spec.ts). See [Wiki: Workflow](https://github.com/NivaldoFarias/translate-react/wiki/Workflow#local-llm-exercise-integration-tests).
+Run `bun run ci:smoke` with a live LLM and mocked GitHub against react.dev fixtures. Profiles: `quick`, `workflow`, `full`. Artifacts land in `.out/`. CI integration tests mock the LLM instead: [`workflow.integration.spec.ts`](./tests/integration/workflow.integration.spec.ts). See [local LLM exercise](https://github.com/NivaldoFarias/translate-react/wiki/Workflow#local-llm-exercise-integration-tests).
 
 ## Versioning and releases
 

@@ -87,22 +87,22 @@ const envSchema = z.object({
 	/**
 	 * The target language for translation.
 	 *
-	 * Must be one of the 38 supported React translation languages. GitHub Actions passes
-	 * `matrix.lang` via `--lang` (see `.github/workflows/workflow.yml` and `translation-cli.util.ts`).
+	 * Must be one of the {@link REACT_TRANSLATION_LANGUAGES|supported React translation languages}.
+	 * GitHub Actions passes `matrix.lang` via `--lang` (see `.github/workflows/workflow.yml` and `translation-cli.util.ts`).
 	 *
-	 * @see {@link REACT_TRANSLATION_LANGUAGES}
+	 * @see
 	 */
-	TARGET_LANGUAGE: z.enum(REACT_TRANSLATION_LANGUAGES).default(envDefaults.TARGET_LANGUAGE),
+	TARGET_LANGUAGE: defaultEnvEnum(REACT_TRANSLATION_LANGUAGES, envDefaults.TARGET_LANGUAGE),
 
 	/**
 	 * The source language for translation and language-detector display names.
 	 *
-	 * Official React docs use English (`en`). Defaults match that; the translation workflow
+	 * Official React docs use English (`en`). That is the default. The translation workflow
 	 * does not set this variable.
 	 *
 	 * @see {@link REACT_TRANSLATION_LANGUAGES}
 	 */
-	SOURCE_LANGUAGE: z.enum(REACT_TRANSLATION_LANGUAGES).default(envDefaults.SOURCE_LANGUAGE),
+	SOURCE_LANGUAGE: defaultEnvEnum(REACT_TRANSLATION_LANGUAGES, envDefaults.SOURCE_LANGUAGE),
 
 	/** Maximum tokens to generate in a single LLM response */
 	MAX_TOKENS: z.coerce.number().positive().default(envDefaults.MAX_TOKENS),
@@ -154,7 +154,9 @@ const envSchema = z.object({
 	TRANSLATION_GUIDELINES_FILE: z.string().optional(),
 
 	/**
-	 * When enabled, fences at or above `MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS` become HTML placeholders before the LLM; restored after. Prose inside those fences is not translated while masked.
+	 * When enabled, fences at or above `MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS` become HTML
+	 * placeholders before the LLM and are restored after. Prose inside those fences is not
+	 * translated while masked.
 	 */
 	MASK_VERBATIM_LARGE_FENCES: z.coerce.boolean().default(envDefaults.MASK_VERBATIM_LARGE_FENCES),
 
@@ -165,7 +167,7 @@ const envSchema = z.object({
 		.default(envDefaults.MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS),
 
 	/**
-	 * Set by the GitHub Actions runner when present; enables workflow run URLs in PR bodies and issue comments.
+	 * Set by the GitHub Actions runner when present. Adds workflow run URLs to PR bodies and issue comments.
 	 */
 	GITHUB_ACTIONS: z.stringbool().optional(),
 
@@ -265,6 +267,21 @@ function emptyEnvValueToUndefined(value: unknown): unknown {
 	}
 
 	return value;
+}
+
+/**
+ * Required env enum with defaults when unset or empty.
+ *
+ * @param values Allowed enum values
+ * @param defaultValue Value used when the variable is missing or `""`
+ *
+ * @returns Zod enum schema with preprocess and default
+ */
+function defaultEnvEnum<T extends Readonly<[string, ...string[]]>>(
+	values: T,
+	defaultValue: T[number],
+) {
+	return z.preprocess(emptyEnvValueToUndefined, z.enum(values).default(defaultValue));
 }
 
 /**

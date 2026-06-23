@@ -27,7 +27,7 @@ const ruPRBodyStrings: LocalePRBodyStrings = {
 	},
 
 	maintainerWikiTip: (wikiUrl) =>
-		`См. [For React Docs Maintainers](${wikiUrl}) — руководство для ревьюеров и формат структурированного feedback.`,
+		`См. [For React Docs Maintainers](${wikiUrl}): руководство для ревьюеров и формат структурированного feedback.`,
 
 	reviewerWarnings: {
 		intro:
