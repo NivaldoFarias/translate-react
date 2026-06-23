@@ -1,8 +1,10 @@
 /**
- * Named fixture sets for `bun run ci:smoke` and `.github/workflows/smoke.yml`.
+ * Named fixture sets for `bun run ci:smoke` and [`.github/workflows/smoke.yml`](../../../../.github/workflows/smoke.yml).
  *
- * Each profile selects markdown basenames under `tests/fixtures/md/`. Mock pull-request
- * metadata for each basename lives in `tests/fixtures/md/workflow.manifest.ts`.
+ * - Each profile selects markdown basenames under`tests/fixtures/md/`.
+ * - Mock pull-request metadata for each basename lives in
+ * [`workflow.manifest.ts`](../../../../tests/fixtures/md/workflow.manifest.ts).
+ * - Profiles, `.out/` layout, and CI artifacts: [CONTRIBUTING.md](../../../../CONTRIBUTING.md).
  */
 export const SmokeProfile = {
 	/**

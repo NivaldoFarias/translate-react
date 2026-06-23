@@ -1,7 +1,9 @@
 /**
- * Runs the translation workflow against fixture markdown with a live LLM and mocked GitHub.
+ * CLI entry for real-LLM workflow smoke (`bun run ci:smoke`).
  *
- * Writes reviewable outputs under `.out/`. Invoked locally or by [`.github/workflows/smoke.yml`](../../.github/workflows/smoke.yml).
+ * Invoked locally or by [`.github/workflows/smoke.yml`](../../.github/workflows/smoke.yml).
+ * Reviewable outputs are written under `.out/`. See {@link runWorkflowSmoke} and
+ * [CONTRIBUTING.md](../../../CONTRIBUTING.md#workflow-smoke) for layout and CI artifacts.
  *
  * @example
  * ```bash
