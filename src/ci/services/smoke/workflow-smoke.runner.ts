@@ -27,10 +27,14 @@ export const WORKFLOW_SMOKE_ARTIFACT_DIR = ".out" as const;
 
 /** Options for {@link runWorkflowSmoke} */
 export interface RunWorkflowSmokeOptions {
-	/** Fixture profile when `filesArgument` is empty */
+	/**
+	 * {@link SmokeProfileId} fixture set.
+	 *
+	 * @see {@link resolveSmokeFixtureBasenames}
+	 */
 	profile: SmokeProfileId;
 
-	/** Comma-separated fixture basenames; overrides `profile` when non-empty */
+	/** Comma-separated fixture basenames. Overrides `profile` when non-empty. */
 	filesArgument?: string;
 
 	/** Repository root for fixture and artifact paths */
@@ -55,10 +59,10 @@ async function clearSmokeArtifactDir(artifactDir: string) {
 }
 
 /**
- * Runs `RunnerService` with real `translatorService` (live LLM) and mocked GitHub fixtures.
+ * Runs {@link RunnerService} with real {@link translatorService} and mocked GitHub fixtures.
  *
  * Loads markdown from `tests/fixtures/md/` and writes translated blobs, PR bodies, and progress
- * comments under `artifactDir`. Do not invoke via `bun test` — the test preload replaces `env`.
+ * comments under `artifactDir`.
  *
  * @param options Profile, optional fixture override, and output directory
  *

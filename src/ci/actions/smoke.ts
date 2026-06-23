@@ -7,6 +7,7 @@
  * ```bash
  * bun run ci:smoke -- --profile quick
  * bun run ci:smoke -- --profile workflow
+ * bun run ci:smoke -- --profile full
  * bun run ci:smoke -- --files hydrateRoot.md,lazy.md
  * ```
  */
@@ -36,7 +37,8 @@ const smokeCommand = defineCommand({
 	args: {
 		profile: {
 			type: "string",
-			description: "Fixture profile: quick, workflow, or full",
+			description:
+				"Fixture set. quick: default CI (small + large new-PR translation, out-of-sync refresh). workflow: PR scenarios (out-of-sync, maintainer fix, valid skip). full: all tests/fixtures/md/*.md",
 			default: SmokeProfile.Quick,
 		},
 		files: {
