@@ -7,6 +7,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 ### Changed
 
 - Manual `smoke.yml` dispatch selects fixtures by profile only; the `files` input is removed.
+- GitHub Actions smoke packs `.out/` into `artifacts/smoke/<profile>-<run_id>.tar.gz` before artifact upload because `upload-artifact` skips hidden dot-directories; artifact name `smoke-<profile>-<run_id>`.
 - Release history bullets rewritten for outcome-first, reader-facing prose.
 
 ### Fixed

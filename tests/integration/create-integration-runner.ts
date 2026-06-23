@@ -287,7 +287,9 @@ export type { WorkflowFixtureFile } from "@tests/fixtures/workflow-fixture.util"
  * under {@link WorkflowGitHubArtifactOptions.captureArtifactsDir}. Each processed file gets a
  * subdirectory named from its path under `src/content/` (e.g. `hydrateRoot.md` → `hydrateRoot/`)
  * containing `translated.md` and `pull-request.md`. The issue comment is
- * `translation-progress-issue-comment.md` at the capture root.
+ * `translation-progress-issue-comment.md` at the capture root. `ci:smoke` defaults
+ * `captureArtifactsDir` to `.out/`; CI packaging is documented in
+ * [CONTRIBUTING.md](../../CONTRIBUTING.md#workflow-smoke).
  */
 export type WorkflowGitHubArtifactOptions = Readonly<{
 	/** Directory (resolved under `cwd`) where artifact files are written */

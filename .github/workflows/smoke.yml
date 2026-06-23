@@ -5,9 +5,7 @@ on:
     inputs:
       profile:
         description: >
-          quick: default CI slice (small API + large MDX new-PR translation, out-of-sync PR refresh,
-          3 fixtures). workflow: PR scenarios only (out-of-sync refresh, maintainer remediation,
-          valid skip, 3 fixtures). full: every *.md under tests/fixtures/md/.
+          quick: default CI slice; workflow: PR scenarios only; full: every *.md under tests/fixtures/md/.
         required: true
         type: choice
         options:
@@ -28,7 +26,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: workflow-smoke-${{ github.ref }}
+  group: smoke-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -37,6 +35,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     environment: ${{ inputs.environment }}
+    env:
+      SMOKE_OUTPUT_DIR: .out
+      SMOKE_ARCHIVE_PATH: artifacts/smoke/${{ inputs.profile }}-${{ github.run_id }}.tar.gz
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -69,10 +70,19 @@ jobs:
         run: bun run ci:smoke -- --profile "${{ inputs.profile }}"
         timeout-minutes: 115
 
-      - name: Upload smoke artifacts
+      - name: Pack workflow smoke outputs for upload
+        if: always()
+        run: |
+          if [ -d "$SMOKE_OUTPUT_DIR" ] && [ -n "$(ls -A "$SMOKE_OUTPUT_DIR" 2>/dev/null)" ]; then
+            mkdir -p "$(dirname "$SMOKE_ARCHIVE_PATH")"
+            tar -czf "$SMOKE_ARCHIVE_PATH" -C "$SMOKE_OUTPUT_DIR" .
+          fi
+
+      - name: Upload workflow smoke archive
         uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: workflow-smoke-${{ inputs.profile }}-${{ github.run_id }}
-          path: .out/
+          name: smoke-${{ inputs.profile }}-${{ github.run_id }}
+          path: ${{ env.SMOKE_ARCHIVE_PATH }}
+          if-no-files-found: warn
           retention-days: 14
