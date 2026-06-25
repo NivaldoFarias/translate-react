@@ -7,7 +7,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 ### Changed
 
 - Manual `smoke.yml` dispatch selects fixtures by profile only; the `files` input is removed.
-- GitHub Actions smoke packs `.out/` into `artifacts/smoke/<profile>-<run_id>.tar.gz` before artifact upload because `upload-artifact` skips hidden dot-directories; artifact name `smoke-<profile>-<run_id>`.
+- GitHub Actions smoke packs `.out/` into `artifacts/smoke/<profile>-<run_id>.tar.gz` before upload (because `upload-artifact` skips hidden dot-directories) and uses `archive: false` so downloads extract with one `tar -xzf`, not zip then tar.
+- `ci:smoke` artifact capture writes `pull-request.md` when the runner refreshes an open pull request, not only on new PR creation.
+- Advisory validation on translation pull requests inlines the guard id and violation tally on each `###` heading, uses `####` line anchors one level below, and fences violation snippets in `markdown` code blocks so sample headings do not render as PR content.
 - Release history bullets rewritten for outcome-first, reader-facing prose.
 
 ### Fixed
