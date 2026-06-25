@@ -247,8 +247,7 @@ describe("ptBrLocale.pullRequest.body", () => {
 			expect(body).toContain(WIKI_FOR_REACT_DOCS_MAINTAINERS_URL);
 			expect(body).toContain("<details>");
 			expect(body).toContain("Ver detalhes da validação");
-			expect(body).toContain("### Links markdown");
-			expect(body).toContain("#### `markdownLinksPreserved` (1 violação)");
+			expect(body).toContain("### Links markdown (`markdownLinksPreserved`, 1 violação)");
 			expect(body).toContain("> Preserve every");
 			expect(body).not.toContain("| Validador | O que corrigir |");
 			expect(body).not.toContain("Guia para revisores:");
@@ -278,8 +277,9 @@ describe("ptBrLocale.pullRequest.body", () => {
 
 			const body = buildPullRequestBody(sourceFile, result, metadata);
 
-			expect(body).toContain("### Texto JSX estático em blocos de código");
-			expect(body).toContain("#### `fenceJsxStaticText` (1 violação)");
+			expect(body).toContain(
+				"### Texto JSX estático em blocos de código (`fenceJsxStaticText`, 1 violação)",
+			);
 			expect(body).toContain("> Inside fenced code blocks");
 			expect(body).toContain("#### L");
 			expect(body).toContain("```diff");

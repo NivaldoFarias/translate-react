@@ -155,48 +155,51 @@ function formatInstructionBlockquote(instruction: string) {
 }
 
 /**
+ * Wraps a violation snippet in a fenced code block when it is not already fenced.
+ *
+ * @param body Violation body text
+ *
+ * @returns Fenced `markdown` block or the original fenced block unchanged
+ */
+function formatViolationBody(body: string) {
+	const trimmed = body.trim();
+	if (trimmed.startsWith("```")) {
+		return trimmed;
+	}
+
+	return ["```markdown", trimmed, "```"].join("\n");
+}
+
+/**
  * Renders one located violation as a subsection heading plus body.
  *
- * @param strings Locale strings for reviewer warnings
  * @param violation Located violation payload
  *
  * @returns Markdown subsection without the guard heading
  */
-function formatLocatedViolation(
-	strings: LocalePRBodyStrings["reviewerWarnings"],
-	violation: LocatedViolation,
-) {
+function formatLocatedViolation(violation: LocatedViolation) {
 	const location = formatViolationLocation(violation.startLine, violation.endLine);
 
 	return `#### ${location}
 
-${violation.body}`;
+${formatViolationBody(violation.body)}`;
 }
 
 /**
  * Builds the guard subsection body from located violations.
  *
- * @param guardId Post-translation guard identifier
  * @param instruction Instruction-only retry hint sentence
  * @param violations Located violations for the guard
- * @param strings Locale strings for reviewer warnings
  *
  * @returns Guard subsection body without the `###` heading
  */
 function formatLocatedViolationsSection(
-	guardId: PostTranslationGuardId,
 	instruction: string,
 	violations: readonly LocatedViolation[],
-	strings: LocalePRBodyStrings["reviewerWarnings"],
 ) {
-	const tally = strings.violationTally(violations.length);
-	const items = violations
-		.map((violation) => formatLocatedViolation(strings, violation))
-		.join("\n\n");
+	const items = violations.map((violation) => formatLocatedViolation(violation)).join("\n\n");
 
 	return `${formatInstructionBlockquote(instruction)}
-
-#### \`${guardId}\` (${tally})
 
 ${items}`;
 }
@@ -403,23 +406,16 @@ function collectHeadingsPreservedViolations(sourceMarkdown: string, translatedMa
  *
  * @param guardId Post-translation guard identifier
  * @param hint Retry hint text
- * @param strings Locale strings for reviewer warnings
  *
- * @returns Guard subsection body
+ * @returns Guard subsection body and violation count for the tally
  */
-function formatHintOnlySection(
-	guardId: PostTranslationGuardId,
-	hint: string,
-	strings: LocalePRBodyStrings["reviewerWarnings"],
-) {
+function formatHintOnlySection(guardId: PostTranslationGuardId, hint: string) {
 	const instruction = extractHintInstruction(hint);
 
-	return formatLocatedViolationsSection(
-		guardId,
-		instruction,
-		[{ startLine: 1, endLine: 1, body: hint }],
-		strings,
-	);
+	return {
+		body: formatLocatedViolationsSection(instruction, [{ startLine: 1, endLine: 1, body: hint }]),
+		violationCount: 1,
+	};
 }
 
 /**
@@ -443,12 +439,14 @@ function formatGuardSection(
 	const heading = strings.guardLabel(guardId);
 	const hint = hints.join(" ");
 
-	const body =
+	const { body, violationCount } =
 		sourceMarkdown && translatedMarkdown ?
-			formatGuardSectionBody(guardId, sourceMarkdown, translatedMarkdown, hint, strings)
-		:	formatHintOnlySection(guardId, hint, strings);
+			formatGuardSectionBody(guardId, sourceMarkdown, translatedMarkdown, hint)
+		:	formatHintOnlySection(guardId, hint);
 
-	return `### ${heading}
+	const tally = strings.violationTally(violationCount);
+
+	return `### ${heading} (\`${guardId}\`, ${tally})
 
 ${body}`;
 }
@@ -460,16 +458,14 @@ ${body}`;
  * @param sourceMarkdown Original markdown
  * @param translatedMarkdown Translated markdown
  * @param hint Retry hint text
- * @param strings Locale strings for reviewer warnings
  *
- * @returns Guard subsection body without the `###` heading
+ * @returns Guard subsection body without the `###` heading and violation count for the tally
  */
 function formatGuardSectionBody(
 	guardId: PostTranslationGuardId,
 	sourceMarkdown: string,
 	translatedMarkdown: string,
 	hint: string,
-	strings: LocalePRBodyStrings["reviewerWarnings"],
 ) {
 	const instruction = extractHintInstruction(hint);
 
@@ -493,15 +489,18 @@ function formatGuardSectionBody(
 
 	const collectViolations = violationsByGuard[guardId];
 	if (!collectViolations) {
-		return formatHintOnlySection(guardId, hint, strings);
+		return formatHintOnlySection(guardId, hint);
 	}
 
 	const violations = collectViolations();
 	if (violations.length === 0) {
-		return formatHintOnlySection(guardId, hint, strings);
+		return formatHintOnlySection(guardId, hint);
 	}
 
-	return formatLocatedViolationsSection(guardId, instruction, violations, strings);
+	return {
+		body: formatLocatedViolationsSection(instruction, violations),
+		violationCount: violations.length,
+	};
 }
 
 /**

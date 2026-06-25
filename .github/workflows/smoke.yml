@@ -84,5 +84,6 @@ jobs:
         with:
           name: smoke-${{ inputs.profile }}-${{ github.run_id }}
           path: ${{ env.SMOKE_ARCHIVE_PATH }}
+          archive: false
           if-no-files-found: warn
           retention-days: 14
