@@ -244,7 +244,7 @@ export class TranslationLlmClient {
 							);
 						}
 
-						const finishReason = completion.choices[0]?.finish_reason;
+						const finishReason = completion.choices[0]?.finish_reason as string | undefined;
 						if (finishReason === "length") {
 							throw new AbortError(
 								new ApplicationError(
@@ -259,6 +259,20 @@ export class TranslationLlmClient {
 										promptTokens: completion.usage?.prompt_tokens,
 									},
 								),
+							);
+						}
+
+						if (finishReason === "error") {
+							throw new ApplicationError(
+								"Language model returned error finish reason",
+								ErrorCode.TranslationFailed,
+								`${TranslationLlmClient.name}.${this.callLanguageModel.name}`,
+								{
+									model: this.model,
+									contentLength: contentToTranslate.length,
+									finishReason,
+									translatedLength: translatedContent.length,
+								},
 							);
 						}
 

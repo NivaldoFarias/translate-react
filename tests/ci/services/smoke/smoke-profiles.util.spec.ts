@@ -12,6 +12,7 @@ describe("smoke-profiles.util", () => {
 				"use-memo.md",
 				"react-labs-view-transitions-activity-and-more.md",
 				"lazy.md",
+				"invalid-hook-call-warning.md",
 			]);
 		});
 

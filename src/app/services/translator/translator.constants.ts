@@ -5,7 +5,7 @@ export const LLM_TEMPERATURE = 0.1;
 export const CONNECTIVITY_TEST_MAX_TOKENS = 5;
 
 /** Maximum prose segments packed into one segment-batch LLM request */
-export const SEGMENT_BATCH_MAX_ITEMS_PER_BATCH = 40;
+export const SEGMENT_BATCH_MAX_ITEMS_PER_BATCH = 20;
 
 /** Maximum follow-up calls that retry only missing segment ids after a partial batch response */
 export const SEGMENT_BATCH_MAX_PARTIAL_FOLLOW_UP_ROUNDS = 3;

@@ -6,6 +6,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Changed
 
+- Segment batches pack at most 20 prose segments per LLM request (down from 40), reducing structured JSON parse failures and split retries on segment-heavy pages.
+- Quick `ci:smoke` profile includes `invalid-hook-call-warning.md` as a structured-output stress fixture.
 - Segment batch failures from truncated output, id mismatch, or malformed JSON now split the batch on the first error instead of repeating the same LLM call through `p-retry`, reducing wasted retries and LLM cost.
 - Manual `smoke.yml` dispatch selects fixtures by profile only; the `files` input is removed.
 - GitHub Actions smoke packs `.out/` into `artifacts/smoke/<profile>-<run_id>.tar.gz` before upload (because `upload-artifact` skips hidden dot-directories) and uses `archive: false` so downloads extract with one `tar -xzf`, not zip then tar.
@@ -15,6 +17,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Fixed
 
+- Full-body LLM calls with provider `finishReason: "error"` no longer pass as success; truncated or malformed output fails and retries instead of reaching guards with misleading `contentRatio` blocks.
 - Glued inline code, MDX slug comments, and adjacent markdown links are repaired before advisory validation so those mechanical spacing regressions no longer surface as `mdxSpacing` reviewer notices on translation pull requests.
 - Blank `TARGET_LANGUAGE` or `SOURCE_LANGUAGE` from GitHub Actions or `.env` no longer fails validation; empty values default to `pt-br` and `en`.
 

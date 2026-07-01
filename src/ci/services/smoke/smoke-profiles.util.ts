@@ -44,7 +44,8 @@ export function isSmokeProfileId(value: string): value is SmokeProfileId {
  * Fixture basenames per non-`full` profile (must exist under `tests/fixtures/md/`).
  *
  * - `"quick"`: `use-memo.md` and `react-labs-view-transitions-activity-and-more.md` (new PR,
- *   translation output), `lazy.md` (open PR behind upstream, branch refresh).
+ *   translation output), `lazy.md` (open PR behind upstream, branch refresh),
+ *   `invalid-hook-call-warning.md` (structured-output stress test with many segments).
  * - `"workflow"`: `lazy.md` (out-of-sync refresh), `react-19.md` (unresolved
  *   `CHANGES_REQUESTED` remediation), `react-conf-2021-recap.md` (in-sync valid PR, skip LLM).
  */
@@ -53,6 +54,7 @@ export const SMOKE_PROFILE_FIXTURES = {
 		"use-memo.md",
 		"react-labs-view-transitions-activity-and-more.md",
 		"lazy.md",
+		"invalid-hook-call-warning.md",
 	],
 	[SmokeProfile.Workflow]: ["lazy.md", "react-19.md", "react-conf-2021-recap.md"],
 } as const satisfies Record<Exclude<SmokeProfileId, "full">, readonly string[]>;
