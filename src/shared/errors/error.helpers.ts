@@ -141,6 +141,76 @@ export function isSegmentBatchIdMismatchError(error: unknown) {
 }
 
 /**
+ * Returns whether `error` is a JSON-parse or schema-validation failure on a segment batch response.
+ *
+ * Matches "Segment batch response was not valid JSON" and "Segment batch response failed schema
+ * validation", including when wrapped in {@link AbortError} from `p-retry`.
+ *
+ * @param error Caught rejection from segment batch translation
+ *
+ * @returns `true` when the LLM returned unparseable or schema-invalid segment JSON
+ */
+export function isSegmentBatchStructuredOutputError(error: unknown) {
+	if (error instanceof ApplicationError && error.code === ErrorCode.TranslationFailed) {
+		return (
+			error.message === "Segment batch response was not valid JSON" ||
+			error.message === "Segment batch response failed schema validation"
+		);
+	}
+
+	if (error instanceof AbortError) {
+		return isSegmentBatchStructuredOutputError(error.originalError);
+	}
+
+	return false;
+}
+
+/** Log reason when a segment batch is split after a splittable failure */
+export type SegmentBatchSplitReason =
+	| "completion_token_limit"
+	| "segment_batch_id_mismatch"
+	| "structured_output_error";
+
+/**
+ * Returns whether a segment batch failure can be recovered by splitting the batch.
+ *
+ * Matches completion truncation, id mismatches, and JSON parse or schema validation
+ * failures, including when wrapped in {@link AbortError} from `p-retry`.
+ *
+ * @param error Caught rejection from segment batch translation
+ *
+ * @returns `true` when the translator should split the batch instead of retrying the same payload
+ */
+export function isSegmentBatchSplittableError(error: unknown) {
+	return (
+		isCompletionLengthTruncationError(error) ||
+		isSegmentBatchIdMismatchError(error) ||
+		isSegmentBatchStructuredOutputError(error)
+	);
+}
+
+/**
+ * Resolves the log reason for a splittable segment batch failure.
+ *
+ * @param error Caught rejection from segment batch translation
+ *
+ * @returns Split reason for structured logging
+ *
+ * @see {@link isSegmentBatchSplittableError}
+ */
+export function getSegmentBatchSplitReason(error: unknown): SegmentBatchSplitReason {
+	if (isCompletionLengthTruncationError(error)) {
+		return "completion_token_limit";
+	}
+
+	if (isSegmentBatchIdMismatchError(error)) {
+		return "segment_batch_id_mismatch";
+	}
+
+	return "structured_output_error";
+}
+
+/**
  * Exhaustively checks wether the provided error is an uncast {@link RequestError}
  *
  * @param error The error to check

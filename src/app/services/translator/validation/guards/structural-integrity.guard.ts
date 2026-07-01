@@ -5,7 +5,7 @@ import {
 	findDuplicatedHeadingMarkerLines,
 	findMissingMdxSlugComments,
 } from "../analyzers/structural-integrity.analyzer";
-import { PostTranslationGuardId } from "../validation.constants";
+import { POST_TRANSLATION_GUARD_IDS } from "../validation.constants";
 
 /**
  * Rejects translations that altered or removed MDX heading slug comments.
@@ -25,7 +25,7 @@ export const mdxSlugPreservedGuard: PostTranslationValidationGuard = (source, tr
 	const sample = missing.slice(0, 5).join(", ");
 
 	return {
-		guardId: PostTranslationGuardId.mdxSlugPreserved,
+		guardId: POST_TRANSLATION_GUARD_IDS.mdxSlugPreserved,
 		message: `MDX slug comments missing or altered (${missing.length}): ${sample}`,
 		retryHint:
 			"Keep every `{/*slug-id*/}` comment exactly as in the source (English ids). Translate only visible heading and body text.",
@@ -49,7 +49,7 @@ export const headingCountPreservedGuard: PostTranslationValidationGuard = (sourc
 	}
 
 	return {
-		guardId: PostTranslationGuardId.headingCountPreserved,
+		guardId: POST_TRANSLATION_GUARD_IDS.headingCountPreserved,
 		message: `Heading count mismatch (source ${sourceCount}, translated ${translatedCount})`,
 		retryHint:
 			"Preserve every markdown heading from the source. Translate heading text only; do not remove sections or collapse headings.",
@@ -72,7 +72,7 @@ export const headingSyntaxGuard: PostTranslationValidationGuard = (_source, tran
 	}
 
 	return {
-		guardId: PostTranslationGuardId.headingSyntax,
+		guardId: POST_TRANSLATION_GUARD_IDS.headingSyntax,
 		message: `Duplicated heading markers detected: ${violations.join(" | ")}`,
 		retryHint:
 			"Translate heading text only. Do not repeat markdown `#` markers that already exist outside the translatable segment.",

@@ -30,7 +30,7 @@ import {
 	getRateLimitResetWaitMs,
 	isOpenRouterDailyFreeModelQuotaError,
 } from "@/app/utils/";
-import { ApplicationError, ErrorCode } from "@/shared/errors/";
+import { ApplicationError, ErrorCode, isSegmentBatchSplittableError } from "@/shared/errors/";
 
 import { emptyTranslationAttemptContext } from "../pipeline/translation-attempt.context";
 import {
@@ -496,6 +496,7 @@ export class TranslationLlmClient {
 						);
 					} catch (error) {
 						this.rethrowNonRetryableApiError(error, file);
+						this.abortRetryWhenSegmentBatchSplittable(error);
 						throw error;
 					}
 				},
@@ -824,6 +825,24 @@ export class TranslationLlmClient {
 			`${TranslationLlmClient.name}.${this.callLanguageModelSegmentBatch.name}`,
 			idMismatchMetadata,
 		);
+	}
+
+	/**
+	 * Aborts `p-retry` when the caller recovers via segment batch splitting.
+	 *
+	 * Truncation, id mismatches, and malformed or schema-invalid JSON are not fixed by
+	 * repeating the same payload; the translator splits the batch instead.
+	 *
+	 * @param error Caught rejection from segment batch translation
+	 *
+	 * @throws {AbortError} When {@link isSegmentBatchSplittableError} is true
+	 */
+	private abortRetryWhenSegmentBatchSplittable(error: unknown): void {
+		if (!isSegmentBatchSplittableError(error)) {
+			return;
+		}
+
+		throw new AbortError(error as Error);
 	}
 
 	/**

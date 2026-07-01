@@ -1,5 +1,6 @@
 import type { ReviewerValidationNotice } from "@/app/services/github/types";
 import type { FenceJsxStaticTextMismatch } from "@/app/services/translator/validation/analyzers/fence-jsx-static-text.analyzer";
+import type { PostTranslationGuardId } from "@/app/services/translator/validation/validation.constants";
 
 import type { LocalePRBodyStrings } from "./types";
 
@@ -15,7 +16,7 @@ import {
 } from "@/app/services/translator/validation/analyzers/fence-code-identifier.analyzer";
 import { findFenceJsxStaticTextMismatches } from "@/app/services/translator/validation/analyzers/fence-jsx-static-text.analyzer";
 import { findMarkdownLinkViolations } from "@/app/services/translator/validation/analyzers/markdown-link.analyzer";
-import { PostTranslationGuardId } from "@/app/services/translator/validation/validation.constants";
+import { POST_TRANSLATION_GUARD_IDS } from "@/app/services/translator/validation/validation.constants";
 
 const HINT_VIOLATION_SPLIT = /\.\s+(?:fence \d+|Problems found:)/;
 
@@ -470,20 +471,20 @@ function formatGuardSectionBody(
 	const instruction = extractHintInstruction(hint);
 
 	const violationsByGuard: Partial<Record<PostTranslationGuardId, () => LocatedViolation[]>> = {
-		[PostTranslationGuardId.fenceJsxStaticText]: () =>
+		[POST_TRANSLATION_GUARD_IDS.fenceJsxStaticText]: () =>
 			collectFenceJsxStaticTextViolations(sourceMarkdown, translatedMarkdown),
-		[PostTranslationGuardId.fenceFunctionIdentifiers]: () =>
+		[POST_TRANSLATION_GUARD_IDS.fenceFunctionIdentifiers]: () =>
 			collectFenceFunctionIdentifierViolations(sourceMarkdown, translatedMarkdown),
-		[PostTranslationGuardId.markdownLinksPreserved]: () =>
+		[POST_TRANSLATION_GUARD_IDS.markdownLinksPreserved]: () =>
 			collectMarkdownLinkViolations(sourceMarkdown, translatedMarkdown),
-		[PostTranslationGuardId.mdxSpacing]: () => collectMdxSpacingViolations(translatedMarkdown),
-		[PostTranslationGuardId.sentenceCaseHeadings]: () =>
+		[POST_TRANSLATION_GUARD_IDS.mdxSpacing]: () => collectMdxSpacingViolations(translatedMarkdown),
+		[POST_TRANSLATION_GUARD_IDS.sentenceCaseHeadings]: () =>
 			collectSentenceCaseHeadingViolations(translatedMarkdown),
-		[PostTranslationGuardId.extraMarkdownLinks]: () =>
+		[POST_TRANSLATION_GUARD_IDS.extraMarkdownLinks]: () =>
 			collectExtraMarkdownLinkViolations(sourceMarkdown, translatedMarkdown),
-		[PostTranslationGuardId.frontmatterPreserved]: () =>
+		[POST_TRANSLATION_GUARD_IDS.frontmatterPreserved]: () =>
 			collectFrontmatterViolations(sourceMarkdown, translatedMarkdown),
-		[PostTranslationGuardId.headingsPreserved]: () =>
+		[POST_TRANSLATION_GUARD_IDS.headingsPreserved]: () =>
 			collectHeadingsPreservedViolations(sourceMarkdown, translatedMarkdown),
 	};
 

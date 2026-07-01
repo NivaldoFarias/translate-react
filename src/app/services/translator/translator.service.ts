@@ -38,8 +38,9 @@ import {
 import {
 	ApplicationError,
 	ErrorCode,
+	getSegmentBatchSplitReason,
 	isCompletionLengthTruncationError,
-	isSegmentBatchIdMismatchError,
+	isSegmentBatchSplittableError,
 } from "@/shared/errors/";
 
 import { ChunksManager } from "./chunking";
@@ -75,6 +76,7 @@ import { validateAndReassembleChunks } from "./postprocess/chunk-reassembly";
 import {
 	cleanupFullBodyTranslation,
 	cleanupTranslatedContent,
+	repairMdxSpacing,
 	sanitizeSegmentTranslation,
 } from "./postprocess/translation-output-cleanup";
 import { TranslationFile } from "./translation-file";
@@ -536,10 +538,10 @@ export class TranslatorService {
 							)
 						:	preservedYamlBlock;
 
-					return mergePreservedYamlFrontmatter(mergedBlock, finalized, translationPayload);
+					finalized = mergePreservedYamlFrontmatter(mergedBlock, finalized, translationPayload);
 				}
 
-				return finalized;
+				return repairMdxSpacing(finalized);
 			},
 			collectIssues: (content) =>
 				this.managers.validation.collectPostTranslationValidationIssues(file, content),
@@ -914,43 +916,72 @@ export class TranslatorService {
 
 			return translations;
 		} catch (error) {
-			const shouldSplitBatch =
-				batchItems.length > 1 &&
-				(isCompletionLengthTruncationError(error) || isSegmentBatchIdMismatchError(error));
-
-			if (!shouldSplitBatch) {
+			if (!this.shouldSplitSegmentBatchOnError(batchItems, error)) {
 				throw error;
 			}
 
-			const [firstHalf, secondHalf] = splitSegmentBatchInHalf(batchItems);
-
-			file.logger.info(
-				{
-					segmentCount: batchItems.length,
-					firstHalfCount: firstHalf.length,
-					reason:
-						isCompletionLengthTruncationError(error) ? "completion_token_limit" : (
-							"segment_batch_id_mismatch"
-						),
-				},
-				"Segment batch failed; splitting batch and retrying halves",
-			);
-
-			const firstTranslations = await this.translateSegmentBatchItems(
-				file,
-				firstHalf,
-				attemptContext,
-				segmentById,
-			);
-			const secondTranslations = await this.translateSegmentBatchItems(
-				file,
-				secondHalf,
-				attemptContext,
-				segmentById,
-			);
-
-			return { ...firstTranslations, ...secondTranslations };
+			return this.recoverSegmentBatchViaSplit(error, file, batchItems, attemptContext, segmentById);
 		}
+	}
+
+	/**
+	 * Returns whether a failed multi-item segment batch can be recovered by splitting and retrying halves.
+	 *
+	 * @param batchItems Segment batch items from the failed call
+	 * @param error Caught rejection from segment batch translation
+	 *
+	 * @returns `true` when the batch has more than one item and the error is splittable
+	 */
+	private shouldSplitSegmentBatchOnError(
+		batchItems: readonly SegmentBatchRequestItem[],
+		error: unknown,
+	) {
+		return batchItems.length > 1 && isSegmentBatchSplittableError(error);
+	}
+
+	/**
+	 * Recovers a failed segment batch by translating each half recursively.
+	 *
+	 * @param error Caught splittable rejection from {@link translateSegmentBatchItems}
+	 * @param file Work file for the document being translated
+	 * @param batchItems Full segment batch that failed
+	 * @param attemptContext Maintainer feedback for the system prompt, when present
+	 * @param segmentById Lookup of segment metadata by id
+	 *
+	 * @returns Merged translations from both halves
+	 */
+	private async recoverSegmentBatchViaSplit(
+		error: unknown,
+		file: TranslationFile,
+		batchItems: readonly SegmentBatchRequestItem[],
+		attemptContext: TranslationAttemptContext,
+		segmentById: ReadonlyMap<string, TranslatableSegment>,
+	): Promise<SegmentTranslationMap> {
+		const [firstHalf, secondHalf] = splitSegmentBatchInHalf(batchItems);
+
+		file.logger.info(
+			{
+				segmentCount: batchItems.length,
+				firstHalfCount: firstHalf.length,
+				reason: getSegmentBatchSplitReason(error),
+			},
+			"Segment batch failed; splitting batch and retrying halves",
+		);
+
+		const firstTranslations = await this.translateSegmentBatchItems(
+			file,
+			firstHalf,
+			attemptContext,
+			segmentById,
+		);
+		const secondTranslations = await this.translateSegmentBatchItems(
+			file,
+			secondHalf,
+			attemptContext,
+			segmentById,
+		);
+
+		return { ...firstTranslations, ...secondTranslations };
 	}
 
 	/**

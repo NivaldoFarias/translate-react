@@ -5,7 +5,7 @@ import {
 	findMdxSpacingViolations,
 	findSentenceCaseHeadingViolations,
 } from "../analyzers/advisory-style.analyzer";
-import { PostTranslationGuardId } from "../validation.constants";
+import { POST_TRANSLATION_GUARD_IDS } from "../validation.constants";
 
 /**
  * Flags likely Title Case violations in pt-br markdown headings.
@@ -25,7 +25,7 @@ export const sentenceCaseHeadingsGuard: PostTranslationValidationGuard = (_sourc
 	const sample = violations.slice(0, 3).join(" | ");
 
 	return {
-		guardId: PostTranslationGuardId.sentenceCaseHeadings,
+		guardId: POST_TRANSLATION_GUARD_IDS.sentenceCaseHeadings,
 		message: `Heading sentence case issues: ${sample}`,
 		retryHint:
 			"Use sentence case in headings: capitalize only the first word and proper nouns (React, JSX, API, etc.).",
@@ -48,7 +48,7 @@ export const mdxSpacingGuard: PostTranslationValidationGuard = (_source, transla
 	}
 
 	return {
-		guardId: PostTranslationGuardId.mdxSpacing,
+		guardId: POST_TRANSLATION_GUARD_IDS.mdxSpacing,
 		message: `MDX spacing issues detected: ${violations.join(" | ")}`,
 		retryHint:
 			"Preserve spaces around markdown links, inline code, and `{/*slug*/}` comments exactly as structural separators in prose.",
@@ -73,7 +73,7 @@ export const extraMarkdownLinksGuard: PostTranslationValidationGuard = (source, 
 	const sample = extra.slice(0, 3).join(" | ");
 
 	return {
-		guardId: PostTranslationGuardId.extraMarkdownLinks,
+		guardId: POST_TRANSLATION_GUARD_IDS.extraMarkdownLinks,
 		message: `Extra markdown link URLs not present in source: ${sample}`,
 		retryHint:
 			"Do not add markdown links or URLs that are absent from the source document. Translate existing link labels only.",

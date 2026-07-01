@@ -1,7 +1,7 @@
 import type { PostTranslationValidationGuard } from "../validation.types";
 
 import { MARKDOWN_REGEXES } from "../../markdown/markdown.regexes";
-import { PostTranslationGuardId } from "../validation.constants";
+import { POST_TRANSLATION_GUARD_IDS } from "../validation.constants";
 
 /**
  * Rejects translations that removed every markdown heading
@@ -18,7 +18,7 @@ export const headingsPreservedGuard: PostTranslationValidationGuard = (source, t
 	if (originalHeadings === 0 || translatedHeadings > 0) return null;
 
 	return {
-		guardId: PostTranslationGuardId.headingsPreserved,
+		guardId: POST_TRANSLATION_GUARD_IDS.headingsPreserved,
 		message: "All markdown headings lost during translation",
 		retryHint:
 			"Preserve every markdown heading (`#` through `######`) from the source. Translate heading text only; do not remove headings.",

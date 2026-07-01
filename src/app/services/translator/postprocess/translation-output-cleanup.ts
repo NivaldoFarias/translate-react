@@ -3,13 +3,44 @@ import type { TranslationFile } from "../translation-file";
 import { MARKDOWN_REGEXES } from "../markdown/markdown.regexes";
 import { TRANSLATION_PREFIXES } from "../validation/validation.constants";
 
+/**
+ * Matches an inline code span immediately followed by a prose letter (no whitespace separator).
+ *
+ * The first character after the opening backtick must be non-whitespace so that a sequence
+ * like a closing backtick, prose, and an opening backtick is not incorrectly interpreted
+ * as a single code span when two spans appear near each other:
+ *
+ * ```
+ * ` and `word
+ * ```
+ *
+ * Only glued spans such as the following are matched:
+ *
+ * ```
+ * `code`word
+ * ```
+ */
+const INLINE_CODE_GLUED_TO_PROSE = /(`[^`\n\s][^`\n]*`)([A-Za-zÀ-ÿ])/g;
+
+/** Matches a non-whitespace character immediately before an MDX slug comment opener */
+const PROSE_GLUED_TO_MDX_SLUG = /(\S)(\{\/\*)/g;
+
+/** Matches adjacent markdown links with no whitespace separator */
+const ADJACENT_LINKS_NO_SPACE = /\],\[/g;
+
 /** Matches translatable text nodes recorded under an mdast heading */
 const HEADING_TEXT_SEGMENT_PATH = /\/heading\[\d+\]\/text\[\d+\](?:#\d+)?$/;
 
 /** Leading markdown heading markers duplicated inside a heading text segment */
 const ECHOED_HEADING_MARKERS = /^#{1,6}\s+/;
 
-/** Spurious whitespace between inline code and following punctuation (e.g. `` `word` , ``) */
+/**
+ * Spurious whitespace between inline code and following punctuation.
+ *
+ * ```
+ * `word` ,
+ * ```
+ */
 const INLINE_CODE_BEFORE_PUNCTUATION_SPACING = /`([^`\n]+)`\s+([,.;:!?])/g;
 
 /**
@@ -107,12 +138,50 @@ export function cleanupSegmentSnippet(
 /**
  * Removes whitespace between a closing inline-code backtick and trailing punctuation.
  *
+ * ```
+ * `identifier` ,
+ * ```
+ *
  * @param content Markdown body or snippet
  *
- * @returns Content without `` `identifier` , `` style spacing regressions
+ * @returns Content without spurious whitespace between inline code and trailing punctuation
  */
 export function normalizeInlineCodeBeforePunctuationSpacing(content: string) {
 	return content.replace(INLINE_CODE_BEFORE_PUNCTUATION_SPACING, "`$1`$2");
+}
+
+/**
+ * Mechanically repairs MDX spacing regressions introduced during translation.
+ *
+ * Applies deterministic space insertion for three language-agnostic structural patterns:
+ *
+ * ```
+ * `code`word
+ * ```
+ *
+ * ```
+ * text{/*
+ * ```
+ *
+ * ```
+ * ],[
+ * ```
+ *
+ * Vocabulary-specific heuristics (e.g. locale-word-before-link) are intentionally
+ * excluded — those belong in locale prompt rules, not a mechanical pass.
+ *
+ * Runs before advisory guards so these deterministic regressions do not produce
+ * `mdxSpacing` reviewer notices.
+ *
+ * @param content Assembled translated markdown document
+ *
+ * @returns Document with MDX spacing regressions repaired
+ */
+export function repairMdxSpacing(content: string) {
+	return content
+		.replace(INLINE_CODE_GLUED_TO_PROSE, "$1 $2")
+		.replace(PROSE_GLUED_TO_MDX_SLUG, "$1 $2")
+		.replace(ADJACENT_LINKS_NO_SPACE, "], [");
 }
 
 /**

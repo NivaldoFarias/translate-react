@@ -1,7 +1,7 @@
 import type { PostTranslationValidationGuard } from "../validation.types";
 
 import { MARKDOWN_REGEXES } from "../../markdown/markdown.regexes";
-import { PostTranslationGuardId } from "../validation.constants";
+import { POST_TRANSLATION_GUARD_IDS } from "../validation.constants";
 
 /**
  * Rejects translations that dropped YAML frontmatter
@@ -23,7 +23,7 @@ export const frontmatterPreservedGuard: PostTranslationValidationGuard = (source
 	if (translatedMatch) return null;
 
 	return {
-		guardId: PostTranslationGuardId.frontmatterPreserved,
+		guardId: POST_TRANSLATION_GUARD_IDS.frontmatterPreserved,
 		message: "Frontmatter lost during translation",
 		retryHint:
 			"Keep the leading YAML frontmatter block (`---` delimiters and keys) intact. Only translate allowed string values per the rules; never remove the frontmatter block.",

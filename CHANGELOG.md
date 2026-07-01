@@ -6,6 +6,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Changed
 
+- Segment batch failures from truncated output, id mismatch, or malformed JSON now split the batch on the first error instead of repeating the same LLM call through `p-retry`, reducing wasted retries and LLM cost.
 - Manual `smoke.yml` dispatch selects fixtures by profile only; the `files` input is removed.
 - GitHub Actions smoke packs `.out/` into `artifacts/smoke/<profile>-<run_id>.tar.gz` before upload (because `upload-artifact` skips hidden dot-directories) and uses `archive: false` so downloads extract with one `tar -xzf`, not zip then tar.
 - `ci:smoke` artifact capture writes `pull-request.md` when the runner refreshes an open pull request, not only on new PR creation.
@@ -14,6 +15,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Fixed
 
+- Glued inline code, MDX slug comments, and adjacent markdown links are repaired before advisory validation so those mechanical spacing regressions no longer surface as `mdxSpacing` reviewer notices on translation pull requests.
 - Blank `TARGET_LANGUAGE` or `SOURCE_LANGUAGE` from GitHub Actions or `.env` no longer fails validation; empty values default to `pt-br` and `en`.
 
 ## [0.2.9] - 2026-06-22

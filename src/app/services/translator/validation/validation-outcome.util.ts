@@ -1,15 +1,16 @@
+import type { PostTranslationGuardId } from "./validation.constants";
 import type {
 	PostTranslationValidationPartition,
 	ReviewerValidationNotice,
 	TranslationValidationIssue,
 } from "./validation.types";
 
-import { PostTranslationGuardId } from "./validation.constants";
+import { POST_TRANSLATION_GUARD_IDS } from "./validation.constants";
 
 /** Guard ids that block shipping; all other guard failures are advisory for maintainers */
 export const BLOCKING_POST_TRANSLATION_GUARD_IDS = new Set<PostTranslationGuardId>([
-	PostTranslationGuardId.contentRatio,
-	PostTranslationGuardId.nonEmptyContent,
+	POST_TRANSLATION_GUARD_IDS.contentRatio,
+	POST_TRANSLATION_GUARD_IDS.nonEmptyContent,
 ]);
 
 /**

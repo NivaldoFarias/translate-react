@@ -1,5 +1,5 @@
 /** Stable identifiers for post-translation validation guards */
-export const PostTranslationGuardId = {
+export const POST_TRANSLATION_GUARD_IDS = {
 	nonEmptyContent: "nonEmptyContent",
 	contentRatio: "contentRatio",
 	mdxSlugPreserved: "mdxSlugPreserved",
@@ -15,9 +15,9 @@ export const PostTranslationGuardId = {
 	extraMarkdownLinks: "extraMarkdownLinks",
 } as const;
 
-/** Union of all {@link PostTranslationGuardId} values */
+/** Union of all {@link POST_TRANSLATION_GUARD_IDS} values */
 export type PostTranslationGuardId =
-	(typeof PostTranslationGuardId)[keyof typeof PostTranslationGuardId];
+	(typeof POST_TRANSLATION_GUARD_IDS)[keyof typeof POST_TRANSLATION_GUARD_IDS];
 
 /** Common LLM response prefixes that should be removed from translated content */
 export const TRANSLATION_PREFIXES = [

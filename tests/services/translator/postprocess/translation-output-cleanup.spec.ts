@@ -6,6 +6,7 @@ import {
 	isHeadingTextSegmentPath,
 	normalizeInlineCodeBeforePunctuationSpacing,
 	preserveSegmentBoundaryWhitespace,
+	repairMdxSpacing,
 	sanitizeSegmentTranslation,
 	stripEchoedHeadingMarkers,
 } from "@/app/services/translator/postprocess/translation-output-cleanup";
@@ -111,5 +112,116 @@ describe("sanitizeSegmentTranslation", () => {
 		const cleaned = sanitizeSegmentTranslation("por", "por ", "root/paragraph[1]/text[0]", file);
 
 		expect(cleaned).toBe("por ");
+	});
+});
+
+describe("repairMdxSpacing", () => {
+	describe("inline code glued to prose", () => {
+		test("inserts space between closing backtick and ASCII letter", () => {
+			expect(repairMdxSpacing("Use `hydrateRoot`to attach React.")).toBe(
+				"Use `hydrateRoot` to attach React.",
+			);
+		});
+
+		test("inserts space before upper-case letter after inline code", () => {
+			expect(repairMdxSpacing("chamar `render`React no root.")).toBe(
+				"chamar `render` React no root.",
+			);
+		});
+
+		test("inserts space before non-ASCII letter after inline code", () => {
+			expect(repairMdxSpacing("ver `useState`é um hook.")).toBe("ver `useState` é um hook.");
+		});
+
+		test("does not insert space when already present", () => {
+			expect(repairMdxSpacing("ver `useState` é um hook.")).toBe("ver `useState` é um hook.");
+		});
+
+		test("does not insert space when followed by punctuation", () => {
+			expect(repairMdxSpacing("ver `useState`.")).toBe("ver `useState`.");
+		});
+
+		test("does not insert space when followed by a digit", () => {
+			expect(repairMdxSpacing("use `v8`2 times")).toBe("use `v8`2 times");
+		});
+
+		test("does not alter code across a newline boundary", () => {
+			expect(repairMdxSpacing("use `foo`\nbar")).toBe("use `foo`\nbar");
+		});
+
+		test("repairs multiple occurrences in one pass", () => {
+			expect(repairMdxSpacing("`a`x and `b`y")).toBe("`a` x and `b` y");
+		});
+
+		test("does not match a closing backtick through prose to the next opening backtick", () => {
+			const clean = "Use `useState` and `useEffect` for state and effects.";
+			expect(repairMdxSpacing(clean)).toBe(clean);
+		});
+
+		test("is idempotent", () => {
+			const input = "Use `hydrateRoot`to attach.";
+			expect(repairMdxSpacing(repairMdxSpacing(input))).toBe(repairMdxSpacing(input));
+		});
+	});
+
+	describe("prose glued to MDX slug comment opener", () => {
+		test("inserts space when prose is immediately followed by slug comment", () => {
+			expect(repairMdxSpacing("## Título{/*title*/}")).toBe("## Título {/*title*/}");
+		});
+
+		test("does not insert space when preceded by whitespace", () => {
+			expect(repairMdxSpacing("## Título {/*title*/}")).toBe("## Título {/*title*/}");
+		});
+
+		test("does not insert space when preceded by a newline", () => {
+			expect(repairMdxSpacing("## Título\n{/*title*/}")).toBe("## Título\n{/*title*/}");
+		});
+
+		test("repairs multiple occurrences in one pass", () => {
+			expect(repairMdxSpacing("a{/*x*/} b{/*y*/}")).toBe("a {/*x*/} b {/*y*/}");
+		});
+	});
+
+	describe("adjacent markdown links with no separator", () => {
+		test("inserts space and comma between adjacent link closers", () => {
+			expect(repairMdxSpacing("[A](url1)],[B](url2)")).toBe("[A](url1)], [B](url2)");
+		});
+
+		test("repairs a chain of three adjacent links", () => {
+			expect(repairMdxSpacing("[A](u1)],[B](u2)],[C](u3)")).toBe("[A](u1)], [B](u2)], [C](u3)");
+		});
+
+		test("does not modify already-separated links", () => {
+			expect(repairMdxSpacing("[A](u1)], [B](u2)")).toBe("[A](u1)], [B](u2)");
+		});
+	});
+
+	describe("locale-word-before-link patterns are NOT auto-repaired", () => {
+		test("does not insert space between 'por' and a markdown link", () => {
+			expect(repairMdxSpacing("por[Link](url)")).toBe("por[Link](url)");
+		});
+
+		test("does not insert space between 'no' and a markdown link", () => {
+			expect(repairMdxSpacing("no[Link](url)")).toBe("no[Link](url)");
+		});
+
+		test("does not insert space between 'e' and a markdown link", () => {
+			expect(repairMdxSpacing("e[Link](url)")).toBe("e[Link](url)");
+		});
+
+		test("does not modify English 'no' before a bracket", () => {
+			expect(repairMdxSpacing("there is no[known fix]")).toBe("there is no[known fix]");
+		});
+	});
+
+	describe("empty and no-op inputs", () => {
+		test("returns empty string unchanged", () => {
+			expect(repairMdxSpacing("")).toBe("");
+		});
+
+		test("returns clean prose unchanged", () => {
+			const clean = "Use `useState` and `useEffect` for state and effects.";
+			expect(repairMdxSpacing(clean)).toBe(clean);
+		});
 	});
 });

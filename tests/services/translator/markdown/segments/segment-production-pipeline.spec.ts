@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { collectPostTranslationValidationIssues } from "@/app/services/translator/validation/guards";
 import { partitionPostTranslationValidationIssues } from "@/app/services/translator/validation/validation-outcome.util";
-import { PostTranslationGuardId } from "@/app/services/translator/validation/validation.constants";
+import { POST_TRANSLATION_GUARD_IDS } from "@/app/services/translator/validation/validation.constants";
 
 import hydrateRootMd from "@tests/fixtures/md/hydrateRoot.md" with { type: "text" };
 import { loadSegmentFixture } from "@tests/fixtures/segment-extraction/load-fixture.util";
@@ -81,7 +81,7 @@ describe("segment production cleanup pipeline", () => {
 
 		expect(blocking).toEqual([]);
 		expect(
-			advisory.some((notice) => notice.guardId === PostTranslationGuardId.mdxSlugPreserved),
+			advisory.some((notice) => notice.guardId === POST_TRANSLATION_GUARD_IDS.mdxSlugPreserved),
 		).toBe(true);
 	});
 
@@ -92,9 +92,9 @@ describe("segment production cleanup pipeline", () => {
 		const { blocking, advisory } = partitionPostTranslationValidationIssues(issues);
 
 		expect(blocking).toEqual([]);
-		expect(advisory.some((notice) => notice.guardId === PostTranslationGuardId.mdxSpacing)).toBe(
-			true,
-		);
+		expect(
+			advisory.some((notice) => notice.guardId === POST_TRANSLATION_GUARD_IDS.mdxSpacing),
+		).toBe(true);
 	});
 });
 
@@ -106,5 +106,5 @@ describe("segment production cleanup pipeline", () => {
  */
 function mdxSpacingPasses(source: string, translated: string) {
 	const issues = collectPostTranslationValidationIssues(source, translated);
-	return !issues.some((issue) => issue.guardId === PostTranslationGuardId.mdxSpacing);
+	return !issues.some((issue) => issue.guardId === POST_TRANSLATION_GUARD_IDS.mdxSpacing);
 }

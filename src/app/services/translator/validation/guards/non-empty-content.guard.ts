@@ -1,6 +1,6 @@
 import type { PostTranslationValidationGuard } from "../validation.types";
 
-import { PostTranslationGuardId } from "../validation.constants";
+import { POST_TRANSLATION_GUARD_IDS } from "../validation.constants";
 
 /**
  * Rejects empty or whitespace-only translations
@@ -14,7 +14,7 @@ export const nonEmptyContentGuard: PostTranslationValidationGuard = (_source, tr
 	if (translated.trim().length > 0) return null;
 
 	return {
-		guardId: PostTranslationGuardId.nonEmptyContent,
+		guardId: POST_TRANSLATION_GUARD_IDS.nonEmptyContent,
 		message: "Translation produced empty content",
 		retryHint:
 			"Return the full translated document. Do not omit sections or return only whitespace.",

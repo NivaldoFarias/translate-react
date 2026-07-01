@@ -127,8 +127,12 @@ export function findExtraMarkdownLinks(source: string, translated: string) {
 /**
  * Flags inline code spans immediately followed by prose letters (no whitespace separator).
  *
- * Uses minimal `` `[^`]+` `` spans so nested backticks inside markdown link labels do not
- * produce false positives across long prose runs.
+ * Uses a minimal non-nested inline-code span pattern so nested backticks inside markdown
+ * link labels do not produce false positives across long prose runs:
+ *
+ * ```
+ * `[^`]+`
+ * ```
  *
  * @param translated Translated markdown
  * @param maxMatches Maximum violations to collect
