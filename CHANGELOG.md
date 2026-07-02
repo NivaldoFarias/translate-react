@@ -4,6 +4,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+### Removed
+
+- Automated maintainer remediation: the runner no longer re-translates open pull requests from `CHANGES_REQUESTED` review text or posts remediation comments; maintainers edit the branch manually. Open PRs with pending reviews are still treated as workflow-complete when in sync and translated.
+
 ### Changed
 
 - Fork synchronization uses the fork repository default branch instead of assuming `main`.

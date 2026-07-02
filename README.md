@@ -100,7 +100,7 @@ bun start
 | Profile    | Fixtures exercised                                                                              |
 | ---------- | ----------------------------------------------------------------------------------------------- |
 | `quick`    | Default pre-merge slice: new-PR translation (small and large pages) and one out-of-sync refresh |
-| `workflow` | PR scenarios only: out-of-sync refresh, maintainer remediation, and valid skip                  |
+| `workflow` | PR scenarios only: out-of-sync refresh and valid skip                                           |
 | `full`     | Every `*.md` file under `tests/fixtures/md/`                                                    |
 
 ```bash

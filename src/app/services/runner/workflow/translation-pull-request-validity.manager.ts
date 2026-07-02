@@ -6,17 +6,8 @@ import type { RunnerServiceDependencies } from "../runner.types";
 
 import { getTranslationBranchNameFromPath, logger } from "@/app/utils/";
 
-import {
-	getUnresolvedChangesRequestedReviews,
-	hasUnresolvedChangesRequestedReview,
-} from "./maintainer-feedback.util";
-
 /** Why an open translation pull request is not treated as workflow-complete */
-export type TranslationPullRequestInvalidReason =
-	| "no_open_pr"
-	| "out_of_sync"
-	| "not_translated"
-	| "needs_maintainer_fix";
+export type TranslationPullRequestInvalidReason = "no_open_pr" | "out_of_sync" | "not_translated";
 
 /** Outcome of evaluating an open translation pull request for a repository path */
 export interface TranslationPullRequestValidity {
@@ -37,8 +28,7 @@ export interface TranslationPullRequestValidity {
  * Decides whether an open translation PR already satisfies the workflow for a path.
  *
  * Valid when there is an open PR on the `translate/…` branch, fork content is in the
- * target language, the PR is in sync with its base (no merge conflicts), and no qualifying
- * reviewer left an unresolved `CHANGES_REQUESTED` review after the latest runner translation commit.
+ * target language, and the PR is in sync with its base (no merge conflicts).
  */
 export class TranslationPullRequestValidityManager {
 	private readonly logger = logger.child({
@@ -127,30 +117,6 @@ export class TranslationPullRequestValidityManager {
 			};
 		}
 
-		const maintainerFeedback = await this.detectUnresolvedMaintainerFeedback(
-			openPullRequest.number,
-			branchName,
-		);
-
-		if (maintainerFeedback) {
-			this.logger.debug(
-				{
-					filePath,
-					prNumber: openPullRequest.number,
-					latestRunnerCommitAt: maintainerFeedback.latestRunnerCommitAt?.toISOString(),
-					reviewSubmittedAt: maintainerFeedback.reviewSubmittedAt.toISOString(),
-				},
-				"Translation pull request has unresolved CHANGES_REQUESTED review after the latest runner commit",
-			);
-
-			return {
-				isValid: false,
-				pullRequest: openPullRequest,
-				invalidReason: "needs_maintainer_fix",
-				pullRequestStatus,
-			};
-		}
-
 		this.logger.debug(
 			{
 				filePath,
@@ -165,34 +131,5 @@ export class TranslationPullRequestValidityManager {
 			pullRequest: openPullRequest,
 			pullRequestStatus,
 		};
-	}
-
-	/**
-	 * Detects unresolved `CHANGES_REQUESTED` reviews posted after the latest runner commit.
-	 *
-	 * @param prNumber Open translation pull request number
-	 * @param branchName Fork branch backing the pull request
-	 *
-	 * @returns Feedback timing when unresolved reviews exist, otherwise `undefined`
-	 */
-	private async detectUnresolvedMaintainerFeedback(prNumber: number, branchName: string) {
-		const [reviews, latestTranslationCommit] = await Promise.all([
-			this.services.github.listPullRequestReviews(prNumber),
-			this.services.github.getLatestTranslationCommit(branchName),
-		]);
-
-		const latestRunnerCommitAt = latestTranslationCommit?.timestamp;
-
-		if (!hasUnresolvedChangesRequestedReview(reviews, latestRunnerCommitAt)) {
-			return undefined;
-		}
-
-		const unresolvedReviews = getUnresolvedChangesRequestedReviews(reviews, latestRunnerCommitAt);
-		const reviewSubmittedAt = unresolvedReviews.reduce(
-			(latest, review) => (review.submittedAt > latest ? review.submittedAt : latest),
-			unresolvedReviews[0]?.submittedAt ?? latestRunnerCommitAt ?? new Date(0),
-		);
-
-		return { latestRunnerCommitAt, reviewSubmittedAt };
 	}
 }

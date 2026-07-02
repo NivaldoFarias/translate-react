@@ -23,21 +23,6 @@ export interface PullRequestDescriptionMetadata {
 	reviewerNotices: readonly ReviewerValidationNotice[];
 }
 
-/** Inputs for a pull request comment after maintainer-feedback remediation */
-export interface RemediationPullRequestCommentParams {
-	/** Basename of the translated markdown file */
-	readonly filename: string;
-
-	/** Maintainer logins whose unresolved reviews triggered remediation */
-	readonly maintainerLogins: readonly string[];
-
-	/** Workflow run metadata when executing in GitHub Actions */
-	readonly runContext?: ProgressCommentRunContext;
-
-	/** Count of advisory post-translation guard notices on the refreshed PR body */
-	readonly advisoryNoticeCount: number;
-}
-
 /**
  * GitHub Actions metadata for the translation-progress issue comment opener.
  */
@@ -82,15 +67,6 @@ export interface LocaleCommentConfig {
 
 	/** Generates the footer/observations section of the comment */
 	readonly suffix: string;
-
-	/**
-	 * Comment posted on an open pull request when a remediation commit is pushed.
-	 *
-	 * @param params File name, maintainer logins, optional run metadata, and advisory notice count
-	 *
-	 * @returns Localized pull request comment body
-	 */
-	readonly remediationPullRequestComment: (params: RemediationPullRequestCommentParams) => string;
 }
 
 /**

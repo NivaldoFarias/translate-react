@@ -40,7 +40,7 @@ const smokeCommand = defineCommand({
 		profile: {
 			type: "string",
 			description:
-				"Fixture set. quick: default CI (small + large new-PR translation, out-of-sync refresh). workflow: PR scenarios (out-of-sync, maintainer fix, valid skip). full: all tests/fixtures/md/*.md",
+				"Fixture set. quick: default CI (small + large new-PR translation, out-of-sync refresh). workflow: PR scenarios (out-of-sync, valid skip). full: all tests/fixtures/md/*.md",
 			default: SmokeProfile.Quick,
 		},
 		files: {

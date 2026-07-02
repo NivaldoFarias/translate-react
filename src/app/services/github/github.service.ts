@@ -373,43 +373,10 @@ export class GitHubService {
 	 *
 	 * @param prNumber Pull request number on the upstream repository
 	 *
-	 * @returns Normalized reviews for maintainer-feedback detection
+	 * @returns Normalized reviews for approved-pull-request preservation checks
 	 */
 	public async listPullRequestReviews(prNumber: number) {
 		return this.content.listPullRequestReviews(prNumber);
-	}
-
-	/**
-	 * Lists inline review comments on a translation pull request.
-	 *
-	 * @param prNumber Pull request number on the upstream repository
-	 *
-	 * @returns Normalized inline review comments for maintainer-feedback remediation
-	 */
-	public async listPullRequestReviewComments(prNumber: number) {
-		return this.content.listPullRequestReviewComments(prNumber);
-	}
-
-	/**
-	 * Returns the newest runner translation commit on a fork branch.
-	 *
-	 * @param branchName Translation branch name without `refs/heads/` prefix
-	 *
-	 * @returns Committer timestamp and message of the newest translation commit, if present
-	 */
-	public async getLatestTranslationCommit(branchName: string) {
-		return this.content.getLatestTranslationCommit(branchName);
-	}
-
-	/**
-	 * Returns the timestamp of the latest runner translation commit on a fork branch.
-	 *
-	 * @param branchName Translation branch name without `refs/heads/` prefix
-	 *
-	 * @returns Committer date of the newest translation commit, if present
-	 */
-	public async getLatestTranslationCommitTimestamp(branchName: string) {
-		return this.content.getLatestTranslationCommitTimestamp(branchName);
 	}
 
 	/**

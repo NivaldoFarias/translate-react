@@ -6,7 +6,6 @@ import type { FileProcessingProgress } from "@/app/services/runner/types";
 
 import type { RunnerServiceDependencies } from "../runner.types";
 
-import type { MaintainerFeedbackSnapshot } from "./maintainer-feedback.util";
 import type { TranslationPullRequestValidity } from "./translation-pull-request-validity.manager";
 
 import { PullRequestProgressAction } from "@/app/services/github/types";
@@ -16,15 +15,11 @@ import {
 	getTranslationBranchNameFromPath,
 	isTranslationEquivalentToCurrentBlob,
 	logger,
-	resolveGitHubActionsRunContext,
 } from "@/app/utils/";
 import { ApplicationError, ErrorCode, isCircuitBreakerError } from "@/shared/errors/";
 
-import {
-	buildTranslationCommitMessage,
-	getMaintainerFeedbackSnapshot,
-	hasQualifyingApprovedReview,
-} from "./maintainer-feedback.util";
+import { hasQualifyingApprovedReview } from "./pull-request-review.util";
+import { buildTranslationCommitMessage } from "./translation-commit.util";
 import { TranslationPullRequestValidityManager } from "./translation-pull-request-validity.manager";
 import { MAX_CONSECUTIVE_FAILURES } from "./workflow.constants";
 
@@ -281,34 +276,18 @@ export class TranslationBatchManager {
 				return skippedForValidTranslationPullRequest;
 			}
 
-			const step1Start = Date.now();
-			const maintainerFeedback = await this.loadMaintainerFeedbackForRemediation(
-				file,
-				pullRequestValidity,
-			);
-			file.logger.debug(
-				{
-					durationMs: Date.now() - step1Start,
-					pullRequestInvalidReason: pullRequestValidity.invalidReason ?? null,
-					maintainerFeedbackLoaded: maintainerFeedback !== undefined,
-					maintainerCommentCount: maintainerFeedback?.authorLogins.length ?? 0,
-				},
-				"Step 1/5: Pull request validity and maintainer feedback resolved",
-			);
-
 			const branchStart = Date.now();
 			metadata.branch = await this.prepareTranslationBranch(file, pullRequestValidity);
 			file.logger.debug(
-				{ branchRef: metadata.branch.ref, durationMs: Date.now() - branchStart },
-				"Step 2/5: Translation branch reset for single-commit workflow",
+				{
+					durationMs: Date.now() - branchStart,
+					pullRequestInvalidReason: pullRequestValidity.invalidReason ?? null,
+				},
+				"Step 1/5: Translation branch prepared",
 			);
 
 			const translationStart = Date.now();
-			const translationResult = await this.resolveTranslation(
-				file,
-				pullRequestValidity,
-				maintainerFeedback,
-			);
+			const translationResult = await this.services.translator.translateContent(file);
 			metadata.translation = translationResult.content;
 			metadata.reviewerNotices = translationResult.reviewerNotices;
 			metadata.llmUsage = translationResult.llmUsage;
@@ -327,7 +306,7 @@ export class TranslationBatchManager {
 					llmUsage: translationResult.llmUsage,
 					reviewerNotices: metadata.reviewerNotices,
 				},
-				"Step 3/5: Translation complete",
+				"Step 2/5: Translation complete",
 			);
 
 			if (isTranslationEquivalentToCurrentBlob(file, metadata.translation)) {
@@ -361,20 +340,15 @@ export class TranslationBatchManager {
 				file,
 				branch: metadata.branch,
 				content: metadata.translation,
-				message: buildTranslationCommitMessage(
-					file.filename,
-					languageName,
-					maintainerFeedback?.authorLogins,
-				),
+				message: buildTranslationCommitMessage(file.filename, languageName),
 			});
-			file.logger.debug({ durationMs: Date.now() - commitStart }, "Step 4/5: Commit complete");
+			file.logger.debug({ durationMs: Date.now() - commitStart }, "Step 3/5: Commit complete");
 
 			const prStart = Date.now();
 			const pullRequestOutcome = await this.openTranslationPullRequest(
 				file,
 				metadata,
 				pullRequestValidity,
-				maintainerFeedback,
 			);
 			metadata.pullRequest = pullRequestOutcome.pullRequest;
 			metadata.pullRequestProgress = pullRequestOutcome.progress;
@@ -384,7 +358,7 @@ export class TranslationBatchManager {
 					pullRequestProgress: metadata.pullRequestProgress,
 					durationMs: Date.now() - prStart,
 				},
-				"Step 5/5: Pull request created/updated",
+				"Step 4/5: Pull request created/updated",
 			);
 
 			this.consecutiveFailures = 0;
@@ -445,70 +419,6 @@ export class TranslationBatchManager {
 				"Failed to cleanup branch after translation failure - non-critical",
 			);
 		}
-	}
-
-	/**
-	 * Loads `CHANGES_REQUESTED` review summaries and inline review comments posted after the latest runner commit on the branch.
-	 *
-	 * Must run before {@link prepareTranslationBranch} for maintainer remediation so the runner commit
-	 * baseline is read while translation commits still exist on the branch.
-	 *
-	 * @param file Translation file being processed
-	 * @param validity Pull request validity from the start of file processing
-	 *
-	 * @returns Feedback snapshot when remediating maintainer review, otherwise `undefined`
-	 */
-	private async loadMaintainerFeedbackForRemediation(
-		file: TranslationFile,
-		validity: TranslationPullRequestValidity,
-	) {
-		if (validity.invalidReason !== "needs_maintainer_fix" || !validity.pullRequest) {
-			return undefined;
-		}
-
-		const branchName = getTranslationBranchNameFromPath(file.path);
-		const [reviews, reviewComments, runnerCommitAt] = await Promise.all([
-			this.services.github.listPullRequestReviews(validity.pullRequest.number),
-			this.services.github.listPullRequestReviewComments(validity.pullRequest.number),
-			this.services.github.getLatestTranslationCommitTimestamp(branchName),
-		]);
-
-		return getMaintainerFeedbackSnapshot(reviews, runnerCommitAt, reviewComments);
-	}
-
-	/**
-	 * Resolves translated content via full document re-translation.
-	 *
-	 * When {@link TranslationPullRequestValidity.invalidReason} is `needs_maintainer_fix`,
-	 * the open PR and branch are reused and review feedback is passed into the LLM prompt.
-	 *
-	 * @param file Upstream English source file for the workflow
-	 * @param validity Pull request validity from the start of file processing
-	 * @param maintainerFeedback Preloaded maintainer feedback when remediating review comments
-	 *
-	 * @returns Translated content, advisory notices, and LLM usage from the translator
-	 */
-	private async resolveTranslation(
-		file: TranslationFile,
-		validity: TranslationPullRequestValidity,
-		maintainerFeedback?: MaintainerFeedbackSnapshot,
-	) {
-		if (validity.invalidReason !== "needs_maintainer_fix" || !validity.pullRequest) {
-			return this.services.translator.translateContent(file);
-		}
-
-		const maintainerFeedbackComments = maintainerFeedback?.bodies ?? [];
-
-		file.logger.info(
-			{
-				path: file.path,
-				prNumber: validity.pullRequest.number,
-				maintainerCommentCount: maintainerFeedbackComments.length,
-			},
-			"Unresolved CHANGES_REQUESTED review after latest runner commit; running full re-translation with review feedback in prompt",
-		);
-
-		return this.services.translator.translateContent(file, { maintainerFeedbackComments });
 	}
 
 	/**
@@ -590,8 +500,8 @@ export class TranslationBatchManager {
 	}
 
 	/**
-	 * Resolves the fork branch for translation: reuses an existing branch when addressing
-	 * maintainer feedback, otherwise resets from the fork default tip.
+	 * Resolves the fork branch for translation: reuses an existing branch when refreshing
+	 * an out-of-sync open pull request, otherwise resets from the fork default tip.
 	 *
 	 * @param file Translation file being processed
 	 * @param validity Pull request validity from the start of file processing
@@ -604,11 +514,7 @@ export class TranslationBatchManager {
 	) {
 		const branchName = getTranslationBranchNameFromPath(file.path);
 
-		if (
-			validity.pullRequest &&
-			(validity.invalidReason === "needs_maintainer_fix" ||
-				validity.invalidReason === "out_of_sync")
-		) {
+		if (validity.pullRequest && validity.invalidReason === "out_of_sync") {
 			this.logger.info(
 				{
 					filename: file.filename,
@@ -692,7 +598,6 @@ export class TranslationBatchManager {
 	 * @param file Translation file being processed
 	 * @param processingResult Processing metadata including translation and timing
 	 * @param validity Pull request validity evaluated at the start of file processing
-	 * @param maintainerFeedback Maintainer review snapshot when remediating feedback
 	 *
 	 * @returns Pull request metadata for progress reporting
 	 */
@@ -700,16 +605,11 @@ export class TranslationBatchManager {
 		file: TranslationFile,
 		processingResult: ProcessedFileResult,
 		validity: TranslationPullRequestValidity,
-		maintainerFeedback?: MaintainerFeedbackSnapshot,
 	): Promise<{
 		pullRequest: NonNullable<ProcessedFileResult["pullRequest"]>;
 		progress: PullRequestProgressAction;
 	}> {
-		if (
-			validity.pullRequest &&
-			(validity.invalidReason === "needs_maintainer_fix" ||
-				validity.invalidReason === "out_of_sync")
-		) {
+		if (validity.pullRequest && validity.invalidReason === "out_of_sync") {
 			const languageName = this.services.languageDetector.getLanguageName(
 				this.services.languageDetector.languages.target,
 			);
@@ -717,31 +617,13 @@ export class TranslationBatchManager {
 
 			await this.services.github.updatePullRequestBody(validity.pullRequest.number, body);
 
-			if (
-				maintainerFeedback &&
-				(maintainerFeedback.authorLogins.length > 0 || maintainerFeedback.bodies.length > 0)
-			) {
-				const commentBody = this.services.locale.definitions.comment.remediationPullRequestComment({
-					filename: file.filename,
-					maintainerLogins: maintainerFeedback.authorLogins,
-					runContext: resolveGitHubActionsRunContext(),
-					advisoryNoticeCount: processingResult.reviewerNotices.length,
-				});
-
-				await this.services.github.createCommentOnPullRequest(
-					validity.pullRequest.number,
-					commentBody,
-				);
-			}
-
 			this.logger.info(
 				{
 					path: file.path,
 					prNumber: validity.pullRequest.number,
 					advisoryGuardCount: processingResult.reviewerNotices.length,
-					maintainerCommentPosted: maintainerFeedback !== undefined,
 				},
-				"Refreshed open translation pull request after maintainer feedback remediation",
+				"Refreshed open translation pull request after upstream sync",
 			);
 
 			return {

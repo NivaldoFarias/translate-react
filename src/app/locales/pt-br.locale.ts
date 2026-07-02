@@ -1,12 +1,7 @@
 import type { TranslationFile } from "@/app/services/translator/";
 import type { PostTranslationGuardId } from "@/app/services/translator/validation/validation.constants";
 
-import type {
-	LocaleDefinition,
-	LocalePRBodyStrings,
-	ProgressCommentRunContext,
-	RemediationPullRequestCommentParams,
-} from "./types";
+import type { LocaleDefinition, LocalePRBodyStrings, ProgressCommentRunContext } from "./types";
 
 import { createPRBodyBuilder } from "./pr-body.builder";
 
@@ -119,43 +114,6 @@ export const ptBrLocale: LocaleDefinition = {
 		createdSectionHeader: "### PRs criados",
 		updatedSectionHeader: "### PRs atualizados",
 		suffix: `[^1]: as traduções foram geradas por uma LLM e requerem revisão humana para garantir precisão técnica e fluência.`,
-		remediationPullRequestComment: ({
-			filename,
-			maintainerLogins,
-			runContext,
-			advisoryNoticeCount,
-		}: RemediationPullRequestCommentParams) => {
-			const mentions = maintainerLogins.map((login) => `@${login}`).join(", ");
-			const opener =
-				runContext ?
-					`O [\`translate-react@${runContext.version}\`](${runContext.releaseUrl}) publicou um novo commit neste PR.`
-				:	"O translate-react publicou um novo commit neste PR.";
-
-			const lines = [
-				opener,
-				"",
-				`Motivo: revisões com **CHANGES_REQUESTED** de ${mentions} após o último commit automatizado de \`${filename}\`.`,
-				"",
-				"A página foi retraduzida com o corpo das revisões no prompt do LLM; a descrição do PR foi atualizada.",
-			];
-
-			if (advisoryNoticeCount > 0) {
-				lines.push(
-					"",
-					`> [!NOTE]`,
-					`> A validação automática reportou ${advisoryNoticeCount} aviso(s) consultivo(s) na descrição deste PR.`,
-				);
-			}
-
-			if (runContext) {
-				lines.push(
-					"",
-					`###### **GitHub Action Run:** [\`${runContext.workflowName} #${runContext.runId}\`](${runContext.url})`,
-				);
-			}
-
-			return lines.join("\n");
-		},
 	},
 	rules: {
 		specific: PT_BR_SPECIFIC_RULES,

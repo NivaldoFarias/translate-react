@@ -146,7 +146,7 @@ export interface ReviewerFeedbackAuthorSnapshot {
 	readonly userType: string;
 }
 
-/** Normalized pull request review for maintainer-feedback detection */
+/** Normalized pull request review for approved-pull-request preservation checks */
 export interface PullRequestReviewSnapshot extends ReviewerFeedbackAuthorSnapshot {
 	/** GitHub review id */
 	readonly id: number;
@@ -159,27 +159,6 @@ export interface PullRequestReviewSnapshot extends ReviewerFeedbackAuthorSnapsho
 
 	/** Review body markdown; GitHub may return null for reviews without a summary */
 	readonly body: string | null;
-}
-
-/** Normalized inline pull request review comment for maintainer-feedback remediation */
-export interface PullRequestReviewCommentSnapshot extends ReviewerFeedbackAuthorSnapshot {
-	/** When the inline comment was created */
-	readonly createdAt: Date;
-
-	/** Inline comment body markdown */
-	readonly body: string;
-
-	/** Parent review id when the comment was submitted with a review */
-	readonly pullRequestReviewId: number | null;
-}
-
-/** Newest runner `docs: translate` commit on a fork translation branch */
-export interface LatestTranslationCommitSnapshot {
-	/** Committer timestamp of the translation commit */
-	readonly timestamp: Date;
-
-	/** Full commit message, including optional remediation attribution body */
-	readonly message: string;
 }
 
 /** Normalized pull request issue comment snapshot */

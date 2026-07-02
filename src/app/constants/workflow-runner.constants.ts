@@ -10,3 +10,6 @@ export const WORKFLOW_RUNNER_REPOSITORY_HTML_BASE =
 /** Maintainer guide linked from every translation PR body */
 export const WIKI_FOR_REACT_DOCS_MAINTAINERS_URL =
 	`${WORKFLOW_RUNNER_REPOSITORY_HTML_BASE}/wiki/For-React-Docs-Maintainers` as const;
+
+/** Prefix of runner translation commits on fork `translate/…` branches */
+export const TRANSLATION_COMMIT_MESSAGE_PREFIX = "docs: translate ";

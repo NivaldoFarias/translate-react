@@ -80,17 +80,6 @@ describe("RunnerService workflow integration", () => {
 					expect(chatMock.mock.calls.length).toBeGreaterThanOrEqual(1);
 					break;
 				}
-				case WorkflowFixturePrScenario.MaintainerFix: {
-					expect(stats.totalCount).toBe(1);
-					expect(stats.successCount).toBe(1);
-					expect(stats.failureCount).toBe(0);
-					expect(github.refreshTranslationBranchPreservePr).toHaveBeenCalled();
-					expect(github.updatePullRequestBody).toHaveBeenCalled();
-					expect(github.createPullRequest).not.toHaveBeenCalled();
-					expect(github.closePullRequest).not.toHaveBeenCalled();
-					expect(chatMock.mock.calls.length).toBeGreaterThanOrEqual(1);
-					break;
-				}
 				case WorkflowFixturePrScenario.ValidSkip: {
 					expect(stats.totalCount).toBe(0);
 					expect(stats.successCount).toBe(0);

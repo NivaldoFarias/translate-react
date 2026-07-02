@@ -926,52 +926,6 @@ describe("GitHubService", () => {
 			});
 		});
 
-		describe("listPullRequestReviewComments", () => {
-			test("should return normalized inline pull request review comments", async () => {
-				octokitMock.paginate.mockResolvedValueOnce([
-					{
-						user: { login: "maintainer", type: "User" },
-						author_association: "MEMBER",
-						created_at: "2026-06-01T12:05:00Z",
-						body: "Use sentence case here.",
-						pull_request_review_id: 99,
-					},
-					{
-						user: { login: "maintainer", type: "User" },
-						author_association: "MEMBER",
-						created_at: "2026-06-01T12:00:00Z",
-						body: "First inline note.",
-						pull_request_review_id: 99,
-					},
-				]);
-
-				const comments = await githubService.listPullRequestReviewComments(42);
-
-				expect(comments).toEqual([
-					{
-						login: "maintainer",
-						authorAssociation: "MEMBER",
-						userType: "User",
-						createdAt: new Date("2026-06-01T12:00:00Z"),
-						body: "First inline note.",
-						pullRequestReviewId: 99,
-					},
-					{
-						login: "maintainer",
-						authorAssociation: "MEMBER",
-						userType: "User",
-						createdAt: new Date("2026-06-01T12:05:00Z"),
-						body: "Use sentence case here.",
-						pullRequestReviewId: 99,
-					},
-				]);
-				expect(octokitMock.paginate).toHaveBeenCalledWith(
-					"GET /repos/{owner}/{repo}/pulls/{pull_number}/comments",
-					{ ...testRepositories.upstream, pull_number: 42, per_page: 100 },
-				);
-			});
-		});
-
 		describe("findPullRequestByBranch", () => {
 			test("should return PR when branch matches", async () => {
 				octokitMock.pulls.list.mockResolvedValueOnce({

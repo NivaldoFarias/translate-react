@@ -14,7 +14,7 @@ export const SmokeProfile = {
 	Quick: "quick",
 
 	/**
-	 * PR workflow scenarios only: out-of-sync refresh, maintainer remediation, and valid skip.
+	 * PR workflow scenarios only: out-of-sync refresh and valid skip.
 	 * Use when testing PR validity and refresh logic without extra fixture pages.
 	 */
 	Workflow: "workflow",
@@ -45,8 +45,7 @@ export function isSmokeProfileId(value: string): value is SmokeProfileId {
  *
  * - `"quick"`: `use-memo.md` and `react-labs-view-transitions-activity-and-more.md` (new PR,
  *   translation output), `lazy.md` (open PR behind upstream, branch refresh).
- * - `"workflow"`: `lazy.md` (out-of-sync refresh), `react-19.md` (unresolved
- *   `CHANGES_REQUESTED` remediation), `react-conf-2021-recap.md` (in-sync valid PR, skip LLM).
+ * - `"workflow"`: `lazy.md` (out-of-sync refresh), `react-conf-2021-recap.md` (in-sync valid PR, skip LLM).
  */
 export const SMOKE_PROFILE_FIXTURES = {
 	[SmokeProfile.Quick]: [
@@ -54,7 +53,7 @@ export const SMOKE_PROFILE_FIXTURES = {
 		"react-labs-view-transitions-activity-and-more.md",
 		"lazy.md",
 	],
-	[SmokeProfile.Workflow]: ["lazy.md", "react-19.md", "react-conf-2021-recap.md"],
+	[SmokeProfile.Workflow]: ["lazy.md", "react-conf-2021-recap.md"],
 } as const satisfies Record<Exclude<SmokeProfileId, "full">, readonly string[]>;
 
 /**

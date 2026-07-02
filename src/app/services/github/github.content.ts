@@ -7,11 +7,9 @@ import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 import type { CommentBuilderService } from "@/app/services/comment-builder/";
 import type {
-	LatestTranslationCommitSnapshot,
 	PatchedRepositoryTreeItem,
 	ProcessedFileResult,
 	PullRequestIssueCommentSnapshot,
-	PullRequestReviewCommentSnapshot,
 	PullRequestReviewSnapshot,
 	PullRequestStatus,
 	RepositoryMarkdownBlob,
@@ -20,7 +18,6 @@ import type {
 
 import type { SharedGitHubDependencies } from "./types";
 
-import { TRANSLATION_COMMIT_MESSAGE_PREFIX } from "@/app/constants/maintainer-feedback.constants";
 import {
 	hasReportableProgressComment,
 	selectProgressCommentPayload,
@@ -755,87 +752,6 @@ export class GitHubContent {
 				},
 			];
 		});
-	}
-
-	/**
-	 * Lists inline review comments on an open translation pull request (upstream repo).
-	 *
-	 * @param prNumber Pull request number on the upstream repository
-	 *
-	 * @returns Normalized inline review comments, oldest first
-	 */
-	public async listPullRequestReviewComments(
-		prNumber: number,
-	): Promise<PullRequestReviewCommentSnapshot[]> {
-		const comments = await this.deps.octokit.paginate(
-			"GET /repos/{owner}/{repo}/pulls/{pull_number}/comments",
-			{
-				...this.deps.repositories.upstream,
-				pull_number: prNumber,
-				per_page: 100,
-			},
-		);
-
-		return comments
-			.map((comment) => ({
-				login: comment.user.login,
-				authorAssociation: comment.author_association,
-				userType: comment.user.type,
-				createdAt: new Date(comment.created_at),
-				body: comment.body,
-				pullRequestReviewId: comment.pull_request_review_id,
-			}))
-			.sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime());
-	}
-
-	/**
-	 * Returns the newest runner translation commit on a fork branch.
-	 *
-	 * @param branchName Translation branch name without `refs/heads/` prefix
-	 *
-	 * @returns Committer timestamp and message of the newest `docs: translate` commit, if any
-	 */
-	public async getLatestTranslationCommit(
-		branchName: string,
-	): Promise<LatestTranslationCommitSnapshot | undefined> {
-		const response = await this.deps.octokit.repos.listCommits({
-			...this.deps.repositories.fork,
-			sha: branchName,
-			per_page: 30,
-		});
-
-		const translationCommit = response.data.find((commit) =>
-			commit.commit.message.startsWith(TRANSLATION_COMMIT_MESSAGE_PREFIX),
-		);
-
-		if (!translationCommit) {
-			return undefined;
-		}
-
-		const timestamp =
-			translationCommit.commit.committer?.date ?? translationCommit.commit.author?.date;
-
-		if (!timestamp) {
-			return undefined;
-		}
-
-		return {
-			timestamp: new Date(timestamp),
-			message: translationCommit.commit.message,
-		};
-	}
-
-	/**
-	 * Returns the committer timestamp of the latest runner translation commit on a fork branch.
-	 *
-	 * @param branchName Translation branch name without `refs/heads/` prefix
-	 *
-	 * @returns Committer date of the newest `docs: translate` commit, or `undefined` when none exist
-	 */
-	public async getLatestTranslationCommitTimestamp(branchName: string): Promise<Date | undefined> {
-		const latestCommit = await this.getLatestTranslationCommit(branchName);
-
-		return latestCommit?.timestamp;
 	}
 
 	/**

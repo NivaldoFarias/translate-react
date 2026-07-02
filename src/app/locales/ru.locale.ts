@@ -1,12 +1,7 @@
 import type { TranslationFile } from "@/app/services/translator/";
 import type { PostTranslationGuardId } from "@/app/services/translator/validation/validation.constants";
 
-import type {
-	LocaleDefinition,
-	LocalePRBodyStrings,
-	ProgressCommentRunContext,
-	RemediationPullRequestCommentParams,
-} from "./types";
+import type { LocaleDefinition, LocalePRBodyStrings, ProgressCommentRunContext } from "./types";
 
 import { createPRBodyBuilder } from "./pr-body.builder";
 
@@ -87,43 +82,6 @@ export const ruLocale: LocaleDefinition = {
 		createdSectionHeader: "### Созданные PR",
 		updatedSectionHeader: "### Обновлённые PR",
 		suffix: `[^1]: переводы были сгенерированы с использованием LLM и требуют проверки человеком для обеспечения точности, культурного контекста и технической терминологии.`,
-		remediationPullRequestComment: ({
-			filename,
-			maintainerLogins,
-			runContext,
-			advisoryNoticeCount,
-		}: RemediationPullRequestCommentParams) => {
-			const mentions = maintainerLogins.map((login) => `@${login}`).join(", ");
-			const opener =
-				runContext ?
-					`[\`translate-react@${runContext.version}\`](${runContext.releaseUrl}) опубликовал новый коммит в этом PR.`
-				:	"translate-react опубликовал новый коммит в этом PR.";
-
-			const lines = [
-				opener,
-				"",
-				`Причина: отзывы со статусом **CHANGES_REQUESTED** от ${mentions} после последнего автоматического коммита для \`${filename}\`.`,
-				"",
-				"Страница переведена заново с учётом текста отзывов в промпте LLM; описание PR обновлено.",
-			];
-
-			if (advisoryNoticeCount > 0) {
-				lines.push(
-					"",
-					`> [!NOTE]`,
-					`> Автоматическая проверка сообщила о ${advisoryNoticeCount} рекомендательных предупреждении(ях) в описании PR.`,
-				);
-			}
-
-			if (runContext) {
-				lines.push(
-					"",
-					`###### **GitHub Action Run:** [\`${runContext.workflowName} #${runContext.runId}\`](${runContext.url})`,
-				);
-			}
-
-			return lines.join("\n");
-		},
 	},
 	rules: {
 		specific: `

@@ -67,10 +67,7 @@ import {
 	reinsertSegments,
 	splitSegmentBatchInHalf,
 } from "./markdown/segments";
-import {
-	emptyTranslationAttemptContext,
-	translationAttemptContextFromMaintainerReview,
-} from "./pipeline/translation-attempt.context";
+import { emptyTranslationAttemptContext } from "./pipeline/translation-attempt.context";
 import { TranslationPipelineManager } from "./pipeline/translation-pipeline.manager";
 import { validateAndReassembleChunks } from "./postprocess/chunk-reassembly";
 import {
@@ -97,12 +94,6 @@ export type {
 
 export type { ReviewerValidationNotice } from "./validation/validation.types";
 export type { TranslationLlmUsageTotals } from "./llm/translation-llm.usage";
-
-/** Optional inputs for {@link TranslatorService.translateContent} */
-export interface TranslateContentOptions {
-	/** Maintainer PR review bodies to include in the translation system prompt */
-	readonly maintainerFeedbackComments?: readonly string[];
-}
 
 /** Translation strategy used for the markdown body on the latest {@link TranslatorService.translateContent} call */
 export type TranslationPath = "segment" | "segment-noop" | "legacy-full-body" | "legacy-chunked";
@@ -419,7 +410,6 @@ export class TranslatorService {
 	 * 8. Cleans up and returns translated content
 	 *
 	 * @param file File containing content to translate
-	 * @param options Optional maintainer feedback for re-translation
 	 *
 	 * @returns Promise resolving to translated content
 	 *
@@ -438,10 +428,7 @@ export class TranslatorService {
 	 * console.log(translated); // '# Olá\n\nBem-vindo ao React!'
 	 * ```
 	 */
-	public async translateContent(
-		file: TranslationFile,
-		options?: TranslateContentOptions,
-	): Promise<TranslationResult> {
+	public async translateContent(file: TranslationFile): Promise<TranslationResult> {
 		file.logger.info({ file: file.getLogContext() }, "Translating content for file");
 
 		if (!file.content.length) {
@@ -515,14 +502,7 @@ export class TranslatorService {
 		const sourceBodyForArtifacts =
 			fileBodySplit.rest.length > 0 ? fileBodySplit.rest : file.content;
 
-		const maintainerComments = options?.maintainerFeedbackComments?.filter(
-			(body) => body.trim().length > 0,
-		);
-
-		const initialAttemptContext =
-			maintainerComments && maintainerComments.length > 0 ?
-				translationAttemptContextFromMaintainerReview(maintainerComments)
-			:	emptyTranslationAttemptContext();
+		const initialAttemptContext = emptyTranslationAttemptContext();
 
 		const pipelineResult = await this.managers.pipeline.translateWithValidation({
 			file,

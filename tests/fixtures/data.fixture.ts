@@ -6,7 +6,6 @@ import type { ChatCompletion } from "openai/resources";
 import type {
 	PatchedRepositoryTreeItem,
 	ProcessedFileResult,
-	PullRequestReviewCommentSnapshot,
 	PullRequestReviewSnapshot,
 	PullRequestStatus,
 } from "@/app/services/github/types";
@@ -75,7 +74,7 @@ export function createPullRequestStatusFixture(
 }
 
 /**
- * Creates a normalized pull request review snapshot for maintainer-feedback tests.
+ * Creates a normalized pull request review snapshot for workflow tests.
  *
  * @param overrides Optional field overrides
  *
@@ -92,27 +91,6 @@ export function createMockPullRequestReviewSnapshot(
 		state: "CHANGES_REQUESTED",
 		submittedAt: new Date("2026-06-03T12:00:00Z"),
 		body: "Please review.",
-		...overrides,
-	};
-}
-
-/**
- * Creates a normalized inline pull request review comment for maintainer-feedback tests.
- *
- * @param overrides Optional field overrides
- *
- * @returns Typed {@link PullRequestReviewCommentSnapshot} for mock `listPullRequestReviewComments` responses
- */
-export function createMockPullRequestReviewCommentSnapshot(
-	overrides: Partial<PullRequestReviewCommentSnapshot> = {},
-): PullRequestReviewCommentSnapshot {
-	return {
-		login: "jhonmike",
-		authorAssociation: "MEMBER",
-		userType: "User",
-		createdAt: new Date("2026-06-03T12:05:00Z"),
-		body: "Use sentence case in this heading.",
-		pullRequestReviewId: 42,
 		...overrides,
 	};
 }

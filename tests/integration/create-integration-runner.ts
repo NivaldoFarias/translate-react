@@ -27,9 +27,6 @@ import type { LanguageAnalysisResult } from "@/app/services/language-detector/la
 import type { WorkflowFixtureFile } from "@tests/fixtures/workflow-fixture.util";
 import type {
 	MockGitHubGetForkFileContentAtBranchFn,
-	MockGitHubGetLatestTranslationCommitFn,
-	MockGitHubGetLatestTranslationCommitTimestampFn,
-	MockGitHubListPullRequestReviewsFn,
 	MockLanguageDetectorService,
 } from "@tests/mocks";
 
@@ -51,10 +48,7 @@ import { WORKFLOW_FIXTURE_MANIFEST } from "@tests/fixtures/md/workflow.manifest"
 import {
 	buildWorkflowFixtureFile,
 	defaultWorkflowFixtureForkContent,
-	defaultWorkflowFixtureMaintainerReviewAt,
-	defaultWorkflowFixtureMaintainerReviews,
 	defaultWorkflowFixtureManifestEntry,
-	defaultWorkflowFixtureRunnerCommitAt,
 	WorkflowFixturePrScenario,
 } from "@tests/fixtures/workflow-fixture.util";
 import {
@@ -93,8 +87,6 @@ type FindPullRequestByBranchMockFn = (
 ) => Promise<RestEndpointMethodTypes["pulls"]["list"]["response"]["data"][number] | undefined>;
 
 type CheckPullRequestStatusMockFn = (prNumber: number) => Promise<PullRequestStatus>;
-
-type ListPullRequestReviewsMockFn = MockGitHubListPullRequestReviewsFn;
 
 const CLEAN_PULL_REQUEST_STATUS = {
 	hasConflicts: false,
@@ -164,59 +156,6 @@ function applyWorkflowSmokePullRequestMocks(
 
 		return Promise.resolve(
 			file.smoke.forkContent ?? defaultWorkflowFixtureForkContent(file.treeItem.filename),
-		);
-	});
-
-	const runnerCommitAt = defaultWorkflowFixtureRunnerCommitAt();
-
-	(
-		github.getLatestTranslationCommit as unknown as Mock<MockGitHubGetLatestTranslationCommitFn>
-	).mockImplementation((branch) => {
-		const file = fileByBranch.get(branch);
-		if (file?.smoke.pullRequestScenario !== WorkflowFixturePrScenario.MaintainerFix) {
-			return Promise.resolve(undefined);
-		}
-
-		return Promise.resolve({
-			timestamp: runnerCommitAt,
-			message: `docs: translate \`${file.treeItem.filename}\` to Brazilian Portuguese`,
-		});
-	});
-
-	(
-		github.getLatestTranslationCommitTimestamp as unknown as Mock<MockGitHubGetLatestTranslationCommitTimestampFn>
-	).mockImplementation((branch) => {
-		const file = fileByBranch.get(branch);
-		if (file?.smoke.pullRequestScenario !== WorkflowFixturePrScenario.MaintainerFix) {
-			return Promise.resolve(undefined);
-		}
-
-		return Promise.resolve(runnerCommitAt);
-	});
-
-	(
-		github.listPullRequestReviews as unknown as Mock<ListPullRequestReviewsMockFn>
-	).mockImplementation((prNumber) => {
-		const file = fileByPullRequestNumber.get(prNumber);
-		if (file?.smoke.pullRequestScenario !== WorkflowFixturePrScenario.MaintainerFix) {
-			return Promise.resolve([]);
-		}
-
-		const bodies =
-			file.smoke.maintainerReviewBodies ??
-			defaultWorkflowFixtureMaintainerReviews(file.treeItem.filename);
-		const logins = file.smoke.maintainerReviewerLogins ?? ["maintainer"];
-
-		return Promise.resolve(
-			bodies.map((body, index) => ({
-				id: 100 + index,
-				login: logins[index] ?? logins[0] ?? "maintainer",
-				authorAssociation: "MEMBER",
-				userType: "User",
-				state: "CHANGES_REQUESTED",
-				submittedAt: defaultWorkflowFixtureMaintainerReviewAt(),
-				body,
-			})),
 		);
 	});
 }

@@ -109,7 +109,7 @@ export const WORKFLOW_FIXTURE_MANIFEST = {
 		tree: fixtureTree("src/content/blog/2024/12/05/react-19.md"),
 		smoke: {
 			pullRequestNumber: 202,
-			pullRequestScenario: WorkflowFixturePrScenario.MaintainerFix,
+			pullRequestScenario: WorkflowFixturePrScenario.New,
 		},
 	},
 	"react-conf-2021-recap.md": {

@@ -24,7 +24,7 @@ export interface BuildMarkdownDocumentPromptParams {
 	/** When set, documents that `userMessageContent` is one slice of a larger markdown body */
 	chunkProgress?: ChunkTranslationProgress;
 
-	/** Maintainer feedback for re-translation, when present */
+	/** Maintainer feedback for re-translations, when present */
 	attemptContext: TranslationAttemptContext;
 
 	/** Optional glossary lines appended to the prompt */
@@ -81,11 +81,7 @@ export class TranslationPromptBuilder {
 		}
 
 		if (systemPromptKind === "segmentBatch") {
-			return this.buildSegmentBatchSystemPrompt(
-				languages,
-				params.translationGuidelines,
-				params.attemptContext,
-			);
+			return this.buildSegmentBatchSystemPrompt(languages, params.translationGuidelines);
 		}
 
 		return (
@@ -95,7 +91,7 @@ export class TranslationPromptBuilder {
 	}
 
 	/**
-	 * Builds the markdown document system prompt with preservation rules and optional maintainer feedback.
+	 * Builds the markdown document system prompt with preservation rules.
 	 *
 	 * @param params Markdown prompt parameters
 	 * @param languages Human-readable language names for the prompt
@@ -124,15 +120,12 @@ export class TranslationPromptBuilder {
 				`
 			:	"";
 
-		const maintainerReviewSection = this.buildMaintainerReviewSection(params.attemptContext);
-
 		const builtSystemPrompt = `# ROLE
 				You are an expert technical translator specializing in React documentation.
 	
 				# TASK
 				Translate the provided content from ${languages.source} to ${languages.target} with absolute precision and technical accuracy.
 				${chunkSliceSection}
-				${maintainerReviewSection}
 				# CRITICAL PRESERVATION RULES
 				1. **Structure & Formatting**: Preserve ALL markdown syntax, HTML tags, code blocks, frontmatter, and line breaks exactly as written
 				2. **Code & identifiers**: Keep ALL code examples, URLs, and every programming identifier (functions, variables, classes, hooks, packages, props as in code) unchanged in every context: fenced blocks, inline code, tables, lists, or prose
@@ -227,14 +220,12 @@ export class TranslationPromptBuilder {
 	 * @param languages.source Source language display name
 	 * @param languages.target Target language display name
 	 * @param translationGuidelines Optional glossary for terminology alignment
-	 * @param attemptContext Maintainer feedback for re-translations, when present
 	 *
 	 * @returns The system prompt string for the segment batch completion
 	 */
 	public buildSegmentBatchSystemPrompt(
 		languages: { source: string; target: string },
 		translationGuidelines: string | null,
-		attemptContext: TranslationAttemptContext,
 	) {
 		const termReferenceSection =
 			translationGuidelines ?
@@ -246,15 +237,11 @@ export class TranslationPromptBuilder {
 				`
 			:	"";
 
-		const maintainerReviewSection = this.buildMaintainerReviewSection(attemptContext);
-
 		return `# ROLE
 				You are an expert technical translator for React documentation prose fragments.
 
 				# TASK
 				The user message is a JSON object with an \`items\` array. Each element has \`segmentId\` (a short opaque key such as \`s0\` or \`s12\`), \`source\` (English text to translate), and optional \`heading\` (nearest section heading for terminology context). Translate each \`source\` from ${languages.source} to ${languages.target}.
-
-				${maintainerReviewSection}
 
 				# OUTPUT (STRICT)
 				- Reply with JSON only, matching the response schema: an object \`items\` whose length equals the request, each item having \`segmentId\` (copy the input opaque key exactly, e.g. \`s0\`) and \`translated\` (the translated string only).
@@ -270,34 +257,6 @@ export class TranslationPromptBuilder {
 				${this.locale.definitions.rules.specific}
 
 				${termReferenceSection}
-				`;
-	}
-
-	/**
-	 * Builds the maintainer review section for re-translations after human feedback on a PR.
-	 *
-	 * @param attemptContext Attempt context with maintainer comment bodies
-	 *
-	 * @returns Markdown section for the system prompt, or empty when no comments
-	 */
-	public buildMaintainerReviewSection(attemptContext: TranslationAttemptContext) {
-		const comments = attemptContext.maintainerReviewComments ?? [];
-		if (comments.length === 0) return "";
-
-		const formattedComments = comments
-			.map((body, index) => {
-				const trimmed = body.trim();
-				if (comments.length === 1) return trimmed;
-
-				return `### Review note ${index + 1}\n\n${trimmed}`;
-			})
-			.join("\n\n");
-
-		return `
-				# MAINTAINER REVIEW (previous automated translation)
-				A repository maintainer reviewed the last automated translation on the pull request and reported problems. The user message is still the English source; produce a new ${this.languageDetector.getLanguageName(this.languageDetector.languages.target)} translation that fixes every issue below.
-				
-				${formattedComments}
 				`;
 	}
 
