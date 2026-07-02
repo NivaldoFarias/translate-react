@@ -1,8 +1,8 @@
 import type { TranslationFile } from "@/app/services/translator/";
-import type { PostTranslationGuardId } from "@/app/services/translator/validation/validation.constants";
 
 import type { LocaleDefinition, LocalePRBodyStrings, ProgressCommentRunContext } from "./types";
 
+import { createGuardLabelResolver } from "./locale-guard-labels.util";
 import { createPRBodyBuilder } from "./pr-body.builder";
 
 /**
@@ -28,25 +28,21 @@ const ruPRBodyStrings: LocalePRBodyStrings = {
 		intro:
 			"Автоматическая проверка обнаружила механические проблемы, которые нужно исправить вручную перед merge:",
 		detailsSummary: "Показать детали проверки",
-		guardLabel: (guardId) => {
-			const labels: Record<PostTranslationGuardId, string> = {
-				markdownLinksPreserved: "Markdown-ссылки",
-				fenceFunctionIdentifiers: "Идентификаторы функций в блоках кода",
-				fenceJsxStaticText: "Статический JSX-текст в блоках кода",
-				headingsPreserved: "Заголовки",
-				frontmatterPreserved: "YAML frontmatter",
-				sentenceCaseHeadings: "Sentence case в заголовках",
-				mdxSpacing: "Интервалы MDX",
-				extraMarkdownLinks: "Лишние ссылки",
-				mdxSlugPreserved: "MDX-slug",
-				headingCountPreserved: "Количество заголовков",
-				headingSyntax: "Синтаксис заголовков",
-				contentRatio: "Соотношение объёма текста",
-				nonEmptyContent: "Пустой перевод",
-			};
-
-			return labels[guardId];
-		},
+		guardLabel: createGuardLabelResolver({
+			markdownLinksPreserved: "Markdown-ссылки",
+			fenceFunctionIdentifiers: "Идентификаторы функций в блоках кода",
+			fenceJsxStaticText: "Статический JSX-текст в блоках кода",
+			headingsPreserved: "Заголовки",
+			frontmatterPreserved: "YAML frontmatter",
+			sentenceCaseHeadings: "Sentence case в заголовках",
+			mdxSpacing: "Интервалы MDX",
+			extraMarkdownLinks: "Лишние ссылки",
+			mdxSlugPreserved: "MDX-slug",
+			headingCountPreserved: "Количество заголовков",
+			headingSyntax: "Синтаксис заголовков",
+			contentRatio: "Соотношение объёма текста",
+			nonEmptyContent: "Пустой перевод",
+		}),
 		violationTally: (count) => {
 			const mod10 = count % 10;
 			const mod100 = count % 100;

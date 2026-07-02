@@ -1,8 +1,7 @@
+import type { LocalePRBodyStrings } from "@/app/locales/types";
 import type { ReviewerValidationNotice } from "@/app/services/github/types";
 import type { FenceJsxStaticTextMismatch } from "@/app/services/translator/validation/analyzers/fence-jsx-static-text.analyzer";
 import type { PostTranslationGuardId } from "@/app/services/translator/validation/validation.constants";
-
-import type { LocalePRBodyStrings } from "./types";
 
 import { MARKDOWN_REGEXES } from "@/app/services/translator/markdown/markdown.regexes";
 import {
@@ -16,6 +15,8 @@ import {
 } from "@/app/services/translator/validation/analyzers/fence-code-identifier.analyzer";
 import { findFenceJsxStaticTextMismatches } from "@/app/services/translator/validation/analyzers/fence-jsx-static-text.analyzer";
 import { findMarkdownLinkViolations } from "@/app/services/translator/validation/analyzers/markdown-link.analyzer";
+import { detectFrontmatterPreservedViolation } from "@/app/services/translator/validation/guards/frontmatter-preserved.guard";
+import { detectHeadingsPreservedViolation } from "@/app/services/translator/validation/guards/headings-preserved.guard";
 import { POST_TRANSLATION_GUARD_IDS } from "@/app/services/translator/validation/validation.constants";
 
 const HINT_VIOLATION_SPLIT = /\.\s+(?:fence \d+|Problems found:)/;
@@ -350,25 +351,18 @@ function collectExtraMarkdownLinkViolations(sourceMarkdown: string, translatedMa
  * @returns Located violations for the PR details block
  */
 function collectFrontmatterViolations(sourceMarkdown: string, translatedMarkdown: string) {
-	const sourceMatch = MARKDOWN_REGEXES.frontmatter.exec(sourceMarkdown);
-	MARKDOWN_REGEXES.frontmatter.lastIndex = 0;
-	if (!sourceMatch) {
+	const violation = detectFrontmatterPreservedViolation(sourceMarkdown, translatedMarkdown);
+	if (!violation) {
 		return [];
 	}
-
-	MARKDOWN_REGEXES.frontmatter.lastIndex = 0;
-	const translatedMatch = MARKDOWN_REGEXES.frontmatter.exec(translatedMarkdown);
-	MARKDOWN_REGEXES.frontmatter.lastIndex = 0;
-	if (translatedMatch) {
-		return [];
-	}
-
-	const endOffset = sourceMatch[0].length;
 
 	return [
 		{
 			startLine: 1,
-			endLine: lineNumberAtOffset(sourceMarkdown, Math.max(0, endOffset - 1)),
+			endLine: lineNumberAtOffset(
+				sourceMarkdown,
+				Math.max(0, violation.sourceFrontmatterBlockLength - 1),
+			),
 			body: "YAML frontmatter block missing from translation.",
 		},
 	];
@@ -383,21 +377,18 @@ function collectFrontmatterViolations(sourceMarkdown: string, translatedMarkdown
  * @returns Located violations for the PR details block
  */
 function collectHeadingsPreservedViolations(sourceMarkdown: string, translatedMarkdown: string) {
-	const sourceHeadingCount = (sourceMarkdown.match(MARKDOWN_REGEXES.headings) ?? []).length;
-	const translatedHeadingCount = (translatedMarkdown.match(MARKDOWN_REGEXES.headings) ?? []).length;
-
-	if (sourceHeadingCount === 0 || translatedHeadingCount > 0) {
+	const violation = detectHeadingsPreservedViolation(sourceMarkdown, translatedMarkdown);
+	if (!violation) {
 		return [];
 	}
 
-	const firstHeading = /^#{1,6}\s.+$/m.exec(sourceMarkdown);
-	const line = firstHeading ? lineNumberAtOffset(sourceMarkdown, firstHeading.index) : 1;
+	const line = lineNumberAtOffset(sourceMarkdown, violation.firstHeadingOffset);
 
 	return [
 		{
 			startLine: line,
 			endLine: line,
-			body: firstHeading?.[0].trim() ?? "All markdown headings were removed.",
+			body: violation.firstHeadingText,
 		},
 	];
 }

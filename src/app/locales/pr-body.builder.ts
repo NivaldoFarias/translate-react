@@ -5,8 +5,7 @@ import type { TranslationFile } from "@/app/services/translator/";
 import type { LocalePRBodyStrings } from "./types";
 
 import { WIKI_FOR_REACT_DOCS_MAINTAINERS_URL } from "@/app/constants";
-
-import { buildReviewerWarningsMarkdown } from "./reviewer-warnings-pr.util";
+import { buildReviewerWarningsMarkdown } from "@/app/services/comment-builder/reviewer-warnings.util";
 
 /**
  * Builds the conflict notice section for PR body when a stale PR was closed.

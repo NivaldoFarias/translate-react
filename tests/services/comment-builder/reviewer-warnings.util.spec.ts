@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import type { LocalePRBodyStrings } from "@/app/locales/types";
 
-import { buildReviewerWarningsMarkdown } from "@/app/locales/reviewer-warnings-pr.util";
+import { buildReviewerWarningsMarkdown } from "@/app/services/comment-builder/reviewer-warnings.util";
 
 const strings: LocalePRBodyStrings["reviewerWarnings"] = {
 	intro: "Validation issues detected:",

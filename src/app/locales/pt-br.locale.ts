@@ -1,8 +1,8 @@
 import type { TranslationFile } from "@/app/services/translator/";
-import type { PostTranslationGuardId } from "@/app/services/translator/validation/validation.constants";
 
 import type { LocaleDefinition, LocalePRBodyStrings, ProgressCommentRunContext } from "./types";
 
+import { createGuardLabelResolver } from "./locale-guard-labels.util";
 import { createPRBodyBuilder } from "./pr-body.builder";
 
 /**
@@ -28,25 +28,21 @@ const ptBrPRBodyStrings: LocalePRBodyStrings = {
 		intro:
 			"A validação automática detectou problemas mecânicos que precisam de correção manual antes do merge:",
 		detailsSummary: "Ver detalhes da validação",
-		guardLabel: (guardId) => {
-			const labels: Record<PostTranslationGuardId, string> = {
-				markdownLinksPreserved: "Links markdown",
-				fenceFunctionIdentifiers: "Identificadores de função em blocos de código",
-				fenceJsxStaticText: "Texto JSX estático em blocos de código",
-				headingsPreserved: "Títulos",
-				frontmatterPreserved: "Frontmatter YAML",
-				sentenceCaseHeadings: "Sentence case em títulos",
-				mdxSpacing: "Espaçamento MDX",
-				extraMarkdownLinks: "Links extras",
-				mdxSlugPreserved: "Slugs MDX",
-				headingCountPreserved: "Contagem de títulos",
-				headingSyntax: "Sintaxe de títulos",
-				contentRatio: "Proporção de conteúdo",
-				nonEmptyContent: "Conteúdo vazio",
-			};
-
-			return labels[guardId];
-		},
+		guardLabel: createGuardLabelResolver({
+			markdownLinksPreserved: "Links markdown",
+			fenceFunctionIdentifiers: "Identificadores de função em blocos de código",
+			fenceJsxStaticText: "Texto JSX estático em blocos de código",
+			headingsPreserved: "Títulos",
+			frontmatterPreserved: "Frontmatter YAML",
+			sentenceCaseHeadings: "Sentence case em títulos",
+			mdxSpacing: "Espaçamento MDX",
+			extraMarkdownLinks: "Links extras",
+			mdxSlugPreserved: "Slugs MDX",
+			headingCountPreserved: "Contagem de títulos",
+			headingSyntax: "Sintaxe de títulos",
+			contentRatio: "Proporção de conteúdo",
+			nonEmptyContent: "Conteúdo vazio",
+		}),
 		violationTally: (count) => (count === 1 ? "1 violação" : `${count} violações`),
 	},
 };
