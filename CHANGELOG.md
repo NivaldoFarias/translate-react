@@ -4,10 +4,6 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
-### Fixed
-
-- CI per-locale smoke gate jobs no longer inherit the 15-minute workflow timeout that cancelled in-progress `quick` runs.
-
 ## [0.2.10] - 2026-07-02
 
 ### Added
@@ -57,6 +53,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 - Glued inline code, MDX slug comments, and adjacent markdown links are repaired before advisory validation so those mechanical spacing regressions no longer surface as `mdxSpacing` reviewer notices on translation pull requests.
 - Blank `TARGET_LANGUAGE` or `SOURCE_LANGUAGE` from GitHub Actions or `.env` no longer fails validation; empty values default to `pt-br` and `en`.
 - Translation pull request conflict notices no longer claim the previous PR was closed when the runner refreshes the branch in place.
+- CI per-locale smoke gate jobs no longer inherit the 15-minute workflow timeout that cancelled in-progress `quick` runs.
 
 ## [0.2.9] - 2026-06-22
 
