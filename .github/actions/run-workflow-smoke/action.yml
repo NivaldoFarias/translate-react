@@ -1,5 +1,5 @@
 name: Run workflow smoke
-description: Checkout, install dependencies, and run `ci:smoke` against real LLM with mocked GitHub
+description: Install dependencies and run `ci:smoke` against real LLM with mocked GitHub (caller must checkout first)
 
 inputs:
   profile:
@@ -65,11 +65,6 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Checkout repository
-      uses: actions/checkout@v7
-      with:
-        fetch-depth: 1
-
     - name: Setup Bun dependencies
       uses: ./.github/actions/setup-bun-deps
       with:

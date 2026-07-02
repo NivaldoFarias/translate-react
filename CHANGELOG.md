@@ -4,6 +4,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+### Fixed
+
+- CI per-locale smoke gate jobs no longer inherit the 15-minute workflow timeout that cancelled in-progress `quick` runs.
+
 ## [0.2.10] - 2026-07-02
 
 ### Added

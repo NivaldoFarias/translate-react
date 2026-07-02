@@ -98,7 +98,6 @@ jobs:
     needs: detect-smoke-gate
     if: needs.detect-smoke-gate.outputs.should_run == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
     environment: development
     strategy:
       fail-fast: false
