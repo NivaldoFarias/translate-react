@@ -1,42 +1,14 @@
-import { version } from "@package";
-
-import type { InvalidFilePullRequest, PullRequestDescriptionMetadata } from "@/app/locales/types";
+import type { InvalidFilePullRequest } from "@/app/locales/types";
 import type { ProcessedFileResult } from "@/app/services/github/types";
-import type { FileProcessingProgress } from "@/app/services/runner/types";
 
 import type { RunnerServiceDependencies } from "../runner.types";
 
-import type { TranslationPullRequestValidity } from "./translation-pull-request-validity.manager";
-
-import { PullRequestProgressAction } from "@/app/services/github/types";
 import { TranslationFile } from "@/app/services/translator/";
-import {
-	env,
-	getTranslationBranchNameFromPath,
-	isTranslationEquivalentToCurrentBlob,
-	logger,
-} from "@/app/utils/";
-import { ApplicationError, ErrorCode, isCircuitBreakerError } from "@/shared/errors/";
+import { logger } from "@/app/utils/";
 
-import { hasQualifyingApprovedReview } from "./pull-request-review.util";
-import { buildTranslationCommitMessage } from "./translation-commit.util";
-import { TranslationPullRequestValidityManager } from "./translation-pull-request-validity.manager";
-import { MAX_CONSECUTIVE_FAILURES } from "./workflow.constants";
-
-/**
- * Returns the hostname of the configured LLM API base URL for PR metadata.
- *
- * @param baseUrl LLM API base URL from environment
- *
- * @returns Parsed hostname, or the original string when URL parsing fails
- */
-function resolveLlmApiHost(baseUrl: string) {
-	try {
-		return new URL(baseUrl).host;
-	} catch {
-		return baseUrl;
-	}
-}
+import { TranslationBranchLifecycleManager } from "./translation-branch.lifecycle.manager";
+import { TranslationFileProcessor } from "./translation-file.processor";
+import { TranslationPullRequestLifecycleManager } from "./translation-pull-request.lifecycle.manager";
 
 /**
  * Manages batch processing and progress tracking for file translations.
@@ -47,6 +19,7 @@ function resolveLlmApiHost(baseUrl: string) {
  */
 export class TranslationBatchManager {
 	private readonly logger = logger.child({ component: TranslationBatchManager.name });
+	private readonly fileProcessor: TranslationFileProcessor;
 
 	/**
 	 * Tracks progress for the current batch of files being processed.
@@ -62,26 +35,33 @@ export class TranslationBatchManager {
 	 * Tracks consecutive failures for circuit breaker pattern.
 	 *
 	 * Resets to 0 on any successful file processing. When this counter
-	 * reaches {@link MAX_CONSECUTIVE_FAILURES}, the workflow terminates
+	 * reaches {@link MAX_CONSECUTIVE_FAILURES} in {@link TranslationFileProcessor}, the workflow terminates
 	 * early to prevent wasting resources on systemic failures.
 	 */
 	private consecutiveFailures = 0;
-
-	private readonly translationPullRequestValidity: TranslationPullRequestValidityManager;
 
 	/**
 	 * Initializes the batch manager with service dependencies.
 	 *
 	 * @param services Injected service dependencies for GitHub and translation
 	 * @param invalidPRsByFile Map of files with invalid PRs for notification
-	 * @param workflowStartTimestamp Timestamp when workflow started for timing calculations
+	 * @param _workflowStartTimestamp Timestamp when workflow started for timing calculations
 	 */
 	constructor(
-		private readonly services: RunnerServiceDependencies,
-		private readonly invalidPRsByFile: Map<string, InvalidFilePullRequest>,
-		private readonly workflowStartTimestamp: number,
+		services: RunnerServiceDependencies,
+		invalidPRsByFile: Map<string, InvalidFilePullRequest>,
+		_workflowStartTimestamp: number,
 	) {
-		this.translationPullRequestValidity = new TranslationPullRequestValidityManager(services);
+		const branchLifecycle = new TranslationBranchLifecycleManager(services);
+		const pullRequestLifecycle = new TranslationPullRequestLifecycleManager(
+			services,
+			invalidPRsByFile,
+		);
+		this.fileProcessor = new TranslationFileProcessor(
+			services,
+			branchLifecycle,
+			pullRequestLifecycle,
+		);
 	}
 
 	/**
@@ -183,7 +163,18 @@ export class TranslationBatchManager {
 				batchSize: batchInfo.batchSize,
 			};
 
-			const result = await this.processFile(file, progress);
+			const result = await this.fileProcessor.processFile(file, progress, {
+				getConsecutiveFailures: () => this.consecutiveFailures,
+				resetConsecutiveFailures: () => {
+					this.consecutiveFailures = 0;
+				},
+				incrementConsecutiveFailures: () => {
+					this.consecutiveFailures++;
+				},
+				updateBatchProgress: (status) => {
+					this.updateBatchProgress(status);
+				},
+			});
 			results.set(result.filename, result);
 		}
 
@@ -204,186 +195,6 @@ export class TranslationBatchManager {
 	}
 
 	/**
-	 * Processes a single file through the complete translation workflow.
-	 *
-	 * ### Workflow Steps
-	 *
-	 * 1. **Existing PR guard**: Skips when a mergeable open PR already exists for the path
-	 * 2. **Branch Creation**: Creates or retrieves translation branch for isolation
-	 * 3. **Content Translation**: Translates file content (may involve chunking for large files)
-	 * 4. **Commit Operation**: Commits translated content to branch with descriptive message
-	 * 5. **Pull Request**: Creates or updates PR with translation and detailed metadata
-	 *
-	 * ### Timing and Sequencing
-	 *
-	 * All operations are awaited sequentially to ensure proper workflow ordering:
-	 * - Translation must complete before commit
-	 * - Commit must complete before PR creation
-	 * - Detailed timing logs track each operation's duration for debugging
-	 *
-	 * @param file File to process through translation workflow
-	 * @param _progress Progress tracking information for batch processing
-	 *
-	 * @returns Processing result metadata including branch, translation, PR, and error info
-	 *
-	 * @throws {ApplicationError} with {@link ErrorCode.TranslationFailed|`"TRANSLATION_FAILED"`}
-	 * If circuit breaker threshold is reached due to consecutive failures
-	 */
-	private async processFile(
-		file: TranslationFile,
-		_progress: FileProcessingProgress,
-	): Promise<ProcessedFileResult> {
-		const metadata: ProcessedFileResult = {
-			branch: null,
-			filename: file.filename,
-			translation: null,
-			reviewerNotices: [],
-			pullRequest: null,
-			pullRequestProgress: null,
-			error: null,
-		};
-
-		const startTime = Date.now();
-		file.logger.debug(
-			{ path: file.path, contentSize: file.content.length },
-			"Starting file processing",
-		);
-
-		try {
-			if (this.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-				throw new ApplicationError(
-					`Workflow terminated: ${this.consecutiveFailures} consecutive failures exceeded threshold of ${MAX_CONSECUTIVE_FAILURES}`,
-					ErrorCode.TranslationFailed,
-					`${TranslationBatchManager.name}.${this.processFile.name}`,
-					{
-						circuitBreaker: true,
-						consecutiveFailures: this.consecutiveFailures,
-						threshold: MAX_CONSECUTIVE_FAILURES,
-					},
-				);
-			}
-
-			const pullRequestValidity = await this.translationPullRequestValidity.evaluate(file.path);
-
-			const skippedForValidTranslationPullRequest = this.skipIfValidTranslationPullRequest(
-				file,
-				metadata,
-				startTime,
-				pullRequestValidity,
-			);
-
-			if (skippedForValidTranslationPullRequest) {
-				return skippedForValidTranslationPullRequest;
-			}
-
-			const branchStart = Date.now();
-			metadata.branch = await this.prepareTranslationBranch(file, pullRequestValidity);
-			file.logger.debug(
-				{
-					durationMs: Date.now() - branchStart,
-					pullRequestInvalidReason: pullRequestValidity.invalidReason ?? null,
-				},
-				"Step 1/5: Translation branch prepared",
-			);
-
-			const translationStart = Date.now();
-			const translationResult = await this.services.translator.translateContent(file);
-			metadata.translation = translationResult.content;
-			metadata.reviewerNotices = translationResult.reviewerNotices;
-			metadata.llmUsage = translationResult.llmUsage;
-			const contentRatio =
-				file.content.length > 0 ?
-					(metadata.translation.length / file.content.length).toFixed(2)
-				:	"unknown";
-
-			file.logger.debug(
-				{
-					translationSize: metadata.translation.length,
-					contentRatio,
-					durationMs: Date.now() - translationStart,
-					advisoryGuardCount: metadata.reviewerNotices.length,
-					translationPath: translationResult.translationPath,
-					llmUsage: translationResult.llmUsage,
-					reviewerNotices: metadata.reviewerNotices,
-				},
-				"Step 2/5: Translation complete",
-			);
-
-			if (isTranslationEquivalentToCurrentBlob(file, metadata.translation)) {
-				file.logger.warn(
-					{ path: file.path, contentLength: metadata.translation.length },
-					"Translation matches existing blob; skipping commit and pull request",
-				);
-
-				await this.deleteIdleTranslationBranchIfAtForkBase(
-					getTranslationBranchNameFromPath(file.path),
-					metadata.branch,
-				);
-
-				this.consecutiveFailures = 0;
-				this.updateBatchProgress("success");
-
-				file.logger.debug(
-					{ totalDurationMs: Date.now() - startTime },
-					"File processing complete (no-op translation)",
-				);
-
-				return metadata;
-			}
-
-			const languageName = this.services.languageDetector.getLanguageName(
-				this.services.languageDetector.languages.target,
-			);
-
-			const commitStart = Date.now();
-			await this.services.github.commitTranslation({
-				file,
-				branch: metadata.branch,
-				content: metadata.translation,
-				message: buildTranslationCommitMessage(file.filename, languageName),
-			});
-			file.logger.debug({ durationMs: Date.now() - commitStart }, "Step 3/5: Commit complete");
-
-			const prStart = Date.now();
-			const pullRequestOutcome = await this.openTranslationPullRequest(
-				file,
-				metadata,
-				pullRequestValidity,
-			);
-			metadata.pullRequest = pullRequestOutcome.pullRequest;
-			metadata.pullRequestProgress = pullRequestOutcome.progress;
-			file.logger.debug(
-				{
-					prNumber: metadata.pullRequest.number,
-					pullRequestProgress: metadata.pullRequestProgress,
-					durationMs: Date.now() - prStart,
-				},
-				"Step 4/5: Pull request created/updated",
-			);
-
-			this.consecutiveFailures = 0;
-			this.updateBatchProgress("success");
-
-			file.logger.debug({ totalDurationMs: Date.now() - startTime }, "File processing complete");
-		} catch (error) {
-			if (isCircuitBreakerError(error)) {
-				throw error;
-			}
-
-			this.consecutiveFailures++;
-
-			file.logger.error({ error, durationMs: Date.now() - startTime }, "File processing failed");
-
-			metadata.error = error instanceof Error ? error : new Error(String(error));
-			this.updateBatchProgress("error");
-
-			await this.cleanupFailedTranslation(metadata);
-		}
-
-		return metadata;
-	}
-
-	/**
 	 * Updates progress tracking for the current batch and adjusts success/failure counts.
 	 *
 	 * This information is used for both real-time feedback and final statistics.
@@ -393,347 +204,5 @@ export class TranslationBatchManager {
 	private updateBatchProgress(status: "success" | "error"): void {
 		if (status === "success") this.batchProgress.successful++;
 		else this.batchProgress.failed++;
-	}
-
-	/**
-	 * Cleans up resources for failed translation attempts.
-	 *
-	 * Removes translation branches that were created but failed during processing
-	 * to prevent accumulation of stale branches in the repository.
-	 *
-	 * @param metadata The processing result metadata containing branch information
-	 */
-	private async cleanupFailedTranslation(metadata: ProcessedFileResult): Promise<void> {
-		if (!metadata.branch?.ref) return;
-
-		try {
-			const branchName = metadata.branch.ref.replace("refs/heads/", "");
-			await this.services.github.deleteBranch(branchName);
-			this.logger.info(
-				{ branchName, filename: metadata.filename },
-				"Cleaned up branch after failed translation",
-			);
-		} catch (error) {
-			this.logger.error(
-				{ error, filename: metadata.filename, branchRef: metadata.branch.ref },
-				"Failed to cleanup branch after translation failure - non-critical",
-			);
-		}
-	}
-
-	/**
-	 * Returns completed metadata when an open translation pull request is already valid.
-	 *
-	 * @param file Translation file being processed
-	 * @param metadata In-progress processing result to populate when skipping
-	 * @param startTime Workflow step start time for duration logging
-	 * @param validity Pull request validity evaluated at the start of file processing
-	 *
-	 * @returns Filled metadata when skipped, or `null` to continue translation
-	 */
-	private skipIfValidTranslationPullRequest(
-		file: TranslationFile,
-		metadata: ProcessedFileResult,
-		startTime: number,
-		validity: TranslationPullRequestValidity,
-	) {
-		if (!validity.isValid || !validity.pullRequest) {
-			return null;
-		}
-
-		metadata.pullRequest = validity.pullRequest;
-		metadata.pullRequestProgress = PullRequestProgressAction.Reused;
-
-		this.consecutiveFailures = 0;
-		this.updateBatchProgress("success");
-
-		file.logger.info(
-			{
-				path: file.path,
-				prNumber: validity.pullRequest.number,
-				mergeableState: validity.pullRequestStatus?.mergeableState,
-				llmWorkSkipped: true,
-				skipReason: "valid_existing_pr",
-			},
-			"Skipping file with valid existing pull request",
-		);
-
-		file.logger.debug(
-			{ totalDurationMs: Date.now() - startTime },
-			"File processing complete (existing PR)",
-		);
-
-		return metadata;
-	}
-
-	/**
-	 * Deletes a translation branch that still points at the fork default tip after a no-op translation.
-	 *
-	 * @param branchName Translation branch name without `refs/heads/` prefix
-	 * @param branchRef Git ref returned from branch creation or lookup
-	 */
-	private async deleteIdleTranslationBranchIfAtForkBase(
-		branchName: string,
-		branchRef: NonNullable<ProcessedFileResult["branch"]>,
-	) {
-		const branchTipSha = branchRef.object.sha;
-		const defaultBranchName = await this.services.github.getDefaultBranch("fork");
-		const defaultBranchRef = await this.services.github.getBranch(defaultBranchName);
-		const defaultTipSha = defaultBranchRef?.data.object.sha;
-
-		if (!defaultTipSha || branchTipSha !== defaultTipSha) {
-			return;
-		}
-
-		try {
-			await this.services.github.deleteBranch(branchName);
-			this.logger.info(
-				{ branchName },
-				"Deleted translation branch still identical to fork default (no-op translation)",
-			);
-		} catch (error) {
-			this.logger.warn(
-				{ branchName, error },
-				"Failed to delete redundant translation branch after no-op translation",
-			);
-		}
-	}
-
-	/**
-	 * Resolves the fork branch for translation: reuses an existing branch when refreshing
-	 * an out-of-sync open pull request, otherwise resets from the fork default tip.
-	 *
-	 * @param file Translation file being processed
-	 * @param validity Pull request validity from the start of file processing
-	 *
-	 * @returns Branch reference to commit the translation on
-	 */
-	private async prepareTranslationBranch(
-		file: TranslationFile,
-		validity: TranslationPullRequestValidity,
-	) {
-		const branchName = getTranslationBranchNameFromPath(file.path);
-
-		if (validity.pullRequest && validity.invalidReason === "out_of_sync") {
-			this.logger.info(
-				{
-					filename: file.filename,
-					prNumber: validity.pullRequest.number,
-					branchName,
-					invalidReason: validity.invalidReason,
-				},
-				"Refreshing translation branch from fork default while preserving open pull request",
-			);
-
-			return this.services.github.refreshTranslationBranchPreservePr(branchName);
-		}
-
-		return this.recreateTranslationBranchClosePr(file);
-	}
-
-	/**
-	 * Closes any open translation PR and recreates the branch from the fork default tip.
-	 *
-	 * Ensures the subsequent translation commit is the only commit on the topic branch.
-	 *
-	 * @param file Translation file being processed
-	 *
-	 * @returns Fresh branch reference for a single translation commit
-	 */
-	private async recreateTranslationBranchClosePr(file: TranslationFile) {
-		const branchName = getTranslationBranchNameFromPath(file.path);
-		const existingPullRequest = await this.services.github.findPullRequestByBranch(branchName);
-
-		if (existingPullRequest) {
-			const reviews = await this.services.github.listPullRequestReviews(existingPullRequest.number);
-
-			if (hasQualifyingApprovedReview(reviews)) {
-				this.logger.info(
-					{
-						filename: file.filename,
-						prNumber: existingPullRequest.number,
-						branchName,
-					},
-					"Preserving approved translation pull request; refreshing branch without closing",
-				);
-
-				return this.services.github.refreshTranslationBranchPreservePr(branchName);
-			}
-
-			this.logger.info(
-				{
-					filename: file.filename,
-					prNumber: existingPullRequest.number,
-					branchName,
-				},
-				"Closing open translation pull request before branch reset",
-			);
-
-			await this.services.github.createCommentOnPullRequest(
-				existingPullRequest.number,
-				"This PR is being closed so the translation branch can be refreshed from the current upstream source.",
-			);
-			await this.services.github.closePullRequest(existingPullRequest.number);
-		}
-
-		const existingBranch = await this.services.github.getBranch(branchName);
-
-		if (existingBranch) {
-			this.logger.info(
-				{ filename: file.filename, branchName },
-				"Deleting translation branch before reset",
-			);
-			await this.services.github.deleteBranch(branchName);
-		}
-
-		const forkDefaultBranch = await this.services.github.getDefaultBranch("fork");
-		const newBranch = await this.services.github.createBranch(branchName, forkDefaultBranch);
-
-		return newBranch.data;
-	}
-
-	/**
-	 * Opens a new upstream pull request for a freshly reset translation branch.
-	 *
-	 * @param file Translation file being processed
-	 * @param processingResult Processing metadata including translation and timing
-	 * @param validity Pull request validity evaluated at the start of file processing
-	 *
-	 * @returns Pull request metadata for progress reporting
-	 */
-	private async openTranslationPullRequest(
-		file: TranslationFile,
-		processingResult: ProcessedFileResult,
-		validity: TranslationPullRequestValidity,
-	): Promise<{
-		pullRequest: NonNullable<ProcessedFileResult["pullRequest"]>;
-		progress: PullRequestProgressAction;
-	}> {
-		if (validity.pullRequest && validity.invalidReason === "out_of_sync") {
-			const languageName = this.services.languageDetector.getLanguageName(
-				this.services.languageDetector.languages.target,
-			);
-			const body = this.createPullRequestDescription(file, processingResult, languageName);
-
-			await this.services.github.updatePullRequestBody(validity.pullRequest.number, body);
-
-			this.logger.info(
-				{
-					path: file.path,
-					prNumber: validity.pullRequest.number,
-					advisoryGuardCount: processingResult.reviewerNotices.length,
-				},
-				"Refreshed open translation pull request after upstream sync",
-			);
-
-			return {
-				pullRequest: validity.pullRequest,
-				progress: PullRequestProgressAction.Reused,
-			};
-		}
-
-		const branchName = getTranslationBranchNameFromPath(file.path);
-		const languageName = this.services.languageDetector.getLanguageName(
-			this.services.languageDetector.languages.target,
-		);
-		const pullRequestOptions = {
-			title: this.services.locale.definitions.pullRequest.title(file),
-			body: this.createPullRequestDescription(file, processingResult, languageName),
-			baseBranch: "main",
-		};
-
-		this.logger.info(
-			{ branchName, title: pullRequestOptions.title },
-			"Opening pull request for refreshed translation branch",
-		);
-
-		const strayPullRequest = await this.services.github.findPullRequestByBranch(branchName);
-
-		if (strayPullRequest) {
-			const body = this.createPullRequestDescription(file, processingResult, languageName);
-
-			await this.services.github.updatePullRequestBody(strayPullRequest.number, body);
-
-			this.logger.info(
-				{
-					path: file.path,
-					prNumber: strayPullRequest.number,
-					invalidReason: validity.invalidReason ?? null,
-				},
-				"Reused open translation pull request after branch refresh",
-			);
-
-			return {
-				pullRequest: strayPullRequest,
-				progress: PullRequestProgressAction.Reused,
-			};
-		}
-
-		const pullRequest = await this.services.github.createPullRequest({
-			branch: branchName,
-			...pullRequestOptions,
-		});
-
-		return {
-			pullRequest,
-			progress: PullRequestProgressAction.Created,
-		};
-	}
-
-	/**
-	 * Creates a pull request description for translated content.
-	 *
-	 * Generates a PR body with a human-review notice, maintainer wiki tip, optional conflict
-	 * notices, and advisory validation details when guards report issues.
-	 * When a file has an existing invalid PR (with merge conflicts), includes a GitHub Flavored Markdown
-	 * alert to inform maintainers about the duplicate PR situation.
-	 *
-	 * @param file Translation file being processed with original content
-	 * @param processingResult Processing metadata
-	 * @param languageName Human-readable name of the target translation language
-	 *
-	 * @returns Markdown-formatted PR description with all components
-	 */
-	private createPullRequestDescription(
-		file: TranslationFile,
-		processingResult: ProcessedFileResult,
-		languageName: string,
-	): string {
-		this.logger.info(
-			{ file: file.path, language: languageName },
-			"Creating pull request description",
-		);
-
-		const contentRatio =
-			file.content.length > 0 ?
-				((processingResult.translation?.length ?? 0) / file.content.length).toFixed(2)
-			:	"unknown";
-
-		this.logger.debug(
-			{
-				path: file.path,
-				runnerVersion: `v${version}`,
-				translationModel: env.LLM_MODEL,
-				llmApiHost: resolveLlmApiHost(env.LLM_API_BASE_URL),
-				nodeEnv: env.NODE_ENV,
-				maskVerbatimLargeFences: env.MASK_VERBATIM_LARGE_FENCES,
-				contentRatio,
-				sourceBytes: file.content.length,
-				translationBytes: processingResult.translation?.length ?? 0,
-				reviewerNotices: processingResult.reviewerNotices,
-			},
-			"Pull request description operator metadata",
-		);
-
-		const pullRequestDescriptionMetadata: PullRequestDescriptionMetadata = {
-			languageName,
-			invalidFilePR: this.invalidPRsByFile.get(file.path),
-			reviewerNotices: processingResult.reviewerNotices,
-		};
-		return this.services.locale.definitions.pullRequest.body(
-			file,
-			processingResult,
-			pullRequestDescriptionMetadata,
-		);
 	}
 }

@@ -7,7 +7,7 @@ export const FAIL_OPEN_REASONS = {
 	prValidityEvaluationError: "prValidityEvaluationError",
 	languageDetectionEmptyContent: "languageDetectionEmptyContent",
 	languageDetectionShortContent: "languageDetectionShortContent",
-	languageDetectionCldError: "languageDetectionCldError",
+	languageDetectionCldUnreliable: "languageDetectionCldUnreliable",
 } as const;
 
 export type FailOpenReasonId = (typeof FAIL_OPEN_REASONS)[keyof typeof FAIL_OPEN_REASONS];

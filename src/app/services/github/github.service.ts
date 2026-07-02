@@ -9,15 +9,18 @@ import type {
 	TranslationProgressFileRef,
 } from "@/app/services/github/types";
 
-import type { CommitTranslationOptions, PullRequestOptions } from "./github.content";
+import type { PullRequestOptions } from "./github.pull-request";
+import type { CommitTranslationOptions } from "./github.repository-content";
 import type { BaseRepositories, SharedGitHubDependencies } from "./types";
 
 import { octokit } from "@/app/clients/";
 import { env } from "@/app/utils/";
 
 import { GitHubBranch } from "./github.branch";
-import { GitHubContent } from "./github.content";
+import { GitHubProgressIssue } from "./github.progress-issue";
+import { GitHubPullRequest } from "./github.pull-request";
 import { GitHubRepository } from "./github.repository";
+import { GitHubRepositoryContent } from "./github.repository-content";
 
 const DEFAULT_REPOSITORIES: BaseRepositories = {
 	upstream: {
@@ -45,7 +48,9 @@ export interface GitHubServiceDependencies {
 export class GitHubService {
 	private readonly repository: GitHubRepository;
 	private readonly branch: GitHubBranch;
-	private readonly content: GitHubContent;
+	private readonly repositoryContent: GitHubRepositoryContent;
+	private readonly pullRequest: GitHubPullRequest;
+	private readonly progressIssue: GitHubProgressIssue;
 
 	constructor(dependencies: GitHubServiceDependencies) {
 		const shared: SharedGitHubDependencies = {
@@ -53,13 +58,15 @@ export class GitHubService {
 			repositories: dependencies.repositories ?? DEFAULT_REPOSITORIES,
 		};
 
-		this.content = new GitHubContent(shared, dependencies.commentBuilderService);
+		this.repositoryContent = new GitHubRepositoryContent(shared);
+		this.pullRequest = new GitHubPullRequest(shared);
+		this.progressIssue = new GitHubProgressIssue(shared, dependencies.commentBuilderService);
 		this.repository = new GitHubRepository(shared);
 		this.branch = new GitHubBranch(shared);
 
 		this.branch.setCleanupContentAccess({
-			findPullRequestByBranch: this.content.findPullRequestByBranch.bind(this.content),
-			checkPullRequestStatus: this.content.checkPullRequestStatus.bind(this.content),
+			findPullRequestByBranch: this.pullRequest.findPullRequestByBranch.bind(this.pullRequest),
+			checkPullRequestStatus: this.pullRequest.checkPullRequestStatus.bind(this.pullRequest),
 		});
 	}
 
@@ -231,7 +238,7 @@ export class GitHubService {
 		prNumber: number,
 		comment: string,
 	): Promise<RestEndpointMethodTypes["issues"]["createComment"]["response"]> {
-		return this.content.createCommentOnPullRequest(prNumber, comment);
+		return this.pullRequest.createCommentOnPullRequest(prNumber, comment);
 	}
 
 	/**
@@ -242,7 +249,7 @@ export class GitHubService {
 	public async listOpenPullRequests(): Promise<
 		RestEndpointMethodTypes["pulls"]["list"]["response"]["data"]
 	> {
-		return this.content.listOpenPullRequests();
+		return this.pullRequest.listOpenPullRequests();
 	}
 
 	/**
@@ -253,7 +260,7 @@ export class GitHubService {
 	 * @returns Array of file paths changed in the PR
 	 */
 	public async getPullRequestFiles(prNumber: number): Promise<string[]> {
-		return this.content.getPullRequestFiles(prNumber);
+		return this.pullRequest.getPullRequestFiles(prNumber);
 	}
 
 	/**
@@ -266,7 +273,7 @@ export class GitHubService {
 	public async commitTranslation(
 		options: CommitTranslationOptions,
 	): Promise<RestEndpointMethodTypes["repos"]["createOrUpdateFileContents"]["response"]> {
-		return this.content.commitTranslation(options);
+		return this.repositoryContent.commitTranslation(options);
 	}
 
 	/**
@@ -279,7 +286,7 @@ export class GitHubService {
 	public async createPullRequest(
 		options: PullRequestOptions,
 	): Promise<RestEndpointMethodTypes["pulls"]["create"]["response"]["data"]> {
-		return this.content.createPullRequest(options);
+		return this.pullRequest.createPullRequest(options);
 	}
 
 	/**
@@ -294,7 +301,7 @@ export class GitHubService {
 		prNumber: number,
 		body: string,
 	): Promise<RestEndpointMethodTypes["pulls"]["update"]["response"]["data"]> {
-		return this.content.updatePullRequestBody(prNumber, body);
+		return this.pullRequest.updatePullRequestBody(prNumber, body);
 	}
 
 	/**
@@ -305,7 +312,7 @@ export class GitHubService {
 	 * @returns Translation file with upstream content and blob `sha`
 	 */
 	public async getFile(file: PatchedRepositoryTreeItem): Promise<RepositoryMarkdownBlob> {
-		return this.content.getFile(file);
+		return this.repositoryContent.getFile(file);
 	}
 
 	/**
@@ -317,7 +324,7 @@ export class GitHubService {
 	 * @returns File body, or `undefined` when absent on that branch
 	 */
 	public async getForkFileContentAtBranch(path: string, branchName: string) {
-		return this.content.getForkFileContentAtBranch(path, branchName);
+		return this.repositoryContent.getForkFileContentAtBranch(path, branchName);
 	}
 
 	/**
@@ -330,7 +337,7 @@ export class GitHubService {
 	public async findPullRequestByBranch(
 		branchName: string,
 	): Promise<RestEndpointMethodTypes["pulls"]["list"]["response"]["data"][number] | undefined> {
-		return this.content.findPullRequestByBranch(branchName);
+		return this.pullRequest.findPullRequestByBranch(branchName);
 	}
 
 	/**
@@ -341,7 +348,7 @@ export class GitHubService {
 	 * @returns PR status information
 	 */
 	public async checkPullRequestStatus(prNumber: number): Promise<PullRequestStatus> {
-		return this.content.checkPullRequestStatus(prNumber);
+		return this.pullRequest.checkPullRequestStatus(prNumber);
 	}
 
 	/**
@@ -354,7 +361,7 @@ export class GitHubService {
 	public async closePullRequest(
 		prNumber: number,
 	): Promise<RestEndpointMethodTypes["pulls"]["update"]["response"]["data"]> {
-		return this.content.closePullRequest(prNumber);
+		return this.pullRequest.closePullRequest(prNumber);
 	}
 
 	/**
@@ -365,7 +372,7 @@ export class GitHubService {
 	 * @returns Normalized issue comments
 	 */
 	public async listPullRequestIssueComments(prNumber: number) {
-		return this.content.listPullRequestIssueComments(prNumber);
+		return this.pullRequest.listPullRequestIssueComments(prNumber);
 	}
 
 	/**
@@ -376,7 +383,7 @@ export class GitHubService {
 	 * @returns Normalized reviews for approved-pull-request preservation checks
 	 */
 	public async listPullRequestReviews(prNumber: number) {
-		return this.content.listPullRequestReviews(prNumber);
+		return this.pullRequest.listPullRequestReviews(prNumber);
 	}
 
 	/**
@@ -391,6 +398,6 @@ export class GitHubService {
 		results: ProcessedFileResult[],
 		filesToTranslate: readonly TranslationProgressFileRef[],
 	): Promise<RestEndpointMethodTypes["issues"]["createComment"]["response"]["data"] | undefined> {
-		return this.content.commentCompiledResultsOnIssue(results, filesToTranslate);
+		return this.progressIssue.commentCompiledResultsOnIssue(results, filesToTranslate);
 	}
 }

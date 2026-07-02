@@ -1,3 +1,5 @@
+import type { Options as RetryOptions } from "p-retry";
+
 /**
  * Minimum content length required for reliable language detection.
  *
@@ -13,3 +15,11 @@ export const MIN_CONTENT_LENGTH_FOR_DETECTION = 10;
  * the content is marked as translated and skipped from the translation workflow.
  */
 export const TRANSLATION_RATIO_THRESHOLD = 0.5;
+
+/** Retry policy for CLD `detect` calls before fail-closed language analysis errors */
+export const CLD_DETECTION_RETRY_CONFIG: RetryOptions = {
+	retries: 2,
+	minTimeout: 50,
+	maxTimeout: 200,
+	factor: 2,
+};

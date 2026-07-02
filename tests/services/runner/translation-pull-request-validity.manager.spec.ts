@@ -109,4 +109,24 @@ describe("TranslationPullRequestValidityManager", () => {
 		expect(result.isValid).toBe(true);
 		expect(result.pullRequest?.number).toBe(55);
 	});
+
+	test("propagates language detection failures from fork content analysis", () => {
+		const github = createMockGitHubService();
+		const languageDetector = createMockLanguageDetectorService();
+
+		github.findPullRequestByBranch.mockResolvedValue(createMockPullRequestListItem(12));
+		github.checkPullRequestStatus.mockResolvedValue(createPullRequestStatusFixture());
+		github.getForkFileContentAtBranch.mockResolvedValue(
+			"Texto em português com comprimento suficiente para análise linguística confiável.",
+		);
+		languageDetector.analyzeLanguage.mockRejectedValue(
+			new Error("Language detection failed after retries"),
+		);
+
+		const manager = createValidityManager({ github, languageDetector });
+
+		expect(manager.evaluate("src/content/page.md")).rejects.toThrow(
+			"Language detection failed after retries",
+		);
+	});
 });

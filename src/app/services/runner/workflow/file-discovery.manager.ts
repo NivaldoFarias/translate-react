@@ -10,6 +10,8 @@ import type {
 
 import type { RunnerServiceDependencies } from "../runner.types";
 
+import { withRetry } from "@/app/clients/";
+import { DEFAULT_RETRY_CONFIG } from "@/app/clients/octokit/octokit.constants";
 import { FAIL_OPEN_REASONS } from "@/app/constants/fail-open.constants";
 import { TranslationFile } from "@/app/services/translator/";
 import { logger } from "@/app/utils/";
@@ -34,7 +36,7 @@ function createEmptyFailOpenInventory(): FailOpenInventory {
 		[FAIL_OPEN_REASONS.prValidityEvaluationError]: 0,
 		[FAIL_OPEN_REASONS.languageDetectionEmptyContent]: 0,
 		[FAIL_OPEN_REASONS.languageDetectionShortContent]: 0,
-		[FAIL_OPEN_REASONS.languageDetectionCldError]: 0,
+		[FAIL_OPEN_REASONS.languageDetectionCldUnreliable]: 0,
 	};
 }
 
@@ -267,7 +269,11 @@ export class FileDiscoveryManager {
 
 		for (const file of candidateFiles) {
 			try {
-				const validity = await this.translationPullRequestValidity.evaluate(file.path);
+				const validity = await withRetry(
+					() => this.translationPullRequestValidity.evaluate(file.path),
+					`${FileDiscoveryManager.name}.${this.filterByPRs.name}.evaluate`,
+					DEFAULT_RETRY_CONFIG,
+				);
 
 				if (validity.isValid) {
 					numFilesWithPRs++;

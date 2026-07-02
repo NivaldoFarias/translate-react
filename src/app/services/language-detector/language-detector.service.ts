@@ -1,4 +1,5 @@
 import cld from "cld";
+import pRetry from "p-retry";
 
 import type { FailOpenReasonId } from "@/app/constants/fail-open.constants";
 import type { ReactLanguageCode } from "@/app/utils/";
@@ -9,6 +10,7 @@ import { ApplicationError, ErrorCode } from "@/shared/errors/";
 import { toSafeErrorLogFields } from "@/shared/errors/error.helpers";
 
 import {
+	CLD_DETECTION_RETRY_CONFIG,
 	MIN_CONTENT_LENGTH_FOR_DETECTION,
 	TRANSLATION_RATIO_THRESHOLD,
 } from "./language-detector.constants";
@@ -106,7 +108,7 @@ export interface LanguageAnalysisResult {
 	rawResult: cld.DetectLanguage;
 
 	/**
-	 * When set, analysis fell back to `isTranslated: false` instead of throwing.
+	 * When set, analysis fell back to `isTranslated: false` for empty or short content.
 	 *
 	 * Inventory-only signal for fail-open discovery metrics (#40).
 	 */
@@ -260,6 +262,8 @@ export class LanguageDetectorService {
 	 * @returns Resolves to a detailed {@link LanguageAnalysisResult} with confidence scores,
 	 *   translation status, detected language, and raw CLD results
 	 *
+	 * @throws {ApplicationError} When CLD raises an unexpected error after retries (metadata includes `reliable: false`)
+	 *
 	 * @see {@link cleanContent} for content preprocessing logic
 	 * @see {@link findLanguageScore} for confidence score calculation
 	 *
@@ -323,7 +327,7 @@ export class LanguageDetectorService {
 				return fallbackLanguageAnalysisResult(FAIL_OPEN_REASONS.languageDetectionShortContent);
 			}
 
-			const detection = await cld.detect(cleanContent);
+			const detection = await this.detectWithRetry(cleanContent);
 
 			const primaryLanguage = detection.languages[0];
 			const detectedLanguage = primaryLanguage?.code ?? "und";
@@ -351,17 +355,52 @@ export class LanguageDetectorService {
 		} catch (error) {
 			if (error instanceof ApplicationError) throw error;
 
-			this.logger.debug(
+			if (this.isUnreliableCldIdentificationError(error)) {
+				this.logger.debug(
+					{
+						filename,
+						failOpenReason: FAIL_OPEN_REASONS.languageDetectionCldUnreliable,
+						...toSafeErrorLogFields(error),
+					},
+					"Language analysis fail-open: CLD could not identify language",
+				);
+
+				return fallbackLanguageAnalysisResult(FAIL_OPEN_REASONS.languageDetectionCldUnreliable);
+			}
+
+			throw new ApplicationError(
+				"Language detection failed after retries",
+				ErrorCode.UnknownError,
+				`${LanguageDetectorService.name}.${this.analyzeLanguage.name}`,
 				{
 					filename,
-					failOpenReason: FAIL_OPEN_REASONS.languageDetectionCldError,
+					reliable: false,
 					...toSafeErrorLogFields(error),
 				},
-				"Language analysis fail-open: CLD error treated as not translated",
 			);
-
-			return fallbackLanguageAnalysisResult(FAIL_OPEN_REASONS.languageDetectionCldError);
 		}
+	}
+
+	/**
+	 * Returns whether CLD rejected content as too ambiguous to classify reliably.
+	 *
+	 * @param error Thrown value from a CLD `detect` call
+	 *
+	 * @returns `true` when the error indicates unreliable identification rather than infrastructure failure
+	 */
+	private isUnreliableCldIdentificationError(error: unknown) {
+		return error instanceof Error && error.message === "Failed to identify language";
+	}
+
+	/**
+	 * Runs CLD detection with bounded retries before surfacing a failure to callers.
+	 *
+	 * @param cleanContent Preprocessed prose suitable for CLD analysis
+	 *
+	 * @returns CLD detection payload
+	 */
+	private detectWithRetry(cleanContent: string): Promise<cld.DetectLanguage> {
+		return pRetry(() => cld.detect(cleanContent), CLD_DETECTION_RETRY_CONFIG);
 	}
 
 	/**

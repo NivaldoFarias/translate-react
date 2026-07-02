@@ -14,7 +14,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Changed
 
-- File discovery logs a per-run `failOpen` summary (PR validity errors, empty or short content, CLD fallbacks) so operators can see how often uncertain paths schedule extra translation work; discovery behavior is unchanged.
+- Discovery retries transient GitHub errors during pull-request validity checks before fail-open inclusion, and unexpected CLD failures after retries now stop the workflow instead of silently scheduling extra translation work; empty, short, or unidentifiable content still counts as not translated.
+- GitHub file content, pull request, and translation-progress issue operations now live in dedicated modules composed by `GitHubService`; branch cleanup hooks bind directly to the pull request module.
+- Translation batch processing now delegates per-file work to dedicated branch, pull request, and file processor modules while the batch manager keeps batching and the consecutive-failure circuit breaker.
+- File discovery logs a per-run `failOpen` summary (PR validity errors, empty or short content, unreliable CLD identification) so operators can see how often uncertain paths schedule extra translation work.
 - LLM translation calls share one queued retry executor so full-body, frontmatter-batch, and segment-batch paths handle rate limits and API errors consistently.
 - GitHub content and default-branch lookups share one API helper; pull request file listing retries use the same Octokit `withRetry` policy as other API calls.
 - Legacy full-body and chunked markdown translation now live in a dedicated service; segment-batch failures no longer fall back on auth, quota, or non-splittable errors.
