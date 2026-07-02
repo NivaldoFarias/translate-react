@@ -42,30 +42,27 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Setup Bun dependencies
-        uses: ./.github/actions/setup-bun-deps
-        with:
-          bun-version: ${{ vars.BUN_VERSION || '1.3.14' }}
-
       - name: Run workflow smoke
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-          NODE_ENV: ${{ vars.NODE_ENV }}
-          LOG_LEVEL: ${{ vars.LOG_LEVEL }}
-          LOG_TO_CONSOLE: ${{ vars.LOG_TO_CONSOLE }}
-          LLM_MODEL: ${{ vars.LLM_MODEL }}
-          LLM_API_BASE_URL: ${{ vars.LLM_API_BASE_URL }}
-          MAX_RETRY_ATTEMPTS: ${{ vars.MAX_RETRY_ATTEMPTS }}
-          MAX_LLM_CONCURRENCY: ${{ vars.MAX_LLM_CONCURRENCY }}
-          OPENAI_PROJECT_ID: ${{ secrets.OPENAI_PROJECT_ID }}
-          GH_PAT_TOKEN: ${{ secrets.GH_PAT_TOKEN }}
-          MAX_TOKENS: ${{ vars.MAX_TOKENS }}
-          BATCH_SIZE: ${{ vars.BATCH_SIZE }}
-          TARGET_LANGUAGE: ${{ vars.TARGET_LANGUAGE }}
-          HEADER_APP_URL: ${{ vars.HEADER_APP_URL }}
-          HEADER_APP_TITLE: ${{ vars.HEADER_APP_TITLE }}
-        run: bun run ci:smoke -- --profile "${{ inputs.profile }}"
+        uses: ./.github/actions/run-workflow-smoke
+        with:
+          profile: ${{ inputs.profile }}
+          bun-version: ${{ vars.BUN_VERSION || '1.3.14' }}
+          gh-token: ${{ secrets.GH_TOKEN }}
+          llm-api-key: ${{ secrets.LLM_API_KEY }}
+          node-env: ${{ vars.NODE_ENV }}
+          log-level: ${{ vars.LOG_LEVEL }}
+          log-to-console: ${{ vars.LOG_TO_CONSOLE }}
+          llm-model: ${{ vars.LLM_MODEL }}
+          llm-api-base-url: ${{ vars.LLM_API_BASE_URL }}
+          max-retry-attempts: ${{ vars.MAX_RETRY_ATTEMPTS }}
+          max-llm-concurrency: ${{ vars.MAX_LLM_CONCURRENCY }}
+          openai-project-id: ${{ secrets.OPENAI_PROJECT_ID }}
+          gh-pat-token: ${{ secrets.GH_PAT_TOKEN }}
+          max-tokens: ${{ vars.MAX_TOKENS }}
+          batch-size: ${{ vars.BATCH_SIZE }}
+          target-language: ${{ vars.TARGET_LANGUAGE }}
+          header-app-url: ${{ vars.HEADER_APP_URL }}
+          header-app-title: ${{ vars.HEADER_APP_TITLE }}
 
       - name: Pack workflow smoke outputs for upload
         if: always()

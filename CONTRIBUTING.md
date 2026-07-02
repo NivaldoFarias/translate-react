@@ -6,7 +6,7 @@ MIT. Not a hosted app: forks use their own API keys and Actions config.
 - TypeScript strict; match patterns in [`src/`](./src/).
 - Layout and services: [Wiki: Codebase](https://github.com/NivaldoFarias/translate-react/wiki/Codebase); run order: [Wiki: Workflow](https://github.com/NivaldoFarias/translate-react/wiki/Workflow). App wiring: [`src/app/composition.ts`](./src/app/composition.ts).
 - Tests: `bun test` (or `bun run test:coverage` locally); CI runs coverage. Mirror `src/` paths under `tests/`; mock GitHub and LLM.
-- Before merging changes under `src/app/services/translator/`, `src/app/services/runner/`, or `src/app/locales/`: CI green and `bun run ci:smoke -- --profile quick` (real LLM, mocked GitHub). Optional: [Workflow smoke](https://github.com/NivaldoFarias/translate-react/actions/workflows/smoke.yml) on GitHub. See [Workflow smoke](#workflow-smoke) for outputs and CI artifacts.
+- Changes under `src/app/services/translator/`, `src/app/services/runner/`, or `src/app/locales/` trigger a required `ci.yml` smoke gate that runs `ci:smoke -- --profile quick` once per configured locale (real LLM, mocked GitHub) before merge. Run it locally first with `bun run ci:smoke -- --profile quick --lang <locale>` to catch issues before pushing. See [Workflow smoke](#workflow-smoke) for outputs and CI artifacts.
 - Before push: `bun run lint`, `bun run format`.
 - Commits: [Conventional Commits](https://www.conventionalcommits.org/) (`feat`, `fix`, `chore`, `refactor`; optional scope).
 - Changelog: accumulate entries under `## [Unreleased]` in [`CHANGELOG.md`](./CHANGELOG.md) as you work. Never hand-write a `## [X.Y.Z]` heading or bump `version` outside the release flow below; CI fails a bumped version whose section lacks a date, footer link, or entries.
@@ -29,7 +29,9 @@ Fixture lists: [`smoke-profiles.util.ts`](./src/ci/services/smoke/smoke-profiles
 > [!IMPORTANT]
 >
 > - Local runs write gitignored `.out/`. Each translated fixture gets a subdirectory (i.e. `use-memo/`) with `translated.md` and `pull-request.md`. When the run posts progress, `translation-progress-issue-comment.md` sits at the `.out/` root.
-> - [`smoke.yml`](./.github/workflows/smoke.yml) is manual dispatch only. The job writes the same tree to `.out/`, packs it to `artifacts/smoke/<profile>-<run_id>.tar.gz`, and uploads artifact `smoke-<profile>-<run_id>`.
+> - `TARGET_LANGUAGE` defaults to `pt-br`; pass `--lang <locale>` to smoke a different configured locale.
+> - [`ci.yml`](./.github/workflows/ci.yml) runs the `quick` profile once per configured locale (from [`.github/locales.json`](./.github/locales.json)) as a required gate whenever `src/app/services/translator/`, `src/app/services/runner/`, or `src/app/locales/` changes; it uploads `.out/` as an artifact only on failure.
+> - [`smoke.yml`](./.github/workflows/smoke.yml) stays manual dispatch for ad hoc `workflow`/`full` profile runs or a specific GitHub Environment. The job writes the same tree to `.out/`, packs it to `artifacts/smoke/<profile>-<run_id>.tar.gz`, and uploads artifact `smoke-<profile>-<run_id>`.
 
 Extract the downloaded artifact[^1]:
 

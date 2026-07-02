@@ -1,0 +1,99 @@
+name: Run workflow smoke
+description: Install dependencies and run `ci:smoke` against real LLM with mocked GitHub (caller must checkout first)
+
+inputs:
+  profile:
+    description: Smoke profile (`quick`, `workflow`, `full`)
+    required: true
+  lang:
+    description: Target locale override (`--lang`); empty uses `TARGET_LANGUAGE`/default
+    required: false
+    default: ""
+  bun-version:
+    description: Bun version (repository variable BUN_VERSION when unset)
+    required: false
+    default: "1.3.14"
+  gh-token:
+    description: GitHub token for mocked GitHub client construction
+    required: false
+  llm-api-key:
+    description: LLM API key
+    required: false
+  node-env:
+    description: NODE_ENV
+    required: false
+  log-level:
+    description: LOG_LEVEL
+    required: false
+  log-to-console:
+    description: LOG_TO_CONSOLE
+    required: false
+  llm-model:
+    description: LLM_MODEL
+    required: false
+  llm-api-base-url:
+    description: LLM_API_BASE_URL
+    required: false
+  max-retry-attempts:
+    description: MAX_RETRY_ATTEMPTS
+    required: false
+  max-llm-concurrency:
+    description: MAX_LLM_CONCURRENCY
+    required: false
+  openai-project-id:
+    description: OPENAI_PROJECT_ID
+    required: false
+  gh-pat-token:
+    description: GH_PAT_TOKEN
+    required: false
+  max-tokens:
+    description: MAX_TOKENS
+    required: false
+  batch-size:
+    description: BATCH_SIZE
+    required: false
+  target-language:
+    description: TARGET_LANGUAGE (ignored when `lang` is set)
+    required: false
+  header-app-url:
+    description: HEADER_APP_URL
+    required: false
+  header-app-title:
+    description: HEADER_APP_TITLE
+    required: false
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Bun dependencies
+      uses: ./.github/actions/setup-bun-deps
+      with:
+        bun-version: ${{ inputs.bun-version }}
+
+    - name: Run workflow smoke
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.gh-token }}
+        LLM_API_KEY: ${{ inputs.llm-api-key }}
+        NODE_ENV: ${{ inputs.node-env }}
+        LOG_LEVEL: ${{ inputs.log-level }}
+        LOG_TO_CONSOLE: ${{ inputs.log-to-console }}
+        LLM_MODEL: ${{ inputs.llm-model }}
+        LLM_API_BASE_URL: ${{ inputs.llm-api-base-url }}
+        MAX_RETRY_ATTEMPTS: ${{ inputs.max-retry-attempts }}
+        MAX_LLM_CONCURRENCY: ${{ inputs.max-llm-concurrency }}
+        OPENAI_PROJECT_ID: ${{ inputs.openai-project-id }}
+        GH_PAT_TOKEN: ${{ inputs.gh-pat-token }}
+        MAX_TOKENS: ${{ inputs.max-tokens }}
+        BATCH_SIZE: ${{ inputs.batch-size }}
+        TARGET_LANGUAGE: ${{ inputs.target-language }}
+        HEADER_APP_URL: ${{ inputs.header-app-url }}
+        HEADER_APP_TITLE: ${{ inputs.header-app-title }}
+        SMOKE_PROFILE: ${{ inputs.profile }}
+        SMOKE_LANG: ${{ inputs.lang }}
+      run: |
+        ARGS=(--profile "$SMOKE_PROFILE")
+        if [ -n "$SMOKE_LANG" ]; then
+          ARGS+=(--lang "$SMOKE_LANG")
+        fi
+        bun run ci:smoke -- "${ARGS[@]}"

@@ -56,7 +56,7 @@ export const ENV_PLACEHOLDERS = {
 	REPO_FORK_NAME: "pt-br.react.dev",
 	REPO_UPSTREAM_OWNER: "reactjs",
 	REPO_UPSTREAM_NAME: "pt-br.react.dev",
-	LLM_MODEL: "google/gemini-2.0-flash-exp:free",
+	LLM_MODEL: "openai/gpt-oss-20b:free",
 	LLM_API_BASE_URL: "https://openrouter.ai/api/v1",
 	HEADER_APP_TITLE: `${name} v${version}`,
 	HEADER_APP_URL: homepage,

@@ -66,6 +66,9 @@ async function clearSmokeArtifactDir(artifactDir: string) {
  * layout and GitHub Actions artifact packaging are documented in
  * [CONTRIBUTING.md](../../../../CONTRIBUTING.md).
  *
+ * The target locale comes from `env.TARGET_LANGUAGE` (default `pt-br`), which the `ci:smoke` CLI's
+ * `--lang` flag overrides before this function runs; see [`smoke.ts`](../../actions/smoke.ts).
+ *
  * @param options Profile, optional fixture override, and output directory
  *
  * @returns Workflow statistics from the runner
