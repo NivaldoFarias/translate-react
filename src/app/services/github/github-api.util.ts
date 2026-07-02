@@ -7,8 +7,7 @@ import type { Octokit, RestEndpointMethodTypes } from "@octokit/rest";
 import type { RepositoryMetadata } from "./types";
 
 /** `repos.getContent` response `data` payload */
-type RepositoryContentData =
-	RestEndpointMethodTypes["repos"]["getContent"]["response"]["data"];
+type RepositoryContentData = RestEndpointMethodTypes["repos"]["getContent"]["response"]["data"];
 
 /**
  * Fetches the default branch name for a repository.
