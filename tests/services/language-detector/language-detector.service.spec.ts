@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, test } from "bun:test";
 
 import type { ReactLanguageCode } from "@/app/utils/";
 
+import { FAIL_OPEN_REASONS } from "@/app/constants/fail-open.constants";
 import { LanguageDetectorService } from "@/app/services/language-detector/language-detector.service";
 import { ApplicationError, ErrorCode } from "@/shared/errors/";
 
@@ -72,6 +73,7 @@ describe("LanguageDetector", () => {
 			expect(analysis.ratio).toBe(0);
 			expect(analysis.languageScore.source).toBe(0);
 			expect(analysis.languageScore.target).toBe(0);
+			expect(analysis.failOpenReason).toBe(FAIL_OPEN_REASONS.languageDetectionShortContent);
 		});
 
 		test("should treat large markdown with only fenced code as below minimum cleaned prose", async () => {
@@ -95,6 +97,7 @@ describe("LanguageDetector", () => {
 			expect(analysis.isTranslated).toBe(false);
 			expect(analysis.ratio).toBe(0);
 			expect(analysis.languageScore).toEqual({ source: 0, target: 0 });
+			expect(analysis.failOpenReason).toBe(FAIL_OPEN_REASONS.languageDetectionEmptyContent);
 		});
 
 		test("should remove code blocks from analysis", async () => {

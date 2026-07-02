@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import {
 	filterUpstreamLocalesByLang,
 	loadUpstreamLocales,
+	resolveForkOwner,
 } from "@/ci/services/upstream/upstream-locales.util";
 
 describe("upstream-locales.util", () => {
@@ -27,5 +28,32 @@ describe("upstream-locales.util", () => {
 
 		expect(filtered).toHaveLength(1);
 		expect(filtered[0]?.lang).toBe("ru");
+	});
+
+	test("resolveForkOwner returns default when row omits fork_owner", () => {
+		const locales = loadUpstreamLocales();
+		const ptBr = locales.find((row) => row.lang === "pt-br");
+
+		if (!ptBr) {
+			throw new Error("Expected pt-br locale in registry");
+		}
+
+		expect(resolveForkOwner(ptBr, "workflow-default")).toBe("workflow-default");
+	});
+
+	test("resolveForkOwner returns trimmed per-row fork_owner when set", () => {
+		expect(
+			resolveForkOwner(
+				{
+					lang: "ru",
+					upstream_owner: "reactjs",
+					upstream_name: "ru.react.dev",
+					fork_name: "ru.react.dev",
+					translation_guidelines_file: "TRANSLATION.md",
+					fork_owner: "  custom-org  ",
+				},
+				"workflow-default",
+			),
+		).toBe("custom-org");
 	});
 });

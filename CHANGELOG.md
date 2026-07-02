@@ -4,12 +4,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+### Added
+
+- Optional `fork_owner` on each `.github/locales.json` row overrides the workflow default fork owner when poll or manual matrix builds translation jobs.
+
 ### Removed
 
 - Automated maintainer remediation: the runner no longer re-translates open pull requests from `CHANGES_REQUESTED` review text or posts remediation comments; maintainers edit the branch manually. Open PRs with pending reviews are still treated as workflow-complete when in sync and translated.
 
 ### Changed
 
+- File discovery logs a per-run `failOpen` summary (PR validity errors, empty or short content, CLD fallbacks) so operators can see how often uncertain paths schedule extra translation work; discovery behavior is unchanged.
 - LLM translation calls share one queued retry executor so full-body, frontmatter-batch, and segment-batch paths handle rate limits and API errors consistently.
 - GitHub content and default-branch lookups share one API helper; pull request file listing retries use the same Octokit `withRetry` policy as other API calls.
 - Legacy full-body and chunked markdown translation now live in a dedicated service; segment-batch failures no longer fall back on auth, quota, or non-splittable errors.

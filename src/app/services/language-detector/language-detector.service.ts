@@ -1,9 +1,12 @@
 import cld from "cld";
 
+import type { FailOpenReasonId } from "@/app/constants/fail-open.constants";
 import type { ReactLanguageCode } from "@/app/utils/";
 
+import { FAIL_OPEN_REASONS } from "@/app/constants/fail-open.constants";
 import { env, logger, REACT_TRANSLATION_LANGUAGES } from "@/app/utils/";
 import { ApplicationError, ErrorCode } from "@/shared/errors/";
+import { toSafeErrorLogFields } from "@/shared/errors/error.helpers";
 
 import {
 	MIN_CONTENT_LENGTH_FOR_DETECTION,
@@ -101,6 +104,13 @@ export interface LanguageAnalysisResult {
 
 	/** Raw CLD detection result for advanced usage */
 	rawResult: cld.DetectLanguage;
+
+	/**
+	 * When set, analysis fell back to `isTranslated: false` instead of throwing.
+	 *
+	 * Inventory-only signal for fail-open discovery metrics (#40).
+	 */
+	failOpenReason?: FailOpenReasonId;
 }
 
 /**
@@ -264,7 +274,9 @@ export class LanguageDetectorService {
 	 * ```
 	 */
 	public async analyzeLanguage(filename: string, content: string): Promise<LanguageAnalysisResult> {
-		const fallbackLanguageAnalysisResult: LanguageAnalysisResult = {
+		const fallbackLanguageAnalysisResult = (
+			failOpenReason: FailOpenReasonId,
+		): LanguageAnalysisResult => ({
 			languageScore: { target: 0, source: 0 },
 			ratio: 0,
 			isTranslated: false,
@@ -275,30 +287,40 @@ export class LanguageDetectorService {
 				textBytes: content.length,
 				chunks: [],
 			},
-		};
+			failOpenReason,
+		});
 
 		try {
 			this.logger.info({ filename }, "Starting language analysis");
 
 			if (!content.trim()) {
-				this.logger.warn({ contentLength: content.length }, "File content is empty");
+				this.logger.debug(
+					{
+						filename,
+						failOpenReason: FAIL_OPEN_REASONS.languageDetectionEmptyContent,
+						contentLength: content.length,
+					},
+					"Language analysis fail-open: empty content treated as not translated",
+				);
 
-				return fallbackLanguageAnalysisResult;
+				return fallbackLanguageAnalysisResult(FAIL_OPEN_REASONS.languageDetectionEmptyContent);
 			}
 
 			const cleanContent = this.cleanContent(content);
 
 			if (cleanContent.length < this.MIN_CONTENT_LENGTH) {
-				this.logger.warn(
+				this.logger.debug(
 					{
+						filename,
+						failOpenReason: FAIL_OPEN_REASONS.languageDetectionShortContent,
 						contentLength: content.length,
 						cleanedLength: cleanContent.length,
 						minContentLength: this.MIN_CONTENT_LENGTH,
 					},
-					"Cleaned prose length is below minimum threshold for reliable detection",
+					"Language analysis fail-open: short cleaned prose treated as not translated",
 				);
 
-				return fallbackLanguageAnalysisResult;
+				return fallbackLanguageAnalysisResult(FAIL_OPEN_REASONS.languageDetectionShortContent);
 			}
 
 			const detection = await cld.detect(cleanContent);
@@ -329,9 +351,16 @@ export class LanguageDetectorService {
 		} catch (error) {
 			if (error instanceof ApplicationError) throw error;
 
-			this.logger.error({ error }, "Language analysis failed. returning fallback result");
+			this.logger.debug(
+				{
+					filename,
+					failOpenReason: FAIL_OPEN_REASONS.languageDetectionCldError,
+					...toSafeErrorLogFields(error),
+				},
+				"Language analysis fail-open: CLD error treated as not translated",
+			);
 
-			return fallbackLanguageAnalysisResult;
+			return fallbackLanguageAnalysisResult(FAIL_OPEN_REASONS.languageDetectionCldError);
 		}
 	}
 
