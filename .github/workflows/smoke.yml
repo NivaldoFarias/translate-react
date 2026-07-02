@@ -37,6 +37,11 @@ jobs:
       SMOKE_OUTPUT_DIR: .out
       SMOKE_ARCHIVE_PATH: artifacts/smoke/${{ inputs.profile }}-${{ github.run_id }}.tar.gz
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
       - name: Run workflow smoke
         uses: ./.github/actions/run-workflow-smoke
         with:

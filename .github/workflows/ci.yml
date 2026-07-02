@@ -108,6 +108,11 @@ jobs:
       SMOKE_OUTPUT_DIR: .out
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
       - name: Run workflow smoke (${{ matrix.lang }})
         uses: ./.github/actions/run-workflow-smoke
         with:
