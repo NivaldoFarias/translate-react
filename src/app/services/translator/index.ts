@@ -1,3 +1,4 @@
+export * from "./legacy";
 export * from "./translation-file";
 export * from "./validation";
 export * from "./postprocess";

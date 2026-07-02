@@ -10,6 +10,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Changed
 
+- Legacy full-body and chunked markdown translation now live in a dedicated service; segment-batch failures no longer fall back on auth, quota, or non-splittable errors.
 - Fork synchronization uses the fork repository default branch instead of assuming `main`.
 - Concurrent `translateContent` calls on the shared translator service no longer share per-file LLM usage or translation-path state.
 - Language-detector tag stripping and JSX static-text link analyzers use linear scans instead of nested-regex patterns that could backtrack on near-valid upstream markdown.
