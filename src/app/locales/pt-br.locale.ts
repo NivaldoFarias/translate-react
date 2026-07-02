@@ -5,20 +5,15 @@ import type { LocaleDefinition, LocalePRBodyStrings, ProgressCommentRunContext }
 import { createGuardLabelResolver } from "./locale-guard-labels.util";
 import { createPRBodyBuilder } from "./pr-body.builder";
 
-/**
- * Brazilian Portuguese strings for the PR body template.
- *
- * Contains all translated text used in the pull request description,
- * following the data-driven approach for locale definitions.
- */
+/** Brazilian Portuguese strings for the PR body template */
 const ptBrPRBodyStrings: LocalePRBodyStrings = {
 	humanReviewNotice:
 		"Esta tradução foi gerada usando LLMs e **requer revisão humana** para garantir precisão, contexto cultural e terminologia técnica.",
 
 	conflictNotice: {
-		title: "PR anterior fechado",
+		title: "PR atualizado após conflito",
 		body: (prNumber) =>
-			`O PR #${prNumber} foi fechado automaticamente por conflito com a branch principal. Esta tradução foi refeita a partir do arquivo fonte atual, sem merge manual dos conflitos do PR anterior.`,
+			`O PR #${prNumber} estava em conflito com a branch principal. A tradução foi refeita a partir do arquivo fonte atual e a branch existente foi atualizada, sem merge manual dos conflitos anteriores.`,
 	},
 
 	maintainerWikiTip: (wikiUrl) =>
@@ -48,7 +43,8 @@ const ptBrPRBodyStrings: LocalePRBodyStrings = {
 };
 
 /**
- * LLM rules for pt-br.react.dev (maintainer review evidence; static JSX demo text in fences is also enforced by the `fenceJsxStaticText` post-translation guard).
+ * LLM rules for pt-br.react.dev. Static JSX demo text in fences is also
+ * enforced by the `fenceJsxStaticText` post-translation guard.
  *
  * @see {@link https://github.com/NivaldoFarias/translate-react/issues/50}
  */

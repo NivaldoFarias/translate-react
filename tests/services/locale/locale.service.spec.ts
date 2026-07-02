@@ -156,8 +156,8 @@ describe("ptBrLocale.pullRequest.body", () => {
 
 			const body = buildPullRequestBody(file, processingResult, metadata);
 
-			expect(body).not.toContain("PR anterior fechado");
-			expect(body).not.toContain("fechado automaticamente");
+			expect(body).not.toContain("PR atualizado após conflito");
+			expect(body).not.toContain("estava em conflito");
 		});
 
 		test("should include conflict notice with PR number when invalidFilePR exists", () => {
@@ -177,9 +177,9 @@ describe("ptBrLocale.pullRequest.body", () => {
 			const body = buildPullRequestBody(file, processingResult, metadata);
 
 			expect(body).toContain("> [!NOTE]");
-			expect(body).toContain("**PR anterior fechado**");
+			expect(body).toContain("**PR atualizado após conflito**");
 			expect(body).toContain("#42");
-			expect(body).toContain("fechado automaticamente");
+			expect(body).toContain("estava em conflito");
 		});
 
 		test("should note rewrite from current source in conflict notice", () => {
@@ -313,8 +313,8 @@ describe("ruLocale.pullRequest.body", () => {
 
 			const body = buildPullRequestBody(file, processingResult, metadata);
 
-			expect(body).not.toContain("Предыдущий PR закрыт");
-			expect(body).not.toContain("закрыт автоматически");
+			expect(body).not.toContain("PR обновлён после конфликта");
+			expect(body).not.toContain("был в конфликте");
 		});
 
 		test("should include conflict notice with PR number when invalidFilePR exists", () => {
@@ -335,9 +335,9 @@ describe("ruLocale.pullRequest.body", () => {
 			const body = buildPullRequestBody(file, processingResult, metadata);
 
 			expect(body).toContain("> [!NOTE]");
-			expect(body).toContain("**Предыдущий PR закрыт**");
+			expect(body).toContain("**PR обновлён после конфликта**");
 			expect(body).toContain("#42");
-			expect(body).toContain("закрыт автоматически");
+			expect(body).toContain("был в конфликте");
 		});
 	});
 

@@ -70,7 +70,7 @@ export class GitHubPullRequest {
 	}
 
 	/**
-	 * Lists all open pull requests. uses `octokit.paginate` to fetch all PRs.
+	 * Lists all open pull requests, using `octokit.paginate` to fetch all pages.
 	 *
 	 * @returns A list of open pull requests
 	 */
@@ -89,7 +89,7 @@ export class GitHubPullRequest {
 	}
 
 	/**
-	 * Retrieves the list of files changed in a pull request. uses `octokit.paginate` to fetch all files.
+	 * Retrieves the list of files changed in a pull request, using `octokit.paginate` to fetch all pages.
 	 *
 	 * @param prNumber Pull request number to fetch changed files from
 	 *
@@ -197,7 +197,7 @@ export class GitHubPullRequest {
 	}
 
 	/**
-	 * Checks if a pull request has merge conflicts that require closing and recreating.
+	 * Checks if a pull request has merge conflicts that require refreshing its translation branch.
 	 *
 	 * Polls GitHub when `mergeable` is `null` (async computation pending) to avoid
 	 * false negatives. After exhausting retries, treats an undetermined state as

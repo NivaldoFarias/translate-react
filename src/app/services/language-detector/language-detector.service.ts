@@ -124,7 +124,7 @@ export interface LanguageAnalysisResult {
  *
  * @example
  * ```typescript
- * const detector = new LanguageDetector();
+ * const detector = new LanguageDetectorService({ source: "en", target: "pt-br" });
  * const analysis = await detector.analyzeLanguage('readme.md', 'Hello world');
  * console.log(analysis.isTranslated); // false
  * ```
@@ -180,7 +180,7 @@ export class LanguageDetectorService {
 	 * @param code React language code (e.g., `"en"`, `"pt-br"`, `"zh-hans"`)
 	 * @param isTargetLanguage Whether the code is for the target language (default: `true`)
 	 *
-	 * @returns Human-readable language name or `"Unknown"` if not found/invalid
+	 * @returns Human-readable language name, or `"Unknown"` when {@link Intl.DisplayNames} cannot resolve it
 	 *
 	 * @throws {ApplicationError} with {@link ErrorCode.LanguageCodeNotSupported|`"LANGUAGE_CODE_NOT_SUPPORTED"`} If the language code is not supported
 	 *
@@ -188,7 +188,6 @@ export class LanguageDetectorService {
 	 * ```typescript
 	 * detector.getLanguageName('pt-br'); 	// "Brazilian Portuguese"
 	 * detector.getLanguageName('zh-hans'); // "Simplified Chinese"
-	 * detector.getLanguageName('invalid'); // "Unknown"
 	 * ```
 	 */
 	public getLanguageName(code: ReactLanguageCode, isTargetLanguage = true): string {
@@ -269,7 +268,7 @@ export class LanguageDetectorService {
 	 *
 	 * @example
 	 * ```typescript
-	 * const detector = new LanguageDetector({ source: 'en', target: 'pt-br' });
+	 * const detector = new LanguageDetectorService({ source: 'en', target: 'pt-br' });
 	 * const analysis = await detector.analyzeLanguage('readme.md', 'Olá mundo');
 	 *
 	 * console.log(analysis.isTranslated); 			// true

@@ -56,7 +56,7 @@ export class LegacyBodyTranslationService {
 	 * Used when segment extraction is unsafe or segment batch translation fails.
 	 *
 	 * @param file Work file whose `content` is the body sent to the LLM
-	 * @param attemptContext Maintainer feedback for the system prompt, when present
+	 * @param attemptContext Reserved per-attempt metadata for the system prompt (currently empty)
 	 * @param fileContext Per-call translation state for the active file
 	 *
 	 * @returns Translated markdown body before frontmatter merge
@@ -102,7 +102,7 @@ export class LegacyBodyTranslationService {
 	 * Legacy fallback used when {@link translateMarkdownBodyLegacy} needs token-budget chunking.
 	 *
 	 * @param file Work file whose `content` is the markdown body
-	 * @param attemptContext Maintainer feedback for the system prompt, when present
+	 * @param attemptContext Reserved per-attempt metadata for the system prompt (currently empty)
 	 * @param fileContext Per-call translation state for the active file
 	 *
 	 * @returns Translated body reassembled from all chunks
@@ -156,7 +156,7 @@ export class LegacyBodyTranslationService {
 	 * @param chunk Content to translate
 	 * @param index Index of the chunk
 	 * @param chunks Array of all chunks
-	 * @param attemptContext Maintainer feedback for the system prompt, when present
+	 * @param attemptContext Reserved per-attempt metadata for the system prompt (currently empty)
 	 * @param fileContext Per-call translation state for the active file
 	 * @param tokenBudget Maximum tokens per sub-chunk (used during recursive re-chunking)
 	 *
@@ -241,7 +241,7 @@ export class LegacyBodyTranslationService {
 	 * @param chunk The chunk that was truncated
 	 * @param index Index of the chunk in the parent array
 	 * @param chunks Parent chunk array
-	 * @param attemptContext Maintainer feedback for the system prompt, when present
+	 * @param attemptContext Reserved per-attempt metadata for the system prompt (currently empty)
 	 * @param fileContext Per-call translation state for the active file
 	 * @param currentBudget Current token budget (if already in a re-chunk pass)
 	 *
@@ -319,7 +319,7 @@ export class LegacyBodyTranslationService {
 	 * @param chunkProgress Slice index when translating a chunked document
 	 * @param systemPromptKind Markdown body vs frontmatter batch prompt
 	 * @param responseFormat Optional structured output format for the completion
-	 * @param attemptContext Maintainer feedback for the system prompt, when present
+	 * @param attemptContext Reserved per-attempt metadata for the system prompt (currently empty)
 	 * @param fileContext Per-call translation state for the active file
 	 *
 	 * @returns LLM completion text from the shared client

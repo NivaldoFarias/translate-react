@@ -8,12 +8,13 @@ import { WIKI_FOR_REACT_DOCS_MAINTAINERS_URL } from "@/app/constants";
 import { buildReviewerWarningsMarkdown } from "@/app/services/comment-builder/reviewer-warnings.util";
 
 /**
- * Builds the conflict notice section for PR body when a stale PR was closed.
+ * Builds the conflict notice section for PR body when the branch was refreshed
+ * after conflicting with the base branch.
  *
- * @param invalidFilePR Metadata about the closed stale PR
+ * @param invalidFilePR Metadata about the out-of-sync pull request being refreshed
  * @param strings Locale-specific strings for the conflict notice
  *
- * @returns Markdown-formatted notice or empty string if no stale PR existed
+ * @returns Markdown-formatted notice or empty string when no conflict occurred
  */
 function buildConflictNotice(
 	invalidFilePR: PullRequestDescriptionMetadata["invalidFilePR"],

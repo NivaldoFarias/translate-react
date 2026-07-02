@@ -10,4 +10,5 @@ export const FAIL_OPEN_REASONS = {
 	languageDetectionCldUnreliable: "languageDetectionCldUnreliable",
 } as const;
 
+/** Union of {@link FAIL_OPEN_REASONS} values */
 export type FailOpenReasonId = (typeof FAIL_OPEN_REASONS)[keyof typeof FAIL_OPEN_REASONS];

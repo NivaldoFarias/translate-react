@@ -4,8 +4,6 @@ import { AbortError } from "p-retry";
 
 import type { Logger } from "pino";
 
-import type { TranslatorService } from "@/app/services/translator";
-
 import { ApplicationError, ErrorCode } from "./error";
 
 /**
@@ -105,7 +103,7 @@ export function handleTopLevelError(error: unknown, logger: Logger): void {
  * Matches {@link ApplicationError} with a truncated-output message, including when
  * wrapped in {@link AbortError} from `p-retry`.
  *
- * @param error Caught rejection from {@link TranslatorService.callLanguageModel}
+ * @param error Caught rejection from an LLM completion call (e.g. `TranslationLlmClient.callLanguageModel`)
  *
  * @returns `true` when the model stopped at the completion token limit
  */
@@ -274,7 +272,7 @@ export function isCircuitBreakerError(error: unknown) {
 }
 
 /**
- * Exhaustively checks wether the provided error is an uncast {@link RequestError}
+ * Exhaustively checks whether the provided error is an uncast {@link RequestError}
  *
  * @param error The error to check
  *
@@ -298,7 +296,7 @@ export function isUncastRequestError(error: unknown): error is RequestError {
 }
 
 /**
- * Exhaustively checks wether the provided error is an uncast {@link APIError}
+ * Exhaustively checks whether the provided error is an uncast {@link APIError}
  *
  * @param error The error to check
  *

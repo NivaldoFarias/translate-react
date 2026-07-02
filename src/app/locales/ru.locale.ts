@@ -5,20 +5,15 @@ import type { LocaleDefinition, LocalePRBodyStrings, ProgressCommentRunContext }
 import { createGuardLabelResolver } from "./locale-guard-labels.util";
 import { createPRBodyBuilder } from "./pr-body.builder";
 
-/**
- * Russian strings for the PR body template.
- *
- * Contains all translated text used in the pull request description,
- * following the data-driven approach for locale definitions.
- */
+/** Russian strings for the PR body template */
 const ruPRBodyStrings: LocalePRBodyStrings = {
 	humanReviewNotice:
 		"Этот перевод был создан с использованием LLM и **требует проверки человеком** для обеспечения точности, культурного контекста и технической терминологии.",
 
 	conflictNotice: {
-		title: "Предыдущий PR закрыт",
+		title: "PR обновлён после конфликта",
 		body: (prNumber) =>
-			`PR #${prNumber} закрыт автоматически из-за конфликта с основной веткой. Перевод сделан заново по текущему исходному файлу, без ручного разрешения конфликтов из предыдущего PR.`,
+			`PR #${prNumber} был в конфликте с основной веткой. Перевод сделан заново по текущему исходному файлу, а существующая ветка обновлена, без ручного разрешения предыдущих конфликтов.`,
 	},
 
 	maintainerWikiTip: (wikiUrl) =>

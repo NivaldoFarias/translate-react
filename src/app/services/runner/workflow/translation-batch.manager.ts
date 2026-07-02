@@ -13,9 +13,9 @@ import { TranslationPullRequestLifecycleManager } from "./translation-pull-reque
 /**
  * Manages batch processing and progress tracking for file translations.
  *
- * Coordinates concurrent translation of multiple files with progress reporting,
- * error handling, and resource cleanup. Processes files in batches to manage
- * resources and provides real-time feedback.
+ * Coordinates serial translation of multiple files with progress reporting,
+ * error handling, and resource cleanup. Processes files in batches so
+ * per-batch progress and the consecutive-failure circuit breaker stay accurate.
  */
 export class TranslationBatchManager {
 	private readonly logger = logger.child({ component: TranslationBatchManager.name });
@@ -67,8 +67,8 @@ export class TranslationBatchManager {
 	/**
 	 * Processes files in batches to manage resources and provide progress feedback.
 	 *
-	 * Splits files into manageable batches, processes each batch concurrently,
-	 * updates progress in real-time, and reports batch completion statistics.
+	 * Splits files into manageable batches, processes each batch serially,
+	 * and reports batch completion statistics after each batch finishes.
 	 *
 	 * @param files List of files to process
 	 * @param batchSize Number of files to process simultaneously
@@ -136,7 +136,7 @@ export class TranslationBatchManager {
 	}
 
 	/**
-	 * Processes a single batch of files concurrently.
+	 * Processes a single batch of files serially.
 	 *
 	 * @param batch Files in the current batch
 	 * @param batchInfo Batch position metadata
@@ -197,7 +197,7 @@ export class TranslationBatchManager {
 	/**
 	 * Updates progress tracking for the current batch and adjusts success/failure counts.
 	 *
-	 * This information is used for both real-time feedback and final statistics.
+	 * This information feeds per-batch logging and the final run statistics.
 	 *
 	 * @param status The processing outcome for the file
 	 */

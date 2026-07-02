@@ -154,7 +154,7 @@ export class TranslationLlmClient {
 	 * @param chunkProgress Optional slice position when translating a chunked body
 	 * @param systemPromptKind Which system prompt to build
 	 * @param responseFormat Optional structured output format
-	 * @param attemptContext Maintainer feedback for the system prompt, when present
+	 * @param attemptContext Reserved per-attempt metadata for the system prompt (currently empty)
 	 *
 	 * @returns Chat completion parameters object
 	 */
@@ -206,7 +206,7 @@ export class TranslationLlmClient {
 	 * @param chunkProgress When set, notes this body is slice `index` of `total`
 	 * @param systemPromptKind Which system prompt to use
 	 * @param responseFormat Optional structured output format
-	 * @param attemptContext Maintainer feedback for the system prompt, when present
+	 * @param attemptContext Reserved per-attempt metadata for the system prompt (currently empty)
 	 *
 	 * @returns Resolves to the translated content
 	 *
@@ -468,7 +468,7 @@ export class TranslationLlmClient {
 	 *
 	 * @param file Logical document being translated
 	 * @param batchItems Segment ids and source strings to translate
-	 * @param attemptContext Maintainer feedback for the system prompt, when present
+	 * @param attemptContext Reserved per-attempt metadata for the system prompt (currently empty)
 	 *
 	 * @returns Parsed envelope matching {@link segmentBatchTranslationEnvelopeSchema}
 	 *
@@ -514,7 +514,7 @@ export class TranslationLlmClient {
 	 *
 	 * @param file Logical document being translated
 	 * @param batchItems Full segment batch request items for this logical call
-	 * @param attemptContext Maintainer feedback for the system prompt, when present
+	 * @param attemptContext Reserved per-attempt metadata for the system prompt (currently empty)
 	 * @param contentLengthForLog Serialized request length for logging
 	 *
 	 * @returns Parsed envelope with every requested segment id and merged usage
@@ -657,7 +657,7 @@ export class TranslationLlmClient {
 	 * @param file Logical document being translated
 	 * @param batchItems Segment batch items for this provider call
 	 * @param userMessage Serialized request envelope
-	 * @param attemptContext Maintainer feedback for the system prompt, when present
+	 * @param attemptContext Reserved per-attempt metadata for the system prompt (currently empty)
 	 * @param contentLengthForLog Original full-batch content length for error metadata
 	 * @param partialFollowUpRound Zero-based count of prior partial batch follow-up rounds
 	 *

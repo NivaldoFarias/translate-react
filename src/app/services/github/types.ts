@@ -54,11 +54,13 @@ export interface RepositoryMetadata {
 	[key: string]: unknown;
 }
 
+/** Upstream and fork repository coordinates shared across GitHub sub-services */
 export interface BaseRepositories {
 	upstream: RepositoryMetadata;
 	fork: RepositoryMetadata;
 }
 
+/** Dependencies shared by every GitHub sub-service composed by {@link GitHubService} */
 export interface SharedGitHubDependencies {
 	octokit: Octokit;
 	repositories: BaseRepositories;
@@ -190,7 +192,7 @@ export interface PullRequestStatus {
 	/** GitHub's mergeable state string (clean, behind, dirty, etc.) */
 	mergeableState: string;
 
-	/** Whether the PR needs to be closed and recreated due to conflicts */
+	/** Whether the PR has conflicts and its translation branch needs to be refreshed */
 	needsUpdate: boolean;
 
 	/** GitHub username of the PR creator */

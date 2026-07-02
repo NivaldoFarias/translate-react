@@ -144,13 +144,10 @@ export interface TranslatorServiceDependencies {
  *
  * @example
  * ```typescript
- * const translator = new TranslatorService({
- *   openai:  new OpenAI(),
- *   model: 'gpt-4o',
- * });
- *
+ * const translator = new TranslatorService(dependencies);
  * const result = await translator.translateContent(file);
- * console.log(result); // Translated content
+ *
+ * console.log(result.content); // Translated content
  * ```
  */
 export class TranslatorService {
@@ -393,26 +390,25 @@ export class TranslatorService {
 	 * 3. Translates the body via AST segments on the unmasked body, or via masked full-body/chunked fallback when segment extraction is unsafe
 	 * 4. Optionally replaces very large fenced code blocks with placeholders only on the legacy fallback path when `MASK_VERBATIM_LARGE_FENCES` is enabled
 	 * 5. Restores verbatim fences when masking was applied on the legacy path
-	 * 7. Validates translation completeness
-	 * 8. Cleans up and returns translated content
+	 * 6. Validates translation completeness
+	 * 7. Cleans up and returns translated content
 	 *
 	 * @param file File containing content to translate
 	 *
-	 * @returns Promise resolving to translated content
+	 * @returns Translated content, advisory reviewer notices, LLM usage totals, and the translation path used
 	 *
 	 * @throws {ApplicationError} with {@link ErrorCode.NoContent} if file's content is empty
 	 *
 	 * @example
 	 * ```typescript
-	 * const translator = new TranslatorService({ source: 'en', target: 'pt-br' });
 	 * const file = new TranslationFile(
 	 *   '# Hello\n\nWelcome to React!',
 	 *   'hello.md',
 	 *   'docs/hello.md',
 	 *   'abc123'
 	 * );
-	 * const translated = await translator.translateContent(file);
-	 * console.log(translated); // '# Olá\n\nBem-vindo ao React!'
+	 * const result = await translator.translateContent(file);
+	 * console.log(result.content); // '# Olá\n\nBem-vindo ao React!'
 	 * ```
 	 */
 	public async translateContent(file: TranslationFile): Promise<TranslationResult> {
@@ -697,7 +693,7 @@ export class TranslatorService {
 	 *
 	 * @param segmentBodyWorkFile Work file whose `content` is the unmasked markdown body (frontmatter already split off)
 	 * @param legacyBodyWorkFile Work file whose `content` is the body for full-body fallback (masked when verbatim masking is on)
-	 * @param attemptContext Maintainer feedback for the system prompt, when present
+	 * @param attemptContext Reserved per-attempt metadata for the system prompt (currently empty)
 	 * @param fileContext Per-call translation state for the active file
 	 *
 	 * @returns Translated markdown body before frontmatter merge
@@ -782,7 +778,7 @@ export class TranslatorService {
 	 * @param file Work file whose `content` is the markdown body
 	 * @param translatableSegments Translate- and policy-kind segments to send to the LLM
 	 * @param extraction Full body extraction including policy segments for reinsert ordering
-	 * @param attemptContext Maintainer feedback for the system prompt, when present
+	 * @param attemptContext Reserved per-attempt metadata for the system prompt (currently empty)
 	 * @param fileContext Per-call translation state for the active file
 	 *
 	 * @returns Translated markdown body before frontmatter merge
@@ -849,7 +845,7 @@ export class TranslatorService {
 	 *
 	 * @param file Work file for logging and prompt context
 	 * @param batchItems Segment batch request items
-	 * @param attemptContext Maintainer feedback for the system prompt, when present
+	 * @param attemptContext Reserved per-attempt metadata for the system prompt (currently empty)
 	 * @param segmentById Lookup map for segment metadata used during snippet sanitization
 	 * @param fileContext Per-call translation state for the active file
 	 *
@@ -929,7 +925,7 @@ export class TranslatorService {
 	 * @param error Caught splittable rejection from {@link translateSegmentBatchItems}
 	 * @param file Work file for the document being translated
 	 * @param batchItems Full segment batch that failed
-	 * @param attemptContext Maintainer feedback for the system prompt, when present
+	 * @param attemptContext Reserved per-attempt metadata for the system prompt (currently empty)
 	 * @param segmentById Lookup of segment metadata by id
 	 * @param fileContext Per-call translation state for the active file
 	 *

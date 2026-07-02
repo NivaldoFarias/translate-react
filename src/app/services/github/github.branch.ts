@@ -12,7 +12,7 @@ import { toSafeErrorLogFields } from "@/shared/errors/";
 import { fetchRepositoryDefaultBranch } from "./github-api.util";
 
 /**
- * Branch operations module for GitHub API.
+ * Branch creation, deletion, and lifecycle management for the GitHub API.
  *
  * Handles branch creation, deletion, and lifecycle management with cleanup support.
  */
@@ -23,10 +23,10 @@ export class GitHubBranch {
 	public activeBranches = new Set<string>();
 
 	/**
-	 * Callback for cleanup operations that need access to content methods.
+	 * Callback for cleanup operations that need access to pull request lookups.
 	 * Set by the unified service to enable cleanup functionality.
 	 */
-	private cleanupContentAccess?: {
+	private cleanupPullRequestAccess?: {
 		findPullRequestByBranch: (branchName: string) => Promise<unknown>;
 		checkPullRequestStatus: (prNumber: number) => Promise<{ needsUpdate: boolean }>;
 	};
@@ -38,19 +38,19 @@ export class GitHubBranch {
 	}
 
 	/**
-	 * Sets the cleanup content access callback.
+	 * Sets the cleanup pull request access callback.
 	 *
 	 * Called by the unified service to enable cleanup functionality.
 	 *
-	 * @param access The callback for cleanup operations that need access to content methods
+	 * @param access The callback for cleanup operations that need access to pull request lookups
 	 * @param access.findPullRequestByBranch The callback to find a pull request by branch name
 	 * @param access.checkPullRequestStatus The callback to check the status of a pull request
 	 */
-	public setCleanupContentAccess(access: {
+	public setCleanupPullRequestAccess(access: {
 		findPullRequestByBranch: (branchName: string) => Promise<unknown>;
 		checkPullRequestStatus: (prNumber: number) => Promise<PullRequestStatus>;
 	}): void {
-		this.cleanupContentAccess = access;
+		this.cleanupPullRequestAccess = access;
 	}
 
 	/**
@@ -235,7 +235,7 @@ export class GitHubBranch {
 	 * ```
 	 */
 	protected async cleanup(): Promise<void> {
-		if (!this.cleanupContentAccess) {
+		if (!this.cleanupPullRequestAccess) {
 			this.logger.warn("Cleanup content access not set, skipping cleanup");
 			return;
 		}
@@ -244,7 +244,7 @@ export class GitHubBranch {
 
 		for (const branch of branchesToCheck) {
 			try {
-				const pr = (await this.cleanupContentAccess.findPullRequestByBranch(branch)) as
+				const pr = (await this.cleanupPullRequestAccess.findPullRequestByBranch(branch)) as
 					| { number: number }
 					| undefined;
 
@@ -254,7 +254,7 @@ export class GitHubBranch {
 					continue;
 				}
 
-				const prStatus = await this.cleanupContentAccess.checkPullRequestStatus(pr.number);
+				const prStatus = await this.cleanupPullRequestAccess.checkPullRequestStatus(pr.number);
 
 				if (prStatus.needsUpdate) {
 					this.logger.info(

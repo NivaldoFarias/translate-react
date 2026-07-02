@@ -33,17 +33,25 @@ const DEFAULT_REPOSITORIES: BaseRepositories = {
 	},
 };
 
+/** Dependency injection interface for {@link GitHubService} */
 export interface GitHubServiceDependencies {
+	/** Octokit client (defaults to the shared app-level client) */
 	octokit?: Octokit;
+
+	/** Upstream and fork repository coordinates (defaults to env-configured repositories) */
 	repositories?: BaseRepositories;
+
+	/** Builder for advisory validation comments on pull requests and issues */
 	commentBuilderService: CommentBuilderService;
 }
 
 /**
- * Unified GitHub service combining repository, branch, and content operations.
+ * Unified GitHub service composing repository, branch, file content, pull
+ * request, and progress issue operations.
  *
- * Provides a single API for all GitHub operations while maintaining clear
- * domain separation through internal composition.
+ * Provides a single API for all GitHub operations by delegating to
+ * {@link GitHubRepository}, {@link GitHubBranch}, {@link GitHubRepositoryContent},
+ * {@link GitHubPullRequest}, and {@link GitHubProgressIssue}.
  */
 export class GitHubService {
 	private readonly repository: GitHubRepository;
@@ -52,6 +60,11 @@ export class GitHubService {
 	private readonly pullRequest: GitHubPullRequest;
 	private readonly progressIssue: GitHubProgressIssue;
 
+	/**
+	 * Wires the composed GitHub sub-services and binds branch cleanup to pull request lookups.
+	 *
+	 * @param dependencies Octokit client, repository coordinates, and comment builder service
+	 */
 	constructor(dependencies: GitHubServiceDependencies) {
 		const shared: SharedGitHubDependencies = {
 			octokit: dependencies.octokit ?? octokit,
@@ -64,7 +77,7 @@ export class GitHubService {
 		this.repository = new GitHubRepository(shared);
 		this.branch = new GitHubBranch(shared);
 
-		this.branch.setCleanupContentAccess({
+		this.branch.setCleanupPullRequestAccess({
 			findPullRequestByBranch: this.pullRequest.findPullRequestByBranch.bind(this.pullRequest),
 			checkPullRequestStatus: this.pullRequest.checkPullRequestStatus.bind(this.pullRequest),
 		});
@@ -341,7 +354,7 @@ export class GitHubService {
 	}
 
 	/**
-	 * Checks if a pull request has merge conflicts that require closing and recreating.
+	 * Checks if a pull request has merge conflicts that require refreshing its translation branch.
 	 *
 	 * @param prNumber Pull request number to check
 	 *

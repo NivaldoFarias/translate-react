@@ -73,7 +73,7 @@ export class GitHubRepositoryContent {
 	 *
 	 * @param options Commit options
 	 * @param options.branch Target branch ref for the commit
-	 * @param options.file File metadata including path and optional stale `sha`
+	 * @param options.file Repository path on the fork
 	 * @param options.content UTF-8 translated file body
 	 * @param options.message Commit message for the translation
 	 *

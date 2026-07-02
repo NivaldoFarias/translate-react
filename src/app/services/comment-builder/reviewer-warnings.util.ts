@@ -127,9 +127,9 @@ function formatDiffBlock(before: string, after: string) {
 }
 
 /**
- * Extracts the instructional sentence from a guard retry hint before violation clauses.
+ * Extracts the instructional sentence from a guard hint before violation clauses.
  *
- * @param hint Full retry hint string
+ * @param hint Full guard hint string
  *
  * @returns Instruction-only prose
  */
@@ -145,7 +145,7 @@ function extractHintInstruction(hint: string) {
 /**
  * Wraps guard instruction prose in a Markdown blockquote.
  *
- * @param instruction Instruction-only retry hint sentence
+ * @param instruction Instruction-only guard hint sentence
  *
  * @returns Blockquoted instruction
  */
@@ -190,7 +190,7 @@ ${formatViolationBody(violation.body)}`;
 /**
  * Builds the guard subsection body from located violations.
  *
- * @param instruction Instruction-only retry hint sentence
+ * @param instruction Instruction-only guard hint sentence
  * @param violations Located violations for the guard
  *
  * @returns Guard subsection body without the `###` heading
@@ -394,7 +394,7 @@ function collectHeadingsPreservedViolations(sourceMarkdown: string, translatedMa
 }
 
 /**
- * Formats a guard section from the retry hint when structured source data is unavailable.
+ * Formats a guard section from the guard hint when structured source data is unavailable.
  *
  * @param guardId Post-translation guard identifier
  * @param hint Retry hint text
