@@ -1,13 +1,19 @@
 /**
  * CLI entry for real-LLM workflow smoke (`bun run ci:smoke`).
  *
- * Invoked locally or by [`.github/workflows/smoke.yml`](../../.github/workflows/smoke.yml).
- * Reviewable outputs are written under `.out/`. See {@link runWorkflowSmoke} and
+ * Invoked locally or by [`.github/workflows/smoke.yml`](../../.github/workflows/smoke.yml) and the
+ * per-locale gate in [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml). Reviewable outputs
+ * are written under `.out/`. See {@link runWorkflowSmoke} and
  * [CONTRIBUTING.md](../../../CONTRIBUTING.md#workflow-smoke) for layout and CI artifacts.
+ *
+ * `TARGET_LANGUAGE` defaults to `pt-br`; pass `--lang`/`-l` (handled by
+ * `bootstrap-cli-overrides.util`, shared with the main translation CLI) to smoke a different
+ * configured locale.
  *
  * @example
  * ```bash
  * bun run ci:smoke -- --profile quick
+ * bun run ci:smoke -- --profile quick --lang ru
  * bun run ci:smoke -- --profile workflow
  * bun run ci:smoke -- --profile full
  * bun run ci:smoke -- --files hydrateRoot.md,lazy.md
