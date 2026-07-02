@@ -18,7 +18,7 @@ import {
 	logger,
 	resolveGitHubActionsRunContext,
 } from "@/app/utils/";
-import { ApplicationError, ErrorCode } from "@/shared/errors/";
+import { ApplicationError, ErrorCode, isCircuitBreakerError } from "@/shared/errors/";
 
 import {
 	buildTranslationCommitMessage,
@@ -182,20 +182,15 @@ export class TranslationBatchManager {
 
 		const results = new Map<string, ProcessedFileResult>();
 
-		const fileResults = await Promise.all(
-			batch.map((file, index) => {
-				const progress = {
-					batchIndex: batchInfo.currentBatch,
-					fileIndex: index,
-					totalBatches: batchInfo.totalBatches,
-					batchSize: batchInfo.batchSize,
-				};
+		for (const [index, file] of batch.entries()) {
+			const progress = {
+				batchIndex: batchInfo.currentBatch,
+				fileIndex: index,
+				totalBatches: batchInfo.totalBatches,
+				batchSize: batchInfo.batchSize,
+			};
 
-				return this.processFile(file, progress);
-			}),
-		);
-
-		for (const result of fileResults) {
+			const result = await this.processFile(file, progress);
 			results.set(result.filename, result);
 		}
 
@@ -268,6 +263,7 @@ export class TranslationBatchManager {
 					ErrorCode.TranslationFailed,
 					`${TranslationBatchManager.name}.${this.processFile.name}`,
 					{
+						circuitBreaker: true,
 						consecutiveFailures: this.consecutiveFailures,
 						threshold: MAX_CONSECUTIVE_FAILURES,
 					},
@@ -398,6 +394,10 @@ export class TranslationBatchManager {
 
 			file.logger.debug({ totalDurationMs: Date.now() - startTime }, "File processing complete");
 		} catch (error) {
+			if (isCircuitBreakerError(error)) {
+				throw error;
+			}
+
 			this.consecutiveFailures++;
 
 			file.logger.error({ error, durationMs: Date.now() - startTime }, "File processing failed");

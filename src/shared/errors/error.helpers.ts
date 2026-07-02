@@ -211,6 +211,31 @@ export function getSegmentBatchSplitReason(error: unknown): SegmentBatchSplitRea
 }
 
 /**
+ * Returns whether a value is a non-null object record.
+ *
+ * @param value Value to narrow
+ *
+ * @returns `true` when `value` is a plain object record
+ */
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null;
+}
+
+/**
+ * Returns whether an error is a workflow circuit-breaker termination.
+ *
+ * @param error Caught rejection from batch file processing
+ *
+ * @returns `true` when consecutive failure threshold halted the workflow
+ */
+export function isCircuitBreakerError(error: unknown) {
+	if (!(error instanceof ApplicationError)) return false;
+	if (!isRecord(error.metadata)) return false;
+
+	return error.metadata["circuitBreaker"] === true;
+}
+
+/**
  * Exhaustively checks wether the provided error is an uncast {@link RequestError}
  *
  * @param error The error to check

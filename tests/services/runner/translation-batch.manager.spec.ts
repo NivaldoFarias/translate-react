@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test";
 
 import { PullRequestProgressAction } from "@/app/services/github/types";
 import { TranslationBatchManager } from "@/app/services/runner/workflow/translation-batch.manager";
+import { MAX_CONSECUTIVE_FAILURES } from "@/app/services/runner/workflow/workflow.constants";
+import { ApplicationError, ErrorCode, isCircuitBreakerError } from "@/shared/errors/";
 
 import {
 	createGitBranchRefResponse,
@@ -353,6 +355,40 @@ describe("TranslationBatchManager", () => {
 			expect(translator.translateContent).toHaveBeenCalled();
 			expect(github.refreshTranslationBranchPreservePr).toHaveBeenCalled();
 			expect(github.closePullRequest).not.toHaveBeenCalled();
+		});
+
+		test("stops batch processing and propagates when consecutive failures reach the circuit breaker threshold", async () => {
+			const github = createMockGitHubService();
+			const translator = createMockTranslatorService();
+			const languageDetector = createMockLanguageDetectorService();
+
+			github.findPullRequestByBranch.mockResolvedValue(undefined);
+			github.getBranch.mockResolvedValue(undefined);
+			languageDetector.analyzeLanguage.mockResolvedValue(createUntranslatedLanguageAnalysis());
+			translator.translateContent.mockRejectedValue(
+				new ApplicationError("Translation failed", ErrorCode.TranslationFailed, "test"),
+			);
+
+			const manager = createTestTranslationBatchManager({
+				github,
+				translator,
+				languageDetector,
+			});
+			const files = Array.from({ length: MAX_CONSECUTIVE_FAILURES + 3 }, (_, index) =>
+				createTranslationFileFixture({
+					path: `src/content/pages/file-${index}.md`,
+					filename: `file-${index}.md`,
+				}),
+			);
+
+			try {
+				await manager.processBatches(files, files.length);
+				expect.unreachable("Expected circuit breaker to halt batch processing");
+			} catch (error) {
+				expect(isCircuitBreakerError(error)).toBe(true);
+			}
+
+			expect(translator.translateContent).toHaveBeenCalledTimes(MAX_CONSECUTIVE_FAILURES);
 		});
 
 		test("preserves approved pull request when resetting an existing translation branch", async () => {

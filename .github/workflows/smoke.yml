@@ -27,7 +27,6 @@ permissions:
 
 concurrency:
   group: smoke-${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
   smoke:

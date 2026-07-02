@@ -17,6 +17,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Fixed
 
+- Consecutive translation failures now halt the workflow once the circuit-breaker threshold is reached instead of continuing through remaining files.
+- Upstream tree paths containing `..`, backslashes, or paths outside `src/<segment>/.../*.md` are rejected before fetch or commit.
 - Full-body LLM calls with provider `finishReason: "error"` no longer pass as success; truncated or malformed output fails and retries instead of reaching guards with misleading `contentRatio` blocks.
 - Glued inline code, MDX slug comments, and adjacent markdown links are repaired before advisory validation so those mechanical spacing regressions no longer surface as `mdxSpacing` reviewer notices on translation pull requests.
 - Blank `TARGET_LANGUAGE` or `SOURCE_LANGUAGE` from GitHub Actions or `.env` no longer fails validation; empty values default to `pt-br` and `en`.

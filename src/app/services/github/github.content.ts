@@ -25,7 +25,7 @@ import {
 	hasReportableProgressComment,
 	selectProgressCommentPayload,
 } from "@/app/services/comment-builder/progress-comment.util";
-import { logger } from "@/app/utils/";
+import { isSafeTranslatablePath, logger } from "@/app/utils/";
 import { ApplicationError, ErrorCode } from "@/shared/errors/";
 
 /** Pull request options */
@@ -85,6 +85,23 @@ export class GitHubContent {
 		private readonly deps: SharedGitHubDependencies,
 		private readonly commentBuilder: CommentBuilderService,
 	) {}
+
+	/**
+	 * Rejects repository paths that could escape the translatable `src/` tree.
+	 *
+	 * @param path Repository-relative file path
+	 * @param operation Caller operation name for error attribution
+	 */
+	private assertSafeTranslatablePath(path: string, operation: string): void {
+		if (isSafeTranslatablePath(path)) return;
+
+		throw new ApplicationError(
+			`Unsafe translatable path rejected: ${path}`,
+			ErrorCode.ResourceLoadError,
+			operation,
+			{ path },
+		);
+	}
 
 	/**
 	 * Creates a comment on a pull request.
@@ -224,6 +241,11 @@ export class GitHubContent {
 	}: CommitTranslationOptions): Promise<
 		RestEndpointMethodTypes["repos"]["createOrUpdateFileContents"]["response"]
 	> {
+		this.assertSafeTranslatablePath(
+			file.path,
+			`${GitHubContent.name}.${this.commitTranslation.name}`,
+		);
+
 		const blobShaOnBranch = await this.resolveBlobShaOnBranchForPath(branch.ref, file.path);
 
 		const response = await this.deps.octokit.repos.createOrUpdateFileContents({
@@ -377,6 +399,8 @@ export class GitHubContent {
 	 * @returns Upstream markdown blob content and `sha`
 	 */
 	public async getFile(file: PatchedRepositoryTreeItem): Promise<RepositoryMarkdownBlob> {
+		this.assertSafeTranslatablePath(file.path, `${GitHubContent.name}.${this.getFile.name}`);
+
 		const ref = await this.resolveUpstreamDefaultBranchRef();
 
 		const response = await this.deps.octokit.repos.getContent({

@@ -6,6 +6,7 @@ import {
 	detectRateLimit,
 	filterMarkdownFiles,
 	formatElapsedTime,
+	isSafeTranslatablePath,
 	nftsCompatibleDateString,
 	resolveRunnerNewIssueChooserUrl,
 	resolveString,
@@ -140,6 +141,36 @@ describe("common.util", () => {
 
 			expect(result).toHaveLength(1);
 			expect(result[0]?.path).toBe("src/docs/readme.md");
+		});
+
+		test("excludes path traversal and unsafe upstream paths", () => {
+			const tree = [
+				createRepositoryTreeItemFixture({ path: "src/../secret.md" }),
+				createRepositoryTreeItemFixture({ path: "src/foo/../../bar.md" }),
+				createRepositoryTreeItemFixture({ path: "src/content/page.md" }),
+			];
+
+			const result = filterMarkdownFiles(tree);
+
+			expect(result).toHaveLength(1);
+			expect(result[0]?.path).toBe("src/content/page.md");
+		});
+	});
+
+	describe("isSafeTranslatablePath", () => {
+		test("accepts nested markdown paths under src/", () => {
+			expect(isSafeTranslatablePath("src/content/page.md")).toBe(true);
+			expect(isSafeTranslatablePath("src/content/nested/page.md")).toBe(true);
+			expect(isSafeTranslatablePath("src/new.md")).toBe(true);
+		});
+
+		test("rejects path traversal, absolute paths, and non-markdown paths", () => {
+			expect(isSafeTranslatablePath("src/../secret.md")).toBe(false);
+			expect(isSafeTranslatablePath("src/foo/../../bar.md")).toBe(false);
+			expect(isSafeTranslatablePath("/src/content/page.md")).toBe(false);
+			expect(isSafeTranslatablePath("src\\content\\page.md")).toBe(false);
+			expect(isSafeTranslatablePath("docs/readme.md")).toBe(false);
+			expect(isSafeTranslatablePath("src/content/page.txt")).toBe(false);
 		});
 	});
 
