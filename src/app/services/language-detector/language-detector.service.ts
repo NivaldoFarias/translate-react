@@ -10,6 +10,43 @@ import {
 	TRANSLATION_RATIO_THRESHOLD,
 } from "./language-detector.constants";
 
+const LANGUAGE_DETECTOR_CODE_BLOCK = /```[\s\S]*?```/g;
+const LANGUAGE_DETECTOR_INLINE_CODE = /`[^`]*`/g;
+const LANGUAGE_DETECTOR_URLS = /https?:\/\/[^\s]+/g;
+const LANGUAGE_DETECTOR_WHITESPACE = /\s+/g;
+
+/**
+ * Removes angle-bracket tags without regex backtracking on unclosed `<`.
+ *
+ * @param content Markdown or HTML-like text
+ *
+ * @returns Text with tag spans replaced by spaces
+ */
+function stripHtmlLikeTags(content: string) {
+	let result = "";
+	let index = 0;
+
+	while (index < content.length) {
+		const openTag = content.indexOf("<", index);
+		if (openTag < 0) {
+			result += content.slice(index);
+			break;
+		}
+
+		result += content.slice(index, openTag);
+		const closeTag = content.indexOf(">", openTag + 1);
+		if (closeTag < 0) {
+			result += " ";
+			break;
+		}
+
+		result += " ";
+		index = closeTag + 1;
+	}
+
+	return result;
+}
+
 /**
  * Configuration interface for language detection settings.
  *
@@ -362,22 +399,11 @@ export class LanguageDetectorService {
 	private cleanContent(content: string): string {
 		this.logger.debug("Cleaning content for language detection");
 
-		const regexes = {
-			codeBlock: new RegExp(/```[\s\S]*?```/g),
-			inlineCode: new RegExp(/`[^`]*`/g),
-			htmlTags: new RegExp(/<[^>]*>/g),
-			urls: new RegExp(/https?:\/\/[^\s]+/g),
-			whitespace: new RegExp(/\s+/g),
-		} as const;
-
-		this.logger.debug({ regexes }, "Using regex patterns for content cleaning");
-
-		const cleanedContent = content
-			.replace(regexes.codeBlock, " ")
-			.replace(regexes.inlineCode, " ")
-			.replace(regexes.htmlTags, " ")
-			.replace(regexes.urls, " ")
-			.replace(regexes.whitespace, " ")
+		const cleanedContent = stripHtmlLikeTags(content)
+			.replace(LANGUAGE_DETECTOR_CODE_BLOCK, " ")
+			.replace(LANGUAGE_DETECTOR_INLINE_CODE, " ")
+			.replace(LANGUAGE_DETECTOR_URLS, " ")
+			.replace(LANGUAGE_DETECTOR_WHITESPACE, " ")
 			.trim();
 
 		this.logger.debug(

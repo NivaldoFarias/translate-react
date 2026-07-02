@@ -4,6 +4,7 @@ import { zodResponseFormat } from "openai/helpers/zod";
 import pRetry, { AbortError } from "p-retry";
 
 import type OpenAI from "openai";
+import type { ChatCompletion } from "openai/resources";
 
 import type { TranslationAttemptContext } from "@/app/services/translator/pipeline/translation-attempt.context";
 import type { TranslationFile } from "@/app/services/translator/translation-file";
@@ -72,6 +73,36 @@ const SEGMENT_BATCH_RESPONSE_FORMAT = zodResponseFormat(
 	segmentBatchTranslationEnvelopeSchema,
 	"segment_batch_translations",
 );
+
+/** OpenRouter may return `error`, which the OpenAI SDK `finish_reason` union omits. */
+type ProviderFinishReason =
+	| NonNullable<ChatCompletion["choices"][number]["finish_reason"]>
+	| "error";
+
+/**
+ * Rejects provider completions that ended with `finish_reason: "error"`.
+ *
+ * @param finishReason Provider finish reason from the completion choice
+ * @param operation Caller operation name for error attribution
+ * @param metadata Additional context merged into the thrown error
+ */
+function rejectProviderFinishReasonErrors(
+	finishReason: ProviderFinishReason | null | undefined,
+	operation: string,
+	metadata: Record<string, unknown>,
+): void {
+	if (finishReason !== "error") return;
+
+	throw new ApplicationError(
+		"Language model returned error finish reason",
+		ErrorCode.TranslationFailed,
+		operation,
+		{
+			...metadata,
+			finishReason,
+		},
+	);
+}
 
 /**
  * OpenAI transport for markdown and frontmatter translation completions.
@@ -244,7 +275,9 @@ export class TranslationLlmClient {
 							);
 						}
 
-						const finishReason = completion.choices[0]?.finish_reason as string | undefined;
+						const finishReason = completion.choices[0]?.finish_reason as
+							| ProviderFinishReason
+							| undefined;
 						if (finishReason === "length") {
 							throw new AbortError(
 								new ApplicationError(
@@ -262,19 +295,15 @@ export class TranslationLlmClient {
 							);
 						}
 
-						if (finishReason === "error") {
-							throw new ApplicationError(
-								"Language model returned error finish reason",
-								ErrorCode.TranslationFailed,
-								`${TranslationLlmClient.name}.${this.callLanguageModel.name}`,
-								{
-									model: this.model,
-									contentLength: contentToTranslate.length,
-									finishReason,
-									translatedLength: translatedContent.length,
-								},
-							);
-						}
+						rejectProviderFinishReasonErrors(
+							finishReason,
+							`${TranslationLlmClient.name}.${this.callLanguageModel.name}`,
+							{
+								model: this.model,
+								contentLength: contentToTranslate.length,
+								translatedLength: translatedContent.length,
+							},
+						);
 
 						const usage = extractTranslationLlmUsageFromCompletion(completion.usage);
 
@@ -387,6 +416,15 @@ export class TranslationLlmClient {
 								},
 							);
 						}
+
+						rejectProviderFinishReasonErrors(
+							finishReason,
+							`${TranslationLlmClient.name}.${this.callLanguageModelFrontmatterBatch.name}`,
+							{
+								model: this.model,
+								contentLength: contentLengthForLog,
+							},
+						);
 
 						const parsedEnvelope = frontmatterBatchTranslationEnvelopeSchema.safeParse(
 							JSON.parse(rawJson),
@@ -734,6 +772,17 @@ export class TranslationLlmClient {
 				truncationMetadata,
 			);
 		}
+
+		rejectProviderFinishReasonErrors(
+			completionContext.finishReason,
+			`${TranslationLlmClient.name}.${this.callLanguageModelSegmentBatch.name}`,
+			{
+				model: this.model,
+				contentLength: contentLengthForLog,
+				segmentCount: batchItems.length,
+				...completionContext,
+			},
+		);
 
 		let parsedEnvelope: ReturnType<typeof segmentBatchTranslationEnvelopeSchema.safeParse>;
 

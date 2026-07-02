@@ -6,6 +6,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Changed
 
+- Language-detector tag stripping and JSX static-text link analyzers use linear scans instead of nested-regex patterns that could backtrack on near-valid upstream markdown.
 - Segment batches pack at most 20 prose segments per LLM request (down from 40), reducing structured JSON parse failures and split retries on segment-heavy pages.
 - Quick `ci:smoke` profile includes `invalid-hook-call-warning.md` as a structured-output stress fixture.
 - Segment batch failures from truncated output, id mismatch, or malformed JSON now split the batch on the first error instead of repeating the same LLM call through `p-retry`, reducing wasted retries and LLM cost.
@@ -17,6 +18,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Fixed
 
+- Segment-batch and frontmatter-batch LLM calls with provider `finishReason: "error"` now fail like full-body calls instead of accepting malformed provider output.
+- GitHub integration logs only safe error fields (`message`, `status`, `code`, `name`) so Octokit request headers are not written to workflow logs.
 - Consecutive translation failures now halt the workflow once the circuit-breaker threshold is reached instead of continuing through remaining files.
 - Upstream tree paths containing `..`, backslashes, or paths outside `src/<segment>/.../*.md` are rejected before fetch or commit.
 - Full-body LLM calls with provider `finishReason: "error"` no longer pass as success; truncated or malformed output fails and retries instead of reaching guards with misleading `contentRatio` blocks.

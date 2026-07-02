@@ -222,6 +222,44 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
+ * Returns log-safe fields from an error without request headers or other sensitive payloads.
+ *
+ * @param error Caught rejection or thrown value
+ *
+ * @returns Message, name, and optional HTTP status or error code
+ */
+export function toSafeErrorLogFields(error: unknown) {
+	if (error instanceof ApplicationError) {
+		return {
+			message: error.message,
+			name: error.name,
+			code: error.code,
+			...(error.statusCode !== undefined ? { status: error.statusCode } : {}),
+		};
+	}
+
+	if (error instanceof RequestError || isUncastRequestError(error)) {
+		return {
+			message: error.message,
+			name: error.name,
+			status: error.status,
+		};
+	}
+
+	if (error instanceof Error) {
+		return {
+			message: error.message,
+			name: error.name,
+		};
+	}
+
+	return {
+		message: String(error),
+		name: "UnknownError",
+	};
+}
+
+/**
  * Returns whether an error is a workflow circuit-breaker termination.
  *
  * @param error Caught rejection from batch file processing

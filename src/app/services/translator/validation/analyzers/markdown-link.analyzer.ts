@@ -312,11 +312,9 @@ function findOrphanLinkClosings(markdown: string, url: string) {
 		}
 
 		const segment = markdown.slice(openIndex);
-		const validPattern = new RegExp(
-			`^\\[(?:[^\\]\\\\]|\\\\.)*\\]\\(${escapeRegExp(url)}(?:\\s+"[^"]*")?\\)`,
-		);
+		const spanAtStart = extractMarkdownLinkSpans(segment).find((link) => link.start === 0);
 
-		if (!validPattern.test(segment)) {
+		if (spanAtStart?.url !== url) {
 			orphanIndices.push(closingIndex);
 		}
 	}

@@ -11,6 +11,7 @@ import {
 	isSegmentBatchIdMismatchError,
 	isSegmentBatchSplittableError,
 	isSegmentBatchStructuredOutputError,
+	toSafeErrorLogFields,
 } from "@/shared/errors/";
 
 import { createOctokitRequestErrorFixture, createOpenAIApiErrorFixture } from "@tests/fixtures";
@@ -335,5 +336,35 @@ describe("getSegmentBatchSplitReason", () => {
 				),
 			),
 		).toBe("structured_output_error");
+	});
+});
+
+describe("toSafeErrorLogFields", () => {
+	test("returns code and message for ApplicationError", () => {
+		const fields = toSafeErrorLogFields(
+			new ApplicationError("Workflow failed", ErrorCode.TranslationFailed, "Test.operation"),
+		);
+
+		expect(fields).toEqual({
+			message: "Workflow failed",
+			name: "ApplicationError",
+			code: ErrorCode.TranslationFailed,
+		});
+	});
+
+	test("returns status and message for Octokit RequestError without request payload", () => {
+		const fields = toSafeErrorLogFields(
+			createOctokitRequestErrorFixture({
+				status: StatusCodes.FORBIDDEN,
+				message: "Forbidden",
+			}),
+		);
+
+		expect(fields).toEqual({
+			message: "Forbidden",
+			name: "HttpError",
+			status: StatusCodes.FORBIDDEN,
+		});
+		expect(fields).not.toHaveProperty("request");
 	});
 });

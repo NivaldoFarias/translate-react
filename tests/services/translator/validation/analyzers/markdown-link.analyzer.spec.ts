@@ -128,6 +128,16 @@ describe("findMarkdownLinkViolations", () => {
 		expect(violations.some((violation) => violation.url === "https://a.example/one")).toBe(true);
 		expect(violations.some((violation) => violation.url === "https://b.example/two")).toBe(true);
 	});
+
+	test("completes on long unclosed bracket input without catastrophic backtracking", () => {
+		const nearValid = `[${"a".repeat(4_000)}`;
+		const translated = `${nearValid}](https://example.com/path)`;
+		const startedAt = performance.now();
+
+		findMarkdownLinkViolations("[docs](https://example.com/path)", translated);
+
+		expect(performance.now() - startedAt).toBeLessThan(500);
+	});
 });
 
 describe("formatMarkdownLinkViolationSummary and buildMarkdownLinkRetryHint", () => {

@@ -5,6 +5,7 @@ import type { RestEndpointMethodTypes } from "@octokit/rest";
 import type { SharedGitHubDependencies } from "./types";
 
 import { env, filterMarkdownFiles, logger, TRANSLATION_GUIDELINES_CANDIDATES } from "@/app/utils/";
+import { toSafeErrorLogFields } from "@/shared/errors/";
 
 /**
  * Repository operations module for GitHub API.
@@ -114,7 +115,7 @@ export class GitHubRepository {
 
 			if (result.status === "rejected") {
 				this.logger.error(
-					{ reason: result.reason },
+					toSafeErrorLogFields(result.reason),
 					`Insufficient permissions for ${repoType} repository`,
 				);
 
@@ -175,7 +176,12 @@ export class GitHubRepository {
 			return comparison.data.ahead_by > 0;
 		} catch (error) {
 			this.logger.warn(
-				{ error, headBranch, baseBranch, target },
+				{
+					...toSafeErrorLogFields(error),
+					headBranch,
+					baseBranch,
+					target,
+				},
 				"Failed to compare branches, assuming not behind",
 			);
 			return false;
@@ -255,7 +261,7 @@ export class GitHubRepository {
 
 			return isSynced;
 		} catch (error) {
-			this.logger.error({ error }, "Failed to check fork synchronization");
+			this.logger.error(toSafeErrorLogFields(error), "Failed to check fork synchronization");
 
 			return false;
 		}
@@ -297,7 +303,10 @@ export class GitHubRepository {
 
 			return true;
 		} catch (error) {
-			this.logger.error({ error, fork: this.deps.repositories.fork }, "Failed to synchronize fork");
+			this.logger.error(
+				{ ...toSafeErrorLogFields(error), fork: this.deps.repositories.fork },
+				"Failed to synchronize fork",
+			);
 			return false;
 		}
 	}

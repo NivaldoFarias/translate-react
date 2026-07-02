@@ -20,8 +20,15 @@ type PullRequestListItem = RestEndpointMethodTypes["pulls"]["list"]["response"][
 /** Octokit `git.getRef` response used by {@link GitHubService.getBranch} */
 export type GitBranchRefResponse = RestEndpointMethodTypes["git"]["getRef"]["response"];
 
+type PartialChatCompletionChoice = PartialDeep<
+	Omit<ChatCompletion["choices"][number], "finish_reason">
+> & {
+	/** Widened for tests: OpenRouter can return `"error"`, which the OpenAI SDK type omits. */
+	finish_reason?: ChatCompletion["choices"][number]["finish_reason"] | "error";
+};
+
 type PartialChatCompletion = PartialDeep<
-	Omit<ChatCompletion, "choices"> & { choices: PartialDeep<ChatCompletion["choices"][number]>[] }
+	Omit<ChatCompletion, "choices"> & { choices: PartialChatCompletionChoice[] }
 >;
 
 /**

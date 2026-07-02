@@ -221,6 +221,15 @@ mesmo com a presença deste código em inglês no meio do documento.
 			expect(analysis.isTranslated).toBe(false);
 			expect(analysis.ratio).toBe(0);
 		});
+
+		test("completes on long unclosed angle-bracket input without catastrophic backtracking", async () => {
+			const nearValid = `<${"x".repeat(4_000)} English prose for detection.`;
+			const startedAt = performance.now();
+
+			await detector.analyzeLanguage("stress.md", nearValid);
+
+			expect(performance.now() - startedAt).toBeLessThan(2_000);
+		});
 	});
 
 	describe("getLanguageName", () => {

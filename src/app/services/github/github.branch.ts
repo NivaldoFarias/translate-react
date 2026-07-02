@@ -7,6 +7,7 @@ import type { PullRequestStatus } from "@/app/services/github/types";
 import type { SharedGitHubDependencies } from "./types";
 
 import { logger, registerCleanup } from "@/app/utils/";
+import { toSafeErrorLogFields } from "@/shared/errors/";
 
 /**
  * Branch operations module for GitHub API.
@@ -107,7 +108,10 @@ export class GitHubBranch {
 
 			return branchRef;
 		} catch (error) {
-			this.logger.debug({ branchName, error }, "Branch creation failed, removing from tracking");
+			this.logger.debug(
+				{ branchName, ...toSafeErrorLogFields(error) },
+				"Branch creation failed, removing from tracking",
+			);
 			this.activeBranches.delete(branchName);
 			throw error;
 		}
@@ -271,7 +275,10 @@ export class GitHubBranch {
 					"Cleanup: Preserving branch with valid PR",
 				);
 			} catch (error) {
-				this.logger.error({ branch, error }, "Cleanup: Error checking branch, skipping deletion");
+				this.logger.error(
+					{ branch, ...toSafeErrorLogFields(error) },
+					"Cleanup: Error checking branch, skipping deletion",
+				);
 			}
 		}
 	}

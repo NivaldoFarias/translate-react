@@ -137,6 +137,27 @@ describe("TranslationLlmClient", () => {
 
 			expect(llmClient.callLanguageModel(file)).rejects.toThrow(ApplicationError);
 		});
+
+		test("throws ApplicationError when finish_reason is error", () => {
+			mockChatCompletionsCreate.mockResolvedValue(
+				createChatCompletionFixture({
+					choices: [
+						{
+							message: { content: "partial", refusal: null, role: "assistant" },
+							finish_reason: "error",
+							index: 0,
+							logprobs: null,
+						},
+					],
+				}),
+			);
+
+			const file = createTranslationFileFixture({ content: "Hello world" });
+
+			expect(llmClient.callLanguageModel(file)).rejects.toThrow(
+				"Language model returned error finish reason",
+			);
+		});
 	});
 
 	describe("callLanguageModelFrontmatterBatch", () => {
@@ -167,6 +188,35 @@ describe("TranslationLlmClient", () => {
 					{ fieldKey: "description", source: "Welcome" },
 				]),
 			).rejects.toThrow("truncated frontmatter batch JSON");
+		});
+
+		test("throws ApplicationError when finish_reason is error", () => {
+			mockChatCompletionsCreate.mockResolvedValue(
+				createChatCompletionFixture({
+					choices: [
+						{
+							message: {
+								content: createFrontmatterBatchLlmJsonContent("Bem-vindo"),
+								refusal: null,
+								role: "assistant",
+							},
+							finish_reason: "error",
+							index: 0,
+							logprobs: null,
+						},
+					],
+				}),
+			);
+
+			const file = createTranslationFileFixture({
+				content: "---\ndescription: Welcome\n---\n\n# Hi",
+			});
+
+			expect(
+				llmClient.callLanguageModelFrontmatterBatch(file, [
+					{ fieldKey: "description", source: "Welcome" },
+				]),
+			).rejects.toThrow("Language model returned error finish reason");
 		});
 
 		test("returns parsed envelope for valid structured JSON", async () => {
@@ -222,6 +272,35 @@ describe("TranslationLlmClient", () => {
 
 			expect(envelope.items[0]?.translated).toBe("Olá mundo");
 			expect(envelope.items[0]?.segmentId).toBe("root/paragraph#0");
+		});
+
+		test("throws ApplicationError when finish_reason is error", () => {
+			mockChatCompletionsCreate.mockResolvedValue(
+				createChatCompletionFixture({
+					choices: [
+						{
+							message: {
+								content: createSegmentBatchLlmJsonContent([
+									{ segmentId: "s0", translated: "Olá mundo" },
+								]),
+								refusal: null,
+								role: "assistant",
+							},
+							finish_reason: "error",
+							index: 0,
+							logprobs: null,
+						},
+					],
+				}),
+			);
+
+			const file = createTranslationFileFixture({ content: "# Hi\n\nHello world" });
+
+			expect(
+				llmClient.callLanguageModelSegmentBatch(file, [
+					{ segmentId: "root/paragraph#0", source: "Hello world" },
+				]),
+			).rejects.toThrow("Language model returned error finish reason");
 		});
 
 		test("follows up with missing segment ids only after a partial batch response", async () => {

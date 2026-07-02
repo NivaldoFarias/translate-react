@@ -26,7 +26,7 @@ import {
 	selectProgressCommentPayload,
 } from "@/app/services/comment-builder/progress-comment.util";
 import { isSafeTranslatablePath, logger } from "@/app/utils/";
-import { ApplicationError, ErrorCode } from "@/shared/errors/";
+import { ApplicationError, ErrorCode, toSafeErrorLogFields } from "@/shared/errors/";
 
 /** Pull request options */
 export interface PullRequestOptions {
@@ -189,7 +189,7 @@ export class GitHubContent {
 						prNumber,
 						attempt: attempt + 1,
 						maxAttempts: PR_FILES_FETCH_MAX_ATTEMPTS,
-						error,
+						...toSafeErrorLogFields(error),
 					},
 					"Failed to fetch pull request files, retrying",
 				);
