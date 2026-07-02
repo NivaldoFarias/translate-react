@@ -303,9 +303,22 @@ describe("GitHubService", () => {
 				const result = await githubService.syncFork();
 
 				expect(result).toBe(true);
+				expect(octokitMock.repos.get).toHaveBeenCalledWith(testRepositories.fork);
 				expect(octokitMock.repos.mergeUpstream).toHaveBeenCalledWith({
 					...testRepositories.fork,
 					branch: "main",
+				});
+			});
+
+			test("should use fork default branch when it is not main", async () => {
+				octokitMock.repos.get.mockResolvedValueOnce({ data: { default_branch: "develop" } });
+
+				const result = await githubService.syncFork();
+
+				expect(result).toBe(true);
+				expect(octokitMock.repos.mergeUpstream).toHaveBeenCalledWith({
+					...testRepositories.fork,
+					branch: "develop",
 				});
 			});
 

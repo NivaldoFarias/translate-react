@@ -19,7 +19,7 @@ import { GitHubBranch } from "./github.branch";
 import { GitHubContent } from "./github.content";
 import { GitHubRepository } from "./github.repository";
 
-export const DEFAULT_REPOSITORIES: BaseRepositories = {
+const DEFAULT_REPOSITORIES: BaseRepositories = {
 	upstream: {
 		owner: env.REPO_UPSTREAM_OWNER,
 		repo: env.REPO_UPSTREAM_NAME,

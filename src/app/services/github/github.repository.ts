@@ -287,9 +287,10 @@ export class GitHubRepository {
 		);
 
 		try {
+			const defaultBranch = await this.getDefaultBranch("fork");
 			const mergeResponse = await this.deps.octokit.repos.mergeUpstream({
 				...this.deps.repositories.fork,
-				branch: "main",
+				branch: defaultBranch,
 			});
 
 			this.logger.info(

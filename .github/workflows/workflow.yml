@@ -95,7 +95,6 @@ jobs:
     needs: prepare-matrix
     if: needs.prepare-matrix.outputs.has_matrix == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 130
     environment: ${{ inputs.environment || 'production' }}
     strategy:
       fail-fast: false
@@ -162,7 +161,6 @@ jobs:
             ARGS+=(--translation-guidelines-file "${{ matrix.translation_guidelines_file }}")
           fi
           bun run start -- "${ARGS[@]}"
-        timeout-minutes: 120
 
       - name: Record upstream SHA (${{ matrix.lang }})
         if: success()

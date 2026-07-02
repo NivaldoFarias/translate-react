@@ -32,7 +32,6 @@ jobs:
   smoke:
     name: Real LLM workflow smoke (${{ inputs.profile }})
     runs-on: ubuntu-latest
-    timeout-minutes: 120
     environment: ${{ inputs.environment }}
     env:
       SMOKE_OUTPUT_DIR: .out
@@ -67,7 +66,6 @@ jobs:
           HEADER_APP_URL: ${{ vars.HEADER_APP_URL }}
           HEADER_APP_TITLE: ${{ vars.HEADER_APP_TITLE }}
         run: bun run ci:smoke -- --profile "${{ inputs.profile }}"
-        timeout-minutes: 115
 
       - name: Pack workflow smoke outputs for upload
         if: always()

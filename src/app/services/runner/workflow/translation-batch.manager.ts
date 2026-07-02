@@ -59,7 +59,6 @@ export class TranslationBatchManager {
 	 * Used to update logging and generate statistics.
 	 */
 	private batchProgress = {
-		completed: 0,
 		successful: 0,
 		failed: 0,
 	};
@@ -176,7 +175,6 @@ export class TranslationBatchManager {
 		batch: TranslationFile[],
 		batchInfo: { currentBatch: number; totalBatches: number; batchSize: number },
 	): Promise<Map<string, ProcessedFileResult>> {
-		this.batchProgress.completed = 0;
 		this.batchProgress.successful = 0;
 		this.batchProgress.failed = 0;
 
@@ -419,8 +417,6 @@ export class TranslationBatchManager {
 	 * @param status The processing outcome for the file
 	 */
 	private updateBatchProgress(status: "success" | "error"): void {
-		this.batchProgress.completed++;
-
 		if (status === "success") this.batchProgress.successful++;
 		else this.batchProgress.failed++;
 	}

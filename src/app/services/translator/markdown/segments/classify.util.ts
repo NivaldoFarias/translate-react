@@ -1,44 +1,5 @@
 import type { Node } from "unist";
 
-import type { SegmentKind } from "./types";
-
-import {
-	isHeading,
-	isInsidePreserveAncestor,
-	isLink,
-	isMdxJsxElement,
-	isPreserveAncestor,
-	isText,
-} from "./mdast-segment.util";
-
-/**
- * Returns the default segment kind for an mdast node during AST walking.
- *
- * @param node Current mdast node
- * @param ancestors Ancestor chain from `visitParents`
- *
- * @returns Classification for inventory tables
- */
-export function classifyNode(node: Node, ancestors: readonly Node[]): SegmentKind {
-	if (isInsidePreserveAncestor(ancestors) || isPreserveAncestor(node)) {
-		return "preserve";
-	}
-
-	if (isMdxJsxElement(node)) {
-		return "policy";
-	}
-
-	if (isText(node)) {
-		return "translate";
-	}
-
-	if (isLink(node) || isHeading(node) || node.type === "tableCell") {
-		return "translate";
-	}
-
-	return "preserve";
-}
-
 /**
  * One-line inventory rule describing how a node is classified.
  *

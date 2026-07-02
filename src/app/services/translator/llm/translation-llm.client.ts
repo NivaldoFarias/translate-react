@@ -12,7 +12,6 @@ import type { FrontmatterBatchFieldKey } from "@/app/services/translator/transla
 import type { SegmentBatchRequestItem } from "@/app/services/translator/translator-segment-batch.schema";
 
 import type { TranslationLlmClientDependencies } from "./translation-llm.client.types";
-import type { TranslationLlmUsageSnapshot } from "./translation-llm.usage";
 import type {
 	ChunkTranslationProgress,
 	TranslationSystemPromptKind,
@@ -52,15 +51,6 @@ import {
 	extractTranslationLlmUsageFromCompletion,
 	mergeTranslationLlmUsageSnapshots,
 } from "./translation-llm.usage";
-
-/** LLM completion text plus optional usage for run statistics */
-export interface TranslationLlmCallResult {
-	/** Model output text */
-	content: string;
-
-	/** Token and cost usage when the provider returned it */
-	usage: TranslationLlmUsageSnapshot | null;
-}
 
 /** Structured-output schema for batched YAML `description` translation (OpenRouter/OpenAI JSON mode). */
 const FRONTMATTER_BATCH_RESPONSE_FORMAT = zodResponseFormat(
