@@ -223,111 +223,93 @@ export class TranslationLlmClient {
 		file.documentSourceLanguage ??= await this.resolveDocumentSourceLanguage(file.content);
 
 		const contentToTranslate = content ?? file.content;
+		const operation = `${TranslationLlmClient.name}.${this.callLanguageModel.name}`;
 
-		return this.queue.add(async () => {
-			const callStartTime = Date.now();
-			const estimatedInputTokens = this.estimateInputTokens(contentToTranslate);
+		return this.executeQueuedLlmCall({
+			file,
+			contentLength: contentToTranslate.length,
+			attemptLabel: "LLM call",
+			runAttempt: async () => {
+				const attemptStartTime = Date.now();
+				const estimatedInputTokens = this.estimateInputTokens(contentToTranslate);
 
-			return pRetry(
-				async () => {
-					const attemptStartTime = Date.now();
+				file.logger.debug(
+					{
+						contentLength: contentToTranslate.length,
+						estimatedInputTokens,
+						model: this.model,
+						systemPromptKind,
+					},
+					"Calling LLM API",
+				);
 
-					try {
-						file.logger.debug(
-							{
-								contentLength: contentToTranslate.length,
-								estimatedInputTokens,
-								model: this.model,
-								systemPromptKind,
-							},
-							"Calling LLM API",
-						);
-
-						const completion = await this.openai.chat.completions.create(
-							this.getLLMCompletionParams(
-								file,
-								contentToTranslate,
-								chunkProgress,
-								systemPromptKind,
-								responseFormat,
-								attemptContext,
-							),
-						);
-
-						const translatedContent = completion.choices[0]?.message.content;
-
-						if (!translatedContent) {
-							throw new ApplicationError(
-								"No content returned from language model",
-								ErrorCode.NoContent,
-								`${TranslationLlmClient.name}.${this.callLanguageModel.name}`,
-								{ model: this.model, contentLength: contentToTranslate.length },
-							);
-						}
-
-						const finishReason = completion.choices[0]?.finish_reason as
-							| ProviderFinishReason
-							| undefined;
-						if (finishReason === "length") {
-							throw new AbortError(
-								new ApplicationError(
-									"Language model response ended at max completion tokens (truncated output)",
-									ErrorCode.TranslationFailed,
-									`${TranslationLlmClient.name}.${this.callLanguageModel.name}`,
-									{
-										model: this.model,
-										contentLength: contentToTranslate.length,
-										finishReason,
-										completionTokens: completion.usage?.completion_tokens,
-										promptTokens: completion.usage?.prompt_tokens,
-									},
-								),
-							);
-						}
-
-						rejectProviderFinishReasonErrors(
-							finishReason,
-							`${TranslationLlmClient.name}.${this.callLanguageModel.name}`,
-							{
-								model: this.model,
-								contentLength: contentToTranslate.length,
-								translatedLength: translatedContent.length,
-							},
-						);
-
-						const usage = extractTranslationLlmUsageFromCompletion(completion.usage);
-
-						file.logger.debug(
-							{
-								completionId: completion.id,
-								model: this.model,
-								durationMs: Date.now() - attemptStartTime,
-								finishReason: completion.choices[0]?.finish_reason ?? null,
-								inputTokens: usage?.promptTokens,
-								outputTokens: usage?.completionTokens,
-								totalTokens: usage?.totalTokens,
-								costUsd: usage?.costUsd,
-								translatedLength: translatedContent.length,
-							},
-							"LLM API call successful",
-						);
-
-						return { content: translatedContent, usage };
-					} catch (error) {
-						this.rethrowNonRetryableApiError(error, file);
-						throw error;
-					}
-				},
-				{
-					...this.retryConfig,
-					onFailedAttempt: this.createRateLimitAwareRetryHandler(
+				const completion = await this.openai.chat.completions.create(
+					this.getLLMCompletionParams(
 						file,
-						callStartTime,
-						contentToTranslate.length,
-						"LLM call",
+						contentToTranslate,
+						chunkProgress,
+						systemPromptKind,
+						responseFormat,
+						attemptContext,
 					),
-				},
-			);
+				);
+
+				const translatedContent = completion.choices[0]?.message.content;
+
+				if (!translatedContent) {
+					throw new ApplicationError(
+						"No content returned from language model",
+						ErrorCode.NoContent,
+						operation,
+						{ model: this.model, contentLength: contentToTranslate.length },
+					);
+				}
+
+				const finishReason = completion.choices[0]?.finish_reason as
+					| ProviderFinishReason
+					| undefined;
+				if (finishReason === "length") {
+					throw new AbortError(
+						new ApplicationError(
+							"Language model response ended at max completion tokens (truncated output)",
+							ErrorCode.TranslationFailed,
+							operation,
+							{
+								model: this.model,
+								contentLength: contentToTranslate.length,
+								finishReason,
+								completionTokens: completion.usage?.completion_tokens,
+								promptTokens: completion.usage?.prompt_tokens,
+							},
+						),
+					);
+				}
+
+				rejectProviderFinishReasonErrors(finishReason, operation, {
+					model: this.model,
+					contentLength: contentToTranslate.length,
+					translatedLength: translatedContent.length,
+				});
+
+				const usage = extractTranslationLlmUsageFromCompletion(completion.usage);
+
+				file.logger.debug(
+					{
+						completionId: completion.id,
+						model: this.model,
+						durationMs: Date.now() - attemptStartTime,
+						finishReason: completion.choices[0]?.finish_reason ?? null,
+						inputTokens: usage?.promptTokens,
+						outputTokens: usage?.completionTokens,
+						totalTokens: usage?.totalTokens,
+						costUsd: usage?.costUsd,
+						translatedLength: translatedContent.length,
+					},
+					"LLM API call successful",
+				);
+
+				return { content: translatedContent, usage };
+			},
 		});
 	}
 
@@ -350,148 +332,134 @@ export class TranslationLlmClient {
 		const requestPayload = frontmatterBatchRequestEnvelopeSchema.parse({ items: batchItems });
 		const userMessage = JSON.stringify(requestPayload);
 		const contentLengthForLog = userMessage.length;
+		const operation = `${TranslationLlmClient.name}.${this.callLanguageModelFrontmatterBatch.name}`;
 
-		return this.queue.add(async () => {
-			const callStartTime = Date.now();
-			const estimatedInputTokens = this.estimateInputTokens(userMessage);
+		return this.executeQueuedLlmCall({
+			file,
+			contentLength: contentLengthForLog,
+			attemptLabel: "LLM frontmatter batch",
+			runAttempt: async () => {
+				const attemptStartTime = Date.now();
+				const estimatedInputTokens = this.estimateInputTokens(userMessage);
 
-			return pRetry(
-				async () => {
-					const attemptStartTime = Date.now();
+				file.logger.debug(
+					{
+						contentLength: contentLengthForLog,
+						estimatedInputTokens,
+						model: this.model,
+						systemPromptKind: "frontmatterBatch",
+					},
+					"Calling LLM API for batched frontmatter metadata",
+				);
 
-					try {
-						file.logger.debug(
-							{
-								contentLength: contentLengthForLog,
-								estimatedInputTokens,
-								model: this.model,
-								systemPromptKind: "frontmatterBatch",
-							},
-							"Calling LLM API for batched frontmatter metadata",
-						);
-
-						const completion = await this.openai.chat.completions.create(
-							this.getLLMCompletionParams(
-								file,
-								userMessage,
-								undefined,
-								"frontmatterBatch",
-								FRONTMATTER_BATCH_RESPONSE_FORMAT,
-							),
-						);
-
-						const rawJson = completion.choices[0]?.message.content;
-
-						if (!rawJson) {
-							throw new ApplicationError(
-								"No content returned from language model for frontmatter batch",
-								ErrorCode.NoContent,
-								`${TranslationLlmClient.name}.${this.callLanguageModelFrontmatterBatch.name}`,
-								{ model: this.model, contentLength: contentLengthForLog },
-							);
-						}
-
-						const finishReason = completion.choices[0]?.finish_reason;
-						if (finishReason === "length") {
-							throw new ApplicationError(
-								"Language model response ended at max completion tokens (truncated frontmatter batch JSON)",
-								ErrorCode.TranslationFailed,
-								`${TranslationLlmClient.name}.${this.callLanguageModelFrontmatterBatch.name}`,
-								{
-									model: this.model,
-									contentLength: contentLengthForLog,
-									finishReason,
-									completionTokens: completion.usage?.completion_tokens,
-									promptTokens: completion.usage?.prompt_tokens,
-								},
-							);
-						}
-
-						rejectProviderFinishReasonErrors(
-							finishReason,
-							`${TranslationLlmClient.name}.${this.callLanguageModelFrontmatterBatch.name}`,
-							{
-								model: this.model,
-								contentLength: contentLengthForLog,
-							},
-						);
-
-						const parsedEnvelope = frontmatterBatchTranslationEnvelopeSchema.safeParse(
-							JSON.parse(rawJson),
-						);
-
-						if (!parsedEnvelope.success) {
-							throw new ApplicationError(
-								"Frontmatter batch response failed schema validation",
-								ErrorCode.TranslationFailed,
-								`${TranslationLlmClient.name}.${this.callLanguageModelFrontmatterBatch.name}`,
-								{
-									model: this.model,
-									issues: parsedEnvelope.error.issues,
-								},
-							);
-						}
-
-						const requestedKeys = new Set(batchItems.map((item) => item.fieldKey));
-						const responseKeys = new Set(parsedEnvelope.data.items.map((item) => item.fieldKey));
-
-						if (
-							requestedKeys.size !== responseKeys.size ||
-							[...requestedKeys].some((k) => !responseKeys.has(k))
-						) {
-							throw new ApplicationError(
-								"Frontmatter batch response keys do not match requested fields",
-								ErrorCode.TranslationFailed,
-								`${TranslationLlmClient.name}.${this.callLanguageModelFrontmatterBatch.name}`,
-								{
-									requested: [...requestedKeys],
-									received: [...responseKeys],
-								},
-							);
-						}
-
-						const usage = extractTranslationLlmUsageFromCompletion(completion.usage);
-
-						file.logger.debug(
-							{
-								completionId: completion.id,
-								model: this.model,
-								durationMs: Date.now() - attemptStartTime,
-								finishReason: completion.choices[0]?.finish_reason ?? null,
-								inputTokens: usage?.promptTokens,
-								outputTokens: usage?.completionTokens,
-								totalTokens: usage?.totalTokens,
-								costUsd: usage?.costUsd,
-								fieldCount: parsedEnvelope.data.items.length,
-							},
-							"LLM frontmatter batch call successful",
-						);
-
-						return { envelope: parsedEnvelope.data, usage };
-					} catch (error) {
-						if (error instanceof SyntaxError) {
-							throw new ApplicationError(
-								"Frontmatter batch response was not valid JSON",
-								ErrorCode.TranslationFailed,
-								`${TranslationLlmClient.name}.${this.callLanguageModelFrontmatterBatch.name}`,
-								{ model: this.model, parseError: error.message },
-							);
-						}
-
-						this.rethrowNonRetryableApiError(error, file);
-						throw error;
-					}
-				},
-				{
-					...this.retryConfig,
-					onFailedAttempt: this.createRateLimitAwareRetryHandler(
+				const completion = await this.openai.chat.completions.create(
+					this.getLLMCompletionParams(
 						file,
-						callStartTime,
-						contentLengthForLog,
-						"LLM frontmatter batch",
+						userMessage,
+						undefined,
+						"frontmatterBatch",
+						FRONTMATTER_BATCH_RESPONSE_FORMAT,
 					),
-				},
-			);
+				);
+
+				const rawJson = completion.choices[0]?.message.content;
+
+				if (!rawJson) {
+					throw new ApplicationError(
+						"No content returned from language model for frontmatter batch",
+						ErrorCode.NoContent,
+						operation,
+						{ model: this.model, contentLength: contentLengthForLog },
+					);
+				}
+
+				const finishReason = completion.choices[0]?.finish_reason;
+				if (finishReason === "length") {
+					throw new ApplicationError(
+						"Language model response ended at max completion tokens (truncated frontmatter batch JSON)",
+						ErrorCode.TranslationFailed,
+						operation,
+						{
+							model: this.model,
+							contentLength: contentLengthForLog,
+							finishReason,
+							completionTokens: completion.usage?.completion_tokens,
+							promptTokens: completion.usage?.prompt_tokens,
+						},
+					);
+				}
+
+				rejectProviderFinishReasonErrors(finishReason, operation, {
+					model: this.model,
+					contentLength: contentLengthForLog,
+				});
+
+				let parsedEnvelope: ReturnType<typeof frontmatterBatchTranslationEnvelopeSchema.safeParse>;
+
+				try {
+					parsedEnvelope = frontmatterBatchTranslationEnvelopeSchema.safeParse(JSON.parse(rawJson));
+				} catch (error) {
+					if (error instanceof SyntaxError) {
+						throw new ApplicationError(
+							"Frontmatter batch response was not valid JSON",
+							ErrorCode.TranslationFailed,
+							operation,
+							{ model: this.model, parseError: error.message },
+						);
+					}
+
+					throw error;
+				}
+
+				if (!parsedEnvelope.success) {
+					throw new ApplicationError(
+						"Frontmatter batch response failed schema validation",
+						ErrorCode.TranslationFailed,
+						operation,
+						{
+							model: this.model,
+							issues: parsedEnvelope.error.issues,
+						},
+					);
+				}
+
+				const requestedKeys = new Set(batchItems.map((item) => item.fieldKey));
+				const responseKeys = new Set(parsedEnvelope.data.items.map((item) => item.fieldKey));
+
+				if (
+					requestedKeys.size !== responseKeys.size ||
+					[...requestedKeys].some((k) => !responseKeys.has(k))
+				) {
+					throw new ApplicationError(
+						"Frontmatter batch response keys do not match requested fields",
+						ErrorCode.TranslationFailed,
+						operation,
+						{
+							requested: [...requestedKeys],
+							received: [...responseKeys],
+						},
+					);
+				}
+
+				const usage = extractTranslationLlmUsageFromCompletion(completion.usage);
+
+				file.logger.debug(
+					{
+						completionId: completion.id,
+						model: this.model,
+						durationMs: Date.now() - attemptStartTime,
+						finishReason: completion.choices[0]?.finish_reason ?? null,
+						inputTokens: usage?.promptTokens,
+						outputTokens: usage?.completionTokens,
+						totalTokens: usage?.totalTokens,
+						costUsd: usage?.costUsd,
+						fieldCount: parsedEnvelope.data.items.length,
+					},
+					"LLM frontmatter batch call successful",
+				);
+
+				return { envelope: parsedEnvelope.data, usage };
+			},
 		});
 	}
 
@@ -524,34 +492,20 @@ export class TranslationLlmClient {
 		const userMessage = JSON.stringify(requestPayload);
 		const contentLengthForLog = userMessage.length;
 
-		return this.queue.add(async () => {
-			const callStartTime = Date.now();
-
-			return pRetry(
-				async () => {
-					try {
-						return await this.translateSegmentBatchCompletingAllIds(
-							file,
-							batchItems,
-							attemptContext,
-							contentLengthForLog,
-						);
-					} catch (error) {
-						this.rethrowNonRetryableApiError(error, file);
-						this.abortRetryWhenSegmentBatchSplittable(error);
-						throw error;
-					}
-				},
-				{
-					...this.retryConfig,
-					onFailedAttempt: this.createRateLimitAwareRetryHandler(
-						file,
-						callStartTime,
-						contentLengthForLog,
-						"LLM segment batch",
-					),
-				},
-			);
+		return this.executeQueuedLlmCall({
+			file,
+			contentLength: contentLengthForLog,
+			attemptLabel: "LLM segment batch",
+			runAttempt: () =>
+				this.translateSegmentBatchCompletingAllIds(
+					file,
+					batchItems,
+					attemptContext,
+					contentLengthForLog,
+				),
+			handleAttemptError: (error) => {
+				this.abortRetryWhenSegmentBatchSplittable(error);
+			},
 		});
 	}
 
@@ -896,6 +850,53 @@ export class TranslationLlmClient {
 		}
 
 		throw new AbortError(error as Error);
+	}
+
+	/**
+	 * Runs one queued LLM operation with `p-retry`, rate-limit-aware backoff, and shared API error handling.
+	 *
+	 * @param params Queued LLM call options
+	 * @param params.file File used for logging and non-retryable API error context
+	 * @param params.contentLength Content length included in retry logs
+	 * @param params.attemptLabel Short label for retry log messages
+	 * @param params.runAttempt Per-attempt logic (API call, validation, success logging)
+	 * @param params.handleAttemptError Optional hook after non-retryable API checks (e.g. segment batch split abort)
+	 *
+	 * @returns Resolves to the value returned by `runAttempt`
+	 */
+	private executeQueuedLlmCall<T>(params: {
+		file: TranslationFile;
+		contentLength: number;
+		attemptLabel: string;
+		runAttempt: () => Promise<T>;
+		handleAttemptError?: (error: unknown) => void;
+	}) {
+		const { file, contentLength, attemptLabel, runAttempt, handleAttemptError } = params;
+
+		return this.queue.add(async () => {
+			const callStartTime = Date.now();
+
+			return pRetry(
+				async () => {
+					try {
+						return await runAttempt();
+					} catch (error) {
+						this.rethrowNonRetryableApiError(error, file);
+						handleAttemptError?.(error);
+						throw error;
+					}
+				},
+				{
+					...this.retryConfig,
+					onFailedAttempt: this.createRateLimitAwareRetryHandler(
+						file,
+						callStartTime,
+						contentLength,
+						attemptLabel,
+					),
+				},
+			);
+		});
 	}
 
 	/**

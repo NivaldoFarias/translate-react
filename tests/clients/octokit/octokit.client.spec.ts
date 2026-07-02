@@ -2,12 +2,34 @@ import { RequestError } from "@octokit/request-error";
 import { describe, expect, mock, test } from "bun:test";
 import { StatusCodes } from "http-status-codes";
 
-import { isForbiddenError, withRetry, wrapMethodWithFallback } from "@/app/clients";
+import {
+	getRetryAfterMs,
+	isForbiddenError,
+	withRetry,
+	wrapMethodWithFallback,
+} from "@/app/clients";
+import {
+	RATE_LIMIT_BUFFER_MS,
+	RATE_LIMIT_MAX_DELAY_MS,
+} from "@/app/clients/octokit/octokit.constants";
+import { MS_PER_SECOND } from "@/app/constants";
 
-/** Creates a RequestError with the specified status code */
-function createRequestError(status: number, message = "API Error") {
+function createRequestError(
+	status: number,
+	message = "API Error",
+	responseHeaders?: Record<string, string>,
+) {
 	return new RequestError(message, status, {
 		request: { method: "GET", url: "https://api.github.com/test", headers: {} },
+		response:
+			responseHeaders ?
+				{
+					status,
+					url: "https://api.github.com/test",
+					headers: responseHeaders,
+					data: null,
+				}
+			:	undefined,
 	});
 }
 
@@ -133,6 +155,50 @@ describe("octokit.client", () => {
 		});
 	});
 
+	describe("getRetryAfterMs", () => {
+		test("returns delay from x-ratelimit-reset Unix timestamp", () => {
+			const resetSeconds = Math.floor(Date.now() / MS_PER_SECOND) + 30;
+			const error = createRequestError(StatusCodes.TOO_MANY_REQUESTS, "rate limited", {
+				"x-ratelimit-reset": String(resetSeconds),
+				"x-ratelimit-limit": "5000",
+				"x-ratelimit-remaining": "0",
+			});
+
+			const delayMs = getRetryAfterMs(error);
+
+			expect(delayMs).toBeDefined();
+			expect(delayMs).toBeGreaterThan(0);
+			expect(delayMs).toBeLessThanOrEqual(30 * MS_PER_SECOND + RATE_LIMIT_BUFFER_MS);
+		});
+
+		test("returns undefined when reset header is absent", () => {
+			const error = createRequestError(StatusCodes.TOO_MANY_REQUESTS);
+
+			expect(getRetryAfterMs(error)).toBeUndefined();
+		});
+
+		test("returns undefined when reset delay exceeds the max wait window", () => {
+			const resetSeconds =
+				Math.floor(Date.now() / MS_PER_SECOND) +
+				Math.ceil(RATE_LIMIT_MAX_DELAY_MS / MS_PER_SECOND) +
+				60;
+			const error = createRequestError(StatusCodes.TOO_MANY_REQUESTS, "rate limited", {
+				"x-ratelimit-reset": String(resetSeconds),
+			});
+
+			expect(getRetryAfterMs(error)).toBeUndefined();
+		});
+
+		test("returns undefined when reset time is already in the past", () => {
+			const resetSeconds = Math.floor(Date.now() / MS_PER_SECOND) - 120;
+			const error = createRequestError(StatusCodes.TOO_MANY_REQUESTS, "rate limited", {
+				"x-ratelimit-reset": String(resetSeconds),
+			});
+
+			expect(getRetryAfterMs(error)).toBeUndefined();
+		});
+	});
+
 	describe("withRetry", () => {
 		test("returns result on first successful attempt", async () => {
 			const fn = mock(() => Promise.resolve({ data: "success" }));
@@ -171,6 +237,29 @@ describe("octokit.client", () => {
 
 			expect(result).toEqual({ data: "recovered" });
 			expect(fn).toHaveBeenCalledTimes(2);
+		});
+
+		test("waits for x-ratelimit-reset before retrying 429", async () => {
+			const resetSeconds = Math.floor(Date.now() / MS_PER_SECOND) + 1;
+			const rateLimitError = createRequestError(StatusCodes.TOO_MANY_REQUESTS, "rate limited", {
+				"x-ratelimit-reset": String(resetSeconds),
+				"x-ratelimit-limit": "5000",
+				"x-ratelimit-remaining": "0",
+			});
+			let callCount = 0;
+			const fn = mock(() => {
+				callCount++;
+				if (callCount < 2) return Promise.reject(rateLimitError);
+				return Promise.resolve({ data: "recovered" });
+			});
+
+			const start = Date.now();
+			const result = await withRetry(fn, "test.rateLimitReset", { retries: 1, minTimeout: 10 });
+			const elapsed = Date.now() - start;
+
+			expect(result).toEqual({ data: "recovered" });
+			expect(fn).toHaveBeenCalledTimes(2);
+			expect(elapsed).toBeGreaterThanOrEqual(RATE_LIMIT_BUFFER_MS);
 		});
 
 		test("retries on network error (ECONNRESET) and succeeds", async () => {

@@ -9,6 +9,8 @@ import type { SharedGitHubDependencies } from "./types";
 import { logger, registerCleanup } from "@/app/utils/";
 import { toSafeErrorLogFields } from "@/shared/errors/";
 
+import { fetchRepositoryDefaultBranch } from "./github-api.util";
+
 /**
  * Branch operations module for GitHub API.
  *
@@ -52,17 +54,6 @@ export class GitHubBranch {
 	}
 
 	/**
-	 * Gets the default branch name for the fork repository.
-	 *
-	 * @returns The default branch name
-	 */
-	private async getDefaultBranch(): Promise<string> {
-		const response = await this.deps.octokit.repos.get(this.deps.repositories.fork);
-
-		return response.data.default_branch;
-	}
-
-	/**
 	 * Creates a new Git branch from a base branch.
 	 *
 	 * Tracks the branch for cleanup if created successfully.
@@ -84,7 +75,9 @@ export class GitHubBranch {
 		this.logger.debug({ branchName, baseBranch: baseBranch ?? "(default)" }, "Creating new branch");
 
 		try {
-			const actualBaseBranch = baseBranch ?? (await this.getDefaultBranch());
+			const actualBaseBranch =
+				baseBranch ??
+				(await fetchRepositoryDefaultBranch(this.deps.octokit, this.deps.repositories.fork));
 
 			this.logger.debug({ branchName, actualBaseBranch }, "Resolved base branch, fetching ref");
 
@@ -175,7 +168,10 @@ export class GitHubBranch {
 			await this.deleteBranch(branchName);
 		}
 
-		const forkDefaultBranch = await this.getDefaultBranch();
+		const forkDefaultBranch = await fetchRepositoryDefaultBranch(
+			this.deps.octokit,
+			this.deps.repositories.fork,
+		);
 		const newBranch = await this.createBranch(branchName, forkDefaultBranch);
 
 		return newBranch.data;

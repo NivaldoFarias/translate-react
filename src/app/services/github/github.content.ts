@@ -1,7 +1,3 @@
-import { Buffer } from "node:buffer";
-
-import { RequestError } from "@octokit/request-error";
-
 import type { components } from "@octokit/openapi-types";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
@@ -18,12 +14,21 @@ import type {
 
 import type { SharedGitHubDependencies } from "./types";
 
+import { withRetry } from "@/app/clients/";
 import {
 	hasReportableProgressComment,
 	selectProgressCommentPayload,
 } from "@/app/services/comment-builder/progress-comment.util";
 import { isSafeTranslatablePath, logger } from "@/app/utils/";
-import { ApplicationError, ErrorCode, toSafeErrorLogFields } from "@/shared/errors/";
+import { ApplicationError, ErrorCode } from "@/shared/errors/";
+
+import {
+	decodeRepositoryFileContent,
+	fetchRepositoryContent,
+	fetchRepositoryDefaultBranch,
+	isRepositoryContentNotFound,
+	readRepositoryFileSha,
+} from "./github-api.util";
 
 /** Pull request options */
 export interface PullRequestOptions {
@@ -63,9 +68,6 @@ const MERGEABLE_POLL_DELAY_MS = 2_000;
 
 /** Max attempts to fetch a pull request file list before failing the workflow */
 const PR_FILES_FETCH_MAX_ATTEMPTS = 3;
-
-/** Delay between pull request file list fetch retries in milliseconds */
-const PR_FILES_FETCH_DELAY_MS = 0;
 
 /**
  * Content and pull request operations module for GitHub API.
@@ -157,45 +159,20 @@ export class GitHubContent {
 	 * ```
 	 */
 	public async getPullRequestFiles(prNumber: number): Promise<string[]> {
-		let lastError: unknown;
+		const response = await withRetry(
+			() =>
+				this.deps.octokit.paginate("GET /repos/{owner}/{repo}/pulls/{pull_number}/files", {
+					...this.deps.repositories.upstream,
+					pull_number: prNumber,
+					per_page: 100,
+				}),
+			`${GitHubContent.name}.${this.getPullRequestFiles.name}`,
+			{ retries: PR_FILES_FETCH_MAX_ATTEMPTS - 1, minTimeout: 1, maxTimeout: 10, factor: 1 },
+		);
 
-		for (let attempt = 0; attempt < PR_FILES_FETCH_MAX_ATTEMPTS; attempt++) {
-			try {
-				const response = await this.deps.octokit.paginate(
-					"GET /repos/{owner}/{repo}/pulls/{pull_number}/files",
-					{
-						...this.deps.repositories.upstream,
-						pull_number: prNumber,
-						per_page: 100,
-					},
-				);
+		this.logger.debug({ count: response.length, prNumber }, "Retrieved pull request files");
 
-				this.logger.debug({ count: response.length, prNumber }, "Retrieved pull request files");
-
-				return response.map((file) => file.filename);
-			} catch (error) {
-				lastError = error;
-				const isLastAttempt = attempt >= PR_FILES_FETCH_MAX_ATTEMPTS - 1;
-
-				if (isLastAttempt) {
-					break;
-				}
-
-				this.logger.warn(
-					{
-						prNumber,
-						attempt: attempt + 1,
-						maxAttempts: PR_FILES_FETCH_MAX_ATTEMPTS,
-						...toSafeErrorLogFields(error),
-					},
-					"Failed to fetch pull request files, retrying",
-				);
-
-				await new Promise((resolve) => setTimeout(resolve, PR_FILES_FETCH_DELAY_MS));
-			}
-		}
-
-		throw lastError;
+		return response.map((file) => file.filename);
 	}
 
 	/**
@@ -277,11 +254,12 @@ export class GitHubContent {
 	 */
 	private async resolveBlobShaOnBranchForPath(branchRef: string, path: string) {
 		try {
-			const existing = await this.deps.octokit.repos.getContent({
-				...this.deps.repositories.fork,
+			const existing = await fetchRepositoryContent(
+				this.deps.octokit,
+				this.deps.repositories.fork,
 				path,
-				ref: branchRef,
-			});
+				branchRef,
+			);
 
 			if (Array.isArray(existing.data)) {
 				this.logger.warn(
@@ -292,13 +270,9 @@ export class GitHubContent {
 				return undefined;
 			}
 
-			if ("sha" in existing.data) {
-				return existing.data.sha;
-			}
-
-			return undefined;
+			return readRepositoryFileSha(existing.data);
 		} catch (error) {
-			if (error instanceof RequestError && error.status === 404) {
+			if (isRepositoryContentNotFound(error)) {
 				return undefined;
 			}
 
@@ -400,11 +374,12 @@ export class GitHubContent {
 
 		const ref = await this.resolveUpstreamDefaultBranchRef();
 
-		const response = await this.deps.octokit.repos.getContent({
-			...this.deps.repositories.upstream,
-			path: file.path,
+		const response = await fetchRepositoryContent(
+			this.deps.octokit,
+			this.deps.repositories.upstream,
+			file.path,
 			ref,
-		});
+		);
 
 		if (Array.isArray(response.data)) {
 			throw new ApplicationError(
@@ -415,7 +390,9 @@ export class GitHubContent {
 			);
 		}
 
-		if (!("content" in response.data) || !response.data.content) {
+		const content = decodeRepositoryFileContent(response.data);
+
+		if (!content) {
 			throw new ApplicationError(
 				`Upstream file has no content: ${file.path}`,
 				ErrorCode.ResourceLoadError,
@@ -423,8 +400,6 @@ export class GitHubContent {
 				{ path: file.path, ref },
 			);
 		}
-
-		const content = Buffer.from(response.data.content, "base64").toString();
 
 		return {
 			content,
@@ -446,11 +421,12 @@ export class GitHubContent {
 		const branchRef = `refs/heads/${branchName}`;
 
 		try {
-			const response = await this.deps.octokit.repos.getContent({
-				...this.deps.repositories.fork,
+			const response = await fetchRepositoryContent(
+				this.deps.octokit,
+				this.deps.repositories.fork,
 				path,
-				ref: branchRef,
-			});
+				branchRef,
+			);
 
 			if (Array.isArray(response.data)) {
 				this.logger.warn(
@@ -461,13 +437,9 @@ export class GitHubContent {
 				return undefined;
 			}
 
-			if (!("content" in response.data) || !response.data.content) {
-				return undefined;
-			}
-
-			return Buffer.from(response.data.content, "base64").toString();
+			return decodeRepositoryFileContent(response.data);
 		} catch (error) {
-			if (error instanceof RequestError && error.status === 404) {
+			if (isRepositoryContentNotFound(error)) {
 				return undefined;
 			}
 
@@ -485,8 +457,11 @@ export class GitHubContent {
 			return this.upstreamDefaultBranchRef;
 		}
 
-		const response = await this.deps.octokit.repos.get(this.deps.repositories.upstream);
-		this.upstreamDefaultBranchRef = response.data.default_branch;
+		const response = await fetchRepositoryDefaultBranch(
+			this.deps.octokit,
+			this.deps.repositories.upstream,
+		);
+		this.upstreamDefaultBranchRef = response;
 
 		return this.upstreamDefaultBranchRef;
 	}

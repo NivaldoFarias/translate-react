@@ -118,7 +118,7 @@ function isRetryableError(error: unknown): boolean {
  *
  * @returns Delay in milliseconds, or `undefined` if no header found
  */
-function getRetryAfterMs(error: RequestError): number | undefined {
+export function getRetryAfterMs(error: RequestError): number | undefined {
 	const headers = error.response?.headers;
 	if (!headers) return;
 

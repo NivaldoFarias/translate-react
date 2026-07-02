@@ -1,11 +1,15 @@
-import { Buffer } from "node:buffer";
-
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 import type { SharedGitHubDependencies } from "./types";
 
 import { env, filterMarkdownFiles, logger, TRANSLATION_GUIDELINES_CANDIDATES } from "@/app/utils/";
 import { toSafeErrorLogFields } from "@/shared/errors/";
+
+import {
+	decodeRepositoryFileContent,
+	fetchRepositoryContent,
+	fetchRepositoryDefaultBranch,
+} from "./github-api.util";
 
 /**
  * Repository operations module for GitHub API.
@@ -32,9 +36,8 @@ export class GitHubRepository {
 	public async getDefaultBranch(target: "fork" | "upstream" = "fork"): Promise<string> {
 		const repoConfig =
 			target === "fork" ? this.deps.repositories.fork : this.deps.repositories.upstream;
-		const response = await this.deps.octokit.repos.get(repoConfig);
 
-		return response.data.default_branch;
+		return fetchRepositoryDefaultBranch(this.deps.octokit, repoConfig);
 	}
 
 	/**
@@ -378,13 +381,20 @@ export class GitHubRepository {
 	 */
 	private async tryFetchGuidelinesFile(filename: string): Promise<string | null> {
 		try {
-			const response = await this.deps.octokit.repos.getContent({
-				...this.deps.repositories.upstream,
-				path: filename,
-			});
+			const response = await fetchRepositoryContent(
+				this.deps.octokit,
+				this.deps.repositories.upstream,
+				filename,
+			);
 
-			if ("content" in response.data) {
-				const content = Buffer.from(response.data.content, "base64").toString();
+			if (Array.isArray(response.data)) {
+				this.logger.warn({ filename }, "Translation guidelines path is a directory listing");
+				return null;
+			}
+
+			const content = decodeRepositoryFileContent(response.data);
+
+			if (content) {
 				this.logger.info(
 					{ filename, contentLength: content.length },
 					"Translation guidelines fetched successfully",

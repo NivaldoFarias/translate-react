@@ -10,6 +10,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Changed
 
+- LLM translation calls share one queued retry executor so full-body, frontmatter-batch, and segment-batch paths handle rate limits and API errors consistently.
+- GitHub content and default-branch lookups share one API helper; pull request file listing retries use the same Octokit `withRetry` policy as other API calls.
 - Legacy full-body and chunked markdown translation now live in a dedicated service; segment-batch failures no longer fall back on auth, quota, or non-splittable errors.
 - Advisory validation PR details reuse the same frontmatter and heading detection as post-translation guards instead of parallel regex logic.
 - Locale advisory guard labels share one resolver factory across `pt-br` and `ru`.
