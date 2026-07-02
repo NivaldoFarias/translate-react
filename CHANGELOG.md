@@ -4,6 +4,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+## [0.2.10] - 2026-07-02
+
 ### Added
 
 - Optional `fork_owner` on each `.github/locales.json` row overrides the workflow default fork owner when poll or manual matrix builds translation jobs.
@@ -318,6 +320,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 - README `MAX_RETRY_ATTEMPTS` default matches runtime (`3`).
 
+[0.2.10]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.10
 [0.2.9]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.9
 [0.2.8]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.8
 [0.2.7]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.7
