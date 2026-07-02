@@ -4,7 +4,8 @@ on:
   workflow_dispatch:
     inputs:
       profile:
-        description: Fixture profile (quick = small + large + out-of-sync; workflow = PR scenarios; full = all fixtures)
+        description: >
+          quick: default CI slice; workflow: PR scenarios only; full: every *.md under tests/fixtures/md/.
         required: true
         type: choice
         options:
@@ -12,11 +13,6 @@ on:
           - workflow
           - full
         default: quick
-      files:
-        description: Comma-separated fixture basenames (overrides profile when set)
-        required: false
-        type: string
-        default: ""
       environment:
         description: GitHub Environment for LLM secrets and variables
         required: true
@@ -30,18 +26,19 @@ permissions:
   contents: read
 
 concurrency:
-  group: workflow-smoke-${{ github.ref }}
-  cancel-in-progress: true
+  group: smoke-${{ github.ref }}
 
 jobs:
   smoke:
     name: Real LLM workflow smoke (${{ inputs.profile }})
     runs-on: ubuntu-latest
-    timeout-minutes: 120
     environment: ${{ inputs.environment }}
+    env:
+      SMOKE_OUTPUT_DIR: .out
+      SMOKE_ARCHIVE_PATH: artifacts/smoke/${{ inputs.profile }}-${{ github.run_id }}.tar.gz
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 1
 
@@ -68,18 +65,22 @@ jobs:
           TARGET_LANGUAGE: ${{ vars.TARGET_LANGUAGE }}
           HEADER_APP_URL: ${{ vars.HEADER_APP_URL }}
           HEADER_APP_TITLE: ${{ vars.HEADER_APP_TITLE }}
-        run: |
-          ARGS=(--profile "${{ inputs.profile }}")
-          if [ -n "${{ inputs.files }}" ]; then
-            ARGS+=(--files "${{ inputs.files }}")
-          fi
-          bun run ci:smoke -- "${ARGS[@]}"
-        timeout-minutes: 115
+        run: bun run ci:smoke -- --profile "${{ inputs.profile }}"
 
-      - name: Upload smoke artifacts
+      - name: Pack workflow smoke outputs for upload
+        if: always()
+        run: |
+          if [ -d "$SMOKE_OUTPUT_DIR" ] && [ -n "$(ls -A "$SMOKE_OUTPUT_DIR" 2>/dev/null)" ]; then
+            mkdir -p "$(dirname "$SMOKE_ARCHIVE_PATH")"
+            tar -czf "$SMOKE_ARCHIVE_PATH" -C "$SMOKE_OUTPUT_DIR" .
+          fi
+
+      - name: Upload workflow smoke archive
         uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: workflow-smoke-${{ inputs.profile }}-${{ github.run_id }}
-          path: .out/
+          name: smoke-${{ inputs.profile }}-${{ github.run_id }}
+          path: ${{ env.SMOKE_ARCHIVE_PATH }}
+          archive: false
+          if-no-files-found: warn
           retention-days: 14

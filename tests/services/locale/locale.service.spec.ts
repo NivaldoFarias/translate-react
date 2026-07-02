@@ -156,8 +156,8 @@ describe("ptBrLocale.pullRequest.body", () => {
 
 			const body = buildPullRequestBody(file, processingResult, metadata);
 
-			expect(body).not.toContain("PR anterior fechado");
-			expect(body).not.toContain("fechado automaticamente");
+			expect(body).not.toContain("PR atualizado após conflito");
+			expect(body).not.toContain("estava em conflito");
 		});
 
 		test("should include conflict notice with PR number when invalidFilePR exists", () => {
@@ -177,9 +177,9 @@ describe("ptBrLocale.pullRequest.body", () => {
 			const body = buildPullRequestBody(file, processingResult, metadata);
 
 			expect(body).toContain("> [!NOTE]");
-			expect(body).toContain("**PR anterior fechado**");
+			expect(body).toContain("**PR atualizado após conflito**");
 			expect(body).toContain("#42");
-			expect(body).toContain("fechado automaticamente");
+			expect(body).toContain("estava em conflito");
 		});
 
 		test("should note rewrite from current source in conflict notice", () => {
@@ -247,8 +247,7 @@ describe("ptBrLocale.pullRequest.body", () => {
 			expect(body).toContain(WIKI_FOR_REACT_DOCS_MAINTAINERS_URL);
 			expect(body).toContain("<details>");
 			expect(body).toContain("Ver detalhes da validação");
-			expect(body).toContain("### Links markdown");
-			expect(body).toContain("#### `markdownLinksPreserved` (1 violação)");
+			expect(body).toContain("### Links markdown (`markdownLinksPreserved`, 1 violação)");
 			expect(body).toContain("> Preserve every");
 			expect(body).not.toContain("| Validador | O que corrigir |");
 			expect(body).not.toContain("Guia para revisores:");
@@ -278,8 +277,9 @@ describe("ptBrLocale.pullRequest.body", () => {
 
 			const body = buildPullRequestBody(sourceFile, result, metadata);
 
-			expect(body).toContain("### Texto JSX estático em blocos de código");
-			expect(body).toContain("#### `fenceJsxStaticText` (1 violação)");
+			expect(body).toContain(
+				"### Texto JSX estático em blocos de código (`fenceJsxStaticText`, 1 violação)",
+			);
 			expect(body).toContain("> Inside fenced code blocks");
 			expect(body).toContain("#### L");
 			expect(body).toContain("```diff");
@@ -313,8 +313,8 @@ describe("ruLocale.pullRequest.body", () => {
 
 			const body = buildPullRequestBody(file, processingResult, metadata);
 
-			expect(body).not.toContain("Предыдущий PR закрыт");
-			expect(body).not.toContain("закрыт автоматически");
+			expect(body).not.toContain("PR обновлён после конфликта");
+			expect(body).not.toContain("был в конфликте");
 		});
 
 		test("should include conflict notice with PR number when invalidFilePR exists", () => {
@@ -335,9 +335,9 @@ describe("ruLocale.pullRequest.body", () => {
 			const body = buildPullRequestBody(file, processingResult, metadata);
 
 			expect(body).toContain("> [!NOTE]");
-			expect(body).toContain("**Предыдущий PR закрыт**");
+			expect(body).toContain("**PR обновлён после конфликта**");
 			expect(body).toContain("#42");
-			expect(body).toContain("закрыт автоматически");
+			expect(body).toContain("был в конфликте");
 		});
 	});
 

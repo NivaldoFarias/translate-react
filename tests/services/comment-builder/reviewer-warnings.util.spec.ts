@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import type { LocalePRBodyStrings } from "@/app/locales/types";
 
-import { buildReviewerWarningsMarkdown } from "@/app/locales/reviewer-warnings-pr.util";
+import { buildReviewerWarningsMarkdown } from "@/app/services/comment-builder/reviewer-warnings.util";
 
 const strings: LocalePRBodyStrings["reviewerWarnings"] = {
 	intro: "Validation issues detected:",
@@ -43,9 +43,9 @@ describe("buildReviewerWarningsMarkdown", () => {
 		);
 
 		expect(markdown).toContain("<details>");
-		expect(markdown).toContain("### fenceJsxStaticText");
+		expect(markdown).toContain("### fenceJsxStaticText (`fenceJsxStaticText`, 1 violation)");
 		expect(markdown).toContain("> Inside fenced code blocks");
-		expect(markdown).toContain("#### `fenceJsxStaticText` (1 violation)");
+		expect(markdown).not.toContain("#### `fenceJsxStaticText`");
 		expect(markdown).toContain("#### L");
 		expect(markdown).toContain("```diff");
 		expect(markdown).toContain("- animate me");
@@ -70,8 +70,9 @@ describe("buildReviewerWarningsMarkdown", () => {
 			translated,
 		);
 
-		expect(markdown).toContain("#### `mdxSpacing` (1 violation)");
+		expect(markdown).toContain("### mdxSpacing (`mdxSpacing`, 1 violation)");
 		expect(markdown).toContain("#### L1");
+		expect(markdown).toContain("```markdown");
 		expect(markdown).toContain("missing space after inline code");
 	});
 
@@ -91,8 +92,41 @@ describe("buildReviewerWarningsMarkdown", () => {
 			translated,
 		);
 
-		expect(markdown).toContain("#### `markdownLinksPreserved`");
+		expect(markdown).toContain(
+			"### markdownLinksPreserved (`markdownLinksPreserved`, 3 violations)",
+		);
 		expect(markdown).toContain("#### L1");
+		expect(markdown).toContain("```markdown");
 		expect(markdown).toContain('Missing markdown link for URL "/learn"');
+	});
+
+	test("formats sentence-case heading violations in markdown fences with h4 line anchors", () => {
+		const translated = [
+			"# Novos Recursos Experimentais {/*new-experimental-features*/}",
+			"",
+			"### Renderização do Servidor com Activity {/*server-side-rendering-with-activity*/}",
+		].join("\n");
+
+		const markdown = buildReviewerWarningsMarkdown(
+			[
+				{
+					guardId: "sentenceCaseHeadings",
+					hint: "Use sentence case in headings: capitalize only the first word and proper nouns (React, JSX, API, etc.).",
+				},
+			],
+			strings,
+			"# New Experimental Features",
+			translated,
+		);
+
+		expect(markdown).toContain("### sentenceCaseHeadings (`sentenceCaseHeadings`, 2 violations)");
+		expect(markdown).not.toContain("#### `sentenceCaseHeadings`");
+		expect(markdown).toContain("#### L1");
+		expect(markdown).toContain("#### L3");
+		expect(markdown).toContain("```markdown");
+		expect(markdown).toContain("# Novos Recursos Experimentais {/*new-experimental-features*/}");
+		expect(markdown).toContain(
+			"### Renderização do Servidor com Activity {/*server-side-rendering-with-activity*/}",
+		);
 	});
 });

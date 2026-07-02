@@ -7,6 +7,7 @@ export const upstreamLocaleConfigSchema = z.object({
 	upstream_name: z.string().min(1),
 	fork_name: z.string().min(1),
 	translation_guidelines_file: z.string().min(1),
+	fork_owner: z.string().min(1).optional(),
 });
 
 /** Validated locale row from `.github/locales.json`. */

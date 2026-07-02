@@ -1,12 +1,15 @@
 /**
- * Runs the translation workflow against fixture markdown with a live LLM and mocked GitHub.
+ * CLI entry for real-LLM workflow smoke (`bun run ci:smoke`).
  *
- * Writes reviewable outputs under `.out/`. Invoked locally or by [`.github/workflows/smoke.yml`](../../.github/workflows/smoke.yml).
+ * Invoked locally or by [`.github/workflows/smoke.yml`](../../.github/workflows/smoke.yml).
+ * Reviewable outputs are written under `.out/`. See {@link runWorkflowSmoke} and
+ * [CONTRIBUTING.md](../../../CONTRIBUTING.md#workflow-smoke) for layout and CI artifacts.
  *
  * @example
  * ```bash
  * bun run ci:smoke -- --profile quick
  * bun run ci:smoke -- --profile workflow
+ * bun run ci:smoke -- --profile full
  * bun run ci:smoke -- --files hydrateRoot.md,lazy.md
  * ```
  */
@@ -36,7 +39,8 @@ const smokeCommand = defineCommand({
 	args: {
 		profile: {
 			type: "string",
-			description: "Fixture profile: quick, workflow, or full",
+			description:
+				"Fixture set. quick: default CI (small + large new-PR translation, out-of-sync refresh). workflow: PR scenarios (out-of-sync, valid skip). full: all tests/fixtures/md/*.md",
 			default: SmokeProfile.Quick,
 		},
 		files: {

@@ -27,9 +27,6 @@ import type { LanguageAnalysisResult } from "@/app/services/language-detector/la
 import type { WorkflowFixtureFile } from "@tests/fixtures/workflow-fixture.util";
 import type {
 	MockGitHubGetForkFileContentAtBranchFn,
-	MockGitHubGetLatestTranslationCommitFn,
-	MockGitHubGetLatestTranslationCommitTimestampFn,
-	MockGitHubListPullRequestReviewsFn,
 	MockLanguageDetectorService,
 } from "@tests/mocks";
 
@@ -51,10 +48,7 @@ import { WORKFLOW_FIXTURE_MANIFEST } from "@tests/fixtures/md/workflow.manifest"
 import {
 	buildWorkflowFixtureFile,
 	defaultWorkflowFixtureForkContent,
-	defaultWorkflowFixtureMaintainerReviewAt,
-	defaultWorkflowFixtureMaintainerReviews,
 	defaultWorkflowFixtureManifestEntry,
-	defaultWorkflowFixtureRunnerCommitAt,
 	WorkflowFixturePrScenario,
 } from "@tests/fixtures/workflow-fixture.util";
 import {
@@ -78,6 +72,11 @@ type CreatePullRequestMockFn = (
 	opts: PullRequestOptions,
 ) => Promise<RestEndpointMethodTypes["pulls"]["create"]["response"]["data"]>;
 
+type UpdatePullRequestBodyMockFn = (
+	prNumber: number,
+	body: string,
+) => Promise<RestEndpointMethodTypes["pulls"]["update"]["response"]["data"]>;
+
 type CommentCompiledResultsMockFn = (
 	results: ProcessedFileResult[],
 	filesToTranslate: TranslationFile[],
@@ -88,8 +87,6 @@ type FindPullRequestByBranchMockFn = (
 ) => Promise<RestEndpointMethodTypes["pulls"]["list"]["response"]["data"][number] | undefined>;
 
 type CheckPullRequestStatusMockFn = (prNumber: number) => Promise<PullRequestStatus>;
-
-type ListPullRequestReviewsMockFn = MockGitHubListPullRequestReviewsFn;
 
 const CLEAN_PULL_REQUEST_STATUS = {
 	hasConflicts: false,
@@ -159,59 +156,6 @@ function applyWorkflowSmokePullRequestMocks(
 
 		return Promise.resolve(
 			file.smoke.forkContent ?? defaultWorkflowFixtureForkContent(file.treeItem.filename),
-		);
-	});
-
-	const runnerCommitAt = defaultWorkflowFixtureRunnerCommitAt();
-
-	(
-		github.getLatestTranslationCommit as unknown as Mock<MockGitHubGetLatestTranslationCommitFn>
-	).mockImplementation((branch) => {
-		const file = fileByBranch.get(branch);
-		if (file?.smoke.pullRequestScenario !== WorkflowFixturePrScenario.MaintainerFix) {
-			return Promise.resolve(undefined);
-		}
-
-		return Promise.resolve({
-			timestamp: runnerCommitAt,
-			message: `docs: translate \`${file.treeItem.filename}\` to Brazilian Portuguese`,
-		});
-	});
-
-	(
-		github.getLatestTranslationCommitTimestamp as unknown as Mock<MockGitHubGetLatestTranslationCommitTimestampFn>
-	).mockImplementation((branch) => {
-		const file = fileByBranch.get(branch);
-		if (file?.smoke.pullRequestScenario !== WorkflowFixturePrScenario.MaintainerFix) {
-			return Promise.resolve(undefined);
-		}
-
-		return Promise.resolve(runnerCommitAt);
-	});
-
-	(
-		github.listPullRequestReviews as unknown as Mock<ListPullRequestReviewsMockFn>
-	).mockImplementation((prNumber) => {
-		const file = fileByPullRequestNumber.get(prNumber);
-		if (file?.smoke.pullRequestScenario !== WorkflowFixturePrScenario.MaintainerFix) {
-			return Promise.resolve([]);
-		}
-
-		const bodies =
-			file.smoke.maintainerReviewBodies ??
-			defaultWorkflowFixtureMaintainerReviews(file.treeItem.filename);
-		const logins = file.smoke.maintainerReviewerLogins ?? ["maintainer"];
-
-		return Promise.resolve(
-			bodies.map((body, index) => ({
-				id: 100 + index,
-				login: logins[index] ?? logins[0] ?? "maintainer",
-				authorAssociation: "MEMBER",
-				userType: "User",
-				state: "CHANGES_REQUESTED",
-				submittedAt: defaultWorkflowFixtureMaintainerReviewAt(),
-				body,
-			})),
 		);
 	});
 }
@@ -286,8 +230,11 @@ export type { WorkflowFixtureFile } from "@tests/fixtures/workflow-fixture.util"
  * persist translated blobs, pull request copy, and the translation-progress issue comment body
  * under {@link WorkflowGitHubArtifactOptions.captureArtifactsDir}. Each processed file gets a
  * subdirectory named from its path under `src/content/` (e.g. `hydrateRoot.md` → `hydrateRoot/`)
- * containing `translated.md` and `pull-request.md`. The issue comment is
- * `translation-progress-issue-comment.md` at the capture root.
+ * containing `translated.md` and `pull-request.md` (written on both new PR creation and open-PR
+ * body updates). The issue comment is
+ * `translation-progress-issue-comment.md` at the capture root. `ci:smoke` defaults
+ * `captureArtifactsDir` to `.out/`; CI packaging is documented in
+ * [CONTRIBUTING.md](../../CONTRIBUTING.md#workflow-smoke).
  */
 export type WorkflowGitHubArtifactOptions = Readonly<{
 	/** Directory (resolved under `cwd`) where artifact files are written */
@@ -423,6 +370,24 @@ export function createWorkflowGitHubServiceFromFiles(
 			return path.join(captureRoot, artifactOutputSubdirFromContentRelative(tail));
 		};
 
+		const fileByBranch = new Map(
+			files.map((file) => [getTranslationBranchNameFromPath(file.treeItem.path), file] as const),
+		);
+		const fileByPullRequestNumber = new Map(
+			files.map((file) => [file.smoke.pullRequestNumber, file] as const),
+		);
+
+		const writePullRequestArtifact = async (file: WorkflowFixtureFile, body: string) => {
+			const branch = getTranslationBranchNameFromPath(file.treeItem.path);
+			const fileDir = artifactDirForTranslateBranch(branch);
+			const title = localeService.definitions.pullRequest.title(
+				new TranslationFile("", file.treeItem.filename, file.treeItem.path, file.treeItem.sha),
+			);
+
+			await fs.mkdir(fileDir, { recursive: true });
+			await fs.writeFile(path.join(fileDir, "pull-request.md"), `# ${title}\n\n${body}`, "utf8");
+		};
+
 		(github.commitTranslation as unknown as Mock<CommitTranslationMockFn>).mockImplementation(
 			async (opts) => {
 				const fileDir = artifactDirForFilePath(opts.file.path);
@@ -437,10 +402,18 @@ export function createWorkflowGitHubServiceFromFiles(
 
 		(github.createPullRequest as unknown as Mock<CreatePullRequestMockFn>).mockImplementation(
 			async (opts) => {
-				const fileDir = artifactDirForTranslateBranch(opts.branch);
-				await fs.mkdir(fileDir, { recursive: true });
-				const prMarkdown = `# ${opts.title}\n\n${opts.body}`;
-				await fs.writeFile(path.join(fileDir, "pull-request.md"), prMarkdown, "utf8");
+				const file = fileByBranch.get(opts.branch);
+				if (file) {
+					await writePullRequestArtifact(file, opts.body);
+				} else {
+					const fileDir = artifactDirForTranslateBranch(opts.branch);
+					await fs.mkdir(fileDir, { recursive: true });
+					await fs.writeFile(
+						path.join(fileDir, "pull-request.md"),
+						`# ${opts.title}\n\n${opts.body}`,
+						"utf8",
+					);
+				}
 
 				const pullRequestNumber = pullRequestNumberByBranch.get(opts.branch) ?? 1;
 
@@ -451,6 +424,20 @@ export function createWorkflowGitHubServiceFromFiles(
 				} as RestEndpointMethodTypes["pulls"]["create"]["response"]["data"];
 			},
 		);
+
+		(
+			github.updatePullRequestBody as unknown as Mock<UpdatePullRequestBodyMockFn>
+		).mockImplementation(async (prNumber, body) => {
+			const file = fileByPullRequestNumber.get(prNumber);
+			if (file) {
+				await writePullRequestArtifact(file, body);
+			}
+
+			return {
+				number: prNumber,
+				body,
+			} as RestEndpointMethodTypes["pulls"]["update"]["response"]["data"];
+		});
 
 		(
 			github.commentCompiledResultsOnIssue as unknown as Mock<CommentCompiledResultsMockFn>
@@ -546,8 +533,14 @@ export function createIntegrationTranslator() {
 	return { translator, chatMock };
 }
 
-export function createIntegrationRunner(file: WorkflowFixtureFile) {
-	const github = createWorkflowGitHubService(file);
+export function createIntegrationRunner(
+	file: WorkflowFixtureFile,
+	artifactOptions?: WorkflowGitHubArtifactOptions,
+) {
+	const github =
+		artifactOptions !== undefined ?
+			createWorkflowGitHubServiceFromFiles([file], artifactOptions)
+		:	createWorkflowGitHubService(file);
 	const { translator, chatMock } = createIntegrationTranslator();
 	const languageDetector = createMockLanguageDetectorService();
 	applyWorkflowSmokeLanguageDetectorMocks(languageDetector, [file]);

@@ -28,7 +28,7 @@ export const defaultParametersSchema = z.looseObject({
 	repetition_penalty: z.union([z.number(), z.null()]).optional(),
 });
 
-/** `PublicPricing` — `prompt` and `completion` are required; other price fields vary by model. */
+/** `PublicPricing`: `prompt` and `completion` are required. Other price fields vary by model. */
 export const publicPricingSchema = z.looseObject({
 	prompt: z.string(),
 	completion: z.string(),

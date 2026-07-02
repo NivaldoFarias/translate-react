@@ -23,21 +23,6 @@ export interface PullRequestDescriptionMetadata {
 	reviewerNotices: readonly ReviewerValidationNotice[];
 }
 
-/** Inputs for a pull request comment after maintainer-feedback remediation */
-export interface RemediationPullRequestCommentParams {
-	/** Basename of the translated markdown file */
-	readonly filename: string;
-
-	/** Maintainer logins whose unresolved reviews triggered remediation */
-	readonly maintainerLogins: readonly string[];
-
-	/** Workflow run metadata when executing in GitHub Actions */
-	readonly runContext?: ProgressCommentRunContext;
-
-	/** Count of advisory post-translation guard notices on the refreshed PR body */
-	readonly advisoryNoticeCount: number;
-}
-
 /**
  * GitHub Actions metadata for the translation-progress issue comment opener.
  */
@@ -80,17 +65,8 @@ export interface LocaleCommentConfig {
 	/** Section heading when existing pull requests received new translation commits */
 	readonly updatedSectionHeader: string;
 
-	/** Generates the footer/observations section of the comment */
+	/** Footer/observations line appended to the progress comment */
 	readonly suffix: string;
-
-	/**
-	 * Comment posted on an open pull request when a remediation commit is pushed.
-	 *
-	 * @param params File name, maintainer logins, optional run metadata, and advisory notice count
-	 *
-	 * @returns Localized pull request comment body
-	 */
-	readonly remediationPullRequestComment: (params: RemediationPullRequestCommentParams) => string;
 }
 
 /**
@@ -127,15 +103,15 @@ export interface LocalePRBodyStrings {
 	/** Human-review notice as the opening body paragraph */
 	readonly humanReviewNotice: string;
 
-	/** Conflict notice section when a stale PR was closed */
+	/** Conflict notice section when an out-of-sync PR's branch was refreshed */
 	readonly conflictNotice: {
-		/** Bold title text (e.g., "Previous PR closed") */
+		/** Bold title text (e.g., "PR updated after conflict") */
 		readonly title: string;
 
 		/**
-		 * Body explaining why the PR was closed.
+		 * Body explaining that the branch was refreshed after a conflict.
 		 *
-		 * @param prNumber The closed PR number
+		 * @param prNumber The refreshed PR number
 		 *
 		 * @returns Formatted conflict notice
 		 */
@@ -153,7 +129,7 @@ export interface LocalePRBodyStrings {
 
 	/** Advisory validation warnings (shown only when `reviewerNotices` is non-empty) */
 	readonly reviewerWarnings: {
-		/** Intro line inside the `[!WARNING]` callout */
+		/** Intro line before the collapsible advisory validation details block */
 		readonly intro: string;
 
 		/** `<summary>` label for the collapsible validation details block */
@@ -216,7 +192,7 @@ export interface LocalePullRequestConfig {
  * const ptBr: LocaleDefinition = {
  *   comment: {
  *     prefix: (runContext) => runContext ? "A última execução..." : "As seguintes páginas...",
- *     suffix: "> [!IMPORTANT]\n> ...",
+ *     suffix: "[^1]: as traduções foram geradas por uma LLM...",
  *   },
  *   rules: {
  *     specific: "# PORTUGUESE (BRAZIL) SPECIFIC RULES\n...",

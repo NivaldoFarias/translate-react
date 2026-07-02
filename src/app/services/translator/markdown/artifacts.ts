@@ -99,8 +99,16 @@ function padTranslatedLeadingNewlinesToSourcePrefix(
 }
 
 /**
- * Strips spurious outer ` ```…``` ` / `~~~…~~~ ` wrappers from a translated slice when the **source**
+ * Strips spurious outer triple-backtick or triple-tilde fence wrappers from a translated slice when the **source**
  * slice contained no fenced code blocks, then restores leading newline depth if the fence ate blank lines.
+ *
+ * ```
+ * ```...```
+ * ```
+ *
+ * ```
+ * ~~~...~~~
+ * ```
  *
  * @param sourceMarkdown Original markdown slice (same span the model was asked to translate)
  * @param translatedMarkdown Model output for that slice

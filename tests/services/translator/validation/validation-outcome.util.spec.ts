@@ -4,23 +4,23 @@ import {
 	BLOCKING_POST_TRANSLATION_GUARD_IDS,
 	partitionPostTranslationValidationIssues,
 } from "@/app/services/translator/validation/validation-outcome.util";
-import { PostTranslationGuardId } from "@/app/services/translator/validation/validation.constants";
+import { POST_TRANSLATION_GUARD_IDS } from "@/app/services/translator/validation/validation.constants";
 
 describe("partitionPostTranslationValidationIssues", () => {
 	test("treats contentRatio and nonEmptyContent as blocking", () => {
 		const issues = [
 			{
-				guardId: PostTranslationGuardId.contentRatio,
+				guardId: POST_TRANSLATION_GUARD_IDS.contentRatio,
 				message: "ratio low",
 				retryHint: "keep full length",
 			},
 			{
-				guardId: PostTranslationGuardId.nonEmptyContent,
+				guardId: POST_TRANSLATION_GUARD_IDS.nonEmptyContent,
 				message: "empty",
 				retryHint: "return full document",
 			},
 			{
-				guardId: PostTranslationGuardId.mdxSlugPreserved,
+				guardId: POST_TRANSLATION_GUARD_IDS.mdxSlugPreserved,
 				message: "slug missing",
 				retryHint: "keep slug",
 			},
@@ -30,26 +30,26 @@ describe("partitionPostTranslationValidationIssues", () => {
 
 		expect(blocking).toHaveLength(2);
 		expect(blocking.map((issue) => issue.guardId)).toEqual([
-			PostTranslationGuardId.contentRatio,
-			PostTranslationGuardId.nonEmptyContent,
+			POST_TRANSLATION_GUARD_IDS.contentRatio,
+			POST_TRANSLATION_GUARD_IDS.nonEmptyContent,
 		]);
 		expect(advisory).toEqual([
-			{ guardId: PostTranslationGuardId.mdxSlugPreserved, hint: "keep slug" },
+			{ guardId: POST_TRANSLATION_GUARD_IDS.mdxSlugPreserved, hint: "keep slug" },
 		]);
-		expect(BLOCKING_POST_TRANSLATION_GUARD_IDS.has(PostTranslationGuardId.mdxSlugPreserved)).toBe(
-			false,
-		);
+		expect(
+			BLOCKING_POST_TRANSLATION_GUARD_IDS.has(POST_TRANSLATION_GUARD_IDS.mdxSlugPreserved),
+		).toBe(false);
 	});
 
 	test("maps mechanical guard failures to advisory reviewer notices", () => {
 		const issues = [
 			{
-				guardId: PostTranslationGuardId.markdownLinksPreserved,
+				guardId: POST_TRANSLATION_GUARD_IDS.markdownLinksPreserved,
 				message: "links missing",
 				retryHint: "preserve every markdown link",
 			},
 			{
-				guardId: PostTranslationGuardId.fenceFunctionIdentifiers,
+				guardId: POST_TRANSLATION_GUARD_IDS.fenceFunctionIdentifiers,
 				message: "identifiers changed",
 				retryHint: "keep `Foo` unchanged",
 			},
@@ -60,22 +60,25 @@ describe("partitionPostTranslationValidationIssues", () => {
 		expect(blocking).toEqual([]);
 		expect(advisory).toEqual([
 			{
-				guardId: PostTranslationGuardId.markdownLinksPreserved,
+				guardId: POST_TRANSLATION_GUARD_IDS.markdownLinksPreserved,
 				hint: "preserve every markdown link",
 			},
-			{ guardId: PostTranslationGuardId.fenceFunctionIdentifiers, hint: "keep `Foo` unchanged" },
+			{
+				guardId: POST_TRANSLATION_GUARD_IDS.fenceFunctionIdentifiers,
+				hint: "keep `Foo` unchanged",
+			},
 		]);
 	});
 
 	test("partitions mixed blocking and advisory issues", () => {
 		const issues = [
 			{
-				guardId: PostTranslationGuardId.contentRatio,
+				guardId: POST_TRANSLATION_GUARD_IDS.contentRatio,
 				message: "ratio high",
 				retryHint: "shorten output",
 			},
 			{
-				guardId: PostTranslationGuardId.headingsPreserved,
+				guardId: POST_TRANSLATION_GUARD_IDS.headingsPreserved,
 				message: "headings mismatch",
 				retryHint: "keep heading count",
 			},
@@ -83,9 +86,11 @@ describe("partitionPostTranslationValidationIssues", () => {
 
 		const { blocking, advisory } = partitionPostTranslationValidationIssues(issues);
 
-		expect(blocking.map((issue) => issue.guardId)).toEqual([PostTranslationGuardId.contentRatio]);
+		expect(blocking.map((issue) => issue.guardId)).toEqual([
+			POST_TRANSLATION_GUARD_IDS.contentRatio,
+		]);
 		expect(advisory).toEqual([
-			{ guardId: PostTranslationGuardId.headingsPreserved, hint: "keep heading count" },
+			{ guardId: POST_TRANSLATION_GUARD_IDS.headingsPreserved, hint: "keep heading count" },
 		]);
 	});
 });

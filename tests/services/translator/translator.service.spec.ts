@@ -265,6 +265,86 @@ describe("TranslatorService", () => {
 			);
 		});
 
+		test("parallel translateContent calls keep separate llm usage totals", async () => {
+			let inFlight = 0;
+			let maxInFlight = 0;
+
+			mockChatCompletionsCreate.mockImplementation((params: unknown) => {
+				inFlight += 1;
+				maxInFlight = Math.max(maxInFlight, inFlight);
+
+				const userMessage = getUserMessageFromCompletionParams(params);
+				const userContent = userMessage?.content ?? "";
+				const isAlpha =
+					isSegmentBatchUserMessage(userContent) && userContent.includes("Alpha prose");
+
+				return new Promise((resolve) => {
+					setTimeout(() => {
+						inFlight -= 1;
+
+						if (!isSegmentBatchUserMessage(userContent)) {
+							resolve(createChatCompletionFixture(userContent));
+							return;
+						}
+
+						const payload = JSON.parse(userContent) as {
+							items: { segmentId: string; source: string }[];
+						};
+
+						resolve(
+							createChatCompletionFixture({
+								usage: {
+									total_tokens: isAlpha ? 111 : 222,
+									completion_tokens: 10,
+									prompt_tokens: isAlpha ? 101 : 212,
+								},
+								choices: [
+									{
+										message: {
+											content: createSegmentBatchLlmJsonContent(
+												payload.items.map((item) => ({
+													segmentId: item.segmentId,
+													translated:
+														item.source === "Alpha prose" ? "Alpha traduzido" : "Beta traduzido",
+												})),
+											),
+											refusal: null,
+											role: "assistant",
+										},
+										finish_reason: "stop",
+										index: 0,
+										logprobs: null,
+									},
+								],
+							}),
+						);
+					}, 20);
+				});
+			});
+
+			const alphaFile = createTranslationFileFixture({
+				content: "Alpha prose",
+				filename: "alpha.md",
+				path: "src/learn/alpha.md",
+			});
+			const betaFile = createTranslationFileFixture({
+				content: "Beta prose",
+				filename: "beta.md",
+				path: "src/learn/beta.md",
+			});
+
+			const [alphaResult, betaResult] = await Promise.all([
+				translatorService.translateContent(alphaFile),
+				translatorService.translateContent(betaFile),
+			]);
+
+			expect(maxInFlight).toBe(2);
+			expect(alphaResult.llmUsage.totalTokens).toBe(111);
+			expect(betaResult.llmUsage.totalTokens).toBe(222);
+			expect(alphaResult.translationPath).toBe("segment");
+			expect(betaResult.translationPath).toBe("segment");
+		});
+
 		test("should preserve code blocks in translated content", async () => {
 			const title = "Title";
 			const sourceContent = `# Title\n\`\`\`javascript\n// Comment\nconst example = "test";\n\`\`\`\n\nText`;

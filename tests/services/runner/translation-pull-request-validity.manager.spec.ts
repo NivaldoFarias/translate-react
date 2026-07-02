@@ -83,7 +83,7 @@ describe("TranslationPullRequestValidityManager", () => {
 		expect(result.invalidReason).toBe("not_translated");
 	});
 
-	test("returns needs_maintainer_fix when a CHANGES_REQUESTED review follows the latest runner commit", async () => {
+	test("returns valid when CHANGES_REQUESTED review exists on an otherwise complete pull request", async () => {
 		const github = createMockGitHubService();
 		const languageDetector = createMockLanguageDetectorService();
 
@@ -92,43 +92,6 @@ describe("TranslationPullRequestValidityManager", () => {
 		github.getForkFileContentAtBranch.mockResolvedValue(
 			"Texto em português com comprimento suficiente para análise linguística confiável.",
 		);
-		github.getLatestTranslationCommit.mockResolvedValue({
-			timestamp: new Date("2026-06-03T10:00:00Z"),
-			message: "docs: translate `legacy.md` to Português (Brasil)",
-		});
-		github.getLatestTranslationCommitTimestamp.mockResolvedValue(new Date("2026-06-03T10:00:00Z"));
-		github.listPullRequestReviews.mockResolvedValue([
-			createMockPullRequestReviewSnapshot({ body: "Please fix the heading." }),
-		]);
-		languageDetector.analyzeLanguage.mockResolvedValue(
-			createTranslatedLanguageAnalysis({
-				ratio: 0.95,
-				languageScore: { target: 0.95, source: 0.05 },
-			}),
-		);
-
-		const manager = createValidityManager({ github, languageDetector });
-
-		const result = await manager.evaluate("src/content/reference/react/legacy.md");
-
-		expect(result.isValid).toBe(false);
-		expect(result.invalidReason).toBe("needs_maintainer_fix");
-		expect(result.pullRequest?.number).toBe(55);
-	});
-
-	test("returns valid when CHANGES_REQUESTED review predates the latest remediation commit", async () => {
-		const github = createMockGitHubService();
-		const languageDetector = createMockLanguageDetectorService();
-
-		github.findPullRequestByBranch.mockResolvedValue(createMockPullRequestListItem(55));
-		github.checkPullRequestStatus.mockResolvedValue(createPullRequestStatusFixture());
-		github.getForkFileContentAtBranch.mockResolvedValue(
-			"Texto em português com comprimento suficiente para análise linguística confiável.",
-		);
-		github.getLatestTranslationCommit.mockResolvedValue({
-			timestamp: new Date("2026-06-04T10:00:00Z"),
-			message: "docs: translate `legacy.md` to Português (Brasil)\n\nper @jhonmike feedback",
-		});
 		github.listPullRequestReviews.mockResolvedValue([
 			createMockPullRequestReviewSnapshot({ body: "Please fix the heading." }),
 		]);
@@ -147,38 +110,23 @@ describe("TranslationPullRequestValidityManager", () => {
 		expect(result.pullRequest?.number).toBe(55);
 	});
 
-	test("returns needs_maintainer_fix when CHANGES_REQUESTED review follows the latest remediation commit", async () => {
+	test("propagates language detection failures from fork content analysis", () => {
 		const github = createMockGitHubService();
 		const languageDetector = createMockLanguageDetectorService();
 
-		github.findPullRequestByBranch.mockResolvedValue(createMockPullRequestListItem(55));
+		github.findPullRequestByBranch.mockResolvedValue(createMockPullRequestListItem(12));
 		github.checkPullRequestStatus.mockResolvedValue(createPullRequestStatusFixture());
 		github.getForkFileContentAtBranch.mockResolvedValue(
 			"Texto em português com comprimento suficiente para análise linguística confiável.",
 		);
-		github.getLatestTranslationCommit.mockResolvedValue({
-			timestamp: new Date("2026-06-04T10:00:00Z"),
-			message: "docs: translate `legacy.md` to Português (Brasil)\n\nper @jhonmike feedback",
-		});
-		github.listPullRequestReviews.mockResolvedValue([
-			createMockPullRequestReviewSnapshot({
-				submittedAt: new Date("2026-06-04T12:00:00Z"),
-				body: "Please fix the heading again.",
-			}),
-		]);
-		languageDetector.analyzeLanguage.mockResolvedValue(
-			createTranslatedLanguageAnalysis({
-				ratio: 0.95,
-				languageScore: { target: 0.95, source: 0.05 },
-			}),
+		languageDetector.analyzeLanguage.mockRejectedValue(
+			new Error("Language detection failed after retries"),
 		);
 
 		const manager = createValidityManager({ github, languageDetector });
 
-		const result = await manager.evaluate("src/content/reference/react/legacy.md");
-
-		expect(result.isValid).toBe(false);
-		expect(result.invalidReason).toBe("needs_maintainer_fix");
-		expect(result.pullRequest?.number).toBe(55);
+		expect(manager.evaluate("src/content/page.md")).rejects.toThrow(
+			"Language detection failed after retries",
+		);
 	});
 });

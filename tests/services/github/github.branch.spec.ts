@@ -42,7 +42,7 @@ describe("GitHubBranch", () => {
 				}),
 			);
 
-			branch.setCleanupContentAccess({
+			branch.setCleanupPullRequestAccess({
 				findPullRequestByBranch,
 				checkPullRequestStatus,
 			});
@@ -69,7 +69,7 @@ describe("GitHubBranch", () => {
 				}),
 			);
 
-			branch.setCleanupContentAccess({
+			branch.setCleanupPullRequestAccess({
 				findPullRequestByBranch,
 				checkPullRequestStatus,
 			});
@@ -96,7 +96,7 @@ describe("GitHubBranch", () => {
 				}),
 			);
 
-			branch.setCleanupContentAccess({
+			branch.setCleanupPullRequestAccess({
 				findPullRequestByBranch,
 				checkPullRequestStatus,
 			});
@@ -120,7 +120,7 @@ describe("GitHubBranch", () => {
 				}),
 			);
 
-			branch.setCleanupContentAccess({
+			branch.setCleanupPullRequestAccess({
 				findPullRequestByBranch,
 				checkPullRequestStatus,
 			});

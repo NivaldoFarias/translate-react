@@ -85,4 +85,16 @@ describe("UpstreamShaPoller", () => {
 		expect(result.hasChanges).toBe(false);
 		expect(result.matrix).toEqual([]);
 	});
+
+	test("uses per-locale fork_owner on changed rows", async () => {
+		const { poller } = createTestPoller({ storedSha: undefined, headSha: "new-sha" });
+		const localeWithOwner: UpstreamLocaleConfig = {
+			...ptBrLocale,
+			fork_owner: "locale-specific-owner",
+		};
+
+		const result = await poller.poll([localeWithOwner], "default-owner");
+
+		expect(result.matrix[0]?.fork_owner).toBe("locale-specific-owner");
+	});
 });

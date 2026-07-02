@@ -40,7 +40,7 @@ describe("workflow fixture utilities", () => {
 			WorkflowFixturePrScenario.OutOfSync,
 		);
 		expect(WORKFLOW_FIXTURE_MANIFEST["react-19.md"].smoke.pullRequestScenario).toBe(
-			WorkflowFixturePrScenario.MaintainerFix,
+			WorkflowFixturePrScenario.New,
 		);
 		expect(WORKFLOW_FIXTURE_MANIFEST["react-conf-2021-recap.md"].smoke.pullRequestScenario).toBe(
 			WorkflowFixturePrScenario.ValidSkip,

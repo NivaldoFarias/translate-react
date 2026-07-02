@@ -48,9 +48,6 @@ export enum WorkflowFixturePrScenario {
 	/** Open PR behind base with merge conflicts; runner refreshes branch and updates the PR */
 	OutOfSync = "out_of_sync",
 
-	/** Open PR with unresolved `CHANGES_REQUESTED` after the latest runner commit */
-	MaintainerFix = "maintainer_remediation",
-
 	/** Open PR already in sync with translated fork content; runner skips LLM work */
 	ValidSkip = "valid_skip",
 }
@@ -62,10 +59,6 @@ export interface WorkflowFixtureSmoke {
 
 	/** Fork branch markdown returned by `getForkFileContentAtBranch` for existing-PR scenarios */
 	forkContent?: string;
-
-	/** Review summaries passed into maintainer remediation when scenario is {@link WorkflowFixturePrScenario.MaintainerFix} */
-	maintainerReviewBodies?: readonly string[];
-	maintainerReviewerLogins?: readonly string[];
 }
 
 /**
@@ -154,15 +147,9 @@ export function buildWorkflowFixtureFile(
 			pullRequestNumber: smoke?.pullRequestNumber ?? 1,
 			pullRequestScenario: smoke?.pullRequestScenario ?? WorkflowFixturePrScenario.New,
 			forkContent: smoke?.forkContent,
-			maintainerReviewBodies: smoke?.maintainerReviewBodies,
-			maintainerReviewerLogins: smoke?.maintainerReviewerLogins,
 		},
 	};
 }
-
-const DEFAULT_RUNNER_COMMIT_AT = new Date("2026-06-01T10:00:00Z");
-
-const DEFAULT_MAINTAINER_REVIEW_AT = new Date("2026-06-03T12:00:00Z");
 
 /**
  * Builds a Git tree blob URL for fixture SHAs (upstream `pt-br.react.dev` shape).
@@ -196,43 +183,6 @@ description: Descrição em português para simular conteúdo já traduzido no f
 Este parágrafo em português simula o arquivo \`${filename}\` já traduzido no branch do fork.
 O detector de idioma precisa de texto suficiente em português brasileiro para marcar a página como traduzida.
 `;
-}
-
-/**
- * Default maintainer review bodies for {@link WorkflowFixturePrScenario.MaintainerFix} smoke scenarios.
- *
- * @param filename Display filename under remediation
- *
- * @returns Review summary strings for the translation prompt
- */
-export function defaultWorkflowFixtureMaintainerReviews(filename: string) {
-	return [
-		`\
-\`\`\`diff
--## Solução de problemas {/*troubleshooting*/}
-+## Solução de Problemas {/*troubleshooting*/}
-\`\`\`
-
-Use sentence case in headings for \`${filename}\`.`,
-	];
-}
-
-/**
- * Default runner translation commit timestamp for maintainer remediation mocks.
- *
- * @returns Commit time on the fork translation branch
- */
-export function defaultWorkflowFixtureRunnerCommitAt() {
-	return DEFAULT_RUNNER_COMMIT_AT;
-}
-
-/**
- * Default `CHANGES_REQUESTED` review submission time (after the runner commit).
- *
- * @returns Review timestamp for maintainer remediation mocks
- */
-export function defaultWorkflowFixtureMaintainerReviewAt() {
-	return DEFAULT_MAINTAINER_REVIEW_AT;
 }
 
 /**

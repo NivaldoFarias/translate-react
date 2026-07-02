@@ -1,4 +1,4 @@
-export { classifyNode, classificationRuleForNode } from "./classify.util";
+export { classificationRuleForNode } from "./classify.util";
 export {
 	buildNodePath,
 	collectHeadingPlainText,

@@ -42,7 +42,7 @@ jobs:
     steps:
       - name: Checkout repository
         if: github.event_name == 'workflow_dispatch'
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 1
 
@@ -95,7 +95,6 @@ jobs:
     needs: prepare-matrix
     if: needs.prepare-matrix.outputs.has_matrix == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 130
     environment: ${{ inputs.environment || 'production' }}
     strategy:
       fail-fast: false
@@ -114,7 +113,7 @@ jobs:
           owner: ${{ github.repository_owner }}
 
       - name: Checkout main repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           token: ${{ steps.generate-token.outputs.token }}
           ref: ${{ github.ref }}
@@ -162,7 +161,6 @@ jobs:
             ARGS+=(--translation-guidelines-file "${{ matrix.translation_guidelines_file }}")
           fi
           bun run start -- "${ARGS[@]}"
-        timeout-minutes: 120
 
       - name: Record upstream SHA (${{ matrix.lang }})
         if: success()

@@ -22,15 +22,19 @@ import {
 
 import { resolveSmokeFixtureBasenames } from "./smoke-profiles.util";
 
-/** Default directory for mocked GitHub outputs from workflow smoke */
+/** Gitignored directory where `ci:smoke` writes reviewable mocked GitHub outputs. */
 export const WORKFLOW_SMOKE_ARTIFACT_DIR = ".out" as const;
 
 /** Options for {@link runWorkflowSmoke} */
 export interface RunWorkflowSmokeOptions {
-	/** Fixture profile when `filesArgument` is empty */
+	/**
+	 * {@link SmokeProfileId} fixture set.
+	 *
+	 * @see {@link resolveSmokeFixtureBasenames}
+	 */
 	profile: SmokeProfileId;
 
-	/** Comma-separated fixture basenames; overrides `profile` when non-empty */
+	/** Comma-separated fixture basenames. Overrides `profile` when non-empty. */
 	filesArgument?: string;
 
 	/** Repository root for fixture and artifact paths */
@@ -55,10 +59,12 @@ async function clearSmokeArtifactDir(artifactDir: string) {
 }
 
 /**
- * Runs `RunnerService` with real `translatorService` (live LLM) and mocked GitHub fixtures.
+ * Runs {@link RunnerService} with real {@link translatorService} and mocked GitHub fixtures.
  *
  * Loads markdown from `tests/fixtures/md/` and writes translated blobs, PR bodies, and progress
- * comments under `artifactDir`. Do not invoke via `bun test` — the test preload replaces `env`.
+ * comments under {@link WORKFLOW_SMOKE_ARTIFACT_DIR} unless `artifactDir` overrides it. Output
+ * layout and GitHub Actions artifact packaging are documented in
+ * [CONTRIBUTING.md](../../../../CONTRIBUTING.md).
  *
  * @param options Profile, optional fixture override, and output directory
  *
@@ -131,9 +137,11 @@ export async function runWorkflowSmoke(options: RunWorkflowSmokeOptions) {
 }
 
 /**
+ * Reports whether every discovered file translated successfully.
+ *
  * @param stats Runner result from {@link runWorkflowSmoke}
  *
- * @returns `true` when every discovered file translated successfully
+ * @returns `true` when `successCount` equals `totalCount` and `failureCount` is zero
  */
 export function workflowSmokeSucceeded(stats: WorkflowStatistics) {
 	return (

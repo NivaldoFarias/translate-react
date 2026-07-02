@@ -4,143 +4,175 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+### Added
+
+- Optional `fork_owner` on each `.github/locales.json` row overrides the workflow default fork owner when poll or manual matrix builds translation jobs.
+
+### Removed
+
+- Automated maintainer remediation: the runner no longer re-translates open pull requests from `CHANGES_REQUESTED` review text or posts remediation comments; maintainers edit the branch manually. Open PRs with pending reviews are still treated as workflow-complete when in sync and translated.
+
+### Changed
+
+- Discovery retries transient GitHub errors during pull-request validity checks before fail-open inclusion, and unexpected CLD failures after retries now stop the workflow instead of silently scheduling extra translation work; empty, short, or unidentifiable content still counts as not translated.
+- GitHub file content, pull request, and translation-progress issue operations now live in dedicated modules composed by `GitHubService`; branch cleanup hooks bind directly to the pull request module.
+- Translation batch processing now delegates per-file work to dedicated branch, pull request, and file processor modules while the batch manager keeps batching and the consecutive-failure circuit breaker.
+- File discovery logs a per-run `failOpen` summary (PR validity errors, empty or short content, unreliable CLD identification) so operators can see how often uncertain paths schedule extra translation work.
+- LLM translation calls share one queued retry executor so full-body, frontmatter-batch, and segment-batch paths handle rate limits and API errors consistently.
+- GitHub content and default-branch lookups share one API helper; pull request file listing retries use the same Octokit `withRetry` policy as other API calls.
+- Legacy full-body and chunked markdown translation now live in a dedicated service; segment-batch failures no longer fall back on auth, quota, or non-splittable errors.
+- Advisory validation PR details reuse the same frontmatter and heading detection as post-translation guards instead of parallel regex logic.
+- Locale advisory guard labels share one resolver factory across `pt-br` and `ru`.
+- PR reviewer-warning formatting now lives under `comment-builder` with the other GitHub comment utilities.
+- Shared app utilities split markdown path filtering, GitHub URL builders, and rate-limit detection into topic modules while keeping `@/app/utils` exports stable.
+- Fork synchronization uses the fork repository default branch instead of assuming `main`.
+- Concurrent `translateContent` calls on the shared translator service no longer share per-file LLM usage or translation-path state.
+- Language-detector tag stripping and JSX static-text link analyzers use linear scans instead of nested-regex patterns that could backtrack on near-valid upstream markdown.
+- Segment batches pack at most 20 prose segments per LLM request (down from 40), reducing structured JSON parse failures and split retries on segment-heavy pages.
+- Quick `ci:smoke` profile drops the segment-heavy `invalid-hook-call-warning.md` fixture so pre-merge runs finish sooner.
+- Translation and smoke workflow jobs no longer set `timeout-minutes`, so long locale runs are not cut off at the previous two-hour caps.
+- Segment batch failures from truncated output, id mismatch, or malformed JSON now split the batch on the first error instead of repeating the same LLM call through `p-retry`, reducing wasted retries and LLM cost.
+- Manual `smoke.yml` dispatch selects fixtures by profile only; the `files` input is removed.
+- GitHub Actions smoke packs `.out/` into `artifacts/smoke/<profile>-<run_id>.tar.gz` before upload (because `upload-artifact` skips hidden dot-directories) and uses `archive: false` so downloads extract with one `tar -xzf`, not zip then tar.
+- `ci:smoke` artifact capture writes `pull-request.md` when the runner refreshes an open pull request, not only on new PR creation.
+- Advisory validation on translation pull requests inlines the guard id and violation tally on each `###` heading, uses `####` line anchors one level below, and fences violation snippets in `markdown` code blocks so sample headings do not render as PR content.
+- Release history bullets rewritten for outcome-first, reader-facing prose.
+
+### Fixed
+
+- Segment-batch and frontmatter-batch LLM calls with provider `finishReason: "error"` now fail like full-body calls instead of accepting malformed provider output.
+- GitHub integration logs only safe error fields (`message`, `status`, `code`, `name`) so Octokit request headers are not written to workflow logs.
+- Consecutive translation failures now halt the workflow once the circuit-breaker threshold is reached instead of continuing through remaining files.
+- Upstream tree paths containing `..`, backslashes, or paths outside `src/<segment>/.../*.md` are rejected before fetch or commit.
+- Full-body LLM calls with provider `finishReason: "error"` no longer pass as success; truncated or malformed output fails and retries instead of reaching guards with misleading `contentRatio` blocks.
+- Glued inline code, MDX slug comments, and adjacent markdown links are repaired before advisory validation so those mechanical spacing regressions no longer surface as `mdxSpacing` reviewer notices on translation pull requests.
+- Blank `TARGET_LANGUAGE` or `SOURCE_LANGUAGE` from GitHub Actions or `.env` no longer fails validation; empty values default to `pt-br` and `en`.
+- Translation pull request conflict notices no longer claim the previous PR was closed when the runner refreshes the branch in place.
+
 ## [0.2.9] - 2026-06-22
 
 ### Added
 
-- `PostTranslationGuardId` constants for post-translation guard identifiers; `guardId` fields and locale label maps infer from that registry.
-- Structural integrity guards (`mdxSlugPreserved`, `headingCountPreserved`, `headingSyntax`) and advisory style guards (`mdxSpacing`, `sentenceCaseHeadings`, `extraMarkdownLinks`), consolidated into `structural-integrity` and `advisory-style` analyzer/guard modules.
-- `refreshTranslationBranchPreservePr` for `out_of_sync` and maintainer-remediation runs that reuse an open translation pull request.
-- `tests/fixtures/md/workflow.manifest.ts` with react.dev fixture corpus and integration coverage for every manifest scenario (`New`, `OutOfSync`, `MaintainerFix`, `ValidSkip`).
-- Segment production-pipeline, reinsert, cleanup, and truncation-audit specs exercising spacing, slug, and heading regressions.
-- `ci:smoke` (`src/ci/actions/smoke.ts`): real-LLM workflow smoke with mocked GitHub fixtures, profile flags (`quick`, `workflow`, `full`), and `.out/` artifacts; [`.github/workflows/smoke.yml`](./.github/workflows/smoke.yml) for manual dispatch.
+- Post-translation validation now blocks PRs when heading syntax, heading count, or MDX slug comments (`{/*slug*/}`) drift from the source; additional advisory checks cover MDX spacing, sentence-case headings, and extra markdown links.
+- Upstream refresh and maintainer-remediation runs reuse the open translation pull request and branch instead of closing and recreating them.
+- `ci:smoke` runs the full translation workflow against real LLM calls with mocked GitHub (`quick`, `workflow`, and `full` profiles); [`.github/workflows/smoke.yml`](./.github/workflows/smoke.yml) supports manual dispatch.
 
 ### Changed
 
-- Segment snippet cleanup (`cleanupSegmentSnippet`, `sanitizeSegmentTranslation`) preserves boundary whitespace so reinsert no longer glues prose, links, or `{/*slug*/}` comments.
-- `SEGMENT_BATCH_MAX_ITEMS_PER_BATCH` reduced from 55 to 40; segment batch packing also caps estimated JSON completion tokens.
-- Translation PR advisory warnings use GitHub-style `L{N}` / `L{N}-L{M}` line anchors and grouped `<details>` sections per guard.
-- Russian locale PR bodies include labels for all advisory and structural guard ids (parity with `pt-br`).
-- ESLint enables JSDoc rules under `tests/fixtures/**`; `.prettierignore` excludes large markdown fixtures from formatting.
+- Segment reinsert no longer glues prose, links, or slug comments: boundary whitespace is preserved during cleanup.
+- Segment batches are smaller (40 items max) and cap estimated JSON completion tokens to reduce truncation.
+- Translation PR advisory warnings use GitHub-style `L{N}` / `L{N}-L{M}` line anchors, grouped in `<details>` sections per guard.
+- Russian translation PR bodies label all advisory and structural guard findings (parity with `pt-br`).
 
 ### Fixed
 
-- Segment batch output no longer duplicates `##` heading markers when translated heading text includes markdown markers.
-- Maintainer remediation reuses open pull requests after `CHANGES_REQUESTED` reviews without closing the branch when an approved review is present.
+- Translated headings no longer get duplicated `##` markers when the model echoes markdown syntax in heading text.
+- Maintainer remediation keeps an open pull request when an approved review is already present (no unnecessary branch close).
 
 ### Removed
 
-- Gitignored `src/ci/smoke-llm.ts` local script (replaced by tracked `ci:smoke`).
+- Gitignored local `smoke-llm` script; use tracked `ci:smoke` instead.
 
 ## [0.2.8] - 2026-06-16
 
 ### Added
 
-- AST segment translation as the default markdown body path: prose mdast segments, link labels, and `policy` segments (fence comments and MDX string attributes) are batched via structured `segmentBatch` LLM calls with offset reinsert; parse failures or batch errors fall back to full-body translation.
-- `translator-segment-batch.schema.ts`, `callLanguageModelSegmentBatch`, and `segmentBatch` system prompt kind on `TranslationLlmClient`.
-- Segment helpers: `segment-translation.util.ts` (eligibility), `segment-batch.util.ts` (token-aware packing and batch split on truncation).
-- `@react-docs-fixtures/*` path alias and `tests/fixtures/react-docs-fixtures.ts` barrel for react.dev markdown fixtures imported as UTF-8 text.
-- Opaque `sN` keys in segment-batch LLM payloads (`segment-batch-opaque-id.util.ts`); mdast paths are remapped before reinsert.
-- Partial follow-up for drop-only segment batch failures (retry missing ids only, up to 3 rounds).
-- `SEGMENT_BATCH_MAX_ITEMS_PER_BATCH` (55) cap in `packSegmentsIntoBatches`.
+- Markdown body translation runs segment-by-segment by default (prose, link labels, fence comments, and MDX string attributes), with automatic fallback to full-document translation when parsing or batching fails.
+- Segment batch failures retry only missing segments (up to three rounds) before wider fallback.
 
 ### Changed
 
-- CI runs `bun run test:coverage`; `bunfig.toml` excludes test files and CLI entrypoints from coverage totals.
-- Maintainer remediation triggers on unresolved **`CHANGES_REQUESTED`** pull request reviews (members, owners, collaborators, and contributors) submitted after the latest runner commit; PR conversation comments no longer invalidate open PRs. Review summaries and inline review comments from those reviews feed the remediation prompt; null review bodies from the API are treated as empty instead of aborting the run.
-- Segment batch failures split the batch or retry segments individually before full-body fallback; mismatch and truncation logs include id diagnostics and token context.
-- remark/mdast stack promoted from devDependencies to runtime dependencies.
-- Translation PR bodies: human-review notice as the opening paragraph; maintainer wiki link in a `[!TIP]` callout; advisory warnings grouped by validator in `<details>` with per-violation diff blocks and fenced-code line ranges.
-- Verbatim fence masking applies only to the legacy full-body fallback path.
-- `@deprecated` JSDoc on legacy full-body APIs used only by fallback: `extractSegments`, `buildMarkdownDocumentSystemPrompt`, `translateWithChunking`.
+- Maintainer remediation follows unresolved `CHANGES_REQUESTED` pull request reviews after the latest runner commit; issue comments no longer invalidate open PRs. Review summaries and inline comments feed the re-translation prompt.
+- Translation PR bodies open with a human-review notice, link the maintainer wiki in a `[!TIP]` callout, and group advisory warnings by validator in collapsible sections with per-violation diffs.
+- Verbatim fence masking applies only on the legacy full-body fallback path.
+- CI reports test coverage via `bun run test:coverage`.
+- Legacy full-body translation APIs (`extractSegments`, `buildMarkdownDocumentSystemPrompt`, `translateWithChunking`) are deprecated; used only by fallback.
 
 ### Fixed
 
-- Segment extraction uses the unmasked document body so `MASK_VERBATIM_LARGE_FENCES` placeholders no longer force MDX-heavy pages onto the legacy path.
+- MDX-heavy pages stay on the segment path: extraction no longer runs on masked placeholder text from `MASK_VERBATIM_LARGE_FENCES`.
 
 ### Removed
 
-- Exploratory segment modules (`spike-writeup`, `integration-analysis`, `tooling-eval`, corpus table utilities) and their production barrel exports.
+- Exploratory segment spike modules and their production exports.
 
 ## [0.2.7] - 2026-06-05
 
 ### Added
 
-- `fenceJsxStaticText` post-translation guard rejects translated static JSX demo text inside fenced code blocks (pairs fences, compares text between tags with expressions removed, accumulates retry hints).
-- `validation-outcome.util` splits post-translation guards into blocking vs advisory; `ReviewerValidationNotice` carries maintainer `retryHint` text on shipped PRs.
-- Per-file LLM usage totals and workflow `printFinalStatistics` rollup (prompt/completion tokens, OpenRouter `usage.cost` when present, advisory guard counts).
+- Post-translation validation blocks PRs when static JSX demo text inside fenced code is translated; advisory findings ship on the PR with maintainer-facing hints.
+- Blocking vs advisory guard outcomes are separated: only `contentRatio` and `nonEmptyContent` stop the workflow; other guard failures still open or update the PR with warnings.
+- Per-file and run-level LLM usage totals (tokens and OpenRouter cost when available).
 
 ### Fixed
 
-- `listPullRequestIssueComments` uses the REST route string with `octokit.paginate` so maintainer-feedback PR checks work on Octokit v22 (fixes discovery and batch failures with `route.endpoint is not a function`).
+- Maintainer-feedback PR checks work on Octokit v22 (discovery and batch no longer fail with `route.endpoint is not a function`).
 
 ### Changed
 
-- Maintainer-feedback re-translations refresh the open pull request body (including advisory `[!WARNING]` guard hints) instead of leaving the pre-remediation description unchanged.
-- Removed unused `git-cliff` dependency, `cliff.toml`, and `release:draft` script; release flow uses curated `## [Unreleased]` entries only.
-- Removed guard-driven LLM retry hints from attempt context and prompts; `collectPostTranslationValidationIssues` replaces `collectRetryableValidationIssues`; `MAX_RETRY_ATTEMPTS` documents LLM API p-retry only.
-- `markdownLinksPreserved` and `fenceFunctionIdentifiers` guards and retry hints list every violation (no arbitrary slice caps).
-- Post-translation validation uses one LLM pass: only `contentRatio` and `nonEmptyContent` fail the workflow; other guard failures open or update the PR with a `[!WARNING]` hint table (no guard-driven LLM retries).
-- Translation PR bodies drop stats/tech `<details>`; operator metadata (model, tokens, ratio) logs at `debug` when the PR is built.
-- `ProcessedFileResult` exposes `reviewerNotices` instead of `retries`.
-- Translation-progress issue comments separate **created** and **updated** pull requests in distinct sections.
-- GitHub Actions: `actions/cache` v5 in `setup-bun-deps`; CI Bun default `1.3.14` (override with repo variable `BUN_VERSION`).
-- Translation workflow concurrency is per matrix locale on the same ref: a new run cancels only the in-flight job for that locale, not sibling locales in the same matrix.
+- Maintainer-feedback re-translations refresh the open pull request body, including advisory guard hints.
+- Post-translation validation uses a single LLM pass; guard failures no longer trigger extra LLM retries.
+- `markdownLinksPreserved` and `fenceFunctionIdentifiers` list every violation in PR hints (no arbitrary caps).
+- Translation PR bodies drop operator stats blocks; model, token, and ratio metadata log at `debug` when the PR is built.
+- Translation-progress issue comments separate **created** and **updated** pull requests.
+- Translation workflow concurrency is per matrix locale: a new run cancels only the in-flight job for that locale.
 - Poll workflow no longer cancels an in-progress upstream SHA check when another poll starts on the same ref.
-- Wiki: locale onboarding checklist, translation workflow concurrency policy, and parallel matrix capacity guidance for LLM and GitHub limits.
+- GitHub Actions: `actions/cache` v5; CI Bun default `1.3.14` (override with `BUN_VERSION`).
+- Wiki: locale onboarding checklist, concurrency policy, and parallel matrix capacity guidance.
+
+### Removed
+
+- `git-cliff`, `cliff.toml`, and `release:draft`; releases use curated `## [Unreleased]` entries only.
+- Guard-driven LLM retry hints from translation attempt context and prompts.
 
 ## [0.2.6] - 2026-06-04
 
 ### Added
 
-- Maintainer feedback detection: invalidate open translation PRs when a member comments after the latest runner commit, then full re-translate on the existing branch and PR with those comments in the LLM system prompt.
-- pt-br translation rules in `pt-br.locale.ts` (fenced-code policy, terminology from maintainer review, heading sentence case, link preservation) plus a markdown scope override for document prompts.
-- `markdownLinksPreserved` post-translation guard for `[text](url)` integrity across locales.
-- `contentRatio` post-translation guard (70%–140% of source length) with retry metadata in PR bodies.
+- Open translation PRs are invalidated and re-translated when a maintainer comments after the latest runner commit; feedback is included in the LLM prompt on the existing branch.
+- `pt-br` locale rules: fenced-code policy, maintainer terminology, sentence-case headings, and link preservation.
+- Post-translation guards for markdown link integrity and content length ratio (70%–140% of source).
 
 ### Fixed
 
-- `LocaleService` fails fast when a locale definition is missing instead of falling back to `pt-br`.
-- `LanguageDetectorService` reads source/target languages from instance config rather than static class fields.
+- Unknown `TARGET_LANGUAGE` values fail fast instead of silently falling back to `pt-br`.
+- Language detection respects per-instance source and target configuration.
 
 ### Changed
 
-- GitHub content APIs return `RepositoryMarkdownBlob` DTOs; runner maps them to `TranslationFile`.
-- `TranslationRetryInfo` lives in `github/types` for workflow metadata shared across layers.
-- CI test enforces parity between `.github/locales.json` and `LocaleService` registrations.
+- CI enforces parity between `.github/locales.json` and registered locales.
 
 ## [0.2.5] - 2026-06-02
 
 ### Changed
 
-- Dependabot opens PRs against `dev` instead of `main`.
-- Bump `p-retry` to 8, GitHub Actions (`checkout` 6, `create-github-app-token` 3, `upload-artifact` 7), and dev deps (`eslint` 10, `typescript` 6, `@types/node` 25).
-- Upgrade `typescript-eslint` to 8.60 for ESLint 10 compatibility; drop deprecated `baseUrl` from `tsconfig.json`.
+- Dependabot targets `dev` instead of `main`.
+- Updated `p-retry`, GitHub Actions (`checkout`, `create-github-app-token`, `upload-artifact`), and dev tooling (`eslint` 10, `typescript` 6, `typescript-eslint` 8.60).
 
 ### Fixed
 
-- Bun test preload path in `bunfig.toml` after dev-dependency upgrades.
+- Bun test preload path in `bunfig.toml` after dependency upgrades.
 
 ## [0.2.4] - 2026-06-02
 
 ### Changed
 
-- Em-dash glue in `README.md`, `CONTRIBUTING.md`, and `SECURITY.md` replaced with colons and plainer link text.
+- Clearer prose in `README.md`, `CONTRIBUTING.md`, and `SECURITY.md` (colons and plainer link text replace em-dash glue).
 
 ## [0.2.3] - 2026-06-02
 
 ### Added
 
-- Content-ratio guard and PR retry metadata in the translator's post-translation validation.
-- git-cliff release tooling (`release:draft`, `release:prepare`) and `release.yml` to tag and publish on merge to `main`.
+- Content-ratio post-translation guard with retry metadata on translation PRs.
+- Release tooling (`release:prepare`) and `release.yml` to tag and publish on merge to `main`.
 
 ### Changed
 
-- Translation-progress comments link to the workflow run and release, with a footnote for the comment suffix.
+- Translation-progress comments link to the workflow run and release.
 
 ### Fixed
 
-- Polled matrix JSON passed via heredoc in `workflow.yml`.
+- Polled matrix JSON passes correctly through `workflow.yml`.
 - Blank OpenRouter metadata env vars no longer fail validation.
 
 ## [0.2.2] - 2026-06-01
@@ -148,219 +180,145 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 ### Added
 
 - `setup-bun-deps` composite action and `ci:verify-changelog`.
-- Translation CLI flags for matrix locale/repo (`--lang`, fork/upstream flags).
-- Workflow job timeouts; log artifacts `retention-days: 30`.
-- GitHub Sponsors (`FUNDING.yml`), Dependabot for npm and Actions, bug/feature issue forms, PR template, and `CODEOWNERS`.
-- `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1).
+- Translation CLI flags for matrix locale and fork/upstream repos (`--lang`, fork/upstream flags).
+- Workflow job timeouts; log artifacts retained 30 days.
+- GitHub Sponsors, Dependabot, issue forms, PR template, `CODEOWNERS`, and `CODE_OF_CONDUCT.md`.
 
 ### Changed
 
-- Rename `.github/upstream-locales.json` to `.github/locales.json`.
-- Workflows use composite setup, shallow checkout; matrix values via CLI, secrets in step `env`.
-- Poll jobs: `actions: write` for reusable workflow calls.
-- Translation workflow: concurrency by event/ref; leaner `prepare-matrix` on `workflow_call`.
-- `README.md`: tagline, badge row, How it works, Sponsor section; Security/Troubleshooting folded into Contributing.
-- `package.json` description aligned with the repo tagline.
+- Locale registry renamed to `.github/locales.json`.
+- Workflows use composite setup, shallow checkout, CLI-driven matrix, and step-scoped secrets.
+- Poll jobs can invoke reusable workflows (`actions: write`).
+- Translation workflow concurrency groups by event and ref.
+- `README.md` adds tagline, badges, How it works, and Sponsor section.
 
 ## [0.2.1] - 2026-05-31
 
 ### Changed
 
-- Refreshed Changelog's links to the project wiki.
-- Removed mentions to local, gitignored files.
+- Changelog and docs link to the project wiki instead of gitignored local paths.
 
 ## [0.2.0] - 2026-05-31
 
 ### Added
 
-- Upstream SHA polling: [`.github/workflows/poll.yml`](./.github/workflows/poll.yml), [`.github/locales.json`](./.github/locales.json), `ci:poll-upstream`, and `ci:resolve-matrix` so translation runs only when `reactjs/<lang>.react.dev` default branch changes.
-- Repository variables `UPSTREAM_SHA_<LANG>` updated after each successful locale job.
-- Source layout: `src/app/` (translation CLI), `src/ci/` (Actions helpers), `src/shared/` (errors, logger factory, bare Octokit); ESLint import boundaries between runtimes.
-- Phase 5 layout: `schemas/`, `constants/`, `ci/actions/` entry scripts; `citty` for `ci:resolve-matrix --langs`; workflow types colocated in `services/github/types.ts`, `services/runner/types.ts`, `locales/types.ts`.
-- [Project wiki](https://github.com/NivaldoFarias/translate-react/wiki): Workflow (run order, polling, forks), Codebase (layout and services), Configuration, For React Docs Maintainers, and FAQ.
+- Upstream SHA polling runs translation only when `reactjs/<lang>.react.dev` changes ([`poll.yml`](./.github/workflows/poll.yml), [`locales.json`](./.github/locales.json), `ci:poll-upstream`, `ci:resolve-matrix`).
+- Repository variables `UPSTREAM_SHA_<LANG>` update after each successful locale job.
+- [Project wiki](https://github.com/NivaldoFarias/translate-react/wiki) for workflow, configuration, codebase layout, and maintainer guidance.
 
 ### Changed
 
-- [`.github/workflows/workflow.yml`](./.github/workflows/workflow.yml) is reusable (`workflow_call`) with a `prepare-matrix` job; matrix rows come from the locale registry instead of hard-coded YAML.
-- **Breaking (contributors):** app env at `src/app/schemas/env.schema.ts`, CI env at `src/ci/schemas/env.schema.ts`, constants at `src/app/constants/` and `src/shared/constants/`; `ci:*` scripts point to `src/ci/actions/`; dissolved `app/domain/workflow/`.
-- `README.md`, `CONTRIBUTING.md`, and `SECURITY.md` point to the wiki for workflow, configuration, and layout; env variable tables removed from the README.
-- Translation PR bodies link to the maintainer wiki page instead of the runner new-issue chooser tip.
+- Translation workflow is reusable (`workflow_call`); matrix rows come from the locale registry.
+- **Breaking (contributors):** source layout under `src/app/`, `src/ci/`, and `src/shared/` with import boundaries; env schemas and `ci:*` entry scripts moved accordingly.
+- `README.md`, `CONTRIBUTING.md`, and `SECURITY.md` point to the wiki; env tables removed from the README.
+- Translation PR bodies link to the maintainer wiki page.
 
 ### Removed
 
-- `ci:smoke-llm` npm script and tracked `src/ci/smoke-llm.ts` (gitignored local-only dev helper; use integration tests instead).
+- `ci:smoke-llm` script (use integration tests or later `ci:smoke`).
 - In-repo `docs/WORKFLOW.md`, `docs/ARCHITECTURE.md`, and `docs/PROJECT_STRUCTURE.md` (superseded by the wiki).
 
 ## [0.1.30] - 2026-05-26
 
 ### Added
 
-- `src/domain/workflow/` shared types (`workflow.types`, `pull-request.types`) decoupled from runner
-  imports; `composition.ts` wires service singletons.
-- Translator pipeline split: `TranslationLlmClient`, `TranslationPromptBuilder`,
-  `TranslationPipelineManager`, `TranslationFile`, and `markdown/` helpers (`artifacts`,
-  `frontmatter`, `markdown.regexes`).
-- Post-translation validation under `translator/validation/`: `PostTranslationValidationService`,
-  pluggable guards (frontmatter, headings, fence identifiers, non-empty content), and
-  `fence-code-identifier.analyzer`.
-- `postprocess/` (`chunk-reassembly`, `translation-output-cleanup`) for assembled chunk output.
-- `isCompletionLengthTruncationError` in `error.helpers.ts` for truncated LLM completions (including
-  when wrapped in `AbortError`).
-- Specs for LLM client, pipeline manager, chunk reassembly, validation guards/analyzer, and
-  `translation-file`; tests mirrored to the new `src/` layout.
+- Pluggable post-translation validation (frontmatter, headings, fence identifiers, non-empty content).
+- Translator pipeline split into focused services (LLM client, prompt builder, pipeline manager, markdown helpers).
+- Truncated LLM completion detection for safer retry handling.
 
 ### Changed
 
-- Remove `src/services/index.ts` barrel; import domain and service modules directly.
-- Runner `managers/` → `workflow/`; translator `managers/` → `chunking/`; extract
-  `TranslationLlmClient` and group markdown helpers.
-- `github/` and `locales/` no longer import runner types; use `@/domain/workflow/`.
-- `OpenRouterModelLimitsService` injected via `composition.ts` and `TranslatorService` DI.
-- `CommentBuilderService`: deduplicate progress-issue filtering via `buildReportableComment`.
-- Throw `InsufficientPermissions` when the GitHub token scope check fails.
-- Drop dead `RATIOS` alias, `ChunkTranslationMode` enum, and unused validator code.
-- `docs/ARCHITECTURE.md`, `docs/PROJECT_STRUCTURE.md`, `docs/WORKFLOW.md`, and `README.md` updated
-  for the new module layout; `eslint.config.mjs` path rules aligned with `src/`.
+- Module layout under `src/` with runner `workflow/`, translator `chunking/`, and shared workflow types decoupled from runner imports.
+- GitHub token scope failures surface as `InsufficientPermissions`.
+- Docs updated for the new layout.
 
 ## [0.1.29] - 2026-05-19
 
 ### Added
 
-- `TranslationPullRequestValidityManager`: skip translation when an open `translate/…` PR has
-  target-language fork content and is in sync with its base.
-- `getTranslationBranchNameFromPath` (`translation-branch.util.ts`) and
-  `GitHubContent.getForkFileContentAtBranch` for fork reads on translation branches.
-- `PullRequestProgressAction` on `ProcessedFileResult`; `selectProgressCommentPayload` /
-  `filterReportableProgressCommentResults` so progress-issue comments list only PRs opened in the
-  current run.
-- `ProgressCommentRunContext` and locale `comment.prefix` callbacks (`pt-br`, `ru`) for
-  CI-aware translation-progress issue openers.
-- Fixture `tests/fixtures/md/use-memo.md`; specs for validity manager, progress comment util,
-  `github-actions-run.util`, and extended batch / discovery / GitHub service tests.
+- Skip re-translation when an open `translate/…` PR is in sync and already in the target language.
+- Translation-progress issue comments list only PRs opened in the current run.
+- Locale-aware progress comment prefixes for `pt-br` and `ru`.
 
 ### Changed
 
-- `FileDiscoveryManager.filterByPRs`: per-path branch validation via validity manager instead of
-  bulk PR file-list mapping.
-- `TranslationBatchManager`: reset `translate/…` branches to a single commit before
-  translate/commit; close open PRs before reset; reuse valid open PRs without re-translating.
-- `CommentBuilderService.buildComment`: document and filter to newly created PRs only.
-- Translation-progress issue comments: branch or tag ref and linked workflow run in the opening
-  line; drop `formatGithubActionsRunIssueLine` footer.
-- `resolveGitHubActionsRunContext`: resolve `refLabel` from `GITHUB_REF` / `GITHUB_REF_NAME`.
-- Actions workflow: pass `github.ref` and `github.ref_name` into `.env` for the translation step.
-- Integration workflow spec: separate small (`use-memo.md`) and medium (`hydrateRoot.md`) runs.
+- File discovery validates each path individually instead of bulk PR file-list mapping.
+- `translate/…` branches reset to a single commit before re-translating; valid open PRs are reused without re-translation.
+- Translation-progress comments show branch or tag ref and linked workflow run.
+- Actions workflow passes `github.ref` and `github.ref_name` into the translation step.
 
 ## [0.1.28] - 2026-05-18
 
 ### Added
 
-- `translator-frontmatter-batch.schema` and `callLanguageModelFrontmatterBatch`: translate
-  frontmatter `description` in one structured LLM completion via `zodResponseFormat` (metadata pass
-  no longer includes `title`).
-- `leadingNewlineRunLength` export and `normalizeBodyAfterFrontmatterMerge` to preserve body
-  spacing after frontmatter merge.
-- Tests: `translation-batch.manager`, `file-discovery.manager`, passthrough chat-completions mock,
-  and extended translator / frontmatter specs.
+- Frontmatter `description` translates in one structured LLM call (`title` stays unchanged).
+- Body spacing preserved after frontmatter merge.
 
 ### Changed
 
-- `LanguageDetectorService`: apply minimum length to cleaned prose before CLD.
-- `FileDiscoveryManager`: cache detected language when the file is already translated.
-- PR body: shorter conflict notice copy and placement in `pr-body.builder` and `pt-br` / `ru`
-  locales; normalize WIP wording in locale strings.
-- Actions workflow: remove `tool_ref` dispatch input; checkout uses `github.ref` for branches and
-  tags; `docs/WORKFLOW.md` drops the pinning section.
-- `logger.util`: honor `LOG_TO_CONSOLE` for pretty transport in all environments.
-- `locale.service.spec`: remove hanging unit test for PR `mergeable_state` in conflict notice.
+- Language detection applies minimum length to cleaned prose before CLD.
+- Already-translated files cache detected language during discovery.
+- Shorter conflict notice copy in translation PR bodies.
+- Actions checkout uses `github.ref`; `tool_ref` dispatch input removed.
+- `LOG_TO_CONSOLE` enables pretty logging in all environments.
 
 ### Fixed
 
-- `GitHubContent.getFile`: read source markdown from upstream default branch via `repos.getContent`
-  instead of fork `git.getBlob`, so existing `translate/...` translations are not re-used as input.
-- `filterByPRs` / `getPullRequestFiles`: retry PR file lists and fail discovery when mapping is
-  unreliable; `TranslationBatchManager` skips translate/commit when a mergeable open PR already
-  exists for the path.
+- Source markdown reads from upstream default branch, not fork blob tips (prevents re-translating existing fork content as input).
+- Discovery retries unreliable PR file lists; skips translate/commit when a mergeable open PR already exists.
 
 ## [0.1.27] - 2026-05-18
 
 ### Fixed
 
-- `CHANGELOG.md`: add the missing `[0.1.26]` release reference link at the bottom so version anchors
-  match the other shipped releases.
+- Missing `[0.1.26]` release footer link in `CHANGELOG.md`.
 
 ## [0.1.26] - 2026-05-18
 
 ### Added
 
-- `buildRunnerNewIssueChooserUrl` / `resolveRunnerNewIssueChooserUrl`
-  (`src/utils/runner-issue-chooser-url.util.ts`): resolve a GitHub new-issue chooser URL for runner
-  feedback, with `WORKFLOW_RUNNER_REPOSITORY_HTML_BASE` fallback; covered by
-  `tests/utils/runner-issue-chooser-url.util.spec.ts`.
-- PR body: translation model line, metric footnotes, and a feedback tip; locale stats `notes` /
-  `feedbackTip` in `locale.types`, `pr-body.builder`, and `pt-br` / `ru` locales; extended
-  `locale.service` PR body tests.
-- `TranslationBatchManager` / runner base: pass `translationModel` and `newIssueChooserUrl` into PR
-  metadata.
+- Translation PR bodies show model, metric footnotes, and a feedback tip.
+- Feedback links resolve to the runner new-issue chooser.
 
 ### Changed
 
-- `TranslatorService`: chunk translation always runs in parallel; remove `CHUNK_TRANSLATION_MODE`
-  from the environment schema and defaults (`env.util`, `constants.util`).
-- README: minor setup copy tweaks.
+- Chunk translation always runs in parallel; `CHUNK_TRANSLATION_MODE` env var removed.
 
 ## [0.1.25] - 2026-05-18
 
 ### Added
 
-- `bun run smoke:llm-workflow` (`src/scripts/llm-workflow-smoke.ts`): one-shot run with real
-  `translatorService` / LLM and mocked GitHub; loads every `tests/fixtures/md/*.md` (same helper as
-  integration tests) and writes artifacts under `.out/` for review.
-- `.gitignore`: ignore `.out/` (smoke and local inspection output).
-- Markdown fixture `tests/fixtures/md/hydrateRoot.md` for integration smoke and specs.
-- `docs/WORKFLOW.md`: Local LLM workflow smoke section and ToC entry.
+- `smoke:llm-workflow` script: one-shot real-LLM run with mocked GitHub; artifacts under `.out/`.
+- `hydrateRoot.md` fixture for integration and smoke runs.
 
 ### Changed
 
-- Translator ([#15](https://github.com/NivaldoFarias/translate-react/pull/15), squash `smoke` → `dev`,
-  [`9bb9c27`](https://github.com/NivaldoFarias/translate-react/commit/9bb9c27459f1dbe111d7f0b8c154004eabb0755b)):
-  resolve document source language once on full-file markdown (after optional verbatim fence masking)
-  before chunking; `TranslationFile` accepts optional `documentSourceLanguage`, exposes it in
-  `getLogContext()`, and uses it for chunked and non-chunked LLM prompts.
-- `LanguageDetectorService.detectPrimaryLanguage`: on CLD failure, log at `warn`, return `"en"` for
-  prompts, and document alignment with full-file detection in `TranslatorService`.
-- Integration harness: `tests/integration/create-integration-runner.ts` refactored so smoke script and
-  `workflow.integration.spec.ts` share fixture loading and in-memory GitHub wiring; related test and
-  mock updates.
-- `docs/PROJECT_STRUCTURE.md`: note that `tests/fixtures/md/` backs smoke runs and specs.
-- `GitHubContent.getFile`: clarify JSDoc `@returns` for `TranslationFile`.
+- Document source language is detected once on full-file markdown before chunking, improving prompt accuracy.
+- CLD failures log a warning and default to `"en"` for prompts.
+- Smoke script and integration tests share fixture loading and in-memory GitHub wiring.
 
 ## [0.1.24] - 2026-05-13
 
 ### Added
 
-- `CHANGELOG.md`; release steps in `docs/WORKFLOW.md`.
-- `CONTRIBUTING.md`, `SECURITY.md`.
-- Actions: `tool_ref` input; workflow `permissions`; maintainer settings checklist in `docs/WORKFLOW.md`.
-- CI: `bun -e` in `lint-and-typecheck` asserts `CHANGELOG.md` has a `## [version]` heading for `package.json` `version`.
-- OpenRouter: `GET /v1/models` metadata via `OpenRouterModelLimitsService` (`src/services/openrouter/`) to size chunk inputs and align `max_tokens` with provider completion caps.
+- `CHANGELOG.md`, `CONTRIBUTING.md`, and `SECURITY.md`.
+- CI verifies `CHANGELOG.md` matches `package.json` version.
+- OpenRouter model metadata sizes chunk inputs and aligns `max_tokens` with provider caps.
 
 ### Changed
 
-- OpenRouter defaults documented (`HEADER_*` from `package.json`); see README and `src/utils/constants.util.ts`.
-- Actions Bun default `1.3` (override with repo variable `BUN_VERSION`); `engines.bun` in `package.json`.
-- OpenRouter models list: Zod types aligned with OpenRouter `ModelsListResponse` / `Model` in `openrouter.schemas.ts`; README footnote links to the [get-models](https://openrouter.ai/docs/api/api-reference/models/get-models) API reference.
-- Removed unused `TOKEN_COUNT_MODE` / `LOG_MAX_STRING_LENGTH` defaults from the environment schema surface (they were never read).
+- OpenRouter defaults documented in README.
+- Actions Bun default `1.3` (override with `BUN_VERSION`).
+- Unused `TOKEN_COUNT_MODE` and `LOG_MAX_STRING_LENGTH` env defaults removed.
 
 ### Fixed
 
-- README `MAX_RETRY_ATTEMPTS` default matches `src/utils/constants.util.ts` (`3`).
+- README `MAX_RETRY_ATTEMPTS` default matches runtime (`3`).
 
 [0.2.9]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.9
 [0.2.8]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.8
 [0.2.7]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.7
 [0.2.6]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.6
-[0.2.5]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.5
 [0.2.5]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.5
 [0.2.4]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.4
 [0.2.3]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.3

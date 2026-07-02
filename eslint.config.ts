@@ -184,6 +184,9 @@ export default defineConfig(
 						{
 							group: [
 								"@/app/services/github/github.content",
+								"@/app/services/github/github.repository-content",
+								"@/app/services/github/github.pull-request",
+								"@/app/services/github/github.progress-issue",
 								"@/app/services/github/github.repository",
 								"@/app/services/github/github.branch",
 							],

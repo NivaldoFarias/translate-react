@@ -50,3 +50,20 @@ export function filterUpstreamLocalesByLang(
 
 	return locales.filter((row) => allowed.has(row.lang));
 }
+
+/**
+ * Resolves the GitHub owner for a locale fork.
+ *
+ * Uses per-row `fork_owner` from `.github/locales.json` when set; otherwise falls back to the
+ * workflow default (typically `GITHUB_REPOSITORY_OWNER`).
+ *
+ * @param locale Validated locale row from the registry
+ * @param defaultForkOwner Fallback owner when the row omits `fork_owner`
+ *
+ * @returns GitHub owner login for the locale fork
+ */
+export function resolveForkOwner(locale: UpstreamLocaleConfig, defaultForkOwner: string) {
+	const configuredOwner = locale.fork_owner?.trim();
+
+	return configuredOwner && configuredOwner.length > 0 ? configuredOwner : defaultForkOwner;
+}

@@ -5,7 +5,7 @@ import {
 	findMarkdownLinkViolations,
 	formatMarkdownLinkViolationSummary,
 } from "../analyzers/markdown-link.analyzer";
-import { PostTranslationGuardId } from "../validation.constants";
+import { POST_TRANSLATION_GUARD_IDS } from "../validation.constants";
 
 /**
  * Rejects translations that dropped or broke markdown links from the source.
@@ -20,7 +20,7 @@ export const markdownLinksPreservedGuard: PostTranslationValidationGuard = (sour
 	if (violations.length === 0) return null;
 
 	return {
-		guardId: PostTranslationGuardId.markdownLinksPreserved,
+		guardId: POST_TRANSLATION_GUARD_IDS.markdownLinksPreserved,
 		message: `Markdown links: ${formatMarkdownLinkViolationSummary(violations)}`,
 		retryHint: buildMarkdownLinkRetryHint(violations),
 	};

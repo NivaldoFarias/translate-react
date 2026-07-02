@@ -1,5 +1,6 @@
 import type { SetRequired } from "type-fest";
 
+import type { FailOpenReasonId } from "@/app/constants/fail-open.constants";
 import type { PatchedRepositoryTreeItem, PullRequestStatus } from "@/app/services/github/types";
 import type {
 	CacheCheckResult,
@@ -9,8 +10,12 @@ import type {
 
 import type { RunnerServiceDependencies } from "../runner.types";
 
+import { withRetry } from "@/app/clients/";
+import { DEFAULT_RETRY_CONFIG } from "@/app/clients/octokit/octokit.constants";
+import { FAIL_OPEN_REASONS } from "@/app/constants/fail-open.constants";
 import { TranslationFile } from "@/app/services/translator/";
 import { logger } from "@/app/utils/";
+import { toSafeErrorLogFields } from "@/shared/errors/error.helpers";
 
 import { TranslationPullRequestValidityManager } from "./translation-pull-request-validity.manager";
 import {
@@ -18,6 +23,22 @@ import {
 	LANGUAGE_CACHE_TTL_MS,
 	MIN_CACHE_CONFIDENCE,
 } from "./workflow.constants";
+
+type FailOpenInventory = Record<FailOpenReasonId, number>;
+
+/**
+ * Returns a zeroed fail-open counter map for discovery inventory logging.
+ *
+ * @returns Empty inventory with zero counts for each fail-open reason
+ */
+function createEmptyFailOpenInventory(): FailOpenInventory {
+	return {
+		[FAIL_OPEN_REASONS.prValidityEvaluationError]: 0,
+		[FAIL_OPEN_REASONS.languageDetectionEmptyContent]: 0,
+		[FAIL_OPEN_REASONS.languageDetectionShortContent]: 0,
+		[FAIL_OPEN_REASONS.languageDetectionCldUnreliable]: 0,
+	};
+}
 
 /**
  * Manages file discovery and filtering pipeline for translation workflow.
@@ -75,6 +96,8 @@ export class FileDiscoveryManager {
 	}> {
 		this.logger.debug({ fileCount: repositoryTree.length }, "Starting file discovery pipeline");
 
+		const failOpenInventory = createEmptyFailOpenInventory();
+
 		const uniqueFiles = repositoryTree.filter(
 			(file, index, self) => index === self.findIndex((compare) => compare.path === file.path),
 		);
@@ -89,8 +112,10 @@ export class FileDiscoveryManager {
 			"Stage 2/5: Cache lookup complete",
 		);
 
-		const { filesToFetch, numFilesWithPRs, invalidPRsByFile } =
-			await this.filterByPRs(candidateFiles);
+		const { filesToFetch, numFilesWithPRs, invalidPRsByFile } = await this.filterByPRs(
+			candidateFiles,
+			failOpenInventory,
+		);
 		this.logger.debug(
 			{
 				before: candidateFiles.length,
@@ -107,8 +132,10 @@ export class FileDiscoveryManager {
 			"Stage 4/5: Content fetch complete",
 		);
 
-		const { numFilesFiltered, filesToTranslate } =
-			await this.detectAndCacheLanguages(uncheckedFiles);
+		const { numFilesFiltered, filesToTranslate } = await this.detectAndCacheLanguages(
+			uncheckedFiles,
+			failOpenInventory,
+		);
 		this.logger.debug(
 			{
 				before: uncheckedFiles.length,
@@ -119,6 +146,7 @@ export class FileDiscoveryManager {
 		);
 
 		const totalFiltered = cacheHits + numFilesFiltered + numFilesWithPRs;
+		const failOpenTotal = Object.values(failOpenInventory).reduce((sum, count) => sum + count, 0);
 
 		this.logger.info(
 			{
@@ -135,6 +163,10 @@ export class FileDiscoveryManager {
 					byExistingPRs: numFilesWithPRs,
 					byLanguageDetection: numFilesFiltered,
 					total: totalFiltered,
+				},
+				failOpen: {
+					total: failOpenTotal,
+					byReason: failOpenInventory,
 				},
 			},
 			`Translation pipeline complete: ${filesToTranslate.length} files need translation (${totalFiltered} filtered across stages)`,
@@ -222,11 +254,13 @@ export class FileDiscoveryManager {
 	 * `invalidPRsByFile` for conflict messaging when a replacement PR is opened.
 	 *
 	 * @param candidateFiles Files remaining after cache check that require PR validation
+	 * @param failOpenInventory Mutable per-reason counters updated when PR validity evaluation fails open
 	 *
 	 * @returns Files to fetch, count of skipped files, and map of conflicted PRs
 	 */
 	public async filterByPRs(
 		candidateFiles: PatchedRepositoryTreeItem[],
+		failOpenInventory: FailOpenInventory = createEmptyFailOpenInventory(),
 	): Promise<PullRequestFilterResult> {
 		const invalidPRsByFile = new Map<string, { prNumber: number; status: PullRequestStatus }>();
 
@@ -235,7 +269,11 @@ export class FileDiscoveryManager {
 
 		for (const file of candidateFiles) {
 			try {
-				const validity = await this.translationPullRequestValidity.evaluate(file.path);
+				const validity = await withRetry(
+					() => this.translationPullRequestValidity.evaluate(file.path),
+					`${FileDiscoveryManager.name}.${this.filterByPRs.name}.evaluate`,
+					DEFAULT_RETRY_CONFIG,
+				);
 
 				if (validity.isValid) {
 					numFilesWithPRs++;
@@ -274,9 +312,15 @@ export class FileDiscoveryManager {
 
 				filesToFetch.push(file);
 			} catch (error) {
-				this.logger.warn(
-					{ path: file.path, error },
-					"Failed to evaluate translation pull request, including file for processing",
+				failOpenInventory[FAIL_OPEN_REASONS.prValidityEvaluationError]++;
+
+				this.logger.debug(
+					{
+						path: file.path,
+						failOpenReason: FAIL_OPEN_REASONS.prValidityEvaluationError,
+						...toSafeErrorLogFields(error),
+					},
+					"PR validity fail-open: including file for processing after evaluation error",
 				);
 				filesToFetch.push(file);
 			}
@@ -373,6 +417,7 @@ export class FileDiscoveryManager {
 	 * returned in the result.
 	 *
 	 * @param uncheckedFiles Files with fetched content awaiting language analysis
+	 * @param failOpenInventory Mutable per-reason counters updated from language analysis fallbacks
 	 *
 	 * @returns Statistics about filtered and analyzed files, plus files needing translation
 	 *
@@ -387,6 +432,7 @@ export class FileDiscoveryManager {
 	 */
 	private async detectAndCacheLanguages(
 		uncheckedFiles: TranslationFile[],
+		failOpenInventory: FailOpenInventory = createEmptyFailOpenInventory(),
 	): Promise<LanguageDetectionResult> {
 		let numFilesFiltered = 0;
 		const filesToTranslate: TranslationFile[] = [];
@@ -396,6 +442,10 @@ export class FileDiscoveryManager {
 				file.filename,
 				file.content,
 			);
+
+			if (analysis.failOpenReason) {
+				failOpenInventory[analysis.failOpenReason]++;
+			}
 
 			if (file.sha && (analysis.detectedLanguage || analysis.isTranslated)) {
 				const cacheKey = this.buildLanguageCacheKey(file);

@@ -160,6 +160,15 @@ describe("findFenceJsxStaticTextMismatches", () => {
 
 		expect(findFenceJsxStaticTextMismatches(source, translated)).toEqual([]);
 	});
+
+	test("completes on long near-valid nested-brace input without catastrophic backtracking", () => {
+		const nearValid = `<div>${"{".repeat(4_000)}`;
+		const startedAt = performance.now();
+
+		expect(collectJsxStaticTextSegments(nearValid)).toEqual([]);
+
+		expect(performance.now() - startedAt).toBeLessThan(500);
+	});
 });
 
 describe("formatFenceJsxStaticTextMismatchSummary", () => {

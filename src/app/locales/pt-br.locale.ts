@@ -1,29 +1,19 @@
 import type { TranslationFile } from "@/app/services/translator/";
-import type { PostTranslationGuardId } from "@/app/services/translator/validation/validation.constants";
 
-import type {
-	LocaleDefinition,
-	LocalePRBodyStrings,
-	ProgressCommentRunContext,
-	RemediationPullRequestCommentParams,
-} from "./types";
+import type { LocaleDefinition, LocalePRBodyStrings, ProgressCommentRunContext } from "./types";
 
+import { createGuardLabelResolver } from "./locale-guard-labels.util";
 import { createPRBodyBuilder } from "./pr-body.builder";
 
-/**
- * Brazilian Portuguese strings for the PR body template.
- *
- * Contains all translated text used in the pull request description,
- * following the data-driven approach for locale definitions.
- */
+/** Brazilian Portuguese strings for the PR body template */
 const ptBrPRBodyStrings: LocalePRBodyStrings = {
 	humanReviewNotice:
 		"Esta tradução foi gerada usando LLMs e **requer revisão humana** para garantir precisão, contexto cultural e terminologia técnica.",
 
 	conflictNotice: {
-		title: "PR anterior fechado",
+		title: "PR atualizado após conflito",
 		body: (prNumber) =>
-			`O PR #${prNumber} foi fechado automaticamente por conflito com a branch principal. Esta tradução foi refeita a partir do arquivo fonte atual, sem merge manual dos conflitos do PR anterior.`,
+			`O PR #${prNumber} estava em conflito com a branch principal. A tradução foi refeita a partir do arquivo fonte atual e a branch existente foi atualizada, sem merge manual dos conflitos anteriores.`,
 	},
 
 	maintainerWikiTip: (wikiUrl) =>
@@ -33,31 +23,28 @@ const ptBrPRBodyStrings: LocalePRBodyStrings = {
 		intro:
 			"A validação automática detectou problemas mecânicos que precisam de correção manual antes do merge:",
 		detailsSummary: "Ver detalhes da validação",
-		guardLabel: (guardId) => {
-			const labels: Record<PostTranslationGuardId, string> = {
-				markdownLinksPreserved: "Links markdown",
-				fenceFunctionIdentifiers: "Identificadores de função em blocos de código",
-				fenceJsxStaticText: "Texto JSX estático em blocos de código",
-				headingsPreserved: "Títulos",
-				frontmatterPreserved: "Frontmatter YAML",
-				sentenceCaseHeadings: "Sentence case em títulos",
-				mdxSpacing: "Espaçamento MDX",
-				extraMarkdownLinks: "Links extras",
-				mdxSlugPreserved: "Slugs MDX",
-				headingCountPreserved: "Contagem de títulos",
-				headingSyntax: "Sintaxe de títulos",
-				contentRatio: "Proporção de conteúdo",
-				nonEmptyContent: "Conteúdo vazio",
-			};
-
-			return labels[guardId];
-		},
+		guardLabel: createGuardLabelResolver({
+			markdownLinksPreserved: "Links markdown",
+			fenceFunctionIdentifiers: "Identificadores de função em blocos de código",
+			fenceJsxStaticText: "Texto JSX estático em blocos de código",
+			headingsPreserved: "Títulos",
+			frontmatterPreserved: "Frontmatter YAML",
+			sentenceCaseHeadings: "Sentence case em títulos",
+			mdxSpacing: "Espaçamento MDX",
+			extraMarkdownLinks: "Links extras",
+			mdxSlugPreserved: "Slugs MDX",
+			headingCountPreserved: "Contagem de títulos",
+			headingSyntax: "Sintaxe de títulos",
+			contentRatio: "Proporção de conteúdo",
+			nonEmptyContent: "Conteúdo vazio",
+		}),
 		violationTally: (count) => (count === 1 ? "1 violação" : `${count} violações`),
 	},
 };
 
 /**
- * LLM rules for pt-br.react.dev (maintainer review evidence; static JSX demo text in fences is also enforced by the `fenceJsxStaticText` post-translation guard).
+ * LLM rules for pt-br.react.dev. Static JSX demo text in fences is also
+ * enforced by the `fenceJsxStaticText` post-translation guard.
  *
  * @see {@link https://github.com/NivaldoFarias/translate-react/issues/50}
  */
@@ -119,43 +106,6 @@ export const ptBrLocale: LocaleDefinition = {
 		createdSectionHeader: "### PRs criados",
 		updatedSectionHeader: "### PRs atualizados",
 		suffix: `[^1]: as traduções foram geradas por uma LLM e requerem revisão humana para garantir precisão técnica e fluência.`,
-		remediationPullRequestComment: ({
-			filename,
-			maintainerLogins,
-			runContext,
-			advisoryNoticeCount,
-		}: RemediationPullRequestCommentParams) => {
-			const mentions = maintainerLogins.map((login) => `@${login}`).join(", ");
-			const opener =
-				runContext ?
-					`O [\`translate-react@${runContext.version}\`](${runContext.releaseUrl}) publicou um novo commit neste PR.`
-				:	"O translate-react publicou um novo commit neste PR.";
-
-			const lines = [
-				opener,
-				"",
-				`Motivo: revisões com **CHANGES_REQUESTED** de ${mentions} após o último commit automatizado de \`${filename}\`.`,
-				"",
-				"A página foi retraduzida com o corpo das revisões no prompt do LLM; a descrição do PR foi atualizada.",
-			];
-
-			if (advisoryNoticeCount > 0) {
-				lines.push(
-					"",
-					`> [!NOTE]`,
-					`> A validação automática reportou ${advisoryNoticeCount} aviso(s) consultivo(s) na descrição deste PR.`,
-				);
-			}
-
-			if (runContext) {
-				lines.push(
-					"",
-					`###### **GitHub Action Run:** [\`${runContext.workflowName} #${runContext.runId}\`](${runContext.url})`,
-				);
-			}
-
-			return lines.join("\n");
-		},
 	},
 	rules: {
 		specific: PT_BR_SPECIFIC_RULES,

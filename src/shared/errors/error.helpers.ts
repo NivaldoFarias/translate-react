@@ -4,8 +4,6 @@ import { AbortError } from "p-retry";
 
 import type { Logger } from "pino";
 
-import type { TranslatorService } from "@/app/services/translator";
-
 import { ApplicationError, ErrorCode } from "./error";
 
 /**
@@ -105,7 +103,7 @@ export function handleTopLevelError(error: unknown, logger: Logger): void {
  * Matches {@link ApplicationError} with a truncated-output message, including when
  * wrapped in {@link AbortError} from `p-retry`.
  *
- * @param error Caught rejection from {@link TranslatorService.callLanguageModel}
+ * @param error Caught rejection from an LLM completion call (e.g. `TranslationLlmClient.callLanguageModel`)
  *
  * @returns `true` when the model stopped at the completion token limit
  */
@@ -141,7 +139,140 @@ export function isSegmentBatchIdMismatchError(error: unknown) {
 }
 
 /**
- * Exhaustively checks wether the provided error is an uncast {@link RequestError}
+ * Returns whether `error` is a JSON-parse or schema-validation failure on a segment batch response.
+ *
+ * Matches "Segment batch response was not valid JSON" and "Segment batch response failed schema
+ * validation", including when wrapped in {@link AbortError} from `p-retry`.
+ *
+ * @param error Caught rejection from segment batch translation
+ *
+ * @returns `true` when the LLM returned unparseable or schema-invalid segment JSON
+ */
+export function isSegmentBatchStructuredOutputError(error: unknown) {
+	if (error instanceof ApplicationError && error.code === ErrorCode.TranslationFailed) {
+		return (
+			error.message === "Segment batch response was not valid JSON" ||
+			error.message === "Segment batch response failed schema validation"
+		);
+	}
+
+	if (error instanceof AbortError) {
+		return isSegmentBatchStructuredOutputError(error.originalError);
+	}
+
+	return false;
+}
+
+/** Log reason when a segment batch is split after a splittable failure */
+export type SegmentBatchSplitReason =
+	| "completion_token_limit"
+	| "segment_batch_id_mismatch"
+	| "structured_output_error";
+
+/**
+ * Returns whether a segment batch failure can be recovered by splitting the batch.
+ *
+ * Matches completion truncation, id mismatches, and JSON parse or schema validation
+ * failures, including when wrapped in {@link AbortError} from `p-retry`.
+ *
+ * @param error Caught rejection from segment batch translation
+ *
+ * @returns `true` when the translator should split the batch instead of retrying the same payload
+ */
+export function isSegmentBatchSplittableError(error: unknown) {
+	return (
+		isCompletionLengthTruncationError(error) ||
+		isSegmentBatchIdMismatchError(error) ||
+		isSegmentBatchStructuredOutputError(error)
+	);
+}
+
+/**
+ * Resolves the log reason for a splittable segment batch failure.
+ *
+ * @param error Caught rejection from segment batch translation
+ *
+ * @returns Split reason for structured logging
+ *
+ * @see {@link isSegmentBatchSplittableError}
+ */
+export function getSegmentBatchSplitReason(error: unknown): SegmentBatchSplitReason {
+	if (isCompletionLengthTruncationError(error)) {
+		return "completion_token_limit";
+	}
+
+	if (isSegmentBatchIdMismatchError(error)) {
+		return "segment_batch_id_mismatch";
+	}
+
+	return "structured_output_error";
+}
+
+/**
+ * Returns whether a value is a non-null object record.
+ *
+ * @param value Value to narrow
+ *
+ * @returns `true` when `value` is a plain object record
+ */
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null;
+}
+
+/**
+ * Returns log-safe fields from an error without request headers or other sensitive payloads.
+ *
+ * @param error Caught rejection or thrown value
+ *
+ * @returns Message, name, and optional HTTP status or error code
+ */
+export function toSafeErrorLogFields(error: unknown) {
+	if (error instanceof ApplicationError) {
+		return {
+			message: error.message,
+			name: error.name,
+			code: error.code,
+			...(error.statusCode !== undefined ? { status: error.statusCode } : {}),
+		};
+	}
+
+	if (error instanceof RequestError || isUncastRequestError(error)) {
+		return {
+			message: error.message,
+			name: error.name,
+			status: error.status,
+		};
+	}
+
+	if (error instanceof Error) {
+		return {
+			message: error.message,
+			name: error.name,
+		};
+	}
+
+	return {
+		message: String(error),
+		name: "UnknownError",
+	};
+}
+
+/**
+ * Returns whether an error is a workflow circuit-breaker termination.
+ *
+ * @param error Caught rejection from batch file processing
+ *
+ * @returns `true` when consecutive failure threshold halted the workflow
+ */
+export function isCircuitBreakerError(error: unknown) {
+	if (!(error instanceof ApplicationError)) return false;
+	if (!isRecord(error.metadata)) return false;
+
+	return error.metadata["circuitBreaker"] === true;
+}
+
+/**
+ * Exhaustively checks whether the provided error is an uncast {@link RequestError}
  *
  * @param error The error to check
  *
@@ -165,7 +296,7 @@ export function isUncastRequestError(error: unknown): error is RequestError {
 }
 
 /**
- * Exhaustively checks wether the provided error is an uncast {@link APIError}
+ * Exhaustively checks whether the provided error is an uncast {@link APIError}
  *
  * @param error The error to check
  *

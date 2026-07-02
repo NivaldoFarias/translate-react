@@ -4,6 +4,7 @@ import type { Logger } from "pino";
 import type { TranslationMatrixEntry, UpstreamLocaleConfig } from "@/ci/services/upstream/types";
 
 import { UpstreamHeadShaService } from "./upstream-head-sha.service";
+import { resolveForkOwner } from "./upstream-locales.util";
 
 /**
  * Builds a full translation matrix (manual runs) with current upstream SHAs for each locale.
@@ -43,7 +44,7 @@ export class TranslationMatrixBuilder {
 
 			matrix.push({
 				...locale,
-				fork_owner: forkOwner,
+				fork_owner: resolveForkOwner(locale, forkOwner),
 				upstream_sha: upstreamSha,
 			});
 

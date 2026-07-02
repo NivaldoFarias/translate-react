@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
+import { FAIL_OPEN_REASONS } from "@/app/constants/fail-open.constants";
 import { FileDiscoveryManager } from "@/app/services/runner/workflow/file-discovery.manager";
 
 import {
@@ -30,6 +31,40 @@ describe("FileDiscoveryManager", () => {
 
 			expect(result.filesToFetch).toHaveLength(1);
 			expect(result.numFilesWithPRs).toBe(0);
+		});
+
+		test("increments PR validity fail-open counter when evaluation fails", async () => {
+			const github = createMockGitHubService();
+			github.findPullRequestByBranch.mockRejectedValue(new Error("GitHub API unavailable"));
+
+			const manager = createTestFileDiscoveryManager({ github });
+			const candidate = createRepositoryTreeItemFixture({ path: "src/content/page.md" });
+			const failOpenInventory = {
+				[FAIL_OPEN_REASONS.prValidityEvaluationError]: 0,
+				[FAIL_OPEN_REASONS.languageDetectionEmptyContent]: 0,
+				[FAIL_OPEN_REASONS.languageDetectionShortContent]: 0,
+				[FAIL_OPEN_REASONS.languageDetectionCldUnreliable]: 0,
+			};
+
+			await manager.filterByPRs([candidate], failOpenInventory);
+
+			expect(failOpenInventory[FAIL_OPEN_REASONS.prValidityEvaluationError]).toBe(1);
+		});
+
+		test("retries transient PR validity errors before fail-open", async () => {
+			const github = createMockGitHubService();
+			github.findPullRequestByBranch
+				.mockRejectedValueOnce(new Error("ECONNRESET"))
+				.mockRejectedValueOnce(new Error("ECONNRESET"))
+				.mockRejectedValue(new Error("GitHub API unavailable"));
+
+			const manager = createTestFileDiscoveryManager({ github });
+			const candidate = createRepositoryTreeItemFixture({ path: "src/content/page.md" });
+
+			const result = await manager.filterByPRs([candidate]);
+
+			expect(github.findPullRequestByBranch).toHaveBeenCalledTimes(3);
+			expect(result.filesToFetch).toHaveLength(1);
 		});
 
 		test("skips file when open translation pull request is valid", async () => {

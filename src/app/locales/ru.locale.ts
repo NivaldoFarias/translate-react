@@ -1,57 +1,43 @@
 import type { TranslationFile } from "@/app/services/translator/";
-import type { PostTranslationGuardId } from "@/app/services/translator/validation/validation.constants";
 
-import type {
-	LocaleDefinition,
-	LocalePRBodyStrings,
-	ProgressCommentRunContext,
-	RemediationPullRequestCommentParams,
-} from "./types";
+import type { LocaleDefinition, LocalePRBodyStrings, ProgressCommentRunContext } from "./types";
 
+import { createGuardLabelResolver } from "./locale-guard-labels.util";
 import { createPRBodyBuilder } from "./pr-body.builder";
 
-/**
- * Russian strings for the PR body template.
- *
- * Contains all translated text used in the pull request description,
- * following the data-driven approach for locale definitions.
- */
+/** Russian strings for the PR body template */
 const ruPRBodyStrings: LocalePRBodyStrings = {
 	humanReviewNotice:
 		"Этот перевод был создан с использованием LLM и **требует проверки человеком** для обеспечения точности, культурного контекста и технической терминологии.",
 
 	conflictNotice: {
-		title: "Предыдущий PR закрыт",
+		title: "PR обновлён после конфликта",
 		body: (prNumber) =>
-			`PR #${prNumber} закрыт автоматически из-за конфликта с основной веткой. Перевод сделан заново по текущему исходному файлу, без ручного разрешения конфликтов из предыдущего PR.`,
+			`PR #${prNumber} был в конфликте с основной веткой. Перевод сделан заново по текущему исходному файлу, а существующая ветка обновлена, без ручного разрешения предыдущих конфликтов.`,
 	},
 
 	maintainerWikiTip: (wikiUrl) =>
-		`См. [For React Docs Maintainers](${wikiUrl}) — руководство для ревьюеров и формат структурированного feedback.`,
+		`См. [For React Docs Maintainers](${wikiUrl}): руководство для ревьюеров и формат структурированного feedback.`,
 
 	reviewerWarnings: {
 		intro:
 			"Автоматическая проверка обнаружила механические проблемы, которые нужно исправить вручную перед merge:",
 		detailsSummary: "Показать детали проверки",
-		guardLabel: (guardId) => {
-			const labels: Record<PostTranslationGuardId, string> = {
-				markdownLinksPreserved: "Markdown-ссылки",
-				fenceFunctionIdentifiers: "Идентификаторы функций в блоках кода",
-				fenceJsxStaticText: "Статический JSX-текст в блоках кода",
-				headingsPreserved: "Заголовки",
-				frontmatterPreserved: "YAML frontmatter",
-				sentenceCaseHeadings: "Sentence case в заголовках",
-				mdxSpacing: "Интервалы MDX",
-				extraMarkdownLinks: "Лишние ссылки",
-				mdxSlugPreserved: "MDX-slug",
-				headingCountPreserved: "Количество заголовков",
-				headingSyntax: "Синтаксис заголовков",
-				contentRatio: "Соотношение объёма текста",
-				nonEmptyContent: "Пустой перевод",
-			};
-
-			return labels[guardId];
-		},
+		guardLabel: createGuardLabelResolver({
+			markdownLinksPreserved: "Markdown-ссылки",
+			fenceFunctionIdentifiers: "Идентификаторы функций в блоках кода",
+			fenceJsxStaticText: "Статический JSX-текст в блоках кода",
+			headingsPreserved: "Заголовки",
+			frontmatterPreserved: "YAML frontmatter",
+			sentenceCaseHeadings: "Sentence case в заголовках",
+			mdxSpacing: "Интервалы MDX",
+			extraMarkdownLinks: "Лишние ссылки",
+			mdxSlugPreserved: "MDX-slug",
+			headingCountPreserved: "Количество заголовков",
+			headingSyntax: "Синтаксис заголовков",
+			contentRatio: "Соотношение объёма текста",
+			nonEmptyContent: "Пустой перевод",
+		}),
 		violationTally: (count) => {
 			const mod10 = count % 10;
 			const mod100 = count % 100;
@@ -87,43 +73,6 @@ export const ruLocale: LocaleDefinition = {
 		createdSectionHeader: "### Созданные PR",
 		updatedSectionHeader: "### Обновлённые PR",
 		suffix: `[^1]: переводы были сгенерированы с использованием LLM и требуют проверки человеком для обеспечения точности, культурного контекста и технической терминологии.`,
-		remediationPullRequestComment: ({
-			filename,
-			maintainerLogins,
-			runContext,
-			advisoryNoticeCount,
-		}: RemediationPullRequestCommentParams) => {
-			const mentions = maintainerLogins.map((login) => `@${login}`).join(", ");
-			const opener =
-				runContext ?
-					`[\`translate-react@${runContext.version}\`](${runContext.releaseUrl}) опубликовал новый коммит в этом PR.`
-				:	"translate-react опубликовал новый коммит в этом PR.";
-
-			const lines = [
-				opener,
-				"",
-				`Причина: отзывы со статусом **CHANGES_REQUESTED** от ${mentions} после последнего автоматического коммита для \`${filename}\`.`,
-				"",
-				"Страница переведена заново с учётом текста отзывов в промпте LLM; описание PR обновлено.",
-			];
-
-			if (advisoryNoticeCount > 0) {
-				lines.push(
-					"",
-					`> [!NOTE]`,
-					`> Автоматическая проверка сообщила о ${advisoryNoticeCount} рекомендательных предупреждении(ях) в описании PR.`,
-				);
-			}
-
-			if (runContext) {
-				lines.push(
-					"",
-					`###### **GitHub Action Run:** [\`${runContext.workflowName} #${runContext.runId}\`](${runContext.url})`,
-				);
-			}
-
-			return lines.join("\n");
-		},
 	},
 	rules: {
 		specific: `

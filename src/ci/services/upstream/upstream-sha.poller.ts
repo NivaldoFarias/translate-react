@@ -10,6 +10,7 @@ import type {
 import type { UpstreamShaVariableReader } from "./upstream-sha-variable.reader";
 
 import { UpstreamHeadShaService } from "./upstream-head-sha.service";
+import { resolveForkOwner } from "./upstream-locales.util";
 
 /**
  * Compares upstream default-branch tips to stored repository variables and builds a translation matrix.
@@ -64,7 +65,7 @@ export class UpstreamShaPoller {
 			if (hasChanged) {
 				matrix.push({
 					...locale,
-					fork_owner: forkOwner,
+					fork_owner: resolveForkOwner(locale, forkOwner),
 					upstream_sha: currentSha,
 				});
 			}

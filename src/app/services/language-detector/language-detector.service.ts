@@ -1,14 +1,56 @@
 import cld from "cld";
+import pRetry from "p-retry";
 
+import type { FailOpenReasonId } from "@/app/constants/fail-open.constants";
 import type { ReactLanguageCode } from "@/app/utils/";
 
+import { FAIL_OPEN_REASONS } from "@/app/constants/fail-open.constants";
 import { env, logger, REACT_TRANSLATION_LANGUAGES } from "@/app/utils/";
 import { ApplicationError, ErrorCode } from "@/shared/errors/";
+import { toSafeErrorLogFields } from "@/shared/errors/error.helpers";
 
 import {
+	CLD_DETECTION_RETRY_CONFIG,
 	MIN_CONTENT_LENGTH_FOR_DETECTION,
 	TRANSLATION_RATIO_THRESHOLD,
 } from "./language-detector.constants";
+
+const LANGUAGE_DETECTOR_CODE_BLOCK = /```[\s\S]*?```/g;
+const LANGUAGE_DETECTOR_INLINE_CODE = /`[^`]*`/g;
+const LANGUAGE_DETECTOR_URLS = /https?:\/\/[^\s]+/g;
+const LANGUAGE_DETECTOR_WHITESPACE = /\s+/g;
+
+/**
+ * Removes angle-bracket tags without regex backtracking on unclosed `<`.
+ *
+ * @param content Markdown or HTML-like text
+ *
+ * @returns Text with tag spans replaced by spaces
+ */
+function stripHtmlLikeTags(content: string) {
+	let result = "";
+	let index = 0;
+
+	while (index < content.length) {
+		const openTag = content.indexOf("<", index);
+		if (openTag < 0) {
+			result += content.slice(index);
+			break;
+		}
+
+		result += content.slice(index, openTag);
+		const closeTag = content.indexOf(">", openTag + 1);
+		if (closeTag < 0) {
+			result += " ";
+			break;
+		}
+
+		result += " ";
+		index = closeTag + 1;
+	}
+
+	return result;
+}
 
 /**
  * Configuration interface for language detection settings.
@@ -64,6 +106,13 @@ export interface LanguageAnalysisResult {
 
 	/** Raw CLD detection result for advanced usage */
 	rawResult: cld.DetectLanguage;
+
+	/**
+	 * When set, analysis fell back to `isTranslated: false` for empty or short content.
+	 *
+	 * Inventory-only signal for fail-open discovery metrics (#40).
+	 */
+	failOpenReason?: FailOpenReasonId;
 }
 
 /**
@@ -75,7 +124,7 @@ export interface LanguageAnalysisResult {
  *
  * @example
  * ```typescript
- * const detector = new LanguageDetector();
+ * const detector = new LanguageDetectorService({ source: "en", target: "pt-br" });
  * const analysis = await detector.analyzeLanguage('readme.md', 'Hello world');
  * console.log(analysis.isTranslated); // false
  * ```
@@ -131,7 +180,7 @@ export class LanguageDetectorService {
 	 * @param code React language code (e.g., `"en"`, `"pt-br"`, `"zh-hans"`)
 	 * @param isTargetLanguage Whether the code is for the target language (default: `true`)
 	 *
-	 * @returns Human-readable language name or `"Unknown"` if not found/invalid
+	 * @returns Human-readable language name, or `"Unknown"` when {@link Intl.DisplayNames} cannot resolve it
 	 *
 	 * @throws {ApplicationError} with {@link ErrorCode.LanguageCodeNotSupported|`"LANGUAGE_CODE_NOT_SUPPORTED"`} If the language code is not supported
 	 *
@@ -139,7 +188,6 @@ export class LanguageDetectorService {
 	 * ```typescript
 	 * detector.getLanguageName('pt-br'); 	// "Brazilian Portuguese"
 	 * detector.getLanguageName('zh-hans'); // "Simplified Chinese"
-	 * detector.getLanguageName('invalid'); // "Unknown"
 	 * ```
 	 */
 	public getLanguageName(code: ReactLanguageCode, isTargetLanguage = true): string {
@@ -213,12 +261,14 @@ export class LanguageDetectorService {
 	 * @returns Resolves to a detailed {@link LanguageAnalysisResult} with confidence scores,
 	 *   translation status, detected language, and raw CLD results
 	 *
+	 * @throws {ApplicationError} When CLD raises an unexpected error after retries (metadata includes `reliable: false`)
+	 *
 	 * @see {@link cleanContent} for content preprocessing logic
 	 * @see {@link findLanguageScore} for confidence score calculation
 	 *
 	 * @example
 	 * ```typescript
-	 * const detector = new LanguageDetector({ source: 'en', target: 'pt-br' });
+	 * const detector = new LanguageDetectorService({ source: 'en', target: 'pt-br' });
 	 * const analysis = await detector.analyzeLanguage('readme.md', 'Olá mundo');
 	 *
 	 * console.log(analysis.isTranslated); 			// true
@@ -227,7 +277,9 @@ export class LanguageDetectorService {
 	 * ```
 	 */
 	public async analyzeLanguage(filename: string, content: string): Promise<LanguageAnalysisResult> {
-		const fallbackLanguageAnalysisResult: LanguageAnalysisResult = {
+		const fallbackLanguageAnalysisResult = (
+			failOpenReason: FailOpenReasonId,
+		): LanguageAnalysisResult => ({
 			languageScore: { target: 0, source: 0 },
 			ratio: 0,
 			isTranslated: false,
@@ -238,33 +290,43 @@ export class LanguageDetectorService {
 				textBytes: content.length,
 				chunks: [],
 			},
-		};
+			failOpenReason,
+		});
 
 		try {
 			this.logger.info({ filename }, "Starting language analysis");
 
 			if (!content.trim()) {
-				this.logger.warn({ contentLength: content.length }, "File content is empty");
+				this.logger.debug(
+					{
+						filename,
+						failOpenReason: FAIL_OPEN_REASONS.languageDetectionEmptyContent,
+						contentLength: content.length,
+					},
+					"Language analysis fail-open: empty content treated as not translated",
+				);
 
-				return fallbackLanguageAnalysisResult;
+				return fallbackLanguageAnalysisResult(FAIL_OPEN_REASONS.languageDetectionEmptyContent);
 			}
 
 			const cleanContent = this.cleanContent(content);
 
 			if (cleanContent.length < this.MIN_CONTENT_LENGTH) {
-				this.logger.warn(
+				this.logger.debug(
 					{
+						filename,
+						failOpenReason: FAIL_OPEN_REASONS.languageDetectionShortContent,
 						contentLength: content.length,
 						cleanedLength: cleanContent.length,
 						minContentLength: this.MIN_CONTENT_LENGTH,
 					},
-					"Cleaned prose length is below minimum threshold for reliable detection",
+					"Language analysis fail-open: short cleaned prose treated as not translated",
 				);
 
-				return fallbackLanguageAnalysisResult;
+				return fallbackLanguageAnalysisResult(FAIL_OPEN_REASONS.languageDetectionShortContent);
 			}
 
-			const detection = await cld.detect(cleanContent);
+			const detection = await this.detectWithRetry(cleanContent);
 
 			const primaryLanguage = detection.languages[0];
 			const detectedLanguage = primaryLanguage?.code ?? "und";
@@ -292,10 +354,52 @@ export class LanguageDetectorService {
 		} catch (error) {
 			if (error instanceof ApplicationError) throw error;
 
-			this.logger.error({ error }, "Language analysis failed. returning fallback result");
+			if (this.isUnreliableCldIdentificationError(error)) {
+				this.logger.debug(
+					{
+						filename,
+						failOpenReason: FAIL_OPEN_REASONS.languageDetectionCldUnreliable,
+						...toSafeErrorLogFields(error),
+					},
+					"Language analysis fail-open: CLD could not identify language",
+				);
 
-			return fallbackLanguageAnalysisResult;
+				return fallbackLanguageAnalysisResult(FAIL_OPEN_REASONS.languageDetectionCldUnreliable);
+			}
+
+			throw new ApplicationError(
+				"Language detection failed after retries",
+				ErrorCode.UnknownError,
+				`${LanguageDetectorService.name}.${this.analyzeLanguage.name}`,
+				{
+					filename,
+					reliable: false,
+					...toSafeErrorLogFields(error),
+				},
+			);
 		}
+	}
+
+	/**
+	 * Returns whether CLD rejected content as too ambiguous to classify reliably.
+	 *
+	 * @param error Thrown value from a CLD `detect` call
+	 *
+	 * @returns `true` when the error indicates unreliable identification rather than infrastructure failure
+	 */
+	private isUnreliableCldIdentificationError(error: unknown) {
+		return error instanceof Error && error.message === "Failed to identify language";
+	}
+
+	/**
+	 * Runs CLD detection with bounded retries before surfacing a failure to callers.
+	 *
+	 * @param cleanContent Preprocessed prose suitable for CLD analysis
+	 *
+	 * @returns CLD detection payload
+	 */
+	private detectWithRetry(cleanContent: string): Promise<cld.DetectLanguage> {
+		return pRetry(() => cld.detect(cleanContent), CLD_DETECTION_RETRY_CONFIG);
 	}
 
 	/**
@@ -362,22 +466,11 @@ export class LanguageDetectorService {
 	private cleanContent(content: string): string {
 		this.logger.debug("Cleaning content for language detection");
 
-		const regexes = {
-			codeBlock: new RegExp(/```[\s\S]*?```/g),
-			inlineCode: new RegExp(/`[^`]*`/g),
-			htmlTags: new RegExp(/<[^>]*>/g),
-			urls: new RegExp(/https?:\/\/[^\s]+/g),
-			whitespace: new RegExp(/\s+/g),
-		} as const;
-
-		this.logger.debug({ regexes }, "Using regex patterns for content cleaning");
-
-		const cleanedContent = content
-			.replace(regexes.codeBlock, " ")
-			.replace(regexes.inlineCode, " ")
-			.replace(regexes.htmlTags, " ")
-			.replace(regexes.urls, " ")
-			.replace(regexes.whitespace, " ")
+		const cleanedContent = stripHtmlLikeTags(content)
+			.replace(LANGUAGE_DETECTOR_CODE_BLOCK, " ")
+			.replace(LANGUAGE_DETECTOR_INLINE_CODE, " ")
+			.replace(LANGUAGE_DETECTOR_URLS, " ")
+			.replace(LANGUAGE_DETECTOR_WHITESPACE, " ")
 			.trim();
 
 		this.logger.debug(

@@ -4,8 +4,6 @@ import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 import type { ReactLanguageCode } from "@/app/constants";
 import type {
-	LatestTranslationCommitSnapshot,
-	PullRequestReviewCommentSnapshot,
 	PullRequestReviewSnapshot,
 	PullRequestStatus,
 	RepositoryMarkdownBlob,
@@ -31,25 +29,10 @@ export type MockLanguageDetectorAnalyzeLanguageFn = (
 	content: string,
 ) => Promise<LanguageAnalysisResult>;
 
-/** Mock signature for {@link GitHubService.getLatestTranslationCommit} */
-export type MockGitHubGetLatestTranslationCommitFn = (
-	branchName: string,
-) => Promise<LatestTranslationCommitSnapshot | undefined>;
-
-/** Mock signature for {@link GitHubService.getLatestTranslationCommitTimestamp} */
-export type MockGitHubGetLatestTranslationCommitTimestampFn = (
-	branchName: string,
-) => Promise<Date | undefined>;
-
 /** Mock signature for {@link GitHubService.listPullRequestReviews} */
 export type MockGitHubListPullRequestReviewsFn = (
 	prNumber: number,
 ) => Promise<PullRequestReviewSnapshot[]>;
-
-/** Mock signature for {@link GitHubService.listPullRequestReviewComments} */
-export type MockGitHubListPullRequestReviewCommentsFn = (
-	prNumber: number,
-) => Promise<PullRequestReviewCommentSnapshot[]>;
 
 /** Mock signature for {@link GitHubService.getForkFileContentAtBranch} */
 export type MockGitHubGetForkFileContentAtBranchFn = (
@@ -76,8 +59,6 @@ export function createMockCommentBuilderService() {
 			prefix: "As seguintes páginas foram traduzidas nesta execução:",
 			createdSectionHeader: "**PRs criados**",
 			updatedSectionHeader: "**PRs atualizados**",
-			remediationPullRequestComment: ({ filename }: { filename: string }) =>
-				`Remediation commit pushed for \`${filename}\`.`,
 		},
 	};
 }
@@ -191,16 +172,6 @@ export function createMockGitHubService() {
 		listPullRequestIssueComments: mock(() => Promise.resolve([])),
 		listPullRequestReviews: mock(
 			(_prNumber: number): Promise<PullRequestReviewSnapshot[]> => Promise.resolve([]),
-		),
-		listPullRequestReviewComments: mock(
-			(_prNumber: number): Promise<PullRequestReviewCommentSnapshot[]> => Promise.resolve([]),
-		),
-		getLatestTranslationCommit: mock(
-			(_branchName: string): Promise<LatestTranslationCommitSnapshot | undefined> =>
-				Promise.resolve(undefined),
-		),
-		getLatestTranslationCommitTimestamp: mock(
-			(_branchName: string): Promise<Date | undefined> => Promise.resolve(undefined),
 		),
 		commentCompiledResultsOnIssue: mock(() => Promise.resolve({ id: 1 })),
 	};

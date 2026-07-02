@@ -32,7 +32,7 @@ describe("sentenceCaseHeadingsGuard", () => {
 describe("mdxSpacingGuard", () => {
 	test("flags prose glued to slug comments", () => {
 		const source = "## Title {/*slug*/}\n\npor [Name](url).";
-		const translated = "## Título{/*slug*/}\n\npor[Name](url).";
+		const translated = "## Título{/*slug*/}\n\npor [Name](url).";
 
 		expect(mdxSpacingGuard(source, translated)?.guardId).toBe("mdxSpacing");
 	});
@@ -61,6 +61,32 @@ describe("mdxSpacingGuard", () => {
 		const translated = "[A](url1)],[B](url2)";
 
 		expect(mdxSpacingGuard("x", translated)?.guardId).toBe("mdxSpacing");
+	});
+
+	test("flags Portuguese word glued to markdown link (advisory only — not auto-repaired)", () => {
+		const translated = "por[Link](url)";
+
+		expect(mdxSpacingGuard("x", translated)?.guardId).toBe("mdxSpacing");
+	});
+
+	test("flags inline code glued to non-ASCII prose letter", () => {
+		const translated = "ver `useState`é obrigatório.";
+
+		expect(mdxSpacingGuard("x", translated)?.guardId).toBe("mdxSpacing");
+	});
+
+	test("returns null for properly spaced inline code before prose", () => {
+		const translated = "Use `hydrateRoot` to attach React.";
+
+		expect(mdxSpacingGuard("x", translated)).toBeNull();
+	});
+
+	test("includes violation label and excerpt in guard message", () => {
+		const translated = "Use `hydrateRoot`to attach React.";
+		const result = mdxSpacingGuard("x", translated);
+
+		expect(result?.message).toContain("MDX spacing issues detected");
+		expect(result?.message).toContain("missing space after inline code");
 	});
 });
 
