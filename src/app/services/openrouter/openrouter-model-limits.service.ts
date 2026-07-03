@@ -65,7 +65,7 @@ export class OpenRouterModelLimitsService {
 	 *
 	 * @param baseUrl Same `LLM_API_BASE_URL` used for chat completions
 	 * @param apiKey Bearer token (`LLM_API_KEY`)
-	 * @param modelId Model id to match (for example `google/gemini-2.0-flash-exp:free`)
+	 * @param modelId Model id to match (for example `openai/gpt-oss-20b:free`)
 	 *
 	 * @returns Limits when a matching row is found and numeric fields are usable; otherwise `null`
 	 */

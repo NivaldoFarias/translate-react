@@ -4,9 +4,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+## [0.2.10] - 2026-07-02
+
 ### Added
 
 - Optional `fork_owner` on each `.github/locales.json` row overrides the workflow default fork owner when poll or manual matrix builds translation jobs.
+- CI runs a real-LLM workflow smoke gate once per configured locale before merging changes under `src/app/services/translator/`, `src/app/services/runner/`, or `src/app/locales/`; `ci:smoke` accepts `--lang` to target a specific locale instead of the `pt-br` default.
+- `run-workflow-smoke` composite action shares the checkout, dependency setup, and `ci:smoke` invocation between the CI gate and the manual `smoke.yml` dispatch.
 
 ### Removed
 
@@ -14,6 +18,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Changed
 
+- CI smoke gate requires only the default `pt-br` locale before merge; other configured locales run as optional jobs that do not block the workflow. Smoke jobs cap at 120 minutes.
 - Discovery retries transient GitHub errors during pull-request validity checks before fail-open inclusion, and unexpected CLD failures after retries now stop the workflow instead of silently scheduling extra translation work; empty, short, or unidentifiable content still counts as not translated.
 - GitHub file content, pull request, and translation-progress issue operations now live in dedicated modules composed by `GitHubService`; branch cleanup hooks bind directly to the pull request module.
 - Translation batch processing now delegates per-file work to dedicated branch, pull request, and file processor modules while the batch manager keeps batching and the consecutive-failure circuit breaker.
@@ -29,6 +34,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 - Concurrent `translateContent` calls on the shared translator service no longer share per-file LLM usage or translation-path state.
 - Language-detector tag stripping and JSX static-text link analyzers use linear scans instead of nested-regex patterns that could backtrack on near-valid upstream markdown.
 - Segment batches pack at most 20 prose segments per LLM request (down from 40), reducing structured JSON parse failures and split retries on segment-heavy pages.
+- Russian translation rules explicitly call out the `ё` letter, guillemet quotation marks («»), the `бандлер` glossary term, lowercase `серверные`/`клиентские компоненты` casing, and named MDN built-in type pages, addressing reviewer feedback on generated Russian pull requests.
 - Quick `ci:smoke` profile drops the segment-heavy `invalid-hook-call-warning.md` fixture so pre-merge runs finish sooner.
 - Translation and smoke workflow jobs no longer set `timeout-minutes`, so long locale runs are not cut off at the previous two-hour caps.
 - Segment batch failures from truncated output, id mismatch, or malformed JSON now split the batch on the first error instead of repeating the same LLM call through `p-retry`, reducing wasted retries and LLM cost.
@@ -40,6 +46,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Fixed
 
+- Workflow smoke sets `TARGET_LANGUAGE` from the locale input before `ci:smoke` starts, and CLI override bootstrap no longer loads env validation early, so non-default locale smoke runs use the correct translation rules.
 - Segment-batch and frontmatter-batch LLM calls with provider `finishReason: "error"` now fail like full-body calls instead of accepting malformed provider output.
 - GitHub integration logs only safe error fields (`message`, `status`, `code`, `name`) so Octokit request headers are not written to workflow logs.
 - Consecutive translation failures now halt the workflow once the circuit-breaker threshold is reached instead of continuing through remaining files.
@@ -48,6 +55,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 - Glued inline code, MDX slug comments, and adjacent markdown links are repaired before advisory validation so those mechanical spacing regressions no longer surface as `mdxSpacing` reviewer notices on translation pull requests.
 - Blank `TARGET_LANGUAGE` or `SOURCE_LANGUAGE` from GitHub Actions or `.env` no longer fails validation; empty values default to `pt-br` and `en`.
 - Translation pull request conflict notices no longer claim the previous PR was closed when the runner refreshes the branch in place.
+- CI per-locale smoke gate jobs no longer inherit the 15-minute workflow timeout that cancelled in-progress `quick` runs.
 
 ## [0.2.9] - 2026-06-22
 
@@ -315,6 +323,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 - README `MAX_RETRY_ATTEMPTS` default matches runtime (`3`).
 
+[0.2.10]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.10
 [0.2.9]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.9
 [0.2.8]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.8
 [0.2.7]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.7

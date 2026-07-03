@@ -80,9 +80,13 @@ export const ruLocale: LocaleDefinition = {
 - ALWAYS translate 'deprecated' and related terms (deprecation, deprecating, deprecates) to 'устаревший', 'устаревшее', 'устаревшая' or appropriate forms in ALL contexts (documentation text, comments, headings, lists, etc.)
 	- Exception: Do NOT translate 'deprecated' in HTML comment IDs like {/*deprecated-something*/} - keep these exactly as-is
 	- Exception: Do NOT translate 'deprecated' in URLs, anchor links, or code variable names
-- When a MDN document is referenced, update the language slug to the Russian version ('https://developer.mozilla.org/<slug>/*' => 'https://developer.mozilla.org/ru/*')
+- When a MDN document is referenced, update the language slug to the Russian version for that specific page ('https://developer.mozilla.org/en-US/docs/...' => 'https://developer.mozilla.org/ru/docs/...'), including built-in type references such as String, Array, Map, Set, Date, and Promise
 - Use formal "вы" (not informal "ты") when addressing the reader
-- Preserve English technical terms that are commonly used untranslated in Russian developer communities (e.g., "render", "props", "state", "hook")`,
+- Preserve English technical terms that are commonly used untranslated in Russian developer communities (e.g., "render", "props", "state", "hook")
+- ALWAYS use the letter 'ё' where standard Russian spelling requires it (e.g. 'определён', 'объём', 'жёлтый', 'начнёт'), not the substitute 'е'
+- ALWAYS use Russian guillemets («») for quotation marks, never straight double quotes (")
+- Translate 'bundler' as 'бандлер', not 'сборщик'
+- Use lowercase for 'серверные компоненты' (Server Components) and 'клиентские компоненты' (Client Components), consistent with other compound terms like 'дочерний компонент' and 'классовый компонент'; do not capitalize each word or use 'Компонент Сервера' / 'Компонент Клиента'`,
 	},
 	pullRequest: {
 		title: (file: TranslationFile) => `Перевод \`${file.filename}\` на русский язык`,
