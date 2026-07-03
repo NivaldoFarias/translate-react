@@ -18,6 +18,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Changed
 
+- CI smoke gate requires only the default `pt-br` locale before merge; other configured locales run as optional jobs that do not block the workflow. Smoke jobs cap at 120 minutes.
 - Discovery retries transient GitHub errors during pull-request validity checks before fail-open inclusion, and unexpected CLD failures after retries now stop the workflow instead of silently scheduling extra translation work; empty, short, or unidentifiable content still counts as not translated.
 - GitHub file content, pull request, and translation-progress issue operations now live in dedicated modules composed by `GitHubService`; branch cleanup hooks bind directly to the pull request module.
 - Translation batch processing now delegates per-file work to dedicated branch, pull request, and file processor modules while the batch manager keeps batching and the consecutive-failure circuit breaker.
@@ -45,6 +46,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Fixed
 
+- Workflow smoke sets `TARGET_LANGUAGE` from the locale input before `ci:smoke` starts, and CLI override bootstrap no longer loads env validation early, so non-default locale smoke runs use the correct translation rules.
 - Segment-batch and frontmatter-batch LLM calls with provider `finishReason: "error"` now fail like full-body calls instead of accepting malformed provider output.
 - GitHub integration logs only safe error fields (`message`, `status`, `code`, `name`) so Octokit request headers are not written to workflow logs.
 - Consecutive translation failures now halt the workflow once the circuit-breaker threshold is reached instead of continuing through remaining files.

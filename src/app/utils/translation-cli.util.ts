@@ -2,8 +2,6 @@ import { parseArgs } from "citty";
 
 import type { ArgsDef } from "citty";
 
-import { validateEnv } from "../schemas/env.schema";
-
 /** CLI flags that override per-locale matrix values before env validation */
 export const translationCliArgs = {
 	"lang": {
@@ -42,7 +40,7 @@ const translationCliEnvKeys: Record<keyof typeof translationCliArgs, string> = {
 	"translation-guidelines-file": "TRANSLATION_GUIDELINES_FILE",
 };
 /**
- * Applies translation workflow CLI flags to `import.meta.env` before {@link validateEnv} runs.
+ * Applies translation workflow CLI flags to `import.meta.env` before runtime env validation runs.
  *
  * Only non-empty flag values are written. Repository secrets and GitHub Environment variables
  * should stay in the process environment; matrix-specific repo coordinates belong on the CLI.
