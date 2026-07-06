@@ -4,6 +4,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+### Added
+
+- Manual `smoke.yml` dispatch accepts an optional `lang` input (default `pt-br`) to run real-LLM workflow smoke for a chosen configured locale.
+
+### Changed
+
+- CI real-LLM smoke runs only on pull requests, not on pushes to `main` or `dev`, so post-merge workflow failures no longer block the default branch when translator changes land without a fresh PR gate.
+
 ## [0.2.10] - 2026-07-02
 
 ### Added

@@ -25,12 +25,7 @@ import "@/app/utils/bootstrap-cli-overrides.util";
 
 import { defineCommand, runCommand } from "citty";
 
-import {
-	isSmokeProfileId,
-	runWorkflowSmoke,
-	SmokeProfile,
-	workflowSmokeSucceeded,
-} from "@/ci/services/smoke";
+import { isSmokeProfileId, run, runSucceeded, SmokeProfile } from "@/ci/services/smoke";
 import { handleTopLevelError } from "@/shared/errors/";
 import { createLogger } from "@/shared/utils/create-logger.util";
 
@@ -41,7 +36,7 @@ const log = createLogger({ level: "info", logToConsole: true }).child({
 const smokeCommand = defineCommand({
 	meta: {
 		name: "smoke",
-		description: "Run workflow smoke with real LLM and mocked GitHub fixtures",
+		description: "Run with real LLM and mocked GitHub fixtures",
 	},
 	args: {
 		profile: {
@@ -66,13 +61,13 @@ const smokeCommand = defineCommand({
 		}
 
 		try {
-			const stats = await runWorkflowSmoke({
+			const stats = await run({
 				profile: args.profile,
 				filesArgument: args.files,
 			});
 
-			if (!workflowSmokeSucceeded(stats)) {
-				log.error({ stats }, "Workflow smoke reported translation failures");
+			if (!runSucceeded(stats)) {
+				log.error({ stats }, "Run reported translation failures");
 				process.exit(1);
 			}
 

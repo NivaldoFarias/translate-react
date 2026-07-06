@@ -96,7 +96,7 @@ jobs:
   smoke:
     name: Workflow smoke (pt-br)
     needs: detect-smoke-gate
-    if: needs.detect-smoke-gate.outputs.should_run == 'true'
+    if: needs.detect-smoke-gate.outputs.should_run == 'true' && github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     environment: development
@@ -154,7 +154,7 @@ jobs:
   smoke-extra-locales:
     name: Workflow smoke (${{ matrix.lang }}, optional)
     needs: detect-smoke-gate
-    if: needs.detect-smoke-gate.outputs.should_run == 'true' && needs.detect-smoke-gate.outputs.optional_langs != '[]'
+    if: needs.detect-smoke-gate.outputs.should_run == 'true' && needs.detect-smoke-gate.outputs.optional_langs != '[]' && github.event_name == 'pull_request'
     continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 120
