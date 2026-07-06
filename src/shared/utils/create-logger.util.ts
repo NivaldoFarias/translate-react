@@ -6,8 +6,11 @@ import { nftsCompatibleDateString } from "./nfts-date.util";
 
 /** Configuration for {@link createLogger} */
 export interface CreateLoggerOptions {
+	/** Minimum Pino log level */
 	level: pino.LevelWithSilent;
+	/** Whether logs are mirrored to stdout */
 	logToConsole: boolean;
+	/** Working directory used for log file paths */
 	cwd?: string;
 }
 

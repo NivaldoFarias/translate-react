@@ -44,7 +44,10 @@ export interface SmokeRunOptions {
 	artifactDir?: string;
 }
 
-const logger = createLogger({ level: "info", logToConsole: true }).child({
+const logger = createLogger({
+	level: env.LOG_LEVEL,
+	logToConsole: env.LOG_TO_CONSOLE,
+}).child({
 	component: "smoke-runner",
 });
 
@@ -125,6 +128,9 @@ export async function run(options: SmokeRunOptions) {
 	logger.info(
 		{
 			model: env.LLM_MODEL,
+			llmApiBaseUrl: env.LLM_API_BASE_URL,
+			nodeEnv: env.NODE_ENV,
+			logLevel: env.LOG_LEVEL,
 			profile: options.profile,
 			artifactDir: artifactDirRelative,
 			files: integrationFiles.map((file) => file.treeItem.path),

@@ -10,13 +10,17 @@ export type { ReviewerValidationNotice };
 
 /** Prior invalid PR for the same file path */
 export interface InvalidFilePullRequest {
+	/** GitHub pull request number */
 	prNumber: number;
+	/** Mergeability and conflict status of the invalid pull request */
 	status: PullRequestStatus;
 }
 
 /** Inputs for locale-specific pull request body templates */
 export interface PullRequestDescriptionMetadata {
+	/** Human-readable target language name for PR copy */
 	languageName: string;
+	/** Prior invalid pull request for the same file, if any */
 	invalidFilePR: InvalidFilePullRequest | undefined;
 
 	/** Advisory post-translation guard hints for maintainers (empty if clean) */
@@ -155,6 +159,7 @@ export interface LocalePRBodyStrings {
 	};
 }
 
+/** Pull request title and body templates for one target locale */
 export interface LocalePullRequestConfig {
 	/**
 	 * Title template for the pull request in the target language.

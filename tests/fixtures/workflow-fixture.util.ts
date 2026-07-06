@@ -54,7 +54,9 @@ export enum WorkflowFixturePrScenario {
 
 /** Mock GitHub knobs for smoke and integration artifact capture */
 export interface WorkflowFixtureSmoke {
+	/** Pull request number returned by mocked GitHub APIs */
 	pullRequestNumber: number;
+	/** Scenario controlling fork content and PR validity mocks */
 	pullRequestScenario?: WorkflowFixturePrScenario;
 
 	/** Fork branch markdown returned by `getForkFileContentAtBranch` for existing-PR scenarios */
@@ -68,8 +70,11 @@ export interface WorkflowFixtureSmoke {
  * `filename`, which the runner derives from `path`). Markdown body bytes are loaded from disk.
  */
 export type WorkflowFixtureManifestEntry = Readonly<{
+	/** Workflow fixture profile controlling discovery and smoke behavior */
 	profile?: WorkflowFixtureProfile;
+	/** Upstream tree metadata for one fixture markdown file */
 	tree: WorkflowFixtureTree;
+	/** Optional smoke-only GitHub mock overrides */
 	smoke?: Partial<WorkflowFixtureSmoke>;
 }>;
 
@@ -80,8 +85,11 @@ export type WorkflowFixtureManifestEntry = Readonly<{
  * {@link GitHubService.getFile} (`RepositoryMarkdownBlob`) before translation starts.
  */
 export type WorkflowFixtureFile = Readonly<{
+	/** Patched repository tree item for the fixture candidate */
 	treeItem: PatchedRepositoryTreeItem;
+	/** Upstream markdown blob loaded from the fixture file */
 	blob: RepositoryMarkdownBlob;
+	/** Smoke-only GitHub mock metadata for artifact capture */
 	smoke: WorkflowFixtureSmoke;
 }>;
 

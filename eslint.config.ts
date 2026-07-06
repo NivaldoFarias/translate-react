@@ -87,6 +87,32 @@ export default defineConfig(
 					],
 				},
 			],
+			"jsdoc/require-jsdoc": [
+				"error",
+				{
+					publicOnly: true,
+					contexts: [
+						"TSInterfaceDeclaration",
+						"TSMethodSignature",
+						"TSTypeAliasDeclaration",
+						{
+							context: "TSPropertySignature",
+							inlineCommentBlock: true,
+						},
+					],
+				},
+			],
+			"jsdoc/require-description": [
+				"error",
+				{
+					contexts: [
+						"TSInterfaceDeclaration",
+						"TSPropertySignature",
+						"TSMethodSignature",
+						"TSTypeAliasDeclaration",
+					],
+				},
+			],
 		},
 	},
 	{

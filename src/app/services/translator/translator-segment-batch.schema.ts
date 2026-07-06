@@ -23,7 +23,11 @@ export const segmentBatchTranslationEnvelopeSchema = z.object({
 	items: z.array(segmentBatchTranslationItemSchema).min(1),
 });
 
+/** One segment in a batched prose translation LLM request */
 export type SegmentBatchRequestItem = z.infer<typeof segmentBatchRequestItemSchema>;
+/** User payload envelope for a segment batch translation request */
 export type SegmentBatchRequestEnvelope = z.infer<typeof segmentBatchRequestEnvelopeSchema>;
+/** One translated segment returned by the LLM in structured-output mode */
 export type SegmentBatchTranslationItem = z.infer<typeof segmentBatchTranslationItemSchema>;
+/** LLM response envelope for a batched prose segment translation */
 export type SegmentBatchTranslationEnvelope = z.infer<typeof segmentBatchTranslationEnvelopeSchema>;

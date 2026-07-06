@@ -5,12 +5,14 @@ import { AbortError } from "p-retry";
 import {
 	ApplicationError,
 	ErrorCode,
+	flattenOpenAiStyleErrorPayload,
 	getSegmentBatchSplitReason,
 	handleTopLevelError,
 	isCompletionLengthTruncationError,
 	isSegmentBatchIdMismatchError,
 	isSegmentBatchSplittableError,
 	isSegmentBatchStructuredOutputError,
+	toLlmApiErrorLogFields,
 	toSafeErrorLogFields,
 } from "@/shared/errors/";
 
@@ -68,16 +70,22 @@ describe("handleTopLevelError", () => {
 		);
 	});
 
-	test("logs APIError with LLM context", () => {
-		const fatalMock = mock(() => {
-			/* empty */
-		});
+	test("logs APIError with LLM context and provider metadata", () => {
+		const fatalMock = mock(
+			(_context: Record<string, unknown>, _message: string): void => undefined,
+		);
 		const logger = { fatal: fatalMock, child: () => ({ fatal: fatalMock }) };
 
 		const error = createOpenAIApiErrorFixture({
-			message: "Rate limit exceeded",
-			error: { type: "rate_limit_error" },
-			status: StatusCodes.TOO_MANY_REQUESTS,
+			message: "400 Provider returned error",
+			error: {
+				type: "invalid_request_error",
+				metadata: {
+					provider_name: "OpenAI",
+					raw: "Model does not support temperature",
+				},
+			},
+			status: StatusCodes.BAD_REQUEST,
 			headers: new Headers({ "x-request-id": "req-llm-456" }),
 		});
 
@@ -87,7 +95,15 @@ describe("handleTopLevelError", () => {
 		expect(fatalMock).toHaveBeenCalledWith(
 			expect.objectContaining({
 				errorType: ErrorCode.OpenAIApiError,
-				statusCode: StatusCodes.TOO_MANY_REQUESTS,
+				statusCode: StatusCodes.BAD_REQUEST,
+				providerMessage: JSON.stringify({
+					provider_name: "OpenAI",
+					raw: "Model does not support temperature",
+				}),
+				providerMetadata: {
+					provider_name: "OpenAI",
+					raw: "Model does not support temperature",
+				},
 			}),
 			expect.stringContaining("LLM API error"),
 		);
@@ -352,6 +368,29 @@ describe("toSafeErrorLogFields", () => {
 		});
 	});
 
+	test("returns provider metadata for APIError", () => {
+		const fields = toSafeErrorLogFields(
+			createOpenAIApiErrorFixture({
+				message: "400 Provider returned error",
+				status: StatusCodes.BAD_REQUEST,
+				error: {
+					metadata: {
+						provider_name: "OpenAI",
+						raw: "invalid model",
+					},
+				},
+			}),
+		);
+
+		expect(fields).toMatchObject({
+			status: StatusCodes.BAD_REQUEST,
+			providerMetadata: {
+				provider_name: "OpenAI",
+				raw: "invalid model",
+			},
+		});
+	});
+
 	test("returns status and message for Octokit RequestError without request payload", () => {
 		const fields = toSafeErrorLogFields(
 			createOctokitRequestErrorFixture({
@@ -366,5 +405,24 @@ describe("toSafeErrorLogFields", () => {
 			status: StatusCodes.FORBIDDEN,
 		});
 		expect(fields).not.toHaveProperty("request");
+	});
+});
+
+describe("flattenOpenAiStyleErrorPayload", () => {
+	test("extracts nested provider metadata raw text", () => {
+		const text = flattenOpenAiStyleErrorPayload({
+			metadata: {
+				provider_name: "OpenAI",
+				raw: "Model not found",
+			},
+		});
+
+		expect(text).toContain("Model not found");
+	});
+});
+
+describe("toLlmApiErrorLogFields", () => {
+	test("returns empty object for non-API errors", () => {
+		expect(toLlmApiErrorLogFields(new Error("network"))).toEqual({});
 	});
 });

@@ -9,6 +9,7 @@ import { env } from "@/app/schemas/env.schema";
 /** Path segment GitHub uses for the issue template picker */
 const ISSUE_CHOOSER_PATH = "/issues/new/choose" as const;
 
+/** Inputs for building the runner issue-chooser URL */
 export interface RunnerIssueChooserUrlParams {
 	/** Value of `GITHUB_SERVER_URL` when present */
 	readonly githubServerUrl: string | undefined;

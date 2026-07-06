@@ -4,7 +4,9 @@
  * Omitted for whole-file translation and for small frontmatter scalar calls.
  */
 export type ChunkTranslationProgress = Readonly<{
+	/** One-based index of the chunk being translated */
 	index: number;
+	/** Total number of chunks for the document body */
 	total: number;
 }>;
 

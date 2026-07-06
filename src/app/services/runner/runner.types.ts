@@ -38,10 +38,15 @@ export interface RunnerServiceDependencies {
 	languageDetector: LanguageDetectorService;
 }
 
+/** Mutable workflow state accumulated across runner stages */
 export interface RunnerState {
+	/** Latest upstream repository tree used for discovery */
 	repositoryTree: PatchedRepositoryTreeItem[];
+	/** Files selected for translation in the current run */
 	filesToTranslate: TranslationFile[];
+	/** Per-file outcomes from batch processing */
 	processedResults: ProcessedFileResult[];
+	/** Unix timestamp when the state snapshot was captured */
 	timestamp: number;
 
 	/**
@@ -50,5 +55,13 @@ export interface RunnerState {
 	 * Tracks files that have existing PRs with conflicts or unmergeable status.
 	 * Used to add informational notes when creating new PRs for these files.
 	 */
-	invalidPRsByFile?: Map<string, { prNumber: number; status: PullRequestStatus }>;
+	invalidPRsByFile?: Map<
+		string,
+		{
+			/** GitHub pull request number for the invalid translation PR */
+			prNumber: number;
+			/** Mergeability and conflict status of the invalid pull request */
+			status: PullRequestStatus;
+		}
+	>;
 }

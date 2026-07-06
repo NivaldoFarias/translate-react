@@ -7,7 +7,9 @@ import { resolveUpstreamShaVariableName } from "@/ci/services/upstream/upstream-
 
 /** Repository coordinates for Actions variable API calls. */
 export interface UpstreamShaVariableRepository {
+	/** Repository owner login or organization */
 	owner: string;
+	/** Repository name without owner prefix */
 	repo: string;
 }
 

@@ -261,6 +261,14 @@ export class TranslatorService {
 	 * ```
 	 */
 	public async testConnectivity(): Promise<void> {
+		this.logger.info(
+			{
+				model: this.model,
+				llmApiBaseUrl: env.LLM_API_BASE_URL,
+			},
+			"Testing LLM API connectivity",
+		);
+
 		const response = await this.openai.chat.completions.create({
 			model: this.model,
 			messages: [{ role: "user", content: "ping" }],

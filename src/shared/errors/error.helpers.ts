@@ -62,14 +62,12 @@ export function handleTopLevelError(error: unknown, logger: Logger): void {
 		return;
 	}
 
-	if (error instanceof APIError || isUncastAPIError(error)) {
+	if (isLlmApiError(error)) {
 		logger.fatal(
 			{
 				errorType: ErrorCode.OpenAIApiError,
-				statusCode: error.status,
 				message: error.message,
-				type: error.type,
-				requestId: error.requestID,
+				...toLlmApiErrorLogFields(error),
 			},
 			`LLM API error: ${error.message}`,
 		);
@@ -219,6 +217,107 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null;
 }
 
+/** {@link APIError} narrowed to concrete, non-generic member types for safe field access */
+type LlmApiError = APIError<
+	number | undefined,
+	Headers | undefined,
+	Record<string, unknown> | undefined
+>;
+
+/**
+ * Narrows an unknown value to an {@link LlmApiError}, covering both real `instanceof` matches
+ * and uncast errors that cross a package boundary (see {@link isUncastAPIError}).
+ *
+ * @param error The value to check
+ *
+ * @returns `true` when `error` is an OpenAI-compatible API error
+ */
+function isLlmApiError(error: unknown): error is LlmApiError {
+	return error instanceof APIError || isUncastAPIError(error);
+}
+
+/**
+ * Flattens nested OpenAI-style error payloads into searchable text for logging and quota heuristics.
+ *
+ * @param value The nested `error` field from an OpenAI-compatible API error, when present
+ *
+ * @returns Concatenated string fragments, or an empty string when nothing useful is present
+ */
+export function flattenOpenAiStyleErrorPayload(value: unknown): string {
+	if (value === null || value === undefined) return "";
+
+	if (typeof value === "string") return value;
+
+	if (typeof value === "number" || typeof value === "boolean") return String(value);
+
+	if (typeof value === "object") {
+		const record = value as { message?: unknown; error?: unknown; metadata?: unknown };
+
+		if (typeof record.message === "string" && record.message.trim().length > 0) {
+			return record.message;
+		}
+
+		if (record.metadata !== undefined) {
+			const metadataText = flattenOpenAiStyleErrorPayload(record.metadata);
+			if (metadataText.length > 0) return metadataText;
+		}
+
+		if (record.error !== undefined) {
+			const nested = flattenOpenAiStyleErrorPayload(record.error);
+			if (nested.length > 0) return nested;
+		}
+
+		try {
+			return JSON.stringify(value);
+		} catch {
+			return "";
+		}
+	}
+
+	return "";
+}
+
+/** Log-safe fields extracted from an {@link LlmApiError}, as returned by {@link toLlmApiErrorLogFields} */
+export interface LlmApiErrorLogFields {
+	/** HTTP status from the provider response */
+	statusCode?: number;
+	/** Provider error type string when present */
+	llmErrorType?: string;
+	/** Provider request id for support correlation */
+	requestId?: string | null;
+	/** Flattened provider error message when present */
+	providerMessage?: string;
+	/** OpenRouter `metadata` payload when present */
+	providerMetadata?: Record<string, unknown>;
+}
+
+/**
+ * Returns log-safe LLM API error fields, including OpenRouter provider metadata when present.
+ *
+ * @param error Caught rejection from the OpenAI-compatible client
+ *
+ * @returns Structured fields for error/fatal logs, or an empty object for non-LLM errors
+ */
+export function toLlmApiErrorLogFields(error: unknown): LlmApiErrorLogFields {
+	if (!isLlmApiError(error)) {
+		return {};
+	}
+
+	const providerMessage = flattenOpenAiStyleErrorPayload(error.error);
+	const providerMetadata =
+		isRecord(error.error) && isRecord(error.error["metadata"]) ?
+			error.error["metadata"]
+		:	undefined;
+
+	return {
+		statusCode: error.status,
+		llmErrorType: error.type,
+		requestId: error.requestID,
+		...(providerMessage.length > 0 ? { providerMessage } : {}),
+		...(providerMetadata ? { providerMetadata } : {}),
+	};
+}
+
 /**
  * Returns log-safe fields from an error without request headers or other sensitive payloads.
  *
@@ -241,6 +340,15 @@ export function toSafeErrorLogFields(error: unknown) {
 			message: error.message,
 			name: error.name,
 			status: error.status,
+		};
+	}
+
+	if (isLlmApiError(error)) {
+		return {
+			message: error.message,
+			name: error.name,
+			status: error.status,
+			...toLlmApiErrorLogFields(error),
 		};
 	}
 

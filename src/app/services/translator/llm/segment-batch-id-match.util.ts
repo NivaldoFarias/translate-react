@@ -2,16 +2,23 @@ import type { SegmentBatchRequestItem } from "@/app/services/translator/translat
 
 /** One row in a segment batch LLM response used for id-set comparison */
 export interface SegmentBatchResponseIdRow {
+	/** Segment id echoed by the model for one translated row */
 	readonly segmentId: string;
 }
 
 /** Diff between requested segment ids and ids returned by the model */
 export interface SegmentBatchIdMismatchDiagnostics {
+	/** Number of segment ids sent in the request */
 	readonly requestedCount: number;
+	/** Number of response rows returned by the model */
 	readonly receivedItemCount: number;
+	/** Number of distinct segment ids in the response */
 	readonly uniqueReceivedCount: number;
+	/** Requested ids missing from the response */
 	readonly missingIds: string[];
+	/** Response ids not present in the request */
 	readonly extraIds: string[];
+	/** Response ids that appeared more than once */
 	readonly duplicateResponseIds: string[];
 }
 

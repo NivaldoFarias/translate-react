@@ -3,7 +3,7 @@ import type { WorkflowStatistics } from "@/app/services/runner/types";
 import type { RunnerOptions, RunnerServiceDependencies } from "./runner.types";
 
 import { logger } from "@/app/utils/";
-import { extractErrorMessage } from "@/shared/errors/";
+import { toSafeErrorLogFields } from "@/shared/errors/";
 
 import { BaseRunnerService } from "./base.service";
 
@@ -75,7 +75,7 @@ export class RunnerService extends BaseRunnerService {
 
 			return this.printFinalStatistics();
 		} catch (error) {
-			this.logger.error({ error: extractErrorMessage(error) }, "Translation workflow failed");
+			this.logger.error(toSafeErrorLogFields(error), "Translation workflow failed");
 
 			throw error;
 		}

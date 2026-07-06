@@ -5,6 +5,7 @@ import { POST_TRANSLATION_GUARD_IDS } from "../validation.constants";
 
 /** Frontmatter block dropped from a translation that had YAML frontmatter in the source */
 export interface FrontmatterPreservedViolation {
+	/** Character length of the source frontmatter block that was removed */
 	readonly sourceFrontmatterBlockLength: number;
 }
 

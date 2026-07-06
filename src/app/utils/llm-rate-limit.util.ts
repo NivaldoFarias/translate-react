@@ -1,6 +1,7 @@
 import { StatusCodes } from "http-status-codes";
 
 import { MS_PER_SECOND } from "@/app/constants";
+import { flattenOpenAiStyleErrorPayload } from "@/shared/errors/";
 
 /** Extra wait after `x-ratelimit-reset` to absorb clock skew and provider propagation delay */
 const RATE_LIMIT_RESET_BUFFER_MS = 750;
@@ -29,42 +30,6 @@ function isOpenAiCompatible429Error(
 		"message" in error &&
 		typeof (error as { message: unknown }).message === "string"
 	);
-}
-
-/**
- * Flattens nested OpenAI-style error payloads into searchable text for quota heuristics.
- *
- * @param value The nested `error` field from an OpenAI-compatible API error, when present
- *
- * @returns Concatenated string fragments, or an empty string when nothing useful is present
- */
-function flattenOpenAiStyleErrorPayload(value: unknown): string {
-	if (value === null || value === undefined) return "";
-
-	if (typeof value === "string") return value;
-
-	if (typeof value === "number" || typeof value === "boolean") return String(value);
-
-	if (typeof value === "object") {
-		const record = value as { message?: unknown; error?: unknown };
-
-		if (typeof record.message === "string" && record.message.trim().length > 0) {
-			return record.message;
-		}
-
-		if (record.error !== undefined) {
-			const nested = flattenOpenAiStyleErrorPayload(record.error);
-			if (nested.length > 0) return nested;
-		}
-
-		try {
-			return JSON.stringify(value);
-		} catch {
-			return "";
-		}
-	}
-
-	return "";
 }
 
 /**

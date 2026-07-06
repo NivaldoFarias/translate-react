@@ -79,4 +79,5 @@ export const openRouterModelsListSchema = z.object({
 	data: z.array(openRouterModelRowSchema),
 });
 
+/** One model row from the OpenRouter models list API */
 export type OpenRouterModelRow = z.infer<typeof openRouterModelRowSchema>;

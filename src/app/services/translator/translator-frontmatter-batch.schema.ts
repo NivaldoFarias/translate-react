@@ -39,8 +39,11 @@ export const frontmatterBatchRequestEnvelopeSchema = z.object({
 		.length(1),
 });
 
+/** Allowed frontmatter field keys in a batched description translation request */
 export type FrontmatterBatchFieldKey = z.infer<typeof frontmatterBatchFieldKeySchema>;
+/** LLM response envelope for a batched frontmatter description translation */
 export type FrontmatterBatchTranslationEnvelope = z.infer<
 	typeof frontmatterBatchTranslationEnvelopeSchema
 >;
+/** User payload envelope for a batched frontmatter description translation request */
 export type FrontmatterBatchRequestEnvelope = z.infer<typeof frontmatterBatchRequestEnvelopeSchema>;
