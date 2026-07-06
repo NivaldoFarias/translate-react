@@ -3,35 +3,9 @@ import type { TranslationPullRequestValidity } from "@/app/services/runner/workf
 import { env } from "@/app/schemas/env.schema";
 
 import { isSafeTranslatablePath } from "./markdown-path.util";
+import { parseTranslationFilePaths } from "./parse-translation-file-paths.util";
 
-/**
- * Parses comma-separated repository paths from CLI or environment input.
- *
- * @param raw Comma-separated paths or `undefined` when unset
- *
- * @returns Deduplicated, trimmed paths in input order
- */
-export function parseTranslationFilePaths(raw: string | undefined) {
-	if (!raw?.trim()) {
-		return [];
-	}
-
-	const seen = new Set<string>();
-	const paths: string[] = [];
-
-	for (const segment of raw.split(",")) {
-		const path = segment.trim();
-
-		if (!path || seen.has(path)) {
-			continue;
-		}
-
-		seen.add(path);
-		paths.push(path);
-	}
-
-	return paths;
-}
+export { parseTranslationFilePaths } from "./parse-translation-file-paths.util";
 
 /**
  * Returns configured single-file or multi-file translation targets from the environment.

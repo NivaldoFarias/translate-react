@@ -2,7 +2,7 @@ import { parseArgs } from "citty";
 
 import type { ArgsDef } from "citty";
 
-import { parseTranslationFilePaths } from "./translation-target.util";
+import { parseTranslationFilePaths } from "./parse-translation-file-paths.util";
 
 /** CLI flags that override per-locale matrix values before env validation */
 export const translationCliArgs = {

@@ -4,7 +4,6 @@ import {
 	filterToTranslationTargets,
 	findUnsafeTranslationTargetPaths,
 	isForceRetranslatePath,
-	parseTranslationFilePaths,
 	shouldPreserveOpenPullRequestOnRefresh,
 } from "@/app/utils/translation-target.util";
 
@@ -12,28 +11,6 @@ import { createMockPullRequestListItem } from "@tests/fixtures";
 
 const TARGET_PATH = "src/content/reference/rsc/use-client.md";
 const OTHER_PATH = "src/content/blog/post.md";
-
-describe("parseTranslationFilePaths", () => {
-	test("returns empty array when input is unset or blank", () => {
-		expect(parseTranslationFilePaths(undefined)).toEqual([]);
-		expect(parseTranslationFilePaths("")).toEqual([]);
-		expect(parseTranslationFilePaths("   ")).toEqual([]);
-	});
-
-	test("parses comma-separated paths and trims whitespace", () => {
-		expect(parseTranslationFilePaths(` ${TARGET_PATH} , ${OTHER_PATH} `)).toEqual([
-			TARGET_PATH,
-			OTHER_PATH,
-		]);
-	});
-
-	test("deduplicates repeated paths while preserving first-seen order", () => {
-		expect(parseTranslationFilePaths(`${TARGET_PATH},${TARGET_PATH},${OTHER_PATH}`)).toEqual([
-			TARGET_PATH,
-			OTHER_PATH,
-		]);
-	});
-});
 
 describe("isForceRetranslatePath", () => {
 	test("returns false when no target paths are configured", () => {

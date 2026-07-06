@@ -131,24 +131,7 @@ jobs:
 
       - name: Resolve translation targets
         id: translation-target
-        run: |
-          FILE_PATH_INPUT="${{ inputs.file_path }}"
-          FILE_PATH_INPUT="${FILE_PATH_INPUT#"${FILE_PATH_INPUT%%[![:space:]]*}"}"
-          FILE_PATH_INPUT="${FILE_PATH_INPUT%"${FILE_PATH_INPUT##*[![:space:]]}"}"
-
-          TARGET_COUNT="$(bun -e "
-            import { parseTranslationFilePaths } from './src/app/utils/translation-target.util.ts';
-            const fromInput = parseTranslationFilePaths(process.argv[1]);
-            const fromEnv = parseTranslationFilePaths(process.env.TRANSLATION_FILE_PATHS);
-            console.log([...new Set([...fromInput, ...fromEnv])].length);
-          " "$FILE_PATH_INPUT")"
-
-          echo "path=$FILE_PATH_INPUT" >> "$GITHUB_OUTPUT"
-          if [ "$TARGET_COUNT" -gt 0 ]; then
-            echo "has_target_paths=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "has_target_paths=false" >> "$GITHUB_OUTPUT"
-          fi
+        run: bun run ci:resolve-translation-targets -- --file-path "${{ inputs.file_path }}"
 
       - name: Run translation workflow (${{ matrix.lang }})
         env:
