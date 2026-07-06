@@ -11,6 +11,7 @@ import { PullRequestProgressAction } from "@/app/services/github/types";
 import { TranslationFile } from "@/app/services/translator/";
 import {
 	getTranslationBranchNameFromPath,
+	isConfiguredForceRetranslatePath,
 	isTranslationEquivalentToCurrentBlob,
 	logger,
 } from "@/app/utils/";
@@ -245,6 +246,10 @@ export class TranslationFileProcessor {
 		batchProgress: TranslationBatchProgressCallbacks,
 	) {
 		if (!validity.isValid || !validity.pullRequest) {
+			return null;
+		}
+
+		if (isConfiguredForceRetranslatePath(file.path)) {
 			return null;
 		}
 

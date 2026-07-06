@@ -6,10 +6,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Added
 
+- Targeted file re-translation: pass `--file` / `-f` locally, set `TRANSLATION_FILE_PATHS`, or use workflow `file_path` on manual dispatch to limit a run to specific `src/**/*.md` paths and refresh an open translation pull request in place instead of skipping it.
 - Manual `smoke.yml` dispatch accepts an optional `lang` input (default `pt-br`) to run real-LLM workflow smoke for a chosen configured locale.
 
 ### Changed
 
+- Manual targeted workflow runs skip recording the upstream locale SHA so a single-file refresh does not advance the poll baseline.
 - CI real-LLM smoke runs only on pull requests, not on pushes to `main` or `dev`, so post-merge workflow failures no longer block the default branch when translator changes land without a fresh PR gate.
 
 ## [0.2.10] - 2026-07-02

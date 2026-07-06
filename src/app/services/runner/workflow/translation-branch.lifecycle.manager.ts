@@ -5,7 +5,12 @@ import type { RunnerServiceDependencies } from "../runner.types";
 import type { TranslationPullRequestValidity } from "./translation-pull-request-validity.manager";
 
 import { TranslationFile } from "@/app/services/translator/";
-import { getTranslationBranchNameFromPath, logger } from "@/app/utils/";
+import {
+	getTranslationBranchNameFromPath,
+	isConfiguredForceRetranslatePath,
+	logger,
+	shouldPreserveOpenPullRequestOnRefresh,
+} from "@/app/utils/";
 
 import { hasQualifyingApprovedReview } from "./pull-request-review.util";
 
@@ -35,13 +40,14 @@ export class TranslationBranchLifecycleManager {
 	) {
 		const branchName = getTranslationBranchNameFromPath(file.path);
 
-		if (validity.pullRequest && validity.invalidReason === "out_of_sync") {
+		if (shouldPreserveOpenPullRequestOnRefresh(file.path, validity)) {
 			this.logger.info(
 				{
 					filename: file.filename,
-					prNumber: validity.pullRequest.number,
+					prNumber: validity.pullRequest?.number,
 					branchName,
-					invalidReason: validity.invalidReason,
+					invalidReason: validity.invalidReason ?? null,
+					forceRetranslate: isConfiguredForceRetranslatePath(file.path),
 				},
 				"Refreshing translation branch from fork default while preserving open pull request",
 			);

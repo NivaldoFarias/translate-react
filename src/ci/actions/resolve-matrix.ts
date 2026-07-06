@@ -23,7 +23,7 @@ import {
 } from "@/ci/utils/workflow-script.util";
 import { createLogger } from "@/shared/utils/create-logger.util";
 
-const log = createLogger({ level: "info", logToConsole: true }).child({
+const logger = createLogger({ level: "info", logToConsole: true }).child({
 	component: "resolve-matrix",
 });
 
@@ -45,11 +45,11 @@ const resolveMatrixCommand = defineCommand({
 			.map((entry) => entry.trim())
 			.filter((entry) => entry.length > 0);
 
-		log.debug({ langsArgument: args.langs, langs }, "Parsed CLI arguments");
+		logger.debug({ langsArgument: args.langs, langs }, "Parsed CLI arguments");
 
 		const context = resolveCiScriptContext();
 
-		log.debug(
+		logger.debug(
 			{
 				repository: context.repositorySlug,
 				forkOwner: context.forkOwner,
@@ -60,16 +60,16 @@ const resolveMatrixCommand = defineCommand({
 
 		const locales = filterUpstreamLocalesByLang(loadUpstreamLocales(), langs);
 
-		log.debug({ localeCount: locales.length }, "Upstream locales selected for matrix");
+		logger.debug({ localeCount: locales.length }, "Upstream locales selected for matrix");
 
 		const octokit = createWorkflowScriptOctokit(context);
-		const builder = new TranslationMatrixBuilder(octokit, log);
+		const builder = new TranslationMatrixBuilder(octokit, logger);
 
 		const matrix = await builder.build(locales, context.forkOwner);
 
-		log.info({ langs: matrix.map((row) => row.lang) }, "Translation matrix resolved");
+		logger.info({ langs: matrix.map((row) => row.lang) }, "Translation matrix resolved");
 
-		writeResolveMatrixWorkflowOutputs(log, matrix);
+		writeResolveMatrixWorkflowOutputs(logger, matrix);
 	},
 });
 

@@ -19,7 +19,7 @@ import { defineCommand, runCommand } from "citty";
 import { extractChangelogEntries } from "@/ci/utils/changelog.util";
 import { createLogger } from "@/shared/utils/create-logger.util";
 
-const log = createLogger({ level: "info", logToConsole: true }).child({
+const logger = createLogger({ level: "info", logToConsole: true }).child({
 	component: "changelog-notes",
 });
 
@@ -58,7 +58,7 @@ const changelogNotesCommand = defineCommand({
 		const entries = extractChangelogEntries(changelog, version);
 
 		if (entries === null || entries.length === 0) {
-			log.error({ version }, "No CHANGELOG.md section found for version");
+			logger.error({ version }, "No CHANGELOG.md section found for version");
 			process.exit(1);
 		}
 
@@ -66,7 +66,7 @@ const changelogNotesCommand = defineCommand({
 
 		writeFileSync(outputPath, `${entries}\n`);
 
-		log.info({ version, outputPath }, "Wrote release notes");
+		logger.info({ version, outputPath }, "Wrote release notes");
 	},
 });
 

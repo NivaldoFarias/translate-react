@@ -12,14 +12,14 @@
 import { verifyChangelogListsPackageVersion } from "@/ci/utils/verify-changelog.util";
 import { createLogger } from "@/shared/utils/create-logger.util";
 
-const log = createLogger({ level: "info", logToConsole: true }).child({
+const logger = createLogger({ level: "info", logToConsole: true }).child({
 	component: "verify-changelog",
 });
 
 try {
 	verifyChangelogListsPackageVersion();
-	log.info("CHANGELOG.md includes the current package version");
+	logger.info("CHANGELOG.md includes the current package version");
 } catch (error) {
-	log.error({ error }, "CHANGELOG version check failed");
+	logger.error({ error }, "CHANGELOG version check failed");
 	process.exit(1);
 }

@@ -44,7 +44,7 @@ export interface SmokeRunOptions {
 	artifactDir?: string;
 }
 
-const log = createLogger({ level: "info", logToConsole: true }).child({
+const logger = createLogger({ level: "info", logToConsole: true }).child({
 	component: "smoke-runner",
 });
 
@@ -55,7 +55,7 @@ const log = createLogger({ level: "info", logToConsole: true }).child({
  */
 async function clearSmokeArtifactDir(artifactDir: string) {
 	await fs.rm(artifactDir, { recursive: true, force: true });
-	log.debug({ artifactDir }, "Cleared previous artifacts");
+	logger.debug({ artifactDir }, "Cleared previous artifacts");
 }
 
 /**
@@ -92,12 +92,12 @@ export async function run(options: SmokeRunOptions) {
 
 	await clearSmokeArtifactDir(artifactDir);
 
-	log.debug({ fixtureDir: MD_FIXTURE_DIR, basenames: basenames ?? "all" }, "Loading fixtures");
+	logger.debug({ fixtureDir: MD_FIXTURE_DIR, basenames: basenames ?? "all" }, "Loading fixtures");
 
 	const integrationFiles = await loadWorkflowFilesFromMdFixtureDir(basenames, cwd);
 	const totalBytes = integrationFiles.reduce((sum, file) => sum + file.blob.content.length, 0);
 
-	log.debug(
+	logger.debug(
 		{
 			fixtureDir: MD_FIXTURE_DIR,
 			fileCount: integrationFiles.length,
@@ -122,7 +122,7 @@ export async function run(options: SmokeRunOptions) {
 		{ batchSize: 1 },
 	);
 
-	log.info(
+	logger.info(
 		{
 			model: env.LLM_MODEL,
 			profile: options.profile,
@@ -134,7 +134,7 @@ export async function run(options: SmokeRunOptions) {
 
 	const stats = await runner.run();
 
-	log.info({ stats }, "Run finished");
+	logger.info({ stats }, "Run finished");
 
 	return stats;
 }

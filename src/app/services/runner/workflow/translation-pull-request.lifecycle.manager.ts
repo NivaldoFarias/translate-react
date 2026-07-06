@@ -9,7 +9,12 @@ import type { TranslationPullRequestValidity } from "./translation-pull-request-
 
 import { PullRequestProgressAction } from "@/app/services/github/types";
 import { TranslationFile } from "@/app/services/translator/";
-import { env, getTranslationBranchNameFromPath, logger } from "@/app/utils/";
+import {
+	env,
+	getTranslationBranchNameFromPath,
+	logger,
+	shouldPreserveOpenPullRequestOnRefresh,
+} from "@/app/utils/";
 
 /**
  * Returns the hostname of the configured LLM API base URL for PR metadata.
@@ -60,25 +65,26 @@ export class TranslationPullRequestLifecycleManager {
 		pullRequest: NonNullable<ProcessedFileResult["pullRequest"]>;
 		progress: PullRequestProgressAction;
 	}> {
-		if (validity.pullRequest && validity.invalidReason === "out_of_sync") {
+		if (shouldPreserveOpenPullRequestOnRefresh(file.path, validity) && validity.pullRequest) {
+			const openPullRequest = validity.pullRequest;
 			const languageName = this.services.languageDetector.getLanguageName(
 				this.services.languageDetector.languages.target,
 			);
 			const body = this.createPullRequestDescription(file, processingResult, languageName);
 
-			await this.services.github.updatePullRequestBody(validity.pullRequest.number, body);
+			await this.services.github.updatePullRequestBody(openPullRequest.number, body);
 
 			this.logger.info(
 				{
 					path: file.path,
-					prNumber: validity.pullRequest.number,
+					prNumber: openPullRequest.number,
 					advisoryGuardCount: processingResult.reviewerNotices.length,
 				},
 				"Refreshed open translation pull request after upstream sync",
 			);
 
 			return {
-				pullRequest: validity.pullRequest,
+				pullRequest: openPullRequest,
 				progress: PullRequestProgressAction.Reused,
 			};
 		}

@@ -18,7 +18,7 @@ import {
 } from "@/ci/utils/workflow-script.util";
 import { createLogger } from "@/shared/utils/create-logger.util";
 
-const log = createLogger({ level: "info", logToConsole: true }).child({
+const logger = createLogger({ level: "info", logToConsole: true }).child({
 	component: "poll-upstream",
 });
 
@@ -28,7 +28,7 @@ const log = createLogger({ level: "info", logToConsole: true }).child({
 async function main() {
 	const context = resolveCiScriptContext();
 
-	log.debug(
+	logger.debug(
 		{
 			repository: context.repositorySlug,
 			forkOwner: context.forkOwner,
@@ -40,12 +40,12 @@ async function main() {
 	const octokit = createWorkflowScriptOctokit(context);
 	const locales = loadUpstreamLocales();
 
-	const variableReader = new UpstreamShaVariableReader(octokit, context.repository, log);
-	const poller = new UpstreamShaPoller(octokit, variableReader, log);
+	const variableReader = new UpstreamShaVariableReader(octokit, context.repository, logger);
+	const poller = new UpstreamShaPoller(octokit, variableReader, logger);
 
 	const result = await poller.poll(locales, context.forkOwner);
 
-	log.info(
+	logger.info(
 		{
 			hasChanges: result.hasChanges,
 			langs: result.matrix.map((row) => row.lang),
@@ -53,7 +53,7 @@ async function main() {
 		"Upstream poll finished",
 	);
 
-	writePollWorkflowOutputs(log, result.hasChanges, result.matrix);
+	writePollWorkflowOutputs(logger, result.hasChanges, result.matrix);
 }
 
 await main();

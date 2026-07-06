@@ -29,7 +29,7 @@ import { isSmokeProfileId, run, runSucceeded, SmokeProfile } from "@/ci/services
 import { handleTopLevelError } from "@/shared/errors/";
 import { createLogger } from "@/shared/utils/create-logger.util";
 
-const log = createLogger({ level: "info", logToConsole: true }).child({
+const logger = createLogger({ level: "info", logToConsole: true }).child({
 	component: "smoke",
 });
 
@@ -53,7 +53,7 @@ const smokeCommand = defineCommand({
 	},
 	async run({ args }) {
 		if (!isSmokeProfileId(args.profile)) {
-			log.error(
+			logger.error(
 				{ profile: args.profile, allowed: Object.values(SmokeProfile) },
 				"Invalid smoke profile",
 			);
@@ -67,13 +67,13 @@ const smokeCommand = defineCommand({
 			});
 
 			if (!runSucceeded(stats)) {
-				log.error({ stats }, "Run reported translation failures");
+				logger.error({ stats }, "Run reported translation failures");
 				process.exit(1);
 			}
 
 			process.exit(0);
 		} catch (error) {
-			handleTopLevelError(error, log);
+			handleTopLevelError(error, logger);
 			process.exit(1);
 		}
 	},

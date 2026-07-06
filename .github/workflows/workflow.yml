@@ -27,6 +27,11 @@ on:
         required: false
         type: string
         default: ""
+      file_path:
+        description: Optional repository path for targeted re-translation (preserves open PR)
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -160,10 +165,13 @@ jobs:
           if [ -n "${{ matrix.translation_guidelines_file }}" ]; then
             ARGS+=(--translation-guidelines-file "${{ matrix.translation_guidelines_file }}")
           fi
+          if [ -n "${{ inputs.file_path }}" ]; then
+            ARGS+=(--file "${{ inputs.file_path }}")
+          fi
           bun run start -- "${ARGS[@]}"
 
       - name: Record upstream SHA (${{ matrix.lang }})
-        if: success()
+        if: success() && (github.event_name == 'workflow_call' || inputs.file_path == '')
         env:
           GH_TOKEN: ${{ steps.generate-token.outputs.token }}
         run: |
