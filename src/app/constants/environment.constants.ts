@@ -42,6 +42,9 @@ export interface EnvironmentSchemaDefaults {
 
 	/** Minimum estimated tokens (tiktoken) for a fence to be masked when `MASK_VERBATIM_LARGE_FENCES` is on */
 	MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS: number;
+
+	/** Comma-separated repository paths for targeted re-translation (`--file` / workflow `file_path`) */
+	TRANSLATION_FILE_PATHS?: string;
 }
 
 /**

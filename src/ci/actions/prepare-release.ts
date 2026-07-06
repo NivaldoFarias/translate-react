@@ -21,7 +21,7 @@ import { promoteUnreleasedToVersion } from "@/ci/utils/changelog.util";
 import { bumpPackageVersion, readPackageVersion } from "@/ci/utils/release.util";
 import { createLogger } from "@/shared/utils/create-logger.util";
 
-const log = createLogger({ level: "info", logToConsole: true }).child({
+const logger = createLogger({ level: "info", logToConsole: true }).child({
 	component: "prepare-release",
 });
 
@@ -45,7 +45,7 @@ const prepareReleaseCommand = defineCommand({
 
 		const version = readPackageVersion(repositoryRoot);
 
-		log.info({ previousVersion, version }, "Bumped package.json version");
+		logger.info({ previousVersion, version }, "Bumped package.json version");
 
 		const changelogPath = join(repositoryRoot, "CHANGELOG.md");
 		const changelog = readFileSync(changelogPath, "utf8");
@@ -53,7 +53,7 @@ const prepareReleaseCommand = defineCommand({
 
 		writeFileSync(changelogPath, promoted);
 
-		log.info({ version }, "Promoted CHANGELOG.md Unreleased section");
+		logger.info({ version }, "Promoted CHANGELOG.md Unreleased section");
 	},
 });
 

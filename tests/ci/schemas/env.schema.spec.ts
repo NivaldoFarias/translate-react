@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test";
 
-import { parseCiPollResolveEnvironment, resolveCiScriptContext } from "@/ci/schemas/env.schema";
+import {
+	parseCiPollResolveEnvironment,
+	parseCiWorkflowOutputEnvironment,
+	resolveCiScriptContext,
+} from "@/ci/schemas/env.schema";
 
 describe("ci env.schema", () => {
 	test("parseCiPollResolveEnvironment accepts valid workflow script variables", () => {
@@ -22,6 +26,14 @@ describe("ci env.schema", () => {
 				GITHUB_OUTPUT: "/tmp/github-output",
 			}),
 		).toThrow();
+	});
+
+	test("parseCiWorkflowOutputEnvironment accepts GITHUB_OUTPUT only", () => {
+		expect(
+			parseCiWorkflowOutputEnvironment({
+				GITHUB_OUTPUT: "/tmp/github-output",
+			}).GITHUB_OUTPUT,
+		).toBe("/tmp/github-output");
 	});
 });
 

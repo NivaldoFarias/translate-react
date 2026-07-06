@@ -27,6 +27,11 @@ on:
         required: false
         type: string
         default: ""
+      file_path:
+        description: Optional repository path for targeted re-translation (preserves open PR)
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -124,6 +129,10 @@ jobs:
         with:
           bun-version: ${{ vars.BUN_VERSION || '1.3.14' }}
 
+      - name: Resolve translation targets
+        id: translation-target
+        run: bun run ci:resolve-translation-targets -- --file-path "${{ inputs.file_path }}"
+
       - name: Run translation workflow (${{ matrix.lang }})
         env:
           GH_TOKEN: ${{ steps.generate-token.outputs.token }}
@@ -160,10 +169,13 @@ jobs:
           if [ -n "${{ matrix.translation_guidelines_file }}" ]; then
             ARGS+=(--translation-guidelines-file "${{ matrix.translation_guidelines_file }}")
           fi
+          if [ -n "${{ steps.translation-target.outputs.path }}" ]; then
+            ARGS+=(--file "${{ steps.translation-target.outputs.path }}")
+          fi
           bun run start -- "${ARGS[@]}"
 
       - name: Record upstream SHA (${{ matrix.lang }})
-        if: success()
+        if: success() && steps.translation-target.outputs.has_target_paths != 'true'
         env:
           GH_TOKEN: ${{ steps.generate-token.outputs.token }}
         run: |

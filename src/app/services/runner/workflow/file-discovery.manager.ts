@@ -14,7 +14,12 @@ import { withRetry } from "@/app/clients/";
 import { DEFAULT_RETRY_CONFIG } from "@/app/clients/octokit/octokit.constants";
 import { FAIL_OPEN_REASONS } from "@/app/constants/fail-open.constants";
 import { TranslationFile } from "@/app/services/translator/";
-import { logger } from "@/app/utils/";
+import {
+	filterToTranslationTargets,
+	getConfiguredTranslationTargetPaths,
+	isConfiguredForceRetranslatePath,
+	logger,
+} from "@/app/utils/";
 import { toSafeErrorLogFields } from "@/shared/errors/error.helpers";
 
 import { TranslationPullRequestValidityManager } from "./translation-pull-request-validity.manager";
@@ -97,18 +102,28 @@ export class FileDiscoveryManager {
 		this.logger.debug({ fileCount: repositoryTree.length }, "Starting file discovery pipeline");
 
 		const failOpenInventory = createEmptyFailOpenInventory();
+		const targetPaths = getConfiguredTranslationTargetPaths();
 
 		const uniqueFiles = repositoryTree.filter(
 			(file, index, self) => index === self.findIndex((compare) => compare.path === file.path),
 		);
+		const scopedFiles = filterToTranslationTargets(uniqueFiles, targetPaths);
+
+		if (targetPaths.length > 0) {
+			this.logger.info(
+				{ targetPaths, matchedFiles: scopedFiles.length },
+				"Restricting discovery to configured translation file paths",
+			);
+		}
+
 		this.logger.debug(
-			{ before: repositoryTree.length, after: uniqueFiles.length },
-			"Stage 1/5: Deduplication complete",
+			{ before: repositoryTree.length, after: scopedFiles.length },
+			"Stage 1/5: Deduplication and target-path filter complete",
 		);
 
-		const { candidateFiles, cacheHits, cacheMisses } = this.checkCache(uniqueFiles);
+		const { candidateFiles, cacheHits, cacheMisses } = this.checkCache(scopedFiles);
 		this.logger.debug(
-			{ before: uniqueFiles.length, after: candidateFiles.length, cacheHits, cacheMisses },
+			{ before: scopedFiles.length, after: candidateFiles.length, cacheHits, cacheMisses },
 			"Stage 2/5: Cache lookup complete",
 		);
 
@@ -152,7 +167,7 @@ export class FileDiscoveryManager {
 			{
 				pipeline: {
 					initial: repositoryTree.length,
-					afterDedup: uniqueFiles.length,
+					afterDedup: scopedFiles.length,
 					afterCache: candidateFiles.length,
 					afterPRFilter: filesToFetch.length,
 					afterContentFetch: uncheckedFiles.length,
@@ -235,6 +250,12 @@ export class FileDiscoveryManager {
 			const cache = languageCaches.get(cacheKey);
 
 			if (cache?.detectedLanguage === targetLanguage && cache.confidence > MIN_CACHE_CONFIDENCE) {
+				if (isConfiguredForceRetranslatePath(file.path)) {
+					cacheMisses++;
+					candidateFiles.push(file);
+					continue;
+				}
+
 				cacheHits++;
 				continue;
 			}
@@ -275,7 +296,7 @@ export class FileDiscoveryManager {
 					DEFAULT_RETRY_CONFIG,
 				);
 
-				if (validity.isValid) {
+				if (validity.isValid && !isConfiguredForceRetranslatePath(file.path)) {
 					numFilesWithPRs++;
 
 					this.logger.debug(
@@ -288,6 +309,21 @@ export class FileDiscoveryManager {
 					);
 
 					continue;
+				}
+
+				if (
+					validity.isValid &&
+					isConfiguredForceRetranslatePath(file.path) &&
+					validity.pullRequest
+				) {
+					this.logger.debug(
+						{
+							path: file.path,
+							prNumber: validity.pullRequest.number,
+							mergeableState: validity.pullRequestStatus?.mergeableState,
+						},
+						"Force re-translating file with valid existing pull request",
+					);
 				}
 
 				if (

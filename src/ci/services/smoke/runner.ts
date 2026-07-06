@@ -23,10 +23,10 @@ import {
 import { resolveSmokeFixtureBasenames } from "./smoke-profiles.util";
 
 /** Gitignored directory where `ci:smoke` writes reviewable mocked GitHub outputs. */
-export const WORKFLOW_SMOKE_ARTIFACT_DIR = ".out" as const;
+export const SMOKE_ARTIFACT_DIR = ".out" as const;
 
-/** Options for {@link runWorkflowSmoke} */
-export interface RunWorkflowSmokeOptions {
+/** Options for {@link run} */
+export interface SmokeRunOptions {
 	/**
 	 * {@link SmokeProfileId} fixture set.
 	 *
@@ -40,12 +40,12 @@ export interface RunWorkflowSmokeOptions {
 	/** Repository root for fixture and artifact paths */
 	cwd?: string;
 
-	/** Relative artifact root (defaults to {@link WORKFLOW_SMOKE_ARTIFACT_DIR}) */
+	/** Relative artifact root (defaults to {@link SMOKE_ARTIFACT_DIR}) */
 	artifactDir?: string;
 }
 
-const log = createLogger({ level: "info", logToConsole: true }).child({
-	component: "workflow-smoke",
+const logger = createLogger({ level: "info", logToConsole: true }).child({
+	component: "smoke-runner",
 });
 
 /**
@@ -55,14 +55,14 @@ const log = createLogger({ level: "info", logToConsole: true }).child({
  */
 async function clearSmokeArtifactDir(artifactDir: string) {
 	await fs.rm(artifactDir, { recursive: true, force: true });
-	log.debug({ artifactDir }, "Cleared previous workflow smoke artifacts");
+	logger.debug({ artifactDir }, "Cleared previous artifacts");
 }
 
 /**
  * Runs {@link RunnerService} with real {@link translatorService} and mocked GitHub fixtures.
  *
  * Loads markdown from `tests/fixtures/md/` and writes translated blobs, PR bodies, and progress
- * comments under {@link WORKFLOW_SMOKE_ARTIFACT_DIR} unless `artifactDir` overrides it. Output
+ * comments under {@link SMOKE_ARTIFACT_DIR} unless `artifactDir` overrides it. Output
  * layout and GitHub Actions artifact packaging are documented in
  * [CONTRIBUTING.md](../../../../CONTRIBUTING.md).
  *
@@ -77,33 +77,33 @@ async function clearSmokeArtifactDir(artifactDir: string) {
  *
  * @example
  * ```typescript
- * const stats = await runWorkflowSmoke({ profile: "quick" });
+ * const stats = await run({ profile: "quick" });
  * ```
  */
-export async function runWorkflowSmoke(options: RunWorkflowSmokeOptions) {
+export async function run(options: SmokeRunOptions) {
 	if (env.NODE_ENV === RuntimeEnvironment.Test) {
-		throw new Error("Workflow smoke must not run under NODE_ENV=test (use bun run ci:smoke)");
+		throw new Error("Run must not run under NODE_ENV=test (use bun run ci:smoke)");
 	}
 
 	const cwd = options.cwd ?? process.cwd();
-	const artifactDirRelative = options.artifactDir ?? WORKFLOW_SMOKE_ARTIFACT_DIR;
+	const artifactDirRelative = options.artifactDir ?? SMOKE_ARTIFACT_DIR;
 	const artifactDir = path.resolve(cwd, artifactDirRelative);
 	const basenames = resolveSmokeFixtureBasenames(options.profile, options.filesArgument ?? "");
 
 	await clearSmokeArtifactDir(artifactDir);
 
-	log.debug({ fixtureDir: MD_FIXTURE_DIR, basenames: basenames ?? "all" }, "Loading fixtures");
+	logger.debug({ fixtureDir: MD_FIXTURE_DIR, basenames: basenames ?? "all" }, "Loading fixtures");
 
 	const integrationFiles = await loadWorkflowFilesFromMdFixtureDir(basenames, cwd);
 	const totalBytes = integrationFiles.reduce((sum, file) => sum + file.blob.content.length, 0);
 
-	log.debug(
+	logger.debug(
 		{
 			fixtureDir: MD_FIXTURE_DIR,
 			fileCount: integrationFiles.length,
 			markdownBytes: totalBytes,
 		},
-		"Workflow smoke fixtures loaded",
+		"Fixtures loaded",
 	);
 
 	const github = createWorkflowGitHubServiceFromFiles(integrationFiles, {
@@ -122,19 +122,19 @@ export async function runWorkflowSmoke(options: RunWorkflowSmokeOptions) {
 		{ batchSize: 1 },
 	);
 
-	log.info(
+	logger.info(
 		{
 			model: env.LLM_MODEL,
 			profile: options.profile,
 			artifactDir: artifactDirRelative,
 			files: integrationFiles.map((file) => file.treeItem.path),
 		},
-		"Workflow smoke started",
+		"Run started",
 	);
 
 	const stats = await runner.run();
 
-	log.info({ stats }, "Workflow smoke finished");
+	logger.info({ stats }, "Run finished");
 
 	return stats;
 }
@@ -142,11 +142,11 @@ export async function runWorkflowSmoke(options: RunWorkflowSmokeOptions) {
 /**
  * Reports whether every discovered file translated successfully.
  *
- * @param stats Runner result from {@link runWorkflowSmoke}
+ * @param stats Runner result from {@link run}
  *
  * @returns `true` when `successCount` equals `totalCount` and `failureCount` is zero
  */
-export function workflowSmokeSucceeded(stats: WorkflowStatistics) {
+export function runSucceeded(stats: WorkflowStatistics) {
 	return (
 		stats.totalCount > 0 && stats.failureCount === 0 && stats.successCount === stats.totalCount
 	);

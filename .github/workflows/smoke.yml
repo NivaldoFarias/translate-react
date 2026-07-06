@@ -1,4 +1,4 @@
-name: Workflow smoke
+name: Smoke
 
 on:
   workflow_dispatch:
@@ -21,6 +21,14 @@ on:
           - development
           - production
         default: development
+      lang:
+        description: Target locale for smoke run (from .github/locales.json)
+        required: false
+        type: choice
+        options:
+          - pt-br
+          - ru
+        default: pt-br
 
 permissions:
   contents: read
@@ -30,12 +38,12 @@ concurrency:
 
 jobs:
   smoke:
-    name: Real LLM workflow smoke (${{ inputs.profile }})
+    name: Real LLM workflow smoke (${{ inputs.profile }}, ${{ inputs.lang }})
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     env:
       SMOKE_OUTPUT_DIR: .out
-      SMOKE_ARCHIVE_PATH: artifacts/smoke/${{ inputs.profile }}-${{ github.run_id }}.tar.gz
+      SMOKE_ARCHIVE_PATH: artifacts/smoke/${{ inputs.lang }}-${{ inputs.profile }}-${{ github.run_id }}.tar.gz
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -46,6 +54,8 @@ jobs:
         uses: ./.github/actions/run-workflow-smoke
         with:
           profile: ${{ inputs.profile }}
+          lang: ${{ inputs.lang }}
+          target-language: ${{ inputs.lang }}
           bun-version: ${{ vars.BUN_VERSION || '1.3.14' }}
           gh-token: ${{ secrets.GH_TOKEN }}
           llm-api-key: ${{ secrets.LLM_API_KEY }}
@@ -60,7 +70,6 @@ jobs:
           gh-pat-token: ${{ secrets.GH_PAT_TOKEN }}
           max-tokens: ${{ vars.MAX_TOKENS }}
           batch-size: ${{ vars.BATCH_SIZE }}
-          target-language: ${{ vars.TARGET_LANGUAGE }}
           header-app-url: ${{ vars.HEADER_APP_URL }}
           header-app-title: ${{ vars.HEADER_APP_TITLE }}
 
@@ -76,7 +85,7 @@ jobs:
         uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: smoke-${{ inputs.profile }}-${{ github.run_id }}
+          name: smoke-${{ inputs.lang }}-${{ inputs.profile }}-${{ github.run_id }}
           path: ${{ env.SMOKE_ARCHIVE_PATH }}
           archive: false
           if-no-files-found: warn

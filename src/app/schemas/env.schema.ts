@@ -154,6 +154,16 @@ const envSchema = z.object({
 	TRANSLATION_GUIDELINES_FILE: z.string().optional(),
 
 	/**
+	 * Optional comma-separated repository paths for targeted re-translation.
+	 *
+	 * When set, discovery limits processing to these paths and bypasses valid-pull-request
+	 * skip logic so an open translation PR can be refreshed in place.
+	 *
+	 * @example "src/content/reference/rsc/use-client.md"
+	 */
+	TRANSLATION_FILE_PATHS: z.string().optional(),
+
+	/**
 	 * When enabled, fences at or above `MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS` become HTML
 	 * placeholders before the LLM and are restored after. Prose inside those fences is not
 	 * translated while masked.
