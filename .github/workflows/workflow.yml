@@ -129,13 +129,26 @@ jobs:
         with:
           bun-version: ${{ vars.BUN_VERSION || '1.3.14' }}
 
-      - name: Resolve translation file path
-        id: translation-file-path
+      - name: Resolve translation targets
+        id: translation-target
         run: |
-          FILE_PATH="${{ inputs.file_path }}"
-          FILE_PATH="${FILE_PATH#"${FILE_PATH%%[![:space:]]*}"}"
-          FILE_PATH="${FILE_PATH%"${FILE_PATH##*[![:space:]]}"}"
-          echo "path=$FILE_PATH" >> "$GITHUB_OUTPUT"
+          FILE_PATH_INPUT="${{ inputs.file_path }}"
+          FILE_PATH_INPUT="${FILE_PATH_INPUT#"${FILE_PATH_INPUT%%[![:space:]]*}"}"
+          FILE_PATH_INPUT="${FILE_PATH_INPUT%"${FILE_PATH_INPUT##*[![:space:]]}"}"
+
+          TARGET_COUNT="$(bun -e "
+            import { parseTranslationFilePaths } from './src/app/utils/translation-target.util.ts';
+            const fromInput = parseTranslationFilePaths(process.argv[1]);
+            const fromEnv = parseTranslationFilePaths(process.env.TRANSLATION_FILE_PATHS);
+            console.log([...new Set([...fromInput, ...fromEnv])].length);
+          " "$FILE_PATH_INPUT")"
+
+          echo "path=$FILE_PATH_INPUT" >> "$GITHUB_OUTPUT"
+          if [ "$TARGET_COUNT" -gt 0 ]; then
+            echo "has_target_paths=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_target_paths=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Run translation workflow (${{ matrix.lang }})
         env:
@@ -173,13 +186,13 @@ jobs:
           if [ -n "${{ matrix.translation_guidelines_file }}" ]; then
             ARGS+=(--translation-guidelines-file "${{ matrix.translation_guidelines_file }}")
           fi
-          if [ -n "${{ steps.translation-file-path.outputs.path }}" ]; then
-            ARGS+=(--file "${{ steps.translation-file-path.outputs.path }}")
+          if [ -n "${{ steps.translation-target.outputs.path }}" ]; then
+            ARGS+=(--file "${{ steps.translation-target.outputs.path }}")
           fi
           bun run start -- "${ARGS[@]}"
 
       - name: Record upstream SHA (${{ matrix.lang }})
-        if: success() && (github.event_name == 'workflow_call' || steps.translation-file-path.outputs.path == '')
+        if: success() && steps.translation-target.outputs.has_target_paths != 'true'
         env:
           GH_TOKEN: ${{ steps.generate-token.outputs.token }}
         run: |
