@@ -129,6 +129,14 @@ jobs:
         with:
           bun-version: ${{ vars.BUN_VERSION || '1.3.14' }}
 
+      - name: Resolve translation file path
+        id: translation-file-path
+        run: |
+          FILE_PATH="${{ inputs.file_path }}"
+          FILE_PATH="${FILE_PATH#"${FILE_PATH%%[![:space:]]*}"}"
+          FILE_PATH="${FILE_PATH%"${FILE_PATH##*[![:space:]]}"}"
+          echo "path=$FILE_PATH" >> "$GITHUB_OUTPUT"
+
       - name: Run translation workflow (${{ matrix.lang }})
         env:
           GH_TOKEN: ${{ steps.generate-token.outputs.token }}
@@ -165,13 +173,13 @@ jobs:
           if [ -n "${{ matrix.translation_guidelines_file }}" ]; then
             ARGS+=(--translation-guidelines-file "${{ matrix.translation_guidelines_file }}")
           fi
-          if [ -n "${{ inputs.file_path }}" ]; then
-            ARGS+=(--file "${{ inputs.file_path }}")
+          if [ -n "${{ steps.translation-file-path.outputs.path }}" ]; then
+            ARGS+=(--file "${{ steps.translation-file-path.outputs.path }}")
           fi
           bun run start -- "${ARGS[@]}"
 
       - name: Record upstream SHA (${{ matrix.lang }})
-        if: success() && (github.event_name == 'workflow_call' || inputs.file_path == '')
+        if: success() && (github.event_name == 'workflow_call' || steps.translation-file-path.outputs.path == '')
         env:
           GH_TOKEN: ${{ steps.generate-token.outputs.token }}
         run: |
