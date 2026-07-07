@@ -4,6 +4,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+## [0.2.12] - 2026-07-07
+
 ### Changed
 
 - ESLint requires a blank line before each JSDoc block that follows another member, including single-line property docs on interfaces and types.
@@ -344,6 +346,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 - README `MAX_RETRY_ATTEMPTS` default matches runtime (`3`).
 
+[0.2.12]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.12
 [0.2.11]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.11
 [0.2.10]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.10
 [0.2.9]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.9
