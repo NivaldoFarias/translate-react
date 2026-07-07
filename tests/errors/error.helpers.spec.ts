@@ -96,10 +96,7 @@ describe("handleTopLevelError", () => {
 			expect.objectContaining({
 				errorType: ErrorCode.OpenAIApiError,
 				statusCode: StatusCodes.BAD_REQUEST,
-				providerMessage: JSON.stringify({
-					provider_name: "OpenAI",
-					raw: "Model does not support temperature",
-				}),
+				providerMessage: "Model does not support temperature",
 				providerMetadata: {
 					provider_name: "OpenAI",
 					raw: "Model does not support temperature",
@@ -419,10 +416,82 @@ describe("flattenOpenAiStyleErrorPayload", () => {
 
 		expect(text).toContain("Model not found");
 	});
+
+	test("extracts nested error message from JSON provider metadata raw", () => {
+		const text = flattenOpenAiStyleErrorPayload({
+			metadata: {
+				provider_name: "Azure",
+				raw: JSON.stringify({
+					error: {
+						message:
+							"Invalid 'max_output_tokens': integer below minimum value. Expected a value >= 16, but got 5 instead.",
+						type: "invalid_request_error",
+						param: "max_output_tokens",
+						code: "integer_below_min_value",
+					},
+				}),
+			},
+		});
+
+		expect(text).toBe(
+			"Invalid 'max_output_tokens': integer below minimum value. Expected a value >= 16, but got 5 instead.",
+		);
+	});
 });
 
 describe("toLlmApiErrorLogFields", () => {
 	test("returns empty object for non-API errors", () => {
 		expect(toLlmApiErrorLogFields(new Error("network"))).toEqual({});
+	});
+
+	test("parses JSON provider metadata raw into structured objects", () => {
+		const fields = toLlmApiErrorLogFields(
+			createOpenAIApiErrorFixture({
+				message: "400 Provider returned error",
+				status: StatusCodes.BAD_REQUEST,
+				error: {
+					metadata: {
+						provider_name: "Azure",
+						raw: JSON.stringify({
+							error: {
+								message: "Invalid max_output_tokens",
+								code: "integer_below_min_value",
+							},
+						}),
+						previous_errors: [
+							{
+								code: 400,
+								message: "Provider returned error",
+								provider_name: "OpenAI",
+								raw: JSON.stringify({
+									error: { message: "Same upstream rejection" },
+								}),
+							},
+						],
+					},
+				},
+			}),
+		);
+
+		expect(fields.providerMessage).toBe("Invalid max_output_tokens");
+		expect(fields.providerMetadata).toEqual({
+			provider_name: "Azure",
+			raw: {
+				error: {
+					message: "Invalid max_output_tokens",
+					code: "integer_below_min_value",
+				},
+			},
+			previous_errors: [
+				{
+					code: 400,
+					message: "Provider returned error",
+					provider_name: "OpenAI",
+					raw: {
+						error: { message: "Same upstream rejection" },
+					},
+				},
+			],
+		});
 	});
 });

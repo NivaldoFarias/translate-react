@@ -76,15 +76,19 @@ export function getCiWorkflowOutputEnv() {
 export interface CiScriptContext {
 	/** GitHub token for Octokit in CI scripts */
 	ghToken: string;
+
 	/** Filesystem path to the `GITHUB_OUTPUT` file */
 	githubOutputPath: string;
+
 	/** Parsed `GITHUB_REPOSITORY` owner and repo name */
 	repository: {
 		owner: string;
 		repo: string;
 	};
+
 	/** Raw `owner/repo` slug from `GITHUB_REPOSITORY` */
 	repositorySlug: string;
+
 	/** Fork owner resolved for matrix and SHA variable I/O */
 	forkOwner: string;
 }

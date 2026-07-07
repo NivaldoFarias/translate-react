@@ -42,10 +42,13 @@ export interface RunnerServiceDependencies {
 export interface RunnerState {
 	/** Latest upstream repository tree used for discovery */
 	repositoryTree: PatchedRepositoryTreeItem[];
+
 	/** Files selected for translation in the current run */
 	filesToTranslate: TranslationFile[];
+
 	/** Per-file outcomes from batch processing */
 	processedResults: ProcessedFileResult[];
+
 	/** Unix timestamp when the state snapshot was captured */
 	timestamp: number;
 
@@ -60,6 +63,7 @@ export interface RunnerState {
 		{
 			/** GitHub pull request number for the invalid translation PR */
 			prNumber: number;
+
 			/** Mergeability and conflict status of the invalid pull request */
 			status: PullRequestStatus;
 		}

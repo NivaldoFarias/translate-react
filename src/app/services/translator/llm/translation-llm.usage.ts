@@ -19,10 +19,13 @@ export interface TranslationLlmUsageTotals {
 export interface TranslationLlmUsageSnapshot {
 	/** Prompt tokens reported for one completion */
 	readonly promptTokens: number;
+
 	/** Completion tokens reported for one completion */
 	readonly completionTokens: number;
+
 	/** Total tokens reported for one completion */
 	readonly totalTokens: number;
+
 	/** OpenRouter `usage.cost` for one completion, if reported */
 	readonly costUsd: number | null;
 }

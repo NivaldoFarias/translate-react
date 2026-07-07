@@ -9,6 +9,7 @@ import { resolveUpstreamShaVariableName } from "@/ci/services/upstream/upstream-
 export interface UpstreamShaVariableRepository {
 	/** Repository owner login or organization */
 	owner: string;
+
 	/** Repository name without owner prefix */
 	repo: string;
 }

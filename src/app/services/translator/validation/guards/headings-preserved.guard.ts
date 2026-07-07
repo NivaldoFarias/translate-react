@@ -9,6 +9,7 @@ const FIRST_HEADING_LINE = /^#{1,6}\s.+$/m;
 export interface HeadingsPreservedViolation {
 	/** Text of the first heading removed from the source */
 	readonly firstHeadingText: string;
+
 	/** Character offset of the first removed heading in the source */
 	readonly firstHeadingOffset: number;
 }

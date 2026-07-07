@@ -12,6 +12,7 @@ import {
 import { createGithubTokenSchema } from "@/shared/schemas/github-token.schema";
 
 const envDefaults = resolveEnvDefaults();
+
 /** Environment configuration schema for runtime validation */
 const envSchema = z.object({
 	/** Node.js's runtime environment */

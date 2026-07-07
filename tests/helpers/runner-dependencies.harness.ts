@@ -21,12 +21,16 @@ import {
 export interface MockRunnerServiceDependencies {
 	/** Mock GitHub service injected into the runner */
 	github?: MockGitHubService;
+
 	/** Mock translator service injected into the runner */
 	translator?: MockTranslatorService;
+
 	/** Mock language cache service injected into the runner */
 	languageCache?: MockLanguageCacheService;
+
 	/** Locale service injected into the runner */
 	locale?: LocaleService;
+
 	/** Mock language detector service injected into the runner */
 	languageDetector?: MockLanguageDetectorService;
 }

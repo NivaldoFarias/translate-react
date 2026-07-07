@@ -10,14 +10,19 @@ export interface SegmentBatchResponseIdRow {
 export interface SegmentBatchIdMismatchDiagnostics {
 	/** Number of segment ids sent in the request */
 	readonly requestedCount: number;
+
 	/** Number of response rows returned by the model */
 	readonly receivedItemCount: number;
+
 	/** Number of distinct segment ids in the response */
 	readonly uniqueReceivedCount: number;
+
 	/** Requested ids missing from the response */
 	readonly missingIds: string[];
+
 	/** Response ids not present in the request */
 	readonly extraIds: string[];
+
 	/** Response ids that appeared more than once */
 	readonly duplicateResponseIds: string[];
 }

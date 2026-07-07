@@ -6,6 +6,7 @@ import { PullRequestProgressAction } from "@/app/services/github/types";
 export interface ProgressCommentSectionPayload {
 	/** Batch results included in this progress section */
 	reportableResults: ProcessedFileResult[];
+
 	/** Translation files paired with {@link ProgressCommentSectionPayload.reportableResults} */
 	reportableFiles: readonly TranslationProgressFileRef[];
 }
@@ -14,6 +15,7 @@ export interface ProgressCommentSectionPayload {
 export interface ProgressCommentPayload {
 	/** Pull requests newly opened in this workflow run */
 	created: ProgressCommentSectionPayload;
+
 	/** Existing pull requests refreshed with new commits in this run */
 	updated: ProgressCommentSectionPayload;
 }

@@ -11,6 +11,7 @@ const FENCE_OPEN_LINE = /(^|\r?\n)([ \t]{0,3})(`{3,})([^\n\r]*)\r?\n/g;
 function closingFenceLinePattern(tickLength: number): RegExp {
 	return new RegExp(`^[ \\t]{0,3}\`{${tickLength},}\\s*$`);
 }
+
 /**
  * Finds the exclusive end index after a valid closing fence line, or `null` if none before EOF.
  *

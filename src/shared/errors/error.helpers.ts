@@ -237,6 +237,69 @@ function isLlmApiError(error: unknown): error is LlmApiError {
 }
 
 /**
+ * Parses a string when it looks like JSON; otherwise returns the original value.
+ *
+ * @param value Candidate JSON string or any other value
+ *
+ * @returns Parsed JSON value, or the original input when parsing does not apply
+ */
+function tryParseJsonString(value: unknown): unknown {
+	if (typeof value !== "string") {
+		return value;
+	}
+
+	const trimmed = value.trim();
+	if (trimmed.length === 0) {
+		return value;
+	}
+
+	const firstChar = trimmed.at(0);
+	if (firstChar !== "{" && firstChar !== "[") {
+		return value;
+	}
+
+	try {
+		return JSON.parse(trimmed);
+	} catch {
+		return value;
+	}
+}
+
+/**
+ * Normalizes OpenRouter provider metadata for structured logging by parsing embedded JSON `raw` payloads.
+ *
+ * @param metadata OpenRouter `metadata` object from an API error
+ *
+ * @returns Metadata with parsed `raw` and `previous_errors[].raw` values when JSON
+ */
+function normalizeProviderMetadataForLogging(
+	metadata: Record<string, unknown>,
+): Record<string, unknown> {
+	const normalized: Record<string, unknown> = { ...metadata };
+
+	if (typeof normalized["raw"] === "string") {
+		normalized["raw"] = tryParseJsonString(normalized["raw"]);
+	}
+
+	if (Array.isArray(normalized["previous_errors"])) {
+		normalized["previous_errors"] = normalized["previous_errors"].map((entry) => {
+			if (!isRecord(entry)) {
+				return entry;
+			}
+
+			const item: Record<string, unknown> = { ...entry };
+			if (typeof item["raw"] === "string") {
+				item["raw"] = tryParseJsonString(item["raw"]);
+			}
+
+			return item;
+		});
+	}
+
+	return normalized;
+}
+
+/**
  * Flattens nested OpenAI-style error payloads into searchable text for logging and quota heuristics.
  *
  * @param value The nested `error` field from an OpenAI-compatible API error, when present
@@ -258,6 +321,19 @@ export function flattenOpenAiStyleErrorPayload(value: unknown): string {
 		}
 
 		if (record.metadata !== undefined) {
+			if (isRecord(record.metadata)) {
+				const raw = record.metadata["raw"];
+				if (typeof raw === "string" && raw.trim().length > 0) {
+					const parsed = tryParseJsonString(raw);
+					const fromRaw = flattenOpenAiStyleErrorPayload(parsed);
+					if (fromRaw.length > 0) {
+						return fromRaw;
+					}
+
+					return raw;
+				}
+			}
+
 			const metadataText = flattenOpenAiStyleErrorPayload(record.metadata);
 			if (metadataText.length > 0) return metadataText;
 		}
@@ -281,12 +357,16 @@ export function flattenOpenAiStyleErrorPayload(value: unknown): string {
 export interface LlmApiErrorLogFields {
 	/** HTTP status from the provider response */
 	statusCode?: number;
+
 	/** Provider error type string when present */
 	llmErrorType?: string;
+
 	/** Provider request id for support correlation */
 	requestId?: string | null;
+
 	/** Flattened provider error message when present */
 	providerMessage?: string;
+
 	/** OpenRouter `metadata` payload when present */
 	providerMetadata?: Record<string, unknown>;
 }
@@ -306,7 +386,7 @@ export function toLlmApiErrorLogFields(error: unknown): LlmApiErrorLogFields {
 	const providerMessage = flattenOpenAiStyleErrorPayload(error.error);
 	const providerMetadata =
 		isRecord(error.error) && isRecord(error.error["metadata"]) ?
-			error.error["metadata"]
+			normalizeProviderMetadataForLogging(error.error["metadata"])
 		:	undefined;
 
 	return {

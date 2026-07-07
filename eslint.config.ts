@@ -71,6 +71,7 @@ export default defineConfig(
 			/* JSDoc */
 			"jsdoc/no-undefined-types": ["error", { disableReporting: true, markVariablesAsUsed: true }],
 			"jsdoc/tag-lines": ["error", "any", { startLines: 1 }],
+			"jsdoc/lines-before-block": ["error", { ignoreSingleLines: false }],
 			"jsdoc/sort-tags": [
 				"error",
 				{

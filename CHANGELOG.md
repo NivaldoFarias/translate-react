@@ -4,6 +4,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+### Changed
+
+- ESLint requires a blank line before each JSDoc block that follows another member, including single-line property docs on interfaces and types.
+
+### Fixed
+
+- `verifyLLMConnectivity()` no longer fails on providers that require at least 16 output tokens; `CONNECTIVITY_TEST_MAX_TOKENS` is raised from 5 to 32.
+- OpenRouter LLM API errors log parsed `providerMetadata` and nested `providerMessage` text instead of stringified JSON blobs.
+
 ## [0.2.11] - 2026-07-06
 
 ### Added

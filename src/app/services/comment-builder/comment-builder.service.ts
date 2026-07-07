@@ -12,6 +12,7 @@ import { selectProgressCommentPayload } from "./progress-comment.util";
 export interface FileEntry {
 	/** File identity used to build hierarchical progress comments */
 	file: TranslationProgressFileRef;
+
 	/** GitHub pull request number opened or updated for the file */
 	prNumber: number;
 }

@@ -51,6 +51,7 @@ export interface TranslationProgressFileRef {
 export interface RepositoryMetadata {
 	/** Repository owner login or organization */
 	owner: components["parameters"]["owner"];
+
 	/** Repository name without owner prefix */
 	repo: components["parameters"]["repo"];
 	[key: string]: unknown;
@@ -60,6 +61,7 @@ export interface RepositoryMetadata {
 export interface BaseRepositories {
 	/** Source React docs repository coordinates */
 	upstream: RepositoryMetadata;
+
 	/** Target-language fork repository coordinates */
 	fork: RepositoryMetadata;
 }
@@ -68,6 +70,7 @@ export interface BaseRepositories {
 export interface SharedGitHubDependencies {
 	/** Authenticated Octokit REST client */
 	octokit: Octokit;
+
 	/** Upstream and fork repository coordinates */
 	repositories: BaseRepositories;
 }

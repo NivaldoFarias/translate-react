@@ -20,6 +20,7 @@ export const upstreamLocalesFileSchema = z.array(upstreamLocaleConfigSchema).min
 export interface TranslationMatrixEntry extends UpstreamLocaleConfig {
 	/** Resolved fork owner for this locale row */
 	fork_owner: string;
+
 	/** Stored upstream default-branch SHA for change detection */
 	upstream_sha: string;
 }
@@ -28,6 +29,7 @@ export interface TranslationMatrixEntry extends UpstreamLocaleConfig {
 export interface UpstreamPollResult {
 	/** Whether any locale upstream tip differs from its stored SHA */
 	hasChanges: boolean;
+
 	/** Matrix rows to dispatch when {@link UpstreamPollResult.hasChanges} is true */
 	matrix: TranslationMatrixEntry[];
 }

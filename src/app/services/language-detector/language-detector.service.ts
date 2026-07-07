@@ -69,6 +69,7 @@ function stripHtmlLikeTags(content: string) {
 export interface LanguageConfig {
 	/** Expected source document locale code */
 	source: ReactLanguageCode;
+
 	/** Target translation locale code */
 	target: ReactLanguageCode;
 }

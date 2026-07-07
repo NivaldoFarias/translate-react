@@ -12,6 +12,7 @@ export type { ReviewerValidationNotice };
 export interface InvalidFilePullRequest {
 	/** GitHub pull request number */
 	prNumber: number;
+
 	/** Mergeability and conflict status of the invalid pull request */
 	status: PullRequestStatus;
 }
@@ -20,6 +21,7 @@ export interface InvalidFilePullRequest {
 export interface PullRequestDescriptionMetadata {
 	/** Human-readable target language name for PR copy */
 	languageName: string;
+
 	/** Prior invalid pull request for the same file, if any */
 	invalidFilePR: InvalidFilePullRequest | undefined;
 
