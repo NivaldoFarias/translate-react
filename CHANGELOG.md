@@ -8,6 +8,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Changed
 
+- Russian translation prompts now steer idiomatic English phrases toward natural Russian (for example `null prototype`, `client-marked code`, Server Component defaults, latency and rendering calques, and `tree graph` alt text) so regenerated `ru` pages read less like word-for-word machine translation.
 - ESLint requires a blank line before each JSDoc block that follows another member, including single-line property docs on interfaces and types.
 
 ### Fixed

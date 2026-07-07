@@ -290,6 +290,26 @@ describe("ptBrLocale.pullRequest.body", () => {
 	});
 });
 
+describe("ruLocale.rules", () => {
+	test("should include semantic calque avoidance rules", () => {
+		const { specific } = ruLocale.rules;
+
+		expect(specific).toContain("SEMANTIC TRANSLATION (avoid calques)");
+		expect(specific).toContain("null prototype");
+		expect(specific).toContain("client-marked code");
+		expect(specific).toContain("tree graph");
+		expect(specific).toContain("As dependencies of ComponentA");
+	});
+
+	test("should include Russian guideline rules from maintainer feedback", () => {
+		const { specific } = ruLocale.rules;
+
+		expect(specific).toContain("бандлер");
+		expect(specific).toContain("серверные компоненты");
+		expect(specific).toContain("developer.mozilla.org/ru/docs");
+	});
+});
+
 describe("ruLocale.pullRequest.body", () => {
 	const buildPullRequestBody = ruLocale.pullRequest.body;
 
