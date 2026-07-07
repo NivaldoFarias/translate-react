@@ -23,12 +23,12 @@ on:
           - production
         default: development
       langs:
-        description: Comma-separated locale ids (empty = all configured upstream locales)
+        description: Comma-separated locale ids (empty = all configured locales)
         required: false
         type: string
         default: ""
       file_path:
-        description: Optional repository path for targeted re-translation (preserves open PR)
+        description: Optional repository path for targeted re-translation
         required: false
         type: string
         default: ""

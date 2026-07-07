@@ -25,11 +25,15 @@ import "@/app/utils/bootstrap-cli-overrides.util";
 
 import { defineCommand, runCommand } from "citty";
 
+import { env } from "@/app/utils/";
 import { isSmokeProfileId, run, runSucceeded, SmokeProfile } from "@/ci/services/smoke";
 import { handleTopLevelError } from "@/shared/errors/";
 import { createLogger } from "@/shared/utils/create-logger.util";
 
-const logger = createLogger({ level: "info", logToConsole: true }).child({
+const logger = createLogger({
+	level: env.LOG_LEVEL,
+	logToConsole: env.LOG_TO_CONSOLE,
+}).child({
 	component: "smoke",
 });
 

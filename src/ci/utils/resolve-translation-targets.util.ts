@@ -4,6 +4,7 @@ import { collectTranslationFilePaths } from "@/app/utils/parse-translation-file-
 export interface ResolvedTranslationTargets {
 	/** Trimmed manual `file_path` input for optional `--file` forwarding */
 	path: string;
+
 	/** Whether any configured target path limits the run */
 	hasTargetPaths: boolean;
 }

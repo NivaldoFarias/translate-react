@@ -2,21 +2,34 @@ import { MARKDOWN_REGEXES } from "../../markdown/markdown.regexes";
 
 /** One MDX spacing regression with document location */
 export interface MdxSpacingViolation {
+	/** Human-readable label for the spacing pattern that matched */
 	readonly label: string;
+
+	/** First line number where the regression starts */
 	readonly startLine: number;
+
+	/** Last line number where the regression ends */
 	readonly endLine: number;
+
+	/** Markdown excerpt covering the matched region */
 	readonly excerpt: string;
 }
 
 /** One sentence-case heading regression with document location */
 export interface SentenceCaseHeadingViolation {
+	/** One-based line number of the heading */
 	readonly lineNumber: number;
+
+	/** Full heading line text */
 	readonly line: string;
 }
 
 /** One extra markdown link URL with document location */
 export interface ExtraMarkdownLinkViolation {
+	/** Link destination URL introduced in the translation */
 	readonly url: string;
+
+	/** One-based line number where the extra link appears */
 	readonly lineNumber: number;
 }
 

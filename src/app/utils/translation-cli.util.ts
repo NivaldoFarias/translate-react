@@ -76,6 +76,7 @@ function collectRepeatedTranslationFilePaths(rawArgs: string[]) {
 
 	return paths;
 }
+
 /**
  * Applies translation workflow CLI flags to `import.meta.env` before runtime env validation runs.
  *

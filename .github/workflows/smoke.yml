@@ -1,4 +1,4 @@
-name: Smoke
+name: Smoke Workflow
 
 on:
   workflow_dispatch:
@@ -22,7 +22,7 @@ on:
           - production
         default: development
       lang:
-        description: Target locale for smoke run (from .github/locales.json)
+        description: Target locale for the smoke run
         required: false
         type: choice
         options:

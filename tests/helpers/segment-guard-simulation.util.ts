@@ -9,8 +9,13 @@ import { collectPostTranslationValidationIssues } from "@/app/services/translato
 
 /** One row in the guard simulation table for a fixture */
 export interface GuardSimulationRow {
+	/** Post-translation guard identifier under test */
 	readonly guardId: string;
+
+	/** Whether the guard fires on a deliberately bad full-body translation */
 	readonly firesOnSimulatedBadFullBody: boolean;
+
+	/** Whether segment freeze prevents the guard from firing */
 	readonly preventedBySegmentFreeze: boolean;
 }
 

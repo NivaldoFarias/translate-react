@@ -18,12 +18,18 @@ export const upstreamLocalesFileSchema = z.array(upstreamLocaleConfigSchema).min
 
 /** One GitHub Actions matrix row for the translation workflow job. */
 export interface TranslationMatrixEntry extends UpstreamLocaleConfig {
+	/** Resolved fork owner for this locale row */
 	fork_owner: string;
+
+	/** Stored upstream default-branch SHA for change detection */
 	upstream_sha: string;
 }
 
 /** Result of comparing upstream default-branch tips to stored repository variables. */
 export interface UpstreamPollResult {
+	/** Whether any locale upstream tip differs from its stored SHA */
 	hasChanges: boolean;
+
+	/** Matrix rows to dispatch when {@link UpstreamPollResult.hasChanges} is true */
 	matrix: TranslationMatrixEntry[];
 }

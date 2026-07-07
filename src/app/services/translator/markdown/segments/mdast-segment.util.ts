@@ -27,8 +27,13 @@ export type PolicyMdxJsxType = MdxJsxFlowElement["type"] | MdxJsxTextElement["ty
 
 /** Absolute source span for byte-stable segment reinsertion */
 export interface AbsoluteSourceSpan {
+	/** Inclusive start byte offset in the source document */
 	readonly start: number;
+
+	/** Exclusive end byte offset in the source document */
 	readonly end: number;
+
+	/** Source substring covered by the span */
 	readonly sourceText: string;
 }
 

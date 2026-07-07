@@ -4,27 +4,68 @@ import type { ReactLanguageCode } from "./react-translation.constants";
 
 import { LogLevel, RuntimeEnvironment } from "./runtime.constants";
 
+/** Default values and types for the application environment schema */
 export interface EnvironmentSchemaDefaults {
+	/** Active Node runtime environment */
 	NODE_ENV: RuntimeEnvironment;
+
+	/** Minimum Pino log level */
 	LOG_LEVEL: LogLevel;
+
+	/** GitHub API token for Octokit */
 	GH_TOKEN: string;
+
+	/** API key for the OpenAI-compatible LLM provider */
 	LLM_API_KEY: string;
+
+	/** Optional OpenAI project id request header */
 	OPENAI_PROJECT_ID: string;
+
+	/** Base URL for the LLM API */
 	LLM_API_BASE_URL: string;
+
+	/** Application title sent in outbound HTTP headers */
 	HEADER_APP_TITLE: string;
+
+	/** Application homepage URL sent in outbound HTTP headers */
 	HEADER_APP_URL: string;
+
+	/** Fork repository owner */
 	REPO_FORK_OWNER: string;
+
+	/** Fork repository name */
 	REPO_FORK_NAME: string;
+
+	/** Upstream repository owner */
 	REPO_UPSTREAM_OWNER: string;
+
+	/** Upstream repository name */
 	REPO_UPSTREAM_NAME: string;
+
+	/** Model id sent to the LLM provider */
 	LLM_MODEL: string;
+
+	/** Number of files processed per translation batch */
 	BATCH_SIZE: number;
+
+	/** Target translation locale code */
 	TARGET_LANGUAGE: ReactLanguageCode;
+
+	/** Source document locale code */
 	SOURCE_LANGUAGE: ReactLanguageCode;
+
+	/** Maximum completion tokens per LLM call */
 	MAX_TOKENS: number;
+
+	/** Whether Pino mirrors logs to stdout */
 	LOG_TO_CONSOLE: boolean;
+
+	/** Octokit request timeout in milliseconds */
 	GH_REQUEST_TIMEOUT: number;
+
+	/** Maximum concurrent in-flight LLM requests */
 	MAX_LLM_CONCURRENCY: number;
+
 	/** Maximum p-retry attempts per LLM chat completion on transient API errors */
 	MAX_RETRY_ATTEMPTS: number;
 

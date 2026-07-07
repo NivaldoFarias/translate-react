@@ -71,6 +71,7 @@ export default defineConfig(
 			/* JSDoc */
 			"jsdoc/no-undefined-types": ["error", { disableReporting: true, markVariablesAsUsed: true }],
 			"jsdoc/tag-lines": ["error", "any", { startLines: 1 }],
+			"jsdoc/lines-before-block": ["error", { ignoreSingleLines: false }],
 			"jsdoc/sort-tags": [
 				"error",
 				{
@@ -84,6 +85,32 @@ export default defineConfig(
 						{ tags: ["see"] },
 						{ tags: ["example"] },
 						{ tags: ["-other"] },
+					],
+				},
+			],
+			"jsdoc/require-jsdoc": [
+				"error",
+				{
+					publicOnly: true,
+					contexts: [
+						"TSInterfaceDeclaration",
+						"TSMethodSignature",
+						"TSTypeAliasDeclaration",
+						{
+							context: "TSPropertySignature",
+							inlineCommentBlock: true,
+						},
+					],
+				},
+			],
+			"jsdoc/require-description": [
+				"error",
+				{
+					contexts: [
+						"TSInterfaceDeclaration",
+						"TSPropertySignature",
+						"TSMethodSignature",
+						"TSTypeAliasDeclaration",
 					],
 				},
 			],

@@ -4,13 +4,19 @@ import { PullRequestProgressAction } from "@/app/services/github/types";
 
 /** One progress-comment section (created or updated pull requests) */
 export interface ProgressCommentSectionPayload {
+	/** Batch results included in this progress section */
 	reportableResults: ProcessedFileResult[];
+
+	/** Translation files paired with {@link ProgressCommentSectionPayload.reportableResults} */
 	reportableFiles: readonly TranslationProgressFileRef[];
 }
 
 /** Created and updated pull request groups for the translation-progress issue comment */
 export interface ProgressCommentPayload {
+	/** Pull requests newly opened in this workflow run */
 	created: ProgressCommentSectionPayload;
+
+	/** Existing pull requests refreshed with new commits in this run */
 	updated: ProgressCommentSectionPayload;
 }
 

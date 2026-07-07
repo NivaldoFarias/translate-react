@@ -8,17 +8,25 @@ import { logger, resolveGitHubActionsRunContext } from "@/app/utils/";
 
 import { selectProgressCommentPayload } from "./progress-comment.util";
 
+/** One translated file and its pull request number for progress comments */
 export interface FileEntry {
+	/** File identity used to build hierarchical progress comments */
 	file: TranslationProgressFileRef;
+
+	/** GitHub pull request number opened or updated for the file */
 	prNumber: number;
 }
 
+/** Nested directory tree of translation progress file entries */
 export interface HierarchicalStructure {
+	/** Leaf files at this directory level */
 	files?: FileEntry[];
 	[key: string]: HierarchicalStructure | FileEntry[] | undefined;
 }
 
+/** File entry with repository path segments for tree rendering */
 export interface FileWithHierarchy extends FileEntry {
+	/** Path segments derived from the repository file path */
 	pathParts: string[];
 }
 

@@ -9,6 +9,7 @@ import { MARKDOWN_REGEXES } from "./markdown.regexes";
 export interface LeadingYamlFrontmatterSplit {
 	/** Matched `---` … `---` prefix when present at document start; otherwise empty */
 	readonly block: string;
+
 	/** Document text after the frontmatter block, or the full `source` when none was split */
 	readonly rest: string;
 }

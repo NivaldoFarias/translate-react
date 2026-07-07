@@ -86,7 +86,15 @@ export const ruLocale: LocaleDefinition = {
 - ALWAYS use the letter 'ё' where standard Russian spelling requires it (e.g. 'определён', 'объём', 'жёлтый', 'начнёт'), not the substitute 'е'
 - ALWAYS use Russian guillemets («») for quotation marks, never straight double quotes (")
 - Translate 'bundler' as 'бандлер', not 'сборщик'
-- Use lowercase for 'серверные компоненты' (Server Components) and 'клиентские компоненты' (Client Components), consistent with other compound terms like 'дочерний компонент' and 'классовый компонент'; do not capitalize each word or use 'Компонент Сервера' / 'Компонент Клиента'`,
+- Use lowercase for 'серверные компоненты' (Server Components) and 'клиентские компоненты' (Client Components), consistent with other compound terms like 'дочерний компонент' and 'классовый компонент'; do not capitalize each word or use 'Компонент Сервера' / 'Компонент Клиента'
+# SEMANTIC TRANSLATION (avoid calques)
+- Translate 'null prototype' as 'прототип null' or 'прототипом null', not 'нулевой прототип' or 'нулевого прототипа' (zero prototype is a different concept)
+- Translate 'client-marked code' with natural Russian grammar, e.g. 'код, помеченный как клиентский' or 'из кода, помеченного как клиентский', not broken phrases like 'импортированный из помеченного клиента кода'
+- Avoid calques for 'may experience low latency'; prefer natural phrasing about lower latency for data retrieval and network requests, not 'могут испытывать низкую задержку'
+- Avoid calques for 'agnostic about where they render'; prefer 'не зависят от того, где они рендерятся', not 'могут быть агностиками к тому, где они рендерятся'
+- Translate 'as Server Components are default' as 'по умолчанию компоненты являются серверными', not 'Компоненты Сервера являются стандартными'
+- In diagram or illustration alt text, translate 'tree graph' as 'древовидный граф' or 'дерево', not 'график дерева' (график implies a chart or plot)
+- When English says 'As dependencies of ComponentA, depB and depC', preserve that depB and depC are dependencies of ComponentA, not three parallel list items`,
 	},
 	pullRequest: {
 		title: (file: TranslationFile) => `Перевод \`${file.filename}\` на русский язык`,

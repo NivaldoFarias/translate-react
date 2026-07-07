@@ -4,6 +4,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+## [0.2.12] - 2026-07-07
+
+### Changed
+
+- Russian translation prompts now steer idiomatic English phrases toward natural Russian (for example `null prototype`, `client-marked code`, Server Component defaults, latency and rendering calques, and `tree graph` alt text) so regenerated `ru` pages read less like word-for-word machine translation.
+- ESLint requires a blank line before each JSDoc block that follows another member, including single-line property docs on interfaces and types.
+
+### Fixed
+
+- `verifyLLMConnectivity()` no longer fails on providers that require at least 16 output tokens; `CONNECTIVITY_TEST_MAX_TOKENS` is raised from 5 to 32.
+- OpenRouter LLM API errors log parsed `providerMetadata` and nested `providerMessage` text instead of stringified JSON blobs.
+
 ## [0.2.11] - 2026-07-06
 
 ### Added
@@ -335,6 +347,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 - README `MAX_RETRY_ATTEMPTS` default matches runtime (`3`).
 
+[0.2.12]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.12
 [0.2.11]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.11
 [0.2.10]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.10
 [0.2.9]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.9

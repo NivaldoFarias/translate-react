@@ -49,20 +49,29 @@ export interface TranslationProgressFileRef {
 
 /** GitHub repository metadata for fork and upstream repositories */
 export interface RepositoryMetadata {
+	/** Repository owner login or organization */
 	owner: components["parameters"]["owner"];
+
+	/** Repository name without owner prefix */
 	repo: components["parameters"]["repo"];
 	[key: string]: unknown;
 }
 
 /** Upstream and fork repository coordinates shared across GitHub sub-services */
 export interface BaseRepositories {
+	/** Source React docs repository coordinates */
 	upstream: RepositoryMetadata;
+
+	/** Target-language fork repository coordinates */
 	fork: RepositoryMetadata;
 }
 
 /** Dependencies shared by every GitHub sub-service composed by {@link GitHubService} */
 export interface SharedGitHubDependencies {
+	/** Authenticated Octokit REST client */
 	octokit: Octokit;
+
+	/** Upstream and fork repository coordinates */
 	repositories: BaseRepositories;
 }
 
@@ -123,6 +132,7 @@ export interface ProcessedFileResult {
 export type RepositoryTreeItem =
 	RestEndpointMethodTypes["git"]["getTree"]["response"]["data"]["tree"][number];
 
+/** Repository tree item with required path and sha plus derived filename */
 export interface PatchedRepositoryTreeItem extends SetRequired<RepositoryTreeItem, "path" | "sha"> {
 	/** Filename extracted from the file path */
 	filename: string;
