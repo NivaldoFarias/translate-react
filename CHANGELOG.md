@@ -4,6 +4,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+### Added
+
+- Manual `smoke.yml` dispatch accepts an optional `llm_model` input that overrides the selected GitHub Environment `LLM_MODEL` when set.
+
+### Changed
+
+- README and package metadata now describe the project as drafting translation pull requests for locale contributors, not as an automatic translation service.
+
 ## [0.2.12] - 2026-07-07
 
 ### Changed

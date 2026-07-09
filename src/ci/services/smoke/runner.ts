@@ -71,6 +71,8 @@ async function clearSmokeArtifactDir(artifactDir: string) {
  *
  * The target locale comes from `env.TARGET_LANGUAGE` (default `pt-br`), which the `ci:smoke` CLI's
  * `--lang` flag overrides before this function runs; see [`smoke.ts`](../../actions/smoke.ts).
+ * `env.LLM_MODEL` comes from the process environment (including manual `smoke.yml` `llm_model`
+ * dispatch when run in Actions).
  *
  * @param options Profile, optional fixture override, and output directory
  *

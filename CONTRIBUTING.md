@@ -29,14 +29,14 @@ Fixture lists: [`smoke-profiles.util.ts`](./src/ci/services/smoke/smoke-profiles
 > [!IMPORTANT]
 >
 > - Local runs write gitignored `.out/`. Each translated fixture gets a subdirectory (i.e. `use-memo/`) with `translated.md` and `pull-request.md`. When the run posts progress, `translation-progress-issue-comment.md` sits at the `.out/` root.
-> - `TARGET_LANGUAGE` defaults to `pt-br`; pass `--lang <locale>` to smoke a different configured locale.
+> - `TARGET_LANGUAGE` defaults to `pt-br`; pass `--lang <locale>` to smoke a different configured locale. Manual [`smoke.yml`](./.github/workflows/smoke.yml) dispatch accepts the same locale override via `lang`, and an optional `llm_model` input that replaces the selected environment's `LLM_MODEL` when set.
 > - [`ci.yml`](./.github/workflows/ci.yml) runs the `quick` profile for `pt-br` as a required gate whenever `src/app/services/translator/`, `src/app/services/runner/`, or `src/app/locales/` changes; other locales from [`.github/locales.json`](./.github/locales.json) run as optional jobs (`continue-on-error`) with a 120-minute timeout. Failed smoke jobs upload `.out/` as an artifact.
-> - [`smoke.yml`](./.github/workflows/smoke.yml) stays manual dispatch for ad hoc `workflow`/`full` profile runs or a specific GitHub Environment. The job writes the same tree to `.out/`, packs it to `artifacts/smoke/<profile>-<run_id>.tar.gz`, and uploads artifact `smoke-<profile>-<run_id>`.
+> - [`smoke.yml`](./.github/workflows/smoke.yml) stays manual dispatch for ad hoc `workflow`/`full` profile runs, a chosen locale, an optional LLM model override, or a specific GitHub Environment. The job writes the same tree to `.out/`, packs it to `artifacts/smoke/<lang>-<profile>-<run_id>.tar.gz`, and uploads artifact `smoke-<lang>-<profile>-<run_id>`.
 
 Extract the downloaded artifact[^1]:
 
 ```bash
-tar -xzf smoke-quick-<run_id>.tar.gz
+tar -xzf smoke-pt-br-quick-<run_id>.tar.gz
 ```
 
 ## Releasing

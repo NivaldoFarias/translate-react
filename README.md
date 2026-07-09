@@ -2,7 +2,7 @@
 
 <div align="center">
 
-<div><b>Translate <code>react.dev</code> locale repos when upstream changes</b></div>
+<div><b>Drafts translation PRs for <code>react.dev</code> locale contributors when upstream changes</b></div>
 
 <br />
 
