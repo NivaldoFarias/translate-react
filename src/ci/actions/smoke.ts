@@ -9,7 +9,9 @@
  *
  * `TARGET_LANGUAGE` defaults to `pt-br`; pass `--lang`/`-l` (handled by
  * `bootstrap-cli-overrides.util`, shared with the main translation CLI) to smoke a different
- * configured locale.
+ * configured locale. Set `LLM_MODEL` in the environment (or `.env`) to try another model locally;
+ * manual [`smoke.yml`](../../.github/workflows/smoke.yml) dispatch can override the environment
+ * value with the `llm_model` input.
  *
  * @example
  * ```bash

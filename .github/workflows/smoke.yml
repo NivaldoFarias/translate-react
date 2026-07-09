@@ -29,6 +29,11 @@ on:
           - pt-br
           - ru
         default: pt-br
+      llm_model:
+        description: Optional LLM model override (replaces environment LLM_MODEL when set)
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -63,6 +68,7 @@ jobs:
           log-level: ${{ vars.LOG_LEVEL }}
           log-to-console: ${{ vars.LOG_TO_CONSOLE }}
           llm-model: ${{ vars.LLM_MODEL }}
+          llm-model-override: ${{ inputs.llm_model }}
           llm-api-base-url: ${{ vars.LLM_API_BASE_URL }}
           max-retry-attempts: ${{ vars.MAX_RETRY_ATTEMPTS }}
           max-llm-concurrency: ${{ vars.MAX_LLM_CONCURRENCY }}
