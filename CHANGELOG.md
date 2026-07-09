@@ -4,6 +4,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+## [0.2.13] - 2026-07-09
+
 ### Added
 
 - Manual `smoke.yml` dispatch accepts an optional `llm_model` input that overrides the selected GitHub Environment `LLM_MODEL` when set.
@@ -355,6 +357,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 - README `MAX_RETRY_ATTEMPTS` default matches runtime (`3`).
 
+[0.2.13]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.13
 [0.2.12]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.12
 [0.2.11]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.11
 [0.2.10]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.10
