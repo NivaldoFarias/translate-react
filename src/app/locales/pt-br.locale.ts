@@ -8,7 +8,7 @@ import { createPRBodyBuilder } from "./pr-body.builder";
 /** Brazilian Portuguese strings for the PR body template */
 const ptBrPRBodyStrings: LocalePRBodyStrings = {
 	humanReviewNotice:
-		"Esta tradução foi gerada usando LLMs e **requer revisão humana** para garantir precisão, contexto cultural e terminologia técnica.",
+		"Esta tradução é um **rascunho** gerado por LLM para contribuidores da documentação. Valide manualmente o conteúdo antes do merge para garantir precisão, contexto cultural e terminologia técnica.\n\nSe encontrar problemas, abra um PR para a branch deste fork ou solicite alterações/comente neste PR.",
 
 	conflictNotice: {
 		title: "PR atualizado após conflito",
@@ -17,7 +17,7 @@ const ptBrPRBodyStrings: LocalePRBodyStrings = {
 	},
 
 	maintainerWikiTip: (wikiUrl) =>
-		`Consulte [For React Docs Maintainers](${wikiUrl}) para orientações de revisão e formato de feedback estruturado.`,
+		`Consulte [For React Docs Maintainers](${wikiUrl}) para orientações de validação manual, revisão e formato de feedback estruturado.`,
 
 	reviewerWarnings: {
 		intro:
@@ -105,7 +105,7 @@ export const ptBrLocale: LocaleDefinition = {
 		},
 		createdSectionHeader: "### PRs criados",
 		updatedSectionHeader: "### PRs atualizados",
-		suffix: `[^1]: as traduções foram geradas por uma LLM e requerem revisão humana para garantir precisão técnica e fluência.`,
+		suffix: `[^1]: as traduções são rascunhos gerados por LLM; valide manualmente antes do merge.`,
 	},
 	rules: {
 		specific: PT_BR_SPECIFIC_RULES,

@@ -4,6 +4,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+## [0.2.14] - 2026-07-13
+
+### Added
+
+- Manual `workflow.yml` dispatch accepts an optional `llm_model` input that overrides the selected GitHub Environment `LLM_MODEL` when set.
+
+### Changed
+
+- Translation PR bodies and progress comments now describe bot output as **drafts** for locale contributors, advise manual validation before merge, and explain how to fix issues (PR to the fork branch or request changes on the bot PR). Maintainer wiki copy mirrors the same framing.
+
+### Fixed
+
+- `bun run type-check` keeps using TypeScript 7 via `@typescript/native` while the runtime stays on TypeScript 6 for programmatic fence parsing after the production dependency bump.
+
 ## [0.2.13] - 2026-07-09
 
 ### Added
@@ -357,6 +371,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 - README `MAX_RETRY_ATTEMPTS` default matches runtime (`3`).
 
+[0.2.14]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.14
 [0.2.13]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.13
 [0.2.12]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.12
 [0.2.11]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.11

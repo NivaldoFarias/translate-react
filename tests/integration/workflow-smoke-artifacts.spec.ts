@@ -64,7 +64,8 @@ describe("workflow smoke artifact capture", () => {
 				expect(pullRequestMarkdown.length).toBeGreaterThan(0);
 				expect(translatedMarkdown.length).toBeGreaterThan(0);
 				expect(pullRequestMarkdown).toStartWith(`# Tradução de \`${basename}\``);
-				expect(pullRequestMarkdown).toContain("requer revisão humana");
+				expect(pullRequestMarkdown).toContain("rascunho");
+				expect(pullRequestMarkdown).toContain("Valide manualmente");
 			} finally {
 				await fs.rm(artifactRoot, { recursive: true, force: true });
 			}

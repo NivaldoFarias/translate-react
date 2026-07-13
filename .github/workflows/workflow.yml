@@ -32,6 +32,11 @@ on:
         required: false
         type: string
         default: ""
+      llm_model:
+        description: Optional LLM model override (replaces environment LLM_MODEL when set)
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -140,7 +145,7 @@ jobs:
           NODE_ENV: ${{ vars.NODE_ENV }}
           LOG_LEVEL: ${{ vars.LOG_LEVEL }}
           LOG_TO_CONSOLE: ${{ vars.LOG_TO_CONSOLE }}
-          LLM_MODEL: ${{ vars.LLM_MODEL }}
+          LLM_MODEL: ${{ github.event_name == 'workflow_dispatch' && inputs.llm_model != '' && inputs.llm_model || vars.LLM_MODEL }}
           LLM_API_BASE_URL: ${{ vars.LLM_API_BASE_URL }}
           MAX_RETRY_ATTEMPTS: ${{ vars.MAX_RETRY_ATTEMPTS }}
           MAX_LLM_CONCURRENCY: ${{ vars.MAX_LLM_CONCURRENCY }}

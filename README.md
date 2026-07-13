@@ -19,7 +19,7 @@ When `react.dev` changes in English (and the translation repository is updated),
 
 1. **Poll**: scheduled runs compare each `reactjs/<lang>.react.dev` upstream against the last translated commit SHA
 2. **Translate**: changed pages pass through an LLM with guards that keep Markdown structure, frontmatter, and code samples intact
-3. **Open PRs**: translated content lands on the locale fork as review-ready PRs through the `translate-react` bot
+3. **Open PRs**: translated content lands on the locale fork as draft PRs through the `translate-react` bot
 
 Locales are defined in [`.github/locales.json`](./.github/locales.json). Currently, only `pt-br` and `ru` are supported.
 
