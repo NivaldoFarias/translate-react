@@ -12,6 +12,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 - Translation PR bodies and progress comments now describe bot output as **drafts** for locale contributors, advise manual validation before merge, and explain how to fix issues (PR to the fork branch or request changes on the bot PR). Maintainer wiki copy mirrors the same framing.
 
+### Fixed
+
+- `bun run type-check` keeps using TypeScript 7 via `@typescript/native` while the runtime stays on TypeScript 6 for programmatic fence parsing after the production dependency bump.
+
 ## [0.2.13] - 2026-07-09
 
 ### Added
