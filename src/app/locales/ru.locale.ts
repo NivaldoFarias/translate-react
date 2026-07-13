@@ -8,7 +8,7 @@ import { createPRBodyBuilder } from "./pr-body.builder";
 /** Russian strings for the PR body template */
 const ruPRBodyStrings: LocalePRBodyStrings = {
 	humanReviewNotice:
-		"Этот перевод был создан с использованием LLM и **требует проверки человеком** для обеспечения точности, культурного контекста и технической терминологии.",
+		"Этот перевод — **черновик**, созданный LLM для контрибьюторов документации. Проверьте содержимое вручную перед merge, чтобы обеспечить точность, культурный контекст и техническую терминологию.\n\nЕсли найдёте проблемы, откройте PR в ветку на форке или запросите правки/оставьте комментарий в этом PR.",
 
 	conflictNotice: {
 		title: "PR обновлён после конфликта",
@@ -17,7 +17,7 @@ const ruPRBodyStrings: LocalePRBodyStrings = {
 	},
 
 	maintainerWikiTip: (wikiUrl) =>
-		`См. [For React Docs Maintainers](${wikiUrl}): руководство для ревьюеров и формат структурированного feedback.`,
+		`См. [For React Docs Maintainers](${wikiUrl}): руководство по ручной проверке, ревью и формату структурированного feedback.`,
 
 	reviewerWarnings: {
 		intro:
@@ -72,7 +72,7 @@ export const ruLocale: LocaleDefinition = {
 		},
 		createdSectionHeader: "### Созданные PR",
 		updatedSectionHeader: "### Обновлённые PR",
-		suffix: `[^1]: переводы были сгенерированы с использованием LLM и требуют проверки человеком для обеспечения точности, культурного контекста и технической терминологии.`,
+		suffix: `[^1]: переводы — черновики, созданные LLM; проверьте вручную перед merge.`,
 	},
 	rules: {
 		specific: `

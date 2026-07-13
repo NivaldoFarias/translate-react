@@ -217,12 +217,14 @@ describe("ptBrLocale.pullRequest.body", () => {
 			expect(body).not.toContain("Versão do translate-react");
 		});
 
-		test("should include human review notice and maintainer wiki tip", () => {
+		test("should include draft notice, manual validation guidance, and maintainer wiki tip", () => {
 			const metadata = createPullRequestDescriptionMetadata();
 
 			const body = buildPullRequestBody(file, processingResult, metadata);
 
-			expect(body).toContain("requer revisão humana");
+			expect(body).toContain("rascunho");
+			expect(body).toContain("Valide manualmente");
+			expect(body).toContain("abra um PR para a branch deste fork");
 			expect(body).toContain("> [!TIP]");
 			expect(body).toContain(WIKI_FOR_REACT_DOCS_MAINTAINERS_URL);
 			expect(body).not.toContain("> [!IMPORTANT]");
@@ -362,14 +364,16 @@ describe("ruLocale.pullRequest.body", () => {
 	});
 
 	describe("PR body structure", () => {
-		test("should include human review notice and maintainer wiki tip in Russian", () => {
+		test("should include draft notice, manual validation guidance, and maintainer wiki tip in Russian", () => {
 			const metadata = createPullRequestDescriptionMetadata({
 				languageName: "Русский",
 			});
 
 			const body = buildPullRequestBody(file, processingResult, metadata);
 
-			expect(body).toContain("требует проверки человеком");
+			expect(body).toContain("черновик");
+			expect(body).toContain("Проверьте содержимое вручную");
+			expect(body).toContain("откройте PR в ветку на форке");
 			expect(body).toContain("> [!TIP]");
 			expect(body).not.toContain("> [!IMPORTANT]");
 			expect(body).not.toContain("Этот PR содержит");

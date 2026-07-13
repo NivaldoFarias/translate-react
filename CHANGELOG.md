@@ -8,6 +8,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 - Manual `workflow.yml` dispatch accepts an optional `llm_model` input that overrides the selected GitHub Environment `LLM_MODEL` when set.
 
+### Changed
+
+- Translation PR bodies and progress comments now describe bot output as **drafts** for locale contributors, advise manual validation before merge, and explain how to fix issues (PR to the fork branch or request changes on the bot PR). Maintainer wiki copy mirrors the same framing.
+
 ## [0.2.13] - 2026-07-09
 
 ### Added
