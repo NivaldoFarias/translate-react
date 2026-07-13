@@ -4,6 +4,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+### Added
+
+- Translation and smoke CLIs accept `--model` to override `LLM_MODEL` for a single local run.
+
 ## [0.2.14] - 2026-07-13
 
 ### Added

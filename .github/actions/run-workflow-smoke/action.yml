@@ -29,12 +29,8 @@ inputs:
     description: LOG_TO_CONSOLE
     required: false
   llm-model:
-    description: LLM_MODEL from environment variables
+    description: Resolved LLM model id for this run
     required: false
-  llm-model-override:
-    description: Optional LLM model override; empty uses `llm-model`
-    required: false
-    default: ""
   llm-api-base-url:
     description: LLM_API_BASE_URL
     required: false
@@ -82,7 +78,7 @@ runs:
         NODE_ENV: ${{ inputs.node-env }}
         LOG_LEVEL: ${{ inputs.log-level }}
         LOG_TO_CONSOLE: ${{ inputs.log-to-console }}
-        LLM_MODEL: ${{ inputs.llm-model-override != '' && inputs.llm-model-override || inputs.llm-model }}
+        LLM_MODEL: ${{ inputs.llm-model }}
         LLM_API_BASE_URL: ${{ inputs.llm-api-base-url }}
         MAX_RETRY_ATTEMPTS: ${{ inputs.max-retry-attempts }}
         MAX_LLM_CONCURRENCY: ${{ inputs.max-llm-concurrency }}

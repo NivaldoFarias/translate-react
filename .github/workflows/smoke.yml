@@ -67,8 +67,7 @@ jobs:
           node-env: ${{ vars.NODE_ENV }}
           log-level: ${{ vars.LOG_LEVEL }}
           log-to-console: ${{ vars.LOG_TO_CONSOLE }}
-          llm-model: ${{ vars.LLM_MODEL }}
-          llm-model-override: ${{ inputs.llm_model }}
+          llm-model: ${{ inputs.llm_model != '' && inputs.llm_model || vars.LLM_MODEL }}
           llm-api-base-url: ${{ vars.LLM_API_BASE_URL }}
           max-retry-attempts: ${{ vars.MAX_RETRY_ATTEMPTS }}
           max-llm-concurrency: ${{ vars.MAX_LLM_CONCURRENCY }}

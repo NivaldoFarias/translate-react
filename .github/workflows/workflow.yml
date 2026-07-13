@@ -33,7 +33,7 @@ on:
         type: string
         default: ""
       llm_model:
-        description: Optional LLM model override (replaces environment LLM_MODEL when set)
+        description: Optional LLM model override
         required: false
         type: string
         default: ""

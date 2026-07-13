@@ -9,14 +9,14 @@
  *
  * `TARGET_LANGUAGE` defaults to `pt-br`; pass `--lang`/`-l` (handled by
  * `bootstrap-cli-overrides.util`, shared with the main translation CLI) to smoke a different
- * configured locale. Set `LLM_MODEL` in the environment (or `.env`) to try another model locally;
- * manual [`smoke.yml`](../../.github/workflows/smoke.yml) dispatch can override the environment
- * value with the `llm_model` input.
+ * configured locale. Pass `--model` to override `LLM_MODEL` for that run (or set it in the
+ * environment or `.env`).
  *
  * @example
  * ```bash
  * bun run ci:smoke -- --profile quick
  * bun run ci:smoke -- --profile quick --lang ru
+ * bun run ci:smoke -- --lang ru --files use-client.md --model openai/gpt-5.4-nano
  * bun run ci:smoke -- --profile workflow
  * bun run ci:smoke -- --profile full
  * bun run ci:smoke -- --files hydrateRoot.md,lazy.md
