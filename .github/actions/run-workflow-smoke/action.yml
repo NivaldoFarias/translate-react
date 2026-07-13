@@ -9,6 +9,10 @@ inputs:
     description: Target locale override (`--lang`); empty uses `TARGET_LANGUAGE`/default
     required: false
     default: ""
+  files:
+    description: Comma-separated fixture basenames (`--files`); overrides profile when set
+    required: false
+    default: ""
   bun-version:
     description: Bun version (repository variable BUN_VERSION when unset)
     required: false
@@ -91,9 +95,13 @@ runs:
         HEADER_APP_TITLE: ${{ inputs.header-app-title }}
         SMOKE_PROFILE: ${{ inputs.profile }}
         SMOKE_LANG: ${{ inputs.lang }}
+        SMOKE_FILES: ${{ inputs.files }}
       run: |
         ARGS=(--profile "$SMOKE_PROFILE")
         if [ -n "$SMOKE_LANG" ]; then
           ARGS+=(--lang "$SMOKE_LANG")
+        fi
+        if [ -n "$SMOKE_FILES" ]; then
+          ARGS+=(--files "$SMOKE_FILES")
         fi
         bun run ci:smoke -- "${ARGS[@]}"

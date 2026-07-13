@@ -16,24 +16,11 @@ MIT. Not a hosted app: forks use their own API keys and Actions config.
 
 ## Workflow smoke
 
-[`ci:smoke`](./package.json) runs the translation workflow against fixture markdown with a live LLM and mocked GitHub.
+Profiles, CLI flags, and when CI runs smoke: [README: Smoke runs](./README.md#smoke-runs). Fixture lists: [`smoke-profiles.util.ts`](./src/ci/services/smoke/smoke-profiles.util.ts).
 
-Profiles:
+Local runs and manual [`smoke.yml`](./.github/workflows/smoke.yml) dispatch write into `.out/`. Each fixture gets a subdirectory (for example `use-memo/`) with `translated.md` and `pull-request.md`. When the run posts progress, `translation-progress-issue-comment.md` sits at the `.out/` root.
 
-- `quick`: default pre-merge slice
-- `workflow`: PR scenarios only
-- `full`: every `tests/fixtures/md/*.md`
-
-Fixture lists: [`smoke-profiles.util.ts`](./src/ci/services/smoke/smoke-profiles.util.ts).
-
-> [!IMPORTANT]
->
-> - Local runs write gitignored `.out/`. Each translated fixture gets a subdirectory (i.e. `use-memo/`) with `translated.md` and `pull-request.md`. When the run posts progress, `translation-progress-issue-comment.md` sits at the `.out/` root.
-> - `TARGET_LANGUAGE` defaults to `pt-br`; pass `--lang <locale>` to smoke a different configured locale. Pass `--model <id>` to override `LLM_MODEL` for a local run (for example `bun run ci:smoke -- --lang ru --files use-client.md --model openai/gpt-5.4-nano`). Manual [`smoke.yml`](./.github/workflows/smoke.yml) dispatch accepts the locale override via `lang` and an optional `llm_model` input that replaces the selected environment's `LLM_MODEL` when set.
-> - [`ci.yml`](./.github/workflows/ci.yml) runs the `quick` profile for `pt-br` as a required gate whenever `src/app/services/translator/`, `src/app/services/runner/`, or `src/app/locales/` changes; other locales from [`.github/locales.json`](./.github/locales.json) run as optional jobs (`continue-on-error`) with a 120-minute timeout. Failed smoke jobs upload `.out/` as an artifact.
-> - [`smoke.yml`](./.github/workflows/smoke.yml) stays manual dispatch for ad hoc `workflow`/`full` profile runs, a chosen locale, an optional LLM model override, or a specific GitHub Environment. The job writes the same tree to `.out/`, packs it to `artifacts/smoke/<lang>-<profile>-<run_id>.tar.gz`, and uploads artifact `smoke-<lang>-<profile>-<run_id>`.
-
-Extract the downloaded artifact[^1]:
+Failed CI smoke jobs and `smoke.yml` runs upload a packed archive. Extract it[^1]:
 
 ```bash
 tar -xzf smoke-pt-br-quick-<run_id>.tar.gz

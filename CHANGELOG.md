@@ -7,6 +7,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 ### Added
 
 - Translation and smoke CLIs accept `--model` to override `LLM_MODEL` for a single local run.
+- Manual `smoke.yml` dispatch accepts an optional `files` input (comma-separated fixture basenames) to smoke specific fixtures instead of a profile.
 
 ## [0.2.14] - 2026-07-13
 
