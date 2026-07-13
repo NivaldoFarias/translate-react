@@ -1,12 +1,19 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+	alignTrailingNewline,
+	applyMechanicalTranslationRepairs,
 	cleanupFullBodyTranslation,
 	cleanupSegmentSnippet,
+	cleanupTranslatedContent,
 	isHeadingTextSegmentPath,
+	normalizeHeadingMarkerSpacing,
 	normalizeInlineCodeBeforePunctuationSpacing,
+	normalizeInlineCodeInteriorSpacing,
+	normalizeMarkdownLinkLabelSpacing,
 	preserveSegmentBoundaryWhitespace,
 	repairMdxSpacing,
+	rewriteMdnLinksToLocale,
 	sanitizeSegmentTranslation,
 	stripEchoedHeadingMarkers,
 } from "@/app/services/translator/postprocess/translation-output-cleanup";
@@ -52,6 +59,13 @@ describe("cleanupFullBodyTranslation", () => {
 		const cleaned = cleanupFullBodyTranslation("No modo `annotation` , onde", file);
 
 		expect(cleaned).toBe("No modo `annotation`, onde");
+	});
+
+	test("restores trailing newline when the source document ends with one", () => {
+		const file = createSnippetFile("source\n");
+		const cleaned = cleanupTranslatedContent("translated body", file);
+
+		expect(cleaned).toBe("translated body\n");
 	});
 });
 
@@ -131,6 +145,12 @@ describe("repairMdxSpacing", () => {
 
 		test("inserts space before non-ASCII letter after inline code", () => {
 			expect(repairMdxSpacing("ver `useState`é um hook.")).toBe("ver `useState` é um hook.");
+		});
+
+		test("inserts space before Cyrillic letter after inline code", () => {
+			expect(repairMdxSpacing("модуль `App`помечает клиентский код.")).toBe(
+				"модуль `App` помечает клиентский код.",
+			);
 		});
 
 		test("does not insert space when already present", () => {
@@ -223,5 +243,71 @@ describe("repairMdxSpacing", () => {
 			const clean = "Use `useState` and `useEffect` for state and effects.";
 			expect(repairMdxSpacing(clean)).toBe(clean);
 		});
+	});
+});
+
+describe("normalizeInlineCodeInteriorSpacing", () => {
+	test("trims leading and trailing spaces inside inline code", () => {
+		expect(normalizeInlineCodeInteriorSpacing("зависимости ` formatDate` и `Button`")).toBe(
+			"зависимости `formatDate` и `Button`",
+		);
+	});
+
+	test("leaves already-normalized inline code unchanged", () => {
+		const clean = "Use `useState` and `useEffect`.";
+		expect(normalizeInlineCodeInteriorSpacing(clean)).toBe(clean);
+	});
+});
+
+describe("normalizeMarkdownLinkLabelSpacing", () => {
+	test("trims leading space inside markdown link labels", () => {
+		expect(
+			normalizeMarkdownLinkLabelSpacing(
+				"работы с [ React Server Components](/reference/rsc/server-components).",
+			),
+		).toBe("работы с [React Server Components](/reference/rsc/server-components).");
+	});
+});
+
+describe("normalizeHeadingMarkerSpacing", () => {
+	test("collapses duplicated whitespace after heading markers", () => {
+		expect(normalizeHeadingMarkerSpacing("##  Справка {/*reference*/}")).toBe(
+			"## Справка {/*reference*/}",
+		);
+	});
+});
+
+describe("rewriteMdnLinksToLocale", () => {
+	test("rewrites en-US MDN docs URLs to the target locale slug", () => {
+		const input = "[string](https://developer.mozilla.org/en-US/docs/Glossary/String)";
+		expect(rewriteMdnLinksToLocale(input, "ru")).toBe(
+			"[string](https://developer.mozilla.org/ru/docs/Glossary/String)",
+		);
+	});
+
+	test("leaves URLs that already use the target locale unchanged", () => {
+		const input = "[string](https://developer.mozilla.org/ru/docs/Glossary/String)";
+		expect(rewriteMdnLinksToLocale(input, "ru")).toBe(input);
+	});
+});
+
+describe("applyMechanicalTranslationRepairs", () => {
+	test("repairs spacing and MDN locale regressions from segment reinsertion", () => {
+		const input =
+			"##  Справка\n\n`App`помечает [ React](https://developer.mozilla.org/en-US/docs/Web/API).";
+
+		expect(applyMechanicalTranslationRepairs(input, { mdnLocaleSlug: "ru" })).toBe(
+			"## Справка\n\n`App` помечает [React](https://developer.mozilla.org/ru/docs/Web/API).",
+		);
+	});
+});
+
+describe("alignTrailingNewline", () => {
+	test("adds trailing newline when the reference document has one", () => {
+		expect(alignTrailingNewline("translated", "source\n")).toBe("translated\n");
+	});
+
+	test("removes trailing newline when the reference document does not have one", () => {
+		expect(alignTrailingNewline("translated\n", "source")).toBe("translated");
 	});
 });

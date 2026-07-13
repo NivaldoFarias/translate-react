@@ -26,6 +26,7 @@ import type { FrontmatterBatchFieldKey } from "./translator-frontmatter-batch.sc
 import type { SegmentBatchRequestItem } from "./translator-segment-batch.schema";
 import type { ReviewerValidationNotice } from "./validation/validation.types";
 
+import { resolveMdnLocaleSlug } from "@/app/constants/mdn-locale.constants";
 import {
 	env,
 	logger,
@@ -64,9 +65,9 @@ import {
 import { emptyTranslationAttemptContext } from "./pipeline/translation-attempt.context";
 import { TranslationPipelineManager } from "./pipeline/translation-pipeline.manager";
 import {
+	applyMechanicalTranslationRepairs,
 	cleanupFullBodyTranslation,
 	cleanupTranslatedContent,
-	repairMdxSpacing,
 	sanitizeSegmentTranslation,
 } from "./postprocess/translation-output-cleanup";
 import { TranslationFile } from "./translation-file";
@@ -532,7 +533,9 @@ export class TranslatorService {
 					finalized = mergePreservedYamlFrontmatter(mergedBlock, finalized, translationPayload);
 				}
 
-				return repairMdxSpacing(finalized);
+				return applyMechanicalTranslationRepairs(finalized, {
+					mdnLocaleSlug: resolveMdnLocaleSlug(this.services.locale.languageCode),
+				});
 			},
 			collectIssues: (content) =>
 				this.managers.validation.collectPostTranslationValidationIssues(file, content),

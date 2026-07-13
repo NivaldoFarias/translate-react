@@ -20,7 +20,23 @@ import { TRANSLATION_PREFIXES } from "../validation/validation.constants";
  * `code`word
  * ```
  */
-const INLINE_CODE_GLUED_TO_PROSE = /(`[^`\n\s][^`\n]*`)([A-Za-zÀ-ÿ])/g;
+const INLINE_CODE_GLUED_TO_PROSE = /(`[^`\n\s][^`\n]*`)(\p{L})/gu;
+
+/** Matches one inline code span (no nested backticks) */
+const INLINE_CODE_SPAN = /`[^`\n]+`/g;
+
+/** Matches a markdown link label with optional leading or trailing whitespace inside brackets */
+const MARKDOWN_LINK_WITH_SPACED_LABEL = /\[(\s*[^\]]*?\s*)\]\(([^)]+)\)/g;
+
+/** Matches duplicated whitespace immediately after a markdown heading marker */
+const HEADING_MARKER_EXTRA_SPACING = /^(#{1,6})\s{2,}/gm;
+
+/**
+ * Matches the locale segment in an MDN docs URL (`en-US`, `pt-BR`, `ru`, …).
+ *
+ * Limited to lowercase ISO-like slugs to keep matching bounded.
+ */
+const MDN_DOCS_URL_LOCALE = /https:\/\/developer\.mozilla\.org\/[a-z]{2}(?:-[A-Z]{2})?(?=\/)/g;
 
 /** Matches a non-whitespace character immediately before an MDX slug comment opener */
 const PROSE_GLUED_TO_MDX_SLUG = /(\S)(\{\/\*)/g;
@@ -130,6 +146,7 @@ export function cleanupSegmentSnippet(
 
 	let cleaned = stripTranslationPrefixes(translatedContent, false);
 	cleaned = preserveSegmentBoundaryWhitespace(cleaned, sourceText);
+	cleaned = normalizeInlineCodeInteriorSpacing(cleaned);
 	cleaned = normalizeInlineCodeBeforePunctuationSpacing(cleaned);
 
 	return applyLineEndings(cleaned, file.content);
@@ -185,6 +202,119 @@ export function repairMdxSpacing(content: string) {
 }
 
 /**
+ * Trims spurious leading or trailing spaces inside inline code spans.
+ *
+ * @param content Markdown body or snippet
+ *
+ * @returns Content with normalized inline code interiors
+ */
+export function normalizeInlineCodeInteriorSpacing(content: string) {
+	return content.replace(INLINE_CODE_SPAN, (span) => {
+		const inner = span.slice(1, -1).trim();
+
+		if (inner.length === 0) {
+			return span;
+		}
+
+		return `\`${inner}\``;
+	});
+}
+
+/**
+ * Trims spurious whitespace inside markdown link labels.
+ *
+ * @param content Markdown body or snippet
+ *
+ * @returns Content with `[ label ]` normalized to `[label]`
+ */
+export function normalizeMarkdownLinkLabelSpacing(content: string) {
+	return content.replace(MARKDOWN_LINK_WITH_SPACED_LABEL, (match, label: string, url: string) => {
+		const trimmedLabel = label.trim();
+
+		if (trimmedLabel === label) {
+			return match;
+		}
+
+		return `[${trimmedLabel}](${url})`;
+	});
+}
+
+/**
+ * Collapses duplicated whitespace after markdown heading markers.
+ *
+ * @param content Markdown body or snippet
+ *
+ * @returns Content with `##  Title` normalized to `## Title`
+ */
+export function normalizeHeadingMarkerSpacing(content: string) {
+	return content.replace(HEADING_MARKER_EXTRA_SPACING, "$1 ");
+}
+
+/**
+ * Rewrites MDN docs URLs to the target locale slug.
+ *
+ * @param content Assembled translated markdown
+ * @param targetMdnLocaleSlug MDN path locale segment (for example `ru` or `pt-BR`)
+ *
+ * @returns Document with MDN locale segments aligned to the target slug
+ */
+export function rewriteMdnLinksToLocale(content: string, targetMdnLocaleSlug: string) {
+	const targetPrefix = `https://developer.mozilla.org/${targetMdnLocaleSlug}`;
+
+	return content.replace(MDN_DOCS_URL_LOCALE, (match) =>
+		match === targetPrefix ? match : targetPrefix,
+	);
+}
+
+/** Options for deterministic post-translation mechanical repairs */
+export interface MechanicalTranslationRepairOptions {
+	/** MDN path locale segment; skips MDN rewrite when omitted */
+	mdnLocaleSlug?: string;
+}
+
+/**
+ * Applies deterministic mechanical repairs before post-translation validation.
+ *
+ * @param content Assembled translated markdown document
+ * @param options Locale-specific repair options
+ *
+ * @returns Document with spacing and MDN link regressions repaired
+ */
+export function applyMechanicalTranslationRepairs(
+	content: string,
+	options: MechanicalTranslationRepairOptions = {},
+) {
+	let cleaned = normalizeInlineCodeInteriorSpacing(content);
+	cleaned = normalizeMarkdownLinkLabelSpacing(cleaned);
+	cleaned = repairMdxSpacing(cleaned);
+	cleaned = normalizeHeadingMarkerSpacing(cleaned);
+
+	if (options.mdnLocaleSlug) {
+		cleaned = rewriteMdnLinksToLocale(cleaned, options.mdnLocaleSlug);
+	}
+
+	return cleaned;
+}
+
+/**
+ * Aligns trailing newline with the reference document.
+ *
+ * @param content Translated content
+ * @param referenceContent Original document used for EOF newline detection
+ *
+ * @returns Content with trailing newline preserved or removed to match the reference
+ */
+export function alignTrailingNewline(content: string, referenceContent: string) {
+	const referenceHasTrailingNewline = referenceContent.endsWith("\n");
+
+	if (!referenceHasTrailingNewline) {
+		return content.endsWith("\n") ? content.slice(0, -1) : content;
+	}
+
+	return content.endsWith("\n") ? content : `${content}\n`;
+}
+
+/**
  * Cleans full-body or frontmatter scalar translations (trim + prefix stripping).
  *
  * @param translatedContent Content returned from the language model
@@ -208,6 +338,7 @@ export function cleanupFullBodyTranslation(translatedContent: string, file: Tran
 	);
 
 	cleaned = applyLineEndings(cleaned, file.content);
+	cleaned = alignTrailingNewline(cleaned, file.content);
 
 	file.logger.debug(
 		{ cleanedContentLength: cleaned.length },
