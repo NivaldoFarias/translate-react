@@ -4,6 +4,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+### Added
+
+- Manual `workflow.yml` dispatch accepts an optional `llm_model` input that overrides the selected GitHub Environment `LLM_MODEL` when set.
+
 ## [0.2.13] - 2026-07-09
 
 ### Added
