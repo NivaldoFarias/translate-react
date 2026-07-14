@@ -1,9 +1,9 @@
 import type { TranslationFile } from "@/app/services/translator/";
 
-import type { LocaleDefinition, LocalePRBodyStrings, ProgressCommentRunContext } from "./types";
+import type { LocaleDefinition, LocalePRBodyStrings, ProgressCommentRunContext } from "../types";
 
-import { createGuardLabelResolver } from "./locale-guard-labels.util";
-import { createPRBodyBuilder } from "./pr-body.builder";
+import { createGuardLabelResolver } from "../locale-guard-labels.util";
+import { createPRBodyBuilder } from "../pr-body.builder";
 
 /** Brazilian Portuguese strings for the PR body template */
 const ptBrPRBodyStrings: LocalePRBodyStrings = {

@@ -27,6 +27,7 @@ import type { SegmentBatchRequestItem } from "./translator-segment-batch.schema"
 import type { ReviewerValidationNotice } from "./validation/validation.types";
 
 import { resolveMdnLocaleSlug } from "@/app/constants/mdn-locale.constants";
+import { resolveLocaleMechanicalRepairs } from "@/app/locales/repairs.registry";
 import {
 	env,
 	logger,
@@ -535,6 +536,7 @@ export class TranslatorService {
 
 				return applyMechanicalTranslationRepairs(finalized, {
 					mdnLocaleSlug: resolveMdnLocaleSlug(this.services.locale.languageCode),
+					localeRepairs: resolveLocaleMechanicalRepairs(this.services.locale.languageCode),
 				});
 			},
 			collectIssues: (content) =>
