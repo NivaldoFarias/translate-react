@@ -100,9 +100,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     environment: development
-    env:
-      SMOKE_OUTPUT_DIR: .out
-      SMOKE_ARCHIVE_PATH: artifacts/ci-smoke/pt-br-${{ github.run_id }}.tar.gz
 
     steps:
       - name: Checkout repository
@@ -133,21 +130,12 @@ jobs:
           header-app-url: ${{ vars.HEADER_APP_URL }}
           header-app-title: ${{ vars.HEADER_APP_TITLE }}
 
-      - name: Pack workflow smoke outputs for upload
-        if: failure()
-        run: |
-          if [ -d "$SMOKE_OUTPUT_DIR" ] && [ -n "$(ls -A "$SMOKE_OUTPUT_DIR" 2>/dev/null)" ]; then
-            mkdir -p "$(dirname "$SMOKE_ARCHIVE_PATH")"
-            tar -czf "$SMOKE_ARCHIVE_PATH" -C "$SMOKE_OUTPUT_DIR" .
-          fi
-
-      - name: Upload workflow smoke archive
+      - name: Upload workflow smoke outputs
         uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: ci-smoke-pt-br-${{ github.run_id }}
-          path: ${{ env.SMOKE_ARCHIVE_PATH }}
-          archive: false
+          path: artifacts/smoke/
           if-no-files-found: warn
           retention-days: 14
 
@@ -163,9 +151,6 @@ jobs:
       fail-fast: false
       matrix:
         lang: ${{ fromJson(needs.detect-smoke-gate.outputs.optional_langs) }}
-    env:
-      SMOKE_OUTPUT_DIR: .out
-      SMOKE_ARCHIVE_PATH: artifacts/ci-smoke/${{ matrix.lang }}-${{ github.run_id }}.tar.gz
 
     steps:
       - name: Checkout repository
@@ -196,20 +181,11 @@ jobs:
           header-app-url: ${{ vars.HEADER_APP_URL }}
           header-app-title: ${{ vars.HEADER_APP_TITLE }}
 
-      - name: Pack workflow smoke outputs for upload
-        if: failure()
-        run: |
-          if [ -d "$SMOKE_OUTPUT_DIR" ] && [ -n "$(ls -A "$SMOKE_OUTPUT_DIR" 2>/dev/null)" ]; then
-            mkdir -p "$(dirname "$SMOKE_ARCHIVE_PATH")"
-            tar -czf "$SMOKE_ARCHIVE_PATH" -C "$SMOKE_OUTPUT_DIR" .
-          fi
-
-      - name: Upload workflow smoke archive
+      - name: Upload workflow smoke outputs
         uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: ci-smoke-${{ matrix.lang }}-${{ github.run_id }}
-          path: ${{ env.SMOKE_ARCHIVE_PATH }}
-          archive: false
+          path: artifacts/smoke/
           if-no-files-found: warn
           retention-days: 14

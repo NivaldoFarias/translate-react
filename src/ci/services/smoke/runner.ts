@@ -23,7 +23,7 @@ import {
 import { resolveSmokeFixtureBasenames } from "./smoke-profiles.util";
 
 /** Gitignored directory where `ci:smoke` writes reviewable mocked GitHub outputs. */
-export const SMOKE_ARTIFACT_DIR = ".out" as const;
+export const SMOKE_ARTIFACT_DIR = "artifacts/smoke" as const;
 
 /** Options for {@link run} */
 export interface SmokeRunOptions {

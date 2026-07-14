@@ -233,7 +233,7 @@ export type { WorkflowFixtureFile } from "@tests/fixtures/workflow-fixture.util"
  * containing `translated.md` and `pull-request.md` (written on both new PR creation and open-PR
  * body updates). The issue comment is
  * `translation-progress-issue-comment.md` at the capture root. `ci:smoke` defaults
- * `captureArtifactsDir` to `.out/`; CI packaging is documented in
+ * `captureArtifactsDir` to `artifacts/smoke/`; CI upload is documented in
  * [CONTRIBUTING.md](../../CONTRIBUTING.md#workflow-smoke).
  */
 export type WorkflowGitHubArtifactOptions = Readonly<{

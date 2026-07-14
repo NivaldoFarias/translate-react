@@ -114,7 +114,7 @@ bun run ci:smoke -- --files hydrateRoot.md,lazy.md
 ```
 
 > [!NOTE]
-> Outputs land in gitignored `.out/` (translated markdown and mock PR bodies per fixture). The manual [smoke workflow](./.github/workflows/smoke.yml) uploads the same tree as a CI artifact. Layout and extraction: [Workflow smoke](./CONTRIBUTING.md#workflow-smoke).
+> Outputs land in gitignored `artifacts/smoke/` (translated markdown and mock PR bodies per fixture). The manual [smoke workflow](./.github/workflows/smoke.yml) uploads the same tree as a CI artifact. Layout and download: [Workflow smoke](./CONTRIBUTING.md#workflow-smoke).
 
 [`workflow.integration.spec.ts`](./tests/integration/workflow.integration.spec.ts) mocks both GitHub and the LLM in CI. For the live-LLM variant of that harness, see [Local LLM exercise](https://github.com/NivaldoFarias/translate-react/wiki/Workflow#local-llm-exercise-integration-tests).
 

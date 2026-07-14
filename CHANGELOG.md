@@ -8,9 +8,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 - Translation and smoke CLIs accept `--model` to override `LLM_MODEL` for a single local run.
 - Manual `smoke.yml` dispatch accepts an optional `files` input (comma-separated fixture basenames) to smoke specific fixtures instead of a profile.
+- `ci:smoke` accepts `--out-dir`/`-o` and `SMOKE_OUTPUT_DIR` to override the reviewable output directory.
 
 ### Changed
 
+- Workflow smoke writes to gitignored `artifacts/smoke/` and uploads that tree as a standard zip artifact so `gh run download` works without a tarball workaround.
 - Translated markdown is mechanically cleaned after assembly: MDN docs links use the target locale slug (`ru`, `pt-BR`), common segment spacing regressions (inline code, link labels, headings) are repaired, and trailing newlines match the source file.
 - Markdown link advisory guards treat MDN locale rewrites as equivalent to the source `en-US` URLs so mechanical MDN repairs do not flood PR bodies with false positives.
 

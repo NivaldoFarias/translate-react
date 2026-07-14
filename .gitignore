@@ -4,6 +4,7 @@ scripts/
 !src/ci/
 *.backup
 .out/
+artifacts/
 
 # Logs
 logs/

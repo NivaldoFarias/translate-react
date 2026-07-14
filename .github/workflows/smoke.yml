@@ -1,5 +1,7 @@
 name: Smoke Workflow
 
+run-name: Smoke (${{ inputs.files != '' && inputs.files || inputs.profile }}, ${{ inputs.lang }})
+
 on:
   workflow_dispatch:
     inputs:
@@ -50,12 +52,9 @@ concurrency:
 
 jobs:
   smoke:
-    name: Real LLM workflow smoke (${{ inputs.profile }}, ${{ inputs.lang }})
+    name: Real LLM workflow smoke (${{ inputs.files != '' && inputs.files || inputs.profile }}, ${{ inputs.lang }})
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
-    env:
-      SMOKE_OUTPUT_DIR: .out
-      SMOKE_ARCHIVE_PATH: artifacts/smoke/${{ inputs.lang }}-${{ inputs.profile }}-${{ github.run_id }}.tar.gz
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -86,20 +85,11 @@ jobs:
           header-app-url: ${{ vars.HEADER_APP_URL }}
           header-app-title: ${{ vars.HEADER_APP_TITLE }}
 
-      - name: Pack workflow smoke outputs for upload
-        if: always()
-        run: |
-          if [ -d "$SMOKE_OUTPUT_DIR" ] && [ -n "$(ls -A "$SMOKE_OUTPUT_DIR" 2>/dev/null)" ]; then
-            mkdir -p "$(dirname "$SMOKE_ARCHIVE_PATH")"
-            tar -czf "$SMOKE_ARCHIVE_PATH" -C "$SMOKE_OUTPUT_DIR" .
-          fi
-
-      - name: Upload workflow smoke archive
+      - name: Upload workflow smoke outputs
         uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: smoke-${{ inputs.lang }}-${{ inputs.profile }}-${{ github.run_id }}
-          path: ${{ env.SMOKE_ARCHIVE_PATH }}
-          archive: false
+          name: smoke-${{ inputs.lang }}-${{ inputs.files != '' && inputs.files || inputs.profile }}-${{ github.run_id }}
+          path: artifacts/smoke/
           if-no-files-found: warn
           retention-days: 14

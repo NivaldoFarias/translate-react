@@ -18,12 +18,12 @@ MIT. Not a hosted app: forks use their own API keys and Actions config.
 
 Profiles, CLI flags, and when CI runs smoke: [README: Smoke runs](./README.md#smoke-runs). Fixture lists: [`smoke-profiles.util.ts`](./src/ci/services/smoke/smoke-profiles.util.ts).
 
-Local runs and manual [`smoke.yml`](./.github/workflows/smoke.yml) dispatch write into `.out/`. Each fixture gets a subdirectory (for example `use-memo/`) with `translated.md` and `pull-request.md`. When the run posts progress, `translation-progress-issue-comment.md` sits at the `.out/` root.
+Local runs and manual [`smoke.yml`](./.github/workflows/smoke.yml) dispatch write into gitignored `artifacts/smoke/`. Each fixture gets a subdirectory (for example `use-memo/`) with `translated.md` and `pull-request.md`. When the run posts progress, `translation-progress-issue-comment.md` sits at the `artifacts/smoke/` root. Override the directory with `--out-dir`/`-o` or `SMOKE_OUTPUT_DIR`.
 
-Failed CI smoke jobs and `smoke.yml` runs upload a packed archive. Extract it[^1]:
+Failed CI smoke jobs and `smoke.yml` runs upload that tree as a standard zip artifact. Download with:
 
 ```bash
-tar -xzf smoke-pt-br-quick-<run_id>.tar.gz
+gh run download <run_id> --dir artifacts/smoke/<run_id>
 ```
 
 ## Releasing
@@ -32,5 +32,3 @@ tar -xzf smoke-pt-br-quick-<run_id>.tar.gz
 2. `bun run release:prepare patch|minor|major`: bump `package.json` and promote `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD` with a footer link (no git tag).
 3. Open a `dev` → `main` PR titled `release X.Y.Z`; CI enforces changelog compliance.
 4. Merge. [`release.yml`](./.github/workflows/release.yml) tags the merge commit `vX.Y.Z` and publishes the GitHub Release from the curated section. Non-release merges are a no-op; use the workflow's manual trigger to re-run.
-
-[^1]: The pack step is required because `actions/upload-artifact@v7` skips hidden dot-directories such as `.out/`. Production translation logs under `logs/` upload directly because that path is not hidden.
