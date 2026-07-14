@@ -6,16 +6,20 @@ import {
 	cleanupFullBodyTranslation,
 	cleanupSegmentSnippet,
 	cleanupTranslatedContent,
+	collapseDuplicatedUseClientLeadIn,
 	isHeadingTextSegmentPath,
 	normalizeHeadingMarkerSpacing,
 	normalizeInlineCodeBeforePunctuationSpacing,
 	normalizeInlineCodeInteriorSpacing,
 	normalizeMarkdownLinkLabelSpacing,
 	preserveSegmentBoundaryWhitespace,
+	repairCorruptedOutputEmphasis,
+	repairLlmDirectiveEchoArtifacts,
 	repairMdxSpacing,
 	rewriteMdnLinksToLocale,
 	sanitizeSegmentTranslation,
 	stripEchoedHeadingMarkers,
+	stripEchoedUseDirectiveGuillemets,
 } from "@/app/services/translator/postprocess/translation-output-cleanup";
 import { TranslationFile } from "@/app/services/translator/translation-file";
 
@@ -297,6 +301,85 @@ describe("rewriteMdnLinksToLocale", () => {
 	});
 });
 
+describe("stripEchoedUseDirectiveGuillemets", () => {
+	test("removes guillemet echoes after client directive inline code", () => {
+		const input = "Добавление `'use client'` «use client» в начало файла, чтобы пометить модуль.";
+
+		expect(stripEchoedUseDirectiveGuillemets(input)).toBe(
+			"Добавление `'use client'` в начало файла, чтобы пометить модуль.",
+		);
+	});
+
+	test("repairs multiple echoed directives in one document", () => {
+		const input =
+			"`* `'use client'` «use client» должны находиться в начале.\n* Когда `'use client'` «use client», импортируется";
+
+		expect(stripEchoedUseDirectiveGuillemets(input)).toBe(
+			"`* `'use client'` должны находиться в начале.\n* Когда `'use client'`, импортируется",
+		);
+	});
+
+	test("leaves legitimate guillemet prose unchanged when not echoed after inline code", () => {
+		const input = "директиву «use client» в «InspirationGenerator.js».";
+		expect(stripEchoedUseDirectiveGuillemets(input)).toBe(input);
+	});
+});
+
+describe("collapseDuplicatedUseClientLeadIn", () => {
+	test("collapses duplicated Russian lead-in before a comma", () => {
+		const input = "С помощью `'use client'` С помощью , вы можете определить";
+
+		expect(collapseDuplicatedUseClientLeadIn(input)).toBe(
+			"С помощью `'use client'`, вы можете определить",
+		);
+	});
+
+	test("collapses duplicated English lead-in before a comma", () => {
+		const input = "With `'use client'` With , you can determine";
+
+		expect(collapseDuplicatedUseClientLeadIn(input)).toBe("With `'use client'`, you can determine");
+	});
+});
+
+describe("repairCorruptedOutputEmphasis", () => {
+	test("restores dropped HTML output emphasis after a component reference", () => {
+		const input = "в результате чего `FancyText` вывод _ (а не его исходный код) будет отправлен";
+
+		expect(repairCorruptedOutputEmphasis(input)).toBe(
+			"в результате чего `FancyText` HTML- _вывод_ (а не его исходный код) будет отправлен",
+		);
+	});
+
+	test("removes duplicated corrupted output clause tails", () => {
+		const input =
+			"`FancyText` HTML- _вывод_ (а не его исходный код) будет отправлен в браузер при обращении из серверного компонента. Как показано в предыдущем примере приложения Inspirations, _ , а не его исходный код), будет отправлен в браузер при обращении из серверного компонента. Как показано в предыдущем примере приложения Inspirations, `FancyText` используется";
+
+		expect(repairCorruptedOutputEmphasis(input)).toBe(
+			"`FancyText` HTML- _вывод_ (а не его исходный код) будет отправлен в браузер при обращении из серверного компонента. Как показано в предыдущем примере приложения Inspirations, `FancyText` используется",
+		);
+	});
+});
+
+describe("repairLlmDirectiveEchoArtifacts", () => {
+	test("repairs smoke-style directive echo regressions from run 29363105829", () => {
+		const input = [
+			"Добавление `'use client'` «use client» в начало файла.",
+			"Когда файл, помеченный `'use client'` «use client», импортируется",
+			"С помощью `'use client'` С помощью , вы можете определить",
+			"в результате чего `FancyText` вывод _ (а не его исходный код) будет отправлен в браузер при обращении из серверного компонента. Как показано в предыдущем примере приложения Inspirations, _ , а не его исходный код), будет отправлен в браузер при обращении из серверного компонента. Как показано в предыдущем примере приложения Inspirations, `FancyText` используется",
+		].join("\n");
+
+		expect(repairLlmDirectiveEchoArtifacts(input)).toBe(
+			[
+				"Добавление `'use client'` в начало файла.",
+				"Когда файл, помеченный `'use client'`, импортируется",
+				"С помощью `'use client'`, вы можете определить",
+				"в результате чего `FancyText` HTML- _вывод_ (а не его исходный код) будет отправлен в браузер при обращении из серверного компонента. Как показано в предыдущем примере приложения Inspirations, `FancyText` используется",
+			].join("\n"),
+		);
+	});
+});
+
 describe("applyMechanicalTranslationRepairs", () => {
 	test("repairs spacing and MDN locale regressions from segment reinsertion", () => {
 		const input =
@@ -312,6 +395,14 @@ describe("applyMechanicalTranslationRepairs", () => {
 
 		expect(applyMechanicalTranslationRepairs(input)).toBe(
 			"Как зависимости `RichTextEditor`, `formatDate` и `Button` также",
+		);
+	});
+
+	test("repairs directive echo artifacts and inline code punctuation spacing together", () => {
+		const input = "С помощью `'use client'` С помощью , вы можете `render` , когда";
+
+		expect(applyMechanicalTranslationRepairs(input, { mdnLocaleSlug: "ru" })).toBe(
+			"С помощью `'use client'`, вы можете `render`, когда",
 		);
 	});
 });

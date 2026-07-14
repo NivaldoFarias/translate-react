@@ -47,6 +47,41 @@ const ADJACENT_LINKS_NO_SPACE = /\],\[/g;
 /** Matches translatable text nodes recorded under an mdast heading */
 const HEADING_TEXT_SEGMENT_PATH = /\/heading\[\d+\]\/text\[\d+\](?:#\d+)?$/;
 
+/**
+ * Matches a `'use client'` or `'use server'` inline code span followed by a echoed guillemet directive.
+ *
+ * ```
+ * `'use client'` «use client»
+ * ```
+ */
+const ECHOED_USE_DIRECTIVE_GUILLEMETS =
+	/(`['"]use (?:client|server)['"]`)\s*«use (?:client|server)»/gi;
+
+/** Matches a duplicated Russian lead-in before a comma after `'use client'` */
+const DUPLICATED_RUSSIAN_USE_CLIENT_LEAD_IN = /(С помощью\s+`'use client'`)\s+С помощью\s*,/g;
+
+/** Matches a duplicated English lead-in before a comma after `'use client'` */
+const DUPLICATED_ENGLISH_USE_CLIENT_LEAD_IN = /(\bWith\s+`'use client'`)\s+With\s*,/gi;
+
+/**
+ * Matches a corrupted duplicated clause after a partial `_output_` emphasis repair failure.
+ *
+ * ```
+ * , _ , а не его исходный код), будет отправлен ...
+ * ```
+ */
+const CORRUPTED_OUTPUT_CLAUSE_DUPLICATE =
+	/, _ , а не его исходный код\), будет отправлен в браузер при обращении из серверного компонента\. Как показано в предыдущем примере приложения Inspirations,/g;
+
+/**
+ * Matches a component reference followed by a dropped `_output_` emphasis marker.
+ *
+ * ```
+ * `FancyText` вывод _ (а не
+ * ```
+ */
+const DROPPED_OUTPUT_EMPHASIS_AFTER_COMPONENT = /(`\w+`)\s+вывод\s+_\s+\(/g;
+
 /** Leading markdown heading markers duplicated inside a heading text segment */
 const ECHOED_HEADING_MARKERS = /^#{1,6}\s+/;
 
@@ -281,6 +316,58 @@ export function rewriteMdnLinksToLocale(content: string, targetMdnLocaleSlug: st
 	);
 }
 
+/**
+ * Removes guillemet echoes of `'use client'` / `'use server'` after the inline code span.
+ *
+ * @param content Assembled translated markdown
+ *
+ * @returns Content without `«use client»` / `«use server»` echoes after directive code spans
+ */
+export function stripEchoedUseDirectiveGuillemets(content: string) {
+	return content.replace(ECHOED_USE_DIRECTIVE_GUILLEMETS, "$1");
+}
+
+/**
+ * Collapses duplicated lead-in phrases that models repeat before a comma after `'use client'`.
+ *
+ * @param content Assembled translated markdown
+ *
+ * @returns Content with duplicated `С помощью` / `With` lead-ins removed
+ */
+export function collapseDuplicatedUseClientLeadIn(content: string) {
+	return content
+		.replace(DUPLICATED_RUSSIAN_USE_CLIENT_LEAD_IN, "$1,")
+		.replace(DUPLICATED_ENGLISH_USE_CLIENT_LEAD_IN, "$1,");
+}
+
+/**
+ * Repairs common `_output_` emphasis corruption and removes duplicated trailing clauses.
+ *
+ * @param content Assembled translated markdown
+ *
+ * @returns Content with restored `HTML- _вывод_` emphasis and no duplicated output clause
+ */
+export function repairCorruptedOutputEmphasis(content: string) {
+	return content
+		.replace(DROPPED_OUTPUT_EMPHASIS_AFTER_COMPONENT, "$1 HTML- _вывод_ (")
+		.replace(CORRUPTED_OUTPUT_CLAUSE_DUPLICATE, ",");
+}
+
+/**
+ * Repairs directive echo and emphasis regressions introduced during translation.
+ *
+ * @param content Assembled translated markdown
+ *
+ * @returns Content with echoed directive guillemets and output emphasis artifacts repaired
+ */
+export function repairLlmDirectiveEchoArtifacts(content: string) {
+	let cleaned = stripEchoedUseDirectiveGuillemets(content);
+	cleaned = collapseDuplicatedUseClientLeadIn(cleaned);
+	cleaned = repairCorruptedOutputEmphasis(cleaned);
+
+	return cleaned;
+}
+
 /** Options for deterministic post-translation mechanical repairs */
 export interface MechanicalTranslationRepairOptions {
 	/** MDN path locale segment; skips MDN rewrite when omitted */
@@ -299,10 +386,12 @@ export function applyMechanicalTranslationRepairs(
 	content: string,
 	options: MechanicalTranslationRepairOptions = {},
 ) {
-	let cleaned = normalizeMarkdownLinkLabelSpacing(content);
+	let cleaned = repairLlmDirectiveEchoArtifacts(content);
+	cleaned = normalizeMarkdownLinkLabelSpacing(cleaned);
 	cleaned = repairMdxSpacing(cleaned);
 	cleaned = normalizeHeadingMarkerSpacing(cleaned);
 	cleaned = normalizeInlineCodeInteriorSpacing(cleaned);
+	cleaned = normalizeInlineCodeBeforePunctuationSpacing(cleaned);
 
 	if (options.mdnLocaleSlug) {
 		cleaned = rewriteMdnLinksToLocale(cleaned, options.mdnLocaleSlug);

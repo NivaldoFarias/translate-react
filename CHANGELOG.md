@@ -14,7 +14,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 - `bun run lint` now lint-checks `.github` YAML with `eslint-plugin-yml` and validates workflows with `actionlint`.
 - Workflow smoke writes to gitignored `artifacts/smoke/` and uploads that tree as a standard zip artifact so `gh run download` works without a tarball workaround.
-- Translated markdown is mechanically cleaned after assembly: MDN docs links use the target locale slug (`ru`, `pt-BR`), common segment spacing regressions (inline code, link labels, headings) are repaired, and trailing newlines match the source file.
+- Translated markdown is mechanically cleaned after assembly: MDN docs links use the target locale slug (`ru`, `pt-BR`), echoed `'use client'` guillemet duplicates and corrupted `_output_` emphasis regressions are repaired, common segment spacing regressions (inline code, link labels, headings) are repaired, and trailing newlines match the source file.
 - Markdown link advisory guards treat MDN locale rewrites as equivalent to the source `en-US` URLs so mechanical MDN repairs do not flood PR bodies with false positives.
 
 ## [0.2.14] - 2026-07-13
