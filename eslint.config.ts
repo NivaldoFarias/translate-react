@@ -2,6 +2,7 @@ import { defineConfig } from "@eslint/config-helpers";
 import eslint from "@eslint/js";
 import eslintConfigPrettier from "eslint-config-prettier";
 import jsdoc from "eslint-plugin-jsdoc";
+import eslintPluginYml from "eslint-plugin-yml";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
@@ -25,8 +26,6 @@ export default defineConfig(
 			"**/docs/**",
 			"**/*.md",
 			"**/*.json",
-			"**/*.yml",
-			"**/*.yaml",
 		],
 	},
 	{
@@ -243,5 +242,7 @@ export default defineConfig(
 			globals: globals.node,
 		},
 	},
+	...eslintPluginYml.configs.recommended,
+	...eslintPluginYml.configs.prettier,
 	eslintConfigPrettier,
 );
