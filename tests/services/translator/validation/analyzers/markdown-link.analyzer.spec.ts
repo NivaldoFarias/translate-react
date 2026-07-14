@@ -53,6 +53,15 @@ describe("findMarkdownLinkViolations", () => {
 		expect(findMarkdownLinkViolations(source, translated)).toEqual([]);
 	});
 
+	test("returns empty when MDN docs URLs are rewritten to the target locale", () => {
+		const source =
+			"[string](https://developer.mozilla.org/en-US/docs/Glossary/String) and [number](https://developer.mozilla.org/en-US/docs/Glossary/Number)";
+		const translated =
+			"[string](https://developer.mozilla.org/ru/docs/Glossary/String) and [number](https://developer.mozilla.org/ru/docs/Glossary/Number)";
+
+		expect(findMarkdownLinkViolations(source, translated)).toEqual([]);
+	});
+
 	test("flags overall link count regression", () => {
 		const source = "[one](/a) [two](/b)";
 		const translated = "[um](/a)";

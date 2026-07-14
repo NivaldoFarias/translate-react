@@ -168,6 +168,19 @@ export function normalizeInlineCodeBeforePunctuationSpacing(content: string) {
 }
 
 /**
+ * Returns whether an inline code span contains identifier-like content worth gluing repairs.
+ *
+ * @param span Full inline code span including backticks
+ *
+ * @returns `true` when the span interior includes a letter, digit, or underscore
+ */
+function isRepairableInlineCodeSpan(span: string) {
+	const inner = span.slice(1, -1);
+
+	return inner.length > 0 && /[\p{L}\p{N}_]/u.test(inner);
+}
+
+/**
  * Mechanically repairs MDX spacing regressions introduced during translation.
  *
  * Applies deterministic space insertion for three language-agnostic structural patterns:
@@ -196,7 +209,9 @@ export function normalizeInlineCodeBeforePunctuationSpacing(content: string) {
  */
 export function repairMdxSpacing(content: string) {
 	return content
-		.replace(INLINE_CODE_GLUED_TO_PROSE, "$1 $2")
+		.replace(INLINE_CODE_GLUED_TO_PROSE, (match, span: string, letter: string) =>
+			isRepairableInlineCodeSpan(span) ? `${span} ${letter}` : match,
+		)
 		.replace(PROSE_GLUED_TO_MDX_SLUG, "$1 $2")
 		.replace(ADJACENT_LINKS_NO_SPACE, "], [");
 }
@@ -284,10 +299,10 @@ export function applyMechanicalTranslationRepairs(
 	content: string,
 	options: MechanicalTranslationRepairOptions = {},
 ) {
-	let cleaned = normalizeInlineCodeInteriorSpacing(content);
-	cleaned = normalizeMarkdownLinkLabelSpacing(cleaned);
+	let cleaned = normalizeMarkdownLinkLabelSpacing(content);
 	cleaned = repairMdxSpacing(cleaned);
 	cleaned = normalizeHeadingMarkerSpacing(cleaned);
+	cleaned = normalizeInlineCodeInteriorSpacing(cleaned);
 
 	if (options.mdnLocaleSlug) {
 		cleaned = rewriteMdnLinksToLocale(cleaned, options.mdnLocaleSlug);

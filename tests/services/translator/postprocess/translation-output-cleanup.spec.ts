@@ -153,6 +153,12 @@ describe("repairMdxSpacing", () => {
 			);
 		});
 
+		test("does not treat comma-separated inline code spans as glued prose", () => {
+			expect(repairMdxSpacing("`RichTextEditor`, `formatDate` и `Button`")).toBe(
+				"`RichTextEditor`, `formatDate` и `Button`",
+			);
+		});
+
 		test("does not insert space when already present", () => {
 			expect(repairMdxSpacing("ver `useState` é um hook.")).toBe("ver `useState` é um hook.");
 		});
@@ -298,6 +304,14 @@ describe("applyMechanicalTranslationRepairs", () => {
 
 		expect(applyMechanicalTranslationRepairs(input, { mdnLocaleSlug: "ru" })).toBe(
 			"## Справка\n\n`App` помечает [React](https://developer.mozilla.org/ru/docs/Web/API).",
+		);
+	});
+
+	test("normalizes inline code after comma-separated spans without reintroducing interior spaces", () => {
+		const input = "Как зависимости `RichTextEditor`, ` formatDate` и `Button` также";
+
+		expect(applyMechanicalTranslationRepairs(input)).toBe(
+			"Как зависимости `RichTextEditor`, `formatDate` и `Button` также",
 		);
 	});
 });

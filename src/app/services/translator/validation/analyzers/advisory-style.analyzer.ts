@@ -1,3 +1,5 @@
+import { canonicalizeMarkdownLinkUrlForComparison } from "@/app/utils/mdn-url.util";
+
 import { MARKDOWN_REGEXES } from "../../markdown/markdown.regexes";
 
 /** One MDX spacing regression with document location */
@@ -133,8 +135,13 @@ export function extractMarkdownLinkUrls(markdown: string) {
  * @returns Extra URL targets introduced during translation
  */
 export function findExtraMarkdownLinks(source: string, translated: string) {
-	const sourceUrls = new Set(extractMarkdownLinkUrls(source));
-	return extractMarkdownLinkUrls(translated).filter((url) => !sourceUrls.has(url));
+	const sourceUrls = new Set(
+		extractMarkdownLinkUrls(source).map(canonicalizeMarkdownLinkUrlForComparison),
+	);
+
+	return extractMarkdownLinkUrls(translated).filter(
+		(url) => !sourceUrls.has(canonicalizeMarkdownLinkUrlForComparison(url)),
+	);
 }
 
 /**
@@ -158,6 +165,13 @@ export function findInlineCodeGluedToProseViolations(translated: string, maxMatc
 	let match = INLINE_CODE_SPAN.exec(translated);
 
 	while (match && violations.length < maxMatches) {
+		const inner = match[0].slice(1, -1);
+
+		if (inner.length === 0 || !/[\p{L}\p{N}_]/u.test(inner)) {
+			match = INLINE_CODE_SPAN.exec(translated);
+			continue;
+		}
+
 		const afterIndex = match.index + match[0].length;
 		const afterChar = translated[afterIndex];
 

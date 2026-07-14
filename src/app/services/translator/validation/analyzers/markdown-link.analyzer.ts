@@ -1,4 +1,5 @@
 import { MARKDOWN_REGEXES } from "@/app/services/translator/markdown/markdown.regexes";
+import { canonicalizeMarkdownLinkUrlForComparison } from "@/app/utils/mdn-url.util";
 
 /** Parsed markdown link with document span */
 export interface MarkdownLinkSpan {
@@ -123,40 +124,47 @@ export function findMarkdownLinkViolations(sourceMarkdown: string, translatedMar
 		const translatedCount = translatedCountByUrl.get(url) ?? 0;
 
 		if (translatedCount < sourceCount) {
-			const sourceLink = findSourceLinkForUrl(sourceLinks, url);
+			const sourceLink = findSourceLinkForComparisonUrl(sourceLinks, url);
+			const displayUrl = sourceLink?.url ?? url;
 			const location =
 				sourceLink ?
 					lineRangeForSpan(sourceMarkdown, sourceLink.start, sourceLink.end)
-				:	findUrlLineRange(translatedMarkdown, url);
+				:	findUrlLineRange(translatedMarkdown, displayUrl);
 
 			violations.push({
-				message: `Missing markdown link for URL "${url}" (${sourceCount} → ${translatedCount})`,
-				url,
+				message: `Missing markdown link for URL "${displayUrl}" (${sourceCount} → ${translatedCount})`,
+				url: displayUrl,
 				...location,
 			});
 		}
 	}
 
-	for (const url of sourceCountByUrl.keys()) {
-		const orphanIndices = findOrphanLinkClosings(translatedMarkdown, url);
-		if (orphanIndices.length > 0) {
-			const orphanIndex = orphanIndices[0] ?? 0;
-			const closingLength = `](${url})`.length;
+	for (const comparisonUrl of sourceCountByUrl.keys()) {
+		for (const url of collectUrlVariantsForComparison(
+			comparisonUrl,
+			sourceLinks,
+			translatedLinks,
+		)) {
+			const orphanIndices = findOrphanLinkClosings(translatedMarkdown, url);
+			if (orphanIndices.length > 0) {
+				const orphanIndex = orphanIndices[0] ?? 0;
+				const closingLength = `](${url})`.length;
 
-			violations.push({
-				message: `Broken markdown link syntax for URL "${url}"`,
-				url,
-				...lineRangeForSpan(translatedMarkdown, orphanIndex, orphanIndex + closingLength),
-			});
-		}
+				violations.push({
+					message: `Broken markdown link syntax for URL "${url}"`,
+					url,
+					...lineRangeForSpan(translatedMarkdown, orphanIndex, orphanIndex + closingLength),
+				});
+			}
 
-		const bareUrlOffset = findBareUrlOffset(translatedMarkdown, url, translatedLinks);
-		if (bareUrlOffset !== null) {
-			violations.push({
-				message: `URL "${url}" appears outside a markdown link`,
-				url,
-				...lineRangeForSpan(translatedMarkdown, bareUrlOffset, bareUrlOffset + url.length),
-			});
+			const bareUrlOffset = findBareUrlOffset(translatedMarkdown, url, translatedLinks);
+			if (bareUrlOffset !== null) {
+				violations.push({
+					message: `URL "${url}" appears outside a markdown link`,
+					url,
+					...lineRangeForSpan(translatedMarkdown, bareUrlOffset, bareUrlOffset + url.length),
+				});
+			}
 		}
 	}
 
@@ -203,27 +211,60 @@ function findFirstUnderrepresentedSourceLink(
 	const translatedCountByUrl = countLinksByUrl(translatedLinks);
 
 	for (const link of sourceLinks) {
-		const translatedCount = translatedCountByUrl.get(link.url) ?? 0;
+		const comparisonUrl = canonicalizeMarkdownLinkUrlForComparison(link.url);
+		const translatedCount = translatedCountByUrl.get(comparisonUrl) ?? 0;
 		if (translatedCount === 0) {
 			return link;
 		}
 
-		translatedCountByUrl.set(link.url, translatedCount - 1);
+		translatedCountByUrl.set(comparisonUrl, translatedCount - 1);
 	}
 
 	return sourceLinks[0] ?? null;
 }
 
 /**
- * Returns the first source link span for a URL.
+ * Returns the first source link span whose URL matches the comparison key.
  *
  * @param sourceLinks Parsed source links
- * @param url Destination URL to locate
+ * @param comparisonUrl Canonical URL key from {@link countLinksByUrl}
  *
  * @returns Matching source link span, if any
  */
-function findSourceLinkForUrl(sourceLinks: readonly MarkdownLinkSpan[], url: string) {
-	return sourceLinks.find((link) => link.url === url) ?? null;
+function findSourceLinkForComparisonUrl(
+	sourceLinks: readonly MarkdownLinkSpan[],
+	comparisonUrl: string,
+) {
+	return (
+		sourceLinks.find(
+			(link) => canonicalizeMarkdownLinkUrlForComparison(link.url) === comparisonUrl,
+		) ?? null
+	);
+}
+
+/**
+ * Collects concrete URL strings that share a comparison key across source and translation.
+ *
+ * @param comparisonUrl Canonical URL key
+ * @param sourceLinks Parsed source links
+ * @param translatedLinks Parsed translated links
+ *
+ * @returns Deduplicated URL variants to scan for orphan or bare-url regressions
+ */
+function collectUrlVariantsForComparison(
+	comparisonUrl: string,
+	sourceLinks: readonly MarkdownLinkSpan[],
+	translatedLinks: readonly MarkdownLinkSpan[],
+) {
+	const variants = new Set<string>([comparisonUrl]);
+
+	for (const link of [...sourceLinks, ...translatedLinks]) {
+		if (canonicalizeMarkdownLinkUrlForComparison(link.url) === comparisonUrl) {
+			variants.add(link.url);
+		}
+	}
+
+	return [...variants];
 }
 
 /**
@@ -284,7 +325,8 @@ function countLinksByUrl(links: readonly MarkdownLinkSpan[]) {
 	const counts = new Map<string, number>();
 
 	for (const { url } of links) {
-		counts.set(url, (counts.get(url) ?? 0) + 1);
+		const comparisonUrl = canonicalizeMarkdownLinkUrlForComparison(url);
+		counts.set(comparisonUrl, (counts.get(comparisonUrl) ?? 0) + 1);
 	}
 
 	return counts;
