@@ -4,6 +4,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+## [0.2.15] - 2026-07-15
+
 ### Added
 
 - Translation and smoke CLIs accept `--model` to override `LLM_MODEL` for a single local run.
@@ -389,6 +391,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 - README `MAX_RETRY_ATTEMPTS` default matches runtime (`3`).
 
+[0.2.15]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.15
 [0.2.14]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.14
 [0.2.13]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.13
 [0.2.12]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.12
