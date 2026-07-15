@@ -319,3 +319,57 @@ export function findExtraMarkdownLinkViolationDetails(source: string, translated
 		} satisfies ExtraMarkdownLinkViolation;
 	});
 }
+
+/** One English Server/Client Component term left in prose */
+export interface EnglishServerClientTermViolation {
+	/** One-based line number where the term appears */
+	readonly lineNumber: number;
+
+	/** Matching English product term */
+	readonly term: string;
+
+	/** Markdown excerpt covering the matched line */
+	readonly excerpt: string;
+}
+
+/** Matches English Server/Client Component product terms outside inline code */
+const ENGLISH_SERVER_CLIENT_TERM =
+	/\b(?:React\s+Server\s+Components?|Server\s+Components?|Client\s+Components?)\b/gu;
+
+/**
+ * Finds English Server/Client Component product terms left in prose outside fenced code.
+ *
+ * @param translated Translated markdown
+ *
+ * @returns Violations with line anchors for maintainer review
+ */
+export function findEnglishServerClientTermViolations(translated: string) {
+	const violations: EnglishServerClientTermViolation[] = [];
+	let inFence = false;
+
+	for (const [lineIndex, line] of translated.split("\n").entries()) {
+		const trimmed = line.trim();
+
+		if (trimmed.startsWith("```")) {
+			inFence = !inFence;
+			continue;
+		}
+
+		if (inFence) {
+			continue;
+		}
+
+		const prose = line.replace(/`[^`\n]+`/g, "");
+		const matches = [...prose.matchAll(ENGLISH_SERVER_CLIENT_TERM)];
+
+		for (const match of matches) {
+			violations.push({
+				lineNumber: lineIndex + 1,
+				term: match[0],
+				excerpt: line.trim(),
+			});
+		}
+	}
+
+	return violations;
+}

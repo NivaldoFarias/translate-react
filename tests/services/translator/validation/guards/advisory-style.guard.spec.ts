@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { findExtraMarkdownLinks } from "@/app/services/translator/validation/analyzers/advisory-style.analyzer";
 import {
+	englishServerClientTermsGuard,
 	extraMarkdownLinksGuard,
 	mdxSpacingGuard,
 	sentenceCaseHeadingsGuard,
@@ -113,5 +114,34 @@ describe("extraMarkdownLinksGuard", () => {
 
 		expect(findExtraMarkdownLinks(source, translated)).toEqual([]);
 		expect(extraMarkdownLinksGuard(source, translated)).toBeNull();
+	});
+});
+
+describe("englishServerClientTermsGuard", () => {
+	test("flags English Server/Client Component terms in prose", () => {
+		const translated = "импортируется из Server Component и считаются Client Components.";
+
+		expect(englishServerClientTermsGuard("x", translated)?.guardId).toBe(
+			"englishServerClientTerms",
+		);
+	});
+
+	test("returns null when product terms are localized", () => {
+		const translated =
+			"импортируется из серверного компонента и считаются клиентскими компонентами.";
+
+		expect(englishServerClientTermsGuard("x", translated)).toBeNull();
+	});
+
+	test("ignores English terms inside inline code", () => {
+		const translated = "используйте `Server Component` в коде, но серверный компонент в prose.";
+
+		expect(englishServerClientTermsGuard("x", translated)).toBeNull();
+	});
+
+	test("ignores English terms inside fenced code blocks", () => {
+		const translated = "```js\nconst Server Component = 1;\n```\nТекст.";
+
+		expect(englishServerClientTermsGuard("x", translated)).toBeNull();
 	});
 });

@@ -4,6 +4,7 @@ import type {
 } from "../validation.types";
 
 import {
+	englishServerClientTermsGuard,
 	extraMarkdownLinksGuard,
 	mdxSpacingGuard,
 	sentenceCaseHeadingsGuard,
@@ -36,6 +37,7 @@ export const POST_TRANSLATION_VALIDATION_GUARDS = [
 	sentenceCaseHeadingsGuard,
 	mdxSpacingGuard,
 	extraMarkdownLinksGuard,
+	englishServerClientTermsGuard,
 ] as const;
 
 /**

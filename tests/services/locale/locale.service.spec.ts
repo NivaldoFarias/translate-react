@@ -304,11 +304,13 @@ describe("ruLocale.rules", () => {
 	});
 
 	test("should include Russian guideline rules from maintainer feedback", () => {
-		const { specific } = ruLocale.rules;
+		const { specific, segmentSpecific } = ruLocale.rules;
 
 		expect(specific).toContain("бандлер");
 		expect(specific).toContain("серверные компоненты");
 		expect(specific).toContain("developer.mozilla.org/ru/docs");
+		expect(segmentSpecific).toContain("SEGMENT BATCH CONTEXT");
+		expect(segmentSpecific).not.toContain("developer.mozilla.org/en-US/docs");
 	});
 });
 

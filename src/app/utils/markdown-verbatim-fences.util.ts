@@ -185,3 +185,85 @@ export function restoreMaskedVerbatimFences(
 
 	return result;
 }
+
+/** Matches one inline backtick code span (no nested backticks). */
+const INLINE_CODE_SPAN = /`[^`\n]+`/g;
+
+/**
+ * Applies a transform to prose regions while preserving fenced code blocks and inline code spans.
+ *
+ * @param content Full markdown document
+ * @param transform Mapper invoked on each prose slice outside fences and inline code
+ *
+ * @returns Document with transforms applied only to translatable prose regions
+ */
+export function mapMarkdownProseRegions(
+	content: string,
+	transform: (proseRegion: string) => string,
+) {
+	const mapProsePreservingInlineCode = (prose: string) => {
+		const inlineCodeRe = new RegExp(INLINE_CODE_SPAN.source, "gu");
+		let output = "";
+		let cursor = 0;
+		let match: RegExpExecArray | null;
+
+		while ((match = inlineCodeRe.exec(prose)) !== null) {
+			output += transform(prose.slice(cursor, match.index));
+			output += match[0];
+			cursor = match.index + match[0].length;
+		}
+
+		output += transform(prose.slice(cursor));
+
+		return output;
+	};
+
+	let cursor = 0;
+	let output = "";
+
+	while (cursor < content.length) {
+		const bounds = findNextFencedCodeBlockBounds(content, cursor);
+
+		if (!bounds) {
+			output += mapProsePreservingInlineCode(content.slice(cursor));
+			break;
+		}
+
+		output += mapProsePreservingInlineCode(content.slice(cursor, bounds.start));
+		output += content.slice(bounds.start, bounds.end);
+		cursor = bounds.end;
+	}
+
+	return output;
+}
+
+/**
+ * Applies a transform to regions outside fenced code blocks only.
+ *
+ * Inline code spans inside prose are included so phrase repairs can match text
+ * that references identifiers in backticks.
+ *
+ * @param content Full markdown document
+ * @param transform Mapper invoked on each non-fence slice
+ *
+ * @returns Document with transforms applied outside fenced code blocks
+ */
+export function mapOutsideFencedCodeBlocks(content: string, transform: (region: string) => string) {
+	let cursor = 0;
+	let output = "";
+
+	while (cursor < content.length) {
+		const bounds = findNextFencedCodeBlockBounds(content, cursor);
+
+		if (!bounds) {
+			output += transform(content.slice(cursor));
+			break;
+		}
+
+		output += transform(content.slice(cursor, bounds.start));
+		output += content.slice(bounds.start, bounds.end);
+		cursor = bounds.end;
+	}
+
+	return output;
+}

@@ -92,6 +92,15 @@ export interface LocaleRulesConfig {
 	readonly specific: string;
 
 	/**
+	 * Optional rules for segment and frontmatter batch prompts.
+	 *
+	 * Segment batches send isolated prose snippets without link URLs or fenced
+	 * code bodies, so omit full-document instructions (for example MDN rewrites)
+	 * that do not apply to batched `source` strings.
+	 */
+	readonly segmentSpecific?: string;
+
+	/**
 	 * Optional override for the markdown "What to Translate" scope section.
 	 *
 	 * When set, replaces the default scope bullets in document prompts.

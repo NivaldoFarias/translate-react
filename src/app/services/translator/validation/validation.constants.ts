@@ -13,6 +13,7 @@ export const POST_TRANSLATION_GUARD_IDS = {
 	sentenceCaseHeadings: "sentenceCaseHeadings",
 	mdxSpacing: "mdxSpacing",
 	extraMarkdownLinks: "extraMarkdownLinks",
+	englishServerClientTerms: "englishServerClientTerms",
 } as const;
 
 /** Union of all {@link POST_TRANSLATION_GUARD_IDS} values */
