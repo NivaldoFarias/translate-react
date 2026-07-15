@@ -93,6 +93,14 @@ export const WORKFLOW_FIXTURE_MANIFEST = {
 			pullRequestScenario: WorkflowFixturePrScenario.New,
 		},
 	},
+	"use-client.md": {
+		profile: WorkflowFixtureProfile.ReferenceClientMedium,
+		tree: fixtureTree("src/content/reference/rsc/use-client.md"),
+		smoke: {
+			pullRequestNumber: 1173,
+			pullRequestScenario: WorkflowFixturePrScenario.New,
+		},
+	},
 
 	// --- Workflow branch coverage (add `.md` when exercising PR logic locally) ---
 

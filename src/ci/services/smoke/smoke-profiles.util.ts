@@ -4,7 +4,7 @@
  * - Each profile selects markdown basenames under`tests/fixtures/md/`.
  * - Mock pull-request metadata for each basename lives in
  * [`workflow.manifest.ts`](../../../../tests/fixtures/md/workflow.manifest.ts).
- * - Profiles, `.out/` layout, and CI artifacts: [CONTRIBUTING.md](../../../../CONTRIBUTING.md).
+ * - Profiles, `artifacts/smoke/` layout, and CI artifacts: [CONTRIBUTING.md](../../../../CONTRIBUTING.md).
  */
 export const SmokeProfile = {
 	/**

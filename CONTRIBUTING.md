@@ -16,27 +16,34 @@ MIT. Not a hosted app: forks use their own API keys and Actions config.
 
 ## Workflow smoke
 
-[`ci:smoke`](./package.json) runs the translation workflow against fixture markdown with a live LLM and mocked GitHub.
+Profiles, CLI flags, and when CI runs smoke: [README: Smoke runs](./README.md#smoke-runs). Fixture lists: [`smoke-profiles.util.ts`](./src/ci/services/smoke/smoke-profiles.util.ts).
 
-Profiles:
+Local runs and manual [`smoke.yml`](./.github/workflows/smoke.yml) dispatch write into gitignored `artifacts/smoke/`. Each fixture gets a subdirectory (for example `use-memo/`) with `translated.md` and `pull-request.md`. When the run posts progress, `translation-progress-issue-comment.md` sits at the `artifacts/smoke/` root. Override the directory with `--out-dir`/`-o` or `SMOKE_OUTPUT_DIR`.
 
-- `quick`: default pre-merge slice
-- `workflow`: PR scenarios only
-- `full`: every `tests/fixtures/md/*.md`
-
-Fixture lists: [`smoke-profiles.util.ts`](./src/ci/services/smoke/smoke-profiles.util.ts).
-
-> [!IMPORTANT]
->
-> - Local runs write gitignored `.out/`. Each translated fixture gets a subdirectory (i.e. `use-memo/`) with `translated.md` and `pull-request.md`. When the run posts progress, `translation-progress-issue-comment.md` sits at the `.out/` root.
-> - `TARGET_LANGUAGE` defaults to `pt-br`; pass `--lang <locale>` to smoke a different configured locale. Manual [`smoke.yml`](./.github/workflows/smoke.yml) dispatch accepts the same locale override via `lang`, and an optional `llm_model` input that replaces the selected environment's `LLM_MODEL` when set.
-> - [`ci.yml`](./.github/workflows/ci.yml) runs the `quick` profile for `pt-br` as a required gate whenever `src/app/services/translator/`, `src/app/services/runner/`, or `src/app/locales/` changes; other locales from [`.github/locales.json`](./.github/locales.json) run as optional jobs (`continue-on-error`) with a 120-minute timeout. Failed smoke jobs upload `.out/` as an artifact.
-> - [`smoke.yml`](./.github/workflows/smoke.yml) stays manual dispatch for ad hoc `workflow`/`full` profile runs, a chosen locale, an optional LLM model override, or a specific GitHub Environment. The job writes the same tree to `.out/`, packs it to `artifacts/smoke/<lang>-<profile>-<run_id>.tar.gz`, and uploads artifact `smoke-<lang>-<profile>-<run_id>`.
-
-Extract the downloaded artifact[^1]:
+CI smoke jobs and `smoke.yml` upload that tree as a standard zip artifact. Download with:
 
 ```bash
-tar -xzf smoke-pt-br-quick-<run_id>.tar.gz
+gh run download <run_id> --dir artifacts/smoke/<run_id>
+```
+
+## Investigating workflow runs
+
+| Artifact                             | Workflow                    | When uploaded                               |
+| ------------------------------------ | --------------------------- | ------------------------------------------- |
+| `artifacts/smoke/` (fixture outputs) | `ci.yml` smoke, `smoke.yml` | Always                                      |
+| `logs/` (Pino file logs)             | `workflow.yml` translation  | Always (`translation-logs-<lang>-<run_id>`) |
+
+Use `gh run download <run_id> --dir artifacts/smoke/<run_id>` for smoke outputs. For translation logs, download the `translation-logs-*` artifact the same way (extracted tree includes `logs/`).
+
+If `gh run view --log` returns empty, fetch per-job logs via the REST API:
+
+```bash
+mkdir -p logs
+REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+gh run view "<run_id>" --json jobs -q '.jobs[] | "\(.databaseId) \(.name)"' | while read -r job_id job_name; do
+  slug=$(echo "$job_name" | tr ' /' '--' | tr -cd '[:alnum:]-')
+  gh api "/repos/$REPO/actions/jobs/$job_id/logs" > "logs/<run_id>-${slug}.log"
+done
 ```
 
 ## Releasing
@@ -45,5 +52,3 @@ tar -xzf smoke-pt-br-quick-<run_id>.tar.gz
 2. `bun run release:prepare patch|minor|major`: bump `package.json` and promote `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD` with a footer link (no git tag).
 3. Open a `dev` → `main` PR titled `release X.Y.Z`; CI enforces changelog compliance.
 4. Merge. [`release.yml`](./.github/workflows/release.yml) tags the merge commit `vX.Y.Z` and publishes the GitHub Release from the curated section. Non-release merges are a no-op; use the workflow's manual trigger to re-run.
-
-[^1]: The pack step is required because `actions/upload-artifact@v7` skips hidden dot-directories such as `.out/`. Production translation logs under `logs/` upload directly because that path is not hidden.

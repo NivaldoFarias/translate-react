@@ -23,7 +23,7 @@ import {
 import { resolveSmokeFixtureBasenames } from "./smoke-profiles.util";
 
 /** Gitignored directory where `ci:smoke` writes reviewable mocked GitHub outputs. */
-export const SMOKE_ARTIFACT_DIR = ".out" as const;
+export const SMOKE_ARTIFACT_DIR = "artifacts/smoke" as const;
 
 /** Options for {@link run} */
 export interface SmokeRunOptions {
@@ -71,8 +71,8 @@ async function clearSmokeArtifactDir(artifactDir: string) {
  *
  * The target locale comes from `env.TARGET_LANGUAGE` (default `pt-br`), which the `ci:smoke` CLI's
  * `--lang` flag overrides before this function runs; see [`smoke.ts`](../../actions/smoke.ts).
- * `env.LLM_MODEL` comes from the process environment (including manual `smoke.yml` `llm_model`
- * dispatch when run in Actions).
+ * `env.LLM_MODEL` comes from the process environment or the shared `--model` CLI flag (see
+ * `bootstrap-cli-overrides.util.ts`).
  *
  * @param options Profile, optional fixture override, and output directory
  *

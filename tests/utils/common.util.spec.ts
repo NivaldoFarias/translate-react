@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { ptBrLocale } from "@/app/locales/pt-br.locale";
+import { ptBrLocale } from "@/app/locales/pt-br/locale";
 import {
 	buildRunnerNewIssueChooserUrl,
 	detectRateLimit,

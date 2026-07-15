@@ -37,6 +37,10 @@ export const translationCliArgs = {
 			"Repository path to re-translate (`TRANSLATION_FILE_PATHS`); comma-separated or repeat the flag",
 		alias: "f",
 	},
+	"model": {
+		type: "string",
+		description: "LLM model id (`LLM_MODEL`)",
+	},
 } satisfies ArgsDef;
 
 const translationCliEnvKeys = {
@@ -46,6 +50,7 @@ const translationCliEnvKeys = {
 	"upstream-owner": "REPO_UPSTREAM_OWNER",
 	"upstream-name": "REPO_UPSTREAM_NAME",
 	"translation-guidelines-file": "TRANSLATION_GUIDELINES_FILE",
+	"model": "LLM_MODEL",
 } satisfies Record<Exclude<keyof typeof translationCliArgs, "file">, string>;
 
 /**
@@ -88,6 +93,7 @@ function collectRepeatedTranslationFilePaths(rawArgs: string[]) {
  * @example
  * ```bash
  * bun run start -- --lang pt-br --fork-owner my-org --fork-name react-pt-br
+ * bun run ci:smoke -- --lang ru --files use-client.md --model openai/gpt-5.4-nano
  * ```
  */
 export function applyTranslationCliOverrides(rawArgs: string[]) {

@@ -1,14 +1,25 @@
 import { describe, expect, test } from "bun:test";
 
+import { applyRuLocaleMechanicalRepairs } from "@/app/locales/ru/repairs";
 import {
+	alignTrailingNewline,
+	applyMechanicalTranslationRepairs,
 	cleanupFullBodyTranslation,
 	cleanupSegmentSnippet,
+	cleanupTranslatedContent,
+	collapseDuplicatedEnUseClientLeadIn,
 	isHeadingTextSegmentPath,
+	normalizeHeadingMarkerSpacing,
 	normalizeInlineCodeBeforePunctuationSpacing,
+	normalizeInlineCodeInteriorSpacing,
+	normalizeMarkdownLinkLabelSpacing,
 	preserveSegmentBoundaryWhitespace,
 	repairMdxSpacing,
+	repairSharedDirectiveEchoArtifacts,
+	rewriteMdnLinksToLocale,
 	sanitizeSegmentTranslation,
 	stripEchoedHeadingMarkers,
+	stripEchoedUseDirectiveGuillemets,
 } from "@/app/services/translator/postprocess/translation-output-cleanup";
 import { TranslationFile } from "@/app/services/translator/translation-file";
 
@@ -52,6 +63,13 @@ describe("cleanupFullBodyTranslation", () => {
 		const cleaned = cleanupFullBodyTranslation("No modo `annotation` , onde", file);
 
 		expect(cleaned).toBe("No modo `annotation`, onde");
+	});
+
+	test("restores trailing newline when the source document ends with one", () => {
+		const file = createSnippetFile("source\n");
+		const cleaned = cleanupTranslatedContent("translated body", file);
+
+		expect(cleaned).toBe("translated body\n");
 	});
 });
 
@@ -131,6 +149,18 @@ describe("repairMdxSpacing", () => {
 
 		test("inserts space before non-ASCII letter after inline code", () => {
 			expect(repairMdxSpacing("ver `useState`é um hook.")).toBe("ver `useState` é um hook.");
+		});
+
+		test("inserts space before Cyrillic letter after inline code", () => {
+			expect(repairMdxSpacing("модуль `App`помечает клиентский код.")).toBe(
+				"модуль `App` помечает клиентский код.",
+			);
+		});
+
+		test("does not treat comma-separated inline code spans as glued prose", () => {
+			expect(repairMdxSpacing("`RichTextEditor`, `formatDate` и `Button`")).toBe(
+				"`RichTextEditor`, `formatDate` и `Button`",
+			);
 		});
 
 		test("does not insert space when already present", () => {
@@ -223,5 +253,137 @@ describe("repairMdxSpacing", () => {
 			const clean = "Use `useState` and `useEffect` for state and effects.";
 			expect(repairMdxSpacing(clean)).toBe(clean);
 		});
+	});
+});
+
+describe("normalizeInlineCodeInteriorSpacing", () => {
+	test("trims leading and trailing spaces inside inline code", () => {
+		expect(normalizeInlineCodeInteriorSpacing("зависимости ` formatDate` и `Button`")).toBe(
+			"зависимости `formatDate` и `Button`",
+		);
+	});
+
+	test("leaves already-normalized inline code unchanged", () => {
+		const clean = "Use `useState` and `useEffect`.";
+		expect(normalizeInlineCodeInteriorSpacing(clean)).toBe(clean);
+	});
+});
+
+describe("normalizeMarkdownLinkLabelSpacing", () => {
+	test("trims leading space inside markdown link labels", () => {
+		expect(
+			normalizeMarkdownLinkLabelSpacing(
+				"работы с [ React Server Components](/reference/rsc/server-components).",
+			),
+		).toBe("работы с [React Server Components](/reference/rsc/server-components).");
+	});
+});
+
+describe("normalizeHeadingMarkerSpacing", () => {
+	test("collapses duplicated whitespace after heading markers", () => {
+		expect(normalizeHeadingMarkerSpacing("##  Справка {/*reference*/}")).toBe(
+			"## Справка {/*reference*/}",
+		);
+	});
+});
+
+describe("rewriteMdnLinksToLocale", () => {
+	test("rewrites en-US MDN docs URLs to the target locale slug", () => {
+		const input = "[string](https://developer.mozilla.org/en-US/docs/Glossary/String)";
+		expect(rewriteMdnLinksToLocale(input, "ru")).toBe(
+			"[string](https://developer.mozilla.org/ru/docs/Glossary/String)",
+		);
+	});
+
+	test("leaves URLs that already use the target locale unchanged", () => {
+		const input = "[string](https://developer.mozilla.org/ru/docs/Glossary/String)";
+		expect(rewriteMdnLinksToLocale(input, "ru")).toBe(input);
+	});
+});
+
+describe("stripEchoedUseDirectiveGuillemets", () => {
+	test("removes guillemet echoes after client directive inline code", () => {
+		const input = "Добавление `'use client'` «use client» в начало файла, чтобы пометить модуль.";
+
+		expect(stripEchoedUseDirectiveGuillemets(input)).toBe(
+			"Добавление `'use client'` в начало файла, чтобы пометить модуль.",
+		);
+	});
+
+	test("repairs multiple echoed directives in one document", () => {
+		const input =
+			"`* `'use client'` «use client» должны находиться в начале.\n* Когда `'use client'` «use client», импортируется";
+
+		expect(stripEchoedUseDirectiveGuillemets(input)).toBe(
+			"`* `'use client'` должны находиться в начале.\n* Когда `'use client'`, импортируется",
+		);
+	});
+
+	test("leaves legitimate guillemet prose unchanged when not echoed after inline code", () => {
+		const input = "директиву «use client» в «InspirationGenerator.js».";
+		expect(stripEchoedUseDirectiveGuillemets(input)).toBe(input);
+	});
+});
+
+describe("collapseDuplicatedEnUseClientLeadIn", () => {
+	test("collapses duplicated English lead-in before a comma", () => {
+		const input = "With `'use client'` With , you can determine";
+
+		expect(collapseDuplicatedEnUseClientLeadIn(input)).toBe(
+			"With `'use client'`, you can determine",
+		);
+	});
+});
+
+describe("repairSharedDirectiveEchoArtifacts", () => {
+	test("repairs echoed directive guillemets and English lead-in duplicates", () => {
+		const input = [
+			"Add `'use client'` «use client» at the top.",
+			"With `'use client'` With , you can determine",
+		].join("\n");
+
+		expect(repairSharedDirectiveEchoArtifacts(input)).toBe(
+			["Add `'use client'` at the top.", "With `'use client'`, you can determine"].join("\n"),
+		);
+	});
+});
+
+describe("applyMechanicalTranslationRepairs", () => {
+	test("repairs spacing and MDN locale regressions from segment reinsertion", () => {
+		const input =
+			"##  Справка\n\n`App`помечает [ React](https://developer.mozilla.org/en-US/docs/Web/API).";
+
+		expect(applyMechanicalTranslationRepairs(input, { mdnLocaleSlug: "ru" })).toBe(
+			"## Справка\n\n`App` помечает [React](https://developer.mozilla.org/ru/docs/Web/API).",
+		);
+	});
+
+	test("normalizes inline code after comma-separated spans without reintroducing interior spaces", () => {
+		const input = "Как зависимости `RichTextEditor`, ` formatDate` и `Button` также";
+
+		expect(applyMechanicalTranslationRepairs(input)).toBe(
+			"Как зависимости `RichTextEditor`, `formatDate` и `Button` также",
+		);
+	});
+
+	test("repairs directive echo artifacts and inline code punctuation spacing together", () => {
+		const input = "С помощью `'use client'` С помощью , вы можете `render` , когда";
+
+		expect(
+			applyMechanicalTranslationRepairs(input, {
+				mdnLocaleSlug: "ru",
+				localeRepairs: applyRuLocaleMechanicalRepairs,
+			}),
+		).toBe("С помощью `'use client'`, вы можете `render`, когда");
+	});
+});
+
+describe("alignTrailingNewline", () => {
+	test("adds trailing newline when the reference document has one", () => {
+		expect(alignTrailingNewline("translated", "source\n")).toBe("translated\n");
+	});
+
+	test("removes trailing newline when the reference document does not have one", () => {
+		expect(alignTrailingNewline("translated\n", "source")).toBe("translated");
 	});
 });

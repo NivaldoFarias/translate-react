@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
+import { findExtraMarkdownLinks } from "@/app/services/translator/validation/analyzers/advisory-style.analyzer";
 import {
 	extraMarkdownLinksGuard,
 	mdxSpacingGuard,
@@ -103,6 +104,14 @@ describe("extraMarkdownLinksGuard", () => {
 		const source = "- [Website](https://example.com)";
 		const translated = "- [Site](https://example.com)";
 
+		expect(extraMarkdownLinksGuard(source, translated)).toBeNull();
+	});
+
+	test("returns null when MDN docs URLs are rewritten to the target locale", () => {
+		const source = "[string](https://developer.mozilla.org/en-US/docs/Glossary/String)";
+		const translated = "[string](https://developer.mozilla.org/ru/docs/Glossary/String)";
+
+		expect(findExtraMarkdownLinks(source, translated)).toEqual([]);
 		expect(extraMarkdownLinksGuard(source, translated)).toBeNull();
 	});
 });

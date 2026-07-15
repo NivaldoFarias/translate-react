@@ -6,13 +6,17 @@ inputs:
     description: Smoke profile (`quick`, `workflow`, `full`)
     required: true
   lang:
-    description: Target locale override (`--lang`); empty uses `TARGET_LANGUAGE`/default
+    description: Target locale override (`--lang`); empty uses schema default
+    required: false
+    default: ""
+  files:
+    description: Comma-separated fixture basenames (`--files`); overrides profile when set
     required: false
     default: ""
   bun-version:
-    description: Bun version (repository variable BUN_VERSION when unset)
+    description: Bun version. Empty uses `setup-bun-deps` action default
     required: false
-    default: "1.3.14"
+    default: ""
   gh-token:
     description: GitHub token for mocked GitHub client construction
     required: false
@@ -29,12 +33,8 @@ inputs:
     description: LOG_TO_CONSOLE
     required: false
   llm-model:
-    description: LLM_MODEL from environment variables
+    description: Resolved LLM model id for this run
     required: false
-  llm-model-override:
-    description: Optional LLM model override; empty uses `llm-model`
-    required: false
-    default: ""
   llm-api-base-url:
     description: LLM_API_BASE_URL
     required: false
@@ -55,9 +55,6 @@ inputs:
     required: false
   batch-size:
     description: BATCH_SIZE
-    required: false
-  target-language:
-    description: TARGET_LANGUAGE fallback when `lang` is empty
     required: false
   header-app-url:
     description: HEADER_APP_URL
@@ -82,7 +79,7 @@ runs:
         NODE_ENV: ${{ inputs.node-env }}
         LOG_LEVEL: ${{ inputs.log-level }}
         LOG_TO_CONSOLE: ${{ inputs.log-to-console }}
-        LLM_MODEL: ${{ inputs.llm-model-override != '' && inputs.llm-model-override || inputs.llm-model }}
+        LLM_MODEL: ${{ inputs.llm-model }}
         LLM_API_BASE_URL: ${{ inputs.llm-api-base-url }}
         MAX_RETRY_ATTEMPTS: ${{ inputs.max-retry-attempts }}
         MAX_LLM_CONCURRENCY: ${{ inputs.max-llm-concurrency }}
@@ -90,14 +87,21 @@ runs:
         GH_PAT_TOKEN: ${{ inputs.gh-pat-token }}
         MAX_TOKENS: ${{ inputs.max-tokens }}
         BATCH_SIZE: ${{ inputs.batch-size }}
-        TARGET_LANGUAGE: ${{ inputs.lang != '' && inputs.lang || inputs.target-language }}
+        TARGET_LANGUAGE: ${{ inputs.lang }}
         HEADER_APP_URL: ${{ inputs.header-app-url }}
         HEADER_APP_TITLE: ${{ inputs.header-app-title }}
         SMOKE_PROFILE: ${{ inputs.profile }}
         SMOKE_LANG: ${{ inputs.lang }}
+        SMOKE_FILES: ${{ inputs.files }}
       run: |
         ARGS=(--profile "$SMOKE_PROFILE")
         if [ -n "$SMOKE_LANG" ]; then
           ARGS+=(--lang "$SMOKE_LANG")
+        fi
+        if [ -n "$SMOKE_FILES" ]; then
+          ARGS+=(--files "$SMOKE_FILES")
+        fi
+        if [ -n "${SMOKE_OUTPUT_DIR:-}" ]; then
+          ARGS+=(--out-dir "$SMOKE_OUTPUT_DIR")
         fi
         bun run ci:smoke -- "${ARGS[@]}"
