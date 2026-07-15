@@ -77,11 +77,19 @@ export class TranslationPromptBuilder {
 		);
 
 		if (systemPromptKind === "frontmatterBatch") {
-			return this.buildFrontmatterBatchSystemPrompt(languages, params.translationGuidelines);
+			return this.buildFrontmatterBatchSystemPrompt(
+				languages,
+				params.translationGuidelines,
+				systemPromptKind,
+			);
 		}
 
 		if (systemPromptKind === "segmentBatch") {
-			return this.buildSegmentBatchSystemPrompt(languages, params.translationGuidelines);
+			return this.buildSegmentBatchSystemPrompt(
+				languages,
+				params.translationGuidelines,
+				systemPromptKind,
+			);
 		}
 
 		return (
@@ -174,12 +182,14 @@ export class TranslationPromptBuilder {
 	 * @param languages.source Source language display name
 	 * @param languages.target Target language display name
 	 * @param translationGuidelines Optional glossary for terminology alignment
+	 * @param systemPromptKind Prompt variant selecting batched vs full-document locale rules
 	 *
 	 * @returns The system prompt string for the frontmatter batch completion
 	 */
 	public buildFrontmatterBatchSystemPrompt(
 		languages: { source: string; target: string },
 		translationGuidelines: string | null,
+		systemPromptKind: TranslationSystemPromptKind = "frontmatterBatch",
 	) {
 		const termReferenceSection =
 			translationGuidelines ?
@@ -207,7 +217,7 @@ export class TranslationPromptBuilder {
 				- Keep programming identifiers, proper nouns, versions, code-like tokens, and URLs unchanged unless the term reference explicitly maps them
 				- Never translate the JSON keys \`fieldKey\`, \`source\`, \`items\`, or \`translated\` themselves
 	
-				${this.locale.definitions.rules.specific}
+				${this.resolveLocaleSpecificRules(systemPromptKind)}
 	
 				${termReferenceSection}
 				`;
@@ -220,12 +230,14 @@ export class TranslationPromptBuilder {
 	 * @param languages.source Source language display name
 	 * @param languages.target Target language display name
 	 * @param translationGuidelines Optional glossary for terminology alignment
+	 * @param systemPromptKind Prompt variant selecting batched vs full-document locale rules
 	 *
 	 * @returns The system prompt string for the segment batch completion
 	 */
 	public buildSegmentBatchSystemPrompt(
 		languages: { source: string; target: string },
 		translationGuidelines: string | null,
+		systemPromptKind: TranslationSystemPromptKind = "segmentBatch",
 	) {
 		const termReferenceSection =
 			translationGuidelines ?
@@ -254,10 +266,27 @@ export class TranslationPromptBuilder {
 				- Never translate the JSON keys \`segmentId\`, \`source\`, \`heading\`, \`items\`, or \`translated\` themselves
 				- Do not add, remove, or merge segments; one output item per input item
 
-				${this.locale.definitions.rules.specific}
-
+				${this.resolveLocaleSpecificRules(systemPromptKind)}
+	
 				${termReferenceSection}
 				`;
+	}
+
+	/**
+	 * Resolves locale-specific rules for the active prompt shape.
+	 *
+	 * @param systemPromptKind Prompt variant selecting full-document vs batched rules
+	 *
+	 * @returns Locale rule block embedded in the system prompt
+	 */
+	private resolveLocaleSpecificRules(systemPromptKind: TranslationSystemPromptKind) {
+		const { rules } = this.locale.definitions;
+
+		if (systemPromptKind === "segmentBatch" || systemPromptKind === "frontmatterBatch") {
+			return rules.segmentSpecific ?? rules.specific;
+		}
+
+		return rules.specific;
 	}
 
 	/**
