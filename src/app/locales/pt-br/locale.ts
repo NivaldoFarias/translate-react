@@ -32,6 +32,7 @@ const ptBrPRBodyStrings: LocalePRBodyStrings = {
 			sentenceCaseHeadings: "Sentence case em títulos",
 			mdxSpacing: "Espaçamento MDX",
 			extraMarkdownLinks: "Links extras",
+			englishServerClientTerms: "Termos Server/Client Component em inglês",
 			mdxSlugPreserved: "Slugs MDX",
 			headingCountPreserved: "Contagem de títulos",
 			headingSyntax: "Sintaxe de títulos",

@@ -19,6 +19,7 @@ describe("POST_TRANSLATION_VALIDATION_GUARDS", () => {
 			"sentenceCaseHeadingsGuard",
 			"mdxSpacingGuard",
 			"extraMarkdownLinksGuard",
+			"englishServerClientTermsGuard",
 		]);
 	});
 });

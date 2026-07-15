@@ -1,6 +1,7 @@
 import type { PostTranslationValidationGuard } from "../validation.types";
 
 import {
+	findEnglishServerClientTermViolations,
 	findExtraMarkdownLinks,
 	findMdxSpacingViolations,
 	findSentenceCaseHeadingViolations,
@@ -77,5 +78,36 @@ export const extraMarkdownLinksGuard: PostTranslationValidationGuard = (source, 
 		message: `Extra markdown link URLs not present in source: ${sample}`,
 		retryHint:
 			"Do not add markdown links or URLs that are absent from the source document. Translate existing link labels only.",
+	};
+};
+
+/**
+ * Flags English Server/Client Component product terms left in translated prose.
+ *
+ * @param _source Original markdown before translation
+ * @param translated Model output to validate
+ *
+ * @returns Advisory guard failure, or `null` when product terms are localized
+ */
+export const englishServerClientTermsGuard: PostTranslationValidationGuard = (
+	_source,
+	translated,
+) => {
+	const violations = findEnglishServerClientTermViolations(translated);
+
+	if (violations.length === 0) {
+		return null;
+	}
+
+	const sample = violations
+		.slice(0, 3)
+		.map((violation) => `L${violation.lineNumber} ${violation.term}`)
+		.join(" | ");
+
+	return {
+		guardId: POST_TRANSLATION_GUARD_IDS.englishServerClientTerms,
+		message: `English Server/Client Component terms in prose: ${sample}`,
+		retryHint:
+			"Translate Server Component / Client Component product terms into Russian prose (серверный компонент, клиентские компоненты) instead of leaving English labels in Russian sentences.",
 	};
 };

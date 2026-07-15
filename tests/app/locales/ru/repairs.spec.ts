@@ -5,8 +5,11 @@ import {
 	applyRuLocaleMechanicalRepairs,
 	collapseDuplicatedRuUseClientLeadIn,
 	repairCorruptedRuOutputEmphasis,
+	repairDuplicatedRuNegationEmphasis,
+	repairRuRichTextEditorDependencyPhrase,
 	replaceEnglishServerClientComponentTerms,
 	replaceKnownRuCalquePhrases,
+	replaceRuEnglishProseLeaks,
 } from "@/app/locales/ru/repairs";
 
 describe("collapseDuplicatedRuUseClientLeadIn", () => {
@@ -38,16 +41,37 @@ describe("repairCorruptedRuOutputEmphasis", () => {
 	});
 });
 
-describe("replaceKnownRuCalquePhrases", () => {
+describe("repairDuplicatedRuNegationEmphasis", () => {
+	test("collapses duplicated negation emphasis", () => {
+		const input = "определение компонента не _не_ имеет `'use client'` директивы";
+
+		expect(repairDuplicatedRuNegationEmphasis(input)).toBe(
+			"определение компонента _не_ имеет `'use client'` директивы",
+		);
+	});
+});
+
+describe("repairRuRichTextEditorDependencyPhrase", () => {
 	test("repairs RichTextEditor dependency phrasing from maintainer feedback", () => {
 		const input =
 			"В качестве зависимостей `RichTextEditor`, `formatDate` и `Button` также будут выполняться на клиенте.";
 
-		expect(replaceKnownRuCalquePhrases(input)).toBe(
-			"Будучи зависимостями `RichTextEditor`, `formatDate` и `Button` также будут выполняться на клиенте.",
+		expect(repairRuRichTextEditorDependencyPhrase(input)).toBe(
+			"`formatDate` и `Button`, будучи зависимостями `RichTextEditor` также будут выполняться на клиенте.",
 		);
 	});
 
+	test("repairs alternate wrong dependency lead-ins", () => {
+		const input =
+			"Как зависимости `RichTextEditor`, `formatDate` и `Button` также будут вычисляться на клиенте.";
+
+		expect(repairRuRichTextEditorDependencyPhrase(input)).toBe(
+			"`formatDate` и `Button`, будучи зависимостями `RichTextEditor` также будут вычисляться на клиенте.",
+		);
+	});
+});
+
+describe("replaceKnownRuCalquePhrases", () => {
 	test("localizes guillemet-wrapped component term", () => {
 		expect(replaceKnownRuCalquePhrases("термин «component» не очень точен")).toBe(
 			"термин «компонент» не очень точен",
@@ -60,6 +84,17 @@ describe("replaceKnownRuCalquePhrases", () => {
 
 		expect(replaceKnownRuCalquePhrases(input)).toBe(
 			"```js\nconst Server Component = 1;\n```\nиз кода, помеченного как клиентский",
+		);
+	});
+});
+
+describe("replaceRuEnglishProseLeaks", () => {
+	test("localizes common English loanword leaks in prose", () => {
+		const input =
+			"В React app фреймворк отрендерит root component через дерево render во время render.";
+
+		expect(replaceRuEnglishProseLeaks(input)).toBe(
+			"В приложении React фреймворк отрендерит корневой компонент через дерево рендеринга во время рендеринга.",
 		);
 	});
 });
@@ -79,6 +114,23 @@ describe("replaceEnglishServerClientComponentTerms", () => {
 
 		expect(replaceEnglishServerClientComponentTerms(input)).toBe(
 			"используйте `Server Component` в коде, но серверный компонент в prose.",
+		);
+	});
+
+	test("localizes Server/Client terms inside markdown link labels", () => {
+		const input =
+			"используется с [React Server Components](/reference/rsc/server-components) и Server Component в prose.";
+
+		expect(replaceEnglishServerClientComponentTerms(input)).toBe(
+			"используется с [серверными компонентами React](/reference/rsc/server-components) и серверный компонент в prose.",
+		);
+	});
+
+	test("fixes instrumental case after generic Server/Client swaps", () => {
+		const input = "компонент одновременно является серверный компонент и клиентский компонент";
+
+		expect(replaceEnglishServerClientComponentTerms(input)).toBe(
+			"компонент одновременно является серверным компонентом и клиентским компонентом",
 		);
 	});
 });
@@ -117,13 +169,15 @@ describe("applyRuLocaleMechanicalRepairs", () => {
 			"В качестве зависимостей `RichTextEditor`, `formatDate` и `Button` также будут выполняться на клиенте.",
 			"импортируется из Server Component, считаются Server Components.",
 			"желтый фон в alt text",
+			"определение компонента не _не_ имеет директивы",
 		].join("\n");
 
 		expect(applyRuLocaleMechanicalRepairs(input)).toBe(
 			[
-				"Будучи зависимостями `RichTextEditor`, `formatDate` и `Button` также будут выполняться на клиенте.",
+				"`formatDate` и `Button`, будучи зависимостями `RichTextEditor` также будут выполняться на клиенте.",
 				"импортируется из серверного компонента, считаются серверными компонентами.",
 				"жёлтый фон в alt text",
+				"определение компонента _не_ имеет директивы",
 			].join("\n"),
 		);
 	});
