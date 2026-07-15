@@ -12,6 +12,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Changed
 
+- Blank GitHub Environment values for `LLM_MODEL` and `REPO_*` fall back to schema defaults instead of passing through as empty strings.
+- CI smoke jobs upload `artifacts/smoke/` on every run (not only on failure), matching manual `smoke.yml` dispatch.
 - `bun run lint` now lint-checks `.github` YAML with `eslint-plugin-yml` and validates workflows with `actionlint`.
 - Workflow smoke writes to gitignored `artifacts/smoke/` and uploads that tree as a standard zip artifact so `gh run download` works without a tarball workaround.
 - Locale definitions live under `src/app/locales/<lang>/locale.ts`; production-validated locale mechanical repairs register in `repairs.ts` and run after shared post-assembly cleanup.

@@ -67,7 +67,6 @@ jobs:
           profile: ${{ inputs.profile }}
           lang: ${{ inputs.lang }}
           files: ${{ inputs.files }}
-          target-language: ${{ inputs.lang }}
           bun-version: ${{ vars.BUN_VERSION || '1.3.14' }}
           gh-token: ${{ secrets.GH_TOKEN }}
           llm-api-key: ${{ secrets.LLM_API_KEY }}

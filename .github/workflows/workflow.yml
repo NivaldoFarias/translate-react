@@ -193,4 +193,5 @@ jobs:
         with:
           name: translation-logs-${{ matrix.lang }}-${{ github.run_id }}
           path: logs/
+          if-no-files-found: warn
           retention-days: 90

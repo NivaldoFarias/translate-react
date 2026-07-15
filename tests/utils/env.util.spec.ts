@@ -47,6 +47,25 @@ describe("Environment Utilities", () => {
 			expect(env.HEADER_APP_TITLE).toBe(validEnv.HEADER_APP_TITLE);
 		});
 
+		test("should use defaults when LLM_MODEL and repo env vars are empty strings", () => {
+			const envWithEmptyDefaults = {
+				...validEnv,
+				LLM_MODEL: "",
+				REPO_FORK_OWNER: "",
+				REPO_FORK_NAME: "",
+				REPO_UPSTREAM_OWNER: "",
+				REPO_UPSTREAM_NAME: "",
+			};
+
+			const env = validateEnv(envWithEmptyDefaults);
+
+			expect(env.LLM_MODEL).toBe(validEnv.LLM_MODEL);
+			expect(env.REPO_FORK_OWNER).toBe(validEnv.REPO_FORK_OWNER);
+			expect(env.REPO_FORK_NAME).toBe(validEnv.REPO_FORK_NAME);
+			expect(env.REPO_UPSTREAM_OWNER).toBe(validEnv.REPO_UPSTREAM_OWNER);
+			expect(env.REPO_UPSTREAM_NAME).toBe(validEnv.REPO_UPSTREAM_NAME);
+		});
+
 		test("should throw error when token is too short", () => {
 			const invalidEnv = { ...validEnv, GH_TOKEN: "short" };
 

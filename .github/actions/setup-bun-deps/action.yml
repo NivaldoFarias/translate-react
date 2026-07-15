@@ -1,5 +1,5 @@
 name: Setup Bun dependencies
-description: Install Bun and restore node_modules from bun.lock cache
+description: Install Bun and restore node_modules from bun.lock cache (caller must checkout first)
 
 inputs:
   bun-version:

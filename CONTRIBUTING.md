@@ -20,11 +20,22 @@ Profiles, CLI flags, and when CI runs smoke: [README: Smoke runs](./README.md#sm
 
 Local runs and manual [`smoke.yml`](./.github/workflows/smoke.yml) dispatch write into gitignored `artifacts/smoke/`. Each fixture gets a subdirectory (for example `use-memo/`) with `translated.md` and `pull-request.md`. When the run posts progress, `translation-progress-issue-comment.md` sits at the `artifacts/smoke/` root. Override the directory with `--out-dir`/`-o` or `SMOKE_OUTPUT_DIR`.
 
-Failed CI smoke jobs and `smoke.yml` runs upload that tree as a standard zip artifact. Download with:
+CI smoke jobs and `smoke.yml` upload that tree as a standard zip artifact. Download with:
 
 ```bash
 gh run download <run_id> --dir artifacts/smoke/<run_id>
 ```
+
+## Investigating workflow runs
+
+| Artifact                             | Workflow                    | When uploaded                               |
+| ------------------------------------ | --------------------------- | ------------------------------------------- |
+| `artifacts/smoke/` (fixture outputs) | `ci.yml` smoke, `smoke.yml` | Always                                      |
+| `logs/` (Pino file logs)             | `workflow.yml` translation  | Always (`translation-logs-<lang>-<run_id>`) |
+
+Use `gh run download <run_id> --dir artifacts/smoke/<run_id>` for smoke outputs. For translation logs, download the `translation-logs-*` artifact the same way (extracted tree includes `logs/`).
+
+If `gh run view --log` returns empty, fetch per-job logs via the REST API (see the investigate-workflow-run skill under `.cursor/skills/`).
 
 ## Releasing
 

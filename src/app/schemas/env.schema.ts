@@ -43,10 +43,10 @@ const envSchema = z.object({
 		:	createGithubTokenSchema("LLM_API_KEY"),
 
 	/** The forked repository's owner */
-	REPO_FORK_OWNER: z.string().default(envDefaults.REPO_FORK_OWNER),
+	REPO_FORK_OWNER: optionalEnvString(envDefaults.REPO_FORK_OWNER),
 
 	/** The name of the forked repository */
-	REPO_FORK_NAME: z.string().default(envDefaults.REPO_FORK_NAME),
+	REPO_FORK_NAME: optionalEnvString(envDefaults.REPO_FORK_NAME),
 
 	/**
 	 * Upstream repository owner (`reactjs` for official React docs).
@@ -54,13 +54,13 @@ const envSchema = z.object({
 	 * Override in `.env` or GitHub Actions variable `REPO_UPSTREAM_OWNER` when testing
 	 * (e.g. point PRs at your fork as the logical upstream for every matrix locale).
 	 */
-	REPO_UPSTREAM_OWNER: z.string().default(envDefaults.REPO_UPSTREAM_OWNER),
+	REPO_UPSTREAM_OWNER: optionalEnvString(envDefaults.REPO_UPSTREAM_OWNER),
 
 	/** Original repository name */
-	REPO_UPSTREAM_NAME: z.string().default(envDefaults.REPO_UPSTREAM_NAME),
+	REPO_UPSTREAM_NAME: optionalEnvString(envDefaults.REPO_UPSTREAM_NAME),
 
 	/** The LLM model to use */
-	LLM_MODEL: z.string().default(envDefaults.LLM_MODEL),
+	LLM_MODEL: optionalEnvString(envDefaults.LLM_MODEL),
 
 	/** The OpenAI/OpenRouter/etc API base URL */
 	LLM_API_BASE_URL: z.url().default(envDefaults.LLM_API_BASE_URL),
@@ -266,7 +266,7 @@ function isTestEnvironment(): boolean {
 /**
  * Treats unset GitHub Actions / `.env` values as missing so schema defaults apply.
  *
- * `vars.HEADER_APP_*` and `KEY=` in `.env` often become `""`, which bypasses Zod `.default()`.
+ * `vars.HEADER_APP_*`, `LLM_MODEL`, `REPO_*`, and `KEY=` in `.env` often become `""`, which bypasses Zod `.default()`.
  *
  * @param value Raw env value from `import.meta.env` or CI inputs
  *

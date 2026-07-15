@@ -112,7 +112,6 @@ jobs:
         with:
           profile: quick
           lang: pt-br
-          target-language: pt-br
           bun-version: ${{ vars.BUN_VERSION || '1.3.14' }}
           gh-token: ${{ secrets.GH_TOKEN }}
           llm-api-key: ${{ secrets.LLM_API_KEY }}
@@ -132,7 +131,7 @@ jobs:
 
       - name: Upload workflow smoke outputs
         uses: actions/upload-artifact@v7
-        if: failure()
+        if: always()
         with:
           name: ci-smoke-pt-br-${{ github.run_id }}
           path: artifacts/smoke/
@@ -163,7 +162,6 @@ jobs:
         with:
           profile: quick
           lang: ${{ matrix.lang }}
-          target-language: ${{ matrix.lang }}
           bun-version: ${{ vars.BUN_VERSION || '1.3.14' }}
           gh-token: ${{ secrets.GH_TOKEN }}
           llm-api-key: ${{ secrets.LLM_API_KEY }}
@@ -183,7 +181,7 @@ jobs:
 
       - name: Upload workflow smoke outputs
         uses: actions/upload-artifact@v7
-        if: failure()
+        if: always()
         with:
           name: ci-smoke-${{ matrix.lang }}-${{ github.run_id }}
           path: artifacts/smoke/

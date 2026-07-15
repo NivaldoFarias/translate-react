@@ -6,7 +6,7 @@ inputs:
     description: Smoke profile (`quick`, `workflow`, `full`)
     required: true
   lang:
-    description: Target locale override (`--lang`); empty uses `TARGET_LANGUAGE`/default
+    description: Target locale override (`--lang`); empty uses schema default
     required: false
     default: ""
   files:
@@ -56,9 +56,6 @@ inputs:
   batch-size:
     description: BATCH_SIZE
     required: false
-  target-language:
-    description: TARGET_LANGUAGE fallback when `lang` is empty
-    required: false
   header-app-url:
     description: HEADER_APP_URL
     required: false
@@ -90,7 +87,7 @@ runs:
         GH_PAT_TOKEN: ${{ inputs.gh-pat-token }}
         MAX_TOKENS: ${{ inputs.max-tokens }}
         BATCH_SIZE: ${{ inputs.batch-size }}
-        TARGET_LANGUAGE: ${{ inputs.lang != '' && inputs.lang || inputs.target-language }}
+        TARGET_LANGUAGE: ${{ inputs.lang }}
         HEADER_APP_URL: ${{ inputs.header-app-url }}
         HEADER_APP_TITLE: ${{ inputs.header-app-title }}
         SMOKE_PROFILE: ${{ inputs.profile }}
