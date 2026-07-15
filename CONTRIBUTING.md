@@ -35,7 +35,16 @@ gh run download <run_id> --dir artifacts/smoke/<run_id>
 
 Use `gh run download <run_id> --dir artifacts/smoke/<run_id>` for smoke outputs. For translation logs, download the `translation-logs-*` artifact the same way (extracted tree includes `logs/`).
 
-If `gh run view --log` returns empty, fetch per-job logs via the REST API (see the investigate-workflow-run skill under `.cursor/skills/`).
+If `gh run view --log` returns empty, fetch per-job logs via the REST API:
+
+```bash
+mkdir -p logs
+REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+gh run view "<run_id>" --json jobs -q '.jobs[] | "\(.databaseId) \(.name)"' | while read -r job_id job_name; do
+  slug=$(echo "$job_name" | tr ' /' '--' | tr -cd '[:alnum:]-')
+  gh api "/repos/$REPO/actions/jobs/$job_id/logs" > "logs/<run_id>-${slug}.log"
+done
+```
 
 ## Releasing
 
