@@ -4,6 +4,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+## [0.2.16] - 2026-07-15
+
 ### Added
 
 - Advisory `englishServerClientTerms` guard surfaces English Server/Client Component product terms left in translated prose on translation pull requests.
@@ -402,6 +404,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 - README `MAX_RETRY_ATTEMPTS` default matches runtime (`3`).
 
+[0.2.16]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.16
 [0.2.15]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.15
 [0.2.14]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.14
 [0.2.13]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.13
