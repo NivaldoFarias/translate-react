@@ -179,6 +179,8 @@ const envSchema = z.object({
 
 	/**
 	 * Set by the GitHub Actions runner when present. Adds workflow run URLs to PR bodies and issue comments.
+	 *
+	 * `workflow.yml` passes these through explicitly so Bun `import.meta.env` picks up run metadata.
 	 */
 	GITHUB_ACTIONS: z.stringbool().optional(),
 

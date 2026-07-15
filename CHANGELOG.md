@@ -12,6 +12,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Changed
 
+- `setup-bun-deps` coalesces an empty `BUN_VERSION` to `1.3.14`; workflows no longer duplicate that default in YAML.
+- `smoke.yml` `lang` dispatch choices are checked against `.github/locales.json` in CI.
 - Blank GitHub Environment values for `LLM_MODEL` and `REPO_*` fall back to schema defaults instead of passing through as empty strings.
 - CI smoke jobs upload `artifacts/smoke/` on every run (not only on failure), matching manual `smoke.yml` dispatch.
 - `bun run lint` now lint-checks `.github` YAML with `eslint-plugin-yml` and validates workflows with `actionlint`.

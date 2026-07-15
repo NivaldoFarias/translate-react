@@ -14,9 +14,9 @@ inputs:
     required: false
     default: ""
   bun-version:
-    description: Bun version (repository variable BUN_VERSION when unset)
+    description: Bun version. Empty uses `setup-bun-deps` action default
     required: false
-    default: "1.3.14"
+    default: ""
   gh-token:
     description: GitHub token for mocked GitHub client construction
     required: false
