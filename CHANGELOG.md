@@ -4,6 +4,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+### Added
+
+- Russian locale mechanical repairs fix prod-validated calques, English Server/Client Component terms left in Russian prose, and common missing `ё` spellings outside fenced and inline code.
+
+### Changed
+
+- Segment and frontmatter batch prompts use optional `rules.segmentSpecific` when defined, adding batch context and omitting full-document instructions (such as MDN URL rewrites) that do not apply to isolated segment snippets.
+- Russian locale prompt rules expand style and semantic guidance: formal `вы`, `ё`, guillemets, `бандлер`, lowercase server/client component phrasing, and calque avoidance for terms like `null prototype` and `client-marked code`.
+
 ## [0.2.15] - 2026-07-15
 
 ### Added
