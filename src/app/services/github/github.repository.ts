@@ -2,7 +2,12 @@ import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 import type { SharedGitHubDependencies } from "./types";
 
-import { env, filterMarkdownFiles, logger, TRANSLATION_GUIDELINES_CANDIDATES } from "@/app/utils/";
+import {
+	baseLogger,
+	env,
+	filterMarkdownFiles,
+	TRANSLATION_GUIDELINES_CANDIDATES,
+} from "@/app/utils/";
 import { toSafeErrorLogFields } from "@/shared/errors/";
 
 import {
@@ -17,7 +22,7 @@ import {
  * Handles repository tree management, fork synchronization, and token verification.
  */
 export class GitHubRepository {
-	private readonly logger = logger.child({ component: GitHubRepository.name });
+	private readonly logger = baseLogger.child({ component: GitHubRepository.name });
 
 	constructor(private readonly deps: SharedGitHubDependencies) {}
 

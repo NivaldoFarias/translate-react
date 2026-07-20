@@ -3,6 +3,7 @@ import { PartialDeep } from "type-fest";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 import type { ChatCompletion } from "openai/resources";
 
+import type { GitHubService } from "@/app/services/github/github.service";
 import type {
 	PatchedRepositoryTreeItem,
 	ProcessedFileResult,

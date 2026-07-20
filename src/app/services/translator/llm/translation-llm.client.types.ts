@@ -4,6 +4,7 @@ import type { Options as RetryOptions } from "p-retry";
 
 import type { ReactLanguageCode } from "@/app/utils/";
 
+import type { TranslationLlmClient } from "./translation-llm.client";
 import type { TranslationPromptBuilder } from "./translation-prompt.builder";
 
 /** Injected dependencies for {@link TranslationLlmClient} */

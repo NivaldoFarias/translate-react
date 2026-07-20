@@ -1,4 +1,4 @@
-import type { LocaleService } from "@/app/services/locale/locale.service";
+import type { LocaleService } from "@/app/locales/locale.service";
 import type { RunnerServiceDependencies } from "@/app/services/runner/runner.types";
 
 import type {

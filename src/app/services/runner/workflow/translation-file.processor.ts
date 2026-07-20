@@ -10,10 +10,10 @@ import type { TranslationPullRequestLifecycleManager } from "./translation-pull-
 import { PullRequestProgressAction } from "@/app/services/github/types";
 import { TranslationFile } from "@/app/services/translator/";
 import {
+	baseLogger,
 	getTranslationBranchNameFromPath,
 	isConfiguredForceRetranslatePath,
 	isTranslationEquivalentToCurrentBlob,
-	logger,
 } from "@/app/utils/";
 import { ApplicationError, ErrorCode, isCircuitBreakerError } from "@/shared/errors/";
 
@@ -40,7 +40,7 @@ export interface TranslationBatchProgressCallbacks {
  * Per-file translation pipeline coordinator for branch, translate, commit, and pull request steps.
  */
 export class TranslationFileProcessor {
-	private readonly logger = logger.child({ component: TranslationFileProcessor.name });
+	private readonly logger = baseLogger.child({ component: TranslationFileProcessor.name });
 	private readonly translationPullRequestValidity: TranslationPullRequestValidityManager;
 
 	/**

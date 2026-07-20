@@ -2,8 +2,14 @@ import type { TranslationFile } from "@/app/services/translator/";
 
 import type { LocaleDefinition, LocalePRBodyStrings, ProgressCommentRunContext } from "../types";
 
-import { createGuardLabelResolver } from "../locale-guard-labels.util";
+import { createGuardLabelResolver } from "../guard-labels.util";
 import { createPRBodyBuilder } from "../pr-body.builder";
+
+import {
+	ptBrMarkdownTranslationScopeSection,
+	ptBrSegmentSpecificRules,
+	ptBrSpecificRules,
+} from "./rules";
 
 /** Brazilian Portuguese strings for the PR body template */
 const ptBrPRBodyStrings: LocalePRBodyStrings = {
@@ -44,83 +50,6 @@ const ptBrPRBodyStrings: LocalePRBodyStrings = {
 };
 
 /**
- * LLM rules for pt-br.react.dev. Static JSX demo text in fences is also
- * enforced by the `fenceJsxStaticText` post-translation guard.
- *
- * @see {@link https://github.com/NivaldoFarias/translate-react/issues/50}
- */
-const PT_BR_SPECIFIC_RULES = `
-# PORTUGUESE (BRAZIL) SPECIFIC RULES
-- ALWAYS translate 'deprecated' and related terms (deprecation, deprecating, deprecates) to 'descontinuado(a)', 'descontinuada', 'obsoleto(a)' or 'obsoleta' in ALL contexts (documentation text, comments, headings, lists, etc.)
-	- Exception: Do NOT translate 'deprecated' in HTML comment IDs like {/*deprecated-something*/} - keep these exactly as-is
-	- Exception: Do NOT translate 'deprecated' in URLs, anchor links, or code variable names
-- When a MDN document is referenced, update the language slug to the Brazilian Portuguese version ('https://developer.mozilla.org/<slug>/*' => 'https://developer.mozilla.org/pt-BR/*')
-
-## FENCED CODE AND MDX (pt-br.react.dev)
-- Inside fenced code blocks: do NOT translate string literals or JSX text used as demo UI copy (labels like \`Created at:\`, button text, \`<h1>\` headings in examples). Copy them exactly from the source in English.
-- Keep React API vocabulary in \`//\` and \`/* */\` code comments in English (\`state\`, \`effect\`, \`ref\`, \`props\`, \`reducer\`, \`dispatch\`, \`context\`, \`memo\`, \`render\`, \`suspense\`, etc.) unless the translation guidelines explicitly map the term.
-- When you translate a code comment into Portuguese, translate the full comment. Do not mix English words into Portuguese sentences except for official API names from the list above.
-- \`<ConsoleLogLine>\` and similar MDX console output: keep message text in English to match runtime console output; do not localize error strings.
-
-## TERMINOLOGY (pt-br.react.dev)
-- Apply upstream \`GLOSSARY.md\` terms consistently in every section and chunk (e.g. "reset" → "redefinir", not "resetar"; "troubleshooting" → "Solução de Problemas" with capital P in headings).
-- "troubleshooting" in headings: use "Solução de Problemas", not "Solução de problemas".
-- "reset" / "resetting": use "redefinir", never "resetar" or "resetou".
-- "opt-out" means opting out of a feature: use "desativar" or keep "opt-out"; never "otimizar para fora".
-- Keep official product names in English when cited: "React Server Components", "React Flight" / "Flight" (never "Voo"), "Effect Event" (prefer "Evento de Effect" or English; never "Evento de Efeito").
-- Use one Portuguese rendering per English concept in the same file (do not mix "lógica" and "lógica de conexão" for "wiring"; pick one form for "Effect Event" throughout).
-
-## HEADINGS (pt-br.react.dev)
-- Use Portuguese sentence case in headings: capitalize only the first word and proper nouns (React, JSX, DOM, product names). Do not use English Title Case on common words (e.g. "Novos recursos do React", not "Novos Recursos do React").
-- Preserve every markdown link as \`[label](same-url)\` with balanced brackets; translate link text inside brackets only.`;
-
-const PT_BR_SEGMENT_BATCH_CONTEXT = `
-# SEGMENT BATCH CONTEXT
-- Each \`source\` string is an isolated prose fragment from a larger markdown document
-- Link URLs and fenced code bodies are frozen outside this batch and reassembled after translation; when \`source\` is link label text, translate only the label words
-- MDN locale URL rewrites are applied mechanically after reassembly, so full \`https://developer.mozilla.org/...\` URLs are not present in segment batches
-`;
-
-const PT_BR_SEGMENT_SPECIFIC_RULES = `
-# PORTUGUESE (BRAZIL) SPECIFIC RULES
-${PT_BR_SEGMENT_BATCH_CONTEXT}
-- ALWAYS translate 'deprecated' and related terms (deprecation, deprecating, deprecates) to 'descontinuado(a)', 'descontinuada', 'obsoleto(a)' or 'obsoleta' in ALL contexts (documentation text, comments, headings, lists, etc.)
-	- Exception: Do NOT translate 'deprecated' in HTML comment IDs like {/*deprecated-something*/} - keep these exactly as-is
-	- Exception: Do NOT translate 'deprecated' in URLs, anchor links, or code variable names
-
-## FENCED CODE AND MDX (pt-br.react.dev)
-- Inside fenced code blocks: do NOT translate string literals or JSX text used as demo UI copy (labels like \`Created at:\`, button text, \`<h1>\` headings in examples). Copy them exactly from the source in English.
-- Keep React API vocabulary in \`//\` and \`/* */\` code comments in English (\`state\`, \`effect\`, \`ref\`, \`props\`, \`reducer\`, \`dispatch\`, \`context\`, \`memo\`, \`render\`, \`suspense\`, etc.) unless the translation guidelines explicitly map the term.
-- When you translate a code comment into Portuguese, translate the full comment. Do not mix English words into Portuguese sentences except for official API names from the list above.
-- \`<ConsoleLogLine>\` and similar MDX console output: keep message text in English to match runtime console output; do not localize error strings.
-
-## TERMINOLOGY (pt-br.react.dev)
-- Apply upstream \`GLOSSARY.md\` terms consistently in every section and chunk (e.g. "reset" → "redefinir", not "resetar"; "troubleshooting" → "Solução de Problemas" with capital P in headings).
-- "troubleshooting" in headings: use "Solução de Problemas", not "Solução de problemas".
-- "reset" / "resetting": use "redefinir", never "resetar" or "resetou".
-- "opt-out" means opting out of a feature: use "desativar" or keep "opt-out"; never "otimizar para fora".
-- Keep official product names in English when cited: "React Server Components", "React Flight" / "Flight" (never "Voo"), "Effect Event" (prefer "Evento de Effect" or English; never "Evento de Efeito").
-- Use one Portuguese rendering per English concept in the same file (do not mix "lógica" and "lógica de conexão" for "wiring"; pick one form for "Effect Event" throughout).
-
-## HEADINGS (pt-br.react.dev)
-- Use Portuguese sentence case in headings: capitalize only the first word and proper nouns (React, JSX, DOM, product names). Do not use English Title Case on common words (e.g. "Novos recursos do React", not "Novos Recursos do React").`;
-
-/**
- * Markdown body scope override for pt-br (stricter fenced-code policy than the default locale).
- */
-const PT_BR_MARKDOWN_TRANSLATION_SCOPE = `
-				## What to Translate
-				- Natural language text and documentation content outside fenced code blocks
-				- Alt text, titles, and descriptive content in prose
-
-				## Fenced code blocks and MDX in examples
-				- Do NOT translate demo UI strings: quoted literals and JSX text between tags inside fenced code. Copy them exactly from the source.
-				- Keep programming identifiers unchanged in every fenced block.
-				- For \`//\` and \`/* */\` comments in fenced code, follow the locale-specific fenced-code rules below (React API terms stay in English; translate full comment text when translating).
-				- Keep \`<ConsoleLogLine>\` and similar MDX console message text in English to match runtime output.
-			`;
-
-/**
  * Brazilian Portuguese locale definition.
  *
  * Contains all Portuguese (Brazil) specific user-facing texts
@@ -140,9 +69,9 @@ export const ptBrLocale: LocaleDefinition = {
 		suffix: `[^1]: as traduções são rascunhos gerados por LLM; valide manualmente antes do merge.`,
 	},
 	rules: {
-		specific: PT_BR_SPECIFIC_RULES,
-		segmentSpecific: PT_BR_SEGMENT_SPECIFIC_RULES,
-		markdownTranslationScopeSection: PT_BR_MARKDOWN_TRANSLATION_SCOPE,
+		specific: ptBrSpecificRules,
+		segmentSpecific: ptBrSegmentSpecificRules,
+		markdownTranslationScopeSection: ptBrMarkdownTranslationScopeSection,
 	},
 	pullRequest: {
 		title: (file: TranslationFile) => `Tradução de \`${file.filename}\` para Português (Brasil)`,

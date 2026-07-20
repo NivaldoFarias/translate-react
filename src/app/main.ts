@@ -3,12 +3,7 @@ import "@/app/utils/bootstrap-cli-overrides.util";
 import { name, version } from "@package";
 
 import { runnerService } from "@/app/composition";
-import {
-	logger as baseLogger,
-	buildOpenRouterRunUserId,
-	env,
-	setupSignalHandlers,
-} from "@/app/utils/";
+import { baseLogger, buildOpenRouterRunUserId, env, setupSignalHandlers } from "@/app/utils/";
 import { handleTopLevelError } from "@/shared/errors/";
 
 if (import.meta.main) {

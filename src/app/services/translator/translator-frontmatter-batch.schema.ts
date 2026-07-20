@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import type { TranslatorService } from "./translator.service";
+
 /**
  * Keys allowed in YAML frontmatter batch translation requests and responses.
  *

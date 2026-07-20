@@ -6,9 +6,9 @@ import type { TranslationPullRequestValidity } from "./translation-pull-request-
 
 import { TranslationFile } from "@/app/services/translator/";
 import {
+	baseLogger,
 	getTranslationBranchNameFromPath,
 	isConfiguredForceRetranslatePath,
-	logger,
 	shouldPreserveOpenPullRequestOnRefresh,
 } from "@/app/utils/";
 
@@ -18,7 +18,7 @@ import { hasQualifyingApprovedReview } from "./pull-request-review.util";
  * Branch prepare, reset, and cleanup policy for per-file translation workflow.
  */
 export class TranslationBranchLifecycleManager {
-	private readonly logger = logger.child({ component: TranslationBranchLifecycleManager.name });
+	private readonly logger = baseLogger.child({ component: TranslationBranchLifecycleManager.name });
 
 	/**
 	 * @param services GitHub and related runner dependencies

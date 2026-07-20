@@ -2,7 +2,7 @@ import type { WorkflowStatistics } from "@/app/services/runner/types";
 
 import type { RunnerOptions, RunnerServiceDependencies } from "./runner.types";
 
-import { logger } from "@/app/utils/";
+import { baseLogger } from "@/app/utils/";
 import { toSafeErrorLogFields } from "@/shared/errors/";
 
 import { BaseRunnerService } from "./base.service";
@@ -36,7 +36,7 @@ export class RunnerService extends BaseRunnerService {
 	constructor(services: RunnerServiceDependencies, options?: RunnerOptions) {
 		super(services, options);
 
-		this.logger = logger.child({ component: RunnerService.name });
+		this.logger = baseLogger.child({ component: RunnerService.name });
 	}
 
 	/**

@@ -1,7 +1,9 @@
+import type { GitHubService } from "@/app/services/github/github.service";
 import type {
 	PatchedRepositoryTreeItem,
 	RepositoryMarkdownBlob,
 } from "@/app/services/github/types";
+import type { RunnerService } from "@/app/services/runner/runner.service";
 
 /** Git tree fields for an upstream markdown blob before runner filename patching */
 export type WorkflowFixtureTree = Readonly<

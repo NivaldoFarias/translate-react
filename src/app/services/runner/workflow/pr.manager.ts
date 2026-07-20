@@ -6,7 +6,7 @@ import type { WorkflowStatistics } from "@/app/services/runner/types";
 import type { RunnerServiceDependencies } from "../runner.types";
 
 import { TranslationFile } from "@/app/services/translator/";
-import { formatElapsedTime, logger } from "@/app/utils/";
+import { baseLogger, formatElapsedTime } from "@/app/utils/";
 
 /**
  * Manages pull request operations and workflow statistics reporting.
@@ -16,7 +16,7 @@ import { formatElapsedTime, logger } from "@/app/utils/";
  * and failure details.
  */
 export class PRManager {
-	private readonly logger = logger.child({ component: PRManager.name });
+	private readonly logger = baseLogger.child({ component: PRManager.name });
 
 	/**
 	 * Initializes the PR manager with service dependencies.

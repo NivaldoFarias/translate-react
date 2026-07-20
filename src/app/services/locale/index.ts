@@ -1,1 +1,1 @@
-export * from "./locale.service";
+export * from "@/app/locales/locale.service";

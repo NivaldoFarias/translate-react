@@ -5,8 +5,8 @@ import pRetry, { AbortError } from "p-retry";
 import type { Octokit } from "@octokit/rest";
 import type { Options as RetryOptions } from "p-retry";
 
-import { logger as baseLogger, env, MS_PER_SECOND } from "@/app/utils";
-import { createOctokit } from "@/shared/clients/octokit/octokit.client";
+import { baseLogger, env, MS_PER_SECOND } from "@/app/utils";
+import { createOctokit } from "@/shared/clients/octokit";
 import { isUncastRequestError } from "@/shared/errors";
 
 import {
@@ -22,8 +22,8 @@ const logger = baseLogger.child({ component: "octokit" });
 /**
  * Compares a numeric HTTP status from Octokit errors against http-status-codes values.
  *
- * @param status HTTP status code from an Octokit `RequestError`
- * @param expected Status code constant to match (for example `StatusCodes.FORBIDDEN`)
+ * @param status HTTP status code from an Octokit {@link RequestError}
+ * @param expected Status code constant to match (for example {@link StatusCodes.FORBIDDEN})
  *
  * @returns `true` when `status` equals `expected`
  */

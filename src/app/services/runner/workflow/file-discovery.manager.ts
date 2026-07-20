@@ -1,6 +1,7 @@
 import type { SetRequired } from "type-fest";
 
 import type { FailOpenReasonId } from "@/app/constants/fail-open.constants";
+import type { GitHubService } from "@/app/services/github/github.service";
 import type { PatchedRepositoryTreeItem, PullRequestStatus } from "@/app/services/github/types";
 import type {
 	CacheCheckResult,
@@ -15,10 +16,10 @@ import { DEFAULT_RETRY_CONFIG } from "@/app/clients/octokit/octokit.constants";
 import { FAIL_OPEN_REASONS } from "@/app/constants/fail-open.constants";
 import { TranslationFile } from "@/app/services/translator/";
 import {
+	baseLogger,
 	filterToTranslationTargets,
 	getConfiguredTranslationTargetPaths,
 	isConfiguredForceRetranslatePath,
-	logger,
 } from "@/app/utils/";
 import { toSafeErrorLogFields } from "@/shared/errors/error.helpers";
 
@@ -53,7 +54,7 @@ function createEmptyFailOpenInventory(): FailOpenInventory {
  * narrows the candidate set to minimize expensive operations.
  */
 export class FileDiscoveryManager {
-	private readonly logger = logger.child({ component: FileDiscoveryManager.name });
+	private readonly logger = baseLogger.child({ component: FileDiscoveryManager.name });
 
 	private readonly translationPullRequestValidity: TranslationPullRequestValidityManager;
 
@@ -447,7 +448,7 @@ export class FileDiscoveryManager {
 	/**
 	 * Performs language detection and updates cache with results.
 	 *
-	 * Filters files exceeding {@link MAX_FILE_SIZE}, then analyzes remaining files
+	 * Performs language detection and updates cache with results. Analyzes files
 	 * to detect translation status. Updates the language cache with detection results
 	 * (language and confidence) for future runs. Files requiring translation are
 	 * returned in the result.

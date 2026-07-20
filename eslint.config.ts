@@ -26,6 +26,7 @@ export default defineConfig(
 			"**/docs/**",
 			"**/*.md",
 			"**/*.json",
+			"scripts/**",
 		],
 	},
 	{
@@ -228,7 +229,10 @@ export default defineConfig(
 	{
 		files: ["tests/**"],
 		ignores: ["tests/fixtures/**", "tests/helpers/**"],
-		rules: jsdocRulesOff,
+		rules: {
+			...jsdocRulesOff,
+			"jsdoc/no-undefined-types": ["error", { disableReporting: true, markVariablesAsUsed: true }],
+		},
 	},
 	{
 		files: ["*.cjs"],

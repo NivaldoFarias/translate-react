@@ -24,7 +24,10 @@ import type {
 import type { LanguageDetectorService } from "@/app/services/language-detector/";
 import type { LanguageAnalysisResult } from "@/app/services/language-detector/language-detector.service";
 
-import type { WorkflowFixtureFile } from "@tests/fixtures/workflow-fixture.util";
+import type {
+	WorkflowFixtureFile,
+	WorkflowFixtureSmoke,
+} from "@tests/fixtures/workflow-fixture.util";
 import type {
 	MockGitHubGetForkFileContentAtBranchFn,
 	MockLanguageDetectorService,

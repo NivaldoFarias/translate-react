@@ -25,7 +25,7 @@ export function normalizeForTranslationCompare(markdown: string) {
  * @param file Translation file carrying the pre-translation blob in `content`
  * @param translation Model output for the same path
  *
- * @returns `true` when normalized `translation` matches normalized `file.content`
+ * @returns `true` when normalized `translation` matches normalized {@link TranslationFile.content|`file.content`}
  *
  * @example
  * ```typescript

@@ -5,6 +5,8 @@ import type { SetRequired } from "type-fest";
 import type { TranslationLlmUsageTotals } from "@/app/services/translator/llm/translation-llm.usage";
 import type { PostTranslationGuardId } from "@/app/services/translator/validation/validation.constants";
 
+import type { GitHubService } from "./github.service";
+
 /** Post-translation validation retry surfaced on processed file results and PR metadata */
 export interface TranslationRetryInfo {
 	/** Stable guard id for logs and error context */
