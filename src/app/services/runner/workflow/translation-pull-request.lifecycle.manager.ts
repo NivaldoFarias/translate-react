@@ -10,9 +10,9 @@ import type { TranslationPullRequestValidity } from "./translation-pull-request-
 import { PullRequestProgressAction } from "@/app/services/github/types";
 import { TranslationFile } from "@/app/services/translator/";
 import {
+	baseLogger,
 	env,
 	getTranslationBranchNameFromPath,
-	logger,
 	shouldPreserveOpenPullRequestOnRefresh,
 } from "@/app/utils/";
 
@@ -35,7 +35,7 @@ function resolveLlmApiHost(baseUrl: string) {
  * Pull request open, reuse, refresh, and description policy for translated files.
  */
 export class TranslationPullRequestLifecycleManager {
-	private readonly logger = logger.child({
+	private readonly logger = baseLogger.child({
 		component: TranslationPullRequestLifecycleManager.name,
 	});
 

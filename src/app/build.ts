@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import Bun from "bun";
 
-import { logger as baseLogger } from "./utils";
+import { baseLogger } from "./utils";
 
 if (import.meta.main) {
 	await build();

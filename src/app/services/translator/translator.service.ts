@@ -29,8 +29,8 @@ import type { ReviewerValidationNotice } from "./validation/validation.types";
 import { resolveMdnLocaleSlug } from "@/app/constants/mdn-locale.constants";
 import { resolveLocaleMechanicalRepairs } from "@/app/locales/repairs/registry";
 import {
+	baseLogger,
 	env,
-	logger,
 	maskLargeVerbatimFencedCodeBlocks,
 	restoreMaskedVerbatimFences,
 } from "@/app/utils/";
@@ -145,7 +145,7 @@ export interface TranslatorServiceDependencies {
  * ```
  */
 export class TranslatorService {
-	private readonly logger = logger.child({ component: TranslatorService.name });
+	private readonly logger = baseLogger.child({ component: TranslatorService.name });
 
 	/** OpenAI client instance for LLM API calls */
 	private readonly openai: OpenAI;

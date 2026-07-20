@@ -10,13 +10,13 @@ import {
 	hasReportableProgressComment,
 	selectProgressCommentPayload,
 } from "@/app/services/comment-builder/progress-comment.util";
-import { logger } from "@/app/utils/";
+import { baseLogger } from "@/app/utils/";
 
 /**
  * Translation progress issue search and comment posting on the upstream repository.
  */
 export class GitHubProgressIssue {
-	private readonly logger = logger.child({ component: GitHubProgressIssue.name });
+	private readonly logger = baseLogger.child({ component: GitHubProgressIssue.name });
 
 	/**
 	 * @param deps Shared Octokit client and repository coordinates

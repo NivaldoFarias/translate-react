@@ -7,7 +7,7 @@ import type {
 
 import type { SharedGitHubDependencies } from "./types";
 
-import { isSafeTranslatablePath, logger } from "@/app/utils/";
+import { baseLogger, isSafeTranslatablePath } from "@/app/utils/";
 import { ApplicationError, ErrorCode } from "@/shared/errors/";
 
 import {
@@ -37,7 +37,7 @@ export interface CommitTranslationOptions {
  * Upstream and fork repository file content operations for the translation workflow.
  */
 export class GitHubRepositoryContent {
-	private readonly logger = logger.child({ component: GitHubRepositoryContent.name });
+	private readonly logger = baseLogger.child({ component: GitHubRepositoryContent.name });
 
 	/** Cached upstream default branch ref for repeated `getFile` calls in one run */
 	private upstreamDefaultBranchRef: string | undefined;

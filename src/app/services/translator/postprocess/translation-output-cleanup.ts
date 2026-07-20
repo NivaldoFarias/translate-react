@@ -1,6 +1,7 @@
 import type { TranslationFile } from "../translation-file";
 
 import { MARKDOWN_REGEXES } from "../markdown/markdown.regexes";
+import { reinsertSegments } from "../markdown/segments/reinsert-segments.util";
 import { TRANSLATION_PREFIXES } from "../validation/validation.constants";
 
 /**

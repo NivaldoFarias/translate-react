@@ -6,7 +6,7 @@ import type { Tiktoken, TiktokenModel } from "js-tiktoken";
 
 import type { TranslationFile } from "../translation-file";
 
-import { env, logger } from "@/app/utils";
+import { baseLogger, env } from "@/app/utils";
 import { ApplicationError, ErrorCode } from "@/shared/errors";
 
 import { TranslatorService } from "../translator.service";
@@ -53,7 +53,7 @@ export type ChunksToReassemble = Omit<ChunkingResult, "chunks"> & {
 };
 
 export class ChunksManager {
-	private readonly logger = logger.child({ component: ChunksManager.name });
+	private readonly logger = baseLogger.child({ component: ChunksManager.name });
 
 	private readonly model: string;
 

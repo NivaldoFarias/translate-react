@@ -1,4 +1,4 @@
-import { logger } from "@/app/utils/logger.util";
+import { baseLogger } from "@/app/utils/logger.util";
 
 import { OpenRouterModelRow, openRouterModelsListSchema } from "./openrouter.schemas";
 
@@ -18,7 +18,7 @@ export type OpenRouterModelLimits = Readonly<{
  * @see {@link https://openrouter.ai/docs/api/api-reference/models/get-models|OpenRouter GET /v1/models}
  */
 export class OpenRouterModelLimitsService {
-	private readonly logger = logger.child({ component: OpenRouterModelLimitsService.name });
+	private readonly logger = baseLogger.child({ component: OpenRouterModelLimitsService.name });
 
 	/** Cached promises for `GET /v1/models` catalog requests by list URL. */
 	private readonly inflightByListUrl = new Map<string, Promise<readonly OpenRouterModelRow[]>>();

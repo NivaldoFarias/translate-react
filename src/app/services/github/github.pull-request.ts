@@ -9,7 +9,7 @@ import type {
 import type { SharedGitHubDependencies } from "./types";
 
 import { withRetry } from "@/app/clients/";
-import { logger } from "@/app/utils/";
+import { baseLogger } from "@/app/utils/";
 
 /** Pull request options */
 export interface PullRequestOptions {
@@ -39,7 +39,7 @@ const PR_FILES_FETCH_MAX_ATTEMPTS = 3;
  * Pull request lifecycle and review operations on the upstream translation repository.
  */
 export class GitHubPullRequest {
-	private readonly logger = logger.child({ component: GitHubPullRequest.name });
+	private readonly logger = baseLogger.child({ component: GitHubPullRequest.name });
 
 	/**
 	 * @param deps Shared Octokit client and repository coordinates

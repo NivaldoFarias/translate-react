@@ -1,3 +1,11 @@
+import {
+	createLocaleMechanicalRepairs,
+	createPhraseGroupPass,
+	createRegexRepairPass,
+	createServerClientTermsPass,
+	createYoSpellingPass,
+} from "./repairs.factory";
+
 /** Literal from/to pair for deterministic phrase repair */
 export type LocalePhraseReplacement = readonly [from: string, to: string];
 

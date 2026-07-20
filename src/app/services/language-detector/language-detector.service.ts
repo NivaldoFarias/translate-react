@@ -4,8 +4,10 @@ import pRetry from "p-retry";
 import type { FailOpenReasonId } from "@/app/constants/fail-open.constants";
 import type { ReactLanguageCode } from "@/app/utils/";
 
+import type { TranslatorService } from "../translator/translator.service";
+
 import { FAIL_OPEN_REASONS } from "@/app/constants/fail-open.constants";
-import { env, logger, REACT_TRANSLATION_LANGUAGES } from "@/app/utils/";
+import { baseLogger, env, REACT_TRANSLATION_LANGUAGES } from "@/app/utils/";
 import { ApplicationError, ErrorCode } from "@/shared/errors/";
 import { toSafeErrorLogFields } from "@/shared/errors/error.helpers";
 
@@ -133,7 +135,7 @@ export interface LanguageAnalysisResult {
  * ```
  */
 export class LanguageDetectorService {
-	private readonly logger = logger.child({ component: LanguageDetectorService.name });
+	private readonly logger = baseLogger.child({ component: LanguageDetectorService.name });
 
 	/** Current language configuration using React language codes */
 	public readonly languages: LanguageConfig;

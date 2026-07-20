@@ -5,6 +5,7 @@ import type {
 	TranslationValidationIssue,
 } from "./validation.types";
 
+import { collectPostTranslationValidationIssues } from "./guards";
 import { POST_TRANSLATION_GUARD_IDS } from "./validation.constants";
 
 /** Guard ids that block shipping; all other guard failures are advisory for maintainers */

@@ -1,4 +1,4 @@
-import { logger } from "@/app/utils/";
+import { baseLogger } from "@/app/utils/";
 
 /** Cache entry with value and expiration timestamp */
 export interface CacheEntry<T> {
@@ -30,7 +30,7 @@ export interface CacheServiceOptions {
  * ```
  */
 export class CacheService<T> {
-	private readonly logger = logger.child({ component: CacheService.name });
+	private readonly logger = baseLogger.child({ component: CacheService.name });
 	private readonly getNow: () => number;
 	private cache = new Map<string, CacheEntry<T>>();
 

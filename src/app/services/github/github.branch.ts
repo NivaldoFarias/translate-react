@@ -6,7 +6,7 @@ import type { PullRequestStatus } from "@/app/services/github/types";
 
 import type { SharedGitHubDependencies } from "./types";
 
-import { logger, registerCleanup } from "@/app/utils/";
+import { baseLogger, registerCleanup } from "@/app/utils/";
 import { toSafeErrorLogFields } from "@/shared/errors/";
 
 import { fetchRepositoryDefaultBranch } from "./github-api.util";
@@ -17,7 +17,7 @@ import { fetchRepositoryDefaultBranch } from "./github-api.util";
  * Handles branch creation, deletion, and lifecycle management with cleanup support.
  */
 export class GitHubBranch {
-	private readonly logger = logger.child({ component: GitHubBranch.name });
+	private readonly logger = baseLogger.child({ component: GitHubBranch.name });
 
 	/** Set of branch names currently being tracked for cleanup */
 	public activeBranches = new Set<string>();

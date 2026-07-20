@@ -1,5 +1,6 @@
 import type { LocaleMechanicalRepairsDefinition } from "../../repairs/types";
 
+import { LOCALE_MECHANICAL_REPAIRS_REGISTRY } from "../../repairs/registry";
 import {
 	createLocaleMechanicalRepairs,
 	createPhraseGroupPass,

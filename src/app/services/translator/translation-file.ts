@@ -2,10 +2,13 @@ import crypto from "node:crypto";
 
 import type { Logger } from "pino";
 
+import type { GitHubService } from "@/app/services/github/github.service";
 import type { RepositoryMarkdownBlob } from "@/app/services/github/types";
 import type { ReactLanguageCode } from "@/app/utils/";
 
-import { logger } from "@/app/utils/";
+import type { TranslatorService } from "./translator.service";
+
+import { baseLogger } from "@/app/utils/";
 
 import { extractTitleScalarFromInnerYaml } from "./markdown/frontmatter";
 import { MARKDOWN_REGEXES } from "./markdown/markdown.regexes";
@@ -53,7 +56,7 @@ export class TranslationFile {
 	) {
 		this.title = this.extractDocTitleFromContent(content);
 		this.correlationId = crypto.randomUUID();
-		this.logger = (parentLogger ?? logger).child({
+		this.logger = (parentLogger ?? baseLogger).child({
 			file: this.filename,
 			path: this.path,
 			correlationId: this.correlationId,

@@ -1,3 +1,5 @@
+import type { PatchedRepositoryTreeItem } from "@/app/services/github/types";
+
 import type { WorkflowFixtureManifestEntry } from "@tests/fixtures/workflow-fixture.util";
 
 import {

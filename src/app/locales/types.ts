@@ -6,6 +6,8 @@ import type {
 import type { TranslationFile } from "@/app/services/translator/";
 import type { PostTranslationGuardId } from "@/app/services/translator/validation/validation.constants";
 
+import { buildLocaleRulesPrompt } from "./rules.util";
+
 export type { ReviewerValidationNotice };
 
 /** Prior invalid PR for the same file path */
