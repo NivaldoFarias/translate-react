@@ -6,7 +6,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Changed
 
-- Locale modules use a role-based layout under `src/app/locales/`: per-locale `rules.ts` and `repairs/` folders, shared `repairs/` infrastructure, and a single `registry.ts` for locale definitions (`LocaleService` resolves from there).
+- **Breaking (contributors):** Locale modules use a role-based layout under `src/app/locales/`: each locale ships `locale.ts`, `rules.ts`, and a `repairs/` module set (`constants.ts`, `definition.ts`, `index.ts`); shared `repairs/` infrastructure and a single `registry.ts` register definitions (`LocaleService` resolves from there; `services/locale/` remains a re-export).
+- Post-assembly mechanical cleanup also removes spurious whitespace between markdown links and trailing punctuation (for example `[label](url) ,` → `[label](url),`).
 
 ## [0.2.16] - 2026-07-15
 
