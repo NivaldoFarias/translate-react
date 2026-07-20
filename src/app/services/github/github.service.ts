@@ -14,7 +14,7 @@ import type { CommitTranslationOptions } from "./github.repository-content";
 import type { BaseRepositories, SharedGitHubDependencies } from "./types";
 
 import { octokit } from "@/app/clients/";
-import { env } from "@/app/utils/";
+import { env, TRANSLATION_GUIDELINES_CANDIDATES } from "@/app/utils/";
 
 import { GitHubBranch } from "./github.branch";
 import { GitHubProgressIssue } from "./github.progress-issue";

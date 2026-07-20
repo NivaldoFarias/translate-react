@@ -1,3 +1,5 @@
+import { extractTranslatableBodySegments } from "./extract-segments.util";
+
 /**
  * Returns whether AST segment translation may proceed without falling back to full-body LLM.
  *

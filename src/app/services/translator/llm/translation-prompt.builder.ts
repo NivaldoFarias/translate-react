@@ -1,5 +1,6 @@
 import type { Logger } from "pino";
 
+import type { LocaleRulesConfig } from "@/app/locales/types";
 import type { LocaleService } from "@/app/services/locale/";
 
 import type { TranslationAttemptContext } from "../pipeline/translation-attempt.context";
@@ -11,7 +12,7 @@ import type {
 } from "./translation-system-prompt.types";
 
 import { LanguageDetectorService } from "@/app/services/language-detector/";
-import { logger } from "@/app/utils/";
+import { baseLogger } from "@/app/utils/";
 
 /** Parameters for building a markdown document system prompt */
 export interface BuildMarkdownDocumentPromptParams {
@@ -35,7 +36,7 @@ export interface BuildMarkdownDocumentPromptParams {
  * Builds system prompts for markdown body and frontmatter batch LLM calls.
  */
 export class TranslationPromptBuilder {
-	private readonly componentLogger = logger.child({
+	private readonly componentLogger = baseLogger.child({
 		component: TranslationPromptBuilder.name,
 	});
 

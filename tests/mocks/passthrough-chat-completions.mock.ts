@@ -4,6 +4,7 @@ import type OpenAI from "openai";
 
 import { frontmatterBatchRequestEnvelopeSchema } from "@/app/services/translator/translator-frontmatter-batch.schema";
 import { segmentBatchRequestEnvelopeSchema } from "@/app/services/translator/translator-segment-batch.schema";
+import { isTranslationEquivalentToCurrentBlob } from "@/app/utils/translation-content-compare.util";
 
 import { createChatCompletionFixture } from "@tests/fixtures";
 

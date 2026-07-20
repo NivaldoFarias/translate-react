@@ -3,8 +3,9 @@ import type { ProcessedFileResult, TranslationProgressFileRef } from "@/app/serv
 
 import type { ProgressCommentPayload } from "./progress-comment.util";
 
+import { PullRequestProgressAction } from "@/app/services/github/types";
 import { TranslationFile } from "@/app/services/translator/";
-import { logger, resolveGitHubActionsRunContext } from "@/app/utils/";
+import { baseLogger, resolveGitHubActionsRunContext } from "@/app/utils/";
 
 import { selectProgressCommentPayload } from "./progress-comment.util";
 
@@ -32,7 +33,7 @@ export interface FileWithHierarchy extends FileEntry {
 
 /** Service for building comments based on translation results */
 export class CommentBuilderService {
-	private readonly logger = logger.child({ component: CommentBuilderService.name });
+	private readonly logger = baseLogger.child({ component: CommentBuilderService.name });
 	private readonly locale: LocaleDefinition;
 
 	/**

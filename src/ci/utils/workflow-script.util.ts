@@ -3,7 +3,8 @@ import type { Logger } from "pino";
 
 import type { CiScriptContext } from "@/ci/schemas/env.schema";
 
-import { createOctokit } from "@/shared/clients/octokit/octokit.client";
+import { resolveCiScriptContext } from "@/ci/schemas/env.schema";
+import { createOctokit } from "@/shared/clients/octokit";
 
 import { writeGitHubActionsOutput } from "./github-output.util";
 
@@ -15,7 +16,7 @@ const CI_GITHUB_REQUEST_TIMEOUT_MS = 30_000;
  *
  * @param context Validated CI script environment from {@link resolveCiScriptContext}
  *
- * @returns Octokit instance using `context.ghToken`
+ * @returns Octokit instance using {@link CiScriptContext.ghToken|`context.ghToken`}
  */
 export function createWorkflowScriptOctokit(context: CiScriptContext): Octokit {
 	return createOctokit({

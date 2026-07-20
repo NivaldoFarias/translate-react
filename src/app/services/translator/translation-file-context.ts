@@ -1,4 +1,5 @@
 import type { TranslationLlmUsageTotals } from "./llm/translation-llm.usage";
+import type { TranslatorService } from "./translator.service";
 
 import { emptyTranslationLlmUsageTotals } from "./llm/translation-llm.usage";
 

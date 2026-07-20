@@ -4,6 +4,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+## [0.2.17] - 2026-07-20
+
+### Changed
+
+- **Breaking (contributors):** Locale modules use a role-based layout under `src/app/locales/`: each locale ships `locale.ts`, `rules.ts`, and a `repairs/` module set (`constants.ts`, `definition.ts`, `index.ts`); shared `repairs/` infrastructure and a single `registry.ts` register definitions (`LocaleService` resolves from there; `services/locale/` remains a re-export).
+- Post-assembly mechanical cleanup also removes spurious whitespace between markdown links and trailing punctuation (for example `[label](url) ,` → `[label](url),`).
+
 ## [0.2.16] - 2026-07-15
 
 ### Added
@@ -404,6 +411,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 - README `MAX_RETRY_ATTEMPTS` default matches runtime (`3`).
 
+[0.2.17]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.17
 [0.2.16]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.16
 [0.2.15]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.15
 [0.2.14]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.14

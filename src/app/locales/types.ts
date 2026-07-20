@@ -6,6 +6,8 @@ import type {
 import type { TranslationFile } from "@/app/services/translator/";
 import type { PostTranslationGuardId } from "@/app/services/translator/validation/validation.constants";
 
+import { buildLocaleRulesPrompt } from "./rules.util";
+
 export type { ReviewerValidationNotice };
 
 /** Prior invalid PR for the same file path */
@@ -80,6 +82,9 @@ export interface LocaleCommentConfig {
  *
  * Contains instructions that guide the translation model on
  * language-specific conventions, terminology, and exceptions.
+ *
+ * Define rule sections with {@link buildLocaleRulesPrompt} in each locale's
+ * `rules.ts` (or inline `locale.ts` until a locale grows repair tables).
  */
 export interface LocaleRulesConfig {
 	/**

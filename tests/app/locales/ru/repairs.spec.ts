@@ -6,7 +6,11 @@ import {
 	collapseDuplicatedRuUseClientLeadIn,
 	repairCorruptedRuOutputEmphasis,
 	repairDuplicatedRuNegationEmphasis,
+	repairRuCounterParentComponentPhrasing,
+	repairRuFancyTextOutputPhrasing,
+	repairRuReactServerComponentsAppCalques,
 	repairRuRichTextEditorDependencyPhrase,
+	repairRuUseClientDirectiveSuffixArtifacts,
 	replaceEnglishServerClientComponentTerms,
 	replaceKnownRuCalquePhrases,
 	replaceRuEnglishProseLeaks,
@@ -57,7 +61,7 @@ describe("repairRuRichTextEditorDependencyPhrase", () => {
 			"В качестве зависимостей `RichTextEditor`, `formatDate` и `Button` также будут выполняться на клиенте.";
 
 		expect(repairRuRichTextEditorDependencyPhrase(input)).toBe(
-			"`formatDate` и `Button`, будучи зависимостями `RichTextEditor` также будут выполняться на клиенте.",
+			"`formatDate` и `Button`, будучи зависимостями `RichTextEditor`, также будут выполняться на клиенте.",
 		);
 	});
 
@@ -66,7 +70,68 @@ describe("repairRuRichTextEditorDependencyPhrase", () => {
 			"Как зависимости `RichTextEditor`, `formatDate` и `Button` также будут вычисляться на клиенте.";
 
 		expect(repairRuRichTextEditorDependencyPhrase(input)).toBe(
-			"`formatDate` и `Button`, будучи зависимостями `RichTextEditor` также будут вычисляться на клиенте.",
+			"`formatDate` и `Button`, будучи зависимостями `RichTextEditor`, также будут вычисляться на клиенте.",
+		);
+	});
+
+	test("inserts the participial comma before также", () => {
+		const input =
+			"`formatDate` и `Button`, будучи зависимостями `RichTextEditor` также будут вычислены на клиенте.";
+
+		expect(repairRuRichTextEditorDependencyPhrase(input)).toBe(
+			"`formatDate` и `Button`, будучи зависимостями `RichTextEditor`, также будут вычислены на клиенте.",
+		);
+	});
+});
+
+describe("repairRuUseClientDirectiveSuffixArtifacts", () => {
+	test("rewrites directive suffix artifacts to natural Russian phrasing", () => {
+		const input =
+			"в модуле с `'use client'` -директивой, а определение _не_ имеет `'use client'` -директиву";
+
+		expect(repairRuUseClientDirectiveSuffixArtifacts(input)).toBe(
+			"в модуле с директивой `'use client'`, а определение _не_ имеет директиву `'use client'`",
+		);
+	});
+});
+
+describe("repairRuReactServerComponentsAppCalques", () => {
+	test("repairs React Server Components app noun-stack calques", () => {
+		const input =
+			"рассмотрим следующее приложение серверные компоненты React и дерево зависимостей модулей приложения серверные компоненты React";
+
+		expect(repairRuReactServerComponentsAppCalques(input)).toBe(
+			"рассмотрим следующее приложение на серверных компонентах React и дерево зависимостей модулей приложения на серверных компонентах React",
+		);
+	});
+});
+
+describe("repairRuFancyTextOutputPhrasing", () => {
+	test("repairs broken FancyText output tense from PR #1173 feedback", () => {
+		const input =
+			"что приводит к тому, что у `FancyText` появляется _вывод_ (а не его исходный код) отправлялся в браузер при обращении к нему из серверного компонента";
+
+		expect(repairRuFancyTextOutputPhrasing(input)).toBe(
+			"в результате чего при обращении из серверного компонента в браузер отправляется _вывод_ `FancyText` (а не его исходный код)",
+		);
+	});
+
+	test("repairs HTML-output size wording", () => {
+		const input = "если у `FancyText` вывод в HTML был большим по сравнению с исходным кодом";
+
+		expect(repairRuFancyTextOutputPhrasing(input)).toBe(
+			"если HTML-вывод `FancyText` велик по сравнению с его исходным кодом",
+		);
+	});
+});
+
+describe("repairRuCounterParentComponentPhrasing", () => {
+	test("disambiguates Counter parent component phrasing", () => {
+		const input =
+			"Например, `Counter`, родительский компонент `CounterContainer`, не требует `'use client'`";
+
+		expect(repairRuCounterParentComponentPhrasing(input)).toBe(
+			"Например, родительский компонент `Counter` — `CounterContainer` — не требует `'use client'`",
 		);
 	});
 });
@@ -174,10 +239,34 @@ describe("applyRuLocaleMechanicalRepairs", () => {
 
 		expect(applyRuLocaleMechanicalRepairs(input)).toBe(
 			[
-				"`formatDate` и `Button`, будучи зависимостями `RichTextEditor` также будут выполняться на клиенте.",
+				"`formatDate` и `Button`, будучи зависимостями `RichTextEditor`, также будут выполняться на клиенте.",
 				"импортируется из серверного компонента, считаются серверными компонентами.",
 				"жёлтый фон в alt text",
 				"определение компонента _не_ имеет директивы",
+			].join("\n"),
+		);
+	});
+
+	test("repairs PR #1173 review items from commit 4facfec", () => {
+		const input = [
+			"рассмотрим следующее приложение серверные компоненты React.",
+			"в модуле с `'use client'` -директивой",
+			"определение компонента _не_ имеет `'use client'` -директиву",
+			"что приводит к тому, что у `FancyText` появляется _вывод_ (а не его исходный код) отправлялся в браузер при обращении к нему из серверного компонента",
+			"если у `FancyText` вывод в HTML был большим по сравнению с исходным кодом",
+			"Например, `Counter`, родительский компонент `CounterContainer`, не требует `'use client'`",
+			"`formatDate` и `Button`, будучи зависимостями `RichTextEditor` также будут вычислены",
+		].join("\n");
+
+		expect(applyRuLocaleMechanicalRepairs(input)).toBe(
+			[
+				"рассмотрим следующее приложение на серверных компонентах React.",
+				"в модуле с директивой `'use client'`",
+				"определение компонента _не_ имеет директиву `'use client'`",
+				"в результате чего при обращении из серверного компонента в браузер отправляется _вывод_ `FancyText` (а не его исходный код)",
+				"если HTML-вывод `FancyText` велик по сравнению с его исходным кодом",
+				"Например, родительский компонент `Counter` — `CounterContainer` — не требует `'use client'`",
+				"`formatDate` и `Button`, будучи зависимостями `RichTextEditor`, также будут вычислены",
 			].join("\n"),
 		);
 	});

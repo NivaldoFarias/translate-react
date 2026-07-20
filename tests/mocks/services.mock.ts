@@ -3,12 +3,16 @@ import { mock } from "bun:test";
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
 import type { ReactLanguageCode } from "@/app/constants";
+import type { GitHubService } from "@/app/services/github/github.service";
 import type {
 	PullRequestReviewSnapshot,
 	PullRequestStatus,
 	RepositoryMarkdownBlob,
 } from "@/app/services/github/types";
-import type { LanguageAnalysisResult } from "@/app/services/language-detector/language-detector.service";
+import type {
+	LanguageAnalysisResult,
+	LanguageDetectorService,
+} from "@/app/services/language-detector/language-detector.service";
 
 import { createGitBranchRefResponse } from "@tests/fixtures";
 

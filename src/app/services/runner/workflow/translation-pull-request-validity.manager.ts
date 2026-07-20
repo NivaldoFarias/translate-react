@@ -4,7 +4,7 @@ import type { PullRequestStatus } from "@/app/services/github/types";
 
 import type { RunnerServiceDependencies } from "../runner.types";
 
-import { getTranslationBranchNameFromPath, logger } from "@/app/utils/";
+import { baseLogger, getTranslationBranchNameFromPath } from "@/app/utils/";
 
 /** Why an open translation pull request is not treated as workflow-complete */
 export type TranslationPullRequestInvalidReason = "no_open_pr" | "out_of_sync" | "not_translated";
@@ -31,7 +31,7 @@ export interface TranslationPullRequestValidity {
  * target language, and the PR is in sync with its base (no merge conflicts).
  */
 export class TranslationPullRequestValidityManager {
-	private readonly logger = logger.child({
+	private readonly logger = baseLogger.child({
 		component: TranslationPullRequestValidityManager.name,
 	});
 

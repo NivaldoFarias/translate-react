@@ -8,7 +8,7 @@ import { createLogger } from "@/shared/utils/create-logger.util";
  *
  * @see {@link createLogger} for transport and serializer configuration
  */
-export const logger: Logger = createLogger({
+export const baseLogger: Logger = createLogger({
 	level: env.LOG_LEVEL,
 	logToConsole: env.LOG_TO_CONSOLE,
 });

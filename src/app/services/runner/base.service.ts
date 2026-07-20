@@ -9,7 +9,7 @@ import type { PrFilterResult, WorkflowStatistics } from "@/app/services/runner/t
 
 import type { RunnerOptions, RunnerServiceDependencies, RunnerState } from "./runner.types";
 
-import { env, logger, registerCleanup } from "@/app/utils/";
+import { baseLogger, env, registerCleanup } from "@/app/utils/";
 import { ApplicationError, ErrorCode } from "@/shared/errors/";
 
 import { TranslatorService } from "../translator";
@@ -24,7 +24,7 @@ import { FileDiscoveryManager, PRManager, TranslationBatchManager } from "./work
  * to define specific workflow execution strategies.
  */
 export abstract class BaseRunnerService {
-	protected logger = logger.child({ component: BaseRunnerService.name });
+	protected logger = baseLogger.child({ component: BaseRunnerService.name });
 
 	/**
 	 * Maintains the current state of the translation workflow.
@@ -223,7 +223,7 @@ export abstract class BaseRunnerService {
 
 	/**
 	 * Rebuilds the translation batch workflow stage with invalid-PR metadata, regardless of whether
-	 * `filesToTranslate` came from discovery or a pre-filled {@link state}.
+	 * `filesToTranslate` came from discovery or a pre-filled {@link RunnerState|`state`}.
 	 *
 	 * @param invalidPRsByFile Paths to open PRs that need conflict messaging in new PR bodies
 	 */
@@ -251,7 +251,7 @@ export abstract class BaseRunnerService {
 	 * ### Invalid PR Tracking
 	 *
 	 * Files with existing PRs that have merge conflicts are identified and stored in
-	 * {@link state.invalidPRsByFile} for notification in new PR descriptions.
+	 * {@link RunnerState.invalidPRsByFile|`state.invalidPRsByFile`} for notification in new PR descriptions.
 	 *
 	 * @returns `true` when there is at least one file to translate; `false` when discovery
 	 * produced no candidates, in which case the caller should skip batch translation.

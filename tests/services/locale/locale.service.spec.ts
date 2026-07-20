@@ -4,7 +4,7 @@ import type { PullRequestDescriptionMetadata } from "@/app/locales/types";
 
 import { WIKI_FOR_REACT_DOCS_MAINTAINERS_URL } from "@/app/constants";
 import { ptBrLocale, ruLocale } from "@/app/locales";
-import { LocaleService } from "@/app/services/locale/locale.service";
+import { LocaleService } from "@/app/locales/locale.service";
 import { TranslationFile } from "@/app/services/translator/translation-file";
 import { buildRunnerReleaseUrl } from "@/app/utils/common.util";
 import { ApplicationError } from "@/shared/errors/";

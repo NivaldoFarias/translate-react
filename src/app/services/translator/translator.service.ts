@@ -27,10 +27,10 @@ import type { SegmentBatchRequestItem } from "./translator-segment-batch.schema"
 import type { ReviewerValidationNotice } from "./validation/validation.types";
 
 import { resolveMdnLocaleSlug } from "@/app/constants/mdn-locale.constants";
-import { resolveLocaleMechanicalRepairs } from "@/app/locales/repairs.registry";
+import { resolveLocaleMechanicalRepairs } from "@/app/locales/repairs/registry";
 import {
+	baseLogger,
 	env,
-	logger,
 	maskLargeVerbatimFencedCodeBlocks,
 	restoreMaskedVerbatimFences,
 } from "@/app/utils/";
@@ -83,18 +83,10 @@ import { PostTranslationValidationService } from "./validation/post-translation-
 import { TranslationLanguageCheck } from "./validation/translation-language-check";
 
 export * from "./translation-file";
-
-export type {
-	ChunkTranslationProgress,
-	TranslationSystemPromptKind,
-} from "./llm/translation-system-prompt.types";
-
-export type { ReviewerValidationNotice } from "./validation/validation.types";
-export type { TranslationLlmUsageTotals } from "./llm/translation-llm.usage";
-
-export type { TranslationPath } from "./translation-file-context";
-export type { TranslationFileContext } from "./translation-file-context";
-export { createTranslationFileContext } from "./translation-file-context";
+export * from "./llm/translation-system-prompt.types";
+export * from "./validation/validation.types";
+export * from "./llm/translation-llm.usage";
+export * from "./translation-file-context";
 
 /** Result from translating a file */
 export interface TranslationResult {
@@ -153,7 +145,7 @@ export interface TranslatorServiceDependencies {
  * ```
  */
 export class TranslatorService {
-	private readonly logger = logger.child({ component: TranslatorService.name });
+	private readonly logger = baseLogger.child({ component: TranslatorService.name });
 
 	/** OpenAI client instance for LLM API calls */
 	private readonly openai: OpenAI;

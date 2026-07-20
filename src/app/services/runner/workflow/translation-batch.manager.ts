@@ -4,11 +4,12 @@ import type { ProcessedFileResult } from "@/app/services/github/types";
 import type { RunnerServiceDependencies } from "../runner.types";
 
 import { TranslationFile } from "@/app/services/translator/";
-import { logger } from "@/app/utils/";
+import { baseLogger } from "@/app/utils/";
 
 import { TranslationBranchLifecycleManager } from "./translation-branch.lifecycle.manager";
 import { TranslationFileProcessor } from "./translation-file.processor";
 import { TranslationPullRequestLifecycleManager } from "./translation-pull-request.lifecycle.manager";
+import { MAX_CONSECUTIVE_FAILURES } from "./workflow.constants";
 
 /**
  * Manages batch processing and progress tracking for file translations.
@@ -18,7 +19,7 @@ import { TranslationPullRequestLifecycleManager } from "./translation-pull-reque
  * per-batch progress and the consecutive-failure circuit breaker stay accurate.
  */
 export class TranslationBatchManager {
-	private readonly logger = logger.child({ component: TranslationBatchManager.name });
+	private readonly logger = baseLogger.child({ component: TranslationBatchManager.name });
 	private readonly fileProcessor: TranslationFileProcessor;
 
 	/**
