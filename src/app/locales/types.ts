@@ -80,6 +80,9 @@ export interface LocaleCommentConfig {
  *
  * Contains instructions that guide the translation model on
  * language-specific conventions, terminology, and exceptions.
+ *
+ * Define rule sections with {@link buildLocaleRulesPrompt} in each locale's
+ * `rules.ts` (or inline `locale.ts` until a locale grows repair tables).
  */
 export interface LocaleRulesConfig {
 	/**

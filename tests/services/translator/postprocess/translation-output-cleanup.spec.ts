@@ -12,6 +12,7 @@ import {
 	normalizeHeadingMarkerSpacing,
 	normalizeInlineCodeBeforePunctuationSpacing,
 	normalizeInlineCodeInteriorSpacing,
+	normalizeMarkdownLinkBeforePunctuationSpacing,
 	normalizeMarkdownLinkLabelSpacing,
 	preserveSegmentBoundaryWhitespace,
 	repairMdxSpacing,
@@ -269,6 +270,24 @@ describe("normalizeInlineCodeInteriorSpacing", () => {
 	});
 });
 
+describe("normalizeMarkdownLinkBeforePunctuationSpacing", () => {
+	test("collapses space before comma after a markdown link", () => {
+		expect(
+			normalizeMarkdownLinkBeforePunctuationSpacing(
+				"использует [DOM API](https://developer.mozilla.org/ru/docs/Glossary/DOM) , чтобы",
+			),
+		).toBe("использует [DOM API](https://developer.mozilla.org/ru/docs/Glossary/DOM), чтобы");
+	});
+
+	test("collapses space before period after inline code inside a link", () => {
+		expect(
+			normalizeMarkdownLinkBeforePunctuationSpacing(
+				"элементом [`canvas`](https://developer.mozilla.org/ru/docs/Web/HTML/Element/canvas) .",
+			),
+		).toBe("элементом [`canvas`](https://developer.mozilla.org/ru/docs/Web/HTML/Element/canvas).");
+	});
+});
+
 describe("normalizeMarkdownLinkLabelSpacing", () => {
 	test("trims leading space inside markdown link labels", () => {
 		expect(
@@ -375,6 +394,15 @@ describe("applyMechanicalTranslationRepairs", () => {
 				localeRepairs: applyRuLocaleMechanicalRepairs,
 			}),
 		).toBe("С помощью `'use client'`, вы можете `render`, когда");
+	});
+
+	test("collapses punctuation spacing after markdown links and inline code", () => {
+		const input =
+			"использует [DOM API](https://developer.mozilla.org/ru/docs/Glossary/DOM) , чтобы управлять [`canvas`](https://developer.mozilla.org/ru/docs/Web/HTML/Element/canvas) .";
+
+		expect(applyMechanicalTranslationRepairs(input)).toBe(
+			"использует [DOM API](https://developer.mozilla.org/ru/docs/Glossary/DOM), чтобы управлять [`canvas`](https://developer.mozilla.org/ru/docs/Web/HTML/Element/canvas).",
+		);
 	});
 });
 

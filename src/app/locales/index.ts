@@ -1,6 +1,9 @@
 export * from "./types";
+export * from "./rules.util";
+export * from "./repairs";
+export * from "./registry";
+export * from "./locale.service";
 export * from "./pr-body.builder";
-export * from "./locale-guard-labels.util";
-export * from "./repairs.registry";
-export { ptBrLocale } from "./pt-br/locale";
-export { ruLocale } from "./ru/locale";
+export * from "./guard-labels.util";
+export * from "./pt-br/locale";
+export * from "./ru/locale";

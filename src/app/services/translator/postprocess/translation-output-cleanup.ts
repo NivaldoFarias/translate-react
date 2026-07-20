@@ -73,6 +73,15 @@ const ECHOED_HEADING_MARKERS = /^#{1,6}\s+/;
 const INLINE_CODE_BEFORE_PUNCTUATION_SPACING = /`([^`\n]+)`\s+([,.;:!?])/g;
 
 /**
+ * Spurious whitespace between a markdown link and following punctuation.
+ *
+ * ```
+ * [DOM API](url) ,
+ * ```
+ */
+const MARKDOWN_LINK_BEFORE_PUNCTUATION_SPACING = /(\]\([^)]+\))\s+([,.;:!?])/g;
+
+/**
  * Strips common LLM response prefixes from translated text.
  *
  * @param content Raw model output
@@ -178,6 +187,17 @@ export function cleanupSegmentSnippet(
  */
 export function normalizeInlineCodeBeforePunctuationSpacing(content: string) {
 	return content.replace(INLINE_CODE_BEFORE_PUNCTUATION_SPACING, "`$1`$2");
+}
+
+/**
+ * Removes whitespace between a markdown link and trailing punctuation.
+ *
+ * @param content Markdown body or snippet
+ *
+ * @returns Content without spurious whitespace after markdown links before punctuation
+ */
+export function normalizeMarkdownLinkBeforePunctuationSpacing(content: string) {
+	return content.replace(MARKDOWN_LINK_BEFORE_PUNCTUATION_SPACING, "$1$2");
 }
 
 /**
@@ -361,6 +381,7 @@ export function applyMechanicalTranslationRepairs(
 	}
 
 	cleaned = normalizeMarkdownLinkLabelSpacing(cleaned);
+	cleaned = normalizeMarkdownLinkBeforePunctuationSpacing(cleaned);
 	cleaned = repairMdxSpacing(cleaned);
 	cleaned = normalizeHeadingMarkerSpacing(cleaned);
 	cleaned = normalizeInlineCodeInteriorSpacing(cleaned);

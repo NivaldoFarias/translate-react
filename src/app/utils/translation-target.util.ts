@@ -5,7 +5,7 @@ import { env } from "@/app/schemas/env.schema";
 import { isSafeTranslatablePath } from "./markdown-path.util";
 import { parseTranslationFilePaths } from "./parse-translation-file-paths.util";
 
-export { parseTranslationFilePaths } from "./parse-translation-file-paths.util";
+export * from "./parse-translation-file-paths.util";
 
 /**
  * Returns configured single-file or multi-file translation targets from the environment.

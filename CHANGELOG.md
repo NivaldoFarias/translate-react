@@ -4,6 +4,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+### Changed
+
+- Locale modules use a role-based layout under `src/app/locales/`: per-locale `rules.ts` and `repairs/` folders, shared `repairs/` infrastructure, and a single `registry.ts` for locale definitions (`LocaleService` resolves from there).
+
 ## [0.2.16] - 2026-07-15
 
 ### Added

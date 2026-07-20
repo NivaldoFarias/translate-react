@@ -1,11 +1,11 @@
 import type { LanguageCacheEntry } from "@/app/services/cache/types";
 
 import { openai, queue } from "@/app/clients/";
+import { LocaleService } from "@/app/locales/locale.service";
 import { CacheService } from "@/app/services/cache/";
 import { CommentBuilderService } from "@/app/services/comment-builder/comment-builder.service";
 import { GitHubService } from "@/app/services/github/github.service";
 import { LanguageDetectorService } from "@/app/services/language-detector/language-detector.service";
-import { LocaleService } from "@/app/services/locale/locale.service";
 import { OpenRouterModelLimitsService } from "@/app/services/openrouter/openrouter-model-limits.service";
 import { RunnerService } from "@/app/services/runner/runner.service";
 import { TranslatorService } from "@/app/services/translator/translator.service";

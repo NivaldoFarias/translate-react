@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { localeService } from "@/app/composition";
 import { ruLocale } from "@/app/locales";
-import { LocaleService } from "@/app/services/locale/locale.service";
+import { LocaleService } from "@/app/locales/locale.service";
 import { TranslationPromptBuilder } from "@/app/services/translator/llm/translation-prompt.builder";
 import { emptyTranslationAttemptContext } from "@/app/services/translator/pipeline/translation-attempt.context";
 import { TranslationFile } from "@/app/services/translator/translation-file";
