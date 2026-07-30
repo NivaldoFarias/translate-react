@@ -76,6 +76,9 @@ export interface LanguageConfig {
 	target: ReactLanguageCode;
 }
 
+/** CLD `detect` function shape used by {@link LanguageDetectorService} */
+export type DetectLanguageFn = (content: string) => Promise<cld.DetectLanguage>;
+
 /**
  * Detailed analysis of content language detection results.
  *
@@ -158,17 +161,23 @@ export class LanguageDetectorService {
 	/** Threshold ratio above which content is considered translated */
 	private readonly TRANSLATION_THRESHOLD = TRANSLATION_RATIO_THRESHOLD;
 
+	/** CLD language detection implementation (injectable for tests) */
+	private readonly detectLanguage: DetectLanguageFn;
+
 	/**
 	 * Creates a language detector for the given source and target React language codes.
 	 *
 	 * @param config Source and target language codes (defaults from validated env)
+	 * @param detectLanguage CLD detect implementation (defaults to the `cld` package)
 	 */
 	constructor(
 		config: LanguageConfig = {
 			source: env.SOURCE_LANGUAGE,
 			target: env.TARGET_LANGUAGE,
 		},
+		detectLanguage: DetectLanguageFn = (content) => cld.detect(content),
 	) {
+		this.detectLanguage = detectLanguage;
 		this.languages = config;
 		this.displayNames = {
 			source: new Intl.DisplayNames([config.source], { type: "language" }),
@@ -404,7 +413,7 @@ export class LanguageDetectorService {
 	 * @returns CLD detection payload
 	 */
 	private detectWithRetry(cleanContent: string): Promise<cld.DetectLanguage> {
-		return pRetry(() => cld.detect(cleanContent), CLD_DETECTION_RETRY_CONFIG);
+		return pRetry(() => this.detectLanguage(cleanContent), CLD_DETECTION_RETRY_CONFIG);
 	}
 
 	/**
@@ -440,7 +449,7 @@ export class LanguageDetectorService {
 				return;
 			}
 
-			const detection = await cld.detect(cleanContent);
+			const detection = await this.detectLanguage(cleanContent);
 			const code = detection.languages[0]?.code ?? "und";
 
 			this.logger.info(

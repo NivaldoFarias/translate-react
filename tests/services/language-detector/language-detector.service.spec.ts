@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, mock, test } from "bun:test";
 
 import type { ReactLanguageCode } from "@/app/utils/";
 
@@ -258,6 +258,36 @@ mesmo com a presença deste código em inglês no meio do documento.
 				expect(error).toBeInstanceOf(ApplicationError);
 				expect((error as ApplicationError).code).toBe(ErrorCode.LanguageCodeNotSupported);
 			}
+		});
+	});
+
+	describe("CLD failures", () => {
+		const detectMock = mock(() => {
+			throw new Error("CLD internal error");
+		});
+
+		test("throws ApplicationError after CLD retries exhaust", () => {
+			const cldFailureDetector = new LanguageDetectorService(undefined, detectMock);
+			const analyzableText =
+				"Este é um texto abrangente em português para fins de teste de detecção de idioma confiável.";
+
+			expect(cldFailureDetector.analyzeLanguage("cld-failure.md", analyzableText)).rejects.toThrow(
+				ApplicationError,
+			);
+		});
+
+		test("retries CLD detect before failing closed", async () => {
+			detectMock.mockClear();
+
+			const cldFailureDetector = new LanguageDetectorService(undefined, detectMock);
+			const analyzableText =
+				"Este é um texto abrangente em português para fins de teste de detecção de idioma confiável.";
+			const analysisPromise = cldFailureDetector.analyzeLanguage("cld-failure.md", analyzableText);
+
+			expect(analysisPromise).rejects.toThrow(ApplicationError);
+			await analysisPromise.catch(() => undefined);
+
+			expect(detectMock).toHaveBeenCalledTimes(3);
 		});
 	});
 });
