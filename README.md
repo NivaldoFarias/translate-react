@@ -13,7 +13,7 @@
 
 </div>
 
-When `react.dev` changes in English (and the translation repository is updated), this tool translates the updates into the user fork and opens PRs for review via the [`translate-react` bot](https://github.com/apps/translate-react-bot)[^1].
+When English `react.dev` changes, this tool translates updated pages into a locale fork and opens draft PRs via the [`translate-react` bot](https://github.com/apps/translate-react-bot)[^1].
 
 ## How it works
 
@@ -95,13 +95,13 @@ bun start
 
 ### Smoke runs
 
-`bun run ci:smoke` exercises the translation workflow against `react.dev` markdown fixtures with a live LLM and mocked GitHub. Use it to review translated output locally without touching a fork.
+`bun run ci:smoke` runs the translation workflow against fixture markdown with a live LLM and mocked GitHub. Review output locally without touching a fork.
 
-| Profile    | Fixtures exercised                                                                              |
-| ---------- | ----------------------------------------------------------------------------------------------- |
-| `quick`    | Default pre-merge slice: new-PR translation (small and large pages) and one out-of-sync refresh |
-| `workflow` | PR scenarios only: out-of-sync refresh and valid skip                                           |
-| `full`     | Every `*.md` file under `tests/fixtures/md/`                                                    |
+| Profile    | Fixtures exercised                                                           |
+| ---------- | ---------------------------------------------------------------------------- |
+| `quick`    | Pre-merge slice: new PRs (small and large pages) and one out-of-sync refresh |
+| `workflow` | PR scenarios only: out-of-sync refresh and valid skip                        |
+| `full`     | Every `*.md` file under `tests/fixtures/md/`                                 |
 
 ```bash
 bun run ci:smoke -- --profile quick
@@ -114,15 +114,15 @@ bun run ci:smoke -- --files hydrateRoot.md,lazy.md
 ```
 
 > [!NOTE]
-> Outputs land in gitignored `artifacts/smoke/` (translated markdown and mock PR bodies per fixture). The manual [smoke workflow](./.github/workflows/smoke.yml) uploads the same tree as a CI artifact. Layout and download: [Workflow smoke](./CONTRIBUTING.md#workflow-smoke).
+> Outputs land in gitignored `artifacts/smoke/` (translated markdown and mock PR bodies per fixture). Download layout: [CONTRIBUTING: Workflow smoke](./CONTRIBUTING.md#workflow-smoke). Manual [`smoke.yml`](./.github/workflows/smoke.yml) uploads the same tree as a CI artifact.
 
-[`workflow.integration.spec.ts`](./tests/integration/workflow.integration.spec.ts) mocks both GitHub and the LLM in CI. For a real-LLM pass with mocked GitHub, use `bun run ci:smoke` ([Workflow smoke](./CONTRIBUTING.md#workflow-smoke)).
+[`workflow.integration.spec.ts`](./tests/integration/workflow.integration.spec.ts) mocks GitHub and the LLM in CI. For a real LLM with mocked GitHub, use `bun run ci:smoke`.
 
 ## Versioning and releases
 
-- `package.json`'s `version` is the semver source. OpenRouter header defaults pull from `homepage`, `name`, and `version` unless overridden (see [Wiki: Configuration](https://github.com/NivaldoFarias/translate-react/wiki/Configuration)).
+- Semver source: `package.json` `version`. OpenRouter headers use `homepage`, `name`, and `version` unless overridden ([Wiki: Configuration](https://github.com/NivaldoFarias/translate-react/wiki/Configuration)).
 - Change log: [`CHANGELOG.md`](./CHANGELOG.md).
-- Tag and release steps: [Releases and semantic versioning](https://github.com/NivaldoFarias/translate-react/wiki/Workflow#releases-and-semantic-versioning).
+- Release steps: [Wiki: Releases and semantic versioning](https://github.com/NivaldoFarias/translate-react/wiki/Workflow#releases-and-semantic-versioning).
 
 ## Documentation
 
@@ -139,7 +139,7 @@ bun run ci:smoke -- --files hydrateRoot.md,lazy.md
 
 ## Contributing
 
-See [`CONTRIBUTING.md`](./CONTRIBUTING.md). Layout and services: [Wiki: Codebase](https://github.com/NivaldoFarias/translate-react/wiki/Codebase). Security policy: [`SECURITY.md`](./SECURITY.md). Common errors and debug logging: [Wiki: Configuration](https://github.com/NivaldoFarias/translate-react/wiki/Configuration#troubleshooting).
+See [`CONTRIBUTING.md`](./CONTRIBUTING.md). Layout: [Wiki: Codebase](https://github.com/NivaldoFarias/translate-react/wiki/Codebase). Security: [`SECURITY.md`](./SECURITY.md). Errors and debug logging: [Wiki: Configuration — Troubleshooting](https://github.com/NivaldoFarias/translate-react/wiki/Configuration#troubleshooting).
 
 ## Sponsor
 
@@ -149,4 +149,4 @@ If this saves your locale team manual translation work, consider [sponsoring the
 
 MIT License - see [LICENSE](./LICENSE) file for details.
 
-[^1]: Upstream PRs _(as well as comments on issues, etc.)_ can only be opened by a GitHub App if it is installed on the repository. Because of this, these specific actions are done by the user via PAT tokens instead of the bot.
+[^1]: Upstream PRs and issue comments need a PAT when the bot is not installed on the repository.
