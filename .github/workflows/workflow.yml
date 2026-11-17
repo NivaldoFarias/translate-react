@@ -46,24 +46,25 @@ jobs:
   prepare-matrix:
     name: Prepare matrix
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     outputs:
-      matrix: ${{ steps.publish.outputs.matrix }}
-      has_matrix: ${{ steps.publish.outputs.has_matrix }}
+      matrix: ${{ steps.select.outputs.matrix }}
+      has_matrix: ${{ steps.select.outputs.has_matrix }}
     steps:
       - name: Checkout repository
-        if: github.event_name == 'workflow_dispatch'
         uses: actions/checkout@v7
         with:
           fetch-depth: 1
 
       - name: Setup Bun dependencies
-        if: github.event_name == 'workflow_dispatch'
         uses: ./.github/actions/setup-bun-deps
         with:
           bun-version: ${{ vars.BUN_VERSION }}
 
+      # `github.event_name` in a called workflow is the caller's event (`schedule` /
+      # `workflow_dispatch`), never `workflow_call`, so key on `matrix_json` instead.
       - name: Generate Bot Token
-        if: github.event_name == 'workflow_dispatch'
+        if: inputs.matrix_json == ''
         id: generate-token
         uses: actions/create-github-app-token@v3
         with:
@@ -72,33 +73,19 @@ jobs:
           owner: ${{ github.repository_owner }}
 
       - name: Resolve matrix for manual run
-        if: github.event_name == 'workflow_dispatch'
+        if: inputs.matrix_json == ''
         id: resolve
         env:
           GH_TOKEN: ${{ steps.generate-token.outputs.token }}
-        run: bun run ci:resolve-matrix --langs "${{ inputs.langs }}"
+          LANGS: ${{ inputs.langs }}
+        run: bun run ci:resolve-matrix --langs "$LANGS"
 
-      - name: Publish matrix outputs
-        id: publish
+      - name: Select matrix
+        id: select
         env:
           POLLED_MATRIX: ${{ inputs.matrix_json }}
           RESOLVED_MATRIX: ${{ steps.resolve.outputs.matrix }}
-          RESOLVED_HAS_MATRIX: ${{ steps.resolve.outputs.has_matrix }}
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_call" ]; then
-            MATRIX="$POLLED_MATRIX"
-            HAS_MATRIX="true"
-          else
-            MATRIX="$RESOLVED_MATRIX"
-            HAS_MATRIX="$RESOLVED_HAS_MATRIX"
-          fi
-
-          {
-            echo "matrix<<EOFMATRIX"
-            echo "$MATRIX"
-            echo "EOFMATRIX"
-          } >> "$GITHUB_OUTPUT"
-          echo "has_matrix=$HAS_MATRIX" >> "$GITHUB_OUTPUT"
+        run: bun run ci:select-matrix
 
   workflow:
     name: Sync & Translate
