@@ -12,6 +12,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Fixed
 
+- `workflow.yml` translation and the `run-workflow-smoke` action (used by `ci.yml` and `smoke.yml`) pass `LLM_MAX_REQUESTS_PER_MINUTE`, `MASK_VERBATIM_LARGE_FENCES`, and `MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS` from GitHub Environment variables through to the app; they were previously ignored in Actions.
 - Scheduled `poll.yml` runs now actually start translation for changed locales: `workflow.yml` picks the matrix from `matrix_json` (new `ci:select-matrix` script) instead of `github.event_name`, which in a called workflow is the caller's event and never `workflow_call`. A supplied `matrix_json` that is invalid or empty now fails the job instead of silently skipping `Sync & Translate`.
 - Blank `LLM_MAX_REQUESTS_PER_MINUTE`, `MASK_VERBATIM_LARGE_FENCES`, and `MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS` fall back to schema defaults (a blank min-token value no longer fails validation), and `MASK_VERBATIM_LARGE_FENCES=false` now parses as `false` instead of `true`.
 

@@ -122,6 +122,9 @@ jobs:
           llm-api-base-url: ${{ vars.LLM_API_BASE_URL }}
           max-retry-attempts: ${{ vars.MAX_RETRY_ATTEMPTS }}
           max-llm-concurrency: ${{ vars.MAX_LLM_CONCURRENCY }}
+          llm-max-requests-per-minute: ${{ vars.LLM_MAX_REQUESTS_PER_MINUTE }}
+          mask-verbatim-large-fences: ${{ vars.MASK_VERBATIM_LARGE_FENCES }}
+          mask-verbatim-large-fences-min-tokens: ${{ vars.MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS }}
           openai-project-id: ${{ secrets.OPENAI_PROJECT_ID }}
           gh-pat-token: ${{ secrets.GH_PAT_TOKEN }}
           max-tokens: ${{ vars.MAX_TOKENS }}
@@ -172,6 +175,9 @@ jobs:
           llm-api-base-url: ${{ vars.LLM_API_BASE_URL }}
           max-retry-attempts: ${{ vars.MAX_RETRY_ATTEMPTS }}
           max-llm-concurrency: ${{ vars.MAX_LLM_CONCURRENCY }}
+          llm-max-requests-per-minute: ${{ vars.LLM_MAX_REQUESTS_PER_MINUTE }}
+          mask-verbatim-large-fences: ${{ vars.MASK_VERBATIM_LARGE_FENCES }}
+          mask-verbatim-large-fences-min-tokens: ${{ vars.MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS }}
           openai-project-id: ${{ secrets.OPENAI_PROJECT_ID }}
           gh-pat-token: ${{ secrets.GH_PAT_TOKEN }}
           max-tokens: ${{ vars.MAX_TOKENS }}

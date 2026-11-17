@@ -44,6 +44,15 @@ inputs:
   max-llm-concurrency:
     description: MAX_LLM_CONCURRENCY
     required: false
+  llm-max-requests-per-minute:
+    description: LLM_MAX_REQUESTS_PER_MINUTE
+    required: false
+  mask-verbatim-large-fences:
+    description: MASK_VERBATIM_LARGE_FENCES
+    required: false
+  mask-verbatim-large-fences-min-tokens:
+    description: MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS
+    required: false
   openai-project-id:
     description: OPENAI_PROJECT_ID
     required: false
@@ -83,6 +92,9 @@ runs:
         LLM_API_BASE_URL: ${{ inputs.llm-api-base-url }}
         MAX_RETRY_ATTEMPTS: ${{ inputs.max-retry-attempts }}
         MAX_LLM_CONCURRENCY: ${{ inputs.max-llm-concurrency }}
+        LLM_MAX_REQUESTS_PER_MINUTE: ${{ inputs.llm-max-requests-per-minute }}
+        MASK_VERBATIM_LARGE_FENCES: ${{ inputs.mask-verbatim-large-fences }}
+        MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS: ${{ inputs.mask-verbatim-large-fences-min-tokens }}
         OPENAI_PROJECT_ID: ${{ inputs.openai-project-id }}
         GH_PAT_TOKEN: ${{ inputs.gh-pat-token }}
         MAX_TOKENS: ${{ inputs.max-tokens }}
