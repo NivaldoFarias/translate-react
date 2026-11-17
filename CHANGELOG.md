@@ -12,7 +12,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Changed
 
-- The Bun version is now read from the root [`.bun-version`](./.bun-version) file (`1.3.14`) by `setup-bun-deps` via `bun-version-file`. The `bun-version` inputs on `setup-bun-deps` and `run-workflow-smoke` and the `bun-version: ${{ vars.BUN_VERSION }}` lines in workflows are removed. The `BUN_VERSION` repository variable is no longer read; repository owners can delete it.
+- The Bun version is now read from the root [`.bun-version`](./.bun-version) file by `setup-bun-deps` via `bun-version-file`. The `bun-version` inputs on `setup-bun-deps` and `run-workflow-smoke` and the `bun-version: ${{ vars.BUN_VERSION }}` lines in workflows are removed. The `BUN_VERSION` repository variable is no longer read; repository owners can delete it.
+- CI now runs on Bun `1.4.4` (was `1.3.14`).
 - `setup-bun-deps` caches Bun's package cache (`~/.bun/install/cache`) instead of `node_modules` and always runs `bun install --frozen-lockfile`, so a stale restored `node_modules` can no longer hide dependencies missing from `bun.lock`.
 - `smoke.yml` and `workflow.yml` jobs set explicit `timeout-minutes` (smoke 120, prepare-matrix 10, translation 240).
 - Updated `openai` SDK to v7 (supersedes Dependabot #79 without its TypeScript 7 runtime bump). The only v7 breaking change is a Node.js 22 floor; the app runs on Bun and uses Chat Completions only.
