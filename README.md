@@ -37,7 +37,7 @@ Full wiki index: [Home](https://github.com/NivaldoFarias/translate-react/wiki).
 
 ## Prerequisites
 
-- [**Bun**](https://bun.sh/) (see `engines` in [`package.json`](./package.json)) and [**Git**](https://git-scm.com/)
+- [**Bun**](https://bun.sh/) (version pinned in [`.bun-version`](./.bun-version), which CI also reads; minimum in `engines` in [`package.json`](./package.json)) and [**Git**](https://git-scm.com/)
 - **GitHub Personal Access Token** with `repo` scope
 - **LLM API Key** (OpenAI, OpenRouter, or compatible)
 - Fork of target React documentation repository with write access

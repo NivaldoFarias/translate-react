@@ -1,19 +1,14 @@
 name: Setup Bun dependencies
 description: Install Bun and dependencies exactly from bun.lock, caching Bun's package cache (caller must checkout first)
 
-inputs:
-  bun-version:
-    description: Bun version (`BUN_VERSION` repository variable when unset)
-    required: false
-    default: ""
-
 runs:
   using: composite
   steps:
+    # The Bun version lives in the root `.bun-version` file (single source of truth for CI and local dev).
     - name: Setup Bun
       uses: oven-sh/setup-bun@v2
       with:
-        bun-version: ${{ inputs.bun-version != '' && inputs.bun-version || '1.3.14' }}
+        bun-version-file: .bun-version
 
     # Cache Bun's global package cache, not node_modules: a stale node_modules restored from a
     # partial key could hide packages missing from bun.lock. Install always runs against the lockfile.

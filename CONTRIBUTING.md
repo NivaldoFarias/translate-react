@@ -2,7 +2,7 @@
 
 MIT. Not a hosted app: forks use their own API keys and Actions config.
 
-- Bun only (`bun install`, `bun run …`); see `engines` in [`package.json`](./package.json).
+- Bun only (`bun install`, `bun run …`). The Bun version is pinned in [`.bun-version`](./.bun-version), the single source of truth for local dev and every GitHub Actions job (`setup-bun-deps` reads it via `bun-version-file`); change the Bun version there, not in workflows. `engines` in [`package.json`](./package.json) sets the minimum supported version.
 - TypeScript strict; match patterns in [`src/`](./src/).
 - Layout and services: [Wiki: Codebase](https://github.com/NivaldoFarias/translate-react/wiki/Codebase); run order: [Wiki: Workflow](https://github.com/NivaldoFarias/translate-react/wiki/Workflow). App wiring: [`src/app/composition.ts`](./src/app/composition.ts).
 - Tests: `bun test` (or `bun run test:coverage` locally); CI runs coverage. Mirror `src/` paths under `tests/`; mock GitHub and LLM.
