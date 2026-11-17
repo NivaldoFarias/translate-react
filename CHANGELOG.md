@@ -4,6 +4,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+### Changed
+
+- Updated `openai` SDK to v7 (supersedes Dependabot #79 without its TypeScript 7 runtime bump). The only v7 breaking change is a Node.js 22 floor; the app runs on Bun and uses Chat Completions only.
+
 ### Fixed
 
 - `@eslint/js` is now a declared dev dependency: `eslint.config.ts` imports it, but ESLint 10 no longer installs it, so a clean `bun install` failed `lint` and `type-check`. Environment validation errors now carry the original Zod error as `cause` (ESLint 10 `preserve-caught-error`).
