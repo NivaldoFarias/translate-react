@@ -4,6 +4,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+### Security
+
+- Workflows pass `inputs.file_path`, `inputs.langs`, `matrix.*`, and the resolved target path to `run:` scripts through `env:` instead of inline `${{ }}` interpolation, hardening against script injection.
+- `ci.yml` drops the unused top-level `actions: write` permission (now `contents: read` only).
+
+### Changed
+
+- `smoke.yml` and `workflow.yml` jobs set explicit `timeout-minutes` (smoke 120, prepare-matrix 10, translation 240).
+
 ### Added
 
 - **Breaking (fork operators):** Scheduled translation from `poll.yml` is opt-in via the `SCHEDULED_TRANSLATION_ENABLED` repository variable, which must be exactly `true`. When unset, polls still run but do not start translation. The `dry_run` input is unchanged, and manual `workflow.yml` dispatch is not gated.

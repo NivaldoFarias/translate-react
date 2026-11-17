@@ -54,6 +54,7 @@ jobs:
   smoke:
     name: Real LLM workflow smoke (${{ inputs.files != '' && inputs.files || inputs.profile }}, ${{ inputs.lang }})
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     environment: ${{ inputs.environment }}
     steps:
       - name: Checkout repository
