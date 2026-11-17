@@ -69,6 +69,15 @@ To run the [main translation workflow](./.github/workflows/workflow.yml) on a fo
 
 Scheduled runs use [`.github/workflows/poll.yml`](./.github/workflows/poll.yml) to detect new commits on `reactjs/<lang>.react.dev` before starting translation. See [Automated upstream polling](https://github.com/NivaldoFarias/translate-react/wiki/Workflow#automated-upstream-polling).
 
+Scheduled translation is **opt-in**. `poll.yml` always polls and writes a run summary (changed locales, upstream SHAs, and whether translation was dispatched and why), but it only starts translation when the repository variable `SCHEDULED_TRANSLATION_ENABLED` is exactly `true`. Unset or any other value keeps it off. This is the kill switch: delete the variable or set it to `false` to stop scheduled translation without disabling the workflow. The manual `dry_run` input still skips translation for a single run. Manual `workflow.yml` dispatch is not gated.
+
+```bash
+gh variable set SCHEDULED_TRANSLATION_ENABLED --body true   # turn on
+gh variable delete SCHEDULED_TRANSLATION_ENABLED            # turn off
+```
+
+GitHub disables scheduled workflows after 60 days without repository activity. Each `poll.yml` run calls the workflow `enable` API to reset that timer. A workflow that is already disabled must be re-enabled once by hand (Actions tab or `gh workflow enable poll.yml`).
+
 When several locales run in parallel, tune LLM and GitHub limits. See [Parallel matrix locales](https://github.com/NivaldoFarias/translate-react/wiki/Workflow#parallel-matrix-locales--capacity).
 
 ### Manual translation

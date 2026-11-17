@@ -4,15 +4,32 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+### Added
+
+- **Breaking (fork operators):** Scheduled translation from `poll.yml` is opt-in via the `SCHEDULED_TRANSLATION_ENABLED` repository variable, which must be exactly `true`. When unset, polls still run but do not start translation. The `dry_run` input is unchanged, and manual `workflow.yml` dispatch is not gated.
+- `poll.yml` writes a step summary listing changed locales, upstream SHAs, and whether translation was dispatched or gated off (and why), via the new `ci:poll-gate` script.
+- `poll.yml` calls the workflow `enable` API on every run so GitHub's 60-day inactivity timer for scheduled workflows is reset.
+
 ### Changed
 
+- `setup-bun-deps` caches Bun's package cache (`~/.bun/install/cache`) instead of `node_modules` and always runs `bun install --frozen-lockfile`, so a stale restored `node_modules` can no longer hide dependencies missing from `bun.lock`.
+- `smoke.yml` and `workflow.yml` jobs set explicit `timeout-minutes` (smoke 120, prepare-matrix 10, translation 240).
 - Updated `openai` SDK to v7 (supersedes Dependabot #79 without its TypeScript 7 runtime bump). The only v7 breaking change is a Node.js 22 floor; the app runs on Bun and uses Chat Completions only.
 - Updated `eslint-plugin-jsdoc` to v64 (ESM-only, Node.js `^22.22.2 || >=24.15.0` for tooling); no lint rule changes needed.
 - Dependabot uses the `bun` ecosystem so update PRs include `bun.lock`, ignores `typescript` majors (the runtime needs the TypeScript 6 compiler API; `tsc` 7 comes from `@typescript/native`), and groups only minor/patch updates so each major arrives as its own PR.
 
 ### Fixed
 
+- Scheduled `poll.yml` runs now actually start translation for changed locales: `workflow.yml` picks the matrix from `matrix_json` (new `ci:select-matrix` script) instead of `github.event_name`, which in a called workflow is the caller's event and never `workflow_call`. A supplied `matrix_json` that is invalid or empty now fails the job instead of silently skipping `Sync & Translate`.
+- `workflow.yml` translation and the `run-workflow-smoke` action (used by `ci.yml` and `smoke.yml`) pass `LLM_MAX_REQUESTS_PER_MINUTE`, `MASK_VERBATIM_LARGE_FENCES`, and `MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS` from GitHub Environment variables through to the app; they were previously ignored in Actions.
+- Blank `LLM_MAX_REQUESTS_PER_MINUTE`, `MASK_VERBATIM_LARGE_FENCES`, and `MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS` fall back to schema defaults (a blank min-token value no longer fails validation), and `MASK_VERBATIM_LARGE_FENCES=false` now parses as `false` instead of `true`.
+- `LOG_TO_CONSOLE` and `GITHUB_ACTIONS` also treat blank values as unset, and the test-environment `LOG_TO_CONSOLE` default is now a real `false` instead of the truthy string `"false"`.
 - `@eslint/js` is now a declared dev dependency: `eslint.config.ts` imports it, but ESLint 10 no longer installs it, so a clean `bun install` failed `lint` and `type-check`. Environment validation errors now carry the original Zod error as `cause` (ESLint 10 `preserve-caught-error`).
+
+### Security
+
+- Workflows pass `inputs.file_path`, `inputs.langs`, `matrix.*`, and the resolved target path to `run:` scripts through `env:` instead of inline `${{ }}` interpolation, hardening against script injection.
+- `ci.yml` drops the unused top-level `actions: write` permission (now `contents: read` only).
 
 ## [0.2.17] - 2026-07-20
 

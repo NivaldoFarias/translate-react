@@ -130,8 +130,7 @@ export const environmentDefaults: Record<RuntimeEnvironment, EnvironmentSchemaDe
 		NODE_ENV: RuntimeEnvironment.Test,
 		LOG_LEVEL: LogLevel.Debug,
 		...ENV_PLACEHOLDERS,
-		// @ts-expect-error - actual zod schema validation expects `stringbool`, but type expects boolean
-		LOG_TO_CONSOLE: "false",
+		LOG_TO_CONSOLE: false,
 	},
 	[RuntimeEnvironment.Staging]: {
 		NODE_ENV: RuntimeEnvironment.Staging,

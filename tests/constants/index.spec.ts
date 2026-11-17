@@ -29,8 +29,7 @@ describe("app/constants", () => {
 		test("Test has LOG_TO_CONSOLE false", () => {
 			const testEnv = environmentDefaults[RuntimeEnvironment.Test];
 
-			// @ts-expect-error - actual zod schema validation expects `stringbool`, but type expects boolean
-			expect(testEnv.LOG_TO_CONSOLE).toBe("false");
+			expect(testEnv.LOG_TO_CONSOLE).toBe(false);
 		});
 
 		test("Production has expected concurrency values", () => {

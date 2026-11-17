@@ -114,7 +114,7 @@ const envSchema = z.object({
 	 * When `false`, logs are only written to files.
 	 * Useful for reducing terminal clutter in debug mode while preserving detailed file logs.
 	 */
-	LOG_TO_CONSOLE: z.stringbool().default(envDefaults.LOG_TO_CONSOLE),
+	LOG_TO_CONSOLE: optionalEnvBoolean(envDefaults.LOG_TO_CONSOLE),
 
 	/**
 	 * Timeout for GitHub API requests in **milliseconds**.
@@ -136,11 +136,9 @@ const envSchema = z.object({
 	 * Set to `0` to disable. For OpenRouter free models (`free-models-per-min`), use `15` or `16` and keep
 	 * `MAX_LLM_CONCURRENCY` low (for example `1`). This does not affect OpenRouter's separate `free-models-per-day` cap.
 	 */
-	LLM_MAX_REQUESTS_PER_MINUTE: z.coerce
-		.number()
-		.int()
-		.min(0)
-		.default(envDefaults.LLM_MAX_REQUESTS_PER_MINUTE),
+	LLM_MAX_REQUESTS_PER_MINUTE: optionalEnvNumber(
+		z.coerce.number().int().min(0).default(envDefaults.LLM_MAX_REQUESTS_PER_MINUTE),
+	),
 
 	/**
 	 * Optional explicit filename for the translation guidelines file.
@@ -169,20 +167,19 @@ const envSchema = z.object({
 	 * placeholders before the LLM and are restored after. Prose inside those fences is not
 	 * translated while masked.
 	 */
-	MASK_VERBATIM_LARGE_FENCES: z.coerce.boolean().default(envDefaults.MASK_VERBATIM_LARGE_FENCES),
+	MASK_VERBATIM_LARGE_FENCES: optionalEnvBoolean(envDefaults.MASK_VERBATIM_LARGE_FENCES),
 
 	/** `Tiktoken` threshold (same estimator as chunking) for treating a fence as verbatim */
-	MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS: z.coerce
-		.number()
-		.positive()
-		.default(envDefaults.MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS),
+	MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS: optionalEnvNumber(
+		z.coerce.number().positive().default(envDefaults.MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS),
+	),
 
 	/**
 	 * Set by the GitHub Actions runner when present. Adds workflow run URLs to PR bodies and issue comments.
 	 *
 	 * `workflow.yml` passes these through explicitly so Bun `import.meta.env` picks up run metadata.
 	 */
-	GITHUB_ACTIONS: z.stringbool().optional(),
+	GITHUB_ACTIONS: z.preprocess(emptyEnvValueToUndefined, z.stringbool().optional()),
 
 	/** GitHub host URL for the run (e.g. `https://github.com`) */
 	GITHUB_SERVER_URL: z.string().optional(),
@@ -317,4 +314,40 @@ function optionalEnvString(defaultValue: string) {
  */
 function optionalEnvUrl(defaultValue: string) {
 	return z.preprocess(emptyEnvValueToUndefined, z.url().optional().default(defaultValue));
+}
+
+/**
+ * Optional numeric env with defaults when unset or empty.
+ *
+ * Without this, `z.coerce.number()` turns `""` (unset GitHub `vars.*`) into `0`.
+ *
+ * @param schema Coercing number schema carrying its own `.default()`
+ *
+ * @returns Zod schema that maps `""` to `undefined` before coercion
+ */
+function optionalEnvNumber<T extends z.ZodType>(schema: T) {
+	return z.preprocess(emptyEnvValueToUndefined, schema);
+}
+
+/**
+ * Optional boolean env with defaults when unset or empty.
+ *
+ * Unlike `z.coerce.boolean()`, the string `"false"` parses as `false`.
+ *
+ * @param defaultValue Value used when the variable is missing or `""`
+ *
+ * @returns Zod boolean schema with preprocess and default
+ */
+function optionalEnvBoolean(defaultValue: boolean) {
+	return z.preprocess((value) => {
+		const normalized = emptyEnvValueToUndefined(value);
+
+		if (typeof normalized !== "string") return normalized;
+
+		const lowered = normalized.trim().toLowerCase();
+		if (["true", "1", "yes", "on"].includes(lowered)) return true;
+		if (["false", "0", "no", "off"].includes(lowered)) return false;
+
+		return normalized;
+	}, z.boolean().default(defaultValue));
 }

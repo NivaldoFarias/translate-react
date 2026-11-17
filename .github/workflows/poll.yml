@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: Poll only; do not start translation
+        description: Poll only; do not start translation (translation also requires vars.SCHEDULED_TRANSLATION_ENABLED == 'true')
         required: false
         type: boolean
         default: false
@@ -29,6 +29,7 @@ jobs:
     outputs:
       has_changes: ${{ steps.poll.outputs.has_changes }}
       matrix: ${{ steps.poll.outputs.matrix }}
+      dispatch: ${{ steps.gate.outputs.dispatch }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -54,13 +55,35 @@ jobs:
           GH_TOKEN: ${{ steps.generate-token.outputs.token }}
         run: bun run ci:poll-upstream
 
+      # Kill switch: translation is opt-in via the SCHEDULED_TRANSLATION_ENABLED repository
+      # variable (must be exactly 'true'). Also writes the run's step summary.
+      - name: Decide translation dispatch
+        id: gate
+        env:
+          HAS_CHANGES: ${{ steps.poll.outputs.has_changes }}
+          MATRIX_JSON: ${{ steps.poll.outputs.matrix }}
+          EVENT_NAME: ${{ github.event_name }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          SCHEDULED_TRANSLATION_ENABLED: ${{ vars.SCHEDULED_TRANSLATION_ENABLED }}
+        run: bun run ci:poll-gate
+
+      # GitHub disables scheduled workflows after 60 days of repository inactivity;
+      # re-enabling this (already active) workflow resets that timer.
+      - name: Keep scheduled workflow alive
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api --method PUT "repos/${GITHUB_REPOSITORY}/actions/workflows/poll.yml/enable"
+
   translate:
     name: Run translation
     needs: poll
     permissions:
       contents: read
       actions: write
-    if: needs.poll.outputs.has_changes == 'true' && (github.event_name != 'workflow_dispatch' || inputs.dry_run != true)
+    # `vars.SCHEDULED_TRANSLATION_ENABLED` is re-checked here so the kill switch holds even if the gate step misbehaves.
+    if: needs.poll.outputs.dispatch == 'true' && vars.SCHEDULED_TRANSLATION_ENABLED == 'true' && needs.poll.outputs.has_changes == 'true' && (github.event_name != 'workflow_dispatch' || inputs.dry_run != true)
     uses: ./.github/workflows/workflow.yml
     with:
       matrix_json: ${{ needs.poll.outputs.matrix }}
