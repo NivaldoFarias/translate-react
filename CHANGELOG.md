@@ -12,9 +12,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Changed
 
+- The Bun version is now read from the root [`.bun-version`](./.bun-version) file (`1.3.14`) by `setup-bun-deps` via `bun-version-file`. The `bun-version` inputs on `setup-bun-deps` and `run-workflow-smoke` and the `bun-version: ${{ vars.BUN_VERSION }}` lines in workflows are removed. The `BUN_VERSION` repository variable is no longer read; repository owners can delete it.
 - `setup-bun-deps` caches Bun's package cache (`~/.bun/install/cache`) instead of `node_modules` and always runs `bun install --frozen-lockfile`, so a stale restored `node_modules` can no longer hide dependencies missing from `bun.lock`.
 - `smoke.yml` and `workflow.yml` jobs set explicit `timeout-minutes` (smoke 120, prepare-matrix 10, translation 240).
-- The Bun version is now read from the root [`.bun-version`](./.bun-version) file (`1.3.14`) by `setup-bun-deps` via `bun-version-file`. The `bun-version` inputs on `setup-bun-deps` and `run-workflow-smoke` and the `bun-version: ${{ vars.BUN_VERSION }}` lines in workflows are removed. The `BUN_VERSION` repository variable is no longer read; repository owners can delete it.
+- Updated `openai` SDK to v7 (supersedes Dependabot #79 without its TypeScript 7 runtime bump). The only v7 breaking change is a Node.js 22 floor; the app runs on Bun and uses Chat Completions only.
+- Updated `eslint-plugin-jsdoc` to v64 (ESM-only, Node.js `^22.22.2 || >=24.15.0` for tooling); no lint rule changes needed.
+- Dependabot uses the `bun` ecosystem so update PRs include `bun.lock`, ignores `typescript` majors (the runtime needs the TypeScript 6 compiler API; `tsc` 7 comes from `@typescript/native`), and groups only minor/patch updates so each major arrives as its own PR.
 
 ### Fixed
 
@@ -22,6 +25,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 - `workflow.yml` translation and the `run-workflow-smoke` action (used by `ci.yml` and `smoke.yml`) pass `LLM_MAX_REQUESTS_PER_MINUTE`, `MASK_VERBATIM_LARGE_FENCES`, and `MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS` from GitHub Environment variables through to the app; they were previously ignored in Actions.
 - Blank `LLM_MAX_REQUESTS_PER_MINUTE`, `MASK_VERBATIM_LARGE_FENCES`, and `MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS` fall back to schema defaults (a blank min-token value no longer fails validation), and `MASK_VERBATIM_LARGE_FENCES=false` now parses as `false` instead of `true`.
 - `LOG_TO_CONSOLE` and `GITHUB_ACTIONS` also treat blank values as unset, and the test-environment `LOG_TO_CONSOLE` default is now a real `false` instead of the truthy string `"false"`.
+- `@eslint/js` is now a declared dev dependency: `eslint.config.ts` imports it, but ESLint 10 no longer installs it, so a clean `bun install` failed `lint` and `type-check`. Environment validation errors now carry the original Zod error as `cause` (ESLint 10 `preserve-caught-error`).
 
 ### Security
 
