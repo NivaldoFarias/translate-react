@@ -8,6 +8,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 - Updated `openai` SDK to v7 (supersedes Dependabot #79 without its TypeScript 7 runtime bump). The only v7 breaking change is a Node.js 22 floor; the app runs on Bun and uses Chat Completions only.
 - Updated `eslint-plugin-jsdoc` to v64 (ESM-only, Node.js `^22.22.2 || >=24.15.0` for tooling); no lint rule changes needed.
+- Dependabot uses the `bun` ecosystem so update PRs include `bun.lock`, ignores `typescript` majors (the runtime needs the TypeScript 6 compiler API; `tsc` 7 comes from `@typescript/native`), and groups only minor/patch updates so each major arrives as its own PR.
 
 ### Fixed
 
