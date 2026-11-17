@@ -58,8 +58,6 @@ jobs:
 
       - name: Setup Bun dependencies
         uses: ./.github/actions/setup-bun-deps
-        with:
-          bun-version: ${{ vars.BUN_VERSION }}
 
       # `github.event_name` in a called workflow is the caller's event (`schedule` /
       # `workflow_dispatch`), never `workflow_call`, so key on `matrix_json` instead.
@@ -119,8 +117,6 @@ jobs:
 
       - name: Setup Bun dependencies
         uses: ./.github/actions/setup-bun-deps
-        with:
-          bun-version: ${{ vars.BUN_VERSION }}
 
       - name: Resolve translation targets
         id: translation-target

@@ -13,10 +13,6 @@ inputs:
     description: Comma-separated fixture basenames (`--files`); overrides profile when set
     required: false
     default: ""
-  bun-version:
-    description: Bun version. Empty uses `setup-bun-deps` action default
-    required: false
-    default: ""
   gh-token:
     description: GitHub token for mocked GitHub client construction
     required: false
@@ -77,8 +73,6 @@ runs:
   steps:
     - name: Setup Bun dependencies
       uses: ./.github/actions/setup-bun-deps
-      with:
-        bun-version: ${{ inputs.bun-version }}
 
     - name: Run workflow smoke
       shell: bash

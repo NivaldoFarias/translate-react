@@ -14,6 +14,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 - `setup-bun-deps` caches Bun's package cache (`~/.bun/install/cache`) instead of `node_modules` and always runs `bun install --frozen-lockfile`, so a stale restored `node_modules` can no longer hide dependencies missing from `bun.lock`.
 - `smoke.yml` and `workflow.yml` jobs set explicit `timeout-minutes` (smoke 120, prepare-matrix 10, translation 240).
+- The Bun version is now read from the root [`.bun-version`](./.bun-version) file (`1.3.14`) by `setup-bun-deps` via `bun-version-file`. The `bun-version` inputs on `setup-bun-deps` and `run-workflow-smoke` and the `bun-version: ${{ vars.BUN_VERSION }}` lines in workflows are removed. The `BUN_VERSION` repository variable is no longer read; repository owners can delete it.
 
 ### Fixed
 

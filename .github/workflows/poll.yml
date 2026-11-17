@@ -38,8 +38,6 @@ jobs:
 
       - name: Setup Bun dependencies
         uses: ./.github/actions/setup-bun-deps
-        with:
-          bun-version: ${{ vars.BUN_VERSION }}
 
       - name: Generate Bot Token
         id: generate-token
