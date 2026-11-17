@@ -232,7 +232,7 @@ export function validateEnv(env?: Environment): Environment {
 			const issues = error.issues
 				.map((issue) => `- ${issue.path.join(".")}: ${issue.message}`)
 				.join("\n");
-			throw new Error(`Invalid environment variables:\n${issues}`);
+			throw new Error(`Invalid environment variables:\n${issues}`, { cause: error });
 		}
 
 		throw error;

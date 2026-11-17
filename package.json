@@ -59,6 +59,7 @@
 		"zod": "^4.3.6"
 	},
 	"devDependencies": {
+		"@eslint/js": "^10.0.1",
 		"@ianvs/prettier-plugin-sort-imports": "^4.4.1",
 		"@mdx-js/mdx": "^3.1.1",
 		"@total-typescript/ts-reset": "^0.6.1",
