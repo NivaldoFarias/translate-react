@@ -11,6 +11,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Changed
 
+- `setup-bun-deps` caches Bun's package cache (`~/.bun/install/cache`) instead of `node_modules` and always runs `bun install --frozen-lockfile`, so a stale restored `node_modules` can no longer hide dependencies missing from `bun.lock`.
 - `smoke.yml` and `workflow.yml` jobs set explicit `timeout-minutes` (smoke 120, prepare-matrix 10, translation 240).
 
 ### Added
