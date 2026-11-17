@@ -4,6 +4,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+### Fixed
+
+- Blank `LLM_MAX_REQUESTS_PER_MINUTE`, `MASK_VERBATIM_LARGE_FENCES`, and `MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS` fall back to schema defaults (a blank min-token value no longer fails validation), and `MASK_VERBATIM_LARGE_FENCES=false` now parses as `false` instead of `true`.
+
 ## [0.2.17] - 2026-07-20
 
 ### Changed
