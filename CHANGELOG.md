@@ -4,6 +4,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+### Added
+
+- **Breaking (fork operators):** Scheduled translation from `poll.yml` is opt-in via the `SCHEDULED_TRANSLATION_ENABLED` repository variable, which must be exactly `true`. When unset, polls still run but do not start translation. The `dry_run` input is unchanged, and manual `workflow.yml` dispatch is not gated.
+- `poll.yml` writes a step summary listing changed locales, upstream SHAs, and whether translation was dispatched or gated off (and why), via the new `ci:poll-gate` script.
+- `poll.yml` calls the workflow `enable` API on every run so GitHub's 60-day inactivity timer for scheduled workflows is reset.
+
 ### Fixed
 
 - Scheduled `poll.yml` runs now actually start translation for changed locales: `workflow.yml` picks the matrix from `matrix_json` (new `ci:select-matrix` script) instead of `github.event_name`, which in a called workflow is the caller's event and never `workflow_call`. A supplied `matrix_json` that is invalid or empty now fails the job instead of silently skipping `Sync & Translate`.

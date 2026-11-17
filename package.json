@@ -26,6 +26,7 @@
 		"type-check": "tsc",
 		"test": "bun test",
 		"ci:poll-upstream": "bun src/ci/actions/poll-upstream.ts",
+		"ci:poll-gate": "bun src/ci/actions/poll-gate.ts",
 		"ci:resolve-matrix": "bun src/ci/actions/resolve-matrix.ts",
 		"ci:select-matrix": "bun src/ci/actions/select-matrix.ts",
 		"ci:resolve-translation-targets": "bun src/ci/actions/resolve-translation-targets.ts",
