@@ -114,7 +114,7 @@ const envSchema = z.object({
 	 * When `false`, logs are only written to files.
 	 * Useful for reducing terminal clutter in debug mode while preserving detailed file logs.
 	 */
-	LOG_TO_CONSOLE: z.stringbool().default(envDefaults.LOG_TO_CONSOLE),
+	LOG_TO_CONSOLE: optionalEnvBoolean(envDefaults.LOG_TO_CONSOLE),
 
 	/**
 	 * Timeout for GitHub API requests in **milliseconds**.
@@ -179,7 +179,7 @@ const envSchema = z.object({
 	 *
 	 * `workflow.yml` passes these through explicitly so Bun `import.meta.env` picks up run metadata.
 	 */
-	GITHUB_ACTIONS: z.stringbool().optional(),
+	GITHUB_ACTIONS: z.preprocess(emptyEnvValueToUndefined, z.stringbool().optional()),
 
 	/** GitHub host URL for the run (e.g. `https://github.com`) */
 	GITHUB_SERVER_URL: z.string().optional(),
