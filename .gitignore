@@ -149,6 +149,14 @@ dist
 # Cursor files
 .cursor/
 
+# Claude Code local state (rules and skills under .claude/ are tracked)
+.claude/worktrees/
+.claude/settings.local.json
+
+# Local wiki drafts and workflow run downloads
+.wiki/
+.out/
+
 # Github Copilot files
 .github/copilot-instructions.md
 .github/**/*.instructions.md
