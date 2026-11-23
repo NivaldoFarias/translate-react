@@ -214,6 +214,7 @@ export class TranslatorService {
 			pipeline: new TranslationPipelineManager(),
 			validation: new PostTranslationValidationService({
 				getTranslationGuidelines: () => this.translationGuidelines,
+				localeGuards: this.services.locale.definitions.validationGuards,
 			}),
 			languageCheck: new TranslationLanguageCheck(this.services.languageDetector),
 		};

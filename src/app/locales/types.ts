@@ -5,6 +5,7 @@ import type {
 } from "@/app/services/github/types";
 import type { TranslationFile } from "@/app/services/translator/";
 import type { PostTranslationGuardId } from "@/app/services/translator/validation/validation.constants";
+import type { PostTranslationValidationGuard } from "@/app/services/translator/validation/validation.types";
 
 import { buildLocaleRulesPrompt } from "./rules.util";
 
@@ -234,4 +235,11 @@ export interface LocaleDefinition {
 
 	/** Pull request templates in the target language */
 	readonly pullRequest: LocalePullRequestConfig;
+
+	/**
+	 * Advisory guards that only apply to this locale, run after the shared guards.
+	 *
+	 * Each guard id still needs a label in the locale's reviewer-warning strings.
+	 */
+	readonly validationGuards?: readonly PostTranslationValidationGuard[];
 }

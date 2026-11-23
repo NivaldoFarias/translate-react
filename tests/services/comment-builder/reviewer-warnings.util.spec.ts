@@ -16,6 +16,32 @@ describe("buildReviewerWarningsMarkdown", () => {
 		expect(buildReviewerWarningsMarkdown([], strings, "# Source", "# Translated")).toBe("");
 	});
 
+	test("renders englishServerClientTerms with the real line and matched excerpt", () => {
+		const translated = [
+			"# Заголовок",
+			"",
+			"Текст.",
+			"Используйте Server Components и Client Components.",
+		].join("\n");
+
+		const markdown = buildReviewerWarningsMarkdown(
+			[
+				{
+					guardId: "englishServerClientTerms",
+					hint: "Translate Server Component terms into Russian prose.",
+				},
+			],
+			strings,
+			"# Source",
+			translated,
+		);
+
+		expect(markdown).toContain("#### L4");
+		expect(markdown).not.toContain("#### L1");
+		expect(markdown).toContain("Используйте Server Components и Client Components.");
+		expect(markdown).toContain("1 violation)");
+	});
+
 	test("formats JSX fence violations as diff blocks with line ranges", () => {
 		const source = [
 			"# Demo",

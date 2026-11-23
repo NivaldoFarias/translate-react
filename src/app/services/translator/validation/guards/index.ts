@@ -1,10 +1,10 @@
 import type {
+	PostTranslationValidationGuard,
 	PostTranslationValidationOptions,
 	TranslationValidationIssue,
 } from "../validation.types";
 
 import {
-	englishServerClientTermsGuard,
 	extraMarkdownLinksGuard,
 	mdxSpacingGuard,
 	sentenceCaseHeadingsGuard,
@@ -37,27 +37,31 @@ export const POST_TRANSLATION_VALIDATION_GUARDS = [
 	sentenceCaseHeadingsGuard,
 	mdxSpacingGuard,
 	extraMarkdownLinksGuard,
-	englishServerClientTermsGuard,
 ] as const;
 
 /**
- * Runs all post-translation guards and returns every issue found.
+ * Runs the shared post-translation guards plus any locale-scoped guards and returns every issue found.
  *
  * @param sourceContent Original markdown
  * @param translatedContent Translated markdown
- * @param _options Reserved for future guard context
+ * @param options Guard context, including guards declared by the target locale
  *
  * @returns Retryable issues with accumulated hints
  */
 export function collectPostTranslationValidationIssues(
 	sourceContent: string,
 	translatedContent: string,
-	_options?: PostTranslationValidationOptions,
+	options?: PostTranslationValidationOptions,
 ) {
 	const issues: TranslationValidationIssue[] = [];
 
-	for (const guard of POST_TRANSLATION_VALIDATION_GUARDS) {
-		const issue = guard(sourceContent, translatedContent);
+	const guards: readonly PostTranslationValidationGuard[] = [
+		...POST_TRANSLATION_VALIDATION_GUARDS,
+		...(options?.localeGuards ?? []),
+	];
+
+	for (const guard of guards) {
+		const issue = guard(sourceContent, translatedContent, options);
 		if (issue) issues.push(issue);
 	}
 

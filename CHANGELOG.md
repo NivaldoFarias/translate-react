@@ -4,6 +4,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+### Fixed
+
+- pt-br pull requests no longer show a bogus "Termos Server/Client Component em inglês" advisory for `React Server Components`, which the pt-br rules keep in English. The `englishServerClientTerms` guard now runs only for the `ru` locale, and the Russian retry hint can no longer reach pt-br prompts.
+- The `englishServerClientTerms` advisory on `ru` pull requests now points at the real line and shows the matched line, instead of `L1` with the guard hint text.
+
 ## [0.3.0] - 2026-11-23
 
 ### Added
