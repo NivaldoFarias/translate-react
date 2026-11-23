@@ -1,30 +1,25 @@
 name: Setup Bun dependencies
-description: Install Bun and restore node_modules from bun.lock cache (caller must checkout first)
-
-inputs:
-  bun-version:
-    description: Bun version (`BUN_VERSION` repository variable when unset)
-    required: false
-    default: ""
+description: Install Bun and dependencies exactly from bun.lock, caching Bun's package cache (caller must checkout first)
 
 runs:
   using: composite
   steps:
+    # The Bun version lives in the root `.bun-version` file (single source of truth for CI and local dev).
     - name: Setup Bun
       uses: oven-sh/setup-bun@v2
       with:
-        bun-version: ${{ inputs.bun-version != '' && inputs.bun-version || '1.3.14' }}
+        bun-version-file: .bun-version
 
-    - name: Cache node_modules
-      id: cache-deps
+    # Cache Bun's global package cache, not node_modules: a stale node_modules restored from a
+    # partial key could hide packages missing from bun.lock. Install always runs against the lockfile.
+    - name: Cache Bun package cache
       uses: actions/cache@v5
       with:
-        path: node_modules
-        key: node-modules-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+        path: ~/.bun/install/cache
+        key: bun-cache-${{ runner.os }}-${{ hashFiles('bun.lock') }}
         restore-keys: |
-          node-modules-${{ runner.os }}-
+          bun-cache-${{ runner.os }}-
 
     - name: Install dependencies
-      if: steps.cache-deps.outputs.cache-hit != 'true'
       shell: bash
       run: bun install --frozen-lockfile

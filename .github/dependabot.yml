@@ -1,6 +1,8 @@
 version: 2
 updates:
-  - package-ecosystem: npm
+  # `bun` (not `npm`) so Dependabot rewrites `bun.lock` alongside `package.json`;
+  # the npm updater only touched `package.json`, leaving PRs out of sync with the lockfile.
+  - package-ecosystem: bun
     directory: /
     target-branch: dev
     schedule:
@@ -9,11 +11,21 @@ updates:
     commit-message:
       prefix: chore
       include: scope
+    ignore:
+      # Runtime `typescript` stays on 6.x: TypeScript 7 (native) ships no JS compiler API,
+      # which `fence-comments.util.ts` needs at runtime, and typescript-eslint requires <6.1.
+      # `tsc` 7 for type-checking comes from the `@typescript/native` alias instead.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
+    # Groups take minor/patch only; each major opens its own PR so one risky major
+    # cannot hold back safe updates in the same group.
     groups:
       dev-dependencies:
         dependency-type: development
+        update-types: ["minor", "patch"]
       production-dependencies:
         dependency-type: production
+        update-types: ["minor", "patch"]
 
   - package-ecosystem: github-actions
     directory: /

@@ -46,24 +46,23 @@ jobs:
   prepare-matrix:
     name: Prepare matrix
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     outputs:
-      matrix: ${{ steps.publish.outputs.matrix }}
-      has_matrix: ${{ steps.publish.outputs.has_matrix }}
+      matrix: ${{ steps.select.outputs.matrix }}
+      has_matrix: ${{ steps.select.outputs.has_matrix }}
     steps:
       - name: Checkout repository
-        if: github.event_name == 'workflow_dispatch'
         uses: actions/checkout@v7
         with:
           fetch-depth: 1
 
       - name: Setup Bun dependencies
-        if: github.event_name == 'workflow_dispatch'
         uses: ./.github/actions/setup-bun-deps
-        with:
-          bun-version: ${{ vars.BUN_VERSION }}
 
+      # `github.event_name` in a called workflow is the caller's event (`schedule` /
+      # `workflow_dispatch`), never `workflow_call`, so key on `matrix_json` instead.
       - name: Generate Bot Token
-        if: github.event_name == 'workflow_dispatch'
+        if: inputs.matrix_json == ''
         id: generate-token
         uses: actions/create-github-app-token@v3
         with:
@@ -72,39 +71,26 @@ jobs:
           owner: ${{ github.repository_owner }}
 
       - name: Resolve matrix for manual run
-        if: github.event_name == 'workflow_dispatch'
+        if: inputs.matrix_json == ''
         id: resolve
         env:
           GH_TOKEN: ${{ steps.generate-token.outputs.token }}
-        run: bun run ci:resolve-matrix --langs "${{ inputs.langs }}"
+          LANGS: ${{ inputs.langs }}
+        run: bun run ci:resolve-matrix --langs "$LANGS"
 
-      - name: Publish matrix outputs
-        id: publish
+      - name: Select matrix
+        id: select
         env:
           POLLED_MATRIX: ${{ inputs.matrix_json }}
           RESOLVED_MATRIX: ${{ steps.resolve.outputs.matrix }}
-          RESOLVED_HAS_MATRIX: ${{ steps.resolve.outputs.has_matrix }}
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_call" ]; then
-            MATRIX="$POLLED_MATRIX"
-            HAS_MATRIX="true"
-          else
-            MATRIX="$RESOLVED_MATRIX"
-            HAS_MATRIX="$RESOLVED_HAS_MATRIX"
-          fi
-
-          {
-            echo "matrix<<EOFMATRIX"
-            echo "$MATRIX"
-            echo "EOFMATRIX"
-          } >> "$GITHUB_OUTPUT"
-          echo "has_matrix=$HAS_MATRIX" >> "$GITHUB_OUTPUT"
+        run: bun run ci:select-matrix
 
   workflow:
     name: Sync & Translate
     needs: prepare-matrix
     if: needs.prepare-matrix.outputs.has_matrix == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 240
     environment: ${{ inputs.environment || 'production' }}
     strategy:
       fail-fast: false
@@ -131,12 +117,12 @@ jobs:
 
       - name: Setup Bun dependencies
         uses: ./.github/actions/setup-bun-deps
-        with:
-          bun-version: ${{ vars.BUN_VERSION }}
 
       - name: Resolve translation targets
         id: translation-target
-        run: bun run ci:resolve-translation-targets -- --file-path "${{ inputs.file_path }}"
+        env:
+          FILE_PATH: ${{ inputs.file_path }}
+        run: bun run ci:resolve-translation-targets -- --file-path "$FILE_PATH"
 
       - name: Run translation workflow (${{ matrix.lang }})
         env:
@@ -149,6 +135,9 @@ jobs:
           LLM_API_BASE_URL: ${{ vars.LLM_API_BASE_URL }}
           MAX_RETRY_ATTEMPTS: ${{ vars.MAX_RETRY_ATTEMPTS }}
           MAX_LLM_CONCURRENCY: ${{ vars.MAX_LLM_CONCURRENCY }}
+          LLM_MAX_REQUESTS_PER_MINUTE: ${{ vars.LLM_MAX_REQUESTS_PER_MINUTE }}
+          MASK_VERBATIM_LARGE_FENCES: ${{ vars.MASK_VERBATIM_LARGE_FENCES }}
+          MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS: ${{ vars.MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS }}
           OPENAI_PROJECT_ID: ${{ secrets.OPENAI_PROJECT_ID }}
           GH_PAT_TOKEN: ${{ secrets.GH_PAT_TOKEN }}
           MAX_TOKENS: ${{ vars.MAX_TOKENS }}
@@ -162,19 +151,27 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_RUN_ID: ${{ github.run_id }}
           GITHUB_WORKFLOW: ${{ github.workflow }}
+          # Matrix values and paths go through env (not `${{ }}` in the script) to avoid script injection.
+          MATRIX_LANG: ${{ matrix.lang }}
+          MATRIX_FORK_OWNER: ${{ matrix.fork_owner }}
+          MATRIX_FORK_NAME: ${{ matrix.fork_name }}
+          MATRIX_UPSTREAM_OWNER: ${{ matrix.upstream_owner }}
+          MATRIX_UPSTREAM_NAME: ${{ matrix.upstream_name }}
+          MATRIX_TRANSLATION_GUIDELINES_FILE: ${{ matrix.translation_guidelines_file }}
+          TARGET_PATH: ${{ steps.translation-target.outputs.path }}
         run: |
           ARGS=(
-            --lang "${{ matrix.lang }}"
-            --fork-owner "${{ matrix.fork_owner }}"
-            --fork-name "${{ matrix.fork_name }}"
-            --upstream-owner "${{ matrix.upstream_owner }}"
-            --upstream-name "${{ matrix.upstream_name }}"
+            --lang "$MATRIX_LANG"
+            --fork-owner "$MATRIX_FORK_OWNER"
+            --fork-name "$MATRIX_FORK_NAME"
+            --upstream-owner "$MATRIX_UPSTREAM_OWNER"
+            --upstream-name "$MATRIX_UPSTREAM_NAME"
           )
-          if [ -n "${{ matrix.translation_guidelines_file }}" ]; then
-            ARGS+=(--translation-guidelines-file "${{ matrix.translation_guidelines_file }}")
+          if [ -n "$MATRIX_TRANSLATION_GUIDELINES_FILE" ]; then
+            ARGS+=(--translation-guidelines-file "$MATRIX_TRANSLATION_GUIDELINES_FILE")
           fi
-          if [ -n "${{ steps.translation-target.outputs.path }}" ]; then
-            ARGS+=(--file "${{ steps.translation-target.outputs.path }}")
+          if [ -n "$TARGET_PATH" ]; then
+            ARGS+=(--file "$TARGET_PATH")
           fi
           bun run start -- "${ARGS[@]}"
 
@@ -182,9 +179,11 @@ jobs:
         if: success() && steps.translation-target.outputs.has_target_paths != 'true'
         env:
           GH_TOKEN: ${{ steps.generate-token.outputs.token }}
+          MATRIX_LANG: ${{ matrix.lang }}
+          MATRIX_UPSTREAM_SHA: ${{ matrix.upstream_sha }}
         run: |
-          VAR_NAME="UPSTREAM_SHA_$(echo '${{ matrix.lang }}' | tr '[:lower:]' '[:upper:]' | tr '-' '_')"
-          gh variable set "$VAR_NAME" --body "${{ matrix.upstream_sha }}"
+          VAR_NAME="UPSTREAM_SHA_$(echo "$MATRIX_LANG" | tr '[:lower:]' '[:upper:]' | tr '-' '_')"
+          gh variable set "$VAR_NAME" --body "$MATRIX_UPSTREAM_SHA"
 
       - name: Upload logs
         uses: actions/upload-artifact@v7

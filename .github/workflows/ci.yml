@@ -8,7 +8,6 @@ on:
 
 permissions:
   contents: read
-  actions: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -28,8 +27,6 @@ jobs:
 
       - name: Setup Bun dependencies
         uses: ./.github/actions/setup-bun-deps
-        with:
-          bun-version: ${{ vars.BUN_VERSION }}
 
       - name: Verify CHANGELOG.md lists current package version
         run: bun run ci:verify-changelog
@@ -56,8 +53,6 @@ jobs:
 
       - name: Setup Bun dependencies
         uses: ./.github/actions/setup-bun-deps
-        with:
-          bun-version: ${{ vars.BUN_VERSION }}
 
       - name: Run tests with coverage
         run: bun run test:coverage
@@ -112,7 +107,6 @@ jobs:
         with:
           profile: quick
           lang: pt-br
-          bun-version: ${{ vars.BUN_VERSION }}
           gh-token: ${{ secrets.GH_TOKEN }}
           llm-api-key: ${{ secrets.LLM_API_KEY }}
           node-env: ${{ vars.NODE_ENV }}
@@ -122,6 +116,9 @@ jobs:
           llm-api-base-url: ${{ vars.LLM_API_BASE_URL }}
           max-retry-attempts: ${{ vars.MAX_RETRY_ATTEMPTS }}
           max-llm-concurrency: ${{ vars.MAX_LLM_CONCURRENCY }}
+          llm-max-requests-per-minute: ${{ vars.LLM_MAX_REQUESTS_PER_MINUTE }}
+          mask-verbatim-large-fences: ${{ vars.MASK_VERBATIM_LARGE_FENCES }}
+          mask-verbatim-large-fences-min-tokens: ${{ vars.MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS }}
           openai-project-id: ${{ secrets.OPENAI_PROJECT_ID }}
           gh-pat-token: ${{ secrets.GH_PAT_TOKEN }}
           max-tokens: ${{ vars.MAX_TOKENS }}
@@ -162,7 +159,6 @@ jobs:
         with:
           profile: quick
           lang: ${{ matrix.lang }}
-          bun-version: ${{ vars.BUN_VERSION }}
           gh-token: ${{ secrets.GH_TOKEN }}
           llm-api-key: ${{ secrets.LLM_API_KEY }}
           node-env: ${{ vars.NODE_ENV }}
@@ -172,6 +168,9 @@ jobs:
           llm-api-base-url: ${{ vars.LLM_API_BASE_URL }}
           max-retry-attempts: ${{ vars.MAX_RETRY_ATTEMPTS }}
           max-llm-concurrency: ${{ vars.MAX_LLM_CONCURRENCY }}
+          llm-max-requests-per-minute: ${{ vars.LLM_MAX_REQUESTS_PER_MINUTE }}
+          mask-verbatim-large-fences: ${{ vars.MASK_VERBATIM_LARGE_FENCES }}
+          mask-verbatim-large-fences-min-tokens: ${{ vars.MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS }}
           openai-project-id: ${{ secrets.OPENAI_PROJECT_ID }}
           gh-pat-token: ${{ secrets.GH_PAT_TOKEN }}
           max-tokens: ${{ vars.MAX_TOKENS }}

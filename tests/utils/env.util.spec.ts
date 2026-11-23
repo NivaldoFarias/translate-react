@@ -66,6 +66,52 @@ describe("Environment Utilities", () => {
 			expect(env.REPO_UPSTREAM_NAME).toBe(validEnv.REPO_UPSTREAM_NAME);
 		});
 
+		test("should use defaults when fence-masking and rate-limit env vars are empty strings", () => {
+			const env = validateEnv({
+				...validEnv,
+				// @ts-expect-error - raw CI env values are strings
+				LLM_MAX_REQUESTS_PER_MINUTE: "",
+				// @ts-expect-error - raw CI env values are strings
+				MASK_VERBATIM_LARGE_FENCES: "",
+				// @ts-expect-error - raw CI env values are strings
+				MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS: "",
+			});
+
+			expect(env.LLM_MAX_REQUESTS_PER_MINUTE).toBe(validEnv.LLM_MAX_REQUESTS_PER_MINUTE);
+			expect(env.MASK_VERBATIM_LARGE_FENCES).toBe(validEnv.MASK_VERBATIM_LARGE_FENCES);
+			expect(env.MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS).toBe(
+				validEnv.MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS,
+			);
+		});
+
+		test("should parse string values for fence-masking and rate-limit env vars", () => {
+			const env = validateEnv({
+				...validEnv,
+				// @ts-expect-error - raw CI env values are strings
+				LLM_MAX_REQUESTS_PER_MINUTE: "15",
+				// @ts-expect-error - raw CI env values are strings
+				MASK_VERBATIM_LARGE_FENCES: "true",
+				// @ts-expect-error - raw CI env values are strings
+				MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS: "200",
+			});
+
+			expect(env.LLM_MAX_REQUESTS_PER_MINUTE).toBe(15);
+			expect(env.MASK_VERBATIM_LARGE_FENCES).toBe(true);
+			expect(env.MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS).toBe(200);
+		});
+
+		test('should parse MASK_VERBATIM_LARGE_FENCES "false" as false', () => {
+			// @ts-expect-error - raw CI env values are strings
+			const env = validateEnv({ ...validEnv, MASK_VERBATIM_LARGE_FENCES: "false" });
+
+			expect(env.MASK_VERBATIM_LARGE_FENCES).toBe(false);
+		});
+
+		test("should reject unrecognized MASK_VERBATIM_LARGE_FENCES strings", () => {
+			// @ts-expect-error - raw CI env values are strings
+			expect(() => validateEnv({ ...validEnv, MASK_VERBATIM_LARGE_FENCES: "maybe" })).toThrow();
+		});
+
 		test("should throw error when token is too short", () => {
 			const invalidEnv = { ...validEnv, GH_TOKEN: "short" };
 

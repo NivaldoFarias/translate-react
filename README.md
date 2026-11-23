@@ -13,7 +13,7 @@
 
 </div>
 
-When `react.dev` changes in English (and the translation repository is updated), this tool translates the updates into the user fork and opens PRs for review via the [`translate-react` bot](https://github.com/apps/translate-react-bot)[^1].
+When English `react.dev` changes, this tool translates updated pages into a locale fork and opens draft PRs via the [`translate-react` bot](https://github.com/apps/translate-react-bot)[^1].
 
 ## How it works
 
@@ -37,7 +37,7 @@ Full wiki index: [Home](https://github.com/NivaldoFarias/translate-react/wiki).
 
 ## Prerequisites
 
-- [**Bun**](https://bun.sh/) (see `engines` in [`package.json`](./package.json)) and [**Git**](https://git-scm.com/)
+- [**Bun**](https://bun.sh/) (version pinned in [`.bun-version`](./.bun-version), which CI also reads; minimum in `engines` in [`package.json`](./package.json)) and [**Git**](https://git-scm.com/)
 - **GitHub Personal Access Token** with `repo` scope
 - **LLM API Key** (OpenAI, OpenRouter, or compatible)
 - Fork of target React documentation repository with write access
@@ -69,6 +69,15 @@ To run the [main translation workflow](./.github/workflows/workflow.yml) on a fo
 
 Scheduled runs use [`.github/workflows/poll.yml`](./.github/workflows/poll.yml) to detect new commits on `reactjs/<lang>.react.dev` before starting translation. See [Automated upstream polling](https://github.com/NivaldoFarias/translate-react/wiki/Workflow#automated-upstream-polling).
 
+Scheduled translation is **opt-in**. `poll.yml` always polls and writes a run summary (changed locales, upstream SHAs, and whether translation was dispatched and why), but it only starts translation when the repository variable `SCHEDULED_TRANSLATION_ENABLED` is exactly `true`. Unset or any other value keeps it off. This is the kill switch: delete the variable or set it to `false` to stop scheduled translation without disabling the workflow. The manual `dry_run` input still skips translation for a single run. Manual `workflow.yml` dispatch is not gated.
+
+```bash
+gh variable set SCHEDULED_TRANSLATION_ENABLED --body true   # turn on
+gh variable delete SCHEDULED_TRANSLATION_ENABLED            # turn off
+```
+
+GitHub disables scheduled workflows after 60 days without repository activity. Each `poll.yml` run calls the workflow `enable` API to reset that timer. A workflow that is already disabled must be re-enabled once by hand (Actions tab or `gh workflow enable poll.yml`).
+
 When several locales run in parallel, tune LLM and GitHub limits. See [Parallel matrix locales](https://github.com/NivaldoFarias/translate-react/wiki/Workflow#parallel-matrix-locales--capacity).
 
 ### Manual translation
@@ -95,13 +104,13 @@ bun start
 
 ### Smoke runs
 
-`bun run ci:smoke` exercises the translation workflow against `react.dev` markdown fixtures with a live LLM and mocked GitHub. Use it to review translated output locally without touching a fork.
+`bun run ci:smoke` runs the translation workflow against fixture markdown with a live LLM and mocked GitHub. Review output locally without touching a fork.
 
-| Profile    | Fixtures exercised                                                                              |
-| ---------- | ----------------------------------------------------------------------------------------------- |
-| `quick`    | Default pre-merge slice: new-PR translation (small and large pages) and one out-of-sync refresh |
-| `workflow` | PR scenarios only: out-of-sync refresh and valid skip                                           |
-| `full`     | Every `*.md` file under `tests/fixtures/md/`                                                    |
+| Profile    | Fixtures exercised                                                           |
+| ---------- | ---------------------------------------------------------------------------- |
+| `quick`    | Pre-merge slice: new PRs (small and large pages) and one out-of-sync refresh |
+| `workflow` | PR scenarios only: out-of-sync refresh and valid skip                        |
+| `full`     | Every `*.md` file under `tests/fixtures/md/`                                 |
 
 ```bash
 bun run ci:smoke -- --profile quick
@@ -114,15 +123,15 @@ bun run ci:smoke -- --files hydrateRoot.md,lazy.md
 ```
 
 > [!NOTE]
-> Outputs land in gitignored `artifacts/smoke/` (translated markdown and mock PR bodies per fixture). The manual [smoke workflow](./.github/workflows/smoke.yml) uploads the same tree as a CI artifact. Layout and download: [Workflow smoke](./CONTRIBUTING.md#workflow-smoke).
+> Outputs land in gitignored `artifacts/smoke/` (translated markdown and mock PR bodies per fixture). Download layout: [CONTRIBUTING: Workflow smoke](./CONTRIBUTING.md#workflow-smoke). Manual [`smoke.yml`](./.github/workflows/smoke.yml) uploads the same tree as a CI artifact.
 
-[`workflow.integration.spec.ts`](./tests/integration/workflow.integration.spec.ts) mocks both GitHub and the LLM in CI. For a real-LLM pass with mocked GitHub, use `bun run ci:smoke` ([Workflow smoke](./CONTRIBUTING.md#workflow-smoke)).
+[`workflow.integration.spec.ts`](./tests/integration/workflow.integration.spec.ts) mocks GitHub and the LLM in CI. For a real LLM with mocked GitHub, use `bun run ci:smoke`.
 
 ## Versioning and releases
 
-- `package.json`'s `version` is the semver source. OpenRouter header defaults pull from `homepage`, `name`, and `version` unless overridden (see [Wiki: Configuration](https://github.com/NivaldoFarias/translate-react/wiki/Configuration)).
+- Semver source: `package.json` `version`. OpenRouter headers use `homepage`, `name`, and `version` unless overridden ([Wiki: Configuration](https://github.com/NivaldoFarias/translate-react/wiki/Configuration)).
 - Change log: [`CHANGELOG.md`](./CHANGELOG.md).
-- Tag and release steps: [Releases and semantic versioning](https://github.com/NivaldoFarias/translate-react/wiki/Workflow#releases-and-semantic-versioning).
+- Release steps: [Wiki: Releases and semantic versioning](https://github.com/NivaldoFarias/translate-react/wiki/Workflow#releases-and-semantic-versioning).
 
 ## Documentation
 
@@ -139,7 +148,7 @@ bun run ci:smoke -- --files hydrateRoot.md,lazy.md
 
 ## Contributing
 
-See [`CONTRIBUTING.md`](./CONTRIBUTING.md). Layout and services: [Wiki: Codebase](https://github.com/NivaldoFarias/translate-react/wiki/Codebase). Security policy: [`SECURITY.md`](./SECURITY.md). Common errors and debug logging: [Wiki: Configuration](https://github.com/NivaldoFarias/translate-react/wiki/Configuration#troubleshooting).
+See [`CONTRIBUTING.md`](./CONTRIBUTING.md). Layout: [Wiki: Codebase](https://github.com/NivaldoFarias/translate-react/wiki/Codebase). Security: [`SECURITY.md`](./SECURITY.md). Errors and debug logging: [Wiki: Configuration — Troubleshooting](https://github.com/NivaldoFarias/translate-react/wiki/Configuration#troubleshooting).
 
 ## Sponsor
 
@@ -149,4 +158,4 @@ If this saves your locale team manual translation work, consider [sponsoring the
 
 MIT License - see [LICENSE](./LICENSE) file for details.
 
-[^1]: Upstream PRs _(as well as comments on issues, etc.)_ can only be opened by a GitHub App if it is installed on the repository. Because of this, these specific actions are done by the user via PAT tokens instead of the bot.
+[^1]: Upstream PRs and issue comments need a PAT when the bot is not installed on the repository.
