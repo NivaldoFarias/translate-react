@@ -1,6 +1,6 @@
 import { pointEnd, pointStart } from "unist-util-position";
 
-import type { Code, Heading, Html, InlineCode, Link, Text } from "mdast";
+import type { Code, Heading, Html, InlineCode, Link, Paragraph, Text } from "mdast";
 import type { MdxFlowExpression, MdxTextExpression } from "mdast-util-mdx-expression";
 import type { MdxJsxAttribute, MdxJsxFlowElement, MdxJsxTextElement } from "mdast-util-mdx-jsx";
 import type { Node, Parent } from "unist";
@@ -68,6 +68,17 @@ export function isLink(node: Node): node is Link {
  */
 export function isHeading(node: Node): node is Heading {
 	return node.type === "heading";
+}
+
+/**
+ * Returns true when `node` is a paragraph.
+ *
+ * @param node Unist node to test
+ *
+ * @returns Whether `node` is an mdast `paragraph` node
+ */
+export function isParagraph(node: Node): node is Paragraph {
+	return node.type === "paragraph";
 }
 
 /**

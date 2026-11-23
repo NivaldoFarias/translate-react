@@ -2,6 +2,7 @@ export * from "./classify.util";
 export * from "./mdast-segment.util";
 export * from "./fence-comments.util";
 export * from "./extract-segments.util";
+export * from "./inline-groups.util";
 export * from "./segment-batch.util";
 export * from "@/app/services/translator/translator-segment-batch.schema";
 export * from "./segment-translation.util";

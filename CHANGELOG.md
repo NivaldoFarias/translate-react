@@ -11,6 +11,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Fixed
 
+- Drafts no longer keep English word order around inline code, links and emphasis ("uma `return` instrução condicional" is now "uma instrução `return` condicional"): the paragraph or heading is translated as one segment. If the model damages the markup, it falls back to split segments.
+- A run stops calling the LLM for a file as soon as the account is out of credit or the API key reaches its spending limit, instead of retrying every call.
 - Error logs no longer include HTTP headers or request and response objects from LLM and GitHub API errors.
 - A non-integer `MAX_LLM_CONCURRENCY` (such as `2.5`) now fails environment validation with the variable named, instead of crashing at startup with a raw `p-queue` v10 error.
 - pt-br pull requests no longer show a bogus "Termos Server/Client Component em inglês" advisory for `React Server Components`, which the pt-br rules keep in English. The `englishServerClientTerms` guard now runs only for the `ru` locale, and the Russian retry hint can no longer reach pt-br prompts.

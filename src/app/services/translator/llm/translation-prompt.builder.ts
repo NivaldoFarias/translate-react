@@ -266,6 +266,8 @@ export class TranslationPromptBuilder {
 				- Keep programming identifiers, proper nouns, versions, code-like tokens, and URLs unchanged unless the term reference explicitly maps them
 				- Never translate the JSON keys \`segmentId\`, \`source\`, \`heading\`, \`items\`, or \`translated\` themselves
 				- Do not add, remove, or merge segments; one output item per input item
+				- Some \`source\` values contain tags: \`<c0>...</c0>\` marks inline code and \`<s1>...</s1>\` marks a link or emphasis. Copy every tag exactly once and keep its nesting. Copy text inside \`<c...>\` tags unchanged; translate text inside \`<s...>\` tags
+				- Move tags wherever natural word order needs them: \`a conditional <c0>return</c0> statement\` puts the noun before the code in languages such as Portuguese (\`uma instrução <c0>return</c0> condicional\`). Never repeat a word on both sides of a tag, and never add backticks, asterisks or link syntax around tags
 
 				${this.resolveLocaleSpecificRules(systemPromptKind)}
 	

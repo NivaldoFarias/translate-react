@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
+import { StatusCodes } from "http-status-codes";
 
 import type { TranslatorServiceDependencies } from "@/app/services/translator/translator.service";
 
@@ -955,6 +956,53 @@ describe("TranslatorService", () => {
 				}).length;
 
 				expect(segmentBatchCallCount).toBeGreaterThanOrEqual(1);
+			});
+
+			test("should let inline code move within its sentence", async () => {
+				mockSegmentAwareTranslation({
+					"After a conditional <c0>return</c0> statement.":
+						"Após uma instrução <c0>return</c0> condicional.",
+				});
+
+				const file = createTranslationFileFixture({
+					content: "After a conditional `return` statement.",
+				});
+				const result = await translatorService.translateContent(file);
+
+				expect(result.content).toContain("Após uma instrução `return` condicional.");
+				expect(collectSegmentBatchSources()).toHaveLength(1);
+			});
+
+			test("should translate split segments when the model drops an inline tag", async () => {
+				mockSegmentAwareTranslation({
+					"After a conditional <c0>return</c0> statement.": "Após uma instrução condicional.",
+					"After a conditional ": "Após um ",
+					" statement.": " condicional.",
+				});
+
+				const file = createTranslationFileFixture({
+					content: "After a conditional `return` statement.",
+				});
+				const result = await translatorService.translateContent(file);
+
+				expect(result.content).toContain("Após um `return` condicional.");
+			});
+
+			test("should stop after one call when the API key limit is exceeded", () => {
+				const keyLimitError = createOpenAIApiErrorFixture({
+					status: StatusCodes.FORBIDDEN,
+					error: { message: "Key limit exceeded (total limit)" },
+				});
+				mockChatCompletionsCreate.mockRejectedValue(keyLimitError);
+
+				const file = createTranslationFileFixture({ content: "# Hello\n\nBody text." });
+
+				expect(
+					translatorService.translateContent(file).catch((error: unknown) => {
+						const calls = mockChatCompletionsCreate.mock.calls.length;
+						throw new Error(`${calls} call(s)`, { cause: error });
+					}),
+				).rejects.toThrow("1 call(s)");
 			});
 
 			test("should fall back to full-body translation when segment extraction is unsafe", async () => {
