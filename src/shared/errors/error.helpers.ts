@@ -163,9 +163,7 @@ export function isSegmentBatchStructuredOutputError(error: unknown) {
 
 /** Log reason when a segment batch is split after a splittable failure */
 export type SegmentBatchSplitReason =
-	| "completion_token_limit"
-	| "segment_batch_id_mismatch"
-	| "structured_output_error";
+	"completion_token_limit" | "segment_batch_id_mismatch" | "structured_output_error";
 
 /**
  * Returns whether a segment batch failure can be recovered by splitting the batch.

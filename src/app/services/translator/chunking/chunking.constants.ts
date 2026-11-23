@@ -25,7 +25,7 @@ export const CHUNKS = {
 
 /**
  * Tokens reserved below the provider completion cap when deriving per-chunk input budgets
- * so translated output is less likely to hit `max_tokens` mid-chunk.
+ * so translated output is less likely to hit `max_completion_tokens` mid-chunk.
  */
 export const CHUNK_OUTPUT_COMPLETION_RESERVE = 384;
 
@@ -34,7 +34,7 @@ export const CHUNK_OUTPUT_COMPLETION_RESERVE = 384;
  *
  * Some target languages (German, Russian, pt-BR) expand significantly versus English source,
  * and Gemini's tokenizer differs from tiktoken. A 1.5x ratio provides headroom to avoid
- * hitting `max_tokens` mid-translation on large chunks.
+ * hitting `max_completion_tokens` mid-translation on large chunks.
  */
 export const TRANSLATION_OUTPUT_TO_INPUT_TOKEN_RATIO = 1.5;
 

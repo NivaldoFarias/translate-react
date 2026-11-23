@@ -53,9 +53,8 @@ function openRouterModelFixture(
 describe("OpenRouterModelLimitsService", () => {
 	const service = new OpenRouterModelLimitsService();
 
-	const mockFetch = mock(
-		(_input: RequestInfo | URL, _init?: RequestInit): Promise<Response> =>
-			Promise.reject(new Error("mockFetch not configured")),
+	const mockFetch = mock((_input: RequestInfo | URL, _init?: RequestInit): Promise<Response> =>
+		Promise.reject(new Error("mockFetch not configured")),
 	);
 
 	beforeEach(() => {

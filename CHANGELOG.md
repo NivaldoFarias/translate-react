@@ -7,6 +7,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 ### Changed
 
 - Updated `p-queue` to v10 and `eslint-plugin-jsdoc` to v65.
+- LLM requests cap output with `max_completion_tokens` instead of the deprecated `max_tokens`. Providers behind a custom `LLM_API_BASE_URL` must accept the newer field.
 
 ### Fixed
 

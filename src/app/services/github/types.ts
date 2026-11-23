@@ -142,11 +142,7 @@ export interface PatchedRepositoryTreeItem extends SetRequired<RepositoryTreeIte
 
 /** GitHub pull request review state returned by the REST reviews API */
 export type PullRequestReviewState =
-	| "APPROVED"
-	| "CHANGES_REQUESTED"
-	| "COMMENTED"
-	| "DISMISSED"
-	| "PENDING";
+	"APPROVED" | "CHANGES_REQUESTED" | "COMMENTED" | "DISMISSED" | "PENDING";
 
 /** Author fields shared by pull request reviews and inline review comments */
 export interface ReviewerFeedbackAuthorSnapshot {

@@ -245,8 +245,7 @@ export class GitHubBranch {
 		for (const branch of branchesToCheck) {
 			try {
 				const pr = (await this.cleanupPullRequestAccess.findPullRequestByBranch(branch)) as
-					| { number: number }
-					| undefined;
+					{ number: number } | undefined;
 
 				if (!pr) {
 					this.logger.info({ branch }, "Cleanup: Deleting branch without PR");

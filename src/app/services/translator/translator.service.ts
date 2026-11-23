@@ -160,8 +160,8 @@ export class TranslatorService {
 	private readonly retryConfig: RetryOptions;
 
 	/**
-	 * When OpenRouter model metadata is loaded, caps chat `max_tokens` by the provider’s
-	 * `max_completion_tokens` (and `MAX_TOKENS`). Otherwise `null` and {@link env.MAX_TOKENS} is used.
+	 * When OpenRouter model metadata is loaded, caps chat `max_completion_tokens` by the provider’s
+	 * own `max_completion_tokens` (and `MAX_TOKENS`). Otherwise `null` and {@link env.MAX_TOKENS} is used.
 	 */
 	private providerCompletionTokenCap: number | null = null;
 
@@ -264,7 +264,7 @@ export class TranslatorService {
 		const response = await this.openai.chat.completions.create({
 			model: this.model,
 			messages: [{ role: "user", content: "ping" }],
-			max_tokens: CONNECTIVITY_TEST_MAX_TOKENS,
+			max_completion_tokens: CONNECTIVITY_TEST_MAX_TOKENS,
 			temperature: LLM_TEMPERATURE,
 		});
 
@@ -294,7 +294,7 @@ export class TranslatorService {
 
 	/**
 	 * When enabled and the base URL is hosted OpenRouter, loads `GET /v1/models` limits for {@link env.LLM_MODEL}
-	 * to widen per-chunk input budgets and align `max_tokens` with `top_provider.max_completion_tokens`.
+	 * to widen per-chunk input budgets and align `max_completion_tokens` with `top_provider.max_completion_tokens`.
 	 */
 	private async maybeApplyOpenRouterModelLimits() {
 		if (!env.LLM_API_BASE_URL.includes("openrouter")) {
