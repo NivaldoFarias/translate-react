@@ -4,6 +4,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-23
+
 ### Added
 
 - **Breaking (fork operators):** Scheduled translation from `poll.yml` is opt-in via the `SCHEDULED_TRANSLATION_ENABLED` repository variable, which must be exactly `true`. When unset, polls still run but do not start translation. The `dry_run` input is unchanged, and manual `workflow.yml` dispatch is not gated.
@@ -440,6 +442,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 - README `MAX_RETRY_ATTEMPTS` default matches runtime (`3`).
 
+[0.3.0]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.3.0
 [0.2.17]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.17
 [0.2.16]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.16
 [0.2.15]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.15
