@@ -28,6 +28,7 @@ import {
 import {
 	buildOpenRouterRunUserId,
 	getRateLimitResetWaitMs,
+	isLlmCreditExhaustedError,
 	isOpenRouterDailyFreeModelQuotaError,
 } from "@/app/utils/";
 import { ApplicationError, ErrorCode, isSegmentBatchSplittableError } from "@/shared/errors/";
@@ -898,7 +899,7 @@ export class TranslationLlmClient {
 	}
 
 	/**
-	 * Maps auth, bad-request, and OpenRouter quota errors to non-retrying `AbortError`.
+	 * Maps auth, bad-request, exhausted-credit, and OpenRouter quota errors to non-retrying `AbortError`.
 	 *
 	 * @param error Caught error from an LLM attempt
 	 * @param file File used for quota logging context
@@ -906,6 +907,14 @@ export class TranslationLlmClient {
 	private rethrowNonRetryableApiError(error: unknown, file: TranslationFile) {
 		if (error instanceof APIError) {
 			if (error.status === StatusCodes.UNAUTHORIZED || error.status === StatusCodes.BAD_REQUEST) {
+				throw new AbortError(error);
+			}
+
+			if (isLlmCreditExhaustedError(error)) {
+				file.logger.error(
+					{ model: this.model, status: error.status, message: error.message },
+					"LLM credit or API key limit exhausted; add credits or raise the key limit",
+				);
 				throw new AbortError(error);
 			}
 

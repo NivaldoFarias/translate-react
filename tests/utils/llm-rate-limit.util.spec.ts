@@ -1,10 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { StatusCodes } from "http-status-codes";
 import { APIError } from "openai";
+import { AbortError } from "p-retry";
 
 import { MS_PER_SECOND } from "@/app/constants";
 import {
 	getRateLimitResetWaitMs,
+	isLlmCreditExhaustedError,
 	isOpenRouterDailyFreeModelQuotaError,
 } from "@/app/utils/llm-rate-limit.util";
 
@@ -116,5 +118,32 @@ describe("isOpenRouterDailyFreeModelQuotaError", () => {
 			new Headers(),
 		);
 		expect(isOpenRouterDailyFreeModelQuotaError(error)).toBe(true);
+	});
+});
+
+describe("isLlmCreditExhaustedError", () => {
+	const keyLimitMessage = "Key limit exceeded (total limit). $7.00 of $7.00 used; does not reset.";
+
+	test.each([
+		["key spending limit", StatusCodes.FORBIDDEN, keyLimitMessage],
+		["empty account balance", StatusCodes.PAYMENT_REQUIRED, "Insufficient credits"],
+	])("returns true for %s", (_name, status, message) => {
+		const error = APIError.generate(status, { error: { message } }, undefined, new Headers());
+
+		expect(isLlmCreditExhaustedError(error)).toBe(true);
+		expect(isLlmCreditExhaustedError(new AbortError(error))).toBe(true);
+	});
+
+	test.each([
+		["moderation refusals", StatusCodes.FORBIDDEN, "Input was flagged by moderation"],
+		["rate limits", StatusCodes.TOO_MANY_REQUESTS, keyLimitMessage],
+	])("returns false for %s", (_name, status, message) => {
+		const error = APIError.generate(status, { error: { message } }, undefined, new Headers());
+
+		expect(isLlmCreditExhaustedError(error)).toBe(false);
+	});
+
+	test("returns false for non-API errors", () => {
+		expect(isLlmCreditExhaustedError(new Error(keyLimitMessage))).toBe(false);
 	});
 });

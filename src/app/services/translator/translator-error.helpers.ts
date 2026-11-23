@@ -2,7 +2,10 @@ import { StatusCodes } from "http-status-codes";
 import { APIError } from "openai/error";
 import { AbortError } from "p-retry";
 
-import { isOpenRouterDailyFreeModelQuotaError } from "@/app/utils/llm-rate-limit.util";
+import {
+	isLlmCreditExhaustedError,
+	isOpenRouterDailyFreeModelQuotaError,
+} from "@/app/utils/llm-rate-limit.util";
 import { ApplicationError, isSegmentBatchSplittableError } from "@/shared/errors/";
 
 /**
@@ -24,7 +27,8 @@ export function isSegmentTranslationLegacyFallbackEligible(error: unknown) {
 		if (
 			error.status === StatusCodes.UNAUTHORIZED ||
 			error.status === StatusCodes.BAD_REQUEST ||
-			isOpenRouterDailyFreeModelQuotaError(error)
+			isOpenRouterDailyFreeModelQuotaError(error) ||
+			isLlmCreditExhaustedError(error)
 		) {
 			return false;
 		}

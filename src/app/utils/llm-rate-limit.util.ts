@@ -1,4 +1,6 @@
 import { StatusCodes } from "http-status-codes";
+import { APIError } from "openai/error";
+import { AbortError } from "p-retry";
 
 import { MS_PER_SECOND } from "@/app/constants";
 import { flattenOpenAiStyleErrorPayload } from "@/shared/errors/";
@@ -11,6 +13,9 @@ const MAX_RATE_LIMIT_RESET_WAIT_MS = 120_000;
 
 /** OpenRouter body snippet when the account has exhausted the daily free-model allowance */
 const OPENROUTER_FREE_MODELS_PER_DAY = "free-models-per-day";
+
+/** OpenRouter 403 body snippet when the API key has used its spending limit */
+const OPENROUTER_KEY_LIMIT_EXCEEDED = "key limit exceeded";
 
 /**
  * Narrows unknown failures to OpenAI-compatible 429 responses without relying on `instanceof` across package entry points.
@@ -45,6 +50,29 @@ export function isOpenRouterDailyFreeModelQuotaError(error: unknown) {
 	const haystack = `${error.message}\n${flattenOpenAiStyleErrorPayload(error.error)}`.toLowerCase();
 
 	return haystack.includes(OPENROUTER_FREE_MODELS_PER_DAY);
+}
+
+/**
+ * Returns whether an LLM error means the account or API key has no credit left.
+ *
+ * OpenRouter answers 402 when the account balance runs out and 403 "Key limit exceeded" when the
+ * key's own spending limit is reached. Neither recovers on retry. Other 403 responses, such as
+ * moderation refusals, are not matched.
+ *
+ * @param error Caught rejection from an LLM call
+ *
+ * @returns `true` for exhausted account credit or key limit
+ */
+export function isLlmCreditExhaustedError(error: unknown): boolean {
+	if (error instanceof AbortError) return isLlmCreditExhaustedError(error.originalError);
+
+	if (!(error instanceof APIError)) return false;
+
+	if (error.status === StatusCodes.PAYMENT_REQUIRED) return true;
+
+	const haystack = `${error.message}\n${flattenOpenAiStyleErrorPayload(error.error)}`.toLowerCase();
+
+	return error.status === StatusCodes.FORBIDDEN && haystack.includes(OPENROUTER_KEY_LIMIT_EXCEEDED);
 }
 
 /**
