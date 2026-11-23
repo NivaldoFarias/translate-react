@@ -169,7 +169,7 @@ export class TranslationLlmClient {
 		const params: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming = {
 			model: this.model,
 			temperature: LLM_TEMPERATURE,
-			max_tokens: this.getCompletionTokenCap(),
+			max_completion_tokens: this.getCompletionTokenCap(),
 			messages: [
 				{
 					role: "system",

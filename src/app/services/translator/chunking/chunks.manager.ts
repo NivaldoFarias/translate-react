@@ -60,7 +60,7 @@ export class ChunksManager {
 	private readonly maxGrossChunkInputTokens: number;
 
 	/**
-	 * Provider `max_tokens` / completion cap for one assistant message; used to cap chunk **input**
+	 * Provider `max_completion_tokens` cap for one assistant message; used to cap chunk **input**
 	 * so a single translation call is less likely to exceed available completion budget.
 	 */
 	private readonly maxCompletionTokensPerResponse: number;
@@ -219,7 +219,7 @@ export class ChunksManager {
 	 * Chunking is required when the body exceeds either the configured **context** budget
 	 * (`maxGrossChunkInputTokens - SYSTEM_PROMPT_TOKEN_RESERVE`) or the **completion** budget
 	 * derived from {@link maxCompletionTokensPerResponse} so a single-shot translation is unlikely
-	 * to hit `max_tokens` mid-document.
+	 * to hit `max_completion_tokens` mid-document.
 	 *
 	 * @param file Translation file whose `content` is measured against token budgets
 	 *
