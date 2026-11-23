@@ -1,7 +1,6 @@
 import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test";
 import { StatusCodes } from "http-status-codes";
 
-import type { components } from "@octokit/openapi-types";
 import type { Octokit, RestEndpointMethodTypes } from "@octokit/rest";
 
 import type { GitHubServiceDependencies } from "@/app/services/github/github.service";
@@ -260,10 +259,10 @@ describe("GitHubService", () => {
 				const sharedSha = "same-commit-sha-12345";
 				octokitMock.repos.listCommits.mockResolvedValueOnce({
 					data: [{ sha: sharedSha }],
-				} as RestEndpointMethodTypes["repos"]["listCommits"]["response"]);
+				});
 				octokitMock.repos.listCommits.mockResolvedValueOnce({
 					data: [{ sha: sharedSha }],
-				} as RestEndpointMethodTypes["repos"]["listCommits"]["response"]);
+				});
 
 				const result = await githubService.isForkSynced();
 
@@ -930,7 +929,7 @@ describe("GitHubService", () => {
 			test("should return PR when branch matches", async () => {
 				octokitMock.pulls.list.mockResolvedValueOnce({
 					data: [{ number: 1, head: { ref: "translate/test" }, title: "Test PR" }],
-				} as RestEndpointMethodTypes["pulls"]["list"]["response"]);
+				});
 
 				const pr = await githubService.findPullRequestByBranch("translate/test");
 
@@ -1126,9 +1125,7 @@ describe("GitHubService", () => {
 			test("should create a new comment when progress issue exists", async () => {
 				octokitMock.rest.search.issuesAndPullRequests.mockResolvedValueOnce({
 					data: {
-						items: [
-							{ number: 123, state: "open" } as components["schemas"]["issue-search-result-item"],
-						],
+						items: [{ number: 123, state: "open" }],
 						total_count: 1,
 					},
 				});
@@ -1164,9 +1161,7 @@ describe("GitHubService", () => {
 			test("should create a comment when only existing pull requests were updated", async () => {
 				octokitMock.rest.search.issuesAndPullRequests.mockResolvedValueOnce({
 					data: {
-						items: [
-							{ number: 123, state: "open" } as components["schemas"]["issue-search-result-item"],
-						],
+						items: [{ number: 123, state: "open" }],
 						total_count: 1,
 					},
 				});
