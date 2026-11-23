@@ -28,4 +28,4 @@ paths:
 
 ## Verification
 
-Run `bun run ci:smoke -- --profile quick` before merging changes here. Override the language or model with `--lang` / `--model` (e.g. `bun run ci:smoke -- --lang ru --files use-client.md --model openai/gpt-5.4-nano`). Output lands in `artifacts/smoke/`. A full re-translation is non-deterministic: it can fix one defect class and introduce another.
+Dispatch a `quick` `smoke.yml` run on the branch before merging changes here (`gh workflow run smoke.yml --ref <branch> -f profile=quick`). Override the locale, fixtures or model with the `lang`, `files` and `llm_model` inputs. Read the output with the `investigate-workflow-run` skill. A full re-translation is non-deterministic: it can fix one defect class and introduce another.

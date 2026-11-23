@@ -7,11 +7,11 @@ Path-scoped standards live in `.claude/rules/` and load with the files they cove
 ## Working agreements
 
 - Run `git commit`, `push`, rebase, or amend only when the user asks for it. "Append a commit" describes the end state you're aiming for. It isn't permission to commit.
-- Do not create GitHub issues unless the user asks. Outline follow-up work in chat and let the user decide what to file. Track tech debt that needs design notes in issues with the `tech debt` label rather than in-code TODOs.
-- Leave real GitHub Actions runs (`gh workflow run`) to the user unless they ask you to start one. A plan step that needs a real run stays a manual step.
+- File GitHub issues when a skill's workflow calls for them (see `docs/agents/issue-tracker.md`). Track tech debt that needs design notes in issues with the `tech debt` label rather than in-code TODOs.
+- Validate with `smoke.yml` dispatches (`gh workflow run smoke.yml`), not local `ci:smoke` runs: GitHub keeps the run history. Never trigger `workflow.yml` or `poll.yml` translation and never set `SCHEDULED_TRANSLATION_ENABLED`: real runs can open invalid PRs on `reactjs` locale repos.
 - Keep `${{ vars.X }}` references in workflow YAML. When a variable's value is wrong or too low, tell the user to fix it in GitHub Settings.
 - Prefer the smallest proven slice. Push back on speculative automation: locale-specific heuristic guards, guard-driven retries, automated maintainer remediation, pre-commit tooling (Husky, lint-staged, commitlint), coverage thresholds or Codecov. Investigate a post-incident fix before building a large layer for it.
-- Write `.md` files only when the user asks, or when a skill's workflow writes them (`GLOSSARY.md`, `docs/adr/`, `.wiki/` drafts). Explanations go in chat.
+- Write `.md` files when the user asks or a skill's workflow writes them (`GLOSSARY.md`, `docs/adr/`, `.wiki/` drafts). One-off explanations go in chat.
 - Use `git mv` (or `mv` for untracked files) to move or rename a file without changing its content.
 - Before opening a PR, run the `pre-pr-sweep` skill on the branch diff.
 
@@ -29,7 +29,7 @@ Path-scoped standards live in `.claude/rules/` and load with the files they cove
 
 ## Architecture
 
-- Use Bun as package manager and runtime. Before a PR, run `bun run lint`, `bun run format:check`, `bun run type-check` and `bun test`. Changes to the translator, runner or locales also need `bun run ci:smoke -- --profile quick` (real LLM, mocked GitHub).
+- Use Bun as package manager and runtime. Before a PR, run `bun run lint`, `bun run format:check`, `bun run type-check` and `bun test`. Changes to the translator, runner or locales also need a `quick` `smoke.yml` run on the branch (real LLM, mocked GitHub).
 - `src/` has three runtimes: `app/` (translation CLI), `ci/` (GitHub Actions scripts) and `shared/`. `app` and `ci` never import each other, and `shared` imports neither. Organize by role (`services/`, `clients/`, `utils/`, `schemas/`, `constants/`, `actions/`), then by feature. Do not add buckets like `lib/`, `entries/` or `domain/`.
 - Wire service singletons only in `src/app/composition.ts`. `github/` and `locales/` never import from `services/runner/`; shared workflow types live in each service's `types.ts`.
 - Errors: throw `ApplicationError` (with `ErrorCode`) for domain failures and rethrow it unchanged. Let library errors bubble up. `main.ts` handles them at the top level. When a budget or limit causes the failure (retries, circuit breaker, token cap), name the constant and its value in the message or `metadata`.
