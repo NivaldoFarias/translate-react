@@ -145,6 +145,20 @@ describe("restoreInlineGroup", () => {
 		);
 	});
 
+	test("rejects a translation that joins or adds source lines", () => {
+		const group = onlyGroup("Call `a` first.\nCall `b` second.");
+
+		expect(
+			restoreInlineGroup("Chame <c0>a</c0> antes. Chame <c1>b</c1> depois.", group),
+		).toBeNull();
+		expect(
+			restoreInlineGroup("Chame <c0>a</c0>\nantes.\nChame <c1>b</c1> depois.", group),
+		).toBeNull();
+		expect(restoreInlineGroup("Chame <c0>a</c0> antes.\nChame <c1>b</c1> depois.", group)).toBe(
+			"Chame `a` antes.\nChame `b` depois.",
+		);
+	});
+
 	test("restores code containing replacement patterns and markup verbatim", () => {
 		const group = onlyGroup("Render `<App $& />` in the root.");
 

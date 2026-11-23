@@ -3,6 +3,9 @@ import { MARKDOWN_REGEXES } from "../../markdown/markdown.regexes";
 /** Matches `function` declarations and captures the identifier name */
 const FUNCTION_DECLARATION = new RegExp(/\bfunction\s+(?<name>[A-Za-z_$][\w$]*)/g);
 
+/** Matches slash-star comments and double-slash comments, leaving `://` in URLs alone */
+const CODE_COMMENT = /\/\*[\s\S]*?\*\/|(?<!:)\/\/.*$/gm;
+
 /** One function identifier renamed between paired fenced blocks */
 export interface FenceFunctionIdentifierMismatch {
 	/** 1-based fence index in document order */
@@ -24,7 +27,18 @@ export function extractFencedCodeBlockBodies(markdown: string) {
 }
 
 /**
- * Collects function declaration names from a code snippet.
+ * Removes comments from a code snippet, so prose such as "a function to reset" is not read as code.
+ *
+ * @param code Fence inner text
+ *
+ * @returns Code without comments
+ */
+function stripCodeComments(code: string) {
+	return code.replace(CODE_COMMENT, "");
+}
+
+/**
+ * Collects function declaration names from a code snippet, ignoring comments.
  *
  * @param code Fence inner text
  *
@@ -34,7 +48,7 @@ export function collectFunctionDeclarationNames(code: string) {
 	const names: string[] = [];
 	const seen = new Set<string>();
 
-	for (const match of code.matchAll(FUNCTION_DECLARATION)) {
+	for (const match of stripCodeComments(code).matchAll(FUNCTION_DECLARATION)) {
 		const name = match.groups?.["name"];
 		if (!name || seen.has(name)) continue;
 
@@ -71,9 +85,11 @@ export function findFenceFunctionIdentifierMismatches(
 		const translatedFence = translatedFences[index];
 		if (!sourceFence || translatedFence === undefined) continue;
 
+		const translatedCode = stripCodeComments(translatedFence);
+
 		for (const sourceName of collectFunctionDeclarationNames(sourceFence)) {
 			const preservedPattern = new RegExp(`\\bfunction\\s+${escapeRegExp(sourceName)}\\b`);
-			if (!preservedPattern.test(translatedFence)) {
+			if (!preservedPattern.test(translatedCode)) {
 				mismatches.push({ fenceIndex: index + 1, sourceName });
 			}
 		}

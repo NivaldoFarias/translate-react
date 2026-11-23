@@ -81,6 +81,9 @@ export type WorkflowFixtureManifestEntry = Readonly<{
 
 	/** Optional smoke-only GitHub mock overrides */
 	smoke?: Partial<WorkflowFixtureSmoke>;
+
+	/** Only target locale this fixture suits, when its source is not English */
+	onlyTargetLanguage?: string;
 }>;
 
 /**

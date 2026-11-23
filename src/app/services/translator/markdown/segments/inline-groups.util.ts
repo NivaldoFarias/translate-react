@@ -255,7 +255,7 @@ export function groupInlineSegments(
  * Restores source markdown in a translated group.
  *
  * Rejects a translation unless every tag appears exactly once, correctly nested, inside the same
- * parent as in the source, and the model added no markdown of its own. Code always comes back
+ * parent as in the source, line breaks match, and the model added no markdown of its own. Code always comes back
  * verbatim, even when the model translated the text inside its tag.
  *
  * @param translated Tagged translation from the model
@@ -265,6 +265,8 @@ export function groupInlineSegments(
  */
 export function restoreInlineGroup(translated: string, group: InlineGroupSegment): string | null {
 	if (GLUED_TAG.test(translated) && !GLUED_TAG.test(group.sourceText)) return null;
+
+	if (countLines(translated) !== countLines(group.sourceText)) return null;
 
 	const tagByName = new Map(group.inlineTags.map((tag) => [tag.name, tag]));
 	const sourceProse = stripInlineTags(group.sourceText);
@@ -320,6 +322,17 @@ export function restoreInlineGroup(translated: string, group: InlineGroupSegment
 	append(translated.slice(cursor));
 
 	return output;
+}
+
+/**
+ * Counts the lines of a text.
+ *
+ * @param text Text to count
+ *
+ * @returns Number of lines
+ */
+function countLines(text: string) {
+	return text.split(/\r?\n/).length;
 }
 
 /**

@@ -7,12 +7,14 @@ const JS_FENCE_LANGS = new Set(["js", "javascript", "ts", "typescript", "tsx"]);
 /**
  * Returns true when the fence language supports TypeScript comment extraction.
  *
+ * react.dev writes line highlights both with and without a space (`js {2-3}` and `js{2-3}`).
+ *
  * @param fenceLang GFM fence info string
  *
  * @returns Whether to run the TypeScript comment parser on the fence body
  */
 export function isJsLikeFenceLang(fenceLang: string): boolean {
-	const normalized = fenceLang.trim().toLowerCase().split(/\s/)[0] ?? "";
+	const normalized = fenceLang.trim().toLowerCase().split(/[\s{]/)[0] ?? "";
 	return JS_FENCE_LANGS.has(normalized);
 }
 

@@ -308,11 +308,11 @@ function extractBodySegments(body: string, offsetBase: number, fullSource: strin
 			);
 		}
 
-		if (isMdxJsxElement(node)) {
+		if (isMdxJsxElement(node) && !insidePreserve) {
 			extractMdxAttributeSegments(state, node, path, context);
 		}
 
-		if (isLink(node)) {
+		if (isLink(node) && !insidePreserve) {
 			pushLinkLabelSegment(state, node, path, context);
 		}
 
