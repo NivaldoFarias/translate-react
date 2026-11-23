@@ -244,13 +244,9 @@ export function validateEnv(env?: Environment): Environment {
  * @returns Default values for the active or fallback runtime environment
  */
 function resolveEnvDefaults(): EnvironmentSchemaDefaults {
-	const nodeEnv = import.meta.env.NODE_ENV as RuntimeEnvironment | undefined;
+	const nodeEnv = z.enum(RuntimeEnvironment).safeParse(import.meta.env.NODE_ENV);
 
-	if (nodeEnv && Object.values(RuntimeEnvironment).includes(nodeEnv)) {
-		return environmentDefaults[nodeEnv];
-	}
-
-	return environmentDefaults[RuntimeEnvironment.Development];
+	return environmentDefaults[nodeEnv.success ? nodeEnv.data : RuntimeEnvironment.Development];
 }
 
 /**
