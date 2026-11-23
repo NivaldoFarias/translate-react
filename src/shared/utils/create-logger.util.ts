@@ -38,6 +38,32 @@ function truncateString(
 }
 
 /**
+ * Serializers and redaction applied to every logger.
+ *
+ * API errors carry HTTP headers and request/response objects as enumerable properties. They are
+ * removed from `error` and from errors nested one level inside it.
+ */
+export const loggerFieldOptions = {
+	serializers: {
+		error: pino.stdSerializers.err,
+		content: (value: unknown) => truncateString(value, "content", MAX_LOG_STRING_LENGTH),
+		body: (value: unknown) => truncateString(value, "body", MAX_LOG_STRING_LENGTH),
+		text: (value: unknown) => truncateString(value, "text", MAX_LOG_STRING_LENGTH),
+	},
+	redact: {
+		paths: [
+			"error.headers",
+			"error.request",
+			"error.response",
+			"error.*.headers",
+			"error.*.request",
+			"error.*.response",
+		],
+		remove: true,
+	},
+} satisfies pino.LoggerOptions;
+
+/**
  * Builds a Pino logger with file transport and optional pretty console output.
  *
  * @param options Log level, console toggle, and working directory for log files
@@ -60,12 +86,7 @@ export function createLogger(options: CreateLoggerOptions) {
 			hostname: undefined,
 		},
 		timestamp: pino.stdTimeFunctions.isoTime,
-		serializers: {
-			error: pino.stdSerializers.err,
-			content: (value: unknown) => truncateString(value, "content", MAX_LOG_STRING_LENGTH),
-			body: (value: unknown) => truncateString(value, "body", MAX_LOG_STRING_LENGTH),
-			text: (value: unknown) => truncateString(value, "text", MAX_LOG_STRING_LENGTH),
-		},
+		...loggerFieldOptions,
 		transport: {
 			targets: [
 				{
