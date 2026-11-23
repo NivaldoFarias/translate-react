@@ -46,7 +46,7 @@
 		"http-status-codes": "^2.3.0",
 		"js-tiktoken": "^1.0.21",
 		"openai": "^7.2.0",
-		"p-queue": "^9.1.0",
+		"p-queue": "^10.0.0",
 		"p-retry": "^8.0.0",
 		"pino": "^10.3.0",
 		"pretty-bytes": "^7.1.0",

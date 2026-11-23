@@ -57,3 +57,10 @@ describe("app env.schema boolean variables", () => {
 		expect(parseRawEnv({ GITHUB_ACTIONS: "true" }).GITHUB_ACTIONS).toBe(true);
 	});
 });
+
+describe("app env.schema queue limits", () => {
+	test("MAX_LLM_CONCURRENCY rejects non-integers, which p-queue would reject at startup", () => {
+		expect(() => parseRawEnv({ MAX_LLM_CONCURRENCY: "2.5" })).toThrow("MAX_LLM_CONCURRENCY");
+		expect(parseRawEnv({ MAX_LLM_CONCURRENCY: "3" }).MAX_LLM_CONCURRENCY).toBe(3);
+	});
+});
