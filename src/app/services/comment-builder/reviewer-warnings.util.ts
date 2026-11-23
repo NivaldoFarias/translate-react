@@ -5,6 +5,7 @@ import type { PostTranslationGuardId } from "@/app/services/translator/validatio
 
 import { MARKDOWN_REGEXES } from "@/app/services/translator/markdown/markdown.regexes";
 import {
+	findEnglishServerClientTermViolations,
 	findExtraMarkdownLinkViolationDetails,
 	findMdxSpacingViolationDetails,
 	findSentenceCaseHeadingViolationDetails,
@@ -325,6 +326,33 @@ function collectSentenceCaseHeadingViolations(translatedMarkdown: string) {
 }
 
 /**
+ * Collects English Server/Client Component term violations, one per affected line.
+ *
+ * @param translatedMarkdown Translated markdown
+ *
+ * @returns Located violations for the PR details block
+ */
+function collectEnglishServerClientTermViolations(translatedMarkdown: string) {
+	const seenLines = new Set<number>();
+	const violations: LocatedViolation[] = [];
+
+	for (const violation of findEnglishServerClientTermViolations(translatedMarkdown)) {
+		if (seenLines.has(violation.lineNumber)) {
+			continue;
+		}
+
+		seenLines.add(violation.lineNumber);
+		violations.push({
+			startLine: violation.lineNumber,
+			endLine: violation.lineNumber,
+			body: violation.excerpt,
+		});
+	}
+
+	return violations;
+}
+
+/**
  * Collects extra markdown link guard violations with document line ranges.
  *
  * @param sourceMarkdown Original markdown
@@ -473,6 +501,8 @@ function formatGuardSectionBody(
 			collectSentenceCaseHeadingViolations(translatedMarkdown),
 		[POST_TRANSLATION_GUARD_IDS.extraMarkdownLinks]: () =>
 			collectExtraMarkdownLinkViolations(sourceMarkdown, translatedMarkdown),
+		[POST_TRANSLATION_GUARD_IDS.englishServerClientTerms]: () =>
+			collectEnglishServerClientTermViolations(translatedMarkdown),
 		[POST_TRANSLATION_GUARD_IDS.frontmatterPreserved]: () =>
 			collectFrontmatterViolations(sourceMarkdown, translatedMarkdown),
 		[POST_TRANSLATION_GUARD_IDS.headingsPreserved]: () =>

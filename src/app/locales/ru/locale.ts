@@ -2,6 +2,8 @@ import type { TranslationFile } from "@/app/services/translator/";
 
 import type { LocaleDefinition, LocalePRBodyStrings, ProgressCommentRunContext } from "../types";
 
+import { englishServerClientTermsGuard } from "@/app/services/translator/validation/guards/advisory-style.guard";
+
 import { createGuardLabelResolver } from "../guard-labels.util";
 import { createPRBodyBuilder } from "../pr-body.builder";
 
@@ -85,4 +87,5 @@ export const ruLocale: LocaleDefinition = {
 		title: (file: TranslationFile) => `Перевод \`${file.filename}\` на русский язык`,
 		body: createPRBodyBuilder(ruPRBodyStrings),
 	},
+	validationGuards: [englishServerClientTermsGuard],
 };
