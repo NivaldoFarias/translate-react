@@ -99,7 +99,11 @@ export async function run(options: SmokeRunOptions) {
 
 	logger.debug({ fixtureDir: MD_FIXTURE_DIR, basenames: basenames ?? "all" }, "Loading fixtures");
 
-	const integrationFiles = await loadWorkflowFilesFromMdFixtureDir(basenames, cwd);
+	const integrationFiles = await loadWorkflowFilesFromMdFixtureDir(
+		basenames,
+		cwd,
+		env.TARGET_LANGUAGE,
+	);
 	const totalBytes = integrationFiles.reduce((sum, file) => sum + file.blob.content.length, 0);
 
 	logger.debug(

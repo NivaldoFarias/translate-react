@@ -26,6 +26,7 @@ import type { LanguageAnalysisResult } from "@/app/services/language-detector/la
 
 import type {
 	WorkflowFixtureFile,
+	WorkflowFixtureManifestEntry,
 	WorkflowFixtureSmoke,
 } from "@tests/fixtures/workflow-fixture.util";
 import type {
@@ -279,20 +280,40 @@ async function listMdFixtureBasenames(cwd: string) {
 }
 
 /**
+ * Returns the manifest entry for a fixture, or a default one when it is not registered.
+ *
+ * @param name Fixture basename
+ *
+ * @returns Manifest entry for the fixture
+ */
+function resolveWorkflowFixtureManifestEntry(name: string): WorkflowFixtureManifestEntry {
+	return name in WORKFLOW_FIXTURE_MANIFEST ?
+			WORKFLOW_FIXTURE_MANIFEST[name as keyof typeof WORKFLOW_FIXTURE_MANIFEST]
+		:	defaultWorkflowFixtureManifestEntry(name);
+}
+
+/**
  * Loads markdown fixtures from `tests/fixtures/md/` for integration workflow tests.
  *
- * When `basenames` is omitted or empty, loads every `*.md` in that directory (sorted). When set,
- * loads only those files in the given order; each name must exist.
+ * When `basenames` is omitted or empty, loads every `*.md` in that directory (sorted) that suits
+ * `targetLanguage`. When set, loads only those files in the given order; each name must exist.
  *
  * @param basenames Optional subset of fixture filenames (e.g. `["use-memo.md"]`)
  * @param cwd Repository root (defaults to `process.cwd()`)
+ * @param targetLanguage Optional target locale used to skip fixtures limited to another one
  */
 export async function loadWorkflowFilesFromMdFixtureDir(
 	basenames?: readonly string[],
 	cwd: string = process.cwd(),
+	targetLanguage?: string,
 ) {
 	const allNames = await listMdFixtureBasenames(cwd);
-	const orderedNames = basenames !== undefined && basenames.length > 0 ? [...basenames] : allNames;
+	const suitableNames = allNames.filter((name) => {
+		const { onlyTargetLanguage } = resolveWorkflowFixtureManifestEntry(name);
+		return !targetLanguage || !onlyTargetLanguage || onlyTargetLanguage === targetLanguage;
+	});
+	const orderedNames =
+		basenames !== undefined && basenames.length > 0 ? [...basenames] : suitableNames;
 
 	if (orderedNames.length === 0) {
 		throw new Error(`No .md files found under ${MD_FIXTURE_DIR}`);
@@ -314,10 +335,7 @@ export async function loadWorkflowFilesFromMdFixtureDir(
 	for (const name of orderedNames) {
 		const absoluteFile = path.join(absoluteDir, name);
 		const content = await fs.readFile(absoluteFile, "utf8");
-		const manifestEntry =
-			name in WORKFLOW_FIXTURE_MANIFEST ?
-				WORKFLOW_FIXTURE_MANIFEST[name as keyof typeof WORKFLOW_FIXTURE_MANIFEST]
-			:	defaultWorkflowFixtureManifestEntry(name);
+		const manifestEntry = resolveWorkflowFixtureManifestEntry(name);
 
 		files.push(buildWorkflowFixtureFile(manifestEntry.tree, content, manifestEntry.smoke));
 	}

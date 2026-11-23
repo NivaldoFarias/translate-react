@@ -11,6 +11,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Fixed
 
+- `<ConsoleBlock>` and `<ConsoleLogLine>` messages stay in English, matching what the runtime prints, instead of being partly translated.
+- Code comments in fences with line highlights and no space (`js{2-3}`) are now translated like those in other fences.
+- The `fenceFunctionIdentifiers` advisory no longer fires on the word "function" in code comments.
 - Drafts no longer keep English word order around inline code, links and emphasis ("uma `return` instrução condicional" is now "uma instrução `return` condicional"): the paragraph or heading is translated as one segment. If the model damages the markup, it falls back to split segments.
 - A run stops calling the LLM for a file as soon as the account is out of credit or the API key reaches its spending limit, instead of retrying every call.
 - Error logs no longer include HTTP headers or request and response objects from LLM and GitHub API errors.

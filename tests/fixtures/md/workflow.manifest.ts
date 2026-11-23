@@ -17,6 +17,7 @@ import {
  *
  * - `profile`: which translation surface or guard set to exercise (output quality).
  * - `tree`: {@link PatchedRepositoryTreeItem} fields from `getRepositoryTree` (`filename` derived from `path`).
+ * - `onlyTargetLanguage`: skips the fixture for other locales when every fixture is loaded.
  * - `smoke`: mocked GitHub only ({@link WorkflowFixturePrScenario} drives Created vs Updated vs skip).
  *
  * @param path The path to the fixture file
@@ -66,6 +67,7 @@ export const WORKFLOW_FIXTURE_MANIFEST = {
 	"describing-the-ui.md": {
 		profile: WorkflowFixtureProfile.LearnTutorial,
 		tree: fixtureTree("src/content/learn/describing-the-ui.md"),
+		onlyTargetLanguage: "pt-br",
 		smoke: {
 			pullRequestNumber: 104,
 			pullRequestScenario: WorkflowFixturePrScenario.New,

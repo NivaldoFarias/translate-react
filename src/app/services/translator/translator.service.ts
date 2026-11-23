@@ -908,8 +908,15 @@ export class TranslatorService {
 
 				const restored = restoreInlineGroup(sanitized, segment);
 
-				if (restored === null) rejectedGroups.push(segment);
-				else translations[item.segmentId] = restored;
+				if (restored === null) {
+					file.logger.debug(
+						{ segmentId: segment.id, source: segment.sourceText, translated: sanitized },
+						"Inline group translation rejected",
+					);
+					rejectedGroups.push(segment);
+				} else {
+					translations[item.segmentId] = restored;
+				}
 			}
 
 			const splitTranslations = await this.translateRejectedInlineGroups(

@@ -22,6 +22,9 @@ export const PRESERVE_ANCESTOR_TYPES = new Set<PreserveAncestorType>([
 	"html",
 ]);
 
+/** MDX components whose text mirrors English runtime console output and stays untranslated */
+const CONSOLE_OUTPUT_COMPONENTS = new Set(["ConsoleBlock", "ConsoleLogLine"]);
+
 /** Policy-classified MDX JSX wrapper element types */
 export type PolicyMdxJsxType = MdxJsxFlowElement["type"] | MdxJsxTextElement["type"];
 
@@ -115,6 +118,17 @@ export function isMdxJsxAttribute(node: Node): node is MdxJsxAttribute {
 }
 
 /**
+ * Returns true when `node` is an MDX component that shows console output.
+ *
+ * @param node Unist node to test
+ *
+ * @returns Whether `node` is a `<ConsoleBlock>` or `<ConsoleLogLine>` element
+ */
+export function isConsoleOutputElement(node: Node) {
+	return isMdxJsxElement(node) && node.name !== null && CONSOLE_OUTPUT_COMPONENTS.has(node.name);
+}
+
+/**
  * Returns true when `node` is a preserve-only ancestor type.
  *
  * @param node Unist node to test
@@ -126,14 +140,14 @@ export function isPreserveAncestor(node: Node): node is Node & { type: PreserveA
 }
 
 /**
- * Returns whether any ancestor is a preserve-only mdast node type.
+ * Returns whether any ancestor keeps its text untranslated.
  *
  * @param ancestors Ancestor chain from `visitParents`
  *
- * @returns True when inside code, inline code, or MDX expression
+ * @returns True when inside code, inline code, an MDX expression, or console output
  */
 export function isInsidePreserveAncestor(ancestors: readonly Node[]): boolean {
-	return ancestors.some(isPreserveAncestor);
+	return ancestors.some((node) => isPreserveAncestor(node) || isConsoleOutputElement(node));
 }
 
 /**

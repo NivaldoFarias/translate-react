@@ -73,3 +73,24 @@ describe("workflow smoke artifact capture", () => {
 		120_000,
 	);
 });
+
+describe("loadWorkflowFilesFromMdFixtureDir", () => {
+	test("skips fixtures limited to another target locale", async () => {
+		const ruFiles = await loadWorkflowFilesFromMdFixtureDir(undefined, process.cwd(), "ru");
+		const ptBrFiles = await loadWorkflowFilesFromMdFixtureDir(undefined, process.cwd(), "pt-br");
+
+		expect(ruFiles.map((file) => file.blob.filename)).not.toContain("describing-the-ui.md");
+		expect(ptBrFiles.map((file) => file.blob.filename)).toContain("describing-the-ui.md");
+		expect(ruFiles).toHaveLength(ptBrFiles.length - 1);
+	});
+
+	test("loads an explicitly requested fixture for any locale", async () => {
+		const files = await loadWorkflowFilesFromMdFixtureDir(
+			["describing-the-ui.md"],
+			process.cwd(),
+			"ru",
+		);
+
+		expect(files).toHaveLength(1);
+	});
+});
