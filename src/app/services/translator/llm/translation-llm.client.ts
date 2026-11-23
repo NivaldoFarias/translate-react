@@ -66,8 +66,7 @@ const SEGMENT_BATCH_RESPONSE_FORMAT = zodResponseFormat(
 
 /** OpenRouter may return `error`, which the OpenAI SDK `finish_reason` union omits. */
 type ProviderFinishReason =
-	| NonNullable<ChatCompletion["choices"][number]["finish_reason"]>
-	| "error";
+	NonNullable<ChatCompletion["choices"][number]["finish_reason"]> | "error";
 
 /**
  * Rejects provider completions that ended with `finish_reason: "error"`.
@@ -266,8 +265,7 @@ export class TranslationLlmClient {
 				}
 
 				const finishReason = completion.choices[0]?.finish_reason as
-					| ProviderFinishReason
-					| undefined;
+					ProviderFinishReason | undefined;
 				if (finishReason === "length") {
 					throw new AbortError(
 						new ApplicationError(

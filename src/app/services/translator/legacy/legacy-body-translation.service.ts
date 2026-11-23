@@ -332,8 +332,7 @@ export class LegacyBodyTranslationService {
 		chunkProgress: ChunkTranslationProgress | undefined,
 		systemPromptKind: TranslationSystemPromptKind,
 		responseFormat:
-			| OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming["response_format"]
-			| undefined,
+			OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming["response_format"] | undefined,
 		attemptContext: TranslationAttemptContext,
 		fileContext: TranslationFileContext,
 	): Promise<string> {

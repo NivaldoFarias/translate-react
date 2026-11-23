@@ -13,10 +13,7 @@ import {
 
 /** Distinct compliance problem a changelog section can have for a version */
 export type ChangelogIssue =
-	| "missing-heading"
-	| "missing-date"
-	| "missing-footer-link"
-	| "empty-section";
+	"missing-heading" | "missing-date" | "missing-footer-link" | "empty-section";
 
 /** Human-readable remediation hint for each {@link ChangelogIssue} */
 const ISSUE_MESSAGES = {
