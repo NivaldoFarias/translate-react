@@ -23,6 +23,7 @@ export default defineConfig(
 			"**/logs/**",
 			"**/.env*",
 			"**/coverage/**",
+			".claude/worktrees/**",
 			"**/docs/**",
 			"**/*.md",
 			"**/*.json",

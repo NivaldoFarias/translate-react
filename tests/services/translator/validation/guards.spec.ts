@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
+import { ptBrLocale } from "@/app/locales/pt-br/locale";
+import { ruLocale } from "@/app/locales/ru/locale";
 import { collectPostTranslationValidationIssues } from "@/app/services/translator/validation/guards";
 import { POST_TRANSLATION_VALIDATION_GUARDS } from "@/app/services/translator/validation/guards/index";
 
@@ -19,12 +21,35 @@ describe("POST_TRANSLATION_VALIDATION_GUARDS", () => {
 			"sentenceCaseHeadingsGuard",
 			"mdxSpacingGuard",
 			"extraMarkdownLinksGuard",
-			"englishServerClientTermsGuard",
 		]);
 	});
 });
 
 describe("collectPostTranslationValidationIssues", () => {
+	const rscSource = "Use [React Server Components](/reference/rsc/server-components) today.\n";
+
+	test("does not flag English Server Components for pt-br (no locale guards)", () => {
+		const issues = collectPostTranslationValidationIssues(rscSource, rscSource);
+
+		expect(issues.map((issue) => issue.guardId)).not.toContain("englishServerClientTerms");
+	});
+
+	test("flags English Server Components in Russian prose when the ru locale guards are passed", () => {
+		const translated = "Используйте Server Components сегодня.\n";
+		const issues = collectPostTranslationValidationIssues(
+			"Use Server Components today.\n",
+			translated,
+			{
+				localeGuards: ruLocale.validationGuards,
+			},
+		);
+
+		expect(issues.map((issue) => issue.guardId)).toContain("englishServerClientTerms");
+	});
+
+	test("ptBrLocale declares no locale-scoped guards", () => {
+		expect(ptBrLocale.validationGuards ?? []).toEqual([]);
+	});
 	test("returns empty when translation passes all guards", () => {
 		const source = "# Title\n\nParagraph with [a link](/learn).\n";
 		const translated = "# Título\n\nParágrafo com [um link](/learn).\n";

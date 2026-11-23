@@ -1,6 +1,7 @@
 import type { TranslationFile } from "../translation-file";
 
 import type {
+	PostTranslationValidationGuard,
 	PostTranslationValidationOptions,
 	TranslationValidationIssue,
 } from "./validation.types";
@@ -20,6 +21,9 @@ export type { TranslationValidationIssue } from "./validation.types";
 export interface PostTranslationValidationServiceDependencies {
 	/** Upstream glossary markdown when loaded on the translator */
 	readonly getTranslationGuidelines?: () => string | null;
+
+	/** Guards declared by the target locale (see `LocaleDefinition.validationGuards`) */
+	readonly localeGuards?: readonly PostTranslationValidationGuard[];
 }
 
 /**
@@ -28,11 +32,14 @@ export interface PostTranslationValidationServiceDependencies {
 export class PostTranslationValidationService {
 	private readonly getTranslationGuidelines: () => string | null;
 
+	private readonly localeGuards: readonly PostTranslationValidationGuard[];
+
 	/**
-	 * @param dependencies Optional glossary provider (reserved for future guards)
+	 * @param dependencies Optional glossary provider and locale-scoped guards
 	 */
 	constructor(dependencies: PostTranslationValidationServiceDependencies = {}) {
 		this.getTranslationGuidelines = dependencies.getTranslationGuidelines ?? (() => null);
+		this.localeGuards = dependencies.localeGuards ?? [];
 	}
 
 	/**
@@ -49,6 +56,7 @@ export class PostTranslationValidationService {
 	): TranslationValidationIssue[] {
 		return runPostTranslationValidationGuards(file.content, translatedContent, {
 			translationGuidelines: this.getTranslationGuidelines(),
+			localeGuards: this.localeGuards,
 		} satisfies PostTranslationValidationOptions);
 	}
 

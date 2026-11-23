@@ -128,7 +128,7 @@ const envSchema = z.object({
 	MAX_RETRY_ATTEMPTS: z.coerce.number().positive().default(envDefaults.MAX_RETRY_ATTEMPTS),
 
 	/** Concurrency limit for LLM requests */
-	MAX_LLM_CONCURRENCY: z.coerce.number().positive().default(envDefaults.MAX_LLM_CONCURRENCY),
+	MAX_LLM_CONCURRENCY: z.coerce.number().int().positive().default(envDefaults.MAX_LLM_CONCURRENCY),
 
 	/**
 	 * Caps how many LLM requests may **start** per rolling 60s window (strict sliding window via `p-queue`).
