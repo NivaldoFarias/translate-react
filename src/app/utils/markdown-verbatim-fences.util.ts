@@ -278,3 +278,17 @@ export function mapOutsideFencedCodeBlocks(content: string, transform: (region: 
 
 	return output;
 }
+
+/**
+ * Removes inline code spans and console output components outside fenced code blocks, keeping
+ * every newline so line numbers still match the input.
+ *
+ * @param content Full markdown document
+ *
+ * @returns Document with the same line count and no inline code or console output text
+ */
+export function blankPreservedProseSpans(content: string) {
+	return mapOutsideFencedCodeBlocks(content, (region) =>
+		region.replace(PRESERVED_PROSE_SPAN, (span) => span.replace(/[^\n]/g, "")),
+	);
+}
