@@ -4,10 +4,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-11-24
+
 ### Changed
 
-- Updated `p-queue` to v10 and `eslint-plugin-jsdoc` to v65.
+- Updated `p-queue` to v10, `eslint-plugin-jsdoc` to v65 and `type-fest` to v6.
 - LLM requests cap output with `max_completion_tokens` instead of the deprecated `max_tokens`. Providers behind a custom `LLM_API_BASE_URL` must accept the newer field.
+- `full` smoke runs skip `describing-the-ui.md` for locales other than `pt-br`, because the fixture is already in Portuguese and could never pass.
 
 ### Fixed
 
@@ -459,6 +462,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 - README `MAX_RETRY_ATTEMPTS` default matches runtime (`3`).
 
+[0.3.1]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.3.1
 [0.3.0]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.3.0
 [0.2.17]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.17
 [0.2.16]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.16
