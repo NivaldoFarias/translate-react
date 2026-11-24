@@ -15,6 +15,7 @@ import type {
 	TranslationLlmUsageSnapshot,
 	TranslationLlmUsageTotals,
 } from "./llm/translation-llm.usage";
+import type { InlineGroupSegment } from "./markdown/segments/inline-groups.util";
 import type {
 	BodySegmentExtractionResult,
 	SegmentTranslationMap,
@@ -34,6 +35,7 @@ import {
 	maskLargeVerbatimFencedCodeBlocks,
 	restoreMaskedVerbatimFences,
 } from "@/app/utils/";
+import { isLlmCreditExhaustedError } from "@/app/utils/llm-rate-limit.util";
 import {
 	ApplicationError,
 	ErrorCode,
@@ -58,9 +60,12 @@ import {
 	computeTranslatableCharRatio,
 	extractTranslatableBodySegments,
 	filterTranslatableSegments,
+	groupInlineSegments,
+	isInlineGroupSegment,
 	isSegmentTranslationEligible,
 	packSegmentsIntoBatches,
 	reinsertSegments,
+	restoreInlineGroup,
 	splitSegmentBatchInHalf,
 } from "./markdown/segments";
 import { emptyTranslationAttemptContext } from "./pipeline/translation-attempt.context";
@@ -160,8 +165,8 @@ export class TranslatorService {
 	private readonly retryConfig: RetryOptions;
 
 	/**
-	 * When OpenRouter model metadata is loaded, caps chat `max_tokens` by the provider’s
-	 * `max_completion_tokens` (and `MAX_TOKENS`). Otherwise `null` and {@link env.MAX_TOKENS} is used.
+	 * When OpenRouter model metadata is loaded, caps chat `max_completion_tokens` by the provider’s
+	 * own `max_completion_tokens` (and `MAX_TOKENS`). Otherwise `null` and {@link env.MAX_TOKENS} is used.
 	 */
 	private providerCompletionTokenCap: number | null = null;
 
@@ -214,6 +219,7 @@ export class TranslatorService {
 			pipeline: new TranslationPipelineManager(),
 			validation: new PostTranslationValidationService({
 				getTranslationGuidelines: () => this.translationGuidelines,
+				localeGuards: this.services.locale.definitions.validationGuards,
 			}),
 			languageCheck: new TranslationLanguageCheck(this.services.languageDetector),
 		};
@@ -263,7 +269,7 @@ export class TranslatorService {
 		const response = await this.openai.chat.completions.create({
 			model: this.model,
 			messages: [{ role: "user", content: "ping" }],
-			max_tokens: CONNECTIVITY_TEST_MAX_TOKENS,
+			max_completion_tokens: CONNECTIVITY_TEST_MAX_TOKENS,
 			temperature: LLM_TEMPERATURE,
 		});
 
@@ -293,7 +299,7 @@ export class TranslatorService {
 
 	/**
 	 * When enabled and the base URL is hosted OpenRouter, loads `GET /v1/models` limits for {@link env.LLM_MODEL}
-	 * to widen per-chunk input budgets and align `max_tokens` with `top_provider.max_completion_tokens`.
+	 * to widen per-chunk input budgets and align `max_completion_tokens` with `top_provider.max_completion_tokens`.
 	 */
 	private async maybeApplyOpenRouterModelLimits() {
 		if (!env.LLM_API_BASE_URL.includes("openrouter")) {
@@ -794,8 +800,9 @@ export class TranslatorService {
 	) {
 		const tokenBudget = this.managers.chunks.getMarkdownChunkSplitterTokenBudget();
 		const responseTokenBudget = this.managers.chunks.getSegmentBatchResponseTokenBudget();
+		const groupedSegments = groupInlineSegments(file.content, translatableSegments);
 		const batches = packSegmentsIntoBatches(
-			translatableSegments,
+			groupedSegments,
 			(text) => this.managers.chunks.estimateTokenCount(text),
 			tokenBudget,
 			SEGMENT_BATCH_MAX_ITEMS_PER_BATCH,
@@ -804,7 +811,10 @@ export class TranslatorService {
 
 		const translations: Record<string, string> = {};
 
-		const segmentById = new Map(translatableSegments.map((segment) => [segment.id, segment]));
+		const groups = groupedSegments.filter(isInlineGroupSegment);
+		const segmentById = new Map(
+			[...translatableSegments, ...groups].map((segment) => [segment.id, segment]),
+		);
 
 		for (const batch of batches) {
 			try {
@@ -817,6 +827,8 @@ export class TranslatorService {
 				);
 				Object.assign(translations, batchTranslations);
 			} catch (error) {
+				if (isLlmCreditExhaustedError(error)) throw error;
+
 				file.logger.warn(
 					{
 						path: file.path,
@@ -839,7 +851,7 @@ export class TranslatorService {
 			}
 		}
 
-		return reinsertSegments(file.content, translations, extraction.segments);
+		return reinsertSegments(file.content, translations, [...extraction.segments, ...groups]);
 	}
 
 	/**
@@ -869,6 +881,7 @@ export class TranslatorService {
 			this.recordLlmUsage(fileContext, usage);
 
 			const translations: Record<string, string> = {};
+			const rejectedGroups: InlineGroupSegment[] = [];
 
 			for (const item of envelope.items) {
 				const batchItem = batchItems.find((candidate) => candidate.segmentId === item.segmentId);
@@ -881,15 +894,40 @@ export class TranslatorService {
 					file.logger,
 					file.documentSourceLanguage,
 				);
-				translations[item.segmentId] = sanitizeSegmentTranslation(
+				const sanitized = sanitizeSegmentTranslation(
 					item.translated,
 					segment?.sourceText ?? batchItem?.source ?? item.translated,
 					segment?.path ?? "",
 					snippetFile,
 				);
+
+				if (!segment || !isInlineGroupSegment(segment)) {
+					translations[item.segmentId] = sanitized;
+					continue;
+				}
+
+				const restored = restoreInlineGroup(sanitized, segment);
+
+				if (restored === null) {
+					file.logger.debug(
+						{ segmentId: segment.id, source: segment.sourceText, translated: sanitized },
+						"Inline group translation rejected",
+					);
+					rejectedGroups.push(segment);
+				} else {
+					translations[item.segmentId] = restored;
+				}
 			}
 
-			return translations;
+			const splitTranslations = await this.translateRejectedInlineGroups(
+				file,
+				rejectedGroups,
+				attemptContext,
+				segmentById,
+				fileContext,
+			);
+
+			return { ...translations, ...splitTranslations };
 		} catch (error) {
 			if (!this.shouldSplitSegmentBatchOnError(batchItems, error)) {
 				throw error;
@@ -904,6 +942,57 @@ export class TranslatorService {
 				fileContext,
 			);
 		}
+	}
+
+	/**
+	 * Translates the split pieces of inline groups whose tagged translation was rejected.
+	 *
+	 * @param file Work file for logging and prompt context
+	 * @param groups Rejected groups from one batch
+	 * @param attemptContext Reserved per-attempt metadata for the system prompt (currently empty)
+	 * @param segmentById Lookup map for segment metadata used during snippet sanitization
+	 * @param fileContext Per-call translation state for the active file
+	 *
+	 * @returns Map of piece segment id to cleaned translated text
+	 */
+	private async translateRejectedInlineGroups(
+		file: TranslationFile,
+		groups: readonly InlineGroupSegment[],
+		attemptContext: TranslationAttemptContext,
+		segmentById: ReadonlyMap<string, TranslatableSegment>,
+		fileContext: TranslationFileContext,
+	) {
+		const translations: Record<string, string> = {};
+
+		if (groups.length === 0) return translations;
+
+		file.logger.info(
+			{ path: file.path, groupIds: groups.map((group) => group.id) },
+			"Inline group translations rejected; translating split segments",
+		);
+
+		const batches = packSegmentsIntoBatches(
+			groups.flatMap((group) => group.pieces),
+			(text) => this.managers.chunks.estimateTokenCount(text),
+			this.managers.chunks.getMarkdownChunkSplitterTokenBudget(),
+			SEGMENT_BATCH_MAX_ITEMS_PER_BATCH,
+			this.managers.chunks.getSegmentBatchResponseTokenBudget(),
+		);
+
+		for (const batch of batches) {
+			Object.assign(
+				translations,
+				await this.translateSegmentBatchItems(
+					file,
+					batch,
+					attemptContext,
+					segmentById,
+					fileContext,
+				),
+			);
+		}
+
+		return translations;
 	}
 
 	/**

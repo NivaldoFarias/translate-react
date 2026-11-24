@@ -1,3 +1,5 @@
+import { CONSOLE_OUTPUT_COMPONENTS } from "@/app/constants";
+
 /** Matches an opening GFM backtick fence line (start or after newline, up to three spaces indent). */
 const FENCE_OPEN_LINE = /(^|\r?\n)([ \t]{0,3})(`{3,})([^\n\r]*)\r?\n/g;
 
@@ -186,14 +188,23 @@ export function restoreMaskedVerbatimFences(
 	return result;
 }
 
-/** Matches one inline backtick code span (no nested backticks). */
-const INLINE_CODE_SPAN = /`[^`\n]+`/g;
+/**
+ * Matches one inline backtick code span (no nested backticks) or one console output component.
+ *
+ * Both are alternatives of a single pattern so a tag mentioned in inline code never opens a
+ * component match, and backticks inside console output never open a code span.
+ */
+const PRESERVED_PROSE_SPAN = new RegExp(
+	`\`[^\`\\n]+\`|<(${CONSOLE_OUTPUT_COMPONENTS.join("|")})\\b[^>]*(?<!/)>[\\s\\S]*?</\\1>`,
+	"gu",
+);
 
 /**
- * Applies a transform to prose regions while preserving fenced code blocks and inline code spans.
+ * Applies a transform to prose regions while preserving fenced code blocks, inline code spans and
+ * console output components.
  *
  * @param content Full markdown document
- * @param transform Mapper invoked on each prose slice outside fences and inline code
+ * @param transform Mapper invoked on each prose slice outside fences, inline code and console output
  *
  * @returns Document with transforms applied only to translatable prose regions
  */
@@ -201,13 +212,13 @@ export function mapMarkdownProseRegions(
 	content: string,
 	transform: (proseRegion: string) => string,
 ) {
-	const mapProsePreservingInlineCode = (prose: string) => {
-		const inlineCodeRe = new RegExp(INLINE_CODE_SPAN.source, "gu");
+	const mapProsePreservingSpans = (prose: string) => {
+		const preservedSpanRe = new RegExp(PRESERVED_PROSE_SPAN);
 		let output = "";
 		let cursor = 0;
 		let match: RegExpExecArray | null;
 
-		while ((match = inlineCodeRe.exec(prose)) !== null) {
+		while ((match = preservedSpanRe.exec(prose)) !== null) {
 			output += transform(prose.slice(cursor, match.index));
 			output += match[0];
 			cursor = match.index + match[0].length;
@@ -225,11 +236,11 @@ export function mapMarkdownProseRegions(
 		const bounds = findNextFencedCodeBlockBounds(content, cursor);
 
 		if (!bounds) {
-			output += mapProsePreservingInlineCode(content.slice(cursor));
+			output += mapProsePreservingSpans(content.slice(cursor));
 			break;
 		}
 
-		output += mapProsePreservingInlineCode(content.slice(cursor, bounds.start));
+		output += mapProsePreservingSpans(content.slice(cursor, bounds.start));
 		output += content.slice(bounds.start, bounds.end);
 		cursor = bounds.end;
 	}
@@ -266,4 +277,18 @@ export function mapOutsideFencedCodeBlocks(content: string, transform: (region: 
 	}
 
 	return output;
+}
+
+/**
+ * Removes inline code spans and console output components outside fenced code blocks, keeping
+ * every newline so line numbers still match the input.
+ *
+ * @param content Full markdown document
+ *
+ * @returns Document with the same line count and no inline code or console output text
+ */
+export function blankPreservedProseSpans(content: string) {
+	return mapOutsideFencedCodeBlocks(content, (region) =>
+		region.replace(PRESERVED_PROSE_SPAN, (span) => span.replace(/[^\n]/g, "")),
+	);
 }

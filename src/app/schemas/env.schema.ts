@@ -128,7 +128,7 @@ const envSchema = z.object({
 	MAX_RETRY_ATTEMPTS: z.coerce.number().positive().default(envDefaults.MAX_RETRY_ATTEMPTS),
 
 	/** Concurrency limit for LLM requests */
-	MAX_LLM_CONCURRENCY: z.coerce.number().positive().default(envDefaults.MAX_LLM_CONCURRENCY),
+	MAX_LLM_CONCURRENCY: z.coerce.number().int().positive().default(envDefaults.MAX_LLM_CONCURRENCY),
 
 	/**
 	 * Caps how many LLM requests may **start** per rolling 60s window (strict sliding window via `p-queue`).
@@ -244,13 +244,9 @@ export function validateEnv(env?: Environment): Environment {
  * @returns Default values for the active or fallback runtime environment
  */
 function resolveEnvDefaults(): EnvironmentSchemaDefaults {
-	const nodeEnv = import.meta.env.NODE_ENV as RuntimeEnvironment | undefined;
+	const nodeEnv = z.enum(RuntimeEnvironment).safeParse(import.meta.env.NODE_ENV);
 
-	if (nodeEnv && Object.values(RuntimeEnvironment).includes(nodeEnv)) {
-		return environmentDefaults[nodeEnv];
-	}
-
-	return environmentDefaults[RuntimeEnvironment.Development];
+	return environmentDefaults[nodeEnv.success ? nodeEnv.data : RuntimeEnvironment.Development];
 }
 
 /**

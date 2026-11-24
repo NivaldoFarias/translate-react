@@ -1,3 +1,4 @@
+import { blankPreservedProseSpans } from "@/app/utils/markdown-verbatim-fences.util";
 import { canonicalizeMarkdownLinkUrlForComparison } from "@/app/utils/mdn-url.util";
 
 import { MARKDOWN_REGEXES } from "../../markdown/markdown.regexes";
@@ -332,12 +333,12 @@ export interface EnglishServerClientTermViolation {
 	readonly excerpt: string;
 }
 
-/** Matches English Server/Client Component product terms outside inline code */
+/** Matches English Server/Client Component product terms */
 const ENGLISH_SERVER_CLIENT_TERM =
 	/\b(?:React\s+Server\s+Components?|Server\s+Components?|Client\s+Components?)\b/gu;
 
 /**
- * Finds English Server/Client Component product terms left in prose outside fenced code.
+ * Finds English Server/Client Component product terms left in prose outside code and console output.
  *
  * @param translated Translated markdown
  *
@@ -345,6 +346,7 @@ const ENGLISH_SERVER_CLIENT_TERM =
  */
 export function findEnglishServerClientTermViolations(translated: string) {
 	const violations: EnglishServerClientTermViolation[] = [];
+	const proseLines = blankPreservedProseSpans(translated).split("\n");
 	let inFence = false;
 
 	for (const [lineIndex, line] of translated.split("\n").entries()) {
@@ -359,7 +361,7 @@ export function findEnglishServerClientTermViolations(translated: string) {
 			continue;
 		}
 
-		const prose = line.replace(/`[^`\n]+`/g, "");
+		const prose = proseLines[lineIndex] ?? "";
 		const matches = [...prose.matchAll(ENGLISH_SERVER_CLIENT_TERM)];
 
 		for (const match of matches) {

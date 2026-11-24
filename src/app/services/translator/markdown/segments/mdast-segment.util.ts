@@ -1,9 +1,11 @@
 import { pointEnd, pointStart } from "unist-util-position";
 
-import type { Code, Heading, Html, InlineCode, Link, Text } from "mdast";
+import type { Code, Heading, Html, InlineCode, Link, Paragraph, Text } from "mdast";
 import type { MdxFlowExpression, MdxTextExpression } from "mdast-util-mdx-expression";
 import type { MdxJsxAttribute, MdxJsxFlowElement, MdxJsxTextElement } from "mdast-util-mdx-jsx";
 import type { Node, Parent } from "unist";
+
+import { CONSOLE_OUTPUT_COMPONENTS } from "@/app/constants";
 
 /** mdast node types whose descendants are never translatable at the AST level */
 export type PreserveAncestorType =
@@ -21,6 +23,9 @@ export const PRESERVE_ANCESTOR_TYPES = new Set<PreserveAncestorType>([
 	"mdxTextExpression",
 	"html",
 ]);
+
+/** Lookup set for {@link isConsoleOutputElement} */
+const CONSOLE_OUTPUT_COMPONENT_NAMES = new Set<string>(CONSOLE_OUTPUT_COMPONENTS);
 
 /** Policy-classified MDX JSX wrapper element types */
 export type PolicyMdxJsxType = MdxJsxFlowElement["type"] | MdxJsxTextElement["type"];
@@ -71,6 +76,17 @@ export function isHeading(node: Node): node is Heading {
 }
 
 /**
+ * Returns true when `node` is a paragraph.
+ *
+ * @param node Unist node to test
+ *
+ * @returns Whether `node` is an mdast `paragraph` node
+ */
+export function isParagraph(node: Node): node is Paragraph {
+	return node.type === "paragraph";
+}
+
+/**
  * Returns true when `node` is a prose text leaf.
  *
  * @param node Unist node to test
@@ -104,6 +120,19 @@ export function isMdxJsxAttribute(node: Node): node is MdxJsxAttribute {
 }
 
 /**
+ * Returns true when `node` is an MDX component that shows console output.
+ *
+ * @param node Unist node to test
+ *
+ * @returns Whether `node` is a `<ConsoleBlock>` or `<ConsoleLogLine>` element
+ */
+export function isConsoleOutputElement(node: Node) {
+	return (
+		isMdxJsxElement(node) && node.name !== null && CONSOLE_OUTPUT_COMPONENT_NAMES.has(node.name)
+	);
+}
+
+/**
  * Returns true when `node` is a preserve-only ancestor type.
  *
  * @param node Unist node to test
@@ -115,14 +144,14 @@ export function isPreserveAncestor(node: Node): node is Node & { type: PreserveA
 }
 
 /**
- * Returns whether any ancestor is a preserve-only mdast node type.
+ * Returns whether any ancestor keeps its text untranslated.
  *
  * @param ancestors Ancestor chain from `visitParents`
  *
- * @returns True when inside code, inline code, or MDX expression
+ * @returns True when inside code, inline code, an MDX expression, or console output
  */
 export function isInsidePreserveAncestor(ancestors: readonly Node[]): boolean {
-	return ancestors.some(isPreserveAncestor);
+	return ancestors.some((node) => isPreserveAncestor(node) || isConsoleOutputElement(node));
 }
 
 /**

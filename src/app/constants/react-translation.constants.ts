@@ -64,3 +64,6 @@ export const REACT_TRANSLATION_LANGUAGES = [
 
 /** Type for React translation language codes */
 export type ReactLanguageCode = (typeof REACT_TRANSLATION_LANGUAGES)[number];
+
+/** MDX components whose text mirrors English runtime console output and stays untranslated */
+export const CONSOLE_OUTPUT_COMPONENTS = ["ConsoleBlock", "ConsoleLogLine"] as const;

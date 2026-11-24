@@ -23,6 +23,7 @@ export default defineConfig(
 			"**/logs/**",
 			"**/.env*",
 			"**/coverage/**",
+			".claude/worktrees/**",
 			"**/docs/**",
 			"**/*.md",
 			"**/*.json",
@@ -232,6 +233,8 @@ export default defineConfig(
 		rules: {
 			...jsdocRulesOff,
 			"jsdoc/no-undefined-types": ["error", { disableReporting: true, markVariablesAsUsed: true }],
+			"@typescript-eslint/no-unsafe-class-instance-assignment": "off",
+			"@typescript-eslint/no-unsafe-enum-assignment": "off",
 		},
 	},
 	{

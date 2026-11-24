@@ -23,6 +23,9 @@ export interface TranslationValidationIssue extends TranslationRetryInfo {
 export interface PostTranslationValidationOptions {
 	/** Upstream glossary markdown (`GLOSSARY.md`) when loaded */
 	readonly translationGuidelines?: string | null;
+
+	/** Advisory guards declared by the target locale, run after the shared guards */
+	readonly localeGuards?: readonly PostTranslationValidationGuard[];
 }
 
 /**

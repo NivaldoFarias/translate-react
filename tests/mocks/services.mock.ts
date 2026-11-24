@@ -104,9 +104,8 @@ export function createMockGitHubService() {
 				},
 			}),
 		),
-		getBranch: mock(
-			(_branchName: string): Promise<MockGitHubGetBranchResponse | undefined> =>
-				Promise.resolve(createGitBranchRefResponse({ sha: "abc123" })),
+		getBranch: mock((_branchName: string): Promise<MockGitHubGetBranchResponse | undefined> =>
+			Promise.resolve(createGitBranchRefResponse({ sha: "abc123" })),
 		),
 		deleteBranch: mock(() => Promise.resolve({ data: {}, status: 204 })),
 		refreshTranslationBranchPreservePr: mock(() =>
@@ -147,19 +146,17 @@ export function createMockGitHubService() {
 		findPullRequestByBranch: mock(() =>
 			Promise.resolve(
 				undefined as
-					| RestEndpointMethodTypes["pulls"]["list"]["response"]["data"][number]
-					| undefined,
+					RestEndpointMethodTypes["pulls"]["list"]["response"]["data"][number] | undefined,
 			),
 		),
-		checkPullRequestStatus: mock(
-			(_prNumber: number): Promise<PullRequestStatus> =>
-				Promise.resolve({
-					hasConflicts: false,
-					mergeable: true,
-					needsUpdate: false,
-					mergeableState: "clean",
-					createdBy: "test-fork-owner",
-				} satisfies PullRequestStatus),
+		checkPullRequestStatus: mock((_prNumber: number): Promise<PullRequestStatus> =>
+			Promise.resolve({
+				hasConflicts: false,
+				mergeable: true,
+				needsUpdate: false,
+				mergeableState: "clean",
+				createdBy: "test-fork-owner",
+			} satisfies PullRequestStatus),
 		),
 		closePullRequest: mock(() =>
 			Promise.resolve({
@@ -174,8 +171,8 @@ export function createMockGitHubService() {
 			} as RestEndpointMethodTypes["pulls"]["update"]["response"]["data"]),
 		),
 		listPullRequestIssueComments: mock(() => Promise.resolve([])),
-		listPullRequestReviews: mock(
-			(_prNumber: number): Promise<PullRequestReviewSnapshot[]> => Promise.resolve([]),
+		listPullRequestReviews: mock((_prNumber: number): Promise<PullRequestReviewSnapshot[]> =>
+			Promise.resolve([]),
 		),
 		commentCompiledResultsOnIssue: mock(() => Promise.resolve({ id: 1 })),
 	};
@@ -274,20 +271,19 @@ export function createMockLanguageCacheService() {
 export function createMockLanguageDetectorService() {
 	return {
 		detectPrimaryLanguage: mock(() => Promise.resolve("en" satisfies ReactLanguageCode)),
-		analyzeLanguage: mock(
-			(_filename: string, _content: string): Promise<LanguageAnalysisResult> =>
-				Promise.resolve({
-					languageScore: { target: 0.1, source: 0.9 },
-					ratio: 0.1,
-					isTranslated: false,
-					detectedLanguage: "en",
-					rawResult: {
-						reliable: true,
-						textBytes: 1234,
-						languages: [],
-						chunks: [],
-					},
-				} satisfies LanguageAnalysisResult),
+		analyzeLanguage: mock((_filename: string, _content: string): Promise<LanguageAnalysisResult> =>
+			Promise.resolve({
+				languageScore: { target: 0.1, source: 0.9 },
+				ratio: 0.1,
+				isTranslated: false,
+				detectedLanguage: "en",
+				rawResult: {
+					reliable: true,
+					textBytes: 1234,
+					languages: [],
+					chunks: [],
+				},
+			} satisfies LanguageAnalysisResult),
 		),
 		getLanguageName: mock((code: string): string => {
 			if (code === "en") return "English";

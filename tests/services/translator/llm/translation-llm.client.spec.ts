@@ -70,6 +70,14 @@ describe("TranslationLlmClient", () => {
 	});
 
 	describe("getLLMCompletionParams", () => {
+		test("caps output with max_completion_tokens", () => {
+			const file = createTranslationFileFixture({ content: "Hello world" });
+
+			const params = llmClient.getLLMCompletionParams(file, "Hello world");
+
+			expect(params.max_completion_tokens).toBe(4_096);
+		});
+
 		test("sets OpenRouter run attribution on the deprecated user field", () => {
 			const file = createTranslationFileFixture({ content: "Hello world" });
 

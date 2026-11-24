@@ -4,6 +4,26 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-11-24
+
+### Changed
+
+- Updated `p-queue` to v10, `eslint-plugin-jsdoc` to v65 and `type-fest` to v6.
+- LLM requests cap output with `max_completion_tokens` instead of the deprecated `max_tokens`. Providers behind a custom `LLM_API_BASE_URL` must accept the newer field.
+- `full` smoke runs skip `describing-the-ui.md` for locales other than `pt-br`, because the fixture is already in Portuguese and could never pass.
+
+### Fixed
+
+- `<ConsoleBlock>` and `<ConsoleLogLine>` messages stay in English, matching what the runtime prints, instead of being partly translated by the model or rewritten by `ru` terminology repairs.
+- Code comments in fences with line highlights and no space (`js{2-3}`) are now translated like those in other fences.
+- The `fenceFunctionIdentifiers` advisory no longer fires on the word "function" in code comments.
+- Drafts no longer keep English word order around inline code, links and emphasis ("uma `return` instrução condicional" is now "uma instrução `return` condicional"): the paragraph or heading is translated as one segment. If the model damages the markup, it falls back to split segments.
+- A run stops calling the LLM for a file as soon as the account is out of credit or the API key reaches its spending limit, instead of retrying every call.
+- Error logs no longer include HTTP headers or request and response objects from LLM and GitHub API errors.
+- A non-integer `MAX_LLM_CONCURRENCY` (such as `2.5`) now fails environment validation with the variable named, instead of crashing at startup with a raw `p-queue` v10 error.
+- pt-br pull requests no longer show a bogus "Termos Server/Client Component em inglês" advisory for `React Server Components`, which the pt-br rules keep in English. The `englishServerClientTerms` guard now runs only for the `ru` locale, and the Russian retry hint can no longer reach pt-br prompts.
+- The `englishServerClientTerms` advisory on `ru` pull requests now points at the real line and shows the matched line, instead of `L1` with the guard hint text. It ignores console output, which stays in English.
+
 ## [0.3.0] - 2026-11-23
 
 ### Added
@@ -442,6 +462,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 - README `MAX_RETRY_ATTEMPTS` default matches runtime (`3`).
 
+[0.3.1]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.3.1
 [0.3.0]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.3.0
 [0.2.17]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.17
 [0.2.16]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.16

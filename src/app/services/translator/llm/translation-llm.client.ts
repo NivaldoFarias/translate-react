@@ -28,6 +28,7 @@ import {
 import {
 	buildOpenRouterRunUserId,
 	getRateLimitResetWaitMs,
+	isLlmCreditExhaustedError,
 	isOpenRouterDailyFreeModelQuotaError,
 } from "@/app/utils/";
 import { ApplicationError, ErrorCode, isSegmentBatchSplittableError } from "@/shared/errors/";
@@ -66,8 +67,7 @@ const SEGMENT_BATCH_RESPONSE_FORMAT = zodResponseFormat(
 
 /** OpenRouter may return `error`, which the OpenAI SDK `finish_reason` union omits. */
 type ProviderFinishReason =
-	| NonNullable<ChatCompletion["choices"][number]["finish_reason"]>
-	| "error";
+	NonNullable<ChatCompletion["choices"][number]["finish_reason"]> | "error";
 
 /**
  * Rejects provider completions that ended with `finish_reason: "error"`.
@@ -169,7 +169,7 @@ export class TranslationLlmClient {
 		const params: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming = {
 			model: this.model,
 			temperature: LLM_TEMPERATURE,
-			max_tokens: this.getCompletionTokenCap(),
+			max_completion_tokens: this.getCompletionTokenCap(),
 			messages: [
 				{
 					role: "system",
@@ -266,8 +266,7 @@ export class TranslationLlmClient {
 				}
 
 				const finishReason = completion.choices[0]?.finish_reason as
-					| ProviderFinishReason
-					| undefined;
+					ProviderFinishReason | undefined;
 				if (finishReason === "length") {
 					throw new AbortError(
 						new ApplicationError(
@@ -900,7 +899,7 @@ export class TranslationLlmClient {
 	}
 
 	/**
-	 * Maps auth, bad-request, and OpenRouter quota errors to non-retrying `AbortError`.
+	 * Maps auth, bad-request, exhausted-credit, and OpenRouter quota errors to non-retrying `AbortError`.
 	 *
 	 * @param error Caught error from an LLM attempt
 	 * @param file File used for quota logging context
@@ -908,6 +907,14 @@ export class TranslationLlmClient {
 	private rethrowNonRetryableApiError(error: unknown, file: TranslationFile) {
 		if (error instanceof APIError) {
 			if (error.status === StatusCodes.UNAUTHORIZED || error.status === StatusCodes.BAD_REQUEST) {
+				throw new AbortError(error);
+			}
+
+			if (isLlmCreditExhaustedError(error)) {
+				file.logger.error(
+					{ model: this.model, status: error.status, message: error.message },
+					"LLM credit or API key limit exhausted; add credits or raise the key limit",
+				);
 				throw new AbortError(error);
 			}
 

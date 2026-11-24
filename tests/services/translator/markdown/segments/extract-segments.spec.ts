@@ -46,6 +46,34 @@ describe("markdown segment extraction", () => {
 		).toBe(false);
 	});
 
+	test.each(["js{2-3}", "js {2-3}", "JS{1}"])("extracts comments from `%s` fences", (info) => {
+		const body = `\`\`\`${info}\n// Good: top level\nuseState();\n\`\`\`\n`;
+
+		const { segments } = extractTranslatableBodySegments(body);
+
+		expect(segments.map((segment) => segment.sourceText)).toEqual(["// Good: top level"]);
+	});
+
+	test.each(["ConsoleBlock", "ConsoleLogLine"])("leaves %s text untranslated", (component) => {
+		const body = [
+			"Before.",
+			"",
+			`<${component} level="error">`,
+			"",
+			'Warning: see [docs](https://react.dev) and `code` <span className="x">here</span>.',
+			"",
+			`</${component}>`,
+			"",
+			"After.",
+		].join("\n");
+
+		const { segments } = extractTranslatableBodySegments(body);
+		const prose = segments.filter((segment) => segment.kind === "translate");
+
+		expect(prose.map((segment) => segment.sourceText)).toEqual(["Before.", "After."]);
+		expect(segments.some((segment) => segment.sourceText.includes("className"))).toBe(false);
+	});
+
 	test("extracts fence comments as policy segments", () => {
 		const source = loadSegmentFixture("S5");
 		const { rest: body } = splitLeadingYamlFrontmatter(source);

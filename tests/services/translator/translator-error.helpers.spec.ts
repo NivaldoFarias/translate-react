@@ -27,6 +27,15 @@ describe("isSegmentTranslationLegacyFallbackEligible", () => {
 		).toBe(false);
 	});
 
+	test("returns false when the API key has used its spending limit", () => {
+		const error = createOpenAIApiErrorFixture({
+			status: StatusCodes.FORBIDDEN,
+			error: { message: "Key limit exceeded (total limit)" },
+		});
+
+		expect(isSegmentTranslationLegacyFallbackEligible(error)).toBe(false);
+	});
+
 	test("returns false for non-splittable ApplicationError", () => {
 		const error = new ApplicationError(
 			"File content is empty",
