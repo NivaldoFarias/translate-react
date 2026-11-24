@@ -11,7 +11,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Fixed
 
-- `<ConsoleBlock>` and `<ConsoleLogLine>` messages stay in English, matching what the runtime prints, instead of being partly translated.
+- `<ConsoleBlock>` and `<ConsoleLogLine>` messages stay in English, matching what the runtime prints, instead of being partly translated by the model or rewritten by `ru` terminology repairs.
 - Code comments in fences with line highlights and no space (`js{2-3}`) are now translated like those in other fences.
 - The `fenceFunctionIdentifiers` advisory no longer fires on the word "function" in code comments.
 - Drafts no longer keep English word order around inline code, links and emphasis ("uma `return` instrução condicional" is now "uma instrução `return` condicional"): the paragraph or heading is translated as one segment. If the model damages the markup, it falls back to split segments.

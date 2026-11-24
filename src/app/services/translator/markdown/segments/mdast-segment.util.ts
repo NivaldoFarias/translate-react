@@ -5,6 +5,8 @@ import type { MdxFlowExpression, MdxTextExpression } from "mdast-util-mdx-expres
 import type { MdxJsxAttribute, MdxJsxFlowElement, MdxJsxTextElement } from "mdast-util-mdx-jsx";
 import type { Node, Parent } from "unist";
 
+import { CONSOLE_OUTPUT_COMPONENTS } from "@/app/constants";
+
 /** mdast node types whose descendants are never translatable at the AST level */
 export type PreserveAncestorType =
 	| Code["type"]
@@ -22,8 +24,8 @@ export const PRESERVE_ANCESTOR_TYPES = new Set<PreserveAncestorType>([
 	"html",
 ]);
 
-/** MDX components whose text mirrors English runtime console output and stays untranslated */
-const CONSOLE_OUTPUT_COMPONENTS = new Set(["ConsoleBlock", "ConsoleLogLine"]);
+/** Lookup set for {@link isConsoleOutputElement} */
+const CONSOLE_OUTPUT_COMPONENT_NAMES = new Set<string>(CONSOLE_OUTPUT_COMPONENTS);
 
 /** Policy-classified MDX JSX wrapper element types */
 export type PolicyMdxJsxType = MdxJsxFlowElement["type"] | MdxJsxTextElement["type"];
@@ -125,7 +127,9 @@ export function isMdxJsxAttribute(node: Node): node is MdxJsxAttribute {
  * @returns Whether `node` is a `<ConsoleBlock>` or `<ConsoleLogLine>` element
  */
 export function isConsoleOutputElement(node: Node) {
-	return isMdxJsxElement(node) && node.name !== null && CONSOLE_OUTPUT_COMPONENTS.has(node.name);
+	return (
+		isMdxJsxElement(node) && node.name !== null && CONSOLE_OUTPUT_COMPONENT_NAMES.has(node.name)
+	);
 }
 
 /**

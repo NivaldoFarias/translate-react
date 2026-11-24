@@ -133,7 +133,7 @@ export function applyPhraseReplacementGroups(
 }
 
 /**
- * Applies phrase replacements only in markdown prose outside fences and inline code.
+ * Applies phrase replacements only in markdown prose outside fences, inline code and console output.
  *
  * @param content Full markdown document
  * @param replacements Ordered from/to pairs

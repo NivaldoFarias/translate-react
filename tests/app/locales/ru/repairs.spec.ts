@@ -182,6 +182,44 @@ describe("replaceEnglishServerClientComponentTerms", () => {
 		);
 	});
 
+	test.each([
+		[
+			"a multi-line `<ConsoleLogLine>`",
+			'<ConsoleLogLine level="error">\n\nCreating promises inside a Client Component is not yet supported.\n\n</ConsoleLogLine>',
+		],
+		[
+			"a `<ConsoleBlock>` with inline code",
+			'<ConsoleBlock level="error">\n\nAn SSR-ed Client Component used `Date.now()` in a Server Component.\n\n</ConsoleBlock>',
+		],
+		[
+			"a log line inside `<ConsoleBlockMulti>`",
+			'<ConsoleBlockMulti>\n<ConsoleLogLine level="error">Client Component</ConsoleLogLine>\n</ConsoleBlockMulti>',
+		],
+	])("keeps English console output in %s", (_label, consoleOutput) => {
+		const input = `до Client Component\n\n${consoleOutput}\n\nпосле Client Component`;
+
+		expect(replaceEnglishServerClientComponentTerms(input)).toBe(
+			`до клиентский компонент\n\n${consoleOutput}\n\nпосле клиентский компонент`,
+		);
+	});
+
+	test("rewrites terms between inline mentions of console component tags", () => {
+		const input = "`<ConsoleBlock>` показывает Client Component, затем `</ConsoleBlock>`";
+
+		expect(replaceEnglishServerClientComponentTerms(input)).toBe(
+			"`<ConsoleBlock>` показывает клиентский компонент, затем `</ConsoleBlock>`",
+		);
+	});
+
+	test("rewrites terms after a self-closing console component", () => {
+		const input =
+			"<ConsoleBlock />\n\nClient Component\n\n<ConsoleBlock>Client Component</ConsoleBlock>";
+
+		expect(replaceEnglishServerClientComponentTerms(input)).toBe(
+			"<ConsoleBlock />\n\nклиентский компонент\n\n<ConsoleBlock>Client Component</ConsoleBlock>",
+		);
+	});
+
 	test("localizes Server/Client terms inside markdown link labels", () => {
 		const input =
 			"используется с [React Server Components](/reference/rsc/server-components) и Server Component в prose.";
