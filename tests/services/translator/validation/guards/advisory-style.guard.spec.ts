@@ -144,4 +144,27 @@ describe("englishServerClientTermsGuard", () => {
 
 		expect(englishServerClientTermsGuard("x", translated)).toBeNull();
 	});
+
+	test.each(["ConsoleBlock", "ConsoleLogLine"])("ignores English terms inside %s", (component) => {
+		const translated = `Текст.\n\n<${component} level="error">\n\nAn SSR-ed Client Component used \`Date.now()\`.\n\n</${component}>\n`;
+
+		expect(englishServerClientTermsGuard("x", translated)).toBeNull();
+	});
+
+	test("flags a term after console output at its own line", () => {
+		const translated =
+			"<ConsoleBlock>\n\nClient Component\n\n</ConsoleBlock>\n\nИмпорт из Server Component.";
+
+		expect(englishServerClientTermsGuard("x", translated)?.message).toBe(
+			"English Server/Client Component terms in prose: L7 Server Component",
+		);
+	});
+
+	test("flags a term between inline mentions of console component tags", () => {
+		const translated = "`<ConsoleBlock>` показывает Client Component, затем `</ConsoleBlock>`";
+
+		expect(englishServerClientTermsGuard("x", translated)?.message).toBe(
+			"English Server/Client Component terms in prose: L1 Client Component",
+		);
+	});
 });
