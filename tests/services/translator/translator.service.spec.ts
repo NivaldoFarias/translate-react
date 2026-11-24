@@ -209,6 +209,51 @@ describe("TranslatorService", () => {
 
 			expect(translatorService.testConnectivity()).rejects.toThrow("Invalid LLM API response");
 		});
+
+		test("recovers from a transient rate limit within the retry budget", async () => {
+			const rateLimitError = createOpenAIApiErrorFixture({
+				status: StatusCodes.TOO_MANY_REQUESTS,
+				error: { message: "Provider returned error" },
+			});
+			const service = createTestTranslatorService({ retryConfig: { retries: 2, minTimeout: 1 } });
+			mockChatCompletionsCreate
+				.mockRejectedValueOnce(rateLimitError)
+				.mockRejectedValueOnce(rateLimitError)
+				.mockResolvedValueOnce(createChatCompletionFixture());
+
+			await service.testConnectivity();
+
+			expect(mockChatCompletionsCreate).toHaveBeenCalledTimes(3);
+		});
+
+		test("throws the rate limit error when the retry budget runs out", () => {
+			const rateLimitError = createOpenAIApiErrorFixture({
+				status: StatusCodes.TOO_MANY_REQUESTS,
+				error: { message: "Provider returned error" },
+			});
+			const service = createTestTranslatorService({ retryConfig: { retries: 2, minTimeout: 1 } });
+			mockChatCompletionsCreate.mockRejectedValue(rateLimitError);
+
+			expect(service.testConnectivity()).rejects.toBe(rateLimitError);
+		});
+
+		test.each([
+			["invalid credentials", StatusCodes.UNAUTHORIZED, "No auth credentials found"],
+			["an exhausted key limit", StatusCodes.FORBIDDEN, "Key limit exceeded (total limit)"],
+			["a spent daily free quota", StatusCodes.TOO_MANY_REQUESTS, "free-models-per-day"],
+		])("stops after one call on %s", (_label, status, message) => {
+			const service = createTestTranslatorService({ retryConfig: { retries: 2, minTimeout: 1 } });
+			mockChatCompletionsCreate.mockRejectedValue(
+				createOpenAIApiErrorFixture({ status, error: { message } }),
+			);
+
+			expect(
+				service.testConnectivity().catch((error: unknown) => {
+					const calls = mockChatCompletionsCreate.mock.calls.length;
+					throw new Error(`${calls} call(s)`, { cause: error });
+				}),
+			).rejects.toThrow("1 call(s)");
+		});
 	});
 
 	describe("getLanguageAnalysis", () => {

@@ -5,6 +5,7 @@ import pRetry, { AbortError } from "p-retry";
 
 import type OpenAI from "openai";
 import type { ChatCompletion } from "openai/resources";
+import type { Logger } from "pino";
 
 import type { TranslationAttemptContext } from "@/app/services/translator/pipeline/translation-attempt.context";
 import type { TranslationFile } from "@/app/services/translator/translation-file";
@@ -35,6 +36,8 @@ import { ApplicationError, ErrorCode, isSegmentBatchSplittableError } from "@/sh
 
 import { emptyTranslationAttemptContext } from "../pipeline/translation-attempt.context";
 import {
+	CONNECTIVITY_TEST_MAX_TOKENS,
+	CONNECTIVITY_TEST_MESSAGE,
 	LLM_TEMPERATURE,
 	SEGMENT_BATCH_MAX_PARTIAL_FOLLOW_UP_ROUNDS,
 } from "../translator.constants";
@@ -147,6 +150,31 @@ export class TranslationLlmClient {
 	}
 
 	/**
+	 * Sends a minimal completion to check that the LLM API answers and accepts the credentials.
+	 *
+	 * Uses the same queue and retry policy as translation calls, so a transient rate limit at startup
+	 * does not fail the run.
+	 *
+	 * @param logger Logger for retry messages
+	 *
+	 * @returns Raw completion for the caller to validate
+	 */
+	public pingLanguageModel(logger: Logger) {
+		return this.executeQueuedLlmCall({
+			logger,
+			contentLength: CONNECTIVITY_TEST_MESSAGE.length,
+			attemptLabel: "LLM connectivity test",
+			runAttempt: () =>
+				this.openai.chat.completions.create({
+					model: this.model,
+					messages: [{ role: "user", content: CONNECTIVITY_TEST_MESSAGE }],
+					max_completion_tokens: CONNECTIVITY_TEST_MAX_TOKENS,
+					temperature: LLM_TEMPERATURE,
+				}),
+		});
+	}
+
+	/**
 	 * Prepares parameters for LLM chat completion API call.
 	 *
 	 * @param file Translation file instance
@@ -226,7 +254,7 @@ export class TranslationLlmClient {
 		const operation = `${TranslationLlmClient.name}.${this.callLanguageModel.name}`;
 
 		return this.executeQueuedLlmCall({
-			file,
+			logger: file.logger,
 			contentLength: contentToTranslate.length,
 			attemptLabel: "LLM call",
 			runAttempt: async () => {
@@ -334,7 +362,7 @@ export class TranslationLlmClient {
 		const operation = `${TranslationLlmClient.name}.${this.callLanguageModelFrontmatterBatch.name}`;
 
 		return this.executeQueuedLlmCall({
-			file,
+			logger: file.logger,
 			contentLength: contentLengthForLog,
 			attemptLabel: "LLM frontmatter batch",
 			runAttempt: async () => {
@@ -492,7 +520,7 @@ export class TranslationLlmClient {
 		const contentLengthForLog = userMessage.length;
 
 		return this.executeQueuedLlmCall({
-			file,
+			logger: file.logger,
 			contentLength: contentLengthForLog,
 			attemptLabel: "LLM segment batch",
 			runAttempt: () =>
@@ -855,7 +883,7 @@ export class TranslationLlmClient {
 	 * Runs one queued LLM operation with `p-retry`, rate-limit-aware backoff, and shared API error handling.
 	 *
 	 * @param params Queued LLM call options
-	 * @param params.file File used for logging and non-retryable API error context
+	 * @param params.logger Logger for retry and non-retryable API error messages
 	 * @param params.contentLength Content length included in retry logs
 	 * @param params.attemptLabel Short label for retry log messages
 	 * @param params.runAttempt Per-attempt logic (API call, validation, success logging)
@@ -864,13 +892,13 @@ export class TranslationLlmClient {
 	 * @returns Resolves to the value returned by `runAttempt`
 	 */
 	private executeQueuedLlmCall<T>(params: {
-		file: TranslationFile;
+		logger: Logger;
 		contentLength: number;
 		attemptLabel: string;
 		runAttempt: () => Promise<T>;
 		handleAttemptError?: (error: unknown) => void;
 	}) {
-		const { file, contentLength, attemptLabel, runAttempt, handleAttemptError } = params;
+		const { logger, contentLength, attemptLabel, runAttempt, handleAttemptError } = params;
 
 		return this.queue.add(async () => {
 			const callStartTime = Date.now();
@@ -880,7 +908,7 @@ export class TranslationLlmClient {
 					try {
 						return await runAttempt();
 					} catch (error) {
-						this.rethrowNonRetryableApiError(error, file);
+						this.rethrowNonRetryableApiError(error, logger);
 						handleAttemptError?.(error);
 						throw error;
 					}
@@ -888,7 +916,7 @@ export class TranslationLlmClient {
 				{
 					...this.retryConfig,
 					onFailedAttempt: this.createRateLimitAwareRetryHandler(
-						file,
+						logger,
 						callStartTime,
 						contentLength,
 						attemptLabel,
@@ -902,16 +930,16 @@ export class TranslationLlmClient {
 	 * Maps auth, bad-request, exhausted-credit, and OpenRouter quota errors to non-retrying `AbortError`.
 	 *
 	 * @param error Caught error from an LLM attempt
-	 * @param file File used for quota logging context
+	 * @param logger Logger for quota messages
 	 */
-	private rethrowNonRetryableApiError(error: unknown, file: TranslationFile) {
+	private rethrowNonRetryableApiError(error: unknown, logger: Logger) {
 		if (error instanceof APIError) {
 			if (error.status === StatusCodes.UNAUTHORIZED || error.status === StatusCodes.BAD_REQUEST) {
 				throw new AbortError(error);
 			}
 
 			if (isLlmCreditExhaustedError(error)) {
-				file.logger.error(
+				logger.error(
 					{ model: this.model, status: error.status, message: error.message },
 					"LLM credit or API key limit exhausted; add credits or raise the key limit",
 				);
@@ -919,7 +947,7 @@ export class TranslationLlmClient {
 			}
 
 			if (isOpenRouterDailyFreeModelQuotaError(error)) {
-				file.logger.error(
+				logger.error(
 					{
 						model: this.model,
 						message: error.message,
@@ -972,7 +1000,7 @@ export class TranslationLlmClient {
 	/**
 	 * Builds `p-retry` `onFailedAttempt` that waits for rate-limit reset windows when present.
 	 *
-	 * @param file File used for retry logging
+	 * @param logger Logger for retry messages
 	 * @param callStartTime Timestamp when the queued call started
 	 * @param contentLength Content length included in retry logs
 	 * @param attemptLabel Short label for log messages
@@ -980,7 +1008,7 @@ export class TranslationLlmClient {
 	 * @returns `p-retry` `onFailedAttempt` callback that honors rate-limit reset headers
 	 */
 	private createRateLimitAwareRetryHandler(
-		file: TranslationFile,
+		logger: Logger,
 		callStartTime: number,
 		contentLength: number,
 		attemptLabel: string,
@@ -996,7 +1024,7 @@ export class TranslationLlmClient {
 		}) => {
 			const applicationError = this.extractApplicationErrorFromRetryFailure(error);
 
-			file.logger.warn(
+			logger.warn(
 				{
 					attempt,
 					retriesLeft,
@@ -1010,7 +1038,7 @@ export class TranslationLlmClient {
 
 			const resetWaitMs = getRateLimitResetWaitMs(error);
 			if (resetWaitMs > 0) {
-				file.logger.info({ resetWaitMs }, "Waiting for LLM rate limit window before retry");
+				logger.info({ resetWaitMs }, "Waiting for LLM rate limit window before retry");
 				await new Promise<void>((resolve) => setTimeout(resolve, resetWaitMs));
 			}
 		};

@@ -4,6 +4,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+### Fixed
+
+- A transient LLM rate limit or provider error at startup no longer fails the run: the connectivity check now follows `MAX_RETRY_ATTEMPTS`. Invalid credentials, exhausted credit and a spent daily free-model quota still stop it right away.
+
 ## [0.3.1] - 2026-11-24
 
 ### Changed
