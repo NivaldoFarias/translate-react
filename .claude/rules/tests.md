@@ -35,7 +35,7 @@ test("throws RequestError when repository does not exist", () => {
 - Mock at service boundaries (GitHub, LLM, file system, network) and test the logic in between.
 - Prefer constructor injection. Use `mock.module()` only for what can't be injected.
 - Type reusable mocks at the factory using production return types, and export a shared `Mock*Fn` type. Shape per-test overrides with `satisfies` or fixture helpers. If a DI boundary needs a cast, keep that one cast in the test harness.
-- `mock.module` leaks across files. Keep `language-detector.service-cld-failure.spec.ts` sorted after `language-detector.service.spec.ts`, and don't restore mocks in `afterAll` via `import("cld")` (it hangs).
+- `mock.module` leaks across files, so inject native dependencies instead (`LanguageDetectorService` takes its CLD `detect`).
 
 ## Coverage of cases
 

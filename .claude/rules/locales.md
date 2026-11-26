@@ -26,9 +26,9 @@ Locale terminology and style live in `rules.ts` as prompt text. When reviewers r
 
 - Add a repair only for a deterministic glitch observed in production output.
 - Declare it in `repairs/definition.ts` with `createLocaleMechanicalRepairs()`, data in `repairs/constants.ts`, thin exports in `repairs/index.ts`.
-- Scope it with `mapMarkdownProseRegions` / `mapOutsideFencedCodeBlocks` so fenced code stays untouched. For non-Latin scripts, build word boundaries explicitly rather than with `\b`.
+- Scope it with `mapMarkdownProseRegions` / `mapOutsideFencedCodeBlocks` so fenced code stays untouched. `mapMarkdownProseRegions` also skips inline code and console output (`CONSOLE_OUTPUT_COMPONENTS`); prefer it when a pattern matches English text. For non-Latin scripts, build word boundaries explicitly rather than with `\b`.
 - A language-agnostic defect goes in the shared `translation-output-cleanup.ts` pass instead.
 
 ## Onboarding
 
-A new locale is ready for a fork operator after it has the full layout, the three registrations and a manual dry run. Expect operator tuning and maintainer review after the first real batch. For the first run, dispatch `workflow.yml` with `langs: <new-locale>` only.
+A new locale is ready for a fork operator after it has the full layout, the three registrations and a manual dry run. Expect operator tuning and maintainer review after the first real batch. The operator dispatches the first run: `workflow.yml` with `langs: <new-locale>` only.
