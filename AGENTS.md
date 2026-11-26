@@ -8,7 +8,7 @@ Path-scoped standards live in `.claude/rules/` and load with the files they cove
 
 - Run `git commit`, `push`, rebase, or amend only when the user asks for it. "Append a commit" describes the end state you're aiming for. It isn't permission to commit.
 - File GitHub issues when a skill's workflow calls for them (see `docs/agents/issue-tracker.md`). Track tech debt that needs design notes in issues with the `tech debt` label rather than in-code TODOs.
-- Validate with `smoke.yml` dispatches (`gh workflow run smoke.yml`), not local `ci:smoke` runs: GitHub keeps the run history. Never trigger `workflow.yml` or `poll.yml` translation and never set `SCHEDULED_TRANSLATION_ENABLED`: real runs can open invalid PRs on `reactjs` locale repos.
+- Validate with `smoke.yml` dispatches (`gh workflow run smoke.yml`), not local `ci:smoke` runs: GitHub keeps the run history. `development` runs a free model. `production` runs the paid model that ships, so ask before dispatching there. Never trigger `workflow.yml` or `poll.yml` translation and never set `SCHEDULED_TRANSLATION_ENABLED`: real runs can open invalid PRs on `reactjs` locale repos.
 - Keep `${{ vars.X }}` references in workflow YAML. When a variable's value is wrong or too low, tell the user to fix it in GitHub Settings.
 - Prefer the smallest proven slice. Push back on speculative automation: locale-specific heuristic guards, guard-driven retries, automated maintainer remediation, pre-commit tooling (Husky, lint-staged, commitlint), coverage thresholds or Codecov. Investigate a post-incident fix before building a large layer for it.
 - Write `.md` files when the user asks or a skill's workflow writes them (`GLOSSARY.md`, `docs/adr/`, `.wiki/` drafts). One-off explanations go in chat.
@@ -24,16 +24,17 @@ Path-scoped standards live in `.claude/rules/` and load with the files they cove
 ## Branches and releases
 
 - Start feature branches from `dev` and open PRs against `dev`. Dependabot also targets `dev`. Release PRs go `dev` → `main` as merge commits, not squashes. Land a Dependabot compatibility fix on the Dependabot branch itself. Rebase a stale Dependabot PR instead of trusting its inflated diff.
+- `main` only accepts an up-to-date PR, so merge `main` into the release branch before the release PR. Issue-closing keywords work only in PRs to `main`: repeat them in the release PR, because PRs into `dev` leave their issues open.
 - Add changelog entries under `## [Unreleased]` as work lands (the `generate-changelog` skill). Cut releases with the `generate-release` skill.
 - Pushing changes under `.github/workflows/**` needs the `workflow` OAuth scope (`gh auth login -s workflow`).
 
 ## Architecture
 
-- Use Bun as package manager and runtime. Before a PR, run `bun run lint`, `bun run format:check`, `bun run type-check` and `bun test`. Changes to the translator, runner or locales also need a `quick` `smoke.yml` run on the branch (real LLM, mocked GitHub).
+- Use Bun as package manager and runtime. Before a PR, run `bun run lint`, `bun run format:check`, `bun run type-check` and `bun test`. For changes to the translator, runner or locales, the PR's CI runs `quick` smoke for each locale (real LLM, mocked GitHub): read its drafts before calling the PR ready, and rerun a job that failed on `429 Provider returned error`.
 - `src/` has three runtimes: `app/` (translation CLI), `ci/` (GitHub Actions scripts) and `shared/`. `app` and `ci` never import each other, and `shared` imports neither. Organize by role (`services/`, `clients/`, `utils/`, `schemas/`, `constants/`, `actions/`), then by feature. Do not add buckets like `lib/`, `entries/` or `domain/`.
 - Wire service singletons only in `src/app/composition.ts`. `github/` and `locales/` never import from `services/runner/`; shared workflow types live in each service's `types.ts`.
 - Errors: throw `ApplicationError` (with `ErrorCode`) for domain failures and rethrow it unchanged. Let library errors bubble up. `main.ts` handles them at the top level. When a budget or limit causes the failure (retries, circuit breaker, token cap), name the constant and its value in the message or `metadata`.
-- Log with the Pino logger and structured fields: `logger.debug({ filename }, "Processing file")`. Use `toSafeErrorLogFields()` instead of raw `{ error }` so request headers stay out of logs.
+- Log with the Pino logger and structured fields: `logger.debug({ filename }, "Processing file")`. Log a caught error under the `error` key, where the logger strips headers, request and response, or spread `toSafeErrorLogFields(error)`.
 - Before writing a custom implementation of chunking, parsing, retry, caching, date handling or token counting, check for an existing library.
 - Keep user-facing copy and docs direct and human. Use colons or separate sentences, not em-dash chains. Operational docs belong on the GitHub Wiki (drafts in `.wiki/`, published with the `sync-wiki` skill). The repo keeps README, CONTRIBUTING, SECURITY and CHANGELOG.
 
