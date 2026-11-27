@@ -4,6 +4,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-11-27
+
 ### Fixed
 
 - A transient LLM rate limit or provider error at startup no longer fails the run: the connectivity check now follows `MAX_RETRY_ATTEMPTS`. Invalid credentials, exhausted credit and a spent daily free-model quota still stop it right away.
@@ -467,6 +469,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 - README `MAX_RETRY_ATTEMPTS` default matches runtime (`3`).
 
+[0.3.2]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.3.2
 [0.3.1]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.3.1
 [0.3.0]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.3.0
 [0.2.17]: https://github.com/NivaldoFarias/translate-react/releases/tag/v0.2.17
