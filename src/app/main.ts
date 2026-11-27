@@ -1,5 +1,7 @@
 import "@/app/utils/bootstrap-cli-overrides.util";
 
+import { appendFileSync } from "node:fs";
+
 import { name, version } from "@package";
 
 import type { Logger } from "pino";
@@ -7,8 +9,9 @@ import type { Logger } from "pino";
 import type { WorkflowStatistics } from "@/app/services/runner/types";
 
 import { runnerService } from "@/app/composition";
+import { buildRunSummary } from "@/app/services/runner/workflow/run-summary.util";
 import { baseLogger, buildOpenRouterRunUserId, env, setupSignalHandlers } from "@/app/utils/";
-import { handleTopLevelError } from "@/shared/errors/";
+import { handleTopLevelError, toSafeErrorLogFields } from "@/shared/errors/";
 import { appendGitHubActionsOutput } from "@/shared/utils/github-output.util";
 
 if (import.meta.main) {
@@ -19,9 +22,11 @@ if (import.meta.main) {
  * Main entry point for the application.
  *
  * Runs the translation workflow, handles top-level error logging and process exit codes.
+ * Writes the step summary whether the run completed or stopped early.
  */
 async function main() {
 	const logger = baseLogger.child({ component: main.name });
+	let runError: unknown;
 
 	setupSignalHandlers((message, error) => {
 		logger.error({ error, message }, "Signal handler error");
@@ -73,12 +78,14 @@ async function main() {
 		);
 
 		reportBacklog(statistics, logger);
-
-		process.exit(0);
 	} catch (error) {
+		runError = error;
 		handleTopLevelError(error, logger);
-		process.exit(1);
 	}
+
+	await writeRunSummary(runError, logger);
+
+	process.exit(runError === undefined ? 0 : 1);
 }
 
 /**
@@ -109,5 +116,30 @@ function reportBacklog(statistics: WorkflowStatistics, logger: Logger) {
 
 	if (env.GITHUB_OUTPUT) {
 		appendGitHubActionsOutput("has_backlog", String(hasBacklog), env.GITHUB_OUTPUT);
+	}
+}
+
+/**
+ * Writes the run summary to `$GITHUB_STEP_SUMMARY` and prints soft-failure `::warning::` lines.
+ *
+ * Does nothing outside GitHub Actions. A failure here is logged and never changes the
+ * run's exit code.
+ *
+ * @param runError Error that stopped the run, or `undefined` when it completed
+ * @param logger Logger for summary failures
+ */
+async function writeRunSummary(runError: unknown, logger: Logger) {
+	if (!env.GITHUB_ACTIONS || !env.GITHUB_STEP_SUMMARY) return;
+
+	try {
+		const { markdown, warnings } = buildRunSummary(await runnerService.buildRunReport(runError));
+
+		appendFileSync(env.GITHUB_STEP_SUMMARY, markdown);
+
+		for (const warning of warnings) {
+			process.stdout.write(`${warning}\n`);
+		}
+	} catch (error) {
+		logger.warn(toSafeErrorLogFields(error), "Could not write the run step summary");
 	}
 }

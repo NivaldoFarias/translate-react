@@ -10,7 +10,11 @@ import { localeService } from "@/app/composition";
 import { RunnerService } from "@/app/services/runner/runner.service";
 import { ApplicationError } from "@/shared/errors/";
 
-import { createRepositoryTreeItemFixture } from "@tests/fixtures";
+import {
+	createMockPullRequestListItem,
+	createMockPullRequestReviewSnapshot,
+	createRepositoryTreeItemFixture,
+} from "@tests/fixtures";
 import { useTranslationTargetPaths } from "@tests/helpers/translation-target.harness";
 import {
 	createMockGitHubService,
@@ -174,6 +178,55 @@ describe("RunnerService", () => {
 				expect(stats.totalCount).toBe(2);
 				expect(stats.filesHeldByCeiling).toBe(0);
 			});
+		});
+	});
+
+	describe("buildRunReport", () => {
+		test("reports files processed before the run stopped", async () => {
+			const runner = createTestRunnerService({
+				github: createGitHubWithQueue() as unknown as GitHubService,
+			});
+			await runner.run();
+
+			const report = await runner.buildRunReport(new Error("Workflow terminated"));
+
+			expect(report.abortMessage).toBe("Workflow terminated");
+			expect(report.results).toHaveLength(5);
+			expect(report.statistics.totalCount).toBe(5);
+		});
+
+		test("lists open translation PRs waiting on requested changes", async () => {
+			const github = createGitHubWithQueue();
+			github.listOpenTranslationPullRequests.mockResolvedValue([
+				createMockPullRequestListItem(1183),
+				createMockPullRequestListItem(1186),
+			]);
+			github.listPullRequestReviews.mockImplementation((prNumber: number) =>
+				Promise.resolve([
+					createMockPullRequestReviewSnapshot({
+						state: prNumber === 1183 ? "CHANGES_REQUESTED" : "APPROVED",
+					}),
+				]),
+			);
+			const runner = createTestRunnerService({ github: github as unknown as GitHubService });
+
+			const report = await runner.buildRunReport();
+
+			expect(report.changesRequestedPullRequests?.map((pullRequest) => pullRequest.number)).toEqual(
+				[1183],
+			);
+		});
+
+		test("reports the requested-changes lookup as unavailable when GitHub fails", async () => {
+			const github = createGitHubWithQueue();
+			github.listOpenTranslationPullRequests.mockRejectedValue(
+				new Error("API rate limit exceeded"),
+			);
+			const runner = createTestRunnerService({ github: github as unknown as GitHubService });
+
+			const report = await runner.buildRunReport();
+
+			expect(report.changesRequestedPullRequests).toBeNull();
 		});
 	});
 });

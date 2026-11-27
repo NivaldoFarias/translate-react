@@ -89,13 +89,15 @@ export class GitHubPullRequest {
 	}
 
 	/**
-	 * Counts open upstream PRs opened from the fork's `translate/...` branches.
+	 * Lists open upstream PRs opened from the fork's `translate/...` branches.
 	 *
 	 * These are the runner's translation PRs, the ones `MAX_OPEN_TRANSLATION_PRS` limits.
 	 *
-	 * @returns Number of open translation PRs on the upstream repository
+	 * @returns Open translation PRs on the upstream repository
 	 */
-	public async countOpenTranslationPullRequests(): Promise<number> {
+	public async listOpenTranslationPullRequests(): Promise<
+		RestEndpointMethodTypes["pulls"]["list"]["response"]["data"]
+	> {
 		const forkOwner = this.deps.repositories.fork.owner.toLowerCase();
 		const openPullRequests = await this.listOpenPullRequests();
 
@@ -104,7 +106,18 @@ export class GitHubPullRequest {
 			const isTranslationBranch = pullRequest.head.ref.startsWith(TRANSLATION_BRANCH_PREFIX);
 
 			return isFromFork && isTranslationBranch;
-		}).length;
+		});
+	}
+
+	/**
+	 * Counts open upstream PRs opened from the fork's `translate/...` branches.
+	 *
+	 * @returns Number of open translation PRs on the upstream repository
+	 */
+	public async countOpenTranslationPullRequests(): Promise<number> {
+		const openTranslationPullRequests = await this.listOpenTranslationPullRequests();
+
+		return openTranslationPullRequests.length;
 	}
 
 	/**

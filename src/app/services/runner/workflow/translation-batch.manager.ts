@@ -73,12 +73,15 @@ export class TranslationBatchManager {
 	 *
 	 * @param files List of files to process
 	 * @param batchSize Number of files to process simultaneously
+	 * @param results Map to fill as each batch finishes; pass the caller's map so results
+	 * from earlier batches survive a circuit-breaker abort
 	 *
-	 * @returns Map of filename to processing result metadata
+	 * @returns `results`, filled with filename to processing result metadata
 	 */
 	public async processBatches(
 		files: TranslationFile[],
 		batchSize: number,
+		results = new Map<ProcessedFileResult["filename"], ProcessedFileResult>(),
 	): Promise<Map<string, ProcessedFileResult>> {
 		this.logger.debug(
 			{ fileCount: files.length, batchSize },
@@ -87,23 +90,21 @@ export class TranslationBatchManager {
 
 		const batches = this.createBatches(files, batchSize);
 
-		const results = new Map<ProcessedFileResult["filename"], ProcessedFileResult>();
-
 		for (const [batchIndex, batch] of batches.entries()) {
 			this.logger.debug(
 				{ batch: batchIndex + 1, totalBatches: batches.length, filesInBatch: batch.length },
 				`Starting batch ${batchIndex + 1}/${batches.length}`,
 			);
 
-			const batchResults = await this.processBatch(batch, {
-				currentBatch: batchIndex + 1,
-				totalBatches: batches.length,
-				batchSize: batch.length,
-			});
-
-			for (const [filename, result] of batchResults.entries()) {
-				results.set(filename, result);
-			}
+			await this.processBatch(
+				batch,
+				{
+					currentBatch: batchIndex + 1,
+					totalBatches: batches.length,
+					batchSize: batch.length,
+				},
+				results,
+			);
 		}
 
 		this.logger.debug(
@@ -144,17 +145,15 @@ export class TranslationBatchManager {
 	 * @param batchInfo.currentBatch One-based index of the batch being processed
 	 * @param batchInfo.totalBatches Total number of batches in the run
 	 * @param batchInfo.batchSize Number of files in this batch
-	 *
-	 * @returns Map of filename to processing result for this batch
+	 * @param results Run-wide result map; each file's result is set as soon as it finishes
 	 */
 	private async processBatch(
 		batch: TranslationFile[],
 		batchInfo: { currentBatch: number; totalBatches: number; batchSize: number },
-	): Promise<Map<string, ProcessedFileResult>> {
+		results: Map<string, ProcessedFileResult>,
+	): Promise<void> {
 		this.batchProgress.successful = 0;
 		this.batchProgress.failed = 0;
-
-		const results = new Map<string, ProcessedFileResult>();
 
 		for (const [index, file] of batch.entries()) {
 			const progress = {
@@ -191,8 +190,6 @@ export class TranslationBatchManager {
 			},
 			`Batch ${batchInfo.currentBatch}/${batchInfo.totalBatches} completed: ${this.batchProgress.successful}/${batch.length} successful (${successRate}%)`,
 		);
-
-		return results;
 	}
 
 	/**

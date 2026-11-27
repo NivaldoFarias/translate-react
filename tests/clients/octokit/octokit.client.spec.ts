@@ -3,6 +3,7 @@ import { describe, expect, mock, test } from "bun:test";
 import { StatusCodes } from "http-status-codes";
 
 import {
+	getPatFallbackCount,
 	getRetryAfterMs,
 	isForbiddenError,
 	withRetry,
@@ -99,6 +100,17 @@ describe("octokit.client", () => {
 			expect(result).toEqual({ data: "fallback-result" });
 			expect(primaryMethod).toHaveBeenCalledTimes(1);
 			expect(fallbackMethod).toHaveBeenCalledTimes(1);
+		});
+
+		test("counts each call that falls back to the PAT", async () => {
+			const primaryMethod = mock(() => Promise.reject(createRequestError(StatusCodes.FORBIDDEN)));
+			const fallbackMethod = mock(() => Promise.resolve({ data: "fallback-result" }));
+			const wrapped = wrapMethodWithFallback(primaryMethod, fallbackMethod, "pulls", "update");
+			const countBefore = getPatFallbackCount();
+
+			await wrapped();
+
+			expect(getPatFallbackCount()).toBe(countBefore + 1);
 		});
 
 		test("propagates non-403 errors without retry", () => {

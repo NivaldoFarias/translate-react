@@ -237,6 +237,17 @@ export class GitHubService {
 	}
 
 	/**
+	 * Lists open upstream PRs opened from the fork's `translate/...` branches.
+	 *
+	 * @returns Open translation PRs
+	 */
+	public async listOpenTranslationPullRequests(): Promise<
+		RestEndpointMethodTypes["pulls"]["list"]["response"]["data"]
+	> {
+		return this.pullRequest.listOpenTranslationPullRequests();
+	}
+
+	/**
 	 * Counts open upstream PRs opened from the fork's `translate/...` branches.
 	 *
 	 * @returns Number of open translation PRs

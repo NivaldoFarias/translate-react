@@ -19,6 +19,21 @@ import {
 /** Octokit-specific logger for GitHub API debugging */
 const logger = baseLogger.child({ component: "octokit" });
 
+/** Calls this process retried with the PAT after a 403 from the GitHub App token */
+let patFallbackCount = 0;
+
+/**
+ * Returns how many GitHub API calls fell back to `GH_PAT_TOKEN` after a 403 in this process.
+ *
+ * The run summary reports it: a 403 on locale-fork PR PATCHes and upstream progress
+ * comments is expected, but a rising count can mean the App lost a permission.
+ *
+ * @returns PAT fallback count since the process started
+ */
+export function getPatFallbackCount(): number {
+	return patFallbackCount;
+}
+
 /**
  * Compares a numeric HTTP status from Octokit errors against http-status-codes values.
  *
@@ -270,6 +285,7 @@ export function wrapMethodWithFallback(
 			return await withRetry(() => method(...args), operationName);
 		} catch (error) {
 			if (isForbiddenError(error) && fallbackMethod) {
+				patFallbackCount++;
 				logger.warn(
 					{ namespace, method: methodName },
 					"Primary client received 403, retrying with PAT fallback",
