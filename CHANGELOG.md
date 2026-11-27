@@ -4,6 +4,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+### Added
+
+- Translation runs process at most `MAX_FILES_PER_RUN` files (default `3`), refreshes of open PRs first, then new files in path order. Once `MAX_OPEN_TRANSLATION_PRS` translation PRs are open (default `10`), runs stop opening new PRs but keep refreshing open ones. `0` removes either limit, and targeted `file_path` runs ignore both.
+- When a run leaves files for later or a file fails, `workflow.yml` keeps `UPSTREAM_SHA_<LANG>` unchanged, so the next poll dispatches another run.
+
 ## [0.3.2] - 2026-11-27
 
 ### Fixed

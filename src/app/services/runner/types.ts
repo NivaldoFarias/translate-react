@@ -42,6 +42,9 @@ export interface PrFilterResult {
 
 	/** Paths mapped to invalid PR info for notes on new PRs */
 	invalidPRsByFile: Map<string, { prNumber: number; status: PullRequestStatus }>;
+
+	/** Queued paths that already have an open translation PR, so translating them refreshes it */
+	refreshPaths: Set<string>;
 }
 
 /** Result of language detection over fetched file contents */
@@ -53,8 +56,20 @@ export interface LanguageDetectionResult {
 	filesToTranslate: TranslationFile[];
 }
 
+/** Queued files a run left for later runs because of the run limits */
+export interface RunBacklog {
+	/** Files left for a later run because `MAX_FILES_PER_RUN` was reached */
+	filesLeftOverByCap: number;
+
+	/** New files held because open translation PRs reached `MAX_OPEN_TRANSLATION_PRS` */
+	filesHeldByCeiling: number;
+}
+
+/** Translation outcome counts from batch processing, before run-limit backlog is added */
+export type TranslationOutcomeStatistics = Omit<WorkflowStatistics, keyof RunBacklog>;
+
 /** Statistics returned from the workflow execution */
-export interface WorkflowStatistics {
+export interface WorkflowStatistics extends RunBacklog {
 	/** Number of files successfully translated */
 	successCount: number;
 

@@ -86,6 +86,12 @@ export interface EnvironmentSchemaDefaults {
 
 	/** Comma-separated repository paths for targeted re-translation (`--file` / workflow `file_path`) */
 	TRANSLATION_FILE_PATHS?: string;
+
+	/** Files one translation run may process, refreshes included. `0` removes the cap. */
+	MAX_FILES_PER_RUN: number;
+
+	/** Open translation PRs at which a run stops opening new ones. `0` removes the ceiling. */
+	MAX_OPEN_TRANSLATION_PRS: number;
 }
 
 /**
@@ -118,6 +124,12 @@ export const ENV_PLACEHOLDERS = {
 	LLM_MAX_REQUESTS_PER_MINUTE: 0,
 	MASK_VERBATIM_LARGE_FENCES: false,
 	MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS: 120,
+
+	/** pt-br has one active reviewer merging about one PR a day; 3 per run keeps a scheduled week reviewable. */
+	MAX_FILES_PER_RUN: 3,
+
+	/** Six pt-br drafts sat with changes requested for five months (2026-06 to 2026-11); 10 keeps the queue within one reviewer's reach. */
+	MAX_OPEN_TRANSLATION_PRS: 10,
 } satisfies Partial<EnvironmentSchemaDefaults>;
 
 export const environmentDefaults: Record<RuntimeEnvironment, EnvironmentSchemaDefaults> = {

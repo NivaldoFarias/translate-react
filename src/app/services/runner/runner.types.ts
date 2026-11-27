@@ -10,6 +10,9 @@ import type { LanguageDetectorService } from "@/app/services/language-detector/"
 import type { LocaleService } from "@/app/services/locale/";
 import type { TranslationFile, TranslatorService } from "@/app/services/translator/";
 
+import type { RunBacklog } from "./types";
+import type { RunLimits } from "./workflow/run-limits.util";
+
 /**
  * Configuration options for the runner service.
  *
@@ -18,6 +21,12 @@ import type { TranslationFile, TranslatorService } from "@/app/services/translat
 export interface RunnerOptions {
 	/** The number of files to process in each batch */
 	batchSize: number;
+
+	/**
+	 * Per-run file cap and open-PR ceiling for scheduled runs. Omitted means unlimited, which
+	 * smoke and integration runs rely on. Targeted runs (`TRANSLATION_FILE_PATHS`) ignore it.
+	 */
+	runLimits?: RunLimits;
 }
 
 /** Dependency injection interface for RunnerService */
@@ -51,6 +60,9 @@ export interface RunnerState {
 
 	/** Unix timestamp when the state snapshot was captured */
 	timestamp: number;
+
+	/** Queued files this run left for later runs because of {@link RunnerOptions.runLimits} */
+	backlog: RunBacklog;
 
 	/**
 	 * Map of file paths to invalid PR information.

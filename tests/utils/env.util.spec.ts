@@ -21,6 +21,39 @@ describe("Environment Utilities", () => {
 			expect(() => validateEnv(invalidEnv)).toThrow();
 		});
 
+		test("uses run-limit defaults when the workflow passes empty strings", () => {
+			const env = validateEnv({
+				...validEnv,
+				// @ts-expect-error - raw CI env values are strings
+				MAX_FILES_PER_RUN: "",
+				// @ts-expect-error - raw CI env values are strings
+				MAX_OPEN_TRANSLATION_PRS: "",
+			});
+
+			expect(env.MAX_FILES_PER_RUN).toBe(3);
+			expect(env.MAX_OPEN_TRANSLATION_PRS).toBe(10);
+		});
+
+		test("accepts 0 to remove the run limits", () => {
+			const env = validateEnv({
+				...validEnv,
+				// @ts-expect-error - raw CI env values are strings
+				MAX_FILES_PER_RUN: "0",
+				// @ts-expect-error - raw CI env values are strings
+				MAX_OPEN_TRANSLATION_PRS: "0",
+			});
+
+			expect(env.MAX_FILES_PER_RUN).toBe(0);
+			expect(env.MAX_OPEN_TRANSLATION_PRS).toBe(0);
+		});
+
+		test("rejects a fractional run cap", () => {
+			const invalidEnv = { ...validEnv, MAX_FILES_PER_RUN: "2.5" };
+
+			// @ts-expect-error - raw CI env values are strings
+			expect(() => validateEnv(invalidEnv)).toThrow();
+		});
+
 		test("should use default values for optional variables when not provided", () => {
 			const minimalEnv = {
 				GH_TOKEN: validEnv.GH_TOKEN,

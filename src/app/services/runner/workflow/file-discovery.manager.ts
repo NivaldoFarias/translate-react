@@ -85,7 +85,7 @@ export class FileDiscoveryManager {
 	 *
 	 * @param repositoryTree Complete repository file tree from GitHub
 	 *
-	 * @returns Object containing files to translate and map of invalid PRs by file path
+	 * @returns Files to translate, invalid PRs by file path, and paths that already have an open PR
 	 *
 	 * @example
 	 * ```typescript
@@ -99,6 +99,7 @@ export class FileDiscoveryManager {
 	public async discoverFiles(repositoryTree: PatchedRepositoryTreeItem[]): Promise<{
 		filesToTranslate: TranslationFile[];
 		invalidPRsByFile: Map<string, { prNumber: number; status: PullRequestStatus }>;
+		refreshPaths: Set<string>;
 	}> {
 		this.logger.debug({ fileCount: repositoryTree.length }, "Starting file discovery pipeline");
 
@@ -128,10 +129,8 @@ export class FileDiscoveryManager {
 			"Stage 2/5: Cache lookup complete",
 		);
 
-		const { filesToFetch, numFilesWithPRs, invalidPRsByFile } = await this.filterByPRs(
-			candidateFiles,
-			failOpenInventory,
-		);
+		const { filesToFetch, numFilesWithPRs, invalidPRsByFile, refreshPaths } =
+			await this.filterByPRs(candidateFiles, failOpenInventory);
 		this.logger.debug(
 			{
 				before: candidateFiles.length,
@@ -188,7 +187,7 @@ export class FileDiscoveryManager {
 			`Translation pipeline complete: ${filesToTranslate.length} files need translation (${totalFiltered} filtered across stages)`,
 		);
 
-		return { filesToTranslate, invalidPRsByFile };
+		return { filesToTranslate, invalidPRsByFile, refreshPaths };
 	}
 
 	/**
@@ -278,13 +277,14 @@ export class FileDiscoveryManager {
 	 * @param candidateFiles Files remaining after cache check that require PR validation
 	 * @param failOpenInventory Mutable per-reason counters updated when PR validity evaluation fails open
 	 *
-	 * @returns Files to fetch, count of skipped files, and map of conflicted PRs
+	 * @returns Files to fetch, count of skipped files, map of conflicted PRs, and paths with an open PR
 	 */
 	public async filterByPRs(
 		candidateFiles: PatchedRepositoryTreeItem[],
 		failOpenInventory: FailOpenInventory = createEmptyFailOpenInventory(),
 	): Promise<PullRequestFilterResult> {
 		const invalidPRsByFile = new Map<string, { prNumber: number; status: PullRequestStatus }>();
+		const refreshPaths = new Set<string>();
 
 		let numFilesWithPRs = 0;
 		const filesToFetch: typeof candidateFiles = [];
@@ -347,6 +347,10 @@ export class FileDiscoveryManager {
 					);
 				}
 
+				if (validity.pullRequest) {
+					refreshPaths.add(file.path);
+				}
+
 				filesToFetch.push(file);
 			} catch (error) {
 				failOpenInventory[FAIL_OPEN_REASONS.prValidityEvaluationError]++;
@@ -372,7 +376,7 @@ export class FileDiscoveryManager {
 			`After PR filter: ${filesToFetch.length} files need content fetch`,
 		);
 
-		return { filesToFetch, numFilesWithPRs, invalidPRsByFile };
+		return { filesToFetch, numFilesWithPRs, invalidPRsByFile, refreshPaths };
 	}
 
 	/**

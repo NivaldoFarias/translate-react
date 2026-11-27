@@ -125,6 +125,7 @@ jobs:
         run: bun run ci:resolve-translation-targets -- --file-path "$FILE_PATH"
 
       - name: Run translation workflow (${{ matrix.lang }})
+        id: translate
         env:
           GH_TOKEN: ${{ steps.generate-token.outputs.token }}
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
@@ -142,6 +143,8 @@ jobs:
           GH_PAT_TOKEN: ${{ secrets.GH_PAT_TOKEN }}
           MAX_TOKENS: ${{ vars.MAX_TOKENS }}
           BATCH_SIZE: ${{ vars.BATCH_SIZE }}
+          MAX_FILES_PER_RUN: ${{ vars.MAX_FILES_PER_RUN }}
+          MAX_OPEN_TRANSLATION_PRS: ${{ vars.MAX_OPEN_TRANSLATION_PRS }}
           GH_REQUEST_TIMEOUT: ${{ vars.GH_REQUEST_TIMEOUT }}
           HEADER_APP_URL: ${{ vars.HEADER_APP_URL }}
           HEADER_APP_TITLE: ${{ vars.HEADER_APP_TITLE }}
@@ -175,8 +178,9 @@ jobs:
           fi
           bun run start -- "${ARGS[@]}"
 
+      # Hold the SHA while the run limits left files or a file failed, so the next poll runs again.
       - name: Record upstream SHA (${{ matrix.lang }})
-        if: success() && steps.translation-target.outputs.has_target_paths != 'true'
+        if: success() && steps.translation-target.outputs.has_target_paths != 'true' && steps.translate.outputs.has_backlog != 'true'
         env:
           GH_TOKEN: ${{ steps.generate-token.outputs.token }}
           MATRIX_LANG: ${{ matrix.lang }}

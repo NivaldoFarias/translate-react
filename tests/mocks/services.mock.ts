@@ -104,6 +104,7 @@ export function createMockGitHubService() {
 			Promise.resolve({ data: { id: 1, body: "Mock comment" } }),
 		),
 		listOpenPullRequests: mock(() => Promise.resolve([])),
+		countOpenTranslationPullRequests: mock(() => Promise.resolve(0)),
 		getPullRequestFiles: mock(() => Promise.resolve(["src/test/file.md"])),
 		commitTranslation: mock(() =>
 			Promise.resolve({

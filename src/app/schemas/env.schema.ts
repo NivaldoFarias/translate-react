@@ -163,6 +163,23 @@ const envSchema = z.object({
 	TRANSLATION_FILE_PATHS: z.string().optional(),
 
 	/**
+	 * Files one translation run may process. Refreshes of open PRs count and go first,
+	 * then new files in path order. `0` removes the cap. Targeted runs
+	 * (`TRANSLATION_FILE_PATHS`) are exempt.
+	 */
+	MAX_FILES_PER_RUN: optionalEnvNumber(
+		z.coerce.number().int().min(0).default(envDefaults.MAX_FILES_PER_RUN),
+	),
+
+	/**
+	 * Open translation PRs (fork `translate/...` heads) at which a run stops opening new
+	 * PRs. Refreshes of open PRs still run. `0` removes the ceiling. Targeted runs are exempt.
+	 */
+	MAX_OPEN_TRANSLATION_PRS: optionalEnvNumber(
+		z.coerce.number().int().min(0).default(envDefaults.MAX_OPEN_TRANSLATION_PRS),
+	),
+
+	/**
 	 * When enabled, fences at or above `MASK_VERBATIM_LARGE_FENCES_MIN_TOKENS` become HTML
 	 * placeholders before the LLM and are restored after. Prose inside those fences is not
 	 * translated while masked.
@@ -189,6 +206,9 @@ const envSchema = z.object({
 
 	/** Numeric workflow run id */
 	GITHUB_RUN_ID: z.string().optional(),
+
+	/** Step output file; the runner writes `has_backlog` here so `workflow.yml` can hold `UPSTREAM_SHA_<LANG>` */
+	GITHUB_OUTPUT: z.preprocess(emptyEnvValueToUndefined, z.string().optional()),
 
 	/** Workflow display name from the workflow file `name` field */
 	GITHUB_WORKFLOW: z.string().optional(),

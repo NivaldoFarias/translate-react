@@ -9,7 +9,7 @@ import type {
 import type { SharedGitHubDependencies } from "./types";
 
 import { withRetry } from "@/app/clients/";
-import { baseLogger } from "@/app/utils/";
+import { baseLogger, TRANSLATION_BRANCH_PREFIX } from "@/app/utils/";
 
 /** Pull request options */
 export interface PullRequestOptions {
@@ -86,6 +86,25 @@ export class GitHubPullRequest {
 		this.logger.debug({ count: response.length }, "Listed open pull requests");
 
 		return response;
+	}
+
+	/**
+	 * Counts open upstream PRs opened from the fork's `translate/...` branches.
+	 *
+	 * These are the runner's translation PRs, the ones `MAX_OPEN_TRANSLATION_PRS` limits.
+	 *
+	 * @returns Number of open translation PRs on the upstream repository
+	 */
+	public async countOpenTranslationPullRequests(): Promise<number> {
+		const forkOwner = this.deps.repositories.fork.owner.toLowerCase();
+		const openPullRequests = await this.listOpenPullRequests();
+
+		return openPullRequests.filter((pullRequest) => {
+			const isFromFork = pullRequest.head.repo.owner.login.toLowerCase() === forkOwner;
+			const isTranslationBranch = pullRequest.head.ref.startsWith(TRANSLATION_BRANCH_PREFIX);
+
+			return isFromFork && isTranslationBranch;
+		}).length;
 	}
 
 	/**

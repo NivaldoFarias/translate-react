@@ -707,6 +707,36 @@ describe("GitHubService", () => {
 			});
 		});
 
+		describe("countOpenTranslationPullRequests", () => {
+			test("counts only PRs from the fork's translate branches", async () => {
+				octokitMock.paginate.mockResolvedValueOnce([
+					{
+						number: 1,
+						head: {
+							ref: "translate/learn/index.md",
+							repo: { owner: { login: "Test-Fork-Owner" } },
+						},
+					},
+					{
+						number: 2,
+						head: {
+							ref: "translate/learn/state.md",
+							repo: { owner: { login: "test-fork-owner" } },
+						},
+					},
+					{ number: 3, head: { ref: "fix-typo", repo: { owner: { login: "test-fork-owner" } } } },
+					{
+						number: 4,
+						head: { ref: "translate/learn/hooks.md", repo: { owner: { login: "someone-else" } } },
+					},
+				]);
+
+				const count = await githubService.countOpenTranslationPullRequests();
+
+				expect(count).toBe(2);
+			});
+		});
+
 		describe("getPullRequestFiles", () => {
 			test("should return list of file paths when PR has files", async () => {
 				octokitMock.paginate.mockResolvedValueOnce([
