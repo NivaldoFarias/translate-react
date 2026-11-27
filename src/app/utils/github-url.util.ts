@@ -3,7 +3,7 @@ import { version } from "@package";
 import type { ProgressCommentRunContext } from "@/app/locales/types";
 import type { Environment } from "@/app/schemas/env.schema";
 
-import { WORKFLOW_RUNNER_REPOSITORY_HTML_BASE } from "@/app/constants";
+import { TRANSLATION_BRANCH_PREFIX, WORKFLOW_RUNNER_REPOSITORY_HTML_BASE } from "@/app/constants";
 import { env } from "@/app/schemas/env.schema";
 
 /** Path segment GitHub uses for the issue template picker */
@@ -26,7 +26,7 @@ export interface RunnerIssueChooserUrlParams {
  * @returns Branch name such as `translate/reference/react/legacy.md`
  */
 export function getTranslationBranchNameFromPath(filePath: string) {
-	return `translate/${filePath.split("/").slice(2).join("/")}`;
+	return `${TRANSLATION_BRANCH_PREFIX}${filePath.split("/").slice(2).join("/")}`;
 }
 
 /**

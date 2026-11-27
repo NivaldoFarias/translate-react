@@ -237,6 +237,15 @@ export class GitHubService {
 	}
 
 	/**
+	 * Counts open upstream PRs opened from the fork's `translate/...` branches.
+	 *
+	 * @returns Number of open translation PRs
+	 */
+	public async countOpenTranslationPullRequests(): Promise<number> {
+		return this.pullRequest.countOpenTranslationPullRequests();
+	}
+
+	/**
 	 * Retrieves the list of files changed in a pull request.
 	 *
 	 * @param prNumber Pull request number to fetch changed files from

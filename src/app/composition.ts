@@ -40,10 +40,19 @@ export const translatorService = new TranslatorService({
 });
 
 /** End-to-end translation workflow orchestrator */
-export const runnerService = new RunnerService({
-	github: githubService,
-	translator: translatorService,
-	languageCache: new CacheService<LanguageCacheEntry>(),
-	locale: localeService,
-	languageDetector: languageDetectorService,
-});
+export const runnerService = new RunnerService(
+	{
+		github: githubService,
+		translator: translatorService,
+		languageCache: new CacheService<LanguageCacheEntry>(),
+		locale: localeService,
+		languageDetector: languageDetectorService,
+	},
+	{
+		batchSize: env.BATCH_SIZE,
+		runLimits: {
+			maxFilesPerRun: env.MAX_FILES_PER_RUN,
+			maxOpenTranslationPullRequests: env.MAX_OPEN_TRANSLATION_PRS,
+		},
+	},
+);

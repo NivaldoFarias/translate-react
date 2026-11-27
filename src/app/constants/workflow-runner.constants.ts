@@ -13,3 +13,6 @@ export const WIKI_FOR_REACT_DOCS_MAINTAINERS_URL =
 
 /** Prefix of runner translation commits on fork `translate/…` branches */
 export const TRANSLATION_COMMIT_MESSAGE_PREFIX = "docs: translate ";
+
+/** Prefix of every fork branch the runner opens a translation PR from */
+export const TRANSLATION_BRANCH_PREFIX = "translate/";

@@ -20,6 +20,35 @@ function createTestFileDiscoveryManager(
 
 describe("FileDiscoveryManager", () => {
 	describe("filterByPRs", () => {
+		test("marks a queued file with an open translation PR as a refresh", async () => {
+			const github = createMockGitHubService();
+			github.findPullRequestByBranch.mockResolvedValue(createMockPullRequestListItem(1301));
+			github.checkPullRequestStatus.mockResolvedValue(
+				createPullRequestStatusFixture({
+					hasConflicts: true,
+					mergeable: false,
+					needsUpdate: true,
+					mergeableState: "dirty",
+				}),
+			);
+			const manager = createTestFileDiscoveryManager({ github });
+			const candidate = createRepositoryTreeItemFixture({ path: "src/content/learn/state.md" });
+
+			const result = await manager.filterByPRs([candidate]);
+
+			expect(result.refreshPaths).toEqual(new Set(["src/content/learn/state.md"]));
+		});
+
+		test("does not mark a queued file without an open PR as a refresh", async () => {
+			const manager = createTestFileDiscoveryManager({ github: createMockGitHubService() });
+			const candidate = createRepositoryTreeItemFixture({ path: "src/content/learn/index.md" });
+
+			const result = await manager.filterByPRs([candidate]);
+
+			expect(result.filesToFetch).toHaveLength(1);
+			expect(result.refreshPaths.size).toBe(0);
+		});
+
 		test("includes file for processing when translation pull request evaluation fails", async () => {
 			const github = createMockGitHubService();
 			github.findPullRequestByBranch.mockRejectedValue(new Error("GitHub API unavailable"));

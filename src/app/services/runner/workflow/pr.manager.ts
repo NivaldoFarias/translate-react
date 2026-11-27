@@ -1,7 +1,7 @@
 import type { SetNonNullable } from "type-fest";
 
 import type { ProcessedFileResult } from "@/app/services/github/types";
-import type { WorkflowStatistics } from "@/app/services/runner/types";
+import type { TranslationOutcomeStatistics } from "@/app/services/runner/types";
 
 import type { RunnerServiceDependencies } from "../runner.types";
 
@@ -74,7 +74,7 @@ export class PRManager {
 	 */
 	public printFinalStatistics(
 		processedResults: Map<string, ProcessedFileResult>,
-	): WorkflowStatistics {
+	): TranslationOutcomeStatistics {
 		const elapsedTime = Math.ceil(Date.now() - this.workflowTimestamp);
 		const results = Array.from(processedResults.values());
 
@@ -127,7 +127,7 @@ export class PRManager {
 			}
 		}
 
-		const workflowStats: WorkflowStatistics = {
+		const workflowStats: TranslationOutcomeStatistics = {
 			successCount,
 			failureCount,
 			totalCount,

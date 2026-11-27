@@ -7,14 +7,22 @@ import type {
 } from "@/app/services/github/types";
 import type { PrFilterResult, WorkflowStatistics } from "@/app/services/runner/types";
 
+import type { TranslationFile } from "../translator";
+
 import type { RunnerOptions, RunnerServiceDependencies, RunnerState } from "./runner.types";
 
-import { baseLogger, env, registerCleanup } from "@/app/utils/";
+import {
+	baseLogger,
+	env,
+	getConfiguredTranslationTargetPaths,
+	registerCleanup,
+} from "@/app/utils/";
 import { ApplicationError, ErrorCode } from "@/shared/errors/";
 
 import { TranslatorService } from "../translator";
 
 import { FileDiscoveryManager, PRManager, TranslationBatchManager } from "./workflow";
+import { selectFilesForRun } from "./workflow/run-limits.util";
 
 /**
  * Base class for translation workflow runners.
@@ -36,6 +44,7 @@ export abstract class BaseRunnerService {
 		filesToTranslate: [],
 		processedResults: [],
 		timestamp: Date.now(),
+		backlog: { filesLeftOverByCap: 0, filesHeldByCeiling: 0 },
 	};
 
 	/** Statistics tracking for the translation process */
@@ -247,6 +256,7 @@ export abstract class BaseRunnerService {
 	 * 2. **PR existence check**: Validates existing PRs to skip files with valid translations
 	 * 3. **Content fetching**: Downloads file content in parallel batches from GitHub
 	 * 4. **Language detection**: Analyzes content and updates cache with detection results
+	 * 5. **Run limits**: Narrows the queue under {@link RunnerOptions.runLimits} (see {@link applyRunLimits})
 	 *
 	 * ### Invalid PR Tracking
 	 *
@@ -254,7 +264,7 @@ export abstract class BaseRunnerService {
 	 * {@link RunnerState.invalidPRsByFile|`state.invalidPRsByFile`} for notification in new PR descriptions.
 	 *
 	 * @returns `true` when there is at least one file to translate; `false` when discovery
-	 * produced no candidates, in which case the caller should skip batch translation.
+	 * or the run limits left no candidates, in which case the caller should skip batch translation.
 	 */
 	protected async fetchFilesToTranslate() {
 		if (this.state.filesToTranslate.length) {
@@ -265,8 +275,11 @@ export abstract class BaseRunnerService {
 			return true;
 		}
 
-		const { filesToTranslate, invalidPRsByFile } = await this.managers.fileDiscovery.discoverFiles(
-			this.state.repositoryTree,
+		const discovery = await this.managers.fileDiscovery.discoverFiles(this.state.repositoryTree);
+		const { invalidPRsByFile } = discovery;
+		const filesToTranslate = await this.applyRunLimits(
+			discovery.filesToTranslate,
+			discovery.refreshPaths,
 		);
 
 		if (filesToTranslate.length === 0) {
@@ -290,6 +303,59 @@ export abstract class BaseRunnerService {
 		return true;
 	}
 
+	/**
+	 * Narrows discovered files to what this run may process under {@link RunnerOptions.runLimits}.
+	 *
+	 * Records the files left for later runs in {@link RunnerState.backlog|`state.backlog`}.
+	 * Returns `files` unchanged when no limits are set or the run is targeted
+	 * (`TRANSLATION_FILE_PATHS`).
+	 *
+	 * @param files Files discovery queued for translation
+	 * @param refreshPaths Queued paths that already have an open translation PR
+	 *
+	 * @returns Files to process in this run
+	 *
+	 * @see {@link selectFilesForRun}
+	 */
+	private async applyRunLimits(files: TranslationFile[], refreshPaths: ReadonlySet<string>) {
+		const limits = this.options.runLimits;
+		const isTargetedRun = getConfiguredTranslationTargetPaths().length > 0;
+
+		if (!limits || isTargetedRun || files.length === 0) return files;
+
+		const hasNewFiles = files.some((file) => !refreshPaths.has(file.path));
+		const needsOpenPullRequestCount = limits.maxOpenTranslationPullRequests > 0 && hasNewFiles;
+		const openTranslationPullRequests =
+			needsOpenPullRequestCount ? await this.services.github.countOpenTranslationPullRequests() : 0;
+
+		const { selected, leftOverByCap, heldByCeiling } = selectFilesForRun({
+			files,
+			refreshPaths,
+			limits,
+			openTranslationPullRequests,
+		});
+
+		this.state.backlog = {
+			filesLeftOverByCap: leftOverByCap.length,
+			filesHeldByCeiling: heldByCeiling.length,
+		};
+
+		this.logger.info(
+			{
+				maxFilesPerRun: limits.maxFilesPerRun,
+				maxOpenTranslationPullRequests: limits.maxOpenTranslationPullRequests,
+				openTranslationPullRequests: needsOpenPullRequestCount ? openTranslationPullRequests : null,
+				selected: selected.map((file) => file.path),
+				refreshCount: selected.filter((file) => refreshPaths.has(file.path)).length,
+				leftOverByCap: leftOverByCap.map((file) => file.path),
+				heldByCeiling: heldByCeiling.map((file) => file.path),
+			},
+			`Run limits: processing ${selected.length} of ${files.length} queued files`,
+		);
+
+		return selected;
+	}
+
 	/** Updates the progress issue with the translation results */
 	protected async updateIssueWithResults(): Promise<void> {
 		await this.managers.prManager.updateIssue(this.metadata.results, this.state.filesToTranslate);
@@ -303,7 +369,10 @@ export abstract class BaseRunnerService {
 	 * @see {@link PRManager.printFinalStatistics}
 	 */
 	protected printFinalStatistics(): WorkflowStatistics {
-		return this.managers.prManager.printFinalStatistics(this.metadata.results);
+		return {
+			...this.managers.prManager.printFinalStatistics(this.metadata.results),
+			...this.state.backlog,
+		};
 	}
 
 	/**
