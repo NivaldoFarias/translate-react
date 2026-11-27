@@ -5,7 +5,6 @@ import type { TranslationMatrixEntry } from "@/ci/services/upstream/types";
 import { buildPollStepSummary, resolveTranslationDispatch } from "@/ci/utils/poll-gate.util";
 
 const PT_BR_ROW: TranslationMatrixEntry = {
-
 	scheduled: false,
 	lang: "pt-br",
 	upstream_owner: "reactjs",

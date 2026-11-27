@@ -8,7 +8,6 @@ import type { UpstreamLocaleConfig } from "@/ci/services/upstream/types";
 import { UpstreamHeadShaService } from "@/ci/services/upstream/upstream-head-sha.service";
 
 const ptBrLocale: UpstreamLocaleConfig = {
-
 	scheduled: false,
 	lang: "pt-br",
 	upstream_owner: "reactjs",
