@@ -9,6 +9,7 @@ import type { UpstreamShaVariableReader } from "@/ci/services/upstream/upstream-
 import { UpstreamShaPoller } from "@/ci/services/upstream/upstream-sha.poller";
 
 const ptBrLocale: UpstreamLocaleConfig = {
+	scheduled: false,
 	lang: "pt-br",
 	upstream_owner: "reactjs",
 	upstream_name: "pt-br.react.dev",

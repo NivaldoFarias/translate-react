@@ -52,6 +52,23 @@ export function filterUpstreamLocalesByLang(
 }
 
 /**
+ * Keeps the locales the scheduled poll should translate (`scheduled: true`).
+ *
+ * @param locales Full registry from {@link loadUpstreamLocales}
+ *
+ * @returns Scheduled locales, in registry order
+ *
+ * @example
+ * ```typescript
+ * filterScheduledLocales(loadUpstreamLocales()).map((row) => row.lang);
+ * // ^? ["pt-br"]
+ * ```
+ */
+export function filterScheduledLocales(locales: UpstreamLocaleConfig[]) {
+	return locales.filter((row) => row.scheduled);
+}
+
+/**
  * Resolves the GitHub owner for a locale fork.
  *
  * Uses per-row `fork_owner` from `.github/locales.json` when set; otherwise falls back to the

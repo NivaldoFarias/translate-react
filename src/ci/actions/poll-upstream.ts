@@ -11,7 +11,10 @@
 
 import { resolveCiScriptContext } from "@/ci/schemas/env.schema";
 import { UpstreamShaPoller, UpstreamShaVariableReader } from "@/ci/services/upstream/";
-import { loadUpstreamLocales } from "@/ci/services/upstream/upstream-locales.util";
+import {
+	filterScheduledLocales,
+	loadUpstreamLocales,
+} from "@/ci/services/upstream/upstream-locales.util";
 import {
 	createWorkflowScriptOctokit,
 	writePollWorkflowOutputs,
@@ -38,7 +41,16 @@ async function main() {
 	);
 
 	const octokit = createWorkflowScriptOctokit(context);
-	const locales = loadUpstreamLocales();
+	const registry = loadUpstreamLocales();
+	const locales = filterScheduledLocales(registry);
+
+	logger.info(
+		{
+			scheduled: locales.map((row) => row.lang),
+			notScheduled: registry.filter((row) => !row.scheduled).map((row) => row.lang),
+		},
+		"Polling locales with scheduled: true in .github/locales.json",
+	);
 
 	const variableReader = new UpstreamShaVariableReader(octokit, context.repository, logger);
 	const poller = new UpstreamShaPoller(octokit, variableReader, logger);

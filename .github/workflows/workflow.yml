@@ -98,7 +98,8 @@ jobs:
         include: ${{ fromJson(needs.prepare-matrix.outputs.matrix) }}
     concurrency:
       group: translation-${{ matrix.lang }}-${{ github.ref }}
-      cancel-in-progress: true
+      # Queue a newer run instead of cancelling one mid-commit, which can leave a branch moved but its PR not updated.
+      cancel-in-progress: false
     steps:
       - name: Generate Bot Token
         id: generate-token

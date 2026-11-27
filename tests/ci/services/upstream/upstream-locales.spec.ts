@@ -1,10 +1,20 @@
 import { describe, expect, test } from "bun:test";
 
+import { upstreamLocaleConfigSchema } from "@/ci/services/upstream/types";
 import {
+	filterScheduledLocales,
 	filterUpstreamLocalesByLang,
 	loadUpstreamLocales,
 	resolveForkOwner,
 } from "@/ci/services/upstream/upstream-locales.util";
+
+const PT_BR_ROW = {
+	lang: "pt-br",
+	upstream_owner: "reactjs",
+	upstream_name: "pt-br.react.dev",
+	fork_name: "pt-br.react.dev",
+	translation_guidelines_file: "GLOSSARY.md",
+};
 
 describe("upstream-locales.util", () => {
 	test("loadUpstreamLocales reads configured registry", () => {
@@ -13,6 +23,28 @@ describe("upstream-locales.util", () => {
 		expect(locales.length).toBeGreaterThanOrEqual(2);
 		expect(locales.some((row) => row.lang === "pt-br")).toBe(true);
 		expect(locales.some((row) => row.lang === "ru")).toBe(true);
+	});
+
+	test("a row without scheduled is not scheduled", () => {
+		const row = upstreamLocaleConfigSchema.parse(PT_BR_ROW);
+
+		expect(row.scheduled).toBe(false);
+	});
+
+	test("filterScheduledLocales keeps only rows with scheduled: true", () => {
+		const locales = [
+			upstreamLocaleConfigSchema.parse({ ...PT_BR_ROW, scheduled: true }),
+			upstreamLocaleConfigSchema.parse({ ...PT_BR_ROW, lang: "ru", scheduled: false }),
+			upstreamLocaleConfigSchema.parse({ ...PT_BR_ROW, lang: "ja" }),
+		];
+
+		const scheduled = filterScheduledLocales(locales);
+
+		expect(scheduled.map((row) => row.lang)).toEqual(["pt-br"]);
+	});
+
+	test("rejects a non-boolean scheduled value", () => {
+		expect(() => upstreamLocaleConfigSchema.parse({ ...PT_BR_ROW, scheduled: "true" })).toThrow();
 	});
 
 	test("filterUpstreamLocalesByLang returns all rows when langs is empty", () => {
@@ -51,6 +83,7 @@ describe("upstream-locales.util", () => {
 					fork_name: "ru.react.dev",
 					translation_guidelines_file: "TRANSLATION.md",
 					fork_owner: "  custom-org  ",
+					scheduled: false,
 				},
 				"workflow-default",
 			),
