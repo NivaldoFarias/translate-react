@@ -90,7 +90,6 @@ describe("UpstreamShaPoller", () => {
 	test("uses per-locale fork_owner on changed rows", async () => {
 		const { poller } = createTestPoller({ storedSha: undefined, headSha: "new-sha" });
 		const localeWithOwner: UpstreamLocaleConfig = {
-			scheduled: false,
 			...ptBrLocale,
 			fork_owner: "locale-specific-owner",
 		};

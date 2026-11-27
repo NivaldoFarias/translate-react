@@ -83,6 +83,7 @@ describe("upstream-locales.util", () => {
 					fork_name: "ru.react.dev",
 					translation_guidelines_file: "TRANSLATION.md",
 					fork_owner: "  custom-org  ",
+					scheduled: false,
 				},
 				"workflow-default",
 			),
