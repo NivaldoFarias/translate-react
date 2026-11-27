@@ -79,11 +79,7 @@ import {
 import { TranslationFile } from "./translation-file";
 import { createTranslationFileContext } from "./translation-file-context";
 import { isSegmentTranslationLegacyFallbackEligible } from "./translator-error.helpers";
-import {
-	CONNECTIVITY_TEST_MAX_TOKENS,
-	LLM_TEMPERATURE,
-	SEGMENT_BATCH_MAX_ITEMS_PER_BATCH,
-} from "./translator.constants";
+import { SEGMENT_BATCH_MAX_ITEMS_PER_BATCH } from "./translator.constants";
 import { PostTranslationValidationService } from "./validation/post-translation-validation.service";
 import { TranslationLanguageCheck } from "./validation/translation-language-check";
 
@@ -250,7 +246,7 @@ export class TranslatorService {
 	}
 
 	/**
-	 * Tests LLM API connectivity and authentication.
+	 * Tests LLM API connectivity and authentication, retrying transient failures.
 	 *
 	 * @throws {ApplicationError} with {@link ErrorCode.InitializationError} If LLM API is not accessible or credentials are invalid
 	 *
@@ -266,12 +262,7 @@ export class TranslatorService {
 			"Testing LLM API connectivity",
 		);
 
-		const response = await this.openai.chat.completions.create({
-			model: this.model,
-			messages: [{ role: "user", content: "ping" }],
-			max_completion_tokens: CONNECTIVITY_TEST_MAX_TOKENS,
-			temperature: LLM_TEMPERATURE,
-		});
+		const response = await this.llmClient.pingLanguageModel(this.logger);
 
 		if (!this.llmClient.isLLMResponseValid(response)) {
 			throw new ApplicationError(

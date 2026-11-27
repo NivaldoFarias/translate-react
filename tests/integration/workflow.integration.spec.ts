@@ -74,7 +74,8 @@ describe("RunnerService workflow integration", () => {
 					expect(stats.totalCount).toBe(1);
 					expect(stats.successCount).toBe(1);
 					expect(stats.failureCount).toBe(0);
-					expect(github.refreshTranslationBranchPreservePr).toHaveBeenCalled();
+					expect(github.commitTranslation.mock.calls.length).toBeGreaterThanOrEqual(1);
+					expect(github.deleteBranch).not.toHaveBeenCalled();
 					expect(github.createPullRequest).not.toHaveBeenCalled();
 					expect(github.closePullRequest).not.toHaveBeenCalled();
 					expect(chatMock.mock.calls.length).toBeGreaterThanOrEqual(1);

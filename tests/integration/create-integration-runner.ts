@@ -70,7 +70,7 @@ type GetFileMockFn = (file: PatchedRepositoryTreeItem) => Promise<RepositoryMark
 
 type CommitTranslationMockFn = (
 	opts: CommitTranslationOptions,
-) => Promise<RestEndpointMethodTypes["repos"]["createOrUpdateFileContents"]["response"]>;
+) => Promise<RestEndpointMethodTypes["git"]["getRef"]["response"]["data"]>;
 
 type CreatePullRequestMockFn = (
 	opts: PullRequestOptions,
@@ -416,8 +416,9 @@ export function createWorkflowGitHubServiceFromFiles(
 				await fs.writeFile(path.join(fileDir, "translated.md"), opts.content, "utf8");
 
 				return {
-					data: { content: { sha: "new-sha" }, commit: { sha: "commit-sha" } },
-				} as RestEndpointMethodTypes["repos"]["createOrUpdateFileContents"]["response"];
+					ref: `refs/heads/${opts.branchName}`,
+					object: { sha: "commit-sha" },
+				} as RestEndpointMethodTypes["git"]["getRef"]["response"]["data"];
 			},
 		);
 

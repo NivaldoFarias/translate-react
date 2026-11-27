@@ -15,13 +15,12 @@ import {
 	fetchRepositoryContent,
 	fetchRepositoryDefaultBranch,
 	isRepositoryContentNotFound,
-	readRepositoryFileSha,
 } from "./github-api.util";
 
 /** Options for committing translation changes */
 export interface CommitTranslationOptions {
-	/** Target branch reference */
-	branch: RestEndpointMethodTypes["git"]["getRef"]["response"]["data"];
+	/** Translation branch to point at the new commit, without the `refs/heads/` prefix */
+	branchName: string;
 
 	/** File path being committed on the fork */
 	file: Pick<RepositoryMarkdownBlob, "path">;
@@ -65,54 +64,60 @@ export class GitHubRepositoryContent {
 	}
 
 	/**
-	 * Commits translated content to a branch.
+	 * Creates a translation commit on top of the fork default branch tip.
 	 *
-	 * Updates an existing file or creates a new one. Resolves the blob `sha` on the
-	 * target branch immediately before the commit so reused topic branches do not
-	 * send a stale tree `sha` (GitHub returns HTTP 409 when the `sha` does not match).
+	 * Builds the tree and commit through the Git Data API without touching any branch, so
+	 * the caller can move the translation branch to the finished commit in one ref update.
+	 * The commit's only parent is the fork default tip, which keeps the translation as the
+	 * single commit on its topic branch.
 	 *
-	 * @param options Commit options
-	 * @param options.branch Target branch ref for the commit
+	 * @param options Commit options; `branchName` is not used here
 	 * @param options.file Repository path on the fork
 	 * @param options.content UTF-8 translated file body
 	 * @param options.message Commit message for the translation
 	 *
-	 * @returns Octokit `createOrUpdateFileContents` response
+	 * @returns Octokit `git.createCommit` data for the new commit
 	 */
-	public async commitTranslation({
-		branch,
+	public async createTranslationCommit({
 		file,
 		content,
 		message,
 	}: CommitTranslationOptions): Promise<
-		RestEndpointMethodTypes["repos"]["createOrUpdateFileContents"]["response"]
+		RestEndpointMethodTypes["git"]["createCommit"]["response"]["data"]
 	> {
 		this.assertSafeTranslatablePath(
 			file.path,
-			`${GitHubRepositoryContent.name}.${this.commitTranslation.name}`,
+			`${GitHubRepositoryContent.name}.${this.createTranslationCommit.name}`,
 		);
 
-		const blobShaOnBranch = await this.resolveBlobShaOnBranchForPath(branch.ref, file.path);
-
-		const response = await this.deps.octokit.repos.createOrUpdateFileContents({
-			...this.deps.repositories.fork,
-			path: file.path,
+		const fork = this.deps.repositories.fork;
+		const forkDefaultBranch = await fetchRepositoryDefaultBranch(this.deps.octokit, fork);
+		const { data: forkTip } = await this.deps.octokit.git.getRef({
+			...fork,
+			ref: `heads/${forkDefaultBranch}`,
+		});
+		const { data: parentCommit } = await this.deps.octokit.git.getCommit({
+			...fork,
+			commit_sha: forkTip.object.sha,
+		});
+		const { data: tree } = await this.deps.octokit.git.createTree({
+			...fork,
+			base_tree: parentCommit.tree.sha,
+			tree: [{ path: file.path, mode: "100644", type: "blob", content }],
+		});
+		const { data: commit } = await this.deps.octokit.git.createCommit({
+			...fork,
 			message,
-			content: Buffer.from(content).toString("base64"),
-			branch: branch.ref,
-			...(blobShaOnBranch !== undefined ? { sha: blobShaOnBranch } : {}),
+			tree: tree.sha,
+			parents: [forkTip.object.sha],
 		});
 
 		this.logger.info(
-			{
-				filePath: file.path,
-				branch: branch.ref,
-				commitSha: response.data.commit.sha,
-			},
-			"Translation committed successfully",
+			{ filePath: file.path, parentSha: forkTip.object.sha, commitSha: commit.sha },
+			"Translation commit created",
 		);
 
-		return response;
+		return commit;
 	}
 
 	/**
@@ -198,43 +203,6 @@ export class GitHubRepositoryContent {
 			}
 
 			return decodeRepositoryFileContent(response.data);
-		} catch (error) {
-			if (isRepositoryContentNotFound(error)) {
-				return undefined;
-			}
-
-			throw error;
-		}
-	}
-
-	/**
-	 * Looks up the current file blob `sha` on the fork at `branchRef`, or `undefined`
-	 * when the path is absent on that branch (create instead of update).
-	 *
-	 * @param branchRef Full ref such as `refs/heads/translate/foo`
-	 * @param path Repository path of the file
-	 *
-	 * @returns Blob `sha` on the branch, or `undefined` when the path is absent (create)
-	 */
-	private async resolveBlobShaOnBranchForPath(branchRef: string, path: string) {
-		try {
-			const existing = await fetchRepositoryContent(
-				this.deps.octokit,
-				this.deps.repositories.fork,
-				path,
-				branchRef,
-			);
-
-			if (Array.isArray(existing.data)) {
-				this.logger.warn(
-					{ path, branchRef },
-					"GitHub returned a directory listing for getContent; omitting sha for file update",
-				);
-
-				return undefined;
-			}
-
-			return readRepositoryFileSha(existing.data);
 		} catch (error) {
 			if (isRepositoryContentNotFound(error)) {
 				return undefined;

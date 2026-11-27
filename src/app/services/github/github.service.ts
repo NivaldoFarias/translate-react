@@ -79,7 +79,6 @@ export class GitHubService {
 
 		this.branch.setCleanupPullRequestAccess({
 			findPullRequestByBranch: this.pullRequest.findPullRequestByBranch.bind(this.pullRequest),
-			checkPullRequestStatus: this.pullRequest.checkPullRequestStatus.bind(this.pullRequest),
 		});
 	}
 
@@ -184,21 +183,6 @@ export class GitHubService {
 	// === Branch Methods ===
 
 	/**
-	 * Creates a new Git branch from a base branch.
-	 *
-	 * @param branchName Name for the new branch
-	 * @param baseBranch Branch to create from
-	 *
-	 * @returns Branch reference data
-	 */
-	public async createBranch(
-		branchName: string,
-		baseBranch?: string,
-	): Promise<RestEndpointMethodTypes["git"]["createRef"]["response"]> {
-		return this.branch.createBranch(branchName, baseBranch);
-	}
-
-	/**
 	 * Retrieves information about an existing branch.
 	 *
 	 * @param branchName Name of branch to retrieve
@@ -222,19 +206,6 @@ export class GitHubService {
 		branchName: string,
 	): Promise<RestEndpointMethodTypes["git"]["deleteRef"]["response"]> {
 		return this.branch.deleteBranch(branchName);
-	}
-
-	/**
-	 * Recreates a translation topic branch from the fork default tip without closing its pull request.
-	 *
-	 * @param branchName Translation branch to refresh
-	 *
-	 * @returns New branch reference data
-	 */
-	public async refreshTranslationBranchPreservePr(
-		branchName: string,
-	): Promise<RestEndpointMethodTypes["git"]["getRef"]["response"]["data"]> {
-		return this.branch.refreshTranslationBranchPreservePr(branchName);
 	}
 
 	// === Content/PR Methods ===
@@ -277,16 +248,21 @@ export class GitHubService {
 	}
 
 	/**
-	 * Commits translated content to a branch.
+	 * Commits a translation on the fork default tip and points its branch at the commit.
+	 *
+	 * The branch moves only once the commit exists, so an open pull request on it never
+	 * loses its head or shows an empty diff while the commit is built.
 	 *
 	 * @param options Commit options
 	 *
-	 * @returns Commit response
+	 * @returns Branch reference data pointing at the translation commit
 	 */
 	public async commitTranslation(
 		options: CommitTranslationOptions,
-	): Promise<RestEndpointMethodTypes["repos"]["createOrUpdateFileContents"]["response"]> {
-		return this.repositoryContent.commitTranslation(options);
+	): Promise<RestEndpointMethodTypes["git"]["getRef"]["response"]["data"]> {
+		const commit = await this.repositoryContent.createTranslationCommit(options);
+
+		return this.branch.pointBranchAtCommit(options.branchName, commit.sha);
 	}
 
 	/**

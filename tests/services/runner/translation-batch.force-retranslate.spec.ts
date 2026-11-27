@@ -60,7 +60,8 @@ describe("TranslationBatchManager targeted re-translation", () => {
 		const results = await manager.processBatches([file], 1);
 
 		expect(translator.translateContent).toHaveBeenCalled();
-		expect(github.refreshTranslationBranchPreservePr).toHaveBeenCalled();
+		expect(github.commitTranslation).toHaveBeenCalled();
+		expect(github.deleteBranch).not.toHaveBeenCalled();
 		expect(github.closePullRequest).not.toHaveBeenCalled();
 		expect(github.updatePullRequestBody).toHaveBeenCalled();
 		expect(results.get(file.filename)?.pullRequest).toEqual(existingPR);
@@ -93,6 +94,6 @@ describe("TranslationBatchManager targeted re-translation", () => {
 		await manager.processBatches([file], 1);
 
 		expect(translator.translateContent).not.toHaveBeenCalled();
-		expect(github.refreshTranslationBranchPreservePr).not.toHaveBeenCalled();
+		expect(github.commitTranslation).not.toHaveBeenCalled();
 	});
 });

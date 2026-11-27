@@ -9,7 +9,6 @@ import {
 	fetchRepositoryContent,
 	fetchRepositoryDefaultBranch,
 	isRepositoryContentNotFound,
-	readRepositoryFileSha,
 } from "@/app/services/github/github-api.util";
 
 function createRequestError(status: number) {
@@ -105,46 +104,6 @@ describe("github-api.util", () => {
 					download_url: null,
 					_links: { self: "", git: null, html: null },
 				}),
-			).toBeUndefined();
-		});
-	});
-
-	describe("readRepositoryFileSha", () => {
-		test("returns sha for a file payload", () => {
-			expect(
-				readRepositoryFileSha({
-					type: "file",
-					encoding: "base64",
-					size: 2,
-					name: "page.md",
-					path: "src/page.md",
-					content: "aGk=",
-					sha: "blob-sha",
-					url: "https://api.github.com",
-					git_url: null,
-					html_url: null,
-					download_url: null,
-					_links: { self: "", git: null, html: null },
-				}),
-			).toBe("blob-sha");
-		});
-
-		test("returns undefined for directory listings", () => {
-			expect(
-				readRepositoryFileSha([
-					{
-						type: "dir",
-						size: 0,
-						name: "src",
-						path: "src",
-						sha: "dir-sha",
-						url: "https://api.github.com",
-						git_url: null,
-						html_url: null,
-						download_url: null,
-						_links: { self: "", git: null, html: null },
-					},
-				]),
 			).toBeUndefined();
 		});
 	});
