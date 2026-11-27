@@ -10,6 +10,7 @@ const PT_BR_ROW = {
 	fork_name: "pt-br.react.dev",
 	fork_owner: "example",
 	translation_guidelines_file: "GLOSSARY.md",
+	scheduled: true,
 	upstream_sha: "abc123",
 };
 

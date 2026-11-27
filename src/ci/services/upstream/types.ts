@@ -8,6 +8,8 @@ export const upstreamLocaleConfigSchema = z.object({
 	fork_name: z.string().min(1),
 	translation_guidelines_file: z.string().min(1),
 	fork_owner: z.string().min(1).optional(),
+	/** Whether the scheduled poll translates this locale; manual runs ignore it. Off unless `true`. */
+	scheduled: z.boolean().default(false),
 });
 
 /** Validated locale row from `.github/locales.json`. */

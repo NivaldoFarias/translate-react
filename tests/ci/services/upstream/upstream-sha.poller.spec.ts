@@ -9,6 +9,8 @@ import type { UpstreamShaVariableReader } from "@/ci/services/upstream/upstream-
 import { UpstreamShaPoller } from "@/ci/services/upstream/upstream-sha.poller";
 
 const ptBrLocale: UpstreamLocaleConfig = {
+
+	scheduled: false,
 	lang: "pt-br",
 	upstream_owner: "reactjs",
 	upstream_name: "pt-br.react.dev",
@@ -89,6 +91,7 @@ describe("UpstreamShaPoller", () => {
 	test("uses per-locale fork_owner on changed rows", async () => {
 		const { poller } = createTestPoller({ storedSha: undefined, headSha: "new-sha" });
 		const localeWithOwner: UpstreamLocaleConfig = {
+			scheduled: false,
 			...ptBrLocale,
 			fork_owner: "locale-specific-owner",
 		};

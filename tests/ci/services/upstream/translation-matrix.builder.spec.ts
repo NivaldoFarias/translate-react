@@ -8,6 +8,8 @@ import type { UpstreamLocaleConfig } from "@/ci/services/upstream/types";
 import { TranslationMatrixBuilder } from "@/ci/services/upstream/translation-matrix.builder";
 
 const ptBrLocale: UpstreamLocaleConfig = {
+
+	scheduled: false,
 	lang: "pt-br",
 	upstream_owner: "reactjs",
 	upstream_name: "pt-br.react.dev",
@@ -16,6 +18,8 @@ const ptBrLocale: UpstreamLocaleConfig = {
 };
 
 const ruLocaleWithOwner: UpstreamLocaleConfig = {
+
+	scheduled: false,
 	lang: "ru",
 	upstream_owner: "reactjs",
 	upstream_name: "ru.react.dev",

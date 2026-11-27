@@ -6,9 +6,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Added
 
+- **Breaking (fork operators):** The scheduled poll only translates locales with `"scheduled": true` in `.github/locales.json`. Rows without the field are off. Both bundled locales ship with `false`. Manual runs ignore the flag.
 - Translation runs process at most `MAX_FILES_PER_RUN` files (default `3`), refreshes of open PRs first, then new files in path order. Once `MAX_OPEN_TRANSLATION_PRS` translation PRs are open (default `10`), runs stop opening new PRs but keep refreshing open ones. `0` removes either limit, and targeted `file_path` runs ignore both.
 - When a run leaves files for later or a file fails, `workflow.yml` keeps `UPSTREAM_SHA_<LANG>` unchanged, so the next poll dispatches another run.
 - Each translation job writes a step summary: file counts and backlog, PRs opened and updated, tokens and cost, failed files with their errors, advisory guard counts, PAT fallbacks and discovery fail-opens, and open translation PRs waiting on requested changes. It's written even when the run stops early, and failed files and fail-opens also show as warning annotations.
+
+### Changed
+
+- A newer translation run for a locale now waits for the one in progress instead of cancelling it mid-commit (`cancel-in-progress: false`).
 
 ## [0.3.2] - 2026-11-27
 
