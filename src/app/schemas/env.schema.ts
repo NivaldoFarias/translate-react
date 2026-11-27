@@ -210,6 +210,9 @@ const envSchema = z.object({
 	/** Step output file; the runner writes `has_backlog` here so `workflow.yml` can hold `UPSTREAM_SHA_<LANG>` */
 	GITHUB_OUTPUT: z.preprocess(emptyEnvValueToUndefined, z.string().optional()),
 
+	/** Step summary file; the runner writes its run report here */
+	GITHUB_STEP_SUMMARY: z.preprocess(emptyEnvValueToUndefined, z.string().optional()),
+
 	/** Workflow display name from the workflow file `name` field */
 	GITHUB_WORKFLOW: z.string().optional(),
 

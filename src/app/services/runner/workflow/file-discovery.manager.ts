@@ -30,7 +30,8 @@ import {
 	MIN_CACHE_CONFIDENCE,
 } from "./workflow.constants";
 
-type FailOpenInventory = Record<FailOpenReasonId, number>;
+/** Per-reason count of files discovery kept in the queue after a check failed open */
+export type FailOpenInventory = Record<FailOpenReasonId, number>;
 
 /**
  * Returns a zeroed fail-open counter map for discovery inventory logging.
@@ -85,7 +86,8 @@ export class FileDiscoveryManager {
 	 *
 	 * @param repositoryTree Complete repository file tree from GitHub
 	 *
-	 * @returns Files to translate, invalid PRs by file path, and paths that already have an open PR
+	 * @returns Files to translate, invalid PRs by file path, paths that already have an open PR,
+	 * and per-reason fail-open counts
 	 *
 	 * @example
 	 * ```typescript
@@ -100,6 +102,7 @@ export class FileDiscoveryManager {
 		filesToTranslate: TranslationFile[];
 		invalidPRsByFile: Map<string, { prNumber: number; status: PullRequestStatus }>;
 		refreshPaths: Set<string>;
+		failOpenInventory: FailOpenInventory;
 	}> {
 		this.logger.debug({ fileCount: repositoryTree.length }, "Starting file discovery pipeline");
 
@@ -187,7 +190,7 @@ export class FileDiscoveryManager {
 			`Translation pipeline complete: ${filesToTranslate.length} files need translation (${totalFiltered} filtered across stages)`,
 		);
 
-		return { filesToTranslate, invalidPRsByFile, refreshPaths };
+		return { filesToTranslate, invalidPRsByFile, refreshPaths, failOpenInventory };
 	}
 
 	/**

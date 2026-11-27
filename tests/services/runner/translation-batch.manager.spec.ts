@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
+import type { ProcessedFileResult } from "@/app/services/github/types";
+
 import { PullRequestProgressAction } from "@/app/services/github/types";
 import { TranslationBatchManager } from "@/app/services/runner/workflow/translation-batch.manager";
 import { MAX_CONSECUTIVE_FAILURES } from "@/app/services/runner/workflow/workflow.constants";
@@ -205,6 +207,29 @@ describe("TranslationBatchManager", () => {
 			}
 
 			expect(translator.translateContent).toHaveBeenCalledTimes(MAX_CONSECUTIVE_FAILURES);
+		});
+
+		test("keeps results from files processed before the circuit breaker trips", async () => {
+			const github = createMockGitHubService();
+			const translator = createMockTranslatorService();
+			const languageDetector = createMockLanguageDetectorService();
+			github.findPullRequestByBranch.mockResolvedValue(undefined);
+			languageDetector.analyzeLanguage.mockResolvedValue(createUntranslatedLanguageAnalysis());
+			translator.translateContent.mockRejectedValue(
+				new ApplicationError("Translation failed", ErrorCode.TranslationFailed, "test"),
+			);
+			const manager = createTestTranslationBatchManager({ github, translator, languageDetector });
+			const files = Array.from({ length: MAX_CONSECUTIVE_FAILURES + 2 }, (_, index) =>
+				createTranslationFileFixture({
+					path: `src/content/pages/file-${index}.md`,
+					filename: `file-${index}.md`,
+				}),
+			);
+			const results = new Map<string, ProcessedFileResult>();
+
+			await manager.processBatches(files, files.length, results).catch(() => undefined);
+
+			expect(results.size).toBe(MAX_CONSECUTIVE_FAILURES);
 		});
 
 		test("preserves approved pull request when resetting an existing translation branch", async () => {

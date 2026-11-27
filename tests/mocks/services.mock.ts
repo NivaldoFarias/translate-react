@@ -105,6 +105,9 @@ export function createMockGitHubService() {
 		),
 		listOpenPullRequests: mock(() => Promise.resolve([])),
 		countOpenTranslationPullRequests: mock(() => Promise.resolve(0)),
+		listOpenTranslationPullRequests: mock(() =>
+			Promise.resolve([] as RestEndpointMethodTypes["pulls"]["list"]["response"]["data"]),
+		),
 		getPullRequestFiles: mock(() => Promise.resolve(["src/test/file.md"])),
 		commitTranslation: mock(() =>
 			Promise.resolve({

@@ -10,18 +10,21 @@ import type { PrFilterResult, WorkflowStatistics } from "@/app/services/runner/t
 import type { TranslationFile } from "../translator";
 
 import type { RunnerOptions, RunnerServiceDependencies, RunnerState } from "./runner.types";
+import type { ChangesRequestedPullRequest, RunReport } from "./workflow/run-summary.util";
 
+import { getPatFallbackCount } from "@/app/clients/";
 import {
 	baseLogger,
 	env,
 	getConfiguredTranslationTargetPaths,
 	registerCleanup,
 } from "@/app/utils/";
-import { ApplicationError, ErrorCode } from "@/shared/errors/";
+import { ApplicationError, ErrorCode, toSafeErrorLogFields } from "@/shared/errors/";
 
 import { TranslatorService } from "../translator";
 
 import { FileDiscoveryManager, PRManager, TranslationBatchManager } from "./workflow";
+import { hasPendingChangesRequestedReview } from "./workflow/pull-request-review.util";
 import { selectFilesForRun } from "./workflow/run-limits.util";
 
 /**
@@ -45,7 +48,11 @@ export abstract class BaseRunnerService {
 		processedResults: [],
 		timestamp: Date.now(),
 		backlog: { filesLeftOverByCap: 0, filesHeldByCeiling: 0 },
+		failOpenByReason: null,
 	};
+
+	/** Statistics from {@link printFinalStatistics}, cached so the run report doesn't log them twice */
+	private finalStatistics: WorkflowStatistics | null = null;
 
 	/** Statistics tracking for the translation process */
 	protected metadata = {
@@ -277,6 +284,7 @@ export abstract class BaseRunnerService {
 
 		const discovery = await this.managers.fileDiscovery.discoverFiles(this.state.repositoryTree);
 		const { invalidPRsByFile } = discovery;
+		this.state.failOpenByReason = discovery.failOpenInventory;
 		const filesToTranslate = await this.applyRunLimits(
 			discovery.filesToTranslate,
 			discovery.refreshPaths,
@@ -369,24 +377,91 @@ export abstract class BaseRunnerService {
 	 * @see {@link PRManager.printFinalStatistics}
 	 */
 	protected printFinalStatistics(): WorkflowStatistics {
-		return {
+		this.finalStatistics = {
 			...this.managers.prManager.printFinalStatistics(this.metadata.results),
 			...this.state.backlog,
 		};
+
+		return this.finalStatistics;
 	}
 
 	/**
 	 * Processes files in batches to manage resources and provide progress feedback.
+	 *
+	 * Fills `metadata.results` as each file finishes, so {@link buildRunReport} still sees
+	 * them if the circuit breaker stops the run.
 	 *
 	 * @param batchSize Number of files to process simultaneously
 	 *
 	 * @see {@link TranslationBatchManager.processBatches}
 	 */
 	protected async processInBatches(batchSize = env.BATCH_SIZE): Promise<void> {
-		this.metadata.results = await this.managers.translationBatch.processBatches(
+		await this.managers.translationBatch.processBatches(
 			this.state.filesToTranslate,
 			batchSize,
+			this.metadata.results,
 		);
+	}
+
+	/**
+	 * Collects what the step summary reports about this run, including after an abort.
+	 *
+	 * Uses the files processed before `error` stopped the run. Never throws: a failed
+	 * lookup of PRs with requested changes becomes `null` in the report.
+	 *
+	 * @param error Error that stopped the run, when it didn't complete
+	 *
+	 * @returns Run report for {@link buildRunSummary}
+	 */
+	public async buildRunReport(error?: unknown): Promise<RunReport> {
+		const abortMessage =
+			error === undefined ? null
+			: error instanceof Error ? error.message
+			: typeof error === "string" ? error
+			: "Run stopped with a non-Error value";
+
+		return {
+			targetLanguage: this.services.languageDetector.languages.target,
+			abortMessage,
+			statistics: this.finalStatistics ?? this.printFinalStatistics(),
+			results: Array.from(this.metadata.results.values()),
+			failOpenByReason: this.state.failOpenByReason,
+			patFallbackCount: getPatFallbackCount(),
+			changesRequestedPullRequests: await this.findChangesRequestedPullRequests(),
+		};
+	}
+
+	/**
+	 * Lists open translation PRs whose latest maintainer review asks for changes.
+	 *
+	 * @returns Matching PRs, or `null` when GitHub couldn't be queried
+	 */
+	private async findChangesRequestedPullRequests(): Promise<ChangesRequestedPullRequest[] | null> {
+		try {
+			const openPullRequests = await this.services.github.listOpenTranslationPullRequests();
+			const waiting: ChangesRequestedPullRequest[] = [];
+
+			for (const pullRequest of openPullRequests) {
+				const reviews = await this.services.github.listPullRequestReviews(pullRequest.number);
+
+				if (hasPendingChangesRequestedReview(reviews)) {
+					waiting.push({
+						number: pullRequest.number,
+						url: pullRequest.html_url,
+						title: pullRequest.title,
+					});
+				}
+			}
+
+			return waiting;
+		} catch (error) {
+			this.logger.warn(
+				toSafeErrorLogFields(error),
+				"Could not list translation PRs with requested changes for the run summary",
+			);
+
+			return null;
+		}
 	}
 
 	abstract run(): Promise<WorkflowStatistics>;

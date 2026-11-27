@@ -11,6 +11,7 @@ import type { LocaleService } from "@/app/services/locale/";
 import type { TranslationFile, TranslatorService } from "@/app/services/translator/";
 
 import type { RunBacklog } from "./types";
+import type { FailOpenInventory } from "./workflow/file-discovery.manager";
 import type { RunLimits } from "./workflow/run-limits.util";
 
 /**
@@ -63,6 +64,9 @@ export interface RunnerState {
 
 	/** Queued files this run left for later runs because of {@link RunnerOptions.runLimits} */
 	backlog: RunBacklog;
+
+	/** Discovery fail-open counts per reason, or `null` until discovery finishes */
+	failOpenByReason: FailOpenInventory | null;
 
 	/**
 	 * Map of file paths to invalid PR information.
