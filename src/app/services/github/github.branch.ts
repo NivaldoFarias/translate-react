@@ -2,14 +2,10 @@ import { RequestError } from "@octokit/request-error";
 
 import type { RestEndpointMethodTypes } from "@octokit/rest";
 
-import type { PullRequestStatus } from "@/app/services/github/types";
-
 import type { SharedGitHubDependencies } from "./types";
 
 import { baseLogger, registerCleanup } from "@/app/utils/";
 import { toSafeErrorLogFields } from "@/shared/errors/";
-
-import { fetchRepositoryDefaultBranch } from "./github-api.util";
 
 /**
  * Branch creation, deletion, and lifecycle management for the GitHub API.
@@ -28,7 +24,6 @@ export class GitHubBranch {
 	 */
 	private cleanupPullRequestAccess?: {
 		findPullRequestByBranch: (branchName: string) => Promise<unknown>;
-		checkPullRequestStatus: (prNumber: number) => Promise<{ needsUpdate: boolean }>;
 	};
 
 	constructor(private readonly deps: SharedGitHubDependencies) {
@@ -43,71 +38,12 @@ export class GitHubBranch {
 	 * Called by the unified service to enable cleanup functionality.
 	 *
 	 * @param access The callback for cleanup operations that need access to pull request lookups
-	 * @param access.findPullRequestByBranch The callback to find a pull request by branch name
-	 * @param access.checkPullRequestStatus The callback to check the status of a pull request
+	 * @param access.findPullRequestByBranch The callback to find an open pull request by branch name
 	 */
 	public setCleanupPullRequestAccess(access: {
 		findPullRequestByBranch: (branchName: string) => Promise<unknown>;
-		checkPullRequestStatus: (prNumber: number) => Promise<PullRequestStatus>;
 	}): void {
 		this.cleanupPullRequestAccess = access;
-	}
-
-	/**
-	 * Creates a new Git branch from a base branch.
-	 *
-	 * Tracks the branch for cleanup if created successfully.
-	 *
-	 * @param branchName Name for the new branch
-	 * @param baseBranch Branch to create from (fork default when omitted)
-	 *
-	 * @returns Octokit `git.createRef` response for the new branch
-	 *
-	 * @example
-	 * ```typescript
-	 * const branch = await branch.createBranch('feature/new-branch');
-	 * ```
-	 */
-	public async createBranch(
-		branchName: string,
-		baseBranch?: string,
-	): Promise<RestEndpointMethodTypes["git"]["createRef"]["response"]> {
-		this.logger.debug({ branchName, baseBranch: baseBranch ?? "(default)" }, "Creating new branch");
-
-		try {
-			const actualBaseBranch =
-				baseBranch ??
-				(await fetchRepositoryDefaultBranch(this.deps.octokit, this.deps.repositories.fork));
-
-			this.logger.debug({ branchName, actualBaseBranch }, "Resolved base branch, fetching ref");
-
-			const mainBranchRef = await this.deps.octokit.git.getRef({
-				...this.deps.repositories.fork,
-				ref: `heads/${actualBaseBranch}`,
-			});
-
-			const branchRef = await this.deps.octokit.git.createRef({
-				...this.deps.repositories.fork,
-				ref: `refs/heads/${branchName}`,
-				sha: mainBranchRef.data.object.sha,
-			});
-
-			this.activeBranches.add(branchName);
-
-			this.logger.info(
-				{ branchName, baseBranch: actualBaseBranch, sha: mainBranchRef.data.object.sha },
-				"Branch created successfully",
-			);
-
-			return branchRef;
-		} catch (error) {
-			this.logger.debug(
-				{ branchName, ...toSafeErrorLogFields(error) },
-				"Branch creation failed, removing from tracking",
-			);
-			this.activeBranches.delete(branchName);
-			throw error;
-		}
 	}
 
 	/**
@@ -148,33 +84,56 @@ export class GitHubBranch {
 	}
 
 	/**
-	 * Recreates a translation topic branch from the fork default tip without closing its pull request.
+	 * Points a translation branch at an existing commit, creating the branch when missing.
 	 *
-	 * @param branchName Translation branch to refresh
+	 * Moves an existing branch with a single forced `git.updateRef`, so an open pull request
+	 * on it keeps its head the whole time. Deleting and recreating the ref instead leaves the
+	 * pull request without a head branch, which GitHub cannot merge (pt-br #1182). Only newly
+	 * created branches are tracked for {@link GitHubBranch.cleanup}.
 	 *
-	 * @returns New branch reference data
+	 * @param branchName Translation branch name without the `refs/heads/` prefix
+	 * @param commitSha Commit the branch should point at
+	 *
+	 * @returns Branch reference data after the move
+	 *
+	 * @example
+	 * ```typescript
+	 * const ref = await branch.pointBranchAtCommit("translate/learn/index.md", commit.sha);
+	 * ```
 	 */
-	public async refreshTranslationBranchPreservePr(
+	public async pointBranchAtCommit(
 		branchName: string,
+		commitSha: string,
 	): Promise<RestEndpointMethodTypes["git"]["getRef"]["response"]["data"]> {
-		this.logger.info(
-			{ branchName },
-			"Refreshing translation branch from fork default without closing PR",
-		);
-
 		const existingBranch = await this.getBranch(branchName);
 
 		if (existingBranch) {
-			await this.deleteBranch(branchName);
+			const response = await this.deps.octokit.git.updateRef({
+				...this.deps.repositories.fork,
+				ref: `heads/${branchName}`,
+				sha: commitSha,
+				force: true,
+			});
+
+			this.logger.info(
+				{ branchName, previousSha: existingBranch.data.object.sha, sha: commitSha },
+				"Branch moved to translation commit",
+			);
+
+			return response.data;
 		}
 
-		const forkDefaultBranch = await fetchRepositoryDefaultBranch(
-			this.deps.octokit,
-			this.deps.repositories.fork,
-		);
-		const newBranch = await this.createBranch(branchName, forkDefaultBranch);
+		const response = await this.deps.octokit.git.createRef({
+			...this.deps.repositories.fork,
+			ref: `refs/heads/${branchName}`,
+			sha: commitSha,
+		});
 
-		return newBranch.data;
+		this.activeBranches.add(branchName);
+
+		this.logger.info({ branchName, sha: commitSha }, "Branch created at translation commit");
+
+		return response.data;
 	}
 
 	/**
@@ -208,30 +167,17 @@ export class GitHubBranch {
 	}
 
 	/**
-	 * Removes all tracked branches, but only if they don't have valid PRs.
+	 * Removes tracked branches that have no open pull request.
 	 *
-	 * Called automatically on process termination. Checks each branch for an associated
-	 * pull request before deletion. If a PR exists without conflicts, the branch is
-	 * preserved to avoid closing valid PRs. Only branches without PRs or branches with
-	 * conflicted PRs are deleted during cleanup.
-	 *
-	 * ### Safety Checks
-	 *
-	 * For each branch in `activeBranches`:
-	 * 1. Check if an open PR exists for the branch
-	 * 2. If PR exists, check for merge conflicts
-	 * 3. Only delete if: no PR exists OR PR has conflicts
-	 * 4. Skip deletion if: PR exists without conflicts
-	 *
-	 * This prevents accidentally closing valid PRs when the process is interrupted
-	 * via SIGINT (Ctrl+C) or other termination signals.
+	 * Called automatically on process termination (SIGINT and other signals). A branch with
+	 * an open pull request is always preserved: deleting it leaves the pull request without
+	 * a head branch. Lookup errors also preserve the branch.
 	 *
 	 * @example
 	 * ```typescript
 	 * // On SIGINT:
-	 * // - Branch "translate/file1.md" has PR #123 (clean) → preserved
-	 * // - Branch "translate/file2.md" has PR #124 (conflicts) → deleted
-	 * // - Branch "translate/file3.md" has no PR → deleted
+	 * // - Branch "translate/file1.md" has PR #123 → preserved
+	 * // - Branch "translate/file2.md" has no PR → deleted
 	 * ```
 	 */
 	protected async cleanup(): Promise<void> {
@@ -247,28 +193,16 @@ export class GitHubBranch {
 				const pr = (await this.cleanupPullRequestAccess.findPullRequestByBranch(branch)) as
 					{ number: number } | undefined;
 
-				if (!pr) {
-					this.logger.info({ branch }, "Cleanup: Deleting branch without PR");
-					await this.deleteBranch(branch);
-					continue;
-				}
-
-				const prStatus = await this.cleanupPullRequestAccess.checkPullRequestStatus(pr.number);
-
-				if (prStatus.needsUpdate) {
+				if (pr) {
 					this.logger.info(
-						{ branch, prNumber: pr.number, mergeableState: prStatus.needsUpdate },
-						"Cleanup: Deleting branch with conflicted PR",
+						{ branch, prNumber: pr.number },
+						"Cleanup: Preserving branch with open PR",
 					);
-
-					await this.deleteBranch(branch);
 					continue;
 				}
 
-				this.logger.info(
-					{ branch, prNumber: pr.number },
-					"Cleanup: Preserving branch with valid PR",
-				);
+				this.logger.info({ branch }, "Cleanup: Deleting branch without PR");
+				await this.deleteBranch(branch);
 			} catch (error) {
 				this.logger.error(
 					{ branch, ...toSafeErrorLogFields(error) },

@@ -7,6 +7,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 ### Fixed
 
 - A transient LLM rate limit or provider error at startup no longer fails the run: the connectivity check now follows `MAX_RETRY_ATTEMPTS`. Invalid credentials, exhausted credit and a spent daily free-model quota still stop it right away.
+- Refreshing an open translation pull request could delete its head branch, leaving it approved but unmergeable. The runner now translates first and moves the branch to the finished commit in one forced update. A failed or no-op translation leaves the branch alone, and cleanup (after a failed file or on SIGINT) never deletes a branch with an open pull request.
 
 ## [0.3.1] - 2026-11-24
 

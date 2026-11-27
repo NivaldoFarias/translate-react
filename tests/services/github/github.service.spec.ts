@@ -401,55 +401,6 @@ describe("GitHubService", () => {
 	});
 
 	describe("Branch Operations", () => {
-		describe("createBranch", () => {
-			test("should create branch from main when no base branch is specified", async () => {
-				const result = await githubService.createBranch("feature/test");
-
-				expect(octokitMock.git.getRef).toHaveBeenCalledWith({
-					...mockFork,
-					ref: "heads/main",
-				});
-
-				expect(octokitMock.git.createRef).toHaveBeenCalledWith({
-					...mockFork,
-					ref: "refs/heads/feature/test",
-					sha: "abc123def456",
-				});
-
-				expect(result).toBeDefined();
-				expect(result.data).toBeDefined();
-			});
-
-			test("should create branch from specified base branch when base branch is provided", async () => {
-				await githubService.createBranch("feature/test", "develop");
-
-				expect(octokitMock.git.getRef).toHaveBeenCalledWith({
-					...mockFork,
-					ref: "heads/develop",
-				});
-			});
-
-			test("should handle branch creation errors when error occurs", () => {
-				octokitMock.git.createRef.mockImplementation(() =>
-					Promise.reject(new Error("Branch creation failed")),
-				);
-
-				expect(githubService.createBranch("feature/test")).rejects.toThrow(
-					"Branch creation failed",
-				);
-			});
-
-			test("should handle base branch not found error", () => {
-				octokitMock.git.getRef.mockImplementation(() =>
-					Promise.reject(new Error("Reference not found")),
-				);
-
-				expect(githubService.createBranch("feature/test", "nonexistent")).rejects.toThrow(
-					"Reference not found",
-				);
-			});
-		});
-
 		describe("getBranch", () => {
 			test("should retrieve branch information when branch exists", async () => {
 				const result = await githubService.getBranch("main");
@@ -488,8 +439,6 @@ describe("GitHubService", () => {
 
 		describe("deleteBranch", () => {
 			test("should delete branch when deletion succeeds", async () => {
-				await githubService.createBranch("feature/test");
-
 				const result = await githubService.deleteBranch("feature/test");
 
 				expect(octokitMock.git.deleteRef).toHaveBeenCalledWith({
@@ -500,8 +449,7 @@ describe("GitHubService", () => {
 				expect(result.status).toBe(StatusCodes.NO_CONTENT);
 			});
 
-			test("should not remove branch from tracking when deletion fails", async () => {
-				await githubService.createBranch("feature/test");
+			test("should reject when deletion fails", () => {
 				octokitMock.git.deleteRef.mockImplementation(() =>
 					Promise.reject(new Error("Deletion failed")),
 				);
@@ -525,174 +473,115 @@ describe("GitHubService", () => {
 		});
 
 		describe("commitTranslation", () => {
-			test("should commit translation when valid translation data is provided", async () => {
-				const mockBranch = {
-					ref: "refs/heads/translate/test",
-					node_id: "branch-node-id",
-					url: "https://api.github.com/repos/test/test/git/refs/heads/translate/test",
-					object: {
-						type: "commit",
-						sha: "branch-sha",
-						url: "https://api.github.com/repos/test/test/git/commits/branch-sha",
-					},
-				};
+			const branchName = "translate/learn/react-v18.md";
+			const file = new TranslationFile(
+				"# Original",
+				"react-v18.md",
+				"src/learn/react-v18.md",
+				"sha",
+			);
 
-				const mockFile = new TranslationFile(
-					"# Original Content",
-					"file.md",
-					"src/test/file.md",
-					"stale-tree-sha",
-				);
-
+			test("moves an existing branch to the new commit without deleting it", async () => {
 				const result = await githubService.commitTranslation({
-					branch: mockBranch,
-					file: mockFile,
-					content: "# Translated Content",
-					message: "test: translate content",
+					branchName,
+					file,
+					content: "# Traduzido",
+					message: "docs: translate `react-v18.md`",
 				});
 
-				expect(result).toBeDefined();
-				expect(octokitMock.repos.getContent).toHaveBeenCalledWith({
+				expect(result.object.sha).toBe("translation-commit-sha");
+				expect(octokitMock.git.updateRef).toHaveBeenCalledWith({
 					...testRepositories.fork,
-					path: mockFile.path,
-					ref: mockBranch.ref,
+					ref: `heads/${branchName}`,
+					sha: "translation-commit-sha",
+					force: true,
 				});
-				expect(octokitMock.repos.createOrUpdateFileContents).toHaveBeenCalledWith(
-					expect.objectContaining({
-						...testRepositories.fork,
-						path: mockFile.path,
-						branch: mockBranch.ref,
-						sha: "abc123",
-					}),
-				);
+				expect(octokitMock.git.deleteRef).not.toHaveBeenCalled();
 			});
 
-			test("should use branch-tip blob sha from getContent when it differs from the tree file sha", async () => {
-				octokitMock.repos.getContent.mockResolvedValueOnce({
-					data: {
-						type: "file",
-						encoding: "base64",
-						content: Buffer.from("# On branch").toString("base64"),
-						sha: "branch-tip-sha-999",
-					},
-				});
-
-				const mockBranch = {
-					ref: "refs/heads/translate/reused",
-					node_id: "branch-node-id",
-					url: "https://api.github.com/repos/test/test/git/refs/heads/translate/reused",
-					object: { type: "commit", sha: "branch-sha", url: "" },
-				};
-
-				const mockFile = new TranslationFile(
-					"# Original",
-					"file.md",
-					"src/learn/react-v18.md",
-					"tree-discovery-sha",
-				);
-
+			test("builds the commit on the fork default tip with the translated file", async () => {
 				await githubService.commitTranslation({
-					branch: mockBranch,
-					file: mockFile,
-					content: "# Translated",
-					message: "translate: test",
+					branchName,
+					file,
+					content: "# Traduzido",
+					message: "docs: translate `react-v18.md`",
 				});
 
-				expect(octokitMock.repos.createOrUpdateFileContents).toHaveBeenCalledWith(
-					expect.objectContaining({
-						sha: "branch-tip-sha-999",
-					}),
-				);
+				expect(octokitMock.git.createTree).toHaveBeenCalledWith({
+					...testRepositories.fork,
+					base_tree: "base-tree-sha",
+					tree: [{ path: file.path, mode: "100644", type: "blob", content: "# Traduzido" }],
+				});
+				expect(octokitMock.git.createCommit).toHaveBeenCalledWith({
+					...testRepositories.fork,
+					message: "docs: translate `react-v18.md`",
+					tree: "translation-tree-sha",
+					parents: ["abc123def456"],
+				});
 			});
 
-			test("should omit sha when file is missing on the branch (getContent 404)", async () => {
+			test("creates the branch at the commit when it does not exist yet", async () => {
 				const notFoundError = createOctokitRequestErrorFixture({
 					message: "Not Found",
 					status: StatusCodes.NOT_FOUND,
-					options: { request: { method: "GET" }, response: { status: StatusCodes.NOT_FOUND } },
 				});
-				octokitMock.repos.getContent.mockRejectedValueOnce(notFoundError);
-
-				const mockBranch = {
-					ref: "refs/heads/translate/new-file",
-					node_id: "branch-node-id",
-					url: "https://api.github.com/repos/test/test/git/refs/heads/translate/new-file",
-					object: { type: "commit", sha: "branch-sha", url: "" },
-				};
-
-				const mockFile = new TranslationFile("# Original", "new.md", "src/new.md", "tree-sha");
-
-				await githubService.commitTranslation({
-					branch: mockBranch,
-					file: mockFile,
-					content: "# Translated",
-					message: "translate: add file",
+				octokitMock.git.getRef.mockImplementation((params?: { ref?: string }) =>
+					params?.ref === `heads/${branchName}` ?
+						Promise.reject(notFoundError)
+					:	Promise.resolve({ data: { object: { sha: "abc123def456" } } }),
+				);
+				octokitMock.git.createRef.mockResolvedValueOnce({
+					data: { ref: `refs/heads/${branchName}`, object: { sha: "translation-commit-sha" } },
 				});
 
-				expect(octokitMock.repos.createOrUpdateFileContents).toHaveBeenCalledWith({
+				const result = await githubService.commitTranslation({
+					branchName,
+					file,
+					content: "# Traduzido",
+					message: "docs: translate `react-v18.md`",
+				});
+
+				expect(result.ref).toBe(`refs/heads/${branchName}`);
+				expect(octokitMock.git.createRef).toHaveBeenCalledWith({
 					...testRepositories.fork,
-					path: mockFile.path,
-					message: "translate: add file",
-					content: Buffer.from("# Translated").toString("base64"),
-					branch: mockBranch.ref,
+					ref: `refs/heads/${branchName}`,
+					sha: "translation-commit-sha",
 				});
+				expect(octokitMock.git.updateRef).not.toHaveBeenCalled();
 			});
 
-			test("should throw RequestError when commit fails", () => {
+			test("leaves the branch untouched when creating the commit fails", async () => {
 				const commitError = createOctokitRequestErrorFixture({
 					message: "Commit failed",
-					status: StatusCodes.BAD_REQUEST,
-					options: { request: { method: "PUT" }, response: { status: StatusCodes.BAD_REQUEST } },
+					status: StatusCodes.UNPROCESSABLE_ENTITY,
 				});
-				octokitMock.repos.createOrUpdateFileContents.mockRejectedValueOnce(commitError);
+				octokitMock.git.createCommit.mockRejectedValueOnce(commitError);
 
-				const mockBranch = {
-					ref: "refs/heads/translate/test",
-					node_id: "branch-node-id",
-					url: "https://api.github.com/repos/test/test/git/refs/heads/translate/test",
-					object: { type: "commit", sha: "branch-sha", url: "" },
-				};
+				const attempt = githubService.commitTranslation({
+					branchName,
+					file,
+					content: "# Traduzido",
+					message: "docs: translate `react-v18.md`",
+				});
 
-				const mockFile = new TranslationFile("# Original", "file.md", "src/test/file.md", "abc123");
-
-				expect(
-					githubService.commitTranslation({
-						branch: mockBranch,
-						file: mockFile,
-						content: "# Translated",
-						message: "translate: test",
-					}),
-				).rejects.toThrow(commitError);
+				expect(attempt).rejects.toThrow(commitError);
+				await attempt.catch(() => undefined);
+				expect(octokitMock.git.updateRef).not.toHaveBeenCalled();
+				expect(octokitMock.git.createRef).not.toHaveBeenCalled();
+				expect(octokitMock.git.deleteRef).not.toHaveBeenCalled();
 			});
 
-			test("should propagate non-404 errors from getContent before commit", () => {
-				const rateLimitError = createOctokitRequestErrorFixture({
-					message: "API rate limit exceeded",
-					status: StatusCodes.TOO_MANY_REQUESTS,
-					options: {
-						request: { method: "GET" },
-						response: { status: StatusCodes.TOO_MANY_REQUESTS },
-					},
-				});
-				octokitMock.repos.getContent.mockRejectedValueOnce(rateLimitError);
-
-				const mockBranch = {
-					ref: "refs/heads/translate/test",
-					node_id: "branch-node-id",
-					url: "https://api.github.com/repos/test/test/git/refs/heads/translate/test",
-					object: { type: "commit", sha: "branch-sha", url: "" },
-				};
-
-				const mockFile = new TranslationFile("# Original", "file.md", "src/test/file.md", "abc123");
+			test("rejects a path outside the translatable tree before any Git write", () => {
+				const unsafeFile = new TranslationFile("# x", "passwd", "../etc/passwd", "sha");
 
 				expect(
 					githubService.commitTranslation({
-						branch: mockBranch,
-						file: mockFile,
-						content: "# Translated",
-						message: "translate: test",
+						branchName,
+						file: unsafeFile,
+						content: "# x",
+						message: "docs: translate",
 					}),
-				).rejects.toThrow(rateLimitError);
+				).rejects.toThrow("Unsafe translatable path rejected");
 			});
 		});
 

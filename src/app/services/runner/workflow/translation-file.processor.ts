@@ -11,7 +11,6 @@ import { PullRequestProgressAction } from "@/app/services/github/types";
 import { TranslationFile } from "@/app/services/translator/";
 import {
 	baseLogger,
-	getTranslationBranchNameFromPath,
 	isConfiguredForceRetranslatePath,
 	isTranslationEquivalentToCurrentBlob,
 } from "@/app/utils/";
@@ -37,7 +36,7 @@ export interface TranslationBatchProgressCallbacks {
 }
 
 /**
- * Per-file translation pipeline coordinator for branch, translate, commit, and pull request steps.
+ * Per-file translation pipeline coordinator for translate, commit, and pull request steps.
  */
 export class TranslationFileProcessor {
 	private readonly logger = baseLogger.child({ component: TranslationFileProcessor.name });
@@ -45,7 +44,7 @@ export class TranslationFileProcessor {
 
 	/**
 	 * @param services GitHub, translator, and locale dependencies
-	 * @param branchLifecycle Branch prepare and cleanup policy
+	 * @param branchLifecycle Branch commit and cleanup policy
 	 * @param pullRequestLifecycle Pull request open, reuse, and description policy
 	 */
 	constructor(
@@ -117,19 +116,6 @@ export class TranslationFileProcessor {
 				return skippedForValidTranslationPullRequest;
 			}
 
-			const branchStart = Date.now();
-			metadata.branch = await this.branchLifecycle.prepareTranslationBranch(
-				file,
-				pullRequestValidity,
-			);
-			file.logger.debug(
-				{
-					durationMs: Date.now() - branchStart,
-					pullRequestInvalidReason: pullRequestValidity.invalidReason ?? null,
-				},
-				"Step 1/5: Translation branch prepared",
-			);
-
 			const translationStart = Date.now();
 			const translationResult = await this.services.translator.translateContent(file);
 			metadata.translation = translationResult.content;
@@ -150,18 +136,13 @@ export class TranslationFileProcessor {
 					llmUsage: translationResult.llmUsage,
 					reviewerNotices: metadata.reviewerNotices,
 				},
-				"Step 2/5: Translation complete",
+				"Step 1/3: Translation complete",
 			);
 
 			if (isTranslationEquivalentToCurrentBlob(file, metadata.translation)) {
 				file.logger.warn(
 					{ path: file.path, contentLength: metadata.translation.length },
 					"Translation matches existing blob; skipping commit and pull request",
-				);
-
-				await this.branchLifecycle.deleteIdleTranslationBranchIfAtForkBase(
-					getTranslationBranchNameFromPath(file.path),
-					metadata.branch,
 				);
 
 				batchProgress.resetConsecutiveFailures();
@@ -180,13 +161,17 @@ export class TranslationFileProcessor {
 			);
 
 			const commitStart = Date.now();
-			await this.services.github.commitTranslation({
-				file,
-				branch: metadata.branch,
+			metadata.branch = await this.branchLifecycle.commitTranslation(file, pullRequestValidity, {
 				content: metadata.translation,
 				message: buildTranslationCommitMessage(file.filename, languageName),
 			});
-			file.logger.debug({ durationMs: Date.now() - commitStart }, "Step 3/5: Commit complete");
+			file.logger.debug(
+				{
+					durationMs: Date.now() - commitStart,
+					pullRequestInvalidReason: pullRequestValidity.invalidReason ?? null,
+				},
+				"Step 2/3: Translation committed",
+			);
 
 			const prStart = Date.now();
 			const pullRequestOutcome = await this.pullRequestLifecycle.openTranslationPullRequest(
@@ -202,7 +187,7 @@ export class TranslationFileProcessor {
 					pullRequestProgress: metadata.pullRequestProgress,
 					durationMs: Date.now() - prStart,
 				},
-				"Step 4/5: Pull request created/updated",
+				"Step 3/3: Pull request created/updated",
 			);
 
 			batchProgress.resetConsecutiveFailures();
