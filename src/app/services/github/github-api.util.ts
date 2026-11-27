@@ -74,22 +74,3 @@ export function decodeRepositoryFileContent(data: RepositoryContentData) {
 
 	return Buffer.from(data.content, "base64").toString();
 }
-
-/**
- * Returns the blob `sha` when `getContent` resolved to a single file.
- *
- * @param data `repos.getContent` response data
- *
- * @returns File blob `sha`, or `undefined` for directories and unexpected shapes
- */
-export function readRepositoryFileSha(data: RepositoryContentData) {
-	if (Array.isArray(data)) {
-		return undefined;
-	}
-
-	if ("sha" in data) {
-		return data.sha;
-	}
-
-	return undefined;
-}

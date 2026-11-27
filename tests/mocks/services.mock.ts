@@ -96,24 +96,10 @@ export function createMockGitHubService() {
 		fetchTranslationGuidelinesFile: mock(
 			() => Promise.resolve("React - React\ncomponent - componente") as Promise<string | null>,
 		),
-		createBranch: mock(() =>
-			Promise.resolve({
-				data: {
-					ref: "refs/heads/translate/test",
-					object: { sha: "abc123" },
-				},
-			}),
-		),
 		getBranch: mock((_branchName: string): Promise<MockGitHubGetBranchResponse | undefined> =>
 			Promise.resolve(createGitBranchRefResponse({ sha: "abc123" })),
 		),
 		deleteBranch: mock(() => Promise.resolve({ data: {}, status: 204 })),
-		refreshTranslationBranchPreservePr: mock(() =>
-			Promise.resolve({
-				ref: "refs/heads/translate/test",
-				object: { sha: "refreshed-sha" },
-			}),
-		),
 		createCommentOnPullRequest: mock(() =>
 			Promise.resolve({ data: { id: 1, body: "Mock comment" } }),
 		),
@@ -121,7 +107,8 @@ export function createMockGitHubService() {
 		getPullRequestFiles: mock(() => Promise.resolve(["src/test/file.md"])),
 		commitTranslation: mock(() =>
 			Promise.resolve({
-				data: { content: { sha: "new-sha" }, commit: { sha: "commit-sha" } },
+				ref: "refs/heads/translate/test",
+				object: { sha: "commit-sha" },
 			}),
 		),
 		createPullRequest: mock(() =>

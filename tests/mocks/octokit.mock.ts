@@ -22,6 +22,26 @@ export function createGitMocks() {
 				RestEndpointMethodTypes["git"]["deleteRef"]["response"]
 			>),
 		),
+		updateRef: mock(() =>
+			Promise.resolve({
+				data: { ref: "refs/heads/test-branch", object: { sha: "translation-commit-sha" } },
+			} as PartialDeep<RestEndpointMethodTypes["git"]["updateRef"]["response"]>),
+		),
+		getCommit: mock(() =>
+			Promise.resolve({
+				data: { sha: "abc123def456", tree: { sha: "base-tree-sha" } },
+			} as PartialDeep<RestEndpointMethodTypes["git"]["getCommit"]["response"]>),
+		),
+		createTree: mock(() =>
+			Promise.resolve({ data: { sha: "translation-tree-sha" } } as PartialDeep<
+				RestEndpointMethodTypes["git"]["createTree"]["response"]
+			>),
+		),
+		createCommit: mock(() =>
+			Promise.resolve({ data: { sha: "translation-commit-sha" } } as PartialDeep<
+				RestEndpointMethodTypes["git"]["createCommit"]["response"]
+			>),
+		),
 		getTree: mock(() =>
 			Promise.resolve({
 				data: {
